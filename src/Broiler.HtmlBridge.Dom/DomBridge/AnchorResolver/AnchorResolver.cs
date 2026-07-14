@@ -16,6 +16,18 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     /// <summary>
+    /// Native anchor-placement mode (HtmlBridge complexity-reduction roadmap Phase 5
+    /// item 3, P5.8d). Default off. When on, the bridge stops pre-baking
+    /// <c>position-area</c> into inline pixel styles and leaves the
+    /// <c>position-area</c>/<c>anchor-name</c>/<c>position-anchor</c> CSS intact, so the
+    /// Broiler.Layout engine's anchor-placement post-pass (gated by
+    /// <c>Broiler.Layout.Engine.NativeAnchorPlacement.Enabled</c>) can place the boxes
+    /// natively during the final render. Internal: driven by the WPT runner lever and
+    /// tests; off in production until the cutover is complete.
+    /// </summary>
+    internal bool NativeAnchorPlacement { get; set; }
+
+    /// <summary>
     /// Resolves <c>anchor()</c> function values and inserts <c>::backdrop</c>
     /// placeholder elements for modal dialogs.  Must be called after script
     /// execution and before serialization.
@@ -56,9 +68,12 @@ public sealed partial class DomBridge
         //    so IsAnchorVisibleForTarget is not affected by the new CB.
         var scrollContainersNeedingRelative = new HashSet<DomElement>();
         var deferredDomMoves = new List<(DomElement element, DomElement oldParent, DomElement newParent)>();
-        ResolvePositionAreaValues(
-            DocumentElement, anchorRegistry, scrollContainersNeedingRelative,
-            deferredDomMoves);
+        // Native mode (P5.8d): skip position-area pre-baking so the value survives to
+        // the render and the Broiler.Layout engine places the box natively.
+        if (!NativeAnchorPlacement)
+            ResolvePositionAreaValues(
+                DocumentElement, anchorRegistry, scrollContainersNeedingRelative,
+                deferredDomMoves);
 
         // 3a2. Resolve align-self/justify-self: anchor-center on elements
         //      that have position-anchor but no position-area.
@@ -117,8 +132,10 @@ public sealed partial class DomBridge
 
         // 7. Strip CSS rules with unsupported properties (anchor(), inset,
         //    anchor-name) from the stylesheet so the renderer doesn't
-        //    misinterpret them.
-        NeutralizeStyleElementsForAnchorRules(DocumentElement);
+        //    misinterpret them. Native mode (P5.8d) keeps position-area/anchor-name/
+        //    position-anchor so the engine's post-pass can consume them.
+        if (!NativeAnchorPlacement)
+            NeutralizeStyleElementsForAnchorRules(DocumentElement);
 
         // 7a. Persist active visual-viewport pinch-zoom state into the DOM so
         //     the static renderer can reproduce zoomed fixed-position pages.

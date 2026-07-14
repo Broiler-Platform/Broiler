@@ -71,24 +71,4 @@ public sealed partial class DomBridge
         foreach (var child in SnapshotChildren(element))
             ResolveAnchorCenter(child, anchorRegistry);
     }
-    /// <summary>
-    /// Computes the offset within a position-area cell based on alignment.
-    /// For "start" cells (top/left), the element is aligned to the end
-    /// (nearest to the anchor). For "end" cells (bottom/right), aligned
-    /// to the start. For "center" cells, centered.
-    /// </summary>
-    private static double ComputeAlignmentOffset(AxisSelection sel, double cellSize, double elementSize, bool isInlineAxis)
-    {
-        double slack = cellSize - elementSize;
-        if (slack <= 0) return 0;
-
-        return sel switch
-        {
-            AxisSelection.Start => slack,// "top" or "left" cell: align towards the anchor (end of cell).
-            AxisSelection.End => 0,// "bottom" or "right" cell: align towards the anchor (start of cell).
-            AxisSelection.Center => slack / 2,// "center" cell: center the element.
-            AxisSelection.SpanStart or AxisSelection.SpanEnd or AxisSelection.SpanAll => 0,// Spanning cells: align to start by default.
-            _ => 0,
-        };
-    }
 }

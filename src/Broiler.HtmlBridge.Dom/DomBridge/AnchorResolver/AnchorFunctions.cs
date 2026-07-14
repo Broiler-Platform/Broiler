@@ -1,6 +1,7 @@
 using System.Globalization;
-using System.Text.RegularExpressions;
+using Broiler.CSS;
 using Broiler.Dom;
+using Broiler.Layout;
 
 namespace Broiler.HtmlBridge;
 
@@ -10,8 +11,10 @@ public sealed partial class DomBridge
     // anchor() resolution
     // -----------------------------------------------------------------
 
-    private static readonly Regex AnchorFunctionPattern = AnchorFunctionPatternRegex();
-    private static readonly Regex AnchorSizeFunctionPattern = AnchorSizeFunctionPatternRegex();
+    // The anchor()/anchor-size() grammar (token matching + typed extraction) is the
+    // canonical Broiler.CSS.AnchorFunction model (Phase 5 item 4). These callbacks
+    // keep only the used-value geometry; AnchorFunction.Rewrite/RewriteSize supply
+    // the parsed AnchorFunctionRef/AnchorSizeFunctionRef.
     private void ResolveAnchorFunctions(DomElement element, Dictionary<string, AnchorInfo> anchorRegistry)
     {
         var cssProps = CollectMatchedRuleProperties(element);
@@ -62,15 +65,12 @@ public sealed partial class DomBridge
             foreach (var kv in cssProps)
             {
                 var propName = kv.Key.ToLowerInvariant();
-                var resolved = AnchorFunctionPattern.Replace(kv.Value, m =>
+                var resolved = AnchorFunction.Rewrite(kv.Value, r =>
                 {
-                    var anchorName = m.Groups["name"].Value;
-                    if (string.IsNullOrEmpty(anchorName))
-                        anchorName = implicitAnchor ?? string.Empty;
-                    var edge = m.Groups["edge"].Value.ToLowerInvariant();
-                    var fallback = m.Groups["fallback"].Success
-                        ? m.Groups["fallback"].Value.Trim()
-                        : null;
+                    var anchorName = string.IsNullOrEmpty(r.Name)
+                        ? (implicitAnchor ?? string.Empty)
+                        : r.Name!;
+                    var fallback = r.Fallback;
 
                     if (!anchorRegistry.TryGetValue(anchorName, out var anchor) ||
                         !IsAnchorAccessible(anchor.SourceElement, element))
@@ -106,24 +106,12 @@ public sealed partial class DomBridge
                     double adjY = anchorIsFixed ? 0 : scrollAdjY + nestedY;
                     double adjX = anchorIsFixed ? 0 : scrollAdjX + nestedX;
 
-                    double rawValue = edge switch
-                    {
-                        "top" => anchor.Top - adjY,
-                        "right" => anchor.Right - adjX,
-                        "bottom" => anchor.Bottom - adjY,
-                        "left" => anchor.Left - adjX,
-                        "center" => (anchor.Top + anchor.Bottom) / 2 - adjY,
-                        _ => 0,
-                    };
-
-                    // For right/bottom inset properties, anchor() returns
-                    // the distance from the CB's opposite edge.
-                    double value = propName switch
-                    {
-                        "right" => cbW - rawValue,
-                        "bottom" => cbH - rawValue,
-                        _ => rawValue,
-                    };
+                    // Edge coordinate math (anchor edge − scroll adjustment, plus the
+                    // right/bottom opposite-edge flip) is the canonical
+                    // Broiler.Layout.AnchorGeometry model (Phase 5 item 3).
+                    double value = AnchorGeometry.ResolveEdge(
+                        anchor.Left, anchor.Top, anchor.Right, anchor.Bottom,
+                        r.Side, adjX, adjY, MapAnchorInsetProperty(propName), cbW, cbH);
 
                     return $"{value.ToString(CultureInfo.InvariantCulture)}px";
                 });
@@ -243,6 +231,20 @@ public sealed partial class DomBridge
             or "width" or "height" => true,
         _ => false,
     };
+
+    /// <summary>
+    /// Maps the CSS inset property an <c>anchor()</c> resolves into to the
+    /// <see cref="AnchorInsetProperty"/> the Layout edge resolver flips against
+    /// (only right/bottom differ; everything else uses the raw edge).
+    /// </summary>
+    private static AnchorInsetProperty MapAnchorInsetProperty(string property) => property switch
+    {
+        "right" => AnchorInsetProperty.Right,
+        "bottom" => AnchorInsetProperty.Bottom,
+        "left" => AnchorInsetProperty.Left,
+        "top" => AnchorInsetProperty.Top,
+        _ => AnchorInsetProperty.Other,
+    };
     /// <summary>
     /// Resolves <c>anchor-size()</c> function calls in CSS properties and inline
     /// styles, replacing them with computed pixel values from the anchor element's
@@ -259,22 +261,16 @@ public sealed partial class DomBridge
 
         string ResolveValue(string value)
         {
-            return AnchorSizeFunctionPattern.Replace(value, m =>
+            return AnchorFunction.RewriteSize(value, r =>
             {
-                var anchorName = m.Groups["name"].Value;
-                if (string.IsNullOrEmpty(anchorName))
-                    anchorName = implicitAnchor ?? string.Empty;
-                var dim = m.Groups["dim"].Value.ToLowerInvariant();
+                var anchorName = string.IsNullOrEmpty(r.Name)
+                    ? (implicitAnchor ?? string.Empty)
+                    : r.Name!;
 
                 if (!anchorRegistry.TryGetValue(anchorName, out var anchor))
                     return "0px";
 
-                double result = dim switch
-                {
-                    "width" or "inline" or "self-inline" => anchor.Width,
-                    "height" or "block" or "self-block" => anchor.Height,
-                    _ => 0,
-                };
+                double result = AnchorGeometry.ResolveSize(r.Dimension, anchor.Width, anchor.Height);
 
                 return $"{result.ToString(CultureInfo.InvariantCulture)}px";
             });
@@ -300,8 +296,4 @@ public sealed partial class DomBridge
         }
     }
 
-    [GeneratedRegex(@"anchor\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<edge>top|right|bottom|left|start|end|center)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex AnchorFunctionPatternRegex();
-    [GeneratedRegex(@"anchor-size\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<dim>width|height|block|inline|self-block|self-inline)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex AnchorSizeFunctionPatternRegex();
 }

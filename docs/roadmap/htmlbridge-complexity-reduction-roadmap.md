@@ -1451,6 +1451,291 @@ Exit criteria:
 
 ### Phase 5 - move used-value behavior into Layout
 
+Status: **P5.1 completed** 2026-07-14 (branch `htmlbridge-phase5-position-area-value`; Broiler.CSS
+submodule branch of the same name) — **work item 4, first slice: promote the `position-area` keyword
+grammar to a canonical `Broiler.CSS` typed value model.** This is the anchor track's mandated first
+step ("move neutral anchor/keyframe/timing syntax models to Broiler.CSS *first*; Layout consumes those
+models"): before Layout can natively place anchor-positioned boxes — the eventual deletion of the
+bridge's 138-site inline-style-dict-rewriting `AnchorResolver`, which unblocks Phase 4 item 2 — it needs
+the typed syntax models to consume.
+
+A new `Broiler.CSS.PositionAreaValue` (a `readonly record struct` of a block- and inline-axis
+`PositionAreaSpan { Start, Center, End, SpanStart, SpanEnd, SpanAll }`) with a total `Parse(string)`
+absorbs the bridge's former `ParsePositionArea` / `MapKeyword` / `ClassifyKeyword` / `AxisSelection`
+(all deleted from `AnchorResolver/PositionArea.cs`). It is **pure syntax** — the keyword→axis-selection
+classification and the two-keyword disambiguation only, carrying no geometry, DOM, or containing-block
+knowledge; the used-value computation (grid rectangle, insets, alignment) stays in the resolver's
+`ComputePositionAreaRect`/`ComputeAlignmentOffset`, which now switch on the canonical `PositionAreaSpan`.
+The port is verbatim (an ambiguous-first + explicit-inline-second quirk — e.g. `center left` lands the
+ambiguous value on the *block* axis, unlike `center bottom` — is preserved deliberately). The bridge
+keeps a thin `ParsePositionArea` out-parameter adapter that delegates to `PositionAreaValue.Parse`.
+
+Behaviour-preserving; no public-API change in the bridge (the deleted members were `private`). Tests:
+`Broiler.CSS.Tests/PositionAreaValueTests.cs` (35 cases pinning single-keyword axis assignment,
+ambiguous-both-axes, two-keyword disambiguation incl. the preserved quirk, 3+ token truncation, and
+empty/unknown → `SpanAll`). Regression check vs baseline: the `Broiler.Wpt.Tests` anchor/position
+suites reproduce an **identical isolated pass/fail set** with the change stashed — all 10 `position-*`
+pixel tests that fail (the heterogeneous css-anchor-position "anchor tail": `PositionAreaInlineContainer`,
+`PositionAreaAbsInlineContainer`, `PositionAreaScrolling002`/`003`, `PositionAreaAnchorPartiallyOutside`,
+`PositionVisibilityRemoveAnchorsVisible`, `PositionTryGrid001`, `Clip{Content,Padding}BoxWithPosition`)
+fail identically before and after; `PositionTry002_CommentedFallbackBody` passes in isolation both ways
+(its occasional failure in the full parallel run is a pre-existing parallel-race flake, reproduced with
+the change stashed). Zero regressions.
+
+Status: **P5.2 completed** 2026-07-14 (same branch) — **work item 4, second slice: promote the
+`anchor()` / `anchor-size()` query-function grammar to canonical `Broiler.CSS`.** A new
+`Broiler.CSS.AnchorFunction` static model owns the token grammar (the two `GeneratedRegex` patterns,
+deleted from the bridge) and typed extraction into `AnchorFunctionRef(Name?, AnchorSide, Fallback?)` /
+`AnchorSizeFunctionRef(Name?, AnchorSizeDimension)` (with `enum AnchorSide {Top,Right,Bottom,Left,Start,
+End,Center}` and `enum AnchorSizeDimension {Width,Height,Block,Inline,SelfBlock,SelfInline}`). Because
+these functions appear *embedded* inside larger declaration values (`left: anchor(--a right)`), the
+grammar is exposed as `Rewrite(value, resolve)` / `RewriteSize(value, resolve)` (locate each reference,
+hand the parsed typed ref to a caller-supplied resolver, splice the returned string) plus
+`TryGetFirst(value, out ref)` — so the **geometry stays in the bridge callbacks** (edge coordinates,
+containing-block math, fixed/scroll adjustment), which now switch on `AnchorSide`/`AnchorSizeDimension`
+instead of raw regex-group strings. The three bridge consumers delegate: `AnchorFunctions.cs`
+(`ResolveAnchorFunctions` + `ResolveAnchorSizeFunctions`), `PositionTry.cs` (four inset `Rewrite` sites;
+`ResolveAnchorEdge` now takes an `AnchorFunctionRef`), and `Visibility.cs` (`anchors-valid` first-ref
+check via `TryGetFirst`). Name-optionality and comma-fallback (trimmed) semantics are preserved
+verbatim; the bridge's cheap `Contains("anchor(")` pre-filters are unchanged.
+
+Behaviour-preserving; no public-API change in the bridge (deleted members were `private`). Tests:
+`Broiler.CSS.Tests/AnchorFunctionTests.cs` (30 cases: name/side/fallback extraction, embedded + multi
+rewrite, anchor()/anchor-size() disjointness, dimension mapping, `TryGetFirst`). Regression check vs
+baseline: the anchor/position-try characterization suites (`AnchorScrollTracking`, `AnchorNameScope`,
+`AnchorInlineContainingBlock`, `PositionTryFallback`) pass; the 10 `position-*` pixel tests reproduce an
+**identical isolated pass/fail set** to baseline (9 anchor-tail fails + `PositionTry002` pass), and the
+full `~Anchor` filter shows only the 2 standing pre-existing fails. Zero regressions.
+
+Status: **P5.3 completed** 2026-07-14 (same branch) — **work item 4, third slice: promote the
+`@position-try` at-rule and the fallback-list grammar to canonical `Broiler.CSS`.** A new
+`Broiler.CSS.PositionTryRule` static model owns the CSS-text parsing (the two `GeneratedRegex` patterns
+— the `@position-try --name { … }` rule matcher and the comment stripper — deleted from the bridge):
+`Parse(cssText)` → a `name → declarations` map (comments stripped first, declaration names
+case-insensitive, rule names case-sensitive, last-wins on duplicates), and `ParseFallbackList(value)`
+splits the comma-separated `position-try-fallbacks` list (trimmed, empties preserved). The **entangled
+part stays in the bridge**: `PositionTry.cs`'s `CollectPositionTryRulesFromTree` still walks the DOM to
+find `<style>` elements and read their source via `GetStyleElementSourceText`, then merges each style's
+`PositionTryRule.Parse(raw)` output into the document-wide accumulator (document order, last-wins);
+`TryApplyFallback` calls `PositionTryRule.ParseFallbackList`. This is the resolver's original
+regex-based grammar ported verbatim (the CSS rule serializer does not round-trip `@position-try`, so the
+canonical model deliberately does not route through the full `CssParser`).
+
+Behaviour-preserving; no public-API change in the bridge (deleted members were `private`). Tests:
+`Broiler.CSS.Tests/PositionTryRuleTests.cs` (14 cases: single/multiple rules, comment stripping before
+declaration parse — the `PositionTry002` path, case sensitivity of rule vs. declaration names,
+duplicate last-wins, blank/colonless-declaration skipping, and the fallback-list split). Regression
+check vs baseline: the position-try characterization suites pass — notably
+`PositionTry002_CommentedFallbackBody` (the exact commented-`@position-try`-body path this slice moved)
+passes in isolation — and the full `~Position` filter reproduces the identical 9-test pre-existing
+anchor-tail pixel-fail set. Zero regressions.
+
+Status: **P5.4 completed** 2026-07-14 (same branch) — **work item 3, first slice: move `position-area`
+placement geometry into `Broiler.Layout`.** A new `Broiler.Layout.PositionAreaGrid` static model (with a
+`PositionAreaCell(Left,Top,Width,Height)` result) owns the pure used-value geometry, consuming the
+item-4 `Broiler.CSS.PositionAreaValue`: `ComputeCell(cbFrame, anchorEdges, area)` computes the 3×3 grid
+(edges from the CB∪anchor union, cell selection per block/inline span), and `ComputeAlignmentOffset(span,
+cellSize, elementSize)` aligns the element within the chosen cell. Both are verbatim ports of the
+bridge's `ComputePositionAreaRect` grid math and `ComputeAlignmentOffset` (the latter's dead
+`isInlineAxis` parameter dropped). This is the **first anchor-placement geometry to live in Layout** —
+the roadmap's "Layout consumes those models and applies them to boxes" — and it keeps double precision
+(the bridge's anchor math is `double`, not the renderer's `float` `BoxGeometry`).
+
+The bridge stays the orchestrator: `AnchorResolver/PositionArea.cs` `ComputePositionAreaRect` still does
+the **DOM-dependent** resolution (containing-block dimensions and origin, anchor-to-CB coordinate
+mapping, scroll-container handling) and then delegates the neutral grid math to
+`PositionAreaGrid.ComputeCell`; the two alignment call sites call `PositionAreaGrid.ComputeAlignmentOffset`;
+the bridge's `ComputeAlignmentOffset` (`AnchorCenter.cs`) is deleted. The inline-style-dict writes,
+anchor registry, and the DOM-rewriting pass all remain bridge-side — this slice moves *geometry*, not
+the placement pipeline, so it is behaviour-preserving. (`Broiler.Layout` already references `Broiler.CSS`
+and is a parent-repo project, so no new dependency edge and no submodule push.)
+
+Behaviour-preserving; no public-API change in the bridge (deleted members were `private`). Tests:
+`Broiler.Layout.Tests/PositionAreaGridTests.cs` (16 cases: all block×inline cell selections on a fixed
+CB/anchor frame, grid extension when the anchor lies outside the CB, and the alignment-offset table).
+Regression check vs baseline: the Layout and HtmlBridge architecture-guard suites pass (the new
+Layout→CSS geometry consumption is within the dependency rules); the full `~Position` filter reproduces
+the identical 9-test pre-existing anchor-tail pixel-fail set and `~Anchor` the identical 2, i.e. every
+previously-passing position-area test still passes pixel-identically. Zero regressions.
+
+Status: **P5.5 completed** 2026-07-14 (same branch) — **work item 3, second slice: move the within-cell
+element-box geometry into `Broiler.Layout`.** `PositionAreaGrid` gains `ResolveElementBox` (returning a
+`PositionAreaBox` of IMCB + used size + aligned position): it applies the already-length-resolved insets
+to form the inset-modified containing block, resolves the used width/height (percentages against the
+cell, an explicit positive length clamped to the cell, otherwise fill the IMCB), and aligns the element
+within the cell — the geometry formerly inlined in `ResolvePositionAreaValues` (the IMCB block, the
+width/height resolution, and the alignment/final-position computation). It is a verbatim port taking
+parsed numeric inputs, so the bridge keeps the CSS parsing (insets/margins/padding/size strings) above
+and the downstream `hasPercentBoxProps` and `box-sizing:border-box` branches and inline-dict writes
+below. `ComputePositionAreaRect` now returns the canonical `PositionAreaCell?` directly (the redundant
+bridge `PositionAreaRect` wrapper introduced in P5.4 is deleted), and the last `ParsePositionArea`
+delegator — now callerless — is removed (call sites use `PositionAreaValue.Parse`).
+
+Behaviour-preserving; no public-API change in the bridge (deleted members were `private`). Tests:
+`Broiler.Layout.Tests/PositionAreaGridTests.cs` grows to 24 cases (+8: no-inset fill, inset-shrunk IMCB,
+over-large-inset clamp, explicit-width clamp+align, percent size, centre alignment, percent-over-explicit
+precedence). Regression check vs baseline: the full `~Position` filter reproduces the identical 9-test
+pre-existing anchor-tail fail *set* (not just count) and `~Anchor` the identical 2 — no previously-passing
+position-area test regressed — and the exact-geometry characterization suites (`AnchorScrollTracking`,
+`AnchorNameScope`, `AnchorInlineContainingBlock`, `AbsposAutoSizeContent`, `PositionTryFallback`) pass.
+Zero regressions.
+
+Status: **P5.6 completed** 2026-07-14 (same branch) — **work item 3, third slice: move the residual
+position-area content-size math into `Broiler.Layout`.** `PositionAreaGrid` gains two content-box
+helpers (over a new `PositionAreaEdges(Top,Right,Bottom,Left)` band type): `ContentSizeFillingImcb`
+(IMCB minus margin+border+padding per axis, clamped ≥0 — the `hasPercentBoxProps` stretch path) and
+`BorderBoxToContentSize` (border-box minus border+padding per axis, clamped ≥0 — the
+`box-sizing:border-box` path). The bridge's two branches in `ResolvePositionAreaValues` delegate the
+arithmetic while keeping the CSS parsing (border shorthand fallback, `ResolveBorderWidth`) and the
+inline-dict writes (resolved margins/padding, explicit border widths). This drains the last pure box
+geometry out of the percentage-box and box-sizing branches.
+
+Behaviour-preserving; no public-API change in the bridge. Tests: `Broiler.Layout.Tests/
+PositionAreaGridTests.cs` grows to 29 cases (+5: margin/border/padding subtraction, asymmetric edges,
+zero-clamp for both helpers). Regression check vs baseline: the full `~Position` filter reproduces the
+identical 9-test pre-existing anchor-tail fail set and the exact-geometry characterization suites pass.
+Zero regressions.
+
+Status: **P5.7 completed** 2026-07-14 (same branch) — **work item 3, fourth slice: move the
+`anchor()`/`anchor-size()` edge-coordinate resolution and the `@position-try` overflow/fit predicates
+into `Broiler.Layout`.** A new `Broiler.Layout.AnchorGeometry` static model (with an
+`AnchorInsetProperty` enum for the right/bottom opposite-edge flip) owns: `ResolveEdge` (anchor edge −
+scroll adjustment — x for inline edges, y for block edges and the vertical-centre quirk — then the
+right/bottom flip against the containing block), `ResolveSize` (`anchor-size()` dimension → anchor
+width/height), and the position-try `Overflows` / `Fits` predicates. It consumes the `Broiler.CSS`
+`AnchorSide`/`AnchorSizeDimension` models and holds no DOM/registry/scroll-resolution knowledge. This
+**unifies the two copies** of the edge math that lived in the bridge's `ResolveAnchorFunctions`
+(`AnchorFunctions.cs`, with scroll adjustment) and `ResolveAnchorEdge` (`PositionTry.cs`, scroll adj 0),
+and moves the overflow/fit checks in `TryApplyFallback`. The bridge keeps the DOM-dependent inputs
+(anchor registry, CB dimensions, intervening-scroll offset) and the inline-dict writes, mapping its CSS
+property string to `AnchorInsetProperty` via a small `MapAnchorInsetProperty` helper.
+
+Behaviour-preserving; no public-API change in the bridge. Tests: `Broiler.Layout.Tests/
+AnchorGeometryTests.cs` (26 cases: raw edges, right/bottom flip, scroll-adjustment axis split, the
+scroll-before-flip order, size mapping, and the overflow/fit truth tables). Regression check vs
+baseline: the exact-geometry characterization suites pass — notably `AnchorScrollTracking` (3/3, the
+scroll-adjusted edge path) and `PositionTryFallback` — and the full `~Position` filter reproduces the
+identical 9-test pre-existing anchor-tail fail set (the intermittent `PositionTry002` in a parallel run
+is the known flake; it passes 3/3 in isolation with the change). Zero regressions.
+
+With P5.4–P5.7, **all position-area, `anchor()`/`anchor-size()`, and position-try used-value geometry now
+lives in `Broiler.Layout`** (`PositionAreaGrid` + `AnchorGeometry`).
+
+Status: **P5.8a completed** 2026-07-14 (same branch) — **work item 3 groundwork: the engine-facing
+named-anchor placement facade.** A layout-engine map (see below) confirmed the engine has *no*
+anchor-name→box index and reads CSS as plain string fields, and that native placement must be a **root
+post-pass** (single-pass source-order layout can't see an anchor laid out later in the tree; precedent:
+`LayoutNestedBrowsingContexts`, `CssBox.cs:383`). The missing piece — the registry abstraction — is now a
+pure, additive `Broiler.Layout.AnchorRegistry` (+ an `AnchorRect(Left,Top,Width,Height)` value): it maps
+`anchor-name → border-box rect` (ordinal, last-wins) and composes the P5.4–P5.7 primitives into three
+placement queries — `ResolvePositionAreaCell` (→ `PositionAreaGrid.ComputeCell`), `ResolveAnchorEdge`
+(→ `AnchorGeometry.ResolveEdge`), `ResolveAnchorSize` (→ `AnchorGeometry.ResolveSize`) — each returning
+`null` for an unregistered anchor. It holds no DOM/cascade/box tree; a caller registers the anchors it has
+laid out and queries. **Not yet wired into the live layout pass or the bridge** (so zero behavioural
+change): `Broiler.Layout.Tests/AnchorRegistryTests.cs` (7 cases) plus the full Layout suite (102) and the
+bridge build are green.
+
+**Remaining Phase 5 anchor-track work — a coordinated re-architecture, not a behaviour-preserving
+extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding corrections from the
+2026-07-14 pipeline investigation:
+
+- **P5.8b is NOT a submodule change.** The switch that maps cascaded CSS strings onto box fields —
+  `CssUtils.SetPropertyValue` (`Broiler.Layout/Engine/CssUtils.cs:149`) — is in Broiler.Layout
+  (parent-repo), and `anchor-name`/`position-area`/`position-anchor`/`position-try` **already flow
+  through the cascade** (`CssStyleEngine.GetCascadedStyle` emits them via
+  `SharedRendererCascade.ProjectCascadedStyle`, `Broiler.HTML …/SharedRendererCascade.cs:99–109`); they
+  reach the switch and fall off the end because it has no `case` and no `default`. Surfacing them needs
+  only Broiler.Layout edits. (A Broiler.CSS `CssComputedDefaults` initial-value entry is needed *only* if
+  we later want them in `getComputedStyle` output — not for layout.)
+- **The engine registry is simpler than the bridge's.** The box tree already carries document-absolute
+  geometry, so an anchor's rect is a direct border-box read — eliminating both the bridge's
+  `ComputeElementBox` estimator (~150 lines, `AnchorRegistry.cs:77–226`, which exists only because the
+  bridge has no real geometry) and the frame-reconciliation gymnastics in `ComputePositionAreaRect`
+  (`PositionArea.cs:439–492`). Store document-absolute rects; convert to the target's CB frame once.
+
+- **P5.8b — surface anchor properties on the box — COMPLETED** 2026-07-14 (same branch, Broiler.Layout
+  only, additive). Added `AnchorName="none"` / `PositionAnchor="auto"` / `PositionArea="none"` /
+  `PositionTry="normal"` string fields to `CssBoxProperties.cs` (after `Position`, :639) and `case` arms
+  to both `CssUtils.SetPropertyValue` (the cascade→box projection) and `CssUtils.GetPropertyValue` (the
+  pseudo/`inherit` round-trip). Nothing reads them yet → no behaviour change (and the bridge still strips
+  `position-area` before render, so they stay at defaults on the live render path). Tests:
+  `Broiler.Layout.Tests/AnchorPropertyProjectionTests.cs` (6: initial values + set/round-trip per
+  property). Full Layout.Tests (108, incl. arch guard) and the WPT `~Position` filter (identical 9-test
+  anchor-tail set) are green. Zero regressions.
+- **P5.8c — engine registry + placement post-pass — COMPLETED** 2026-07-14 (same branch, Broiler.Layout
+  only, additive, behind a default-OFF flag). New `Engine/NativeAnchorPlacement.cs` (a `[ThreadStatic]
+  bool Enabled` flag) + `Engine/CssBox.Anchor.cs` (a `partial class CssBox`). `RunNativeAnchorPlacement`
+  is a root post-pass hooked into `PerformLayout` at `ParentBox == null` **after**
+  `LayoutNestedBrowsingContexts`, **before** the (post-`PerformLayout`) fragment build, and only when the
+  flag is on. It (1) `BuildAnchorRegistry` walks the box tree → `AnchorRegistry` (P5.8a) of
+  `AnchorName → AnchorRect(box.Bounds)` (document-absolute border box, last-wins); (2) for each box with
+  `PositionArea != "none"` + an explicit `PositionAnchor`, `TryResolvePositionAreaTarget` resolves the CB
+  via `FindPositionedContainingBlock` + `GetAbsoluteContainingBlockPaddingBox` (document coords), looks up
+  the anchor rect, computes the cell via `AnchorRegistry.ResolvePositionAreaCell` and the within-cell box
+  via `PositionAreaGrid.ResolveElementBox`, and **repositions** the box with `OffsetLeft`/`OffsetTop`.
+  **MVP = reposition-only** (definite-size boxes; the box's already-laid-out border-box size is kept and
+  used as the alignment size). `ResolveInset` resolves px/percent insets against the cell (percent via
+  `CssLength`, which stores a fraction — `basis * Number`, not `/100`). Flag off → the engine ignores
+  anchor properties and the bridge still pre-bakes → no behaviour change. Tests:
+  `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` (8: registry build incl. nesting, inset px/%/auto,
+  an end-to-end reposition of a `bottom right` box against a registered anchor to the grid-derived
+  `(60,60)`, and the not-registered-anchor no-op). Full Layout.Tests (116, incl. arch guard) and the WPT
+  `~Position` filter (the 9 deterministic anchor-tail fails; the flaky `PositionTry002` passes in
+  isolation) are green. Zero regressions.
+- **P5.8d.1 — cutover validation (real pipeline) — COMPLETED** 2026-07-14 (same branch, test-only, zero
+  production change). Proved the native path works end-to-end through the **real** parse → cascade →
+  layout pipeline (not synthetic `CssBox` trees): `Broiler.Cli.Tests/NativeAnchorPlacementPipelineTests.cs`
+  renders a `position-area: bottom right` fixture via `DomBridge.Attach` → `GetRenderDocument` →
+  `HtmlContainer.GetLayoutGeometry` (which does **not** neutralize `position-area`), with the engine flag
+  on, and asserts the box is placed at the grid-derived `(60,60)` — confirming P5.8b projection + P5.8c
+  placement agree with the bridge's `PositionAreaGrid` math on real HTML; a flag-off control pins that the
+  placement is the post-pass's doing. (Cli.Tests has IVT to set the flag.) The 5 shared-geometry
+  collection tests pass together (flag isolation OK). **Flag-plumbing finding for the production flip:**
+  `NativeAnchorPlacement.Enabled` is `internal` in Broiler.Layout, whose IVT list grants
+  `Broiler.HTML(.Dom/.Orchestration)`, `Broiler.Cli.Tests`, `Broiler.DevConsole(.Tests)`,
+  `Broiler.Layout.Tests` — **not** `Broiler.HtmlBridge.Dom` or `Broiler.Wpt`. The final WPT render is a
+  fresh parse via `HtmlRender.RenderToImageCore` (Broiler.HTML submodule) → `CssBox.PerformLayout`, so
+  enabling the flag for the production render needs either an IVT for the bridge/Wpt, a small **public**
+  seam on Broiler.Layout, or setting it inside Broiler.HTML (submodule). Decide this before P5.8d.2.
+- **P5.8d.2a — bridge native-anchor mode — COMPLETED** 2026-07-14 (same branch, bridge only, additive,
+  default-off). Added an internal `DomBridge.NativeAnchorPlacement` flag (default off; the bridge's IVT
+  already covers `Broiler.Cli.Tests` and the `Broiler.Wpt` runner, so no public-API/snapshot churn). When
+  on, `ResolveAnchorPositions` **skips** `ResolvePositionAreaValues` (no pre-baking) and **skips**
+  `NeutralizeStyleElementsForAnchorRules` (keeps `position-area`/`anchor-name`/`position-anchor`), so the
+  properties survive serialization → cascade → the engine post-pass. Default off → the two gates are
+  `if (!NativeAnchorPlacement)`, so `ResolveAnchorPositions` is byte-identical for every existing caller.
+  Tests: `Broiler.Cli.Tests/NativeAnchorBridgeModeTests.cs` (native mode preserves the three properties
+  through `Attach` → `ResolveAnchorPositions` → `SerializeToHtml`). WPT `~Position` (default-off) = the
+  identical 9 deterministic anchor-tail fails. Zero regressions. (A default-mode strip assertion was
+  dropped as unreliable in the raw-string `Attach` harness — the `<style>` InnerHtml-vs-DomText nuance +
+  no real layout make it diverge from the full WPT pipeline; default-off safety is proven by the WPT run.)
+- **P5.8d.2b — runner lever + full render parity (NOT started, the concentrated risk):** add
+  `<InternalsVisibleTo Include="Broiler.Wpt" />` to `Broiler.Layout.csproj` (the runner can already set the
+  bridge flag via bridge IVT; this lets it also set `NativeAnchorPlacement.Enabled` around **only** the
+  final `RenderToImageWithStyleSet` — not the earlier geometry snapshots). Gate both behind a default-off
+  runner lever (env var, like `UseSharedLayoutGeometry`). Then prove pixel parity on the **MVP subset**
+  (position-area + explicit `position-anchor` + uniquely-named anchor + non-inline CB + no scroll
+  container); for mixed MVP/non-MVP rules, add per-element suppression (write `position-area: none` inline
+  on bridge-baked boxes so the engine skips them). Expand feature-by-feature (percentage box props →
+  box-sizing → inline-CB promotion → scroll simulation → `position-visibility` → dialog/backdrop →
+  `anchor()` insets → position-try), each its own PR + parity gate. Start with the **MVP subset**:
+  `position-area` with an explicit `position-anchor`, a uniquely-named anchor, a non-inline containing
+  block, and no intervening scroll container (`scrollContainer == null` and `!IsInlineContainingBlock`).
+  For those boxes the bridge's `ResolvePositionAreaValues` returns early (leaving the CSS intact) and the
+  engine places them; everything else stays on the bridge path. Prove parity per-test in isolation
+  against the css-anchor-position baseline, then expand coverage one entangled feature at a time
+  (percentage box props → box-sizing → inline-CB promotion → scroll simulation → `position-visibility` →
+  dialog/backdrop → `anchor()` insets → position-try). Each expansion is its own PR with its own parity
+  gate.
+- **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
+  item-2 unblock** — once every feature is on the engine path.
+
+The DOM-entangled bridge concerns (anchor registry *building* now trivial on the box tree; but
+inline-CB promotion with DOM moves, scroll simulation, `position-visibility`, dialog/backdrop,
+`anchor-scope`/scoping) are the hard part of the later cutover expansions: the engine operates on boxes,
+not the DOM, so these are re-implementations, not moves — which is why the MVP subset deliberately
+excludes them.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 
