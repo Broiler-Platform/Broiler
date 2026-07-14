@@ -1823,16 +1823,34 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   writing-mode containers still fail). **`AnchorNameScopeTests`** — which regressed when the uniqueness
   gate was first added — now passes **both** default-off and lever-on in isolation. This is the first
   expansion with observable pixel-test movement (the size expansions had none, being gate-masked).
+- **P5.8d.2b — writing-mode percentage box props (fifth expansion) — COMPLETED** 2026-07-14
+  (Broiler.Layout only, additive, default-off). CSS Writing Modes §7.4: percentage margins/padding resolve
+  against the **inline** size of the containing block. `ApplyPercentBoxPropsPlacement` now resolves them
+  against the cell width for a horizontal CB and the cell **height** for a vertical one (the CB's writing
+  mode via `FindPositionedContainingBlock` + `IsVerticalWritingMode`), instead of always the width; insets
+  keep resolving against their own physical axis. This is the first expansion that deliberately **exceeds**
+  the bridge (which always used the width, so it gets vertical CBs wrong), so native diverges from the
+  baked path only for a vertical CB — a strictly-more-correct divergence. Tests: `NativeAnchorPlacementTests`
+  +1 (non-square cell in a `vertical-rl` CB: percent margin resolves against the cell height). Regression
+  check: full `Broiler.Layout.Tests` (134) green; **default-off byte-identical (8-fail / 31-pass)**;
+  **lever-on unchanged (7-fail / 32-pass)** with `position-area-percents-001` improving 98.7 %→98.8 % (its
+  vertical-CB containers 3&4 now geometrically correct). **Finding — `percents-001` is capped by rendering
+  fidelity, not geometry:** the native render matches Broiler's own `-ref` render to **0.05 %** (400 px of
+  sub-pixel border rounding), and differs from the committed Chromium **golden** by **1.25 %** — but
+  Broiler's render of the plain `-ref` markup (no anchor positioning at all) itself differs from the golden
+  by **1.26 %**. So the residual is Broiler-vs-Chromium anti-aliasing/border fidelity (a separate,
+  pre-existing rendering concern), and the anchor geometry is exact. `percents-001` will not cross the 99 %
+  pixel threshold from anchor work alone.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
-  ~~anchor-name scope/uniqueness~~ → inline-CB promotion (DOM moves) → scroll simulation →
-  `position-visibility` → dialog/backdrop → `anchor()` insets → position-try (and **writing-mode**
-  position-area, which blocks `percents-001` fully passing). (Childless auto/explicit/percentage sizing,
-  `box-sizing:border-box`, percentage margin/padding/inset box props, AND shared-name scope resolution now
-  land natively — see the four expansions above.) Each remaining feature is currently excluded by
-  `IsMvpNativeAnchorBox` (or `CanApplyNativeAnchorSize`) and stays on the bridge path (baked +
-  `position-area: none`), so enabling the lever globally is already safe (proven above); the expansions
-  widen the gate one feature at a time as the engine grows to reproduce them.
+  ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → inline-CB promotion (DOM moves) →
+  scroll simulation → `position-visibility` → dialog/backdrop → `anchor()` insets → position-try.
+  (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, percentage margin/padding/inset box
+  props, shared-name scope resolution, AND writing-mode percentage basis now land natively — see the five
+  expansions above.) Each remaining feature is currently excluded by `IsMvpNativeAnchorBox` (or
+  `CanApplyNativeAnchorSize`) and stays on the bridge path (baked + `position-area: none`), so enabling the
+  lever globally is already safe (proven above); the expansions widen the gate one feature at a time as the
+  engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 
