@@ -34,12 +34,11 @@ internal sealed partial class SubDocumentBinding
         if (!string.IsNullOrEmpty(qName))
             DomBridge.ValidateQualifiedName(qName, ns, _host.JsContext);
         // Phase 4 item 1 (P4.4a): a createDocument root is a canonical DomDocument (was a #subdoc-root).
+        // Phase 4 item 1 (P4.4c): structural nodes are appended under subDocRoot (a canonical
+        // DomDocument), so GetOwningDocument derives their owner from tree position — no OwnerDocRoot.
         var subDocRoot = _host.CreateBrowsingContextDocument();
         if (doctypeArg is JSObject dtObj && _host.FindDomNodeByJSObject(dtObj) is { } dtNode)
-        {
             subDocRoot.AppendChild(dtNode);
-            _host.SetOwnerDocRoot(dtNode, subDocRoot);
-        }
 
         if (!string.IsNullOrEmpty(qName))
         {
@@ -47,7 +46,6 @@ internal sealed partial class SubDocumentBinding
                 ? _host.CreateElement(qName)
                 : _host.CreateElementNS(ns, qName);
             subDocRoot.AppendChild(docEl);
-            _host.SetOwnerDocRoot(docEl, subDocRoot);
         }
 
         return BuildDocument(subDocRoot);
@@ -58,33 +56,29 @@ internal sealed partial class SubDocumentBinding
         var subTitle = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
         // Phase 4 item 1 (P4.4a): a createHTMLDocument root is a canonical DomDocument (was a
         // #subdoc-root); doctype + <html> are appended as canonical document children.
+        // Phase 4 item 1 (P4.4c): structural nodes are appended under subDocRoot (a canonical
+        // DomDocument), so GetOwningDocument derives their owner from tree position — no OwnerDocRoot.
         var subDocRoot = _host.CreateBrowsingContextDocument();
         var dt = _host.CreateDocumentType("html", string.Empty, string.Empty);
         subDocRoot.AppendChild(dt);
-        _host.SetOwnerDocRoot(dt, subDocRoot);
         // "http://www.w3.org/1999/xhtml" is the default HTML namespace the funnel applies.
         var subHtml = _host.CreateElement("html");
         subDocRoot.AppendChild(subHtml);
-        _host.SetOwnerDocRoot(subHtml, subDocRoot);
         var subHead = _host.CreateElement("head");
         DomBridge.SetParent(subHead, subHtml);
-        _host.SetOwnerDocRoot(subHead, subDocRoot);
         subHtml.AppendChild(subHead);
         if (subTitle != null)
         {
             var subTitleEl = _host.CreateElement("title");
             DomBridge.SetParent(subTitleEl, subHead);
-            _host.SetOwnerDocRoot(subTitleEl, subDocRoot);
             subHead.AppendChild(subTitleEl);
             var subTitleText = _host.CreateTextNode(subTitle);
             DomBridge.SetParent(subTitleText, subTitleEl);
-            _host.SetOwnerDocRoot(subTitleText, subDocRoot);
             subTitleEl.AppendChild(subTitleText);
         }
 
         var subBody = _host.CreateElement("body");
         DomBridge.SetParent(subBody, subHtml);
-        _host.SetOwnerDocRoot(subBody, subDocRoot);
         subHtml.AppendChild(subBody);
         return BuildDocument(subDocRoot);
     }

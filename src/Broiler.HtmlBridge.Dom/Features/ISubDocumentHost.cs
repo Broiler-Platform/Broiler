@@ -41,9 +41,10 @@ internal interface ISubDocumentHost
     /// <summary>The JS wrapper already registered for <paramref name="node"/>, if any.</summary>
     bool TryGetNodeWrapper(DomNode node, out JSObject wrapper);
 
-    /// <summary>Records <paramref name="node"/>'s owning sub-document root (the runtime-state
-    /// <c>OwnerDocRoot</c> field the bridge keys sub-document membership on).</summary>
-    void SetOwnerDocRoot(DomNode node, DomNode docRoot);
+    /// <summary>Adopts a freshly-created, still-detached <paramref name="node"/> into the sub-document
+    /// <paramref name="docRoot"/> (a canonical <c>DomDocument</c>) so its canonical
+    /// <c>ownerDocument</c> is the sub-document, not the main document it was minted from (P4.4c).</summary>
+    void AdoptDetachedNode(DomNode node, DomNode docRoot);
 
     // -------- node construction funnels --------
     DomElement CreateElement(string tagName);

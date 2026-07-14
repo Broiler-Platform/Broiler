@@ -521,12 +521,19 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private static bool DocumentHasViewport(DomElement documentElement)
+    private bool DocumentHasViewport(DomElement documentElement)
     {
-        var docRoot = GetElementRuntimeState(documentElement).OwnerDocRoot;
-        if (docRoot == null)
+        var docRoot = GetOwningDocument(documentElement);
+        // Phase 4 item 1 (P4.4c): the owning document comes from the canonical tree, not OwnerDocRoot.
+        // The main document and rendered nested browsing contexts (iframe/object/frame — reachable
+        // through a container frame in the content-document map) have a viewport. This replaces the
+        // former heuristic that relied on regime-A iframe nodes carrying a null OwnerDocRoot: those
+        // content documents share the CreateBrowsingContextDocument HasViewport=false marker with
+        // detached programmatic documents, so the frame-container test is what distinguishes them.
+        if (ReferenceEquals(docRoot, _document) || GetFrameForContentDocument(docRoot) != null)
             return true;
 
+        // A detached programmatic document (createDocument/createHTMLDocument) is viewport-less.
         return !GetElementRuntimeState(docRoot).Document.HasViewport.TryGet(out var value) ||
                value is not bool hasViewport ||
                hasViewport;

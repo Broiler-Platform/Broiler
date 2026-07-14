@@ -366,10 +366,10 @@ public sealed partial class DomBridge
 
     private JSObject? GetParentWindowForSubDocument(DomElement containerElement)
     {
-        // The container's owning document root is a severed sub-document DomDocument when the
-        // container is itself nested in another frame; recover that frame via the reverse map
-        // (was ParentEl(#subdoc-root)).
-        var parentFrame = GetFrameForContentDocument(GetElementRuntimeState(containerElement).OwnerDocRoot);
+        // The container's owning document is a severed sub-document DomDocument when the container is
+        // itself nested in another frame; recover that frame via the reverse map (P4.4c: the owning
+        // document comes from the canonical tree, was OwnerDocRoot / ParentEl(#subdoc-root)).
+        var parentFrame = GetFrameForContentDocument(GetOwningDocument(containerElement));
         if (parentFrame != null)
             return GetOrCreateSubWindow(parentFrame);
 
@@ -378,7 +378,7 @@ public sealed partial class DomBridge
 
     private string GetInheritedSubDocumentBaseUrl(DomElement containerElement)
     {
-        var parentFrame = GetFrameForContentDocument(GetElementRuntimeState(containerElement).OwnerDocRoot);
+        var parentFrame = GetFrameForContentDocument(GetOwningDocument(containerElement));
         if (parentFrame != null &&
             _subDocumentBaseUrlCache.TryGetValue(parentFrame, out var parentBaseUrl) &&
             !string.IsNullOrWhiteSpace(parentBaseUrl))
@@ -1063,7 +1063,6 @@ public sealed partial class DomBridge
         }
 
         SetParent(node, parent);
-        AdoptSubtreeIntoDocument(node, GetElementRuntimeState(parent).OwnerDocRoot);
         InsertChildAt(parent, index, node);
         if (parent is DomElement parentElement)
         {
@@ -1155,7 +1154,6 @@ public sealed partial class DomBridge
             foreach (var child in fragmentContainer.ChildNodes.ToArray())
             {
                 SetParent(child, element);
-                AdoptSubtreeIntoDocument(child, GetElementRuntimeState(element).OwnerDocRoot);
                 element.AppendChild(child);
             }
         }
@@ -1200,7 +1198,6 @@ public sealed partial class DomBridge
             foreach (var child in parsedContainer.ChildNodes.ToArray())
             {
                 SetParent(child, parent);
-                AdoptSubtreeIntoDocument(child, GetElementRuntimeState(parent).OwnerDocRoot);
                 InsertChildAt(parent, insertIndex, child);
                 NotifyChildAdded(parent, child, insertIndex);
                 insertIndex++;

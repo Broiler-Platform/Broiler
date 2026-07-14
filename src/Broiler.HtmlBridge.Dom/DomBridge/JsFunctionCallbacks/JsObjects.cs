@@ -476,10 +476,13 @@ public sealed partial class DomBridge
 
     private JSValue JsJsObjectsGetOwnerDocument057Core(DomNode node, in Arguments a)
     {
-        // For elements in sub-documents, return the sub-document JSObject
-        if (GetElementRuntimeState(node).OwnerDocRoot != null && _jsObjects.TryGetDocument(GetElementRuntimeState(node).OwnerDocRoot, out var subDoc))
+        // Phase 4 item 1 (P4.4c): the owning document is derived from the canonical tree (connected
+        // nodes) or the node's canonical OwnerDocument (detached), not a parallel OwnerDocRoot field.
+        var owner = GetOwningDocument(node);
+        // A sub-document maps to its JS document wrapper; the main document maps to the window
+        // document object.
+        if (!ReferenceEquals(owner, _document) && _jsObjects.TryGetDocument(owner, out var subDoc))
             return subDoc;
-        // For main document elements, return the main document JSObject
         return _documentJSObject ?? JSNull.Value;
     }
 
@@ -853,8 +856,9 @@ public sealed partial class DomBridge
 
         mode = string.Equals(mode, "closed", StringComparison.OrdinalIgnoreCase) ? "closed" : "open";
         var shadowRoot = CreateBridgeElement("#shadow-root");
+        // SetParent links the shadow root to its host, so GetOwningDocument derives the shadow root's
+        // owning document from the host's tree position — no OwnerDocRoot inheritance needed (P4.4c).
         SetParent(shadowRoot, element);
-        GetElementRuntimeState(shadowRoot).OwnerDocRoot = GetElementRuntimeState(element).OwnerDocRoot;
         GetElementRuntimeState(shadowRoot).Shadow.Host.Set(element);
         GetElementRuntimeState(shadowRoot).Shadow.Mode.Set(mode);
         GetElementRuntimeState(element).Shadow.Root.Set(shadowRoot);
@@ -969,7 +973,6 @@ public sealed partial class DomBridge
 
         SetParent(oldEl, null);
         SetParent(newEl, element);
-        AdoptSubtreeIntoDocument(newEl, GetElementRuntimeState(element).OwnerDocRoot);
         element.ReplaceChild(newEl, element.ChildNodes[idx]);
         bridgeForAppend.InvalidateStyleScope(element);
         NotifyChildRemoved(element, oldEl, idx, previousSibling, nextSibling);

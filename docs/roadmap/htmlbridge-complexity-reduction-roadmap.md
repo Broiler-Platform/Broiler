@@ -860,6 +860,50 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.4c completed** 2026-07-14 (branch `htmlbridge-phase4-remove-subdocroot-guards`) — **work item 1:
+eliminate the `OwnerDocRoot` parallel-state field.** `ElementRuntimeState.OwnerDocRoot` (a per-node
+back-reference to the owning browsing-context root — null for main-document nodes, the sub-document root
+for sub-document nodes) shadowed the canonical owner-document. It existed because every bridge node is
+minted from the main `_document` (the `CreateBridgeElement` funnel), so canonical `node.OwnerDocument` is
+uniformly the main document even for sub-document nodes. P4.4b unblocked its removal by making a
+(sub-)document root a canonical `Broiler.Dom.DomDocument`: a node's owning document is now **derived**, not
+stored —
+
+- **Connected nodes:** the new `DomBridge.GetOwningDocument(node)` returns the absolute canonical tree root
+  (a `DomDocument` after the sever). This makes the four readers (`ownerDocument` getter, hit-test viewport
+  check, and the two sub-window/base-URL frame recoveries) tree-derived, and lets the subtree-propagation
+  helper `AdoptSubtreeIntoDocument` (and its five insertion call sites + the recursive walk) be **deleted**
+  outright — connected nodes no longer need eager owner-root propagation.
+- **Detached `createElement` nodes:** a sub-document's `document.createElement`/`createTextNode`/… returns a
+  *detached* node whose owner a tree-walk can't see; those are now adopted into their content document via
+  the public `DomDocument.AdoptNode` (a no-op `RemoveChild` on the parentless node), so canonical
+  `node.OwnerDocument` — `GetOwningDocument`'s detached fallback — reports the sub-document. This replaces the
+  `ISubDocumentHost.SetOwnerDocRoot` seam with `AdoptDetachedNode`. **No submodule change** was needed (the
+  connected-node case is tree-derived; the detached case uses the existing public `AdoptNode`).
+- The ~28 write sites collapse: the `createDocument`/`createHTMLDocument` structural writers (Registration +
+  SubDocumentBinding.Implementation) and the shadow-root inheritance are simply dropped (those nodes are
+  connected via `AppendChild`/`SetParent`, so tree-walk covers them).
+
+**One regression found and fixed in-slice** (a genuine behaviour dependency, not a rename): the hit-test
+`DocumentHasViewport` check returned `true` for regime-A iframe content precisely *because* those nodes
+carried a null `OwnerDocRoot` (P4.4b left regime-A nodes unadopted), so the content document's
+`CreateBrowsingContextDocument` `HasViewport=false` marker — shared with detached programmatic documents —
+was never consulted. With ownership now tree-derived, that marker became live and suppressed iframe
+hit-testing (`GoogleSearchPolyfillTests.Document_HitTesting_Uses_Html_But_Not_Body_For_Iframe_Viewport_Fallback`).
+Fixed by distinguishing rendered nested browsing contexts (main document, or a content document reachable
+through a container frame in the `_documentContainers` map) from detached programmatic documents
+(`createDocument`/`createHTMLDocument`, which have no frame and keep `HasViewport=false`); `DocumentHasViewport`
+became an instance method to consult the frame map. Behaviour-preserving; no public-API change (the field,
+helper and host seam are all internal). Tests: `Broiler.Cli.Tests/OwnerDocRootRemovalTests.cs` (reflection
+guards that the field + `AdoptSubtreeIntoDocument` are gone and `GetOwningDocument` is present; `ownerDocument`
+characterizations across main / detached-main-created / sub-document connected / sub-document detached-created
+/ iframe-content regimes; and the iframe-content hit-test viewport guard). Regression check vs the P4.11
+baseline: the SubDocument / Iframe / Frame / ShadowDom / OwnerDocument / CrossDocument / HtmlDomInterface /
+DomImplementation / GoogleSearchPolyfill suites are an **identical** failure set with the change stashed
+(the standing real-HTTP `Iframe_*` and zoom/srcdoc serialization failures), and the wider DomEdgeCase /
+Namespace / Attributes / DomTraversal / Acid3Phase4 / DomEvents / sentinel-migration sweep shows only the
+standing headless `Range_GetBoundingClientRect` failure → zero regressions.
+
 Status: **P4.11 completed** 2026-07-14 (branch `htmlbridge-phase4-remove-subdocroot-guards`) — **work item 1,
 final cleanup: delete the now-inert `#subdoc-root` tag-name special cases.** P4.4b severed the materialized
 nested browsing context from the `_document` tree (a sub-document is a canonical `Broiler.Dom.DomDocument`
@@ -898,8 +942,8 @@ are now removed.** The remaining Phase 4 residue is unchanged and still blocked/
 item 2's full inline-style dict elimination (P4.7 shipped the script-observable write-through slice; the
 ~200-site dict rewrite is deferred), item 4/5's submodule-push-gated promotions (`IsEqualNode` P4.9,
 `CommonAncestorWith` P4.10) and the `GetNodesInRange` / `DomRange`-stringifier / `Normalize` / `CloneDomElement`
-swaps blocked by regime-A layout coupling or side-effect coupling, and P4.4c (`OwnerDocRoot`) which still needs
-regime-A content-node adoption.
+swaps blocked by regime-A layout coupling or side-effect coupling. (P4.4c `OwnerDocRoot` — the last independent
+in-repo residue — is now also done; see the P4.4c entry above.)
 
 Status: **P4.10 prepared as a submodule patch** 2026-07-14 (same branch) — **work items 4/5: promote the
 nearest-common-ancestor tree query to canonical `Broiler.Dom.DomNode.CommonAncestorWith`.** The bridge's

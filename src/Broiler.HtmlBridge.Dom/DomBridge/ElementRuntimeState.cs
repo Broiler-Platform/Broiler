@@ -24,16 +24,11 @@ internal sealed class ElementRuntimeState
     /// </summary>
     public HashSet<string> JsSetStyleProps { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// The browsing-context root that owns this node's (sub)document — iframe / nested
-    /// browsing-context bookkeeping. Relocated off the <c>Broiler.Dom.DomElement</c> facade
-    /// (RF-BRIDGE-1c Phase A). Not carried across <c>cloneNode</c> (matching the prior
-    /// facade behaviour: a clone re-derives its owner on adoption). Phase 4 item 1 (P4.4a): widened
-    /// <c>DomElement?</c>→<c>DomNode?</c> so a canonical <c>DomDocument</c> browsing-context root
-    /// (createDocument/createHTMLDocument) can own its descendants, alongside the legacy
-    /// <c>#subdoc-root</c> element roots that regime-A (iframe) still uses.
-    /// </summary>
-    public DomNode? OwnerDocRoot { get; set; }
+    // Phase 4 item 1 (P4.4c): the OwnerDocRoot parallel-state field is deleted. A node's owning
+    // (sub-)document is now derived from the canonical tree (a connected node's absolute root is a
+    // Broiler.Dom.DomDocument after the P4.4b sever) or the node's canonical OwnerDocument when
+    // detached — see DomBridge.GetOwningDocument. Sub-document createElement nodes are adopted into
+    // their content document (DomDocument.AdoptNode) so their detached OwnerDocument is correct.
 
     /// <summary>
     /// The node's inline style in CSS kebab-case — the authoritative in-memory inline
