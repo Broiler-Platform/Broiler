@@ -2149,6 +2149,19 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   `position`, not `transform`/`contain` containing blocks). Each is its own engine feature + broad-corpus
   parity effort, larger than a lever-gated slice.
 
+  **Finding — `position:sticky` is blocked here (2026-07-15 investigation).** Three compounding blockers make
+  a responsible port infeasible in this environment: (1) **no corpus** — this WPT checkout has zero sticky
+  render tests, so there is nothing to validate parity against (position-visibility had 14). (2) **The
+  native-vs-baked parity model is unusable because the reference is buggy** — a sticky box inside a scrolled
+  container is wrongly hidden by `ApplyScrollSimulation`'s clip loop, which marks it `visibility:hidden`
+  using its *flow* position (y=0) rather than its pinned *paint* position (probe: the box pins correctly to
+  `Y=10` but serialises with `visibility:hidden`+`data-broiler-scroll-hidden`). Matching the bridge would
+  reproduce that bug. (3) **Scroll-model dependency** — sticky is inherently scroll-dependent and the engine
+  has no scroll-offset model; it is coupled to `ApplyScrollSimulation` (itself an unported bridge pass whose
+  DOM-shift is the only scroll representation). The correct sequence is to give the engine a real scroll
+  model first (port `ApplyScrollSimulation`), which unblocks both scroll and sticky and fixes the
+  flow-vs-paint hiding bug, and to do it in an environment with a sticky corpus. Left on the bridge path.
+
   Still bridge-only: dialog/backdrop, sticky, scroll simulation, visual-viewport, transform/contain CBs
   (the engine-feature set above), and the opposing-inset / auto-min-content-sized position-try bases (the engine's
   `TryApplyPositionTryFallback` supports these geometries but the bridge gate keeps them baked pending per-case
