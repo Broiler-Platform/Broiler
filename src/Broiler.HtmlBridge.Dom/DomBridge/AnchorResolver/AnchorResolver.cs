@@ -85,8 +85,11 @@ public sealed partial class DomBridge
             deferredDomMoves);
 
         // 3a2. Resolve align-self/justify-self: anchor-center on elements
-        //      that have position-anchor but no position-area.
-        ResolveAnchorCenter(DocumentElement, anchorRegistry);
+        //      that have position-anchor but no position-area. Native mode (P5.8d.2b) centres
+        //      these in the engine post-pass (CssBox.TryApplyAnchorCenter) instead, so the
+        //      align-self/justify-self + position-anchor CSS survives to the render un-baked.
+        if (!NativeAnchorPlacement)
+            ResolveAnchorCenter(DocumentElement, anchorRegistry);
 
         // 3b. Resolve position-try-fallbacks for elements whose base
         //     style overflows the containing block.

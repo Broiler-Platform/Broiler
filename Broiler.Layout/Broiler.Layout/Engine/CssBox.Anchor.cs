@@ -146,6 +146,10 @@ partial class CssBox
             // a box positioned by anchor() functions in its left/right/top/bottom rather
             // than position-area.
             box.TryApplyAnchorInsetPlacement(registry);
+            // align-self/justify-self: anchor-center (P5.8d.2b anchor-center expansion): centre
+            // the box on its anchor in the block/inline axis (a box with position-anchor but no
+            // position-area).
+            box.TryApplyAnchorCenter(registry);
         }
 
         // position-try fallback (P5.8d.2b position-try expansion): after the base placement
@@ -604,6 +608,51 @@ partial class CssBox
         if (len.HasError) return null;
         if (len.IsPercentage) return basis * len.Number;
         return len.Unit == CssUnit.Px ? len.Number : null;
+    }
+
+    /// <summary>
+    /// Centres a box on its anchor per <c>align-self: anchor-center</c> (block axis) /
+    /// <c>justify-self: anchor-center</c> (inline axis) — the engine equivalent of the bridge's
+    /// <c>ResolveAnchorCenter</c> (P5.8d.2b anchor-center expansion). Applies only to an
+    /// absolutely/fixed-positioned box with <c>position-anchor</c> and no <c>position-area</c>
+    /// (position-area does its own alignment). Repositions the centred axis so the box's centre
+    /// aligns with the anchor's centre; the other axis keeps its laid-out position. The anchor rect
+    /// is the same registered (scroll-shifted) geometry the placement passes use, so the centring is
+    /// scroll-correct. Returns <c>false</c> when it is not an anchor-center box or the anchor is
+    /// unregistered.
+    /// </summary>
+    internal bool TryApplyAnchorCenter(AnchorRegistry registry)
+    {
+        if (Position != CssConstants.Absolute && Position != CssConstants.Fixed)
+            return false;
+        if (PositionArea != "none")
+            return false;
+        var anchorName = PositionAnchor;
+        if (string.IsNullOrEmpty(anchorName) || anchorName == "auto")
+            return false;
+        bool alignCenter = string.Equals(AlignSelf, "anchor-center", StringComparison.OrdinalIgnoreCase);
+        bool justifyCenter = string.Equals(JustifySelf, "anchor-center", StringComparison.OrdinalIgnoreCase);
+        if (!alignCenter && !justifyCenter)
+            return false;
+
+        var cb = FindPositionedContainingBlock();
+        Func<object?, bool> inScope = scope => scope is CssBox src && IsBoxDescendantOf(src, cb);
+        if (!registry.TryResolveRect(anchorName, inScope, out var a))
+            return false;
+
+        // align-self centres in the block axis (Y for horizontal writing modes), justify-self in
+        // the inline axis (X). The non-centred axis keeps its laid-out position.
+        if (alignCenter)
+        {
+            double centredTop = (a.Top + a.Bottom) / 2 - Size.Height / 2.0;
+            OffsetTop((float)(centredTop - Location.Y));
+        }
+        if (justifyCenter)
+        {
+            double centredLeft = (a.Left + a.Right) / 2 - Size.Width / 2.0;
+            OffsetLeft((float)(centredLeft - Location.X));
+        }
+        return true;
     }
 
     /// <summary>

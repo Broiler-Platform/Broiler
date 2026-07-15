@@ -2097,6 +2097,19 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   set — zero regressions)**. Full `Broiler.Layout.Tests` (156, the pre-existing environmental arch-guard fail
   identical on baseline) and the Cli/Wpt anchor suites green. Zero corpus gain (a parity move), but it removes the
   position-visibility `display:none` DOM write from the bridge's render path.
+- **P5.8d.2b — `anchor-center` (fourteenth expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-9m00kh`; Broiler.Layout + bridge, additive, default-off). The bridge's
+  `ResolveAnchorCenter` pass is now on the engine: `CssBox.TryApplyAnchorCenter` centres an
+  absolutely/fixed-positioned box with `position-anchor` and no `position-area` on its anchor —
+  `align-self: anchor-center` in the block axis, `justify-self: anchor-center` in the inline axis — using the
+  registered (scroll-shifted) anchor rect the placement passes use, so it is scroll-correct. Run from the
+  `PositionArea == "none"` branch of the post-pass after the `anchor()`-inset placement. The bridge skips
+  `ResolveAnchorCenter` in native mode (deleting its `InlineStyle["top"/"left"]` writes), leaving the
+  `align-self`/`position-anchor` CSS to survive to the engine. Tests:
+  `Broiler.Wpt.Tests/NativeAnchorCenterWptTests.cs` (full render; centred on the anchor, baked & native agree).
+  Regression check: default-off byte-identical; **lever-on the css-anchor-position subset is unchanged (6 fails,
+  identical set)** and `anchor-center-scroll-001` (its one corpus render test) improves **99.4 %→100 %** — the
+  native centring is exact where the bridge estimator was a hair off. Zero regressions.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
