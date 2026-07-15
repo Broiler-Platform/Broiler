@@ -561,6 +561,43 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(30, target.Size.Width, 3);  // unchanged (reposition/resize needs a re-flow)
     }
 
+    // ------------------------------------------------------------------
+    // combined anchor-size() + anchor() inset (P5.8d.2b combined expansion) —
+    // the sizing pass runs before the inset pass, so a box that both sizes to its
+    // anchor and positions against it resolves both natively in one post-pass.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Combined_AnchorSizeThenLeftTopInset_SizesThenPlaces()
+    {
+        var (root, _) = AnchorInsetFixture(out var target); // anchor --a 20×20 at (40,40)
+        target.Width = "anchor-size(--a width)";   // 20
+        target.Height = "anchor-size(--a height)"; // 20
+        target.Left = "anchor(--a right)";         // box left edge = anchor right = 60
+        target.Top = "anchor(--a bottom)";         // box top edge  = anchor bottom = 60
+        RunPass(root);
+        Assert.Equal(20, target.Size.Width, 3);
+        Assert.Equal(20, target.Size.Height, 3);
+        Assert.Equal(60, target.Location.X, 3);
+        Assert.Equal(60, target.Location.Y, 3);
+    }
+
+    [Fact]
+    public void Combined_AnchorSizeThenRightBottomInset_PlacesFarEdgeUsingResolvedSize()
+    {
+        var (root, _) = AnchorInsetFixture(out var target); // anchor --a 20×20 at (40,40)
+        target.Width = "anchor-size(--a width)";   // 20
+        target.Height = "anchor-size(--a height)"; // 20
+        // right edge lands on anchor left (40) → left = 40 - resolved width 20 = 20.
+        target.Right = "anchor(--a left)";
+        target.Bottom = "anchor(--a top)";
+        RunPass(root);
+        Assert.Equal(20, target.Size.Width, 3);
+        Assert.Equal(20, target.Size.Height, 3);
+        Assert.Equal(20, target.Location.X, 3);
+        Assert.Equal(20, target.Location.Y, 3);
+    }
+
     // Shared fixture: CB 200×200 at origin, anchor --a (20×20 at (40,40)), and a
     // childless absolutely-positioned "bottom right" target (30×30 at origin).
     private static (CssBox root, CssBox cb) FillCellFixture(out CssBox target)

@@ -2212,18 +2212,51 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   the bridge's `CollectFixedDescendants` reparenting only undoes the DOM-shift wrapper's renderer bug), but
   that correctness can't be *demonstrated* here. Both cases were therefore left on the bridge path; they need
   an environment where page scroll and fixed-in-scroll actually render.
+- **P5.8d.2b — combined `anchor()` + `anchor-size()` (eighteenth expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-ke2wvn`; **bridge only, additive, default-off**). A box that both
+  **sizes** to its anchor (`anchor-size()` in `width`/`height`) **and** positions against it (`anchor()`
+  in a physical inset) now goes native — the case the seventh (`anchor()`-insets) and eighth
+  (`anchor-size()`) expansions deliberately kept baked ("the combined case stays baked"). **No engine
+  change needed:** the engine's post-pass already runs `TryApplyNativeAnchorSizing` **before**
+  `TryApplyAnchorInsetPlacement` (`CssBox.Anchor.cs:144,148`), so the two pure passes compose — the box is
+  sized first, then a right/bottom inset repositions against the *resolved* size (a probe test proved both
+  the left/top and right/bottom orderings land exactly, so the eighteenth is a pure bridge gate-widening).
+  The two pure bridge gates each exclude the other function (`IsMvpNativeAnchorInsetBox` returns false on
+  any `anchor-size(`; `IsMvpNativeAnchorSizeBox` on any `anchor(` inset), so a combined box was fully baked.
+  - **Bridge.** A new `IsMvpNativeAnchorCombinedBox` (the intersection of both pure MVP subsets: an
+    absolutely-positioned, childless, non-modal, non-zoomed box with no `position-area`/`position-try`;
+    `anchor-size()` only in `width`/`height` and `anchor()` only in `left`/`right`/`top`/`bottom`; at most
+    one inset per axis — an opposing pair plus a definite `anchor-size()` is over-constrained and stays
+    baked; every referenced anchor registered, accessible and moved by no intervening scroll) drives a
+    single `combinedMvp` flag in `ResolveAnchorFunctions` that skips **both** the inset bake and the
+    `ResolveAnchorSizeFunctions` size bake, keeping the two halves' bake/handoff decision in lockstep so
+    they can never disagree (one baked, one native).
+  Tests: `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` +2 (size-then-left/top place, size-then-
+  right/bottom place using the resolved size); `Broiler.Cli.Tests/NativeAnchorCombinedPipelineTests.cs`
+  (real parse→cascade→layout: the engine sizes the box to the anchor's 50×70 and places its edge at the
+  anchor's right/bottom corner (90,110); a flag-off control pins the resolution to the post-pass) +
+  `NativeAnchorCombinedBridgeModeTests.cs` (native mode leaves both `anchor()` and `anchor-size()` un-baked
+  through serialization); `Broiler.Wpt.Tests/NativeAnchorCombinedWptTests.cs` (full render; baked & native
+  paths agree pixel-wise). Regression check: full `Broiler.Layout.Tests` (179 pass; the pre-existing
+  environmental arch-guard fail identical on baseline) green; **default-off byte-identical (8-fail /
+  31-pass)** and **lever-on the identical 6-fail set** (verified against the stashed baseline lever-on run —
+  `set()` diff), with zero per-test movement. As with the seventh/eighth expansions, **no corpus pixel test
+  exercises the combined path** (the corpus's `anchor-size()` tests are `transform-005` — combined with
+  `position-area`, not `anchor()` insets — and `anchor-size-css-zoom` — zoom-gated), so validation is the
+  exact-geometry unit + pipeline + full-render tests plus no-regression. Zero regressions.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
   CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
   ~~scroll simulation~~ → ~~`position-visibility`~~ → dialog/backdrop → ~~position-try (anchor()-inset handoff
-  subset)~~ → ~~transform/contain/will-change containing blocks~~. (Childless auto/explicit/percentage sizing,
+  subset)~~ → ~~transform/contain/will-change containing blocks~~ → ~~combined `anchor()` + `anchor-size()`~~.
+  (Childless auto/explicit/percentage sizing,
   `box-sizing:border-box`, percentage margin/padding/inset box props, shared-name scope resolution,
   writing-mode percentage basis, relatively-positioned inline containing blocks, `anchor()` physical insets,
   `anchor-size()` sizing, opposing-inset sizing, abspos-inline containing blocks, intervening scroll
   containers, the anchor()-inset `@position-try` fallback subset, `position-visibility`, `anchor-center`,
-  redundant fixed-position sizing, AND transform/contain/will-change containing blocks now land natively —
-  see the sixteen expansions above.)
+  redundant fixed-position sizing, transform/contain/will-change containing blocks, AND a box combining
+  `anchor()` insets with `anchor-size()` sizing now land natively — see the eighteen expansions above.)
 
   **Triage of the remaining AnchorResolver passes (2026-07-15):** the anchor-specific, lever-gated passes
   are now on the engine (placement MVPs, `position-visibility`, `anchor-center`). The rest are *general*
