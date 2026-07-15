@@ -92,7 +92,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // _windowEventListeners/_eventTargetListeners/_eventTargetOwnerWindows/_visualViewportScrollListeners
     // fields plus ElementRuntimeState.EventListeners for node listeners).
     private readonly Dom.Runtime.EventTargetRegistry _eventTargets = new();
-    private readonly Dictionary<JSObject, DomElement> _subWindowContainers = new(ReferenceEqualityComparer.Instance);
+    // Phase 3 (P3.16): the nested-browsing-context state — the per-container sub-document/sub-window
+    // JS-object identity, location/base-URL caches, object-load-failure and onload-fired marks, the
+    // reverse sub-window→container map, the current-window override, and the P4.4b content-document
+    // maps — is owned by the single BrowsingContextManager (was ten fields scattered across
+    // SubDocuments.cs / DomBridge.WindowContext.cs / DomBridge.cs). The bridge keeps the algorithms.
+    private readonly Dom.Runtime.BrowsingContextManager _browsingContexts = new();
     // Phase 3 (P3.10): the whole web-messaging feature — window.postMessage, MessageChannel/
     // MessagePort (which own the P2.6 MessagePortRegistry state) and the generic EventTarget dispatch
     // shared with sub-windows — lives in MessagingBinding, reached through the narrow IMessagingHost
@@ -114,10 +119,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // getElementById/createElement/querySelector/… callback + document.implementation) lives in
     // SubDocumentBinding, reached through the ISubDocumentHost contract (see DomBridge.SubDocumentHost.cs).
     // Unblocked by P4.4b's #subdoc-root sever — a sub-document root is now a canonical DomNode. The
-    // browsing-context infrastructure (sub-document/-window caches, content-document maps, resource
-    // loading, onload, the sub-window object) stays bridge-owned pending a future BrowsingContextManager.
+    // browsing-context state (sub-document/-window caches, content-document maps, current-window
+    // override) is owned by BrowsingContextManager (P3.16); the builders / resource loading / onload
+    // algorithms stay bridge-owned and reach that state through it.
     private readonly Dom.Features.SubDocumentBinding _subDocuments;
-    private JSObject? _currentWindowOverride;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
     private double _visualViewportPageTopOffset;

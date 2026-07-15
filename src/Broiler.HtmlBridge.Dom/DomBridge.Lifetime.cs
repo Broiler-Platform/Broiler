@@ -91,13 +91,11 @@ public sealed partial class DomBridge : IDisposable
         _smoothScrollTokenCounter = 0;
 
         _eventTargets.Clear();
-        _subWindowContainers.Clear();
+        _browsingContexts.ResetSession();
 
         _messaging.ClearPorts();
 
         _mutations.Clear();
         _traversal.ClearActive();
-
-        _currentWindowOverride = null;
     }
 }

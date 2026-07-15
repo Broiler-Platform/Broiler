@@ -8,8 +8,9 @@ namespace Broiler.HtmlBridge;
 /// against the sub-window caches, resolving the current/owner window, and temporarily switching the
 /// global window/document/location/parent bindings into another browsing context. These were
 /// physically co-located with web messaging but are browsing-context infrastructure (they read the
-/// sub-window/sub-document caches and the active-window override that Phase 2 deliberately left in the
-/// bridge). They stay bridge-owned pending a future <c>BrowsingContextManager</c>; the extracted
+/// sub-window/sub-document caches and the active-window override, now owned by
+/// <see cref="Broiler.HtmlBridge.Dom.Runtime.BrowsingContextManager"/> — P3.16). These algorithms stay
+/// bridge-owned and reach that state through it; the extracted
 /// <see cref="Broiler.HtmlBridge.Dom.Features.MessagingBinding"/> reaches the ones it needs through the
 /// <see cref="Broiler.HtmlBridge.Dom.Features.IMessagingHost"/> contract, and <c>SubDocuments.cs</c>
 /// calls <see cref="RunWithWindowContext"/> directly when running a sub-window's scripts.
@@ -17,7 +18,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     private JSObject? ResolveCurrentWindow()
-        => GetCanonicalWindow(_currentWindowOverride ?? _jsContext?["window"] as JSObject ?? _windowJSObject);
+        => GetCanonicalWindow(_browsingContexts.CurrentWindowOverride ?? _jsContext?["window"] as JSObject ?? _windowJSObject);
 
     private JSObject? ResolveOwnerWindow(JSObject target)
         => _eventTargets.TryGetOwnerWindow(target, out var ownerWindow) ? GetCanonicalWindow(ownerWindow) : ResolveCurrentWindow();
@@ -27,10 +28,10 @@ public sealed partial class DomBridge
         if (candidate == null || ReferenceEquals(candidate, _windowJSObject))
             return candidate;
 
-        if (_subWindowContainers.ContainsKey(candidate))
+        if (_browsingContexts.IsSubWindow(candidate))
             return candidate;
 
-        foreach (var subWindow in _subWindowCache.Values)
+        foreach (var subWindow in _browsingContexts.SubWindows)
         {
             if (ReferenceEquals(candidate, subWindow))
                 return subWindow;
@@ -64,7 +65,7 @@ public sealed partial class DomBridge
         JSValue? previousPostMessage = null;
         JSValue? previousSelf = null;
         JSValue? previousTop = null;
-        var previousCurrentWindow = _currentWindowOverride;
+        var previousCurrentWindow = _browsingContexts.CurrentWindowOverride;
 
         try
         {
@@ -83,7 +84,7 @@ public sealed partial class DomBridge
             _jsContext["postMessage"] = targetWindow[(KeyString)"postMessage"] ?? JSUndefined.Value;
             _jsContext["self"] = targetWindow;
             _jsContext["top"] = _windowJSObject ?? targetWindow;
-            _currentWindowOverride = targetWindow;
+            _browsingContexts.CurrentWindowOverride = targetWindow;
 
             callback();
         }
@@ -96,7 +97,7 @@ public sealed partial class DomBridge
             _jsContext["postMessage"] = previousPostMessage ?? JSUndefined.Value;
             _jsContext["self"] = previousSelf ?? JSUndefined.Value;
             _jsContext["top"] = previousTop ?? JSUndefined.Value;
-            _currentWindowOverride = previousCurrentWindow;
+            _browsingContexts.CurrentWindowOverride = previousCurrentWindow;
         }
     }
 
@@ -105,7 +106,7 @@ public sealed partial class DomBridge
         if (ReferenceEquals(targetWindow, _windowJSObject))
             return _documentJSObject ?? JSUndefined.Value;
 
-        return _subWindowContainers.TryGetValue(targetWindow, out var containerElement)
+        return _browsingContexts.TryGetSubWindowContainer(targetWindow, out var containerElement)
             ? GetOrCreateSubDocument(containerElement)
             : JSUndefined.Value;
     }

@@ -397,12 +397,12 @@ Behavior-preserving; no public-API change (both internal). Tests:
 tests + existing messaging/network suites pass). Full-suite regression check vs the P2.5 baseline:
 every candidate fails identically in isolation on both sides → zero regressions.
 
-**Deferred within "browsing-context state" (a follow-up, not blocking Phase 3):** the sub-window and
-sub-document content caches in `SubDocuments.cs` (`_subWindowCache`/`_subWindowContainers`,
+**Deferred within "browsing-context state" (a follow-up, not blocking Phase 3) — DONE in P3.16:** the
+sub-window and sub-document content caches in `SubDocuments.cs` (`_subWindowCache`/`_subWindowContainers`,
 `_subDocumentCache`, `_subDocumentLocationCache`, `_subDocumentBaseUrlCache`, `_objectLoadFailures`,
-`_onloadFired`) and `_currentWindowOverride` are not yet consolidated into a `BrowsingContextManager`
-— they are largely internal to `SubDocuments.cs` and intertwined with sub-document resolution. P2.6
-took the cross-file cohesive slice (ports) and the resource-loader seam.
+`_onloadFired`) and `_currentWindowOverride` are now consolidated into the single `BrowsingContextManager`
+(see the P3.16 status under Phase 3). P2.6 took the cross-file cohesive slice (ports) and the resource-loader
+seam; P3.16 took the rest.
 
 ## Phase 2 outcome
 
@@ -413,8 +413,8 @@ bridge state now has explicit single owners (all internal, in `Broiler.HtmlBridg
 event listeners were de-globalized off the process-static `ElementRuntimeState` onto an instance
 `ConditionalWeakTable`. Not fully met and carried forward: two simultaneous sessions are still not
 isolated (blocked at the Broiler.JS engine's shared globals — a JS-engine concern, not the bridge),
-and the remaining process-static `ElementRuntimeState`/`PositionAreaResolutions` tables plus the
-sub-document caches above are still to be de-globalized/consolidated.
+and the remaining process-static `ElementRuntimeState`/`PositionAreaResolutions` tables are still to be
+de-globalized (the sub-document caches above are now consolidated into `BrowsingContextManager` — P3.16).
 
 Two findings recorded for later phases:
 
@@ -856,12 +856,41 @@ architecture-guard suites reproduce an **identical** failure set with the change
 selector and Acid3 border-shorthand environmental fails) → zero regressions. This takes `StyleSheets.cs`
 under the 750-line exit-criterion limit.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.15 named-accessor / relocated-infra /
-shared-write-hub / wide-explicit-host / no-host-static pattern is the template for any residual coupling:
-Element/geometry, Window/Document, SVG, the **rest** of Frames/browsing-contexts (the
-`BrowsingContextManager` consolidating the sub-window / content-document caches, the sub-window object and
-`WindowContext.cs`), Canvas (better done with Phase 6, which dissolves
-`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
+Status: **P3.16 completed** 2026-07-15 (branch `claude/htmlbridge-phase-5-hixy7x`) — the **browsing-context
+state authority**, the frames-feature owner Phase 2/P2.6 deferred and P3.10/P3.13 left bridge-owned "pending a
+future `BrowsingContextManager`". A single `BrowsingContextManager` (namespace
+`Broiler.HtmlBridge.Dom.Runtime`) now owns the ten scattered nested-browsing-context fields — the per-container
+(`<iframe>`/`<object>`/`<frame>`) sub-document and sub-window JS-object identity, the location/base-URL caches,
+the object-load-failure and onload-fired marks, the reverse sub-window→container map, the current-window
+override, and the P4.4b severed content-document maps — behind a narrow surface (`TryGet/SetSubDocument`,
+`TryGet/SetSubWindow`+`IsSubWindow`/`SubWindows`/`TryGetSubWindowContainer`, `TryGet/SetLocation`+`BaseUrl`,
+`Has/Mark/Clear*` load marks, `Link/Unlink/GetContentDocument`+`GetContainerForDocument`, `RemoveContainerCaches`,
+`ResetSession`). It replaces the six caches in `SubDocuments.cs`, the two content-document maps there, and
+`_subWindowContainers`/`_currentWindowOverride` in `DomBridge.cs` (~48 sites across `SubDocuments.cs`,
+`DomBridge.WindowContext.cs`, `JsObjects.cs`, `DomBridge.Lifetime.cs`, `DomBridge.cs`). The bridge keeps the
+**algorithms** (sub-document/-window builders, window resolution in `WindowContext.cs`, resource loading, onload
+dispatch) and reaches the state through the owner; no back-reference. Behaviour-preserving: the deliberately
+**asymmetric** sub-window lifecycle is exactly preserved — the container→sub-window map is dropped per container
+(`RemoveContainerCaches`, was `InvalidateCachedSubDocument`) while the reverse map is bulk-cleared only on session
+reset (`ResetSession`, was `ClearRuntimeSessionState`), and `InvalidateCachedSubDocument`'s
+`RemoveElementsRecursive`-before-unlink order is kept. No public-API change (the owner is internal; snapshot
+unchanged). Tests: `Broiler.Cli.Tests/BrowsingContextManagerTests.cs` (surface unit tests + the two asymmetry
+characterizations + an ownership guard that the ten scattered fields are gone and `_browsingContexts` is present).
+Regression check: the BrowsingContextRootMigration / SubDocumentBinding / SubDocumentSeverMigration /
+SubdocRootGuardRemoval / MessagingBinding / WebMessaging / DomBridgeSessionLifetime / DialogBinding suites (59)
+and the architecture-guard + public-API-snapshot suites (17) pass; the broader window-context / sub-resource /
+cross-doc set is 126/129 with the three standing environmental `DomBridge_SerializeToHtml_*` zoom/srcdoc
+failures identical on the stashed baseline → zero regressions. **Finding:** the six sub-document caches + the two
+content-document maps were never bulk-cleared (only per-container removal), so they were a strong-ref leak across
+re-parse; the consolidation preserves that behaviour (a later single-`Clear()` leak-fix is now trivial — the
+owner is one seam — but was kept out of this behaviour-preserving slice).
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.16 named-accessor / relocated-infra /
+shared-write-hub / wide-explicit-host / no-host-static / state-owner pattern is the template for any residual
+coupling: Element/geometry, Window/Document, SVG, the residual Frames/browsing-context surface (the sub-window
+*object* with its scroll/getComputedStyle callbacks and the `WindowContext.cs` window-resolution *algorithms* —
+the **state** is now consolidated in `BrowsingContextManager`, P3.16), Canvas (better done with Phase 6, which
+dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
