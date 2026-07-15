@@ -5,6 +5,43 @@ namespace Broiler.UI.FormatCodeView.Tests;
 public sealed class UiFormatCodeViewTests
 {
     [Fact]
+    public void Editable_Text_Raises_Typed_Intent_And_Code_Tokens_Stay_Atomic()
+    {
+        var view = new TestFormatCodeView
+        {
+            Projection = ProjectBold("Hello"),
+            IsEditable = true,
+        };
+        FormatCodeEditRequestedEventArgs? raised = null;
+        view.EditRequested += (_, args) => raised = args;
+        int textStart = view.Text.IndexOf("Hello", StringComparison.Ordinal);
+
+        view.SetSelection(textStart + 1, textStart + 4);
+        Assert.True(view.RequestTextReplacement("i"));
+        ReplaceFormatCodeTextIntent replace = Assert.IsType<ReplaceFormatCodeTextIntent>(raised?.Intent);
+        Assert.Equal("i", replace.Text);
+
+        view.SetSelection(1, 3);
+        Assert.False(view.RequestTextReplacement("bad"));
+    }
+
+    [Fact]
+    public void Token_Delete_Requests_Its_Semantic_Removal_Intent()
+    {
+        var view = new TestFormatCodeView
+        {
+            Projection = ProjectBold("x"),
+            IsEditable = true,
+        };
+        FormatCodeEditRequestedEventArgs? raised = null;
+        view.EditRequested += (_, args) => raised = args;
+        view.SetSelection(0, 0);
+
+        Assert.True(view.RequestTokenRemoval());
+        Assert.Equal(FormatCodeProperty.Bold, raised?.Token?.EditDescriptor?.Property);
+        Assert.IsType<ApplyFormatCodeInlineIntent>(raised?.Intent);
+    }
+    [Fact]
     public void Projection_Selection_Is_Directional_And_Clamped()
     {
         var view = new TestFormatCodeView { Projection = Project("abcdef") };

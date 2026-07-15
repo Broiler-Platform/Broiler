@@ -118,6 +118,48 @@ public sealed class RichTextEditor
     }
 
     /// <summary>
+    /// Replaces an explicit document range as one transaction, independently of
+    /// the current selection. Used by synchronized structured editors.
+    /// </summary>
+    public bool ReplaceText(
+        RichTextRange range,
+        string text,
+        RichTextRange? afterSelection = null)
+    {
+        text ??= string.Empty;
+        range = ClampRange(range);
+        if (range.IsEmpty && text.Length == 0)
+            return false;
+
+        RichTextDocument document = Document;
+        var operations = new List<RichTextOperation>(2);
+        RichTextPosition at = range.Start;
+        if (!range.IsEmpty)
+        {
+            RichTextEditResult deletion = document.DeleteRange(range);
+            operations.Add(new DeleteRangeOperation(range));
+            document = deletion.Document;
+            at = deletion.Caret;
+        }
+
+        RichTextPosition caret = at;
+        if (text.Length > 0)
+        {
+            InlineStyle style = document.InlineStyleAt(at);
+            RichTextEditResult insertion = document.InsertText(at, text, style);
+            operations.Add(new InsertTextOperation(at, text));
+            document = insertion.Document;
+            caret = insertion.Caret;
+        }
+
+        RichTextRange resolvedAfter = afterSelection is RichTextRange requested
+            ? ClampRange(document, requested)
+            : RichTextRange.Caret(caret);
+        Commit(document, resolvedAfter, operations);
+        return true;
+    }
+
+    /// <summary>
     /// Inserts a whole document's rich content at the caret, replacing the current
     /// selection, as one undo transaction. This is the rich-paste primitive.
     /// </summary>
@@ -219,6 +261,31 @@ public sealed class RichTextEditor
         return true;
     }
 
+    /// <summary>Applies an inline delta to an explicit range as one transaction.</summary>
+    public bool ApplyInlineStyle(
+        RichTextRange range,
+        InlineStyleDelta delta,
+        RichTextRange? afterSelection = null)
+    {
+        range = ClampRange(range);
+        if (range.IsEmpty)
+        {
+            SetSelection(range);
+            _pendingInline = _pendingInline is InlineStyleDelta existing
+                ? Compose(existing, delta)
+                : delta;
+            return false;
+        }
+
+        RichTextDocument document = Document.ApplyInlineStyle(range, delta);
+        RichTextRange resolvedAfter = afterSelection is RichTextRange requested
+            ? ClampRange(document, requested)
+            : range;
+        Commit(document, resolvedAfter,
+            new[] { (RichTextOperation)new ApplyInlineStyleOperation(range, delta) });
+        return true;
+    }
+
     public bool SetBold(bool on) => ApplyInlineStyle(InlineStyleDelta.ToggleBold(on));
 
     public bool SetItalic(bool on) => ApplyInlineStyle(InlineStyleDelta.ToggleItalic(on));
@@ -236,6 +303,22 @@ public sealed class RichTextEditor
 
         RichTextDocument document = Document.ApplyParagraphStyle(Selection, delta);
         Commit(document, Selection, new[] { (RichTextOperation)new ApplyParagraphStyleOperation(Selection, delta) });
+        return true;
+    }
+
+    /// <summary>Applies a paragraph delta to an explicit range as one transaction.</summary>
+    public bool ApplyParagraphStyle(
+        RichTextRange range,
+        ParagraphStyleDelta delta,
+        RichTextRange? afterSelection = null)
+    {
+        range = ClampRange(range);
+        RichTextDocument document = Document.ApplyParagraphStyle(range, delta);
+        RichTextRange resolvedAfter = afterSelection is RichTextRange requested
+            ? ClampRange(document, requested)
+            : range;
+        Commit(document, resolvedAfter,
+            new[] { (RichTextOperation)new ApplyParagraphStyleOperation(range, delta) });
         return true;
     }
 
@@ -353,6 +436,11 @@ public sealed class RichTextEditor
         while (_undo.Count > MaxHistoryDepth)
             _undo.RemoveAt(0);
     }
+
+    private RichTextRange ClampRange(RichTextRange range) => ClampRange(Document, range);
+
+    private static RichTextRange ClampRange(RichTextDocument document, RichTextRange range) =>
+        new(document.ClampPosition(range.Anchor), document.ClampPosition(range.Focus));
 
     private static InlineStyleDelta Compose(InlineStyleDelta baseDelta, InlineStyleDelta over) => new()
     {

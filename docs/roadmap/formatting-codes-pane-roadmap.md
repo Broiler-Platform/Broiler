@@ -1,7 +1,7 @@
 # Broiler Writer Formatting Codes Pane Roadmap
 
-> **Status:** Phase 3 complete; Phase 4 ready
-> **Last updated:** 2026-07-12
+> **Status:** Phase 4 complete; Phase 5 is optional and requires an explicit go/no-go review
+> **Last updated:** 2026-07-15
 > **Scope:** An independently designed bottom pane inspired by the WordPerfect®
 > word processor that presents Broiler's rich-text state as simple text tokens such as
 > `[Bold ON]Hello World![Bold OFF]`.
@@ -648,28 +648,33 @@ Exit gate - **read-only preview milestone**:
 
 **Estimate:** 10-15 engineering days
 
+**Status:** Complete (2026-07-15). Public evidence is recorded in the
+[`Phase 4 implementation record`](formatting-codes-phase4/implementation-record.md)
+and the machine-readable
+[`Phase 4 boundary record`](formatting-codes-phase4/phase4-boundary.json).
+
 Tasks:
 
-- Define typed `FormatCodeEditIntent` operations and validation.
-- Add missing explicit-range operations to `RichTextEditor`/`UiRichEdit`, each as
+- [x] Define typed `FormatCodeEditIntent` operations and validation.
+- [x] Add missing explicit-range operations to `RichTextEditor`/`UiRichEdit`, each as
   one undo transaction with before/after selection.
-- Permit ordinary text edits within text tokens.
-- Keep code tokens atomic. Backspace/Delete selects an intentional action rather
+- [x] Permit ordinary text edits within text tokens.
+- [x] Keep code tokens atomic. Backspace/Delete selects an intentional action rather
   than silently producing malformed bracket text.
-- Add code property editing, Clear Formatting, Insert Code palette, and link/color
+- [x] Add code property editing, Clear Formatting, Insert Code palette, and link/color
   validation.
-- Define deletion semantics as semantic operations. Recommended first behavior:
+- [x] Define deletion semantics as semantic operations. Recommended first behavior:
   deleting a paired code offers “remove this formatting from its affected range”
   rather than imitating endpoint leakage.
-- Add undo/redo, IME, clipboard, read-only, malformed-intent, and selection tests.
+- [x] Add undo/redo, IME, clipboard, read-only, malformed-intent, and selection tests.
 
 Exit gate - **structured editable milestone**:
 
-- every pane action is one predictable undo unit;
-- undo/redo from either pane restores the same document and selections;
-- no edit bypasses read-only state or document limits;
-- token actions cannot create an unrepresentable document; and
-- projector output after every edit is canonical.
+- [x] every pane action is one predictable undo unit;
+- [x] undo/redo from either pane restores the same document and selections;
+- [x] no edit bypasses read-only state or document limits;
+- [x] token actions cannot create an unrepresentable document; and
+- [x] projector output after every edit is canonical.
 
 ### Phase 5 - Advanced textual source editing (optional)
 

@@ -10,8 +10,8 @@ using Broiler.UI.RichEdit;
 namespace Broiler.Writer.FormatCodes;
 
 /// <summary>
-/// Keeps a Writer RichEdit and its read-only Formatting Codes view synchronized.
-/// It never moves focus and never replaces or edits the source document.
+/// Keeps a Writer RichEdit and its Formatting Codes view synchronized. Structured
+/// edits use typed intents and RichEdit's single transaction history.
 /// </summary>
 public sealed class WriterFormatCodesController : IDisposable
 {
@@ -20,6 +20,7 @@ public sealed class WriterFormatCodesController : IDisposable
     private readonly IUiDispatcher _dispatcher;
     private readonly FormatCodeProjector _projector;
     private readonly IWriterFormatCodesScheduler _scheduler;
+    private readonly FormatCodeEditLimits _editLimits;
     private CancellationTokenSource? _projectionCancellation;
     private FormatCodeProjection? _projection;
     private RichTextDocument? _projectedDocument;
@@ -34,19 +35,25 @@ public sealed class WriterFormatCodesController : IDisposable
         UiFormatCodeView view,
         IUiDispatcher dispatcher,
         FormatCodeProjector? projector = null,
-        IWriterFormatCodesScheduler? scheduler = null)
+        IWriterFormatCodesScheduler? scheduler = null,
+        FormatCodeEditLimits? editLimits = null)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _view = view ?? throw new ArgumentNullException(nameof(view));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _projector = projector ?? new FormatCodeProjector();
         _scheduler = scheduler ?? new WriterFormatCodesScheduler();
+        _editLimits = editLimits ?? FormatCodeEditLimits.Default;
 
         _editor.DocumentChanged += EditorDocumentChanged;
         _editor.SelectionChanged += EditorSelectionChanged;
         _editor.CommandExecuted += EditorCommandExecuted;
         _view.SelectionChanged += ViewSelectionChanged;
         _view.NavigationRequested += ViewNavigationRequested;
+        _view.EditRequested += ViewEditRequested;
+        _view.UndoRequested += ViewUndoRequested;
+        _view.RedoRequested += ViewRedoRequested;
+        SynchronizeEditableState();
         Refresh();
     }
 
@@ -83,6 +90,131 @@ public sealed class WriterFormatCodesController : IDisposable
         _editor.CommandExecuted -= EditorCommandExecuted;
         _view.SelectionChanged -= ViewSelectionChanged;
         _view.NavigationRequested -= ViewNavigationRequested;
+        _view.EditRequested -= ViewEditRequested;
+        _view.UndoRequested -= ViewUndoRequested;
+        _view.RedoRequested -= ViewRedoRequested;
+    }
+
+    /// <summary>Executes a validated structured intent through RichEdit.</summary>
+    public bool ExecuteIntent(FormatCodeEditIntent intent)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(intent);
+        SynchronizeEditableState();
+        if (!_view.IsEditable || !ProjectionMatchesEditor())
+        {
+            SetStatus("Formatting Codes edit rejected: FCEDIT100");
+            return false;
+        }
+
+        FormatCodeEditValidationResult validation =
+            FormatCodeEditValidator.Validate(_editor.Document, intent, _editLimits);
+        if (!validation.IsValid)
+        {
+            SetStatus($"Formatting Codes edit rejected: {validation.ErrorCode}");
+            return false;
+        }
+
+        bool changed = intent switch
+        {
+            ReplaceFormatCodeTextIntent replace =>
+                _editor.ReplaceTextRange(replace.Range, replace.Text),
+            ApplyFormatCodeInlineIntent inline =>
+                _editor.ApplyInlineStyleRange(inline.Range, inline.Delta, inline.Range),
+            ApplyFormatCodeParagraphIntent paragraph =>
+                _editor.ApplyParagraphStyleRange(paragraph.Range, paragraph.Delta, paragraph.Range),
+            _ => false,
+        };
+
+        // Empty-range inline edits change pending caret style without changing
+        // the document snapshot or raising DocumentChanged.
+        if (!changed && intent is ApplyFormatCodeInlineIntent { Range.IsEmpty: true })
+            StartProjection();
+        SetStatus(changed
+            ? "Formatting Codes edit applied"
+            : "Formatting Codes edit made no document change");
+        return changed || intent is ApplyFormatCodeInlineIntent { Range.IsEmpty: true };
+    }
+
+    public bool ExecutePaletteEntry(FormatCodePaletteEntry entry, object? value = null)
+    {
+        ThrowIfDisposed();
+        FormatCodeEditIntent intent;
+        try
+        {
+            intent = FormatCodeInsertPalette.Create(entry, _editor.Selection, value);
+        }
+        catch (ArgumentException)
+        {
+            SetStatus("Formatting Codes edit rejected: FCEDIT101");
+            return false;
+        }
+        return ExecuteIntent(intent);
+    }
+
+    public bool ClearFormatting() => ExecuteIntent(
+        new ApplyFormatCodeInlineIntent(_editor.Selection, InlineStyleDelta.Clear));
+
+    public bool RemoveTokenFormatting(FormatCodeToken token)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(token);
+        if (!ProjectionMatchesEditor() || !ProjectionContainsToken(token) ||
+            token.EditDescriptor is not FormatCodeTokenEditDescriptor descriptor)
+        {
+            SetStatus("Formatting Codes edit rejected: FCEDIT102");
+            return false;
+        }
+        return ExecuteIntent(descriptor.RemovalIntent);
+    }
+
+    /// <summary>Changes the typed property represented by a projected code token.</summary>
+    public bool EditTokenProperty(FormatCodeToken token, object? value)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(token);
+        if (!ProjectionMatchesEditor() || !ProjectionContainsToken(token) ||
+            token.EditDescriptor is not FormatCodeTokenEditDescriptor descriptor)
+        {
+            SetStatus("Formatting Codes edit rejected: FCEDIT102");
+            return false;
+        }
+
+        RichTextRange range = descriptor.RemovalIntent.Range;
+        if (value is false && descriptor.Property is >= FormatCodeProperty.Bold and <= FormatCodeProperty.Strikethrough)
+            return ExecuteIntent(descriptor.RemovalIntent);
+
+        try
+        {
+            FormatCodePaletteEntry entry = descriptor.Property switch
+            {
+                FormatCodeProperty.Bold => FormatCodePaletteEntry.Bold,
+                FormatCodeProperty.Italic => FormatCodePaletteEntry.Italic,
+                FormatCodeProperty.Underline => FormatCodePaletteEntry.Underline,
+                FormatCodeProperty.Strikethrough => FormatCodePaletteEntry.Strikethrough,
+                FormatCodeProperty.FontFamily => FormatCodePaletteEntry.FontFamily,
+                FormatCodeProperty.FontSize => FormatCodePaletteEntry.FontSize,
+                FormatCodeProperty.Foreground => FormatCodePaletteEntry.Foreground,
+                FormatCodeProperty.Background => FormatCodePaletteEntry.Background,
+                FormatCodeProperty.Link => FormatCodePaletteEntry.Link,
+                FormatCodeProperty.Alignment when value is TextAlignment.Left => FormatCodePaletteEntry.AlignLeft,
+                FormatCodeProperty.Alignment when value is TextAlignment.Center => FormatCodePaletteEntry.AlignCenter,
+                FormatCodeProperty.Alignment when value is TextAlignment.Right => FormatCodePaletteEntry.AlignRight,
+                FormatCodeProperty.ListKind when value is ListKind.Bullet => FormatCodePaletteEntry.BulletList,
+                FormatCodeProperty.ListKind when value is ListKind.Numbered => FormatCodePaletteEntry.NumberedList,
+                FormatCodeProperty.IndentLevel => FormatCodePaletteEntry.Indent,
+                FormatCodeProperty.LineSpacing => FormatCodePaletteEntry.LineSpacing,
+                FormatCodeProperty.SpacingBefore => FormatCodePaletteEntry.SpacingBefore,
+                FormatCodeProperty.SpacingAfter => FormatCodePaletteEntry.SpacingAfter,
+                _ => throw new ArgumentException("The value does not match the token property.", nameof(value)),
+            };
+            return ExecuteIntent(FormatCodeInsertPalette.Create(entry, range, value));
+        }
+        catch (ArgumentException)
+        {
+            SetStatus("Formatting Codes edit rejected: FCEDIT101");
+            return false;
+        }
     }
 
     private void EditorDocumentChanged(object? sender, RichEditDocumentChangedEventArgs e)
@@ -144,6 +276,36 @@ public sealed class WriterFormatCodesController : IDisposable
         SetStatus(e.Token is null
             ? "Formatting Codes navigation"
             : $"Formatting Codes: {e.Token.DisplayText}");
+    }
+
+    private void ViewEditRequested(object? sender, FormatCodeEditRequestedEventArgs e)
+    {
+        if (_disposed || !ProjectionMatchesEditor())
+            return;
+        if (e.Token is not null && !ProjectionContainsToken(e.Token))
+        {
+            SetStatus("Formatting Codes edit rejected: FCEDIT102");
+            return;
+        }
+        ExecuteIntent(e.Intent);
+    }
+
+    private void ViewUndoRequested(object? sender, EventArgs e)
+    {
+        if (_disposed)
+            return;
+        SynchronizeEditableState();
+        if (_view.IsEditable)
+            _editor.ExecuteCommand(RichEditCommand.Undo);
+    }
+
+    private void ViewRedoRequested(object? sender, EventArgs e)
+    {
+        if (_disposed)
+            return;
+        SynchronizeEditableState();
+        if (_view.IsEditable)
+            _editor.ExecuteCommand(RichEditCommand.Redo);
     }
 
     private void StartProjection()
@@ -221,6 +383,7 @@ public sealed class WriterFormatCodesController : IDisposable
 
         _projection = projection;
         _projectedDocument = document;
+        SynchronizeEditableState();
         RunSynchronized(() => _view.Projection = projection);
         SetProjectionPending(false);
         SynchronizeEditorSelection();
@@ -260,6 +423,26 @@ public sealed class WriterFormatCodesController : IDisposable
 
     private bool ProjectionMatchesEditor() =>
         _projection is not null && ReferenceEquals(_projectedDocument, _editor.Document);
+
+    private bool ProjectionContainsToken(FormatCodeToken token)
+    {
+        if (_projection is null)
+            return false;
+        foreach (FormatCodeToken candidate in _projection.Tokens)
+        {
+            if (ReferenceEquals(candidate, token))
+                return true;
+        }
+        foreach (FormatCodeToken candidate in _projection.PendingTokens)
+        {
+            if (ReferenceEquals(candidate, token))
+                return true;
+        }
+        return false;
+    }
+
+    private void SynchronizeEditableState() =>
+        _view.IsEditable = _editor.IsEnabled && !_editor.IsReadOnly;
 
     private bool CanPublish(long generation, RichTextDocument document) =>
         !_disposed && generation == _generation && ReferenceEquals(document, _editor.Document);

@@ -8,7 +8,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <RootNamespace>Broiler.Writer.FormatCodes</RootNamespace>
     <AssemblyName>Broiler.Writer.FormatCodes</AssemblyName>
-    <Description>Shared Formatting Codes synchronization and host policy for Broiler Writer.</Description>
+    <Description>Shared Formatting Codes synchronization, structured editing, and host policy for Broiler Writer.</Description>
   </PropertyGroup>
 
   <ItemGroup>

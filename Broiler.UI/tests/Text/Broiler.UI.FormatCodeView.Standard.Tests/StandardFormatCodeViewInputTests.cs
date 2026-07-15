@@ -1,10 +1,59 @@
 using Broiler.Graphics;
 using Broiler.Input.Keyboard;
+using Broiler.Input.Text;
 
 namespace Broiler.UI.FormatCodeView.Standard.Tests;
 
 public sealed class StandardFormatCodeViewInputTests
 {
+    [Fact]
+    public void Committed_Ime_Text_Raises_One_Structured_Edit()
+    {
+        using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
+            new BSize(320, 100),
+            FormatCodeViewStandardHarness.Project("hello"));
+        scene.View.IsEditable = true;
+        scene.Session.SetFocus(scene.View);
+        scene.View.SetSelection(1, 4);
+        var edits = new List<FormatCodeEditRequestedEventArgs>();
+        scene.View.EditRequested += (_, args) => edits.Add(args);
+
+        Assert.True(scene.Route.Dispatch(new TextCompositionEvent(
+            FormatCodeViewStandardHarness.Header("ime"),
+            "ni",
+            TextCompositionState.Updated)));
+        Assert.Equal("ni", scene.View.CompositionText);
+        Assert.Empty(edits);
+
+        Assert.True(scene.Route.Dispatch(new TextCompositionEvent(
+            FormatCodeViewStandardHarness.Header("ime"),
+            "你",
+            TextCompositionState.Committed)));
+        ReplaceFormatCodeTextIntent intent = Assert.IsType<ReplaceFormatCodeTextIntent>(
+            Assert.Single(edits).Intent);
+        Assert.Equal("你", intent.Text);
+        Assert.Empty(scene.View.CompositionText);
+    }
+
+    [Fact]
+    public void Backspace_On_Code_Requests_Semantic_Removal_Not_Bracket_Deletion()
+    {
+        RichTextDocument document = RichTextDocument.FromParagraphs(
+            [RichTextParagraph.Create("x", new InlineStyle { Bold = true })]);
+        using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
+            new BSize(320, 100), new FormatCodeProjector().Project(document));
+        scene.View.IsEditable = true;
+        scene.Session.SetFocus(scene.View);
+        FormatCodeEditRequestedEventArgs? edit = null;
+        scene.View.EditRequested += (_, args) => edit = args;
+        int afterOpenCode = scene.View.Projection!.Tokens[0].ProjectedLength;
+        scene.View.SetSelection(afterOpenCode, afterOpenCode);
+
+        Assert.True(scene.Route.Dispatch(FormatCodeViewStandardHarness.Key(
+            "Backspace", BVirtualKey.Back)));
+        Assert.Equal(FormatCodeProperty.Bold, edit?.Token?.EditDescriptor?.Property);
+        Assert.IsType<ApplyFormatCodeInlineIntent>(edit?.Intent);
+    }
     [Fact]
     public void Pointer_Click_Requests_Typed_Navigation_And_Drag_Selects()
     {

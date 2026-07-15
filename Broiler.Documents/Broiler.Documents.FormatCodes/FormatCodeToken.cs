@@ -14,6 +14,7 @@ public sealed class FormatCodeToken
         RichTextPosition sourceAfter,
         RichTextRange? affectedRange,
         FormatCodeEditCapabilities editCapabilities,
+        FormatCodeTokenEditDescriptor? editDescriptor,
         FormatCodeMappingMode mappingMode)
     {
         Kind = kind;
@@ -24,6 +25,7 @@ public sealed class FormatCodeToken
         SourceAfter = sourceAfter;
         AffectedRange = affectedRange;
         EditCapabilities = editCapabilities;
+        EditDescriptor = editDescriptor;
         MappingMode = mappingMode;
     }
 
@@ -43,6 +45,8 @@ public sealed class FormatCodeToken
     public RichTextRange? AffectedRange { get; }
 
     public FormatCodeEditCapabilities EditCapabilities { get; }
+
+    public FormatCodeTokenEditDescriptor? EditDescriptor { get; }
 
     internal FormatCodeMappingMode MappingMode { get; }
 }

@@ -5,6 +5,7 @@ using Broiler.Documents.FormatCodes;
 using Broiler.Graphics;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
+using Broiler.Input.Text;
 using Broiler.UI.Standard;
 
 namespace Broiler.UI.FormatCodeView.Standard;
@@ -30,6 +31,7 @@ public sealed class StandardFormatCodeView : UiFormatCodeView, IStandardThemedCo
     private bool _isSelecting;
     private ScrollbarAxis _dragAxis;
     private double _scrollbarDragOffset;
+    private string _compositionText = string.Empty;
 
     public StandardFormatCodeView()
     {
@@ -79,6 +81,10 @@ public sealed class StandardFormatCodeView : UiFormatCodeView, IStandardThemedCo
     public double VerticalScrollOffset => _scrollY;
 
     public double HorizontalScrollOffset => _scrollX;
+
+    public string CompositionText => _compositionText;
+
+    protected override bool IsCompositionActive => _compositionText.Length > 0;
 
     public int VisualLineCount
     {
@@ -154,8 +160,10 @@ public sealed class StandardFormatCodeView : UiFormatCodeView, IStandardThemedCo
         DrawVisibleText(list);
         DrawPendingTokens(list);
         DrawCaret(list, focused);
+        DrawComposition(list, focused);
         list.PopClip();
         DrawScrollbars(list);
+        PublishCaret(focused);
     }
 
     protected override bool OnInput(UiInputEvent input)
@@ -167,9 +175,19 @@ public sealed class StandardFormatCodeView : UiFormatCodeView, IStandardThemedCo
             UiInputEventKind.PointerButton => HandlePointerButton(input),
             UiInputEventKind.PointerMove => HandlePointerMove(input),
             UiInputEventKind.PointerWheel => HandleWheel(input),
+            UiInputEventKind.TextInput => RequestTextReplacement(input.Text ?? string.Empty),
+            UiInputEventKind.TextComposition => HandleTextComposition(input),
             UiInputEventKind.KeyboardKey => HandleKeyboard(input),
             _ => false,
         };
+    }
+
+    protected override void OnDetached()
+    {
+        if (Session?.Host is IUiTextInputHost textInput)
+            textInput.ClearCaret(this);
+        _compositionText = string.Empty;
+        base.OnDetached();
     }
 
     private void DrawVisibleText(BRenderList list)
@@ -236,6 +254,54 @@ public sealed class StandardFormatCodeView : UiFormatCodeView, IStandardThemedCo
         double x = ContentLeft + ((CaretOffset - line.Start) * _characterAdvance) - _scrollX;
         double y = ContentTop + line.Top - _scrollY;
         list.FillRect(new BRect(x, y + 1, 1, Math.Max(1, _lineHeight - 2)), CaretColor);
+    }
+
+    private void DrawComposition(BRenderList list, bool focused)
+    {
+        if (!focused || _compositionText.Length == 0)
+            return;
+        BRect caret = CaretBounds();
+        double advance = BTextMeasurer.MeasureAdvance(_compositionText, Font);
+        list.DrawText(new BTextRun(_compositionText, Font, Foreground), new BPoint(caret.Left, caret.Top));
+        list.FillRect(new BRect(caret.Left, caret.Bottom - 1, advance, 1), Foreground);
+    }
+
+    private void PublishCaret(bool focused)
+    {
+        if (!focused || Session?.Host is not IUiTextInputHost textInput)
+            return;
+        textInput.PublishCaret(new UiTextCaretInfo(
+            this,
+            CaretBounds(),
+            CaretOffset,
+            SelectionStart,
+            SelectionLength,
+            IsCompositionActive));
+    }
+
+    private BRect CaretBounds()
+    {
+        VisualLine line = LineForOffset(CaretOffset);
+        double x = ContentLeft + ((CaretOffset - line.Start) * _characterAdvance) - _scrollX;
+        double y = ContentTop + line.Top - _scrollY;
+        return new BRect(x, y + 1, 1, Math.Max(1, _lineHeight - 2));
+    }
+
+    private bool HandleTextComposition(UiInputEvent input)
+    {
+        if (!IsEditable)
+            return false;
+        TextCompositionState state = input.CompositionState ?? TextCompositionState.Updated;
+        if (state is TextCompositionState.Started or TextCompositionState.Updated)
+        {
+            _compositionText = input.Text ?? string.Empty;
+            Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
+            return true;
+        }
+        _compositionText = string.Empty;
+        Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
+        return state != TextCompositionState.Committed ||
+            RequestTextReplacement(input.Text ?? string.Empty);
     }
 
     private void DrawPendingTokens(BRenderList list)
@@ -355,6 +421,20 @@ public sealed class StandardFormatCodeView : UiFormatCodeView, IStandardThemedCo
         }
         if (control && IsKey(input, BVirtualKey.C, "C"))
             return CopySelection();
+        if (control && IsKey(input, 0x58, "X"))
+            return CutSelection();
+        if (control && IsKey(input, 0x56, "V"))
+            return Paste();
+        if (control && IsKey(input, 0x5A, "Z"))
+        {
+            RequestUndo();
+            return true;
+        }
+        if (control && IsKey(input, 0x59, "Y"))
+        {
+            RequestRedo();
+            return true;
+        }
         if (control && IsKey(input, 0x46, "F"))
         {
             RequestSearch();
@@ -377,6 +457,10 @@ public sealed class StandardFormatCodeView : UiFormatCodeView, IStandardThemedCo
             ActivateAt(CaretOffset);
             return true;
         }
+        if (IsKey(input, BVirtualKey.Back, "Backspace"))
+            return DeleteProjected(backward: true);
+        if (IsKey(input, 0x2E, "Delete"))
+            return DeleteProjected(backward: false);
         if (IsKey(input, BVirtualKey.Left, "Left"))
         {
             MoveCaret(control ? PreviousTokenBoundary(CaretOffset) : PreviousTextBoundary(CaretOffset), shift);
@@ -422,6 +506,27 @@ public sealed class StandardFormatCodeView : UiFormatCodeView, IStandardThemedCo
             return true;
         }
 
+        return false;
+    }
+
+    private bool DeleteProjected(bool backward)
+    {
+        if (!IsEditable)
+            return false;
+        if (HasSelection)
+            return RequestTextReplacement(string.Empty);
+        if (RequestTokenRemoval(backward))
+            return true;
+
+        int target = backward ? PreviousTextBoundary(CaretOffset) : NextTextBoundary(CaretOffset);
+        if (target == CaretOffset)
+            return false;
+        int start = Math.Min(target, CaretOffset);
+        int end = Math.Max(target, CaretOffset);
+        SetSelection(start, end);
+        if (RequestTextReplacement(string.Empty))
+            return true;
+        SetSelection(CaretOffset, CaretOffset);
         return false;
     }
 

@@ -11,6 +11,93 @@ namespace Broiler.Writer.FormatCodes.Tests;
 public sealed class WriterFormatCodesControllerTests
 {
     [Fact]
+    public void Text_Edit_From_Pane_Is_Atomic_And_Undoable_From_Either_Pane()
+    {
+        var editor = new StandardRichEdit();
+        editor.SetPlainText("hello");
+        var view = new TestFormatCodeView();
+        using var controller = CreateController(editor, view);
+        view.SetSelection(1, 4);
+
+        Assert.True(view.RequestTextReplacement("i"));
+        Assert.Equal("hio", editor.GetPlainText());
+        Assert.True(editor.ExecuteCommand(RichEditCommand.Undo));
+        Assert.Equal("hello", editor.GetPlainText());
+
+        view.RequestRedoForTest();
+        Assert.Equal("hio", editor.GetPlainText());
+    }
+
+    [Fact]
+    public void Deleting_A_Code_Removes_Formatting_Without_Deleting_Text()
+    {
+        StandardRichEdit editor = BoldEditor("hello");
+        var view = new TestFormatCodeView();
+        using var controller = CreateController(editor, view);
+        view.SetSelection(0, 0);
+
+        Assert.True(view.RequestTokenRemoval());
+        Assert.Equal("hello", editor.GetPlainText());
+        Assert.Equal("hello", view.Text);
+        Assert.True(editor.ExecuteCommand(RichEditCommand.Undo));
+        Assert.Equal("[Bold ON]hello[Bold OFF]", view.Text);
+    }
+
+    [Fact]
+    public void ReadOnly_And_Unsafe_Link_Intents_Are_Rejected()
+    {
+        var editor = new StandardRichEdit();
+        editor.SetPlainText("hello");
+        var view = new TestFormatCodeView();
+        using var controller = CreateController(editor, view);
+        var range = new RichTextRange(editor.Document.Start, editor.Document.End);
+
+        Assert.False(controller.ExecuteIntent(new ApplyFormatCodeInlineIntent(
+            range, InlineStyleDelta.WithLink("javascript:alert(1)"))));
+        Assert.Contains("FCEDIT022", controller.Status);
+
+        editor.IsReadOnly = true;
+        Assert.False(controller.ExecuteIntent(new ReplaceFormatCodeTextIntent(range, "changed")));
+        Assert.Equal("hello", editor.GetPlainText());
+    }
+
+    [Fact]
+    public void Insert_Code_Palette_Applies_Validated_Formatting()
+    {
+        var editor = new StandardRichEdit();
+        editor.SetPlainText("hello");
+        editor.Selection = new RichTextRange(editor.Document.Start, editor.Document.End);
+        var view = new TestFormatCodeView();
+        using var controller = CreateController(editor, view);
+
+        Assert.True(controller.ExecutePaletteEntry(FormatCodePaletteEntry.Bold));
+        Assert.Equal("[Bold ON]hello[Bold OFF]", view.Text);
+        Assert.False(controller.ExecutePaletteEntry(FormatCodePaletteEntry.Link, "file:///secret"));
+    }
+
+    [Fact]
+    public void Scalar_Code_Property_Can_Be_Edited_Without_Parsing_Its_Label()
+    {
+        var editor = new StandardRichEdit
+        {
+            Document = RichTextDocument.FromParagraphs(
+                [RichTextParagraph.Create("link", new InlineStyle
+                {
+                    LinkHref = "https://old.example.test",
+                })]),
+        };
+        var view = new TestFormatCodeView();
+        using var controller = CreateController(editor, view);
+        FormatCodeToken link = Assert.Single(
+            controller.Projection!.Tokens,
+            token => token.EditDescriptor?.Property == FormatCodeProperty.Link &&
+                token.DisplayText.StartsWith("[Link \"", StringComparison.Ordinal));
+
+        Assert.True(controller.EditTokenProperty(link, "https://new.example.test"));
+        Assert.Contains("https://new.example.test", view.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("https://old.example.test", view.Text, StringComparison.Ordinal);
+    }
+    [Fact]
     public void Initial_Projection_Uses_Canonical_Bracket_Text()
     {
         StandardRichEdit editor = BoldEditor("Hello World!");
@@ -226,6 +313,8 @@ public sealed class WriterFormatCodesControllerTests
     private sealed class TestFormatCodeView : UiFormatCodeView
     {
         public void Activate(int offset) => ActivateAt(offset);
+
+        public void RequestRedoForTest() => RequestRedo();
     }
 
     private sealed class TestDispatcher : IUiDispatcher

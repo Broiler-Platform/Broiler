@@ -246,7 +246,7 @@ making the typed-document render path work to drop per-frame HTML re-parsing.)*
 
 | # | Task | Detail |
 |---|------|--------|
-| 3.1 | Packaging | Self-contained Windows build (single-folder or installer); app icon, version stamp. |
+| 3.1 | Packaging | Self-contained Windows build (single-folder or installer); app icon, version stamp. The first preview consumes Phase 0/1 of the [application installation and update roadmap](application-installation-and-update-roadmap.md): product/version contracts and a reviewed, signed portable artifact. Native installers, profile self-installation, automatic update, and rollback remain follow-up phases unless maintainers explicitly promote them to preview blockers. |
 | 3.2 | Crash/error UX | Graceful page-load errors, render-exception guard (don't hard-crash on a bad page). |
 | 3.3 | Smoke suite | A small set of "must render" real-world pages run in CI against the Graphics app (the README already aspires to a heise.de capture — wire it to the new app). |
 | 3.4 | Docs refresh | ✅ Root and component READMEs now disclose preview instability, AI assistance, foundation provenance, licensing, and human-review status. Add final artifact install/run instructions and the WPT coverage dashboard link when those exist. |

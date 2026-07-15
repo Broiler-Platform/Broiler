@@ -1,12 +1,13 @@
 using System;
 using System.Linq;
 using Broiler.Documents.FormatCodes;
+using Broiler.Documents.Model;
 using Broiler.Graphics;
 
 namespace Broiler.UI.FormatCodeView;
 
 /// <summary>
-/// Platform-neutral state and commands for a read-only Formatting Codes view.
+/// Platform-neutral state and commands for a token-aware Formatting Codes view.
 /// Rendering and input are supplied by the Standard implementation. Canonical
 /// bracket text is never reparsed for interaction; typed projector mappings are
 /// authoritative.
@@ -15,6 +16,7 @@ public abstract class UiFormatCodeView : UiElement
 {
     private FormatCodeProjection? _projection;
     private bool _isEnabled = true;
+    private bool _isEditable;
     private BSize _preferredSize = new(320, 160);
     private FormatCodeViewWrapping _wrapping = FormatCodeViewWrapping.Wrap;
     private FormatCodeViewScrollPolicy _verticalScrollPolicy = FormatCodeViewScrollPolicy.Auto;
@@ -27,6 +29,12 @@ public abstract class UiFormatCodeView : UiElement
     public event EventHandler<FormatCodeViewSelectionChangedEventArgs>? SelectionChanged;
 
     public event EventHandler<FormatCodeNavigationRequestedEventArgs>? NavigationRequested;
+
+    public event EventHandler<FormatCodeEditRequestedEventArgs>? EditRequested;
+
+    public event EventHandler? UndoRequested;
+
+    public event EventHandler? RedoRequested;
 
     public event EventHandler? ExitRequested;
 
@@ -66,6 +74,19 @@ public abstract class UiFormatCodeView : UiElement
             if (_isEnabled == value)
                 return;
             _isEnabled = value;
+            Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
+        }
+    }
+
+    public bool IsEditable
+    {
+        get => _isEditable;
+        set
+        {
+            ThrowIfDisposed();
+            if (_isEditable == value)
+                return;
+            _isEditable = value;
             Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
         }
     }
@@ -174,6 +195,89 @@ public abstract class UiFormatCodeView : UiElement
         return true;
     }
 
+    /// <summary>
+    /// Requests replacement of the current projected selection. Only ordinary
+    /// text spans and whole escape tokens are accepted; code tokens stay atomic.
+    /// </summary>
+    public bool RequestTextReplacement(string text)
+    {
+        ThrowIfDisposed();
+        text ??= string.Empty;
+        if (!IsEnabled || !IsEditable || Projection is null ||
+            !TryMapEditableTextRange(SelectionStart, SelectionEnd, out var range))
+        {
+            return false;
+        }
+
+        EditRequested?.Invoke(this, new FormatCodeEditRequestedEventArgs(
+            new ReplaceFormatCodeTextIntent(range, text)));
+        return true;
+    }
+
+    public bool CutSelection()
+    {
+        ThrowIfDisposed();
+        if (!HasSelection || Session?.Host is not IUiClipboardHost clipboard)
+            return false;
+        string selected = GetSelectedText();
+        if (!RequestTextReplacement(string.Empty))
+            return false;
+        clipboard.SetText(selected);
+        return true;
+    }
+
+    public bool Paste()
+    {
+        ThrowIfDisposed();
+        return Session?.Host is IUiClipboardHost clipboard &&
+            clipboard.TryGetText(out string text) && RequestTextReplacement(text);
+    }
+
+    /// <summary>Requests the semantic removal attached to the token at the caret.</summary>
+    public bool RequestTokenRemoval(bool backward = false)
+    {
+        ThrowIfDisposed();
+        if (!IsEnabled || !IsEditable || Projection is null)
+            return false;
+
+        FormatCodeToken? token = TokenForRemoval(backward);
+        if (token?.EditDescriptor is not FormatCodeTokenEditDescriptor descriptor)
+            return false;
+        EditRequested?.Invoke(this,
+            new FormatCodeEditRequestedEventArgs(descriptor.RemovalIntent, token));
+        return true;
+    }
+
+    /// <summary>Requests an already typed property edit supplied by host UI.</summary>
+    public bool RequestEdit(FormatCodeEditIntent intent, FormatCodeToken? token = null)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(intent);
+        if (!IsEnabled || !IsEditable || Projection is null)
+            return false;
+        EditRequested?.Invoke(this, new FormatCodeEditRequestedEventArgs(intent, token));
+        return true;
+    }
+
+    /// <summary>Requests a typed Insert Code palette action at the mapped selection.</summary>
+    public bool RequestPaletteEntry(FormatCodePaletteEntry entry, object? value = null)
+    {
+        ThrowIfDisposed();
+        if (!IsEnabled || !IsEditable || Projection is null)
+            return false;
+        RichTextPosition anchor = Projection.MapProjectedOffset(SelectionAnchor).DocumentPosition;
+        RichTextPosition focus = Projection.MapProjectedOffset(SelectionFocus).DocumentPosition;
+        try
+        {
+            return RequestEdit(FormatCodeInsertPalette.Create(
+                entry, new RichTextRange(anchor, focus), value));
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     public bool Find(string query, bool matchCase = false, bool wrap = true)
     {
         ThrowIfDisposed();
@@ -234,11 +338,19 @@ public abstract class UiFormatCodeView : UiElement
 
     protected void RequestSearch() => SearchRequested?.Invoke(this, EventArgs.Empty);
 
+    protected void RequestUndo() => UndoRequested?.Invoke(this, EventArgs.Empty);
+
+    protected void RequestRedo() => RedoRequested?.Invoke(this, EventArgs.Empty);
+
+    protected virtual bool IsCompositionActive => false;
+
     protected override UiSemanticNode GetSemanticNodeCore()
     {
         UiSemanticState state = Visibility == UiVisibility.Visible
-            ? UiSemanticState.Visible | UiSemanticState.ReadOnly
-            : UiSemanticState.ReadOnly;
+            ? UiSemanticState.Visible
+            : UiSemanticState.None;
+        if (!IsEditable)
+            state |= UiSemanticState.ReadOnly;
         if (IsEnabled)
             state |= UiSemanticState.Enabled;
         if (Session?.FocusedElement == this)
@@ -257,9 +369,9 @@ public abstract class UiFormatCodeView : UiElement
                 CaretOffset,
                 SelectionStart,
                 SelectionLength,
-                IsEditable: false,
+                IsEditable,
                 IsPassword: false,
-                IsCompositionActive: false));
+                IsCompositionActive));
     }
 
     private bool FindFrom(int origin, bool forward, bool wrap)
@@ -311,6 +423,93 @@ public abstract class UiFormatCodeView : UiElement
                 return token;
         }
 
+        return null;
+    }
+
+    private bool TryMapEditableTextRange(int start, int end, out Broiler.Documents.Model.RichTextRange range)
+    {
+        range = default;
+        if (Projection is null)
+            return false;
+        start = Math.Clamp(start, 0, Text.Length);
+        end = Math.Clamp(end, start, Text.Length);
+
+        if (start == end)
+        {
+            FormatCodeToken? token = EditableTokenAtBoundary(start);
+            if (token is null && !IsEmptySourceBoundary(start))
+                return false;
+        }
+        else
+        {
+            foreach (FormatCodeToken token in Projection.Tokens)
+            {
+                int tokenStart = token.ProjectedStart;
+                int tokenEnd = tokenStart + token.ProjectedLength;
+                if (tokenEnd <= start || tokenStart >= end)
+                    continue;
+                if (token.Kind == FormatCodeTokenKind.Text)
+                    continue;
+                if (token.Kind == FormatCodeTokenKind.Escape && start <= tokenStart && end >= tokenEnd)
+                    continue;
+                if (start < tokenStart && end > tokenEnd)
+                    continue; // atomic token wholly enclosed by a cross-run text selection
+                return false;
+            }
+        }
+
+        var mappedStart = Projection.MapProjectedOffset(start);
+        var mappedEnd = Projection.MapProjectedOffset(end);
+        range = new Broiler.Documents.Model.RichTextRange(
+            mappedStart.DocumentPosition,
+            mappedEnd.DocumentPosition);
+        return true;
+    }
+
+    private FormatCodeToken? EditableTokenAtBoundary(int offset)
+    {
+        if (Projection is null)
+            return null;
+        FormatCodeToken? exact = TokenAt(offset);
+        if (exact?.Kind == FormatCodeTokenKind.Text)
+            return exact;
+        for (int i = Projection.Tokens.Count - 1; i >= 0; i--)
+        {
+            FormatCodeToken token = Projection.Tokens[i];
+            if (token.ProjectedStart + token.ProjectedLength == offset &&
+                token.Kind == FormatCodeTokenKind.Text)
+            {
+                return token;
+            }
+        }
+        return null;
+    }
+
+    private bool IsEmptySourceBoundary(int offset)
+    {
+        if (Projection is null)
+            return false;
+        FormatCodeMappedPosition mapping = Projection.MapProjectedOffset(offset);
+        FormatCodeToken? token = TokenAt(offset);
+        return mapping.AffectedRange is RichTextRange affected && affected.IsEmpty &&
+            (offset == 0 || offset == Text.Length || token is not null &&
+             (offset == token.ProjectedStart ||
+              offset == token.ProjectedStart + token.ProjectedLength));
+    }
+
+    private FormatCodeToken? TokenForRemoval(bool backward)
+    {
+        if (Projection is null)
+            return null;
+        int offset = CaretOffset;
+        if (!backward)
+            return TokenAt(offset);
+        for (int i = Projection.Tokens.Count - 1; i >= 0; i--)
+        {
+            FormatCodeToken token = Projection.Tokens[i];
+            if (token.ProjectedStart + token.ProjectedLength <= offset)
+                return token;
+        }
         return null;
     }
 }

@@ -9,7 +9,7 @@
     <RootNamespace>Broiler.UI.FormatCodeView</RootNamespace>
     <AssemblyName>Broiler.UI.FormatCodeView</AssemblyName>
     <PackageId>Broiler.UI.FormatCodeView</PackageId>
-    <Description>Platform-neutral read-only Formatting Codes view abstraction.</Description>
+    <Description>Platform-neutral token-aware Formatting Codes view abstraction.</Description>
   </PropertyGroup>
 
   <ItemGroup>

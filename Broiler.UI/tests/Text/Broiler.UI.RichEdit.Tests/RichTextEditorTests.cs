@@ -5,6 +5,34 @@ namespace Broiler.UI.RichEdit.Tests;
 public sealed class RichTextEditorTests
 {
     [Fact]
+    public void Explicit_Range_Replacement_Is_One_Undo_Unit_With_Selections()
+    {
+        RichTextDocument document = RichTextDocument.FromPlainText("abcdef");
+        var editor = new RichTextEditor(document);
+        RichTextPosition start = MoveRight(document, 2);
+        RichTextPosition end = MoveRight(document, 4);
+        editor.SetCaret(document.Start);
+
+        Assert.True(editor.ReplaceText(new RichTextRange(start, end), "XY"));
+        Assert.Equal("abXYef", editor.GetPlainText());
+        Assert.Single(editor.UndoStack);
+        Assert.Equal(document.Start, editor.UndoStack[0].BeforeSelection.Focus);
+
+        Assert.True(editor.Undo());
+        Assert.Equal("abcdef", editor.GetPlainText());
+        Assert.Equal(document.Start, editor.Selection.Focus);
+        Assert.True(editor.Redo());
+        Assert.Equal("abXYef", editor.GetPlainText());
+    }
+
+    private static RichTextPosition MoveRight(RichTextDocument document, int count)
+    {
+        RichTextPosition position = document.Start;
+        for (int i = 0; i < count; i++)
+            position = document.PositionRightOf(position);
+        return position;
+    }
+    [Fact]
     public void New_Editor_Starts_Empty_With_Caret_At_Start()
     {
         var editor = new RichTextEditor();

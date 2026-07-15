@@ -29,6 +29,8 @@ public enum FormatCodeEditCapabilities
     Navigate = 1 << 0,
     Copy = 1 << 1,
     ChangeFormatting = 1 << 2,
+    EditText = 1 << 3,
+    Remove = 1 << 4,
 }
 
 /// <summary>Severity of a deterministic projection diagnostic.</summary>

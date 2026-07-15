@@ -30,3 +30,18 @@ public sealed class FormatCodeNavigationRequestedEventArgs : EventArgs
 
     public FormatCodeToken? Token { get; }
 }
+
+public sealed class FormatCodeEditRequestedEventArgs : EventArgs
+{
+    public FormatCodeEditRequestedEventArgs(
+        FormatCodeEditIntent intent,
+        FormatCodeToken? token = null)
+    {
+        Intent = intent ?? throw new ArgumentNullException(nameof(intent));
+        Token = token;
+    }
+
+    public FormatCodeEditIntent Intent { get; }
+
+    public FormatCodeToken? Token { get; }
+}

@@ -85,7 +85,10 @@ public sealed class FormatCodeProjector
                     paragraphEnd,
                     nextStart,
                     new RichTextRange(paragraphEnd, nextStart),
-                    FormatCodeMappingMode.Expanded);
+                    FormatCodeMappingMode.Expanded,
+                    StructureDescriptor(
+                        FormatCodeProperty.ParagraphBreak,
+                        new RichTextRange(paragraphEnd, nextStart)));
             }
         }
 
@@ -124,7 +127,9 @@ public sealed class FormatCodeProjector
                 boundary,
                 boundary,
                 paragraphRange,
-                FormatCodeMappingMode.Boundary);
+                FormatCodeMappingMode.Boundary,
+                ParagraphDescriptor(FormatCodeProperty.Alignment, paragraphRange,
+                    ParagraphStyleDelta.WithAlignment(TextAlignment.Left)));
             if (style.Alignment is not TextAlignment.Center and not TextAlignment.Right)
                 builder.AddDiagnostic("FC1001", "Unknown text-alignment value was projected numerically.", paragraphRange);
         }
@@ -143,15 +148,21 @@ public sealed class FormatCodeProjector
                 boundary,
                 boundary,
                 paragraphRange,
-                FormatCodeMappingMode.Boundary);
+                FormatCodeMappingMode.Boundary,
+                ParagraphDescriptor(FormatCodeProperty.ListKind, paragraphRange,
+                    ParagraphStyleDelta.WithListKind(ListKind.None)));
             if (style.ListKind is not ListKind.Bullet and not ListKind.Numbered)
                 builder.AddDiagnostic("FC1002", "Unknown list-kind value was projected numerically.", paragraphRange);
         }
 
-        AddParagraphNumber(builder, "Indent", style.IndentLevel, 0, boundary, paragraphRange);
-        AddParagraphNumber(builder, "Line Spacing", style.LineSpacing, 1f, boundary, paragraphRange);
-        AddParagraphNumber(builder, "Space Before", style.SpacingBefore, 0f, boundary, paragraphRange);
-        AddParagraphNumber(builder, "Space After", style.SpacingAfter, 0f, boundary, paragraphRange);
+        AddParagraphNumber(builder, "Indent", FormatCodeProperty.IndentLevel,
+            style.IndentLevel, 0, boundary, paragraphRange);
+        AddParagraphNumber(builder, "Line Spacing", FormatCodeProperty.LineSpacing,
+            style.LineSpacing, 1f, boundary, paragraphRange);
+        AddParagraphNumber(builder, "Space Before", FormatCodeProperty.SpacingBefore,
+            style.SpacingBefore, 0f, boundary, paragraphRange);
+        AddParagraphNumber(builder, "Space After", FormatCodeProperty.SpacingAfter,
+            style.SpacingAfter, 0f, boundary, paragraphRange);
 
         if (style.IndentLevel < 0 || style.LineSpacing <= 0 ||
             style.SpacingBefore < 0 || style.SpacingAfter < 0)
@@ -163,6 +174,7 @@ public sealed class FormatCodeProjector
     private static void AddParagraphNumber(
         ProjectionBuilder builder,
         string name,
+        FormatCodeProperty property,
         int value,
         int defaultValue,
         RichTextPosition boundary,
@@ -176,12 +188,15 @@ public sealed class FormatCodeProjector
             boundary,
             boundary,
             paragraphRange,
-            FormatCodeMappingMode.Boundary);
+            FormatCodeMappingMode.Boundary,
+            ParagraphDescriptor(property, paragraphRange,
+                new ParagraphStyleDelta { IndentLevel = defaultValue }));
     }
 
     private static void AddParagraphNumber(
         ProjectionBuilder builder,
         string name,
+        FormatCodeProperty property,
         float value,
         float defaultValue,
         RichTextPosition boundary,
@@ -195,7 +210,14 @@ public sealed class FormatCodeProjector
             boundary,
             boundary,
             paragraphRange,
-            FormatCodeMappingMode.Boundary);
+            FormatCodeMappingMode.Boundary,
+            ParagraphDescriptor(property, paragraphRange, property switch
+            {
+                FormatCodeProperty.LineSpacing => new ParagraphStyleDelta { LineSpacing = defaultValue },
+                FormatCodeProperty.SpacingBefore => new ParagraphStyleDelta { SpacingBefore = defaultValue },
+                FormatCodeProperty.SpacingAfter => new ParagraphStyleDelta { SpacingAfter = defaultValue },
+                _ => throw new ArgumentOutOfRangeException(nameof(property)),
+            }));
         if (!float.IsFinite(value))
             builder.AddDiagnostic("FC1004", "A non-finite paragraph metric was projected canonically.", paragraphRange);
     }
@@ -218,7 +240,8 @@ public sealed class FormatCodeProjector
                     boundary,
                     boundary,
                     closingRange,
-                    FormatCodeMappingMode.Boundary);
+                    FormatCodeMappingMode.Boundary,
+                    InlineDescriptor(property, closingRange));
             }
         }
 
@@ -232,7 +255,8 @@ public sealed class FormatCodeProjector
                     boundary,
                     boundary,
                     openingRange,
-                    FormatCodeMappingMode.Boundary);
+                    FormatCodeMappingMode.Boundary,
+                    InlineDescriptor(property, openingRange));
                 if (property == 5 && to.FontSize is float size && !float.IsFinite(size))
                 {
                     builder.AddDiagnostic(
@@ -284,10 +308,14 @@ public sealed class FormatCodeProjector
             switch (character)
             {
                 case '\t':
-                    builder.AddToken(FormatCodeTokenKind.StructureCode, "[Tab]", sourceBefore, sourceAfter, affected, FormatCodeMappingMode.Expanded);
+                    builder.AddToken(FormatCodeTokenKind.StructureCode, "[Tab]", sourceBefore, sourceAfter,
+                        affected, FormatCodeMappingMode.Expanded,
+                        StructureDescriptor(FormatCodeProperty.Tab, affected));
                     break;
                 case '\u2028':
-                    builder.AddToken(FormatCodeTokenKind.StructureCode, "[Line Break]", sourceBefore, sourceAfter, affected, FormatCodeMappingMode.Expanded);
+                    builder.AddToken(FormatCodeTokenKind.StructureCode, "[Line Break]", sourceBefore, sourceAfter,
+                        affected, FormatCodeMappingMode.Expanded,
+                        StructureDescriptor(FormatCodeProperty.LineBreak, affected));
                     break;
                 case '\\':
                     builder.AddToken(FormatCodeTokenKind.Escape, "\\\\", sourceBefore, sourceAfter, affected, FormatCodeMappingMode.Expanded);
@@ -362,6 +390,7 @@ public sealed class FormatCodeProjector
                 pending.Caret,
                 range,
                 FormatCodeEditCapabilities.Navigate | FormatCodeEditCapabilities.ChangeFormatting,
+                InlineDescriptor(property, range),
                 FormatCodeMappingMode.Boundary));
         }
 
@@ -381,6 +410,37 @@ public sealed class FormatCodeProjector
         8 => !string.Equals(NormalizeLink(left.LinkHref), NormalizeLink(right.LinkHref), StringComparison.Ordinal),
         _ => throw new ArgumentOutOfRangeException(nameof(property)),
     };
+
+    private static FormatCodeTokenEditDescriptor InlineDescriptor(int property, RichTextRange range)
+    {
+        InlineStyleDelta delta = property switch
+        {
+            0 => InlineStyleDelta.ToggleBold(false),
+            1 => InlineStyleDelta.ToggleItalic(false),
+            2 => InlineStyleDelta.ToggleUnderline(false),
+            3 => InlineStyleDelta.ToggleStrikethrough(false),
+            4 => InlineStyleDelta.WithFontFamily(null),
+            5 => InlineStyleDelta.WithFontSize(null),
+            6 => InlineStyleDelta.WithForeground(BColor.Empty),
+            7 => InlineStyleDelta.WithBackground(BColor.Empty),
+            8 => InlineStyleDelta.WithLink(null),
+            _ => throw new ArgumentOutOfRangeException(nameof(property)),
+        };
+        return new FormatCodeTokenEditDescriptor(
+            (FormatCodeProperty)((int)FormatCodeProperty.Bold + property),
+            new ApplyFormatCodeInlineIntent(range, delta));
+    }
+
+    private static FormatCodeTokenEditDescriptor ParagraphDescriptor(
+        FormatCodeProperty property,
+        RichTextRange range,
+        ParagraphStyleDelta delta) =>
+        new(property, new ApplyFormatCodeParagraphIntent(range, delta));
+
+    private static FormatCodeTokenEditDescriptor StructureDescriptor(
+        FormatCodeProperty property,
+        RichTextRange range) =>
+        new(property, new ReplaceFormatCodeTextIntent(range, string.Empty));
 
     private static bool InlinePropertyIsActive(int property, InlineStyle style) => property switch
     {
@@ -523,7 +583,8 @@ public sealed class FormatCodeProjector
             RichTextPosition sourceBefore,
             RichTextPosition sourceAfter,
             RichTextRange? affectedRange,
-            FormatCodeMappingMode mappingMode)
+            FormatCodeMappingMode mappingMode,
+            FormatCodeTokenEditDescriptor? editDescriptor = null)
         {
             CancellationToken.ThrowIfCancellationRequested();
             if (_tokens.Count >= Options.MaxTokens)
@@ -536,6 +597,12 @@ public sealed class FormatCodeProjector
 
             int start = _text.Length;
             _text.Append(displayText);
+            FormatCodeEditCapabilities capabilities =
+                FormatCodeEditCapabilities.Navigate | FormatCodeEditCapabilities.Copy;
+            if (kind is FormatCodeTokenKind.Text or FormatCodeTokenKind.Escape)
+                capabilities |= FormatCodeEditCapabilities.EditText;
+            if (editDescriptor is not null)
+                capabilities |= FormatCodeEditCapabilities.ChangeFormatting | FormatCodeEditCapabilities.Remove;
             _tokens.Add(new FormatCodeToken(
                 kind,
                 displayText,
@@ -544,7 +611,8 @@ public sealed class FormatCodeProjector
                 sourceBefore,
                 sourceAfter,
                 affectedRange,
-                FormatCodeEditCapabilities.Navigate | FormatCodeEditCapabilities.Copy,
+                capabilities,
+                editDescriptor,
                 mappingMode));
         }
 

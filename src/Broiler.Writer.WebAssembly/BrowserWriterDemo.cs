@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using Broiler.Documents;
 using Broiler.Documents.Docx;
+using Broiler.Documents.FormatCodes;
 using Broiler.Documents.Html;
 using Broiler.Documents.Markdown;
 using Broiler.Documents.Model;
@@ -395,6 +396,7 @@ internal sealed class BrowserWriterDemo : IDisposable
         dispatcher.Add(new StandardCommand("file.save", SaveDocument));
         dispatcher.Add(new StandardCommand("file.save-as", SaveDocumentAs));
         dispatcher.Add(new StandardCommand("view.formatting-codes", ToggleFormattingCodes));
+        AddFormatCodeCommands(dispatcher);
         dispatcher.Add(new StandardCommand("format.font", ShowFontDialog, () => _editor.GetCommandState(RichEditCommand.SetFont).IsEnabled));
         AddRichEditCommand(dispatcher, "edit.undo", RichEditCommand.Undo);
         AddRichEditCommand(dispatcher, "edit.redo", RichEditCommand.Redo);
@@ -438,6 +440,20 @@ internal sealed class BrowserWriterDemo : IDisposable
         format.Children.Add(RichEditItem("strike", "Strikethrough", "format.strike", RichEditCommand.Strikethrough, 'S', checkable: true));
         format.Children.Add(RichEditItem("clear", "Clear formatting", "format.clear", RichEditCommand.ClearFormatting, 'C'));
 
+        var insertCode = new UiMenuItem("insert-code", "Insert Code") { AccessKey = 'D' };
+        insertCode.Children.Add(new UiMenuItem("code-bold", "Bold") { CommandName = "formatcodes.insert.bold" });
+        insertCode.Children.Add(new UiMenuItem("code-italic", "Italic") { CommandName = "formatcodes.insert.italic" });
+        insertCode.Children.Add(new UiMenuItem("code-underline", "Underline") { CommandName = "formatcodes.insert.underline" });
+        insertCode.Children.Add(new UiMenuItem("code-strike", "Strikethrough") { CommandName = "formatcodes.insert.strike" });
+        insertCode.Children.Add(new UiMenuItem("code-tab", "Tab") { CommandName = "formatcodes.insert.tab" });
+        insertCode.Children.Add(new UiMenuItem("code-line-break", "Soft line break") { CommandName = "formatcodes.insert.line-break" });
+        insertCode.Children.Add(new UiMenuItem("code-paragraph-break", "Paragraph break") { CommandName = "formatcodes.insert.paragraph-break" });
+        format.Children.Add(insertCode);
+        format.Children.Add(new UiMenuItem("remove-code", "Remove selected code")
+        {
+            CommandName = "formatcodes.remove-code",
+        });
+
         var paragraph = new UiMenuItem("paragraph", "Paragraph") { AccessKey = 'P' };
         paragraph.Children.Add(RichEditItem("left", "Align left", "paragraph.left", RichEditCommand.AlignLeft, 'L', checkable: true));
         paragraph.Children.Add(RichEditItem("center", "Align center", "paragraph.center", RichEditCommand.AlignCenter, 'C', checkable: true));
@@ -479,6 +495,33 @@ internal sealed class BrowserWriterDemo : IDisposable
         };
         menu.SetItems([file, edit, format, view, help]);
         return menu;
+    }
+
+    private void AddFormatCodeCommands(StandardCommandDispatcher dispatcher)
+    {
+        dispatcher.Add(new StandardCommand("formatcodes.insert.bold", () => RunFormatCodePalette(FormatCodePaletteEntry.Bold)));
+        dispatcher.Add(new StandardCommand("formatcodes.insert.italic", () => RunFormatCodePalette(FormatCodePaletteEntry.Italic)));
+        dispatcher.Add(new StandardCommand("formatcodes.insert.underline", () => RunFormatCodePalette(FormatCodePaletteEntry.Underline)));
+        dispatcher.Add(new StandardCommand("formatcodes.insert.strike", () => RunFormatCodePalette(FormatCodePaletteEntry.Strikethrough)));
+        dispatcher.Add(new StandardCommand("formatcodes.insert.tab", () => RunFormatCodePalette(FormatCodePaletteEntry.Tab)));
+        dispatcher.Add(new StandardCommand("formatcodes.insert.line-break", () => RunFormatCodePalette(FormatCodePaletteEntry.LineBreak)));
+        dispatcher.Add(new StandardCommand("formatcodes.insert.paragraph-break", () => RunFormatCodePalette(FormatCodePaletteEntry.ParagraphBreak)));
+        dispatcher.Add(new StandardCommand("formatcodes.remove-code", RemoveCurrentFormatCode));
+    }
+
+    private void RunFormatCodePalette(FormatCodePaletteEntry entry)
+    {
+        _formatCodesController.ExecutePaletteEntry(entry);
+        _lastAction = _formatCodesController.Status;
+        RefreshUi();
+    }
+
+    private void RemoveCurrentFormatCode()
+    {
+        if (_formatCodesView.CurrentToken is FormatCodeToken token)
+            _formatCodesController.RemoveTokenFormatting(token);
+        _lastAction = _formatCodesController.Status;
+        RefreshUi();
     }
 
     // ---- Toolbar ----------------------------------------------------------------------------

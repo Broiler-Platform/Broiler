@@ -64,6 +64,7 @@ security-critical, or safety-critical use.
 
 Current implementation and compliance work is tracked in the
 [public-preview roadmap](docs/roadmap/public-preview-roadmap.md),
+[application installation and update roadmap](docs/roadmap/application-installation-and-update-roadmap.md),
 [engine standards roadmap](docs/roadmap/engines-standards-and-performance-roadmap.md),
 [refactor gap register](docs/roadmap/refactor-gap.md),
 [DOM plan](docs/roadmap/broiler-dom-component.md),

@@ -255,6 +255,36 @@ public abstract class UiRichEdit : UiElement
         return RunEditorEdit(editor => editor.InsertDocument(content));
     }
 
+    /// <summary>Replaces an explicit source range as one undo transaction.</summary>
+    public bool ReplaceTextRange(
+        RichTextRange range,
+        string text,
+        RichTextRange? afterSelection = null)
+    {
+        ThrowIfDisposed();
+        return RunEditorEdit(editor => editor.ReplaceText(range, text, afterSelection));
+    }
+
+    /// <summary>Applies an exact inline delta to an explicit source range.</summary>
+    public bool ApplyInlineStyleRange(
+        RichTextRange range,
+        InlineStyleDelta delta,
+        RichTextRange? afterSelection = null)
+    {
+        ThrowIfDisposed();
+        return RunEditorEdit(editor => editor.ApplyInlineStyle(range, delta, afterSelection));
+    }
+
+    /// <summary>Applies an exact paragraph delta to an explicit source range.</summary>
+    public bool ApplyParagraphStyleRange(
+        RichTextRange range,
+        ParagraphStyleDelta delta,
+        RichTextRange? afterSelection = null)
+    {
+        ThrowIfDisposed();
+        return RunEditorEdit(editor => editor.ApplyParagraphStyle(range, delta, afterSelection));
+    }
+
     /// <summary>
     /// Deletes backward from the caret (the Backspace key): the current selection
     /// if any, otherwise the character or paragraph break before the caret. This is
