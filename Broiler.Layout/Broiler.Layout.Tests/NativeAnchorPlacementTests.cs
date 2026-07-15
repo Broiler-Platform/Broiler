@@ -895,6 +895,62 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(10, target.Location.Y, 3); // base top preserved (no inset:auto here)
     }
 
+    // Opposing-inset position-try base (P5.8d.2b opposing-inset position-try expansion): the
+    // base is sized on an axis by a pair of opposing insets (auto length, childless), and its
+    // position-try fallback composes with that sizing. CB 100×100 at origin; anchor --a a 20×20
+    // box; the target's horizontal axis is opposing-inset-sized (left anchor(--a right), right
+    // 5px, auto width → width 65) while its vertical axis is a single inset + definite height.
+    private static (CssBox root, CssBox target) OpposingBaseFixture(PointF anchorPos)
+    {
+        var root = Box(null, new PointF(0, 0), new SizeF(1000, 1000));
+        var cb = Box(root, new PointF(0, 0), new SizeF(100, 100));
+        cb.Position = "relative";
+        cb.Display = "block";
+        var anchor = Box(cb, anchorPos, new SizeF(20, 20));
+        anchor.AnchorName = "--a";
+        var target = Box(cb, new PointF(0, 0), new SizeF(10, 30)); // childless; height 30 definite
+        target.Position = "absolute";
+        target.Left = "anchor(--a right)";
+        target.Right = "5px";
+        target.Height = "30px"; // width left auto → opposing-inset sized
+        target.PositionTryFallbacks = "--up";
+        return (root, target);
+    }
+
+    [Fact]
+    public void PositionTry_OpposingInsetAutoBase_Overflows_AppliesFallback()
+    {
+        // Anchor at (10,75) → right 30, bottom 95. Base: opposing-inset width 65 at x=30; top at
+        // the anchor bottom (95), height 30 → y 95..125 overflows the 100-tall CB.
+        var (root, target) = OpposingBaseFixture(new PointF(10, 75));
+        target.Top = "anchor(--a bottom)";
+        // Fallback pins the box above the anchor: bottom at the anchor top (75) → top 45.
+        RunPassWithRules(root, Rules(("--up", new[]
+        {
+            ("top", "auto"), ("bottom", "anchor(--a top)"),
+        })));
+        Assert.Equal(30, target.Location.X, 3); // opposing-inset left, unchanged by the fallback
+        Assert.Equal(45, target.Location.Y, 3); // pinned above the anchor
+        Assert.Equal(65, target.Size.Width, 3); // sized from the two horizontal insets
+        Assert.Equal(30, target.Size.Height, 3);
+    }
+
+    [Fact]
+    public void PositionTry_OpposingInsetAutoBase_Fits_NoFallbackApplied()
+    {
+        // Anchor at (10,20) → bottom 40. Base top at the anchor bottom (40), height 30 → y 40..70
+        // fits, so the fallback must NOT be applied and the opposing-inset base is kept.
+        var (root, target) = OpposingBaseFixture(new PointF(10, 20));
+        target.Top = "anchor(--a bottom)";
+        RunPassWithRules(root, Rules(("--up", new[]
+        {
+            ("top", "auto"), ("bottom", "anchor(--a top)"),
+        })));
+        Assert.Equal(30, target.Location.X, 3);
+        Assert.Equal(40, target.Location.Y, 3); // base position kept
+        Assert.Equal(65, target.Size.Width, 3);
+    }
+
     // Minimal layout environment for the synthetic box trees: resolves a fixed-size
     // font (so em-based Actual border/padding widths compute) and returns benign
     // defaults for everything else. The test boxes carry no text or replaced content,

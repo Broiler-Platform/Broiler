@@ -2491,6 +2491,46 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   overlapping content, popover UA box styling) remains the separate submodule effort the finding describes;
   this slice takes only the anchor-geometry part the corpus actually exercises.
 
+- **P5.8d.2b — opposing-inset `@position-try` base (twenty-third expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-cj1q73`; **bridge only, additive, default-off**). A `@position-try`
+  box whose **base** is sized on an axis by a pair of **opposing insets** (both insets present, an `auto`
+  length, childless — e.g. `left: anchor(--a right); right: 5px; width: auto`) now goes native — one of
+  the two remaining position-try sub-cases the twelfth expansion's handoff gate kept baked ("a definite
+  pixel width AND height … and no opposing insets on the base"). **No engine change needed:** the base is
+  sized by the ninth expansion's opposing-inset path (`CssBox.TryApplyAnchorInsetPlacement`, the
+  `childless && leftInset && rightInset && IsAutoLength(Width)` branch), and `TryApplyPositionTryFallback`
+  already reads the box's laid-out `Bounds` for its overflow test and computes `tryWidth = cbW − tryLeft −
+  rightPx` for opposing insets in a fallback — so the base sizing and the fallback loop compose with the
+  passes run in order (`TryApplyAnchorInsetPlacement` → `TryApplyPositionTryFallback`,
+  `CssBox.Anchor.cs:148,160`). This is a **pure bridge gate-widening** (like the eighteenth expansion):
+  - **Gate.** `NativePositionTryHandoffSupported`'s all-or-nothing "definite pixel width AND height, no
+    opposing insets" size check is replaced by a per-axis `AxisSizeHandoffSupported`: each axis is admitted
+    if it is EITHER a definite pixel length with a single inset (a reposition base, as before) OR — for a
+    **childless** box — an opposing-inset `auto` length (the engine sizes it from the two insets). A
+    `min-content`/free-`auto` length (no bridge-matching engine size) and a definite length combined with
+    opposing insets (over-constrained) still stay baked. The single `IsMvpNativeAnchorInsetBox` predicate
+    drives both the base-skip (`AnchorFunctions.cs`) and the fallback-skip (`PositionTry.cs`), so the
+    handoff decision stays in lockstep; `childless` is hoisted so both the position-try check and the
+    existing opposing-inset base check share it.
+  Tests: `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` +2 (an opposing-inset auto-width base that
+  overflows vertically → the `@position-try` fallback pins it above the anchor, sized 65 wide from the two
+  insets; and a base-fits no-op); `Broiler.Cli.Tests/NativePositionTryBridgeModeTests.cs` +1 (native mode
+  leaves the opposing-inset box un-baked; default mode bakes it to the identical `left:30px; top:45px;
+  width:65px` — proving the bridge estimator and the engine agree); `Broiler.Wpt.Tests/
+  NativeOpposingInsetPositionTryWptTests.cs` (full render: the engine sizes from the insets and applies the
+  fallback, baked & native agree pixel-wise at (30,45)–(94,74)). Regression check: full
+  `Broiler.Layout.Tests` (195 pass; the pre-existing environmental arch-guard fail identical on the stashed
+  baseline) green; the anchor/position Wpt (24) and Cli (24) suites green; **css-anchor-position default-off
+  byte-identical (8-fail / 31-pass)** (my gate only runs when both flags are on, off by default) **and
+  lever-on unchanged (6-fail / 33-pass, identical set)**. Zero regressions, and — as with the seventh /
+  eighth / eighteenth expansions — **no corpus pixel test exercises the childless opposing-inset auto path**
+  (the corpus's only opposing-inset position-try test, `position-try-002`, has a `min-content` width and an
+  inline-spacer child, so the `min-content`/childful exclusions keep it baked), so validation is the
+  exact-geometry unit + bridge-mode + full-render tests plus no-regression. The remaining position-try
+  sub-case is the `min-content`/free-`auto`-sized base (`position-try-002`), which needs the engine's real
+  intrinsic width to be validated against the bridge's estimator (a JS-`checkLayout` test, entangled with
+  the getBoundingClientRect path) and stays baked.
+
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
@@ -2498,7 +2538,7 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   ~~scroll simulation~~ → ~~`position-visibility`~~ → dialog/backdrop → ~~position-try (anchor()-inset handoff
   subset)~~ → ~~transform/contain/will-change containing blocks~~ → ~~combined `anchor()` + `anchor-size()`~~ →
   ~~`position: sticky` (non-document scroll container)~~ → ~~document/page scroll~~ → ~~page-scroll sticky~~ →
-  ~~modal-dialog `anchor()` (top-layer geometry)~~.
+  ~~modal-dialog `anchor()` (top-layer geometry)~~ → ~~opposing-inset `@position-try` base~~.
   (Childless auto/explicit/percentage sizing,
   `box-sizing:border-box`, percentage margin/padding/inset box props, shared-name scope resolution,
   writing-mode percentage basis, relatively-positioned inline containing blocks, `anchor()` physical insets,
@@ -2622,11 +2662,11 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   entangled scroll case (anchor-scroll containers — the plain non-anchor container is native as of the
   seventeenth expansion and the document scrolling element as of the twentieth; fixed descendants need no
   reparenting on the native path), visual-viewport (the engine-feature set above;
-  transform/contain/will-change CBs are now native — sixteenth expansion), and the opposing-inset /
-  auto-min-content-sized position-try bases (the
-  engine's
-  `TryApplyPositionTryFallback` supports these geometries but the bridge gate keeps them baked pending per-case
-  parity). **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler
+  transform/contain/will-change CBs are now native — sixteenth expansion), and the
+  auto-`min-content`-sized position-try base (the **opposing-inset** case is now native — twenty-third
+  expansion; the `min-content` case — `position-try-002`, a JS `checkLayout` test entangled with the
+  getBoundingClientRect path — stays baked pending validation of the engine's real intrinsic width against
+  the bridge's estimator). **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler
   clamps an explicit position-area size to the grid cell (P5.5 `PositionAreaGrid.ResolveElementBox`) and a
   cell is always inside the containing block, so a position-area base **never overflows** — its
   `@position-try` fallback is therefore **inert**, and no corpus test combines the two (all four `position-try`
@@ -2723,9 +2763,11 @@ threads `styleSet.AuthorStyleSheet` (at-rules included) into layout for `@keyfra
 channel (a) plus the fallback apply/re-test loop (c, `CssBox.TryApplyPositionTryFallback`) are now in place;
 (b) the native base is reused from the anchor()-inset pass. `position-try-grid-001` now goes native and
 **passes lever-on** (it was the failing example this finding cited). Remaining: the loop supports
-position-area / opposing-inset / auto-sized bases geometrically, but the bridge gate
-(`NativePositionTryHandoffSupported`) hands off only the anchor()-inset + definite-size + single-inset
-subset pending per-case parity for the other bases.
+position-area / opposing-inset / auto-sized bases geometrically; the bridge gate
+(`NativePositionTryHandoffSupported`) now hands off the anchor()-inset definite-size single-inset subset
+(twelfth expansion) **and** the childless opposing-inset auto-sized base (twenty-third expansion), leaving
+only the `min-content`/free-`auto`-sized base pending per-case parity (the engine's real intrinsic width
+vs the bridge's estimator).
 
 **Groundwork landed (2026-07-14):** the per-box half of that input is now in place — `position-try-fallbacks`
 is projected onto `CssBox` (`CssBoxProperties.PositionTryFallbacks`, plus the `CssUtils` get/set arms), the
