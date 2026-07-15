@@ -27,6 +27,7 @@ public sealed class AnchorPropertyProjectionTests
         Assert.Equal("auto", box.PositionAnchor);
         Assert.Equal("none", box.PositionArea);
         Assert.Equal("normal", box.PositionTry);
+        Assert.Equal("none", box.PositionTryFallbacks);
     }
 
     [Theory]
@@ -34,6 +35,7 @@ public sealed class AnchorPropertyProjectionTests
     [InlineData("position-anchor", "--foo")]
     [InlineData("position-area", "top left")]
     [InlineData("position-try", "flip-block")]
+    [InlineData("position-try-fallbacks", "--f1, --f2, --f3")]
     public void SetPropertyValue_ProjectsOntoBox_AndRoundTrips(string property, string value)
     {
         var box = NewBox();
@@ -49,10 +51,12 @@ public sealed class AnchorPropertyProjectionTests
         CssUtils.SetPropertyValue(box, "position-anchor", "--a");
         CssUtils.SetPropertyValue(box, "position-area", "bottom right");
         CssUtils.SetPropertyValue(box, "position-try", "--fallback-1");
+        CssUtils.SetPropertyValue(box, "position-try-fallbacks", "--f1, --f2");
 
         Assert.Equal("--a", box.AnchorName);
         Assert.Equal("--a", box.PositionAnchor);
         Assert.Equal("bottom right", box.PositionArea);
         Assert.Equal("--fallback-1", box.PositionTry);
+        Assert.Equal("--f1, --f2", box.PositionTryFallbacks);
     }
 }

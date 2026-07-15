@@ -2064,8 +2064,20 @@ project onto the box via `SharedRendererCascade` — its rule *bodies* never rea
 engine consumes cascaded box properties only, never the stylesheet). A native `position-try` therefore
 needs a new data path: the parsed `@position-try` name→declarations map (already modelled canonically as
 `Broiler.CSS.PositionTryRule`, P5.3) must be handed to the engine's post-pass, and the fallback
-apply/re-place/re-test loop reimplemented on the box tree. Until that infrastructure lands,
-`position-try` boxes stay gate-excluded and baked (`IsMvpNativeAnchorBox` excludes `position-try`); this
+apply/re-place/re-test loop reimplemented on the box tree.
+
+**Groundwork landed (2026-07-14):** the per-box half of that input is now in place — `position-try-fallbacks`
+is projected onto `CssBox` (`CssBoxProperties.PositionTryFallbacks`, plus the `CssUtils` get/set arms), the
+P5.8b pattern applied to the fallback list. It is **inert** (nothing reads it yet — no behaviour change; the
+css-anchor-position subset is byte-identical, 31/8 default-off and 32/7 lever-on), so the box now carries the
+ordered fallback names the post-pass will consume. Test: `Broiler.Layout.Tests/AnchorPropertyProjectionTests.cs`
+(+1 theory row + round-trip). Still to build: (a) the `@position-try` **rule-body** channel from the
+bridge/runner into the post-pass (the parsed `PositionTryRule` map), (b) the base placement of a
+position-try box made native (its `position-area`/`anchor()` base must be on the engine so the fallback loop
+has a base to overflow-test), and (c) the fallback apply/re-place/re-test loop itself (reusing the promoted
+`AnchorGeometry.Overflows`/`Fits` and the engine's existing `anchor()`-inset / position-area placement).
+Until (a)–(c) land, `position-try` boxes stay gate-excluded and baked (`IsMvpNativeAnchorBox` excludes
+`position-try`); this
 is why `position-try-grid-001` — which also combines `anchor()` insets and grid abspos — fails identically
 on both the baked and native paths and is not a native-gate regression.
 
