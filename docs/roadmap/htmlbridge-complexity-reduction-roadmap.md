@@ -2132,9 +2132,25 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   margin/padding/inset box props, shared-name scope resolution, writing-mode percentage basis,
   relatively-positioned inline containing blocks, `anchor()` physical insets, `anchor-size()` sizing,
   opposing-inset sizing, abspos-inline containing blocks, intervening scroll containers, the
-  anchor()-inset `@position-try` fallback subset, AND `position-visibility` now land natively — see the
-  thirteen expansions above.)
-  Still bridge-only: dialog/backdrop and the opposing-inset / auto-min-content-sized position-try bases (the engine's
+  anchor()-inset `@position-try` fallback subset, `position-visibility`, `anchor-center`, AND redundant
+  fixed-position sizing now land natively — see the fifteen expansions above.)
+
+  **Triage of the remaining AnchorResolver passes (2026-07-15):** the anchor-specific, lever-gated passes
+  are now on the engine (placement MVPs, `position-visibility`, `anchor-center`). The rest are *general*
+  (non-anchor) rendering passes the bridge pre-bakes for the static renderer, and they split two ways:
+  (a) **redundant** — the engine already handles it, so the pass is just skipped in native mode
+  (`ResolveFixedPositionSizing`, done above); (b) **needs a new engine feature** — the engine genuinely
+  lacks it, so a port is engine-layout work, not a bridge extraction, and it affects *all* pages (not just
+  anchor pages) so the eventual production flip carries broad risk. Verified engine gaps:
+  `ResolveStickyPositioning` (no `position:sticky` in the engine), `ApplyScrollSimulation` (no scroll-offset
+  model — scroll is only the bridge's DOM-shift), `ApplyVisualViewportSerializationState` (no pinch-zoom /
+  `zoom`), `InsertDialogBackdrops`/`ApplyDialogUAPositioning` (no top-layer painting), and
+  `EnsureContainingBlockPositioning` (the engine's `FindPositionedContainingBlock` considers only
+  `position`, not `transform`/`contain` containing blocks). Each is its own engine feature + broad-corpus
+  parity effort, larger than a lever-gated slice.
+
+  Still bridge-only: dialog/backdrop, sticky, scroll simulation, visual-viewport, transform/contain CBs
+  (the engine-feature set above), and the opposing-inset / auto-min-content-sized position-try bases (the engine's
   `TryApplyPositionTryFallback` supports these geometries but the bridge gate keeps them baked pending per-case
   parity). **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler
   clamps an explicit position-area size to the grid cell (P5.5 `PositionAreaGrid.ResolveElementBox`) and a
