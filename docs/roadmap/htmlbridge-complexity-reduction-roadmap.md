@@ -2071,9 +2071,16 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   opposing-inset sizing, abspos-inline containing blocks, intervening scroll containers, AND the
   anchor()-inset `@position-try` fallback subset now land natively — see the twelve expansions above.)
   Still bridge-only: `position-visibility` (blocked by the scroll-container CB ordering, see the finding
-  below), dialog/backdrop, and the non-anchor()-inset position-try bases (position-area base, opposing-inset
-  base, auto/min-content sizing — the engine's `TryApplyPositionTryFallback` supports these geometries but
-  the bridge gate keeps them baked pending per-case parity). Each remaining feature is currently excluded by
+  below), dialog/backdrop, and the opposing-inset / auto-min-content-sized position-try bases (the engine's
+  `TryApplyPositionTryFallback` supports these geometries but the bridge gate keeps them baked pending per-case
+  parity). **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler
+  clamps an explicit position-area size to the grid cell (P5.5 `PositionAreaGrid.ResolveElementBox`) and a
+  cell is always inside the containing block, so a position-area base **never overflows** — its
+  `@position-try` fallback is therefore **inert**, and no corpus test combines the two (all four `position-try`
+  corpus tests are anchor()-inset). Extending the gate to it would move zero corpus boxes while adding
+  cross-step gate/threading complexity for a fallback that never fires; the speculative extension was written,
+  proven inert by a full-pipeline parity test (base placed at the cell, fallback never applied), and reverted.
+  Each remaining feature is currently excluded by
   `IsMvpNativeAnchorBox`/`IsMvpNativeAnchorInsetBox`/`IsMvpNativeAnchorSizeBox` (or `CanApplyNativeAnchorSize`)
   and stays on the bridge path (baked + `position-area: none` / `position-try-fallbacks: none`), so enabling
   the lever globally is already safe (proven above); the expansions widen the gate one feature at a time as
