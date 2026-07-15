@@ -2330,8 +2330,9 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   existing bridge `StickyPositioningTests` (baked path) and the anchor/scroll Wpt + Cli suites green;
   **css-anchor-position default-off byte-identical (8-fail — all gates are no-ops when the flags are off) and
   lever-on unchanged (6-fail, identical set — the corpus is all anchor pages, so the sticky handoff is off
-  there)**. Zero regressions. The entangled remainder (document/page-scroll sticky, and the anchor-page
-  sticky/scroll/position-visibility interaction) stays on the bridge until the full scroll model lands.
+  there)**. Zero regressions. The entangled remainder (document/page-scroll sticky — done in the twenty-first
+  expansion — and the anchor-page sticky/scroll/position-visibility interaction) stays on the bridge until the
+  full scroll model lands.
 
 - **P5.8d.2b — native document/page scroll (twentieth expansion) — COMPLETED** 2026-07-15
   (branch `claude/htmlbridge-phase-5-hixy7x`; **bridge only, additive, default-off**). Extends the
@@ -2350,10 +2351,34 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   DOM-shift **agree pixel-wise**). Regression check: the scroll/sticky/anchor/position-visibility Wpt suites
   (18) green; **css-anchor-position default-off byte-identical (8-fail) and lever-on unchanged (6-fail,
   identical set)** — anchor pages keep the bridge scroll path, so the anchor corpus is untouched. Zero
-  regressions. **Unblocks** page/document-scroll sticky (the nineteenth expansion's excluded case — the
-  engine can now see the page-scrolled geometry) and the modal-dialog document-scroll adjustment the
-  dialog/backdrop feature needs; both remain follow-ups (the engine's sticky pass still needs a
-  viewport-as-scroll-container path, and dialog needs the modality/top-layer channel + `IsAnchorAccessible`).
+  regressions. **Unblocks** page/document-scroll sticky (done — twenty-first expansion below) and the
+  modal-dialog document-scroll adjustment the dialog/backdrop feature needs (still a follow-up: dialog also
+  needs the modality/top-layer channel + `IsAnchorAccessible`).
+
+- **P5.8d.2b — page/document-scroll sticky (twenty-first expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-hixy7x`; Broiler.Layout + bridge, both parent-repo, additive,
+  default-off). Completes the sticky feature by adding the case the nineteenth expansion excluded: a sticky
+  box pinned to the **document scrolling element** (page scroll), now that the twentieth expansion made
+  `<html>` scroll native. Two small changes:
+  - **Engine.** `CssBox.Sticky.cs` gains a viewport-scrollport fallback: `TryGetStickyScrollport` returns the
+    nearest scroll-clip ancestor's content box, or — when there is none — the **viewport**
+    (`LayoutEnvironment.ViewportSize` at the origin). The engine's document-scroll pass has already applied
+    the page scroll to the box's geometry, so a viewport-anchored sticky box pins against the fixed viewport
+    rect with the same `ComputeStickyShift` math (refactored to take the scrollport edges directly).
+  - **Bridge.** `IsMvpNativeStickyBox` drops the `!IsDocumentElement(scrollContainer)` carve-out (still
+    scoped to no-anchor pages), so a document-scroll sticky box is handed off too.
+  **Native mode fixes a pre-existing bridge bug here:** the bridge's baked document-scroll sticky pins the box
+  by the inset *even at `scrollTop = 0`* (it reads the box's offset within the document scrolling element as
+  0), rendering it at natural+inset instead of natural; the engine is correct (no pin until scrolled past the
+  inset line). So validation is **native-only** (baked is not a valid reference), not baked-vs-native parity.
+  Tests: `Broiler.Layout.Tests/NativeStickyPlacementTests.cs` (+1 viewport-pin, +1 viewport-no-op; the former
+  `NoScrollContainer_IsNoOp` becomes `NoClipContainer_PinsAgainstViewport`);
+  `Broiler.Wpt.Tests/NativePageScrollStickyWptTests.cs` (full render: a 900px page's sticky box sits at its
+  natural row at `scrollTop:0` and pins to viewport y 20 at `scrollTop:200`). Regression check: the
+  scroll/sticky/anchor/position-visibility Wpt suites (20) and the sticky engine/bridge-mode suites green;
+  **css-anchor-position default-off byte-identical (8-fail) and lever-on unchanged (6-fail, identical set)**.
+  Zero regressions. Sticky's remaining bridge-only case is the **anchor page** (the anchor-scroll /
+  position-visibility interaction still uses the bridge's DOM-shift).
 
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
@@ -2361,7 +2386,7 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
   ~~scroll simulation~~ → ~~`position-visibility`~~ → dialog/backdrop → ~~position-try (anchor()-inset handoff
   subset)~~ → ~~transform/contain/will-change containing blocks~~ → ~~combined `anchor()` + `anchor-size()`~~ →
-  ~~`position: sticky` (non-document scroll container)~~ → ~~document/page scroll~~.
+  ~~`position: sticky` (non-document scroll container)~~ → ~~document/page scroll~~ → ~~page-scroll sticky~~.
   (Childless auto/explicit/percentage sizing,
   `box-sizing:border-box`, percentage margin/padding/inset box props, shared-name scope resolution,
   writing-mode percentage basis, relatively-positioned inline containing blocks, `anchor()` physical insets,
@@ -2471,12 +2496,12 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   renderer effort, and all-or-nothing for parity (a partial port breaks the 7 passing tests). Best done as its
   own submodule feature, not folded into the lever-gated anchor cutover. Left on the bridge path.
 
-  Still bridge-only: dialog/backdrop, sticky's **page/document-scroll and anchor-page** cases (the
-  non-document scroll-container case is native as of the nineteenth expansion — the engine's sticky pass still
-  needs a viewport-as-scroll-container path to use the now-native document scroll), the remaining entangled
-  scroll case (anchor-scroll containers — the plain non-anchor container is native as of the seventeenth
-  expansion and the document scrolling element as of the twentieth; fixed descendants need no reparenting on
-  the native path), visual-viewport (the engine-feature set above;
+  Still bridge-only: dialog/backdrop, sticky's **anchor-page** case only (the non-document scroll-container
+  case is native as of the nineteenth expansion and page/document-scroll sticky as of the twenty-first — the
+  anchor page's anchor-scroll / position-visibility interaction keeps the bridge DOM-shift), the remaining
+  entangled scroll case (anchor-scroll containers — the plain non-anchor container is native as of the
+  seventeenth expansion and the document scrolling element as of the twentieth; fixed descendants need no
+  reparenting on the native path), visual-viewport (the engine-feature set above;
   transform/contain/will-change CBs are now native — sixteenth expansion), and the opposing-inset /
   auto-min-content-sized position-try bases (the
   engine's

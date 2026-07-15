@@ -141,10 +141,11 @@ public sealed class NativeStickyPlacementTests
     }
 
     [Fact]
-    public void NoScrollContainer_IsNoOp()
+    public void NoClipContainer_PinsAgainstViewport_WhenScrolledAbove()
     {
-        // CB directly under the root with no clipping ancestor → the box scrolls with the
-        // viewport, which the engine does not model natively → left untouched.
+        // No clipping ancestor → the box's scroll container is the viewport (document scroll).
+        // Placed at post-page-scroll y=-50 (above the viewport top); top:10 pins it to y=10.
+        // The FakeLayoutEnvironment viewport is 1000×1000 at the origin.
         var root = Box(null, new PointF(0, 0), new SizeF(1000, 1000));
         var cb = Box(root, new PointF(0, -50), new SizeF(200, 1000));
         var sticky = Box(cb, new PointF(0, -50), new SizeF(50, 30));
@@ -153,7 +154,23 @@ public sealed class NativeStickyPlacementTests
 
         Run(root);
 
-        Assert.Equal(-50, sticky.Location.Y, 3);
+        Assert.Equal(10, sticky.Location.Y, 3); // pinned 10px below the viewport top
+    }
+
+    [Fact]
+    public void ViewportSticky_NoPin_WhenWithinViewportPastInset()
+    {
+        // Viewport-anchored sticky whose (post-scroll) position is comfortably inside the
+        // viewport and past top:10 → no pin, stays put.
+        var root = Box(null, new PointF(0, 0), new SizeF(1000, 1000));
+        var cb = Box(root, new PointF(0, 0), new SizeF(200, 1000));
+        var sticky = Box(cb, new PointF(0, 200), new SizeF(50, 30));
+        sticky.Position = "sticky";
+        sticky.Top = "10px";
+
+        Run(root);
+
+        Assert.Equal(200, sticky.Location.Y, 3);
     }
 
     [Fact]

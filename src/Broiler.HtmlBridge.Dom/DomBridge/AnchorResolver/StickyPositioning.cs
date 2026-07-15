@@ -49,19 +49,19 @@ public sealed partial class DomBridge
     /// Whether a <c>position: sticky</c> box is handled by the Broiler.Layout engine's native
     /// sticky post-pass in native mode (so the bridge skips pre-baking it to
     /// <c>relative</c> + offset). Scoped exactly like the native scroll handoff
-    /// (<see cref="ApplyScrollSimulationTree"/>): a no-anchor page — so none of the
-    /// anchor-scroll / position-visibility machinery runs and the container reaches the engine
-    /// via <c>data-broiler-scroll-*</c> — and a non-document scroll container that clips
-    /// overflow, so the engine's scroll post-pass has the offset and can pin the box. A box
-    /// pinned to the document scrolling element (page scroll) stays baked: the engine has no
-    /// document-scroll model.
+    /// (<see cref="ApplyScrollSimulationTree"/>): a <em>no-anchor</em> page, so none of the
+    /// anchor-scroll / position-visibility machinery runs and any scroll container reaches the
+    /// engine via <c>data-broiler-scroll-*</c>. Both a non-document clipping scroll container
+    /// and the document scrolling element (page scroll) are handled — the latter since the
+    /// twentieth expansion made <c>&lt;html&gt;</c> scroll native, so the engine sees the
+    /// page-scrolled geometry and pins the box against the viewport
+    /// (<c>CssBox.TryGetStickyScrollport</c>).
     /// </summary>
     private bool IsMvpNativeStickyBox(DomElement el)
     {
         if (DocumentHasAnchorContent())
             return false;
-        var scrollContainer = FindScrollContainer(el);
-        return scrollContainer != null && !IsDocumentElement(scrollContainer);
+        return FindScrollContainer(el) != null;
     }
 
     private void ApplyStickyOffset(DomElement el)
