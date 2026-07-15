@@ -2162,6 +2162,23 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   model first (port `ApplyScrollSimulation`), which unblocks both scroll and sticky and fixes the
   flow-vs-paint hiding bug, and to do it in an environment with a sticky corpus. Left on the bridge path.
 
+  **Finding — dialog/backdrop is a renderer-submodule feature, not a parent-repo post-pass slice (2026-07-15
+  investigation).** It *is* validatable — 7 `anchor-position-top-layer-*` corpus tests, all passing — and has
+  no scroll dependency, so unlike sticky it is not blocked; but it is the largest category-2 item and is
+  structurally different from the anchor slices, which were pure post-layout *repositioning* in the parent-repo
+  engine. The bridge's `ApplyDialogUAPositioning`/`ApplyPopoverUAPositioning`/`InsertDialogBackdrops` do four
+  things a native port must reproduce: (1) **runtime state** — modality (`showModal()`), popover-open
+  (`showPopover()`), and top-layer order are bridge `ElementRuntimeState`; the engine cannot tell a modal
+  dialog from a merely-`open` one from the serialised DOM, so a native port needs a runtime-state channel /
+  markers; (2) **`::backdrop` pseudo-element generation** — a *new* box (viewport-covering scrim), which is
+  box-generation work in `Broiler.HTML`'s `DomParser` (submodule), not post-layout repositioning; (3) **a
+  top-layer paint pass** — none exists in the renderer's `PaintWalker` (submodule); the bridge fakes it with a
+  2-billion z-index; (4) **dialog UA box styles** (border/padding/background — a submodule UA-stylesheet
+  concern). So the bulk of the work is in the `Broiler.HTML` renderer submodule (box-gen + paint + UA styles),
+  delivered as patches under `patches/`, plus a parent-repo runtime-state channel — a dedicated multi-part
+  renderer effort, and all-or-nothing for parity (a partial port breaks the 7 passing tests). Best done as its
+  own submodule feature, not folded into the lever-gated anchor cutover. Left on the bridge path.
+
   Still bridge-only: dialog/backdrop, sticky, scroll simulation, visual-viewport, transform/contain CBs
   (the engine-feature set above), and the opposing-inset / auto-min-content-sized position-try bases (the engine's
   `TryApplyPositionTryFallback` supports these geometries but the bridge gate keeps them baked pending per-case
