@@ -826,10 +826,39 @@ pass unchanged; the only failures (the `:lang` selector, the three zoom/srcdoc
 `ScriptEngineExecuteTests.DomBridge_SerializeToHtml_*`, and the `HttpClientMigrationTests` reflection guard)
 are the standing environmental set, confirmed identical at baseline in isolation → zero regressions.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.14 named-accessor / relocated-infra /
+Status: **P3.15 completed** 2026-07-15 (branch `claude/htmlbridge-phase-5-ke2wvn`) — the **CSSOM stylesheet /
+CSS-rule object model** slice, the sibling of P3.14's declaration. The JS `CSSRuleList`/`CSSRule` object
+model is the fifteenth co-located module: `StyleSheetBinding` (namespace `Broiler.HtmlBridge.Dom.Features`,
+split `StyleSheetBinding.cs` / `.Rules.cs` / `.Callbacks.cs` to stay under the 750-line/file guideline) owns
+the rule-list + keyframe builders (`ParseCssRuleStrings`, `BuildCssRuleListObject`, `BuildNestedRuleObjects`/
+`BuildNestedKeyframeObjects`, `BuildCssKeyframeRuleObject`), the per-rule `CSSRule` builder for every rule
+kind (`BuildCssRuleObject` — style/`@media`/`@supports`/`@layer`/`@keyframes`/`@font-face`/`@page`/
+`@property`/`@counter-style`/`@import`/`@namespace`, reading selector/prelude metadata from the neutral
+`Broiler.CSS.Cssom.CssomRuleMetadata` projection), and the ~20 `JsStyleSheets…002…028Core` callbacks (the
+`length`/`item`/`cssRules`/`insertRule`/`deleteRule` operations and the per-kind `cssText` serializers) —
+all moved out of the **918-line `StyleSheets.cs`** (now 141) and the deleted `JsFunctionCallbacks/
+StyleSheets.cs`.
+
+**Like `ClassListBinding` (P3.6) and `StyleDeclarationBinding` (P3.14) it is an internal *static* class with
+no host contract** — pure CSSOM-IDL logic over the shared `Broiler.CSS` rule model, the canonical
+`CssParser`/`CssSerializer`, and `StyleDeclarationBinding.BuildRuleDeclaration` (P3.14) for a rule's `style`;
+the one bridge helper it needs is the neutral static `DomBridge.ParseStyle`. The **`CSSStyleSheet` object
+itself** stays bridge-owned in `DomBridge.BuildStyleSheetObject` (`StyleSheets.cs`) — its per-element
+identity cache (`_styleSheetCache`), the live `cssRules` collection, and the `insertRule`/`deleteRule`
+mutation bookkeeping that marks the shared model mutated (`RulesMutated` runtime state,
+`EnsureStyleSheetRulesCurrent`) are runtime-state coupled; it calls into the module for the rule objects and
+the six sheet callbacks (widened to `internal static`). Behaviour-preserving; no public-API change (module +
+callbacks internal). Tests: `Broiler.Cli.Tests/StyleSheetBindingModuleTests.cs` (co-location/static guard +
+selectorText/rule.style/cssText, insertRule/deleteRule live-collection mutation, and `@media`/`@keyframes`
+rule-kind characterizations through the JS engine). Regression check vs the P3.14/pre-change baseline: the
+SelectorsAndCssom / StyleDeclarationBinding / Acid3CssCompliance / CssStyleDeclarationValidation and
+architecture-guard suites reproduce an **identical** failure set with the change stashed (the standing `:lang`
+selector and Acid3 border-shorthand environmental fails) → zero regressions. This takes `StyleSheets.cs`
+under the 750-line exit-criterion limit.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.15 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static pattern is the template for any residual coupling:
-the CSSOM **stylesheet** objects (CSSStyleSheet/CSSRule in `StyleSheets.cs`, the sibling of P3.14's
-declaration), Element/geometry, Window/Document, SVG, the **rest** of Frames/browsing-contexts (the
+Element/geometry, Window/Document, SVG, the **rest** of Frames/browsing-contexts (the
 `BrowsingContextManager` consolidating the sub-window / content-document caches, the sub-window object and
 `WindowContext.cs`), Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
@@ -2212,18 +2241,51 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   the bridge's `CollectFixedDescendants` reparenting only undoes the DOM-shift wrapper's renderer bug), but
   that correctness can't be *demonstrated* here. Both cases were therefore left on the bridge path; they need
   an environment where page scroll and fixed-in-scroll actually render.
+- **P5.8d.2b — combined `anchor()` + `anchor-size()` (eighteenth expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-ke2wvn`; **bridge only, additive, default-off**). A box that both
+  **sizes** to its anchor (`anchor-size()` in `width`/`height`) **and** positions against it (`anchor()`
+  in a physical inset) now goes native — the case the seventh (`anchor()`-insets) and eighth
+  (`anchor-size()`) expansions deliberately kept baked ("the combined case stays baked"). **No engine
+  change needed:** the engine's post-pass already runs `TryApplyNativeAnchorSizing` **before**
+  `TryApplyAnchorInsetPlacement` (`CssBox.Anchor.cs:144,148`), so the two pure passes compose — the box is
+  sized first, then a right/bottom inset repositions against the *resolved* size (a probe test proved both
+  the left/top and right/bottom orderings land exactly, so the eighteenth is a pure bridge gate-widening).
+  The two pure bridge gates each exclude the other function (`IsMvpNativeAnchorInsetBox` returns false on
+  any `anchor-size(`; `IsMvpNativeAnchorSizeBox` on any `anchor(` inset), so a combined box was fully baked.
+  - **Bridge.** A new `IsMvpNativeAnchorCombinedBox` (the intersection of both pure MVP subsets: an
+    absolutely-positioned, childless, non-modal, non-zoomed box with no `position-area`/`position-try`;
+    `anchor-size()` only in `width`/`height` and `anchor()` only in `left`/`right`/`top`/`bottom`; at most
+    one inset per axis — an opposing pair plus a definite `anchor-size()` is over-constrained and stays
+    baked; every referenced anchor registered, accessible and moved by no intervening scroll) drives a
+    single `combinedMvp` flag in `ResolveAnchorFunctions` that skips **both** the inset bake and the
+    `ResolveAnchorSizeFunctions` size bake, keeping the two halves' bake/handoff decision in lockstep so
+    they can never disagree (one baked, one native).
+  Tests: `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` +2 (size-then-left/top place, size-then-
+  right/bottom place using the resolved size); `Broiler.Cli.Tests/NativeAnchorCombinedPipelineTests.cs`
+  (real parse→cascade→layout: the engine sizes the box to the anchor's 50×70 and places its edge at the
+  anchor's right/bottom corner (90,110); a flag-off control pins the resolution to the post-pass) +
+  `NativeAnchorCombinedBridgeModeTests.cs` (native mode leaves both `anchor()` and `anchor-size()` un-baked
+  through serialization); `Broiler.Wpt.Tests/NativeAnchorCombinedWptTests.cs` (full render; baked & native
+  paths agree pixel-wise). Regression check: full `Broiler.Layout.Tests` (179 pass; the pre-existing
+  environmental arch-guard fail identical on baseline) green; **default-off byte-identical (8-fail /
+  31-pass)** and **lever-on the identical 6-fail set** (verified against the stashed baseline lever-on run —
+  `set()` diff), with zero per-test movement. As with the seventh/eighth expansions, **no corpus pixel test
+  exercises the combined path** (the corpus's `anchor-size()` tests are `transform-005` — combined with
+  `position-area`, not `anchor()` insets — and `anchor-size-css-zoom` — zoom-gated), so validation is the
+  exact-geometry unit + pipeline + full-render tests plus no-regression. Zero regressions.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
   CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
   ~~scroll simulation~~ → ~~`position-visibility`~~ → dialog/backdrop → ~~position-try (anchor()-inset handoff
-  subset)~~ → ~~transform/contain/will-change containing blocks~~. (Childless auto/explicit/percentage sizing,
+  subset)~~ → ~~transform/contain/will-change containing blocks~~ → ~~combined `anchor()` + `anchor-size()`~~.
+  (Childless auto/explicit/percentage sizing,
   `box-sizing:border-box`, percentage margin/padding/inset box props, shared-name scope resolution,
   writing-mode percentage basis, relatively-positioned inline containing blocks, `anchor()` physical insets,
   `anchor-size()` sizing, opposing-inset sizing, abspos-inline containing blocks, intervening scroll
   containers, the anchor()-inset `@position-try` fallback subset, `position-visibility`, `anchor-center`,
-  redundant fixed-position sizing, AND transform/contain/will-change containing blocks now land natively —
-  see the sixteen expansions above.)
+  redundant fixed-position sizing, transform/contain/will-change containing blocks, AND a box combining
+  `anchor()` insets with `anchor-size()` sizing now land natively — see the eighteen expansions above.)
 
   **Triage of the remaining AnchorResolver passes (2026-07-15):** the anchor-specific, lever-gated passes
   are now on the engine (placement MVPs, `position-visibility`, `anchor-center`). The rest are *general*

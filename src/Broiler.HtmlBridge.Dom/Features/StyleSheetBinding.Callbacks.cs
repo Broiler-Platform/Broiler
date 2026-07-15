@@ -1,19 +1,29 @@
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.BuiltIns.Array;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.Dom;
 using Broiler.CSS;
+using Broiler.CSS.Cssom;
 
-namespace Broiler.HtmlBridge;
+namespace Broiler.HtmlBridge.Dom.Features;
 
-public sealed partial class DomBridge
+/// <summary>
+/// The <c>JsStyleSheets*Core</c> callback half of <see cref="StyleSheetBinding"/> (Phase 3, P3.15):
+/// the <c>CSSStyleSheet</c>/<c>CSSRuleList</c> <c>length</c>/<c>item</c>/<c>cssRules</c>/<c>insertRule</c>/
+/// <c>deleteRule</c> operations (driven by closures the bridge's <c>BuildStyleSheetObject</c> supplies)
+/// and the per-rule-kind <c>cssText</c> serializers. Pure functions over their arguments — no state.
+/// </summary>
+internal static partial class StyleSheetBinding
 {
+    internal static JSValue JsStyleSheetsGetLength002Core(Func<List<CssRule>> currentRules, in Arguments _) => new JSNumber(currentRules().Count);
 
-    private JSValue JsStyleSheetsGetLength002Core(Func<List<CssRule>> currentRules, in Arguments _) => new JSNumber(currentRules().Count);
 
-
-    private JSValue JsStyleSheetsItem003Core(Action syncLiveCssRulesIndices, JSObject? liveCssRules, Func<List<CssRule>> currentRules, in Arguments a)
+    internal static JSValue JsStyleSheetsItem003Core(Action syncLiveCssRulesIndices, JSObject? liveCssRules, Func<List<CssRule>> currentRules, in Arguments a)
     {
         syncLiveCssRulesIndices();
         var dv = a.Length > 0 ? a[0].DoubleValue : 0;
@@ -22,14 +32,14 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsStyleSheetsGetCssRules004Core(Action syncLiveCssRulesIndices, JSObject? liveCssRules, in Arguments _)
+    internal static JSValue JsStyleSheetsGetCssRules004Core(Action syncLiveCssRulesIndices, JSObject? liveCssRules, in Arguments _)
     {
         syncLiveCssRulesIndices();
         return liveCssRules;
     }
 
 
-    private JSValue JsStyleSheetsInsertRule005Core(Func<List<CssRule>> currentRules, Action markRulesMutated, Action syncLiveCssRulesIndices, in Arguments a)
+    internal static JSValue JsStyleSheetsInsertRule005Core(Func<List<CssRule>> currentRules, Action markRulesMutated, Action syncLiveCssRulesIndices, in Arguments a)
     {
         var ruleText = a.Length > 0 ? a[0].ToString() : string.Empty;
         // currentRules() reparses on any pending textContent change before we mutate,
@@ -52,7 +62,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsStyleSheetsDeleteRule006Core(Func<List<CssRule>> currentRules, Action markRulesMutated, Action syncLiveCssRulesIndices, in Arguments a)
+    internal static JSValue JsStyleSheetsDeleteRule006Core(Func<List<CssRule>> currentRules, Action markRulesMutated, Action syncLiveCssRulesIndices, in Arguments a)
     {
         var rules = currentRules();
         if (a.Length > 0)
@@ -106,7 +116,6 @@ public sealed partial class DomBridge
 
         return JSUndefined.Value;
     }
-
 
     private static JSValue JsStyleSheetsGetCssText013Core(string? keyText, JSObject? ruleObj, in Arguments _)
     {
@@ -216,5 +225,4 @@ public sealed partial class DomBridge
         var styleText = styleObj?[(KeyString)"cssText"]?.ToString() ?? string.Empty;
         return new JSString($"{selectorText} {{ {styleText} }}");
     }
-
 }
