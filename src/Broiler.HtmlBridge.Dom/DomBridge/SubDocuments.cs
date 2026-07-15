@@ -210,152 +210,10 @@ public sealed partial class DomBridge
         return doc;
     }
 
-    private JSObject GetOrCreateSubWindow(DomElement containerElement)
-    {
-        if (_browsingContexts.TryGetSubWindow(containerElement, out var cached))
-            return cached;
-
-        var subDocument = GetOrCreateSubDocument(containerElement);
-        var subWindow = new JSObject();
-        _browsingContexts.SetSubWindow(containerElement, subWindow);
-        _eventTargets.SetOwnerWindow(subWindow, subWindow);
-        _messaging.InstallEventTargetApi(subWindow, "DomBridge.subWindow.dispatchEvent");
-        _messaging.RegisterWindowMessaging(subWindow);
-
-        subWindow.FastAddProperty((KeyString)"document",
-            new JSFunction((in _) => GetOrCreateSubDocument(containerElement), "get document"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        var locationHref = GetSubWindowLocationHref(containerElement);
-        var iframeLocation = new JSObject();
-        iframeLocation.FastAddValue((KeyString)"href",
-            new JSString(locationHref), JSPropertyAttributes.EnumerableConfigurableValue);
-        if (Uri.TryCreate(locationHref, UriKind.Absolute, out var locationUri))
-        {
-            iframeLocation.FastAddValue((KeyString)"protocol", new JSString(locationUri.Scheme + ":"), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"host", new JSString(locationUri.IsDefaultPort ? locationUri.Host : $"{locationUri.Host}:{locationUri.Port}"), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"hostname", new JSString(locationUri.Host), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"pathname", new JSString(locationUri.AbsolutePath), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"search", new JSString(locationUri.Query), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"hash", new JSString(locationUri.Fragment), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"origin", new JSString($"{locationUri.Scheme}://{(locationUri.IsDefaultPort ? locationUri.Host : $"{locationUri.Host}:{locationUri.Port}")}"), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
-        else
-        {
-            iframeLocation.FastAddValue((KeyString)"search", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"hash", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
-        subWindow.FastAddValue((KeyString)"location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        subWindow.FastAddProperty((KeyString)"scrollX", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get scrollX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"scrollY", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get scrollY"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"pageXOffset", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"pageYOffset", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        subWindow.FastAddValue((KeyString)"scroll", new JSFunction((in a) => JsSubDocumentsScroll006Core(containerElement, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue((KeyString)"scrollTo", new JSFunction((in a) => JsSubDocumentsScrollTo007Core(containerElement, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue((KeyString)"scrollBy", new JSFunction((in a) => JsSubDocumentsScrollBy008Core(containerElement, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        subWindow.FastAddValue((KeyString)"self", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue((KeyString)"window", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["Event"] is { } eventCtor)
-            subWindow.FastAddValue((KeyString)"Event", eventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["CustomEvent"] is { } customEventCtor)
-            subWindow.FastAddValue((KeyString)"CustomEvent", customEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["MouseEvent"] is { } mouseEventCtor)
-            subWindow.FastAddValue((KeyString)"MouseEvent", mouseEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["FocusEvent"] is { } focusEventCtor)
-            subWindow.FastAddValue((KeyString)"FocusEvent", focusEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["KeyboardEvent"] is { } keyboardEventCtor)
-            subWindow.FastAddValue((KeyString)"KeyboardEvent", keyboardEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["WheelEvent"] is { } wheelEventCtor)
-            subWindow.FastAddValue((KeyString)"WheelEvent", wheelEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["UIEvent"] is { } uiEventCtor)
-            subWindow.FastAddValue((KeyString)"UIEvent", uiEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["MessageChannel"] is { } messageChannelCtor)
-            subWindow.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        var parentWindow = GetParentWindowForSubDocument(containerElement);
-        if (parentWindow != null)
-        {
-            subWindow.FastAddValue((KeyString)"parent", parentWindow, JSPropertyAttributes.EnumerableConfigurableValue);
-        }
-
-        subWindow.FastAddValue((KeyString)"top", _windowJSObject ?? subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        subDocument.FastAddValue((KeyString)"defaultView", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // window.getComputedStyle — sub-window needs its own copy so that
-        // doc.defaultView.getComputedStyle(node, "") resolves CSS rules from
-        // the sub-document's <style> elements rather than the main document.
-        var bridgeForSubStyle = this;
-        subWindow.FastAddValue((KeyString)"getComputedStyle", new JSFunction((in a) => JsSubDocumentsGetComputedStyle009Core(bridgeForSubStyle, in a), "getComputedStyle", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        return subWindow;
-    }
-
-    private string GetSubWindowLocationHref(DomElement containerElement)
-    {
-        if (_browsingContexts.TryGetLocation(containerElement, out var cachedLocation) &&
-            !string.IsNullOrWhiteSpace(cachedLocation))
-        {
-            return cachedLocation;
-        }
-
-        if (string.Equals(containerElement.TagName, "iframe", StringComparison.OrdinalIgnoreCase) &&
-            HasAttr(containerElement, "srcdoc"))
-            return "about:srcdoc";
-
-        var resolvedUrl = ResolveSubResourceUrl(GetSubResourceUrl(containerElement), GetInheritedSubDocumentBaseUrl(containerElement));
-        return !string.IsNullOrWhiteSpace(resolvedUrl) ? resolvedUrl : "about:blank";
-    }
-
-    private double GetSubWindowScrollOffset(DomElement containerElement, bool vertical)
-    {
-        var scrollingElement = GetSubDocumentScrollingElement(containerElement);
-        return scrollingElement == null ? 0 : GetElementScrollOffset(scrollingElement, vertical);
-    }
-
-    private void SetSubWindowScrollOffsets(DomElement containerElement, double? left = null, double? top = null, bool relative = false, string? behavior = null)
-    {
-        var scrollingElement = GetSubDocumentScrollingElement(containerElement);
-        if (scrollingElement == null)
-            return;
-
-        SetElementScrollOffsetsWithBehavior(scrollingElement, left, top, relative: relative, clamp: false, behavior: behavior);
-    }
-
-    private DomElement? GetSubDocumentScrollingElement(DomElement containerElement)
-    {
-        var document = GetContentDocument(containerElement);
-        return document == null ? null : GetDocumentElement(document);
-    }
-
     private static DomElement? FindBodyElement(DomElement documentElement) =>
         ChildElements(documentElement).FirstOrDefault(c =>
             !IsText(c) &&
             string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
-
-    private JSObject? GetParentWindowForSubDocument(DomElement containerElement)
-    {
-        // The container's owning document is a severed sub-document DomDocument when the container is
-        // itself nested in another frame; recover that frame via the reverse map (P4.4c: the owning
-        // document comes from the canonical tree, was OwnerDocRoot / ParentEl(#subdoc-root)).
-        var parentFrame = GetFrameForContentDocument(GetOwningDocument(containerElement));
-        if (parentFrame != null)
-            return GetOrCreateSubWindow(parentFrame);
-
-        return _windowJSObject;
-    }
 
     private string GetInheritedSubDocumentBaseUrl(DomElement containerElement)
     {
@@ -483,7 +341,7 @@ public sealed partial class DomBridge
             extraction.DeferredScripts.Count == 0)
             return;
 
-        var subWindow = GetOrCreateSubWindow(containerElement);
+        var subWindow = _subWindows.GetOrCreate(containerElement);
 
         RunWithWindowContext(subWindow, () =>
         {
@@ -597,7 +455,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Gets the resource URL for a container element (iframe src or object data).
     /// </summary>
-    private static string GetSubResourceUrl(DomElement containerElement)
+    internal static string GetSubResourceUrl(DomElement containerElement)
     {
         var tag = containerElement.TagName?.ToLowerInvariant();
         if (tag == "iframe")

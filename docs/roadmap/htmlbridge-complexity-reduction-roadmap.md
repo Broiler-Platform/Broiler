@@ -885,12 +885,37 @@ content-document maps were never bulk-cleared (only per-container removal), so t
 re-parse; the consolidation preserves that behaviour (a later single-`Clear()` leak-fix is now trivial — the
 owner is one seam — but was kept out of this behaviour-preserving slice).
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.16 named-accessor / relocated-infra /
+Status: **P3.17 completed** 2026-07-15 (branch `claude/htmlbridge-phase-5-hixy7x`) — the **nested-browsing-context
+`window` (sub-window) object**, the residual Frames surface P3.13 deferred. The sub-window JS object built for
+an `<iframe>`/`<object>`/`<frame>` — its `document`/`location`/`self`/`window`/`parent`/`top` wiring, the scroll
+surface (`scrollX`/`scrollY`/`pageXOffset`/`pageYOffset` + `scroll`/`scrollTo`/`scrollBy`), the mirrored event
+constructors and its own `getComputedStyle` — plus the five sub-window-scoped helpers (location href, scroll
+offset read/write, scrolling-element and parent-window resolution) and the four scroll/getComputedStyle
+callbacks are now the co-located `SubWindowBinding` module (namespace `Broiler.HtmlBridge.Dom.Features`), moved
+out of the 1280-line `SubDocuments.cs` and the deleted `JsFunctionCallbacks/SubDocuments.cs`. It holds direct
+references to the shared owners it installs on the sub-window (the P3.16 `BrowsingContextManager`, the
+`EventTargetRegistry`, the `MessagingBinding`) and reaches everything else — the sub-document builder it wraps
+(mutual recursion), sub-resource URL resolution, scroll geometry, computed style, the global event constructors
+— through the narrow `ISubWindowHost` contract (14 members), implemented via explicit interface members in
+`DomBridge.SubWindowHost.cs`, so no callback touches an arbitrary bridge private field. The three
+`GetOrCreateSubWindow` call sites (`DomBridge.cs`, `JsObjects.cs` contentWindow getter, `SubDocuments.cs`) now
+call `_subWindows.GetOrCreate`; the numbered `JsSubDocuments…006…009Core` callbacks were renamed
+`Scroll`/`ScrollTo`/`ScrollBy`/`GetComputedStyle`; `GetSubResourceUrl` widened `private`→`internal static`.
+Behaviour-preserving; no public-API change (module + contract internal — snapshot unchanged; a module, not a new
+`DomBridge` partial). Tests: `Broiler.Cli.Tests/SubWindowBindingModuleTests.cs` (co-location / host-contract /
+builder-moved-off-bridge guards + an `<iframe srcdoc>` `contentWindow` characterization exercising
+`getComputedStyle`/`scrollX`/`scroll`/`self`/`window`). Regression check: the SubDocumentBinding /
+SubDocumentSeverMigration / BrowsingContextRootMigration / MessagingBinding / WebMessaging / architecture-guard /
+public-API-snapshot suites (60) pass; the broader window-context / sub-resource / cross-doc set is 132/138 with
+the six standing environmental failures (the three `DomBridge_SerializeToHtml_*` zoom/srcdoc and the three
+real-HTTP `HttpSubResourceTests.Iframe_*`) identical on the stashed committed-P3.16 baseline → zero regressions.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.17 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner pattern is the template for any residual
-coupling: Element/geometry, Window/Document, SVG, the residual Frames/browsing-context surface (the sub-window
-*object* with its scroll/getComputedStyle callbacks and the `WindowContext.cs` window-resolution *algorithms* —
-the **state** is now consolidated in `BrowsingContextManager`, P3.16), Canvas (better done with Phase 6, which
-dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
+coupling: Element/geometry, Window/Document, SVG, the last Frames/browsing-context residue (the `WindowContext.cs`
+window-resolution *algorithms* — the sub-window *object* is now the `SubWindowBinding` module, P3.17, and the
+**state** the `BrowsingContextManager`, P3.16), Canvas (better done with Phase 6, which dissolves
+`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

@@ -123,6 +123,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // override) is owned by BrowsingContextManager (P3.16); the builders / resource loading / onload
     // algorithms stay bridge-owned and reach that state through it.
     private readonly Dom.Features.SubDocumentBinding _subDocuments;
+    // Phase 3 (P3.17): the nested-browsing-context `window` (sub-window) object — its
+    // document/location/scroll/getComputedStyle surface and the sub-window-scoped helpers — lives in
+    // SubWindowBinding, reached through the narrow ISubWindowHost contract (see DomBridge.SubWindowHost.cs);
+    // it holds the P3.16 BrowsingContextManager + the shared EventTargetRegistry/MessagingBinding it installs.
+    private readonly Dom.Features.SubWindowBinding _subWindows;
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
     private double _visualViewportPageTopOffset;
@@ -182,6 +187,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _fetch = new Dom.Features.FetchBinding(this, _resources);
         _attributes = new Dom.Features.AttributesBinding(this);
         _subDocuments = new Dom.Features.SubDocumentBinding(this);
+        _subWindows = new Dom.Features.SubWindowBinding(this, _browsingContexts, _eventTargets, _messaging);
         _document = new DomDocument();
         DocumentElement = CreateBridgeElement("html");
         // Phase 4 item 1 (final sentinel): the canonical DomDocument is the document root — the JS
@@ -845,7 +851,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             {
                 var src = TryGetAttribute(child, "src", out var srcValue) ? srcValue : string.Empty;
                 if (!IsCrossOrigin(src, _pageUrl))
-                    frames.Add(GetOrCreateSubWindow(child));
+                    frames.Add(_subWindows.GetOrCreate(child));
             }
 
             // Sub-documents are severed (P4.4b) — never in-tree children — so the walk always

@@ -1563,7 +1563,7 @@ public sealed partial class DomBridge
     {
         if (IsCurrentIframeCrossOrigin(element))
             return JSNull.Value;
-        return GetOrCreateSubWindow(element);
+        return _subWindows.GetOrCreate(element);
     }
 
 
