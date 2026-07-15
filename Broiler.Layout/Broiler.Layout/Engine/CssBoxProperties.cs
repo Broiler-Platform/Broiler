@@ -648,6 +648,22 @@ internal abstract partial class CssBoxProperties
     public string PositionArea { get; set; } = "none";
     public string PositionTry { get; set; } = "normal";
     public string PositionTryFallbacks { get; set; } = "none";
+    // Default "normal" is a sentinel for UNSET (the cascade only emits position-visibility
+    // when authored, since it is not in CssComputedDefaults). It lets the visibility pass
+    // distinguish an unset target — which, when it has position-area + position-anchor, takes
+    // an implicit "anchors-visible" (the position-visibility-initial reftest) — from an
+    // explicit "always" (position-visibility-remove-anchors-visible), which must never hide.
+    public string PositionVisibility { get; set; } = "normal";
+
+    /// <summary>
+    /// Runtime flag set by the native anchor post-pass' <c>position-visibility</c> resolution
+    /// (P5.8d.2b) to suppress an anchor-positioned box whose anchor is not visible (scrolled out
+    /// of an intervening clip container, <c>visibility:hidden</c>, or — for <c>anchors-valid</c> —
+    /// missing). Unlike <c>display:none</c> it is applied <em>after</em> layout, so the box keeps
+    /// its geometry but <see cref="Broiler.Layout.IR.FragmentTreeBuilder"/> excludes it (and its
+    /// subtree) from the paint fragment tree. Not a CSS property — never cascaded or copied.
+    /// </summary>
+    public bool PositionHidden { get; set; }
 
     public string LineHeight
     {

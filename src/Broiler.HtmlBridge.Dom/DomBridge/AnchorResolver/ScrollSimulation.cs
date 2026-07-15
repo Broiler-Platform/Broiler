@@ -55,6 +55,13 @@ public sealed partial class DomBridge
                     // spacers can leak above the container's top edge.
                     var wrapper = CreateBridgeElement("div");
                     InlineStyle(wrapper)["position"] = "relative";
+                    // Native mode: this scroll-offset wrapper is a rendering hack, not an authored
+                    // containing block, so mark it (like an anchor-induced-relative scroller) — the
+                    // engine's position-visibility pass must resolve a target's CB to the real
+                    // authored scroll container, not this wrapper (else an authored position:relative
+                    // scroller's target is wrongly hidden — position-visibility-anchors-visible-with-position).
+                    if (NativeAnchorPlacement)
+                        SetAttr(wrapper, "data-broiler-anchor-cb", "1");
                     if (scrollTop != 0)
                         InlineStyle(wrapper)["top"] =
                             $"{(-scrollTop).ToString(CultureInfo.InvariantCulture)}px";
@@ -115,6 +122,13 @@ public sealed partial class DomBridge
                             if (childOffset + childH <= scrollTop)
                             {
                                 InlineStyle(child)["visibility"] = "hidden";
+                                // Native mode: this visibility:hidden is a scroll-clip hack, not an
+                                // authored value — mark it so the engine's position-visibility pass
+                                // does not mistake a scrolled-out anchor for an authored
+                                // visibility:hidden anchor (which would hide the target even when its
+                                // CB is the scroller — position-visibility-anchors-visible-with-position).
+                                if (NativeAnchorPlacement)
+                                    SetAttr(child, "data-broiler-scroll-hidden", "1");
                                 childOffset += childH;
                             }
                             else

@@ -69,7 +69,27 @@ public sealed partial class DomBridge
 
             if (!string.IsNullOrWhiteSpace(fallbacks) && positionTryRules.Count > 0)
             {
-                TryApplyFallback(element, cssProps, anchorRegistry, positionTryRules, fallbacks!);
+                // Native mode (P5.8d.2b position-try expansion): a box in the anchor()-inset
+                // position-try handoff subset had its base left un-baked in
+                // ResolveAnchorFunctions (same IsMvpNativeAnchorInsetBox predicate); the
+                // engine's post-pass applies the fallback from the PositionTryRules channel,
+                // so skip baking and leave the position-try + anchor() CSS intact. Every other
+                // position-try box is baked here and, in native mode, has its position-try
+                // neutralized inline so the engine's fallback pass skips the already-baked box.
+                if (NativeAnchorPlacement &&
+                    IsMvpNativeAnchorInsetBox(element, cssProps, anchorRegistry, positionTryRules))
+                {
+                    // handed off to the engine — the bridge does not touch this box
+                }
+                else
+                {
+                    TryApplyFallback(element, cssProps, anchorRegistry, positionTryRules, fallbacks!);
+                    if (NativeAnchorPlacement)
+                    {
+                        InlineStyle(element)["position-try-fallbacks"] = "none";
+                        InlineStyle(element)["position-try"] = "normal";
+                    }
+                }
             }
         }
 

@@ -33,6 +33,9 @@ partial class CssBox
         if (registry.Count == 0)
             return;
         ApplyNativeAnchorPlacement(root, registry);
+        // position-visibility (P5.8d.2b): hide anchor-positioned targets whose anchor is not
+        // visible. Runs after placement so the anchor's final (scroll-shifted) geometry is known.
+        ResolvePositionVisibility(root, registry);
     }
 
     /// <summary>
@@ -143,7 +146,18 @@ partial class CssBox
             // a box positioned by anchor() functions in its left/right/top/bottom rather
             // than position-area.
             box.TryApplyAnchorInsetPlacement(registry);
+            // align-self/justify-self: anchor-center (P5.8d.2b anchor-center expansion): centre
+            // the box on its anchor in the block/inline axis (a box with position-anchor but no
+            // position-area).
+            box.TryApplyAnchorCenter(registry);
         }
+
+        // position-try fallback (P5.8d.2b position-try expansion): after the base placement
+        // above, if the box's base overflows its containing block, replace it with the first
+        // @position-try fallback that fits. Reads the rule bodies from the out-of-band channel
+        // (NativeAnchorPlacement.PositionTryRules); a no-op when the box has no position-try or
+        // no rules are available.
+        box.TryApplyPositionTryFallback(registry);
 
         foreach (var child in box.Boxes)
             ApplyNativeAnchorPlacement(child, registry);
@@ -584,6 +598,229 @@ partial class CssBox
                 !registry.TryResolveRect(name, inScope, out var a))
                 return r.Fallback ?? "0px";
 
+            double v = AnchorGeometry.ResolveEdge(
+                a.Left - cbX, a.Top - cbY, a.Right - cbX, a.Bottom - cbY,
+                r.Side, 0, 0, property, cbW, cbH);
+            return v.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
+        });
+
+        var len = new CssLength(rewritten);
+        if (len.HasError) return null;
+        if (len.IsPercentage) return basis * len.Number;
+        return len.Unit == CssUnit.Px ? len.Number : null;
+    }
+
+    /// <summary>
+    /// Centres a box on its anchor per <c>align-self: anchor-center</c> (block axis) /
+    /// <c>justify-self: anchor-center</c> (inline axis) — the engine equivalent of the bridge's
+    /// <c>ResolveAnchorCenter</c> (P5.8d.2b anchor-center expansion). Applies only to an
+    /// absolutely/fixed-positioned box with <c>position-anchor</c> and no <c>position-area</c>
+    /// (position-area does its own alignment). Repositions the centred axis so the box's centre
+    /// aligns with the anchor's centre; the other axis keeps its laid-out position. The anchor rect
+    /// is the same registered (scroll-shifted) geometry the placement passes use, so the centring is
+    /// scroll-correct. Returns <c>false</c> when it is not an anchor-center box or the anchor is
+    /// unregistered.
+    /// </summary>
+    internal bool TryApplyAnchorCenter(AnchorRegistry registry)
+    {
+        if (Position != CssConstants.Absolute && Position != CssConstants.Fixed)
+            return false;
+        if (PositionArea != "none")
+            return false;
+        var anchorName = PositionAnchor;
+        if (string.IsNullOrEmpty(anchorName) || anchorName == "auto")
+            return false;
+        bool alignCenter = string.Equals(AlignSelf, "anchor-center", StringComparison.OrdinalIgnoreCase);
+        bool justifyCenter = string.Equals(JustifySelf, "anchor-center", StringComparison.OrdinalIgnoreCase);
+        if (!alignCenter && !justifyCenter)
+            return false;
+
+        var cb = FindPositionedContainingBlock();
+        Func<object?, bool> inScope = scope => scope is CssBox src && IsBoxDescendantOf(src, cb);
+        if (!registry.TryResolveRect(anchorName, inScope, out var a))
+            return false;
+
+        // align-self centres in the block axis (Y for horizontal writing modes), justify-self in
+        // the inline axis (X). The non-centred axis keeps its laid-out position.
+        if (alignCenter)
+        {
+            double centredTop = (a.Top + a.Bottom) / 2 - Size.Height / 2.0;
+            OffsetTop((float)(centredTop - Location.Y));
+        }
+        if (justifyCenter)
+        {
+            double centredLeft = (a.Left + a.Right) / 2 - Size.Width / 2.0;
+            OffsetLeft((float)(centredLeft - Location.X));
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// The fallback-name list a position-try box carries — <c>position-try-fallbacks</c>
+    /// when set, else the <c>position-try</c> shorthand (mirrors the bridge's
+    /// <c>position-try-fallbacks ?? position-try</c>). <c>null</c> when neither is set
+    /// (the projected defaults are <c>none</c>/<c>normal</c>).
+    /// </summary>
+    private string? PositionTryFallbackList()
+    {
+        if (!string.IsNullOrWhiteSpace(PositionTryFallbacks) && PositionTryFallbacks != "none")
+            return PositionTryFallbacks;
+        if (!string.IsNullOrWhiteSpace(PositionTry) && PositionTry != "normal")
+            return PositionTry;
+        return null;
+    }
+
+    /// <summary>
+    /// Native <c>@position-try</c> fallback selection (P5.8d.2b position-try expansion) — the
+    /// engine equivalent of the bridge's <c>TryApplyFallback</c>. Runs after the base
+    /// placement: if the box's base overflows its containing block, it walks the box's
+    /// <c>position-try-fallbacks</c> list and applies the first <c>@position-try</c> rule
+    /// whose resolved position/size fits the containing block. The rule bodies come from the
+    /// out-of-band <see cref="NativeAnchorPlacement.PositionTryRules"/> channel (a stylesheet
+    /// at-rule never reaches the cascaded box properties). Reposition + (childless) resize,
+    /// matching the bridge; a no-op when the box has no position-try, no rules are available,
+    /// or the base already fits. Returns <c>false</c> in those no-op cases, <c>true</c> when a
+    /// fallback was applied.
+    /// </summary>
+    internal bool TryApplyPositionTryFallback(AnchorRegistry registry)
+    {
+        if (Position != CssConstants.Absolute && Position != CssConstants.Fixed)
+            return false;
+        var fallbackList = PositionTryFallbackList();
+        if (fallbackList is null)
+            return false;
+        var rules = NativeAnchorPlacement.PositionTryRules;
+        if (rules is null || rules.Count == 0)
+            return false;
+
+        var cb = FindPositionedContainingBlock();
+        GetAbsoluteContainingBlockPaddingBox(cb, out double cbX, out double cbY, out double cbW, out double cbH);
+        Func<object?, bool> inScope = scope => scope is CssBox src && IsBoxDescendantOf(src, cb);
+
+        // Base placement geometry, in the containing-block frame. baseLeft/baseTop are the
+        // already-placed used position; baseRight/baseBottom are the box's numeric right/bottom
+        // insets (px only, else 0 — an anchor()/auto inset is already reflected in the used
+        // position). Mirrors the bridge's IMCB computation (cb − left − right per axis).
+        double baseLeft = Bounds.X - cbX;
+        double baseTop = Bounds.Y - cbY;
+        double baseWidth = Bounds.Width;
+        double baseHeight = Bounds.Height;
+        double baseRight = ParsePxOnly(Right) ?? 0;
+        double baseBottom = ParsePxOnly(Bottom) ?? 0;
+        double imcbWidth = cbW - baseLeft - baseRight;
+        double imcbHeight = cbH - baseTop - baseBottom;
+
+        if (!AnchorGeometry.Overflows(baseLeft, baseTop, baseWidth, baseHeight, cbW, cbH, imcbWidth, imcbHeight))
+            return false; // Base fits — no fallback needed.
+
+        foreach (var name in PositionTryRule.ParseFallbackList(fallbackList))
+        {
+            if (!rules.TryGetValue(name, out var tryProps))
+                continue;
+
+            // Overlay the fallback's declarations on the box's own position/size CSS.
+            var merged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["left"] = Left ?? "auto",
+                ["right"] = Right ?? "auto",
+                ["top"] = Top ?? "auto",
+                ["bottom"] = Bottom ?? "auto",
+                ["width"] = Width ?? "auto",
+                ["height"] = Height ?? "auto",
+            };
+            foreach (var kv in tryProps)
+                merged[kv.Key] = kv.Value;
+
+            // inset: auto resets any inset the fallback didn't itself set, so the base
+            // insets don't leak through (mirrors the bridge).
+            if (merged.TryGetValue("inset", out var insetVal) && insetVal.Trim() == "auto")
+            {
+                foreach (var side in new[] { "left", "right", "top", "bottom" })
+                    if (!tryProps.ContainsKey(side))
+                        merged[side] = "auto";
+            }
+
+            // Resolve explicit width/height first so left-from-right / top-from-bottom use the
+            // right element size; else keep the base used size.
+            double tryWidth = baseWidth, tryHeight = baseHeight;
+            if (merged.TryGetValue("width", out var wv) && ParsePxOnly(wv) is double pw) tryWidth = pw;
+            if (merged.TryGetValue("height", out var hv) && ParsePxOnly(hv) is double ph) tryHeight = ph;
+
+            double tryLeft = 0, tryTop = 0;
+            if (IsPresentInset(merged, "left", out var lv))
+                tryLeft = ResolveTryEdge(lv, AnchorInsetProperty.Left, registry, inScope, cbX, cbY, cbW, cbH) ?? 0;
+            if (IsPresentInset(merged, "right", out var rv) &&
+                ResolveTryEdge(rv, AnchorInsetProperty.Right, registry, inScope, cbX, cbY, cbW, cbH) is double rightPx)
+            {
+                if (!IsPresentInset(merged, "left", out _))
+                    tryLeft = cbW - rightPx - tryWidth;   // no left → left from right + width
+                else
+                    tryWidth = cbW - tryLeft - rightPx;   // both → width from the two insets
+            }
+            if (IsPresentInset(merged, "top", out var tv))
+                tryTop = ResolveTryEdge(tv, AnchorInsetProperty.Top, registry, inScope, cbX, cbY, cbW, cbH) ?? 0;
+            if (IsPresentInset(merged, "bottom", out var bv) &&
+                ResolveTryEdge(bv, AnchorInsetProperty.Bottom, registry, inScope, cbX, cbY, cbW, cbH) is double bottomPx)
+            {
+                if (!IsPresentInset(merged, "top", out _))
+                    tryTop = cbH - bottomPx - tryHeight;
+                else
+                    tryHeight = cbH - tryTop - bottomPx;
+            }
+
+            if (!AnchorGeometry.Fits(tryLeft, tryTop, tryWidth, tryHeight, cbW, cbH))
+                continue;
+
+            // Apply: reposition to the CB-frame candidate, and resize a childless box (a
+            // childful box keeps its laid-out size — a re-flow would be needed).
+            if (Boxes.Count == 0 && Words.Count == 0 &&
+                (tryWidth != Size.Width || tryHeight != Size.Height))
+                Size = new System.Drawing.SizeF((float)tryWidth, (float)tryHeight);
+            OffsetLeft((float)(cbX + tryLeft - Location.X));
+            OffsetTop((float)(cbY + tryTop - Location.Y));
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Whether a merged inset entry is present and not <c>auto</c>.</summary>
+    private static bool IsPresentInset(Dictionary<string, string> merged, string key, out string value)
+    {
+        value = merged.GetValueOrDefault(key) ?? "auto";
+        return !string.IsNullOrWhiteSpace(value) && value.Trim() != "auto";
+    }
+
+    /// <summary>
+    /// Resolves one <c>@position-try</c> inset declaration (a plain length/percentage or an
+    /// <c>anchor()</c> reference) to a containing-block-frame length (px). Mirrors the base
+    /// anchor()-inset resolution (<see cref="ResolveInsetMaybeAnchor"/>): the anchor rect is
+    /// taken document-absolute and converted to the CB frame, with no scroll adjustment (the
+    /// fallback path, like the bridge's, uses none). Returns <c>null</c> for
+    /// unparseable/unregistered.
+    /// </summary>
+    private double? ResolveTryEdge(
+        string? value, AnchorInsetProperty property, AnchorRegistry registry,
+        Func<object?, bool> inScope, double cbX, double cbY, double cbW, double cbH)
+    {
+        if (string.IsNullOrEmpty(value) || value == CssConstants.Auto)
+            return null;
+        double basis = property is AnchorInsetProperty.Left or AnchorInsetProperty.Right ? cbW : cbH;
+
+        if (!value.Contains("anchor(", System.StringComparison.OrdinalIgnoreCase))
+        {
+            var plain = new CssLength(value);
+            if (plain.HasError) return null;
+            if (plain.IsPercentage) return basis * plain.Number;
+            return plain.Unit == CssUnit.Px ? plain.Number : null;
+        }
+
+        string rewritten = AnchorFunction.Rewrite(value, r =>
+        {
+            string name = string.IsNullOrEmpty(r.Name) ? (PositionAnchor ?? string.Empty) : r.Name!;
+            if (string.IsNullOrEmpty(name) || name == "auto" ||
+                !registry.TryResolveRect(name, inScope, out var a))
+                return r.Fallback ?? "0px";
             double v = AnchorGeometry.ResolveEdge(
                 a.Left - cbX, a.Top - cbY, a.Right - cbX, a.Bottom - cbY,
                 r.Side, 0, 0, property, cbW, cbH);

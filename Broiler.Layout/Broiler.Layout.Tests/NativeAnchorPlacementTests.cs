@@ -618,6 +618,140 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(9, target.Location.Y, 3);
     }
 
+    // ------------------------------------------------------------------
+    // @position-try fallback (P5.8d.2b position-try expansion)
+    // ------------------------------------------------------------------
+
+    // CB 100×100 at origin (relative, block); anchor --a is a 20×20 box at (70,70)
+    // → left/top 70, right/bottom 90. Returns a childless 30×30 abspos target at the
+    // origin for the caller to give a (usually overflowing) base placement + position-try.
+    private static (CssBox root, CssBox cb) PositionTryFixture(out CssBox target)
+    {
+        var root = Box(null, new PointF(0, 0), new SizeF(1000, 1000));
+        var cb = Box(root, new PointF(0, 0), new SizeF(100, 100));
+        cb.Position = "relative";
+        cb.Display = "block";
+        var anchor = Box(cb, new PointF(70, 70), new SizeF(20, 20));
+        anchor.AnchorName = "--a";
+        target = Box(cb, new PointF(0, 0), new SizeF(30, 30));
+        target.Position = "absolute";
+        return (root, cb);
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Rules(
+        params (string name, (string, string)[] decls)[] rules)
+    {
+        var map = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
+        foreach (var (name, decls) in rules)
+        {
+            var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (k, v) in decls) d[k] = v;
+            map[name] = d;
+        }
+        return map;
+    }
+
+    private static void RunPassWithRules(
+        CssBox root, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? rules)
+    {
+        try
+        {
+            NativeAnchorPlacement.Enabled = true;
+            NativeAnchorPlacement.PositionTryRules = rules;
+            CssBox.RunNativeAnchorPlacement(root);
+        }
+        finally
+        {
+            NativeAnchorPlacement.Enabled = false;
+            NativeAnchorPlacement.PositionTryRules = null;
+        }
+    }
+
+    [Fact]
+    public void PositionTry_BaseOverflows_AppliesFirstFittingFallback()
+    {
+        var (root, _) = PositionTryFixture(out var target);
+        // Base: box left/top margin edge at the anchor's right/bottom (90,90); a 30-wide box
+        // then overflows the 100-wide CB (90+30 = 120).
+        target.Left = "anchor(--a right)";
+        target.Top = "anchor(--a bottom)";
+        target.PositionTryFallbacks = "--flip";
+        // Fallback flips to the anchor's opposite edges: right/bottom at the anchor's
+        // left/top (70), so a 30-wide box lands at (40,40) and fits.
+        RunPassWithRules(root, Rules(("--flip", new[]
+        {
+            ("left", "auto"), ("right", "anchor(--a left)"),
+            ("top", "auto"), ("bottom", "anchor(--a top)"),
+        })));
+        Assert.Equal(40, target.Location.X, 3);
+        Assert.Equal(40, target.Location.Y, 3);
+        Assert.Equal(30, target.Size.Width, 3);
+        Assert.Equal(30, target.Size.Height, 3);
+    }
+
+    [Fact]
+    public void PositionTry_BaseFits_NoFallbackApplied()
+    {
+        var (root, _) = PositionTryFixture(out var target);
+        // Base at the anchor's left/top (70,70); a 30-wide box ends exactly at the CB edge
+        // (70+30 = 100) → does not overflow, so the fallback must NOT be applied.
+        target.Left = "anchor(--a left)";
+        target.Top = "anchor(--a top)";
+        target.PositionTryFallbacks = "--flip";
+        RunPassWithRules(root, Rules(("--flip", new[]
+        {
+            ("left", "auto"), ("right", "anchor(--a left)"),
+            ("top", "auto"), ("bottom", "anchor(--a top)"),
+        })));
+        Assert.Equal(70, target.Location.X, 3);
+        Assert.Equal(70, target.Location.Y, 3);
+    }
+
+    [Fact]
+    public void PositionTry_NoRules_LeavesBaseInPlace()
+    {
+        var (root, _) = PositionTryFixture(out var target);
+        target.Left = "anchor(--a right)";  // base overflows
+        target.Top = "anchor(--a bottom)";
+        target.PositionTryFallbacks = "--flip";
+        RunPassWithRules(root, rules: null); // channel empty → the overflowing base is kept
+        Assert.Equal(90, target.Location.X, 3);
+        Assert.Equal(90, target.Location.Y, 3);
+    }
+
+    [Fact]
+    public void PositionTry_InsetAuto_ResetsBaseInsetsNotSetByFallback()
+    {
+        var (root, _) = PositionTryFixture(out var target);
+        target.Left = "anchor(--a right)"; // 90 → overflows
+        target.Top = "10px";               // base top 10
+        target.PositionTryFallbacks = "--flip";
+        // inset:auto resets left/top/bottom; only right is set by the fallback → the base
+        // top (10px) must NOT leak, so tryTop resolves to 0.
+        RunPassWithRules(root, Rules(("--flip", new[]
+        {
+            ("right", "anchor(--a left)"), ("inset", "auto"),
+        })));
+        Assert.Equal(40, target.Location.X, 3); // 100 - 30(rightInset) - 30(width)
+        Assert.Equal(0, target.Location.Y, 3);  // top reset to auto → 0, not 10
+    }
+
+    [Fact]
+    public void PositionTry_PicksFirstFittingFallback_SkippingOverflowing()
+    {
+        var (root, _) = PositionTryFixture(out var target);
+        target.Left = "anchor(--a right)"; // base left 90 → overflows
+        target.Top = "10px";               // base top 10 (fits)
+        target.PositionTryFallbacks = "--stay, --flip";
+        RunPassWithRules(root, Rules(
+            // First fallback still overflows (left stays at the anchor's right edge, 90).
+            ("--stay", new[] { ("left", "anchor(--a right)") }),
+            // Second fits: right at the anchor's left edge → left 40.
+            ("--flip", new[] { ("left", "auto"), ("right", "anchor(--a left)") })));
+        Assert.Equal(40, target.Location.X, 3); // the second fallback won
+        Assert.Equal(10, target.Location.Y, 3); // base top preserved (no inset:auto here)
+    }
+
     // Minimal layout environment for the synthetic box trees: resolves a fixed-size
     // font (so em-based Actual border/padding widths compute) and returns benign
     // defaults for everything else. The test boxes carry no text or replaced content,

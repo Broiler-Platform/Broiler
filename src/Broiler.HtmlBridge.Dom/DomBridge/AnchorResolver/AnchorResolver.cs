@@ -65,8 +65,11 @@ public sealed partial class DomBridge
         // 1b. Parse @position-try at-rules from stylesheets.
         var positionTryRules = ParsePositionTryRules();
 
-        // 2. Resolve anchor() function values on elements.
-        ResolveAnchorFunctions(DocumentElement, anchorRegistry);
+        // 2. Resolve anchor() function values on elements. Native mode passes the
+        //    parsed @position-try rules so the anchor()-inset MVP gate can hand off a
+        //    position-try box only when the engine has its fallback rules (via the
+        //    NativeAnchorPlacement.PositionTryRules channel).
+        ResolveAnchorFunctions(DocumentElement, anchorRegistry, positionTryRules);
 
         // 3. Resolve position-area values on anchored elements.
         //    Collects scroll containers that need position:relative but
@@ -82,16 +85,23 @@ public sealed partial class DomBridge
             deferredDomMoves);
 
         // 3a2. Resolve align-self/justify-self: anchor-center on elements
-        //      that have position-anchor but no position-area.
-        ResolveAnchorCenter(DocumentElement, anchorRegistry);
+        //      that have position-anchor but no position-area. Native mode (P5.8d.2b) centres
+        //      these in the engine post-pass (CssBox.TryApplyAnchorCenter) instead, so the
+        //      align-self/justify-self + position-anchor CSS survives to the render un-baked.
+        if (!NativeAnchorPlacement)
+            ResolveAnchorCenter(DocumentElement, anchorRegistry);
 
         // 3b. Resolve position-try-fallbacks for elements whose base
         //     style overflows the containing block.
         ResolvePositionTryFallbacks(DocumentElement, anchorRegistry, positionTryRules);
 
         // 3c. Resolve position-visibility: hide anchor-positioned elements
-        //     whose anchor is not visible or does not exist.
-        ResolvePositionVisibility(DocumentElement, anchorRegistry);
+        //     whose anchor is not visible or does not exist. Native mode (P5.8d.2b) resolves
+        //     this in the Broiler.Layout engine post-pass instead (CssBox.ResolvePositionVisibility),
+        //     so the bridge stops writing display:none; the scroll-container marker stamped in
+        //     step 3e gives the engine the pre-position:relative CB view the decision needs.
+        if (!NativeAnchorPlacement)
+            ResolvePositionVisibility(DocumentElement, anchorRegistry);
 
         // 3d. Apply deferred DOM moves (inline CB → block ancestor promotion).
         //     Must be done after all position-area resolution is complete
@@ -118,7 +128,15 @@ public sealed partial class DomBridge
                 (scPos == "relative" || scPos == "absolute" ||
                  scPos == "fixed" || scPos == "sticky");
             if (!alreadyPositioned)
+            {
                 InlineStyle(sc)["position"] = "relative";
+                // Native mode: mark this scroller so the engine's position-visibility pass knows
+                // its position:relative is anchor-induced (not authored) and must still count as an
+                // intervening clip container — reproducing the bridge's pre-position:relative CB
+                // view without which a static-scroller target would be wrongly kept visible.
+                if (NativeAnchorPlacement)
+                    SetAttr(sc, "data-broiler-anchor-cb", "1");
+            }
         }
 
         // 4. Insert backdrop elements for modal dialogs.
@@ -127,9 +145,13 @@ public sealed partial class DomBridge
             anchorRegistry, positionTryRules);
 
         // 5. Ensure fixed-position elements from CSS have explicit pixel
-        //    dimensions (the Broiler renderer does not resolve width/height
-        //    from opposing inset values).
-        ResolveFixedPositionSizing(viewportWidth, viewportHeight);
+        //    dimensions from opposing inset values (e.g. top:0;bottom:0). Native mode (P5.8d.2b)
+        //    relies on the Broiler.Layout engine, which resolves this natively (CSS2.1 §10.3.7,
+        //    incl. the fixed→viewport containing block and the `inset` shorthand — verified to
+        //    agree with this pre-bake), so the bridge pass is redundant and skipped, removing its
+        //    inline width/height/inset writes.
+        if (!NativeAnchorPlacement)
+            ResolveFixedPositionSizing(viewportWidth, viewportHeight);
 
         // 6. Ensure elements that establish containing blocks via non-position
         //    properties (contain:layout, transform) get position:relative so the

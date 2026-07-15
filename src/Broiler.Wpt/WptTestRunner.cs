@@ -307,7 +307,7 @@ internal sealed class WptTestResult
 /// through the Broiler HTML/JavaScript stack and comparing the output to
 /// a Chromium/Playwright reference image.
 /// </summary>
-internal sealed class WptTestRunner
+internal sealed partial class WptTestRunner
 {
     /// <summary>
     /// When set, the stub <c>promise_test</c> does NOT run its bodies before the
@@ -1487,7 +1487,7 @@ internal sealed class WptTestRunner
         HTML.Image.BBitmap rendered;
         try
         {
-            rendered = RenderWithNativeAnchor(() => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
+            rendered = RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
                 backgroundColor: BColor.White,
                 stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
         }
@@ -1774,7 +1774,7 @@ internal sealed class WptTestRunner
             };
         }
 
-        return RenderWithNativeAnchor(() => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
+        return RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
             backgroundColor: BColor.White,
             stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
     }
@@ -1784,23 +1784,56 @@ internal sealed class WptTestRunner
     /// anchor-placement post-pass enabled iff the runner lever is on (P5.8d.2b). The
     /// engine flag is <c>[ThreadStatic]</c>, so enabling it here scopes it to this one
     /// render on this thread — the earlier bridge geometry snapshots are unaffected.
+    /// The document's <c>@position-try</c> rule bodies (parsed from <paramref name="html"/>)
+    /// are handed to the engine's post-pass via the same thread-static channel, since a
+    /// stylesheet at-rule never reaches the cascaded box properties the engine reads
+    /// (P5.8d.2b position-try expansion).
     /// </summary>
-    private static HTML.Image.BBitmap RenderWithNativeAnchor(Func<HTML.Image.BBitmap> render)
+    private static HTML.Image.BBitmap RenderWithNativeAnchor(string html, Func<HTML.Image.BBitmap> render)
     {
         if (!NativeAnchorPlacement)
             return render();
 
-        var previous = Broiler.Layout.Engine.NativeAnchorPlacement.Enabled;
+        var previousEnabled = Broiler.Layout.Engine.NativeAnchorPlacement.Enabled;
+        var previousRules = Broiler.Layout.Engine.NativeAnchorPlacement.PositionTryRules;
         Broiler.Layout.Engine.NativeAnchorPlacement.Enabled = true;
+        Broiler.Layout.Engine.NativeAnchorPlacement.PositionTryRules = ParsePositionTryRulesFromHtml(html);
         try
         {
             return render();
         }
         finally
         {
-            Broiler.Layout.Engine.NativeAnchorPlacement.Enabled = previous;
+            Broiler.Layout.Engine.NativeAnchorPlacement.Enabled = previousEnabled;
+            Broiler.Layout.Engine.NativeAnchorPlacement.PositionTryRules = previousRules;
         }
     }
+
+    /// <summary>
+    /// Extracts the document's <c>@position-try</c> rules (name → declarations) from the
+    /// serialised HTML's <c>&lt;style&gt;</c> blocks, using the canonical
+    /// <c>Broiler.CSS.PositionTryRule</c> parser (the same model the bridge uses). Later
+    /// duplicates win, in document order — matching the bridge's accumulator.
+    /// </summary>
+    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? ParsePositionTryRulesFromHtml(string html)
+    {
+        if (string.IsNullOrEmpty(html) || html.IndexOf("@position-try", StringComparison.OrdinalIgnoreCase) < 0)
+            return null;
+
+        var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
+        foreach (Match m in StyleBlockRegex().Matches(html))
+        {
+            var css = m.Groups["css"].Value;
+            if (css.IndexOf("@position-try", StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+            foreach (var rule in Broiler.CSS.PositionTryRule.Parse(css))
+                result[rule.Key] = rule.Value;
+        }
+        return result.Count > 0 ? result : null;
+    }
+
+    [GeneratedRegex(@"<style[^>]*>(?<css>.*?)</style>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex StyleBlockRegex();
 
     internal HTML.Image.BBitmap RenderHtmlFileBitmapPublic(string htmlPath, string? wptRoot)
     {
