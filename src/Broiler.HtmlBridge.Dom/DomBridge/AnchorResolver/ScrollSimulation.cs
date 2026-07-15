@@ -47,6 +47,30 @@ public sealed partial class DomBridge
 
                 if ((clips || isDocScrollingElement) && el.ChildNodes.Count > 0)
                 {
+                    // Native mode (P5.8d.2b scroll expansion): for a non-document scroll
+                    // container on a page with no anchor content, hand the scroll offset to the
+                    // Broiler.Layout engine via data attributes instead of DOM-shifting the
+                    // content. The engine's scroll post-pass (CssBox.RunScrollSimulation)
+                    // translates the container's content and its overflow box clips it — no
+                    // wrapper div, no inline position/top/left/visibility writes reach the render.
+                    // Scoped to no-anchor documents so this never crosses the anchor-scroll-
+                    // container / position-visibility machinery, which keeps the DOM-shift below.
+                    if (NativeAnchorPlacement && !isDocScrollingElement && !DocumentHasAnchorContent())
+                    {
+                        if (scrollTop != 0)
+                            SetAttr(el, "data-broiler-scroll-top",
+                                scrollTop.ToString(CultureInfo.InvariantCulture));
+                        if (scrollLeft != 0)
+                            SetAttr(el, "data-broiler-scroll-left",
+                                scrollLeft.ToString(CultureInfo.InvariantCulture));
+
+                        // Recurse into children (nested scroll containers) and skip the DOM-shift.
+                        for (int i = 0; i < el.ChildNodes.Count; i++)
+                            if (ChildAt(el, i) is DomElement scrolledChild)
+                                ApplyScrollSimulationTree(scrolledChild);
+                        return;
+                    }
+
                     // Wrap all children in a positioned div that shifts content
                     // upward / leftward.  Using position:relative + top/left
                     // ensures the shifted content is clipped correctly by the
@@ -172,6 +196,16 @@ public sealed partial class DomBridge
     }
     
     private double GetScrollSimulationScaleFactor() => HasActiveVisualViewport() ? GetVisualViewportScale() : 1;
+
+    /// <summary>
+    /// Whether the document has any registered anchor (a named <c>anchor-name</c>) — i.e.
+    /// CSS anchor positioning could be active. Used to scope the native scroll handoff: when
+    /// there are no anchors, none of the anchor-scroll-container / position-visibility
+    /// machinery runs, so a scroll container can be handed to the engine's scroll post-pass
+    /// without any interaction with it. <c>_anchorCandidates</c> is populated by
+    /// <c>BuildAnchorRegistry</c> (step 1), well before scroll simulation (step 8).
+    /// </summary>
+    private bool DocumentHasAnchorContent() => _anchorCandidates is { Count: > 0 };
 
     private static bool HasOverflowClipping(Dictionary<string, string> props)
     {

@@ -126,6 +126,7 @@ internal static partial class CssUtils
             "box-sizing" => cssBox.BoxSizing,
             "clip-path" => cssBox.ClipPath,
             "transform" => cssBox.Transform,
+            "will-change" => cssBox.WillChange,
             "align-content" => cssBox.AlignContent,
             "justify-self" => cssBox.JustifySelf,
             "align-self" => cssBox.AlignSelf,
@@ -250,6 +251,9 @@ internal static partial class CssUtils
                 break;
             case "transform":
                 cssBox.Transform = value;
+                break;
+            case "will-change":
+                cssBox.WillChange = value;
                 break;
             case "box-shadow":
                 cssBox.BoxShadow = value;

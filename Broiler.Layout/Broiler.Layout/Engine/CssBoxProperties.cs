@@ -811,6 +811,18 @@ internal abstract partial class CssBoxProperties
     /// </summary>
     public string ContentVisibility { get; set; } = "visible";
     public string Transform { get; set; } = "none";
+
+    /// <summary>
+    /// CSS Will Change Module Level 1: the <c>will-change</c> property. A
+    /// comma-separated hint list (<c>auto</c> by default). Consumed only by the
+    /// native anchor-placement containing-block resolution: <c>will-change: transform</c>
+    /// (and other values that would create one) establishes a containing block for
+    /// absolutely-positioned descendants — see
+    /// <see cref="CssBox.EstablishesNonPositionAbsPosContainingBlock"/>. No other layout
+    /// or paint behaviour reads it today.
+    /// </summary>
+    public string WillChange { get; set; } = "auto";
+
     public string FlexDirection { get; set; } = "row";
     public string FlexGrow { get; set; } = "0";
     public string FlexShrink { get; set; } = "1";

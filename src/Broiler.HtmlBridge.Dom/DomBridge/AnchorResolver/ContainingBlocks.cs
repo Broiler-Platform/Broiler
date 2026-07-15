@@ -11,9 +11,13 @@ public sealed partial class DomBridge
     /// <summary>
     /// For elements that establish containing blocks via CSS properties that
     /// Broiler's renderer does not understand (e.g. <c>contain:layout</c>,
-    /// <c>transform</c>), adds <c>position:relative</c> to their inline
-    /// styles so the renderer treats them as containing blocks for absolutely
-    /// positioned descendants.
+    /// <c>transform</c>, <c>will-change:transform</c>), adds <c>position:relative</c> to
+    /// their inline styles so the renderer treats them as containing blocks for absolutely
+    /// positioned descendants. Called only on the default (baked) path — in native mode the
+    /// Broiler.Layout engine resolves these containing blocks itself
+    /// (<see cref="EstablishesContainingBlock"/>'s engine mirror,
+    /// <c>CssBox.EstablishesNonPositionAbsPosContainingBlock</c>), so
+    /// <see cref="ResolveAnchorPositions"/> skips this pass entirely.
     /// </summary>
     private void EnsureContainingBlockPositioning(DomElement root) => EnsureContainingBlockPositioningTree(root);
 
