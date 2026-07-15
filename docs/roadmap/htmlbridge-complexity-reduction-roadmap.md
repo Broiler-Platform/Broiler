@@ -2273,12 +2273,58 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   exercises the combined path** (the corpus's `anchor-size()` tests are `transform-005` — combined with
   `position-area`, not `anchor()` insets — and `anchor-size-css-zoom` — zoom-gated), so validation is the
   exact-geometry unit + pipeline + full-render tests plus no-regression. Zero regressions.
+- **P5.8d.2b — `position: sticky` (nineteenth expansion, FIRST INCREMENT) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-hixy7x`; Broiler.Layout + bridge, both parent-repo, additive,
+  default-off). **The first native `position: sticky` in the engine** (it had none) — and the resolution of
+  the sticky "blocked here" finding below for the **non-document scroll-container** case. It builds directly
+  on the seventeenth expansion's scroll model: a sticky box inside a non-document `overflow`-clipping scroll
+  container on a no-anchor page is now pinned by the Broiler.Layout engine instead of the bridge pre-baking
+  `position: relative` + a computed offset. Landed:
+  - **Engine.** New `Engine/CssBox.Sticky.cs` — `RunStickyPositioning`, a root post-pass run (gated by
+    `NativeAnchorPlacement.Enabled`) from `PerformLayout` **after** `RunScrollSimulation` (so it reads the
+    scroll-shifted geometry), **before** `RunNativeAnchorPlacement`. For each `position: sticky` box it finds
+    the nearest `IsScrollClipContainer` ancestor (the scrollport = that box's content box) and the box's
+    `ContainingBlock`, computes the physical-inset pin (a `top`/`left` inset pins the box toward the end when
+    it scrolls above the inset line; a `bottom`/`right` inset pins it toward the start when it scrolls past
+    the far edge — mirroring the bridge's `ComputeStickyShift`), clamps the shift so the box never leaves its
+    containing block's content box (CSS Positioned Layout 3 §6.3), and offsets the box. Because the engine
+    reads the box's already-scroll-shifted `Bounds`, the pin formula needs no scroll value of its own. First
+    increment: physical-inset "pin to an edge", reposition-only, px/percent insets. The renderer treats the
+    unrecognised `sticky` value as `static`, so the box is laid out in flow and this pass then offsets it.
+  - **Bridge.** `ResolveStickyPositioning` skips its `sticky → relative` pre-bake for a box the engine
+    handles — `IsMvpNativeStickyBox`: a no-anchor page (`!DocumentHasAnchorContent()`, so none of the
+    anchor-scroll / position-visibility machinery runs and the container reaches the engine via
+    `data-broiler-scroll-*`) whose scroll container is a **non-document** clipping element — leaving
+    `position: sticky` on the box to survive to the engine. Default off → the gate is
+    `if (!(NativeAnchorPlacement && …)) ApplyStickyOffset(el)`, so `ResolveStickyPositioning` is byte-identical
+    for every existing caller. Document/page-scroll sticky and anchor pages stay baked.
+  - **Why non-document-only.** The engine has no document-scroll model (the seventeenth expansion's first
+    increment left the `<html>` scrolling element on the bridge), so page-scroll sticky cannot yet be pinned
+    natively. And the bridge's DOM-shift scroll simulation is the sticky "blocked" finding's buggy reference —
+    but in native mode a no-anchor non-document scroll container uses the seventeenth expansion's DOM-shift-free
+    native scroll path (no `visibility:hidden` clip hack), so the native sticky path is free of that bug.
+  Validation (the render-parity model can't be used — the baked reference is buggy for scrolled sticky, and
+  there is no sticky corpus in this checkout): `Broiler.Layout.Tests/NativeStickyPlacementTests.cs` (13 unit
+  cases: top/bottom/left/right pin, no-pin-when-below-the-line, percent inset against the scrollport,
+  containing-block clamp, no-scroll-container no-op, non-sticky ignored, `ParseStickyInset` theory) +
+  `Broiler.Cli.Tests/NativeStickyBridgeModeTests.cs` (native mode leaves `position: sticky` un-baked; default
+  bakes `position: relative`) + `Broiler.Wpt.Tests/NativeStickyWptTests.cs` (**full render**: a JS-`scrollTop`
+  sticky box pins to the scrollport edge at the engine-computed row — a position that is neither the unscrolled
+  nor the pure-scroll position, so it is uniquely the engine's pin). Regression check: full `Broiler.Layout.Tests`
+  (192 pass; the pre-existing environmental arch-guard fail identical on the stashed baseline) green; the
+  existing bridge `StickyPositioningTests` (baked path) and the anchor/scroll Wpt + Cli suites green;
+  **css-anchor-position default-off byte-identical (8-fail — all gates are no-ops when the flags are off) and
+  lever-on unchanged (6-fail, identical set — the corpus is all anchor pages, so the sticky handoff is off
+  there)**. Zero regressions. The entangled remainder (document/page-scroll sticky, and the anchor-page
+  sticky/scroll/position-visibility interaction) stays on the bridge until the full scroll model lands.
+
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
   CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
   ~~scroll simulation~~ → ~~`position-visibility`~~ → dialog/backdrop → ~~position-try (anchor()-inset handoff
-  subset)~~ → ~~transform/contain/will-change containing blocks~~ → ~~combined `anchor()` + `anchor-size()`~~.
+  subset)~~ → ~~transform/contain/will-change containing blocks~~ → ~~combined `anchor()` + `anchor-size()`~~ →
+  ~~`position: sticky` (non-document scroll container)~~.
   (Childless auto/explicit/percentage sizing,
   `box-sizing:border-box`, percentage margin/padding/inset box props, shared-name scope resolution,
   writing-mode percentage basis, relatively-positioned inline containing blocks, `anchor()` physical insets,
@@ -2294,7 +2340,9 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   (`ResolveFixedPositionSizing`, done above); (b) **needs a new engine feature** — the engine genuinely
   lacks it, so a port is engine-layout work, not a bridge extraction, and it affects *all* pages (not just
   anchor pages) so the eventual production flip carries broad risk. Verified engine gaps:
-  `ResolveStickyPositioning` (no `position:sticky` in the engine), `ApplyVisualViewportSerializationState`
+  `ResolveStickyPositioning` (**partly closed — the nineteenth expansion gives the engine
+  `CssBox.RunStickyPositioning` for the non-document scroll-container case; page/document-scroll and
+  anchor-page sticky remain**), `ApplyVisualViewportSerializationState`
   (no pinch-zoom / `zoom`), and `InsertDialogBackdrops`/`ApplyDialogUAPositioning` (whose 7 validation tests
   turn out to be a **scroll-dependent, anchor-entangled modal-dialog path** — a transparent backdrop, modal
   UA positioning, `anchor()` insets, `IsAnchorAccessible`, and a document-scroll adjustment — NOT the
@@ -2327,7 +2375,17 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   that model. But sticky stays blocked here: it still has no corpus, and the remaining scroll cases the
   full model needs (the document scrolling element, fixed reparenting, and the anchor-scroll-container /
   position-visibility interaction that reproduces the flow-vs-paint hiding bug) are unbuilt.** Left on the
-  bridge path.
+  bridge path. **Update — RESOLVED for the non-document scroll-container case (nineteenth expansion above).**
+  Blocker (3) is what unblocked it: the seventeenth expansion's native scroll model gives the engine the
+  scroll-shifted geometry, and its **DOM-shift-free** native scroll path (for a no-anchor non-document
+  scroll container) means blocker (2)'s buggy `visibility:hidden` reference does not apply on the native
+  path — so `CssBox.RunStickyPositioning` pins those boxes and the bridge hands them off
+  (`IsMvpNativeStickyBox`). Blocker (1) is worked around exactly as this finding's own sequencing implies is
+  necessary: the validation is engine unit + a **native-only** full-render pin assertion + a bridge-mode
+  handoff test, not baked-vs-native parity. Still blocked here and left on the bridge: **page/document-scroll
+  sticky** (the engine has no document-scroll model) and **anchor-page sticky** (the anchor-scroll /
+  position-visibility interaction still uses the bridge's buggy DOM-shift) — they need the rest of the scroll
+  model.
 
   **Finding — dialog/backdrop is scroll-dependent and anchor-entangled, NOT a standalone renderer feature
   (2026-07-15 deep investigation; corrects the earlier "renderer-submodule feature, no scroll dependency"
@@ -2376,10 +2434,12 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   renderer effort, and all-or-nothing for parity (a partial port breaks the 7 passing tests). Best done as its
   own submodule feature, not folded into the lever-gated anchor cutover. Left on the bridge path.
 
-  Still bridge-only: dialog/backdrop, sticky, the entangled scroll cases (document scrolling element, fixed
-  reparenting, anchor-scroll containers — the plain non-anchor case is native as of the seventeenth
-  expansion), visual-viewport (the engine-feature set above; transform/contain/will-change CBs are now
-  native — sixteenth expansion), and the opposing-inset / auto-min-content-sized position-try bases (the
+  Still bridge-only: dialog/backdrop, sticky's **page/document-scroll and anchor-page** cases (the
+  non-document scroll-container case is native as of the nineteenth expansion), the entangled scroll cases
+  (document scrolling element, fixed reparenting, anchor-scroll containers — the plain non-anchor case is
+  native as of the seventeenth expansion), visual-viewport (the engine-feature set above;
+  transform/contain/will-change CBs are now native — sixteenth expansion), and the opposing-inset /
+  auto-min-content-sized position-try bases (the
   engine's
   `TryApplyPositionTryFallback` supports these geometries but the bridge gate keeps them baked pending per-case
   parity). **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler

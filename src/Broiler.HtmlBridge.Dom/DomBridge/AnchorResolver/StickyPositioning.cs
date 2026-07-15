@@ -27,13 +27,41 @@ public sealed partial class DomBridge
     private void ResolveStickyPositioningTree(DomElement el)
     {
         if (!IsText(el) && IsSticky(GetComputedProps(el)))
-            ApplyStickyOffset(el);
+        {
+            // Native mode (P5.8d.2b sticky expansion): hand a sticky box whose scroll
+            // container is a non-document clipping element on a no-anchor page to the
+            // Broiler.Layout engine's sticky post-pass (CssBox.RunStickyPositioning) — leave
+            // position:sticky un-baked so it survives serialization → cascade → the engine,
+            // which pins it against the natively scroll-shifted scrollport. Every other sticky
+            // box (document/page scroll, or an anchor page) stays baked here.
+            if (!(NativeAnchorPlacement && IsMvpNativeStickyBox(el)))
+                ApplyStickyOffset(el);
+        }
 
         // Index-based: ApplyStickyOffset only mutates el's own style, not the
         // child list, but stay defensive.
         for (int i = 0; i < el.ChildNodes.Count; i++)
             if (ChildAt(el, i) is DomElement child)
                 ResolveStickyPositioningTree(child);
+    }
+
+    /// <summary>
+    /// Whether a <c>position: sticky</c> box is handled by the Broiler.Layout engine's native
+    /// sticky post-pass in native mode (so the bridge skips pre-baking it to
+    /// <c>relative</c> + offset). Scoped exactly like the native scroll handoff
+    /// (<see cref="ApplyScrollSimulationTree"/>): a no-anchor page — so none of the
+    /// anchor-scroll / position-visibility machinery runs and the container reaches the engine
+    /// via <c>data-broiler-scroll-*</c> — and a non-document scroll container that clips
+    /// overflow, so the engine's scroll post-pass has the offset and can pin the box. A box
+    /// pinned to the document scrolling element (page scroll) stays baked: the engine has no
+    /// document-scroll model.
+    /// </summary>
+    private bool IsMvpNativeStickyBox(DomElement el)
+    {
+        if (DocumentHasAnchorContent())
+            return false;
+        var scrollContainer = FindScrollContainer(el);
+        return scrollContainer != null && !IsDocumentElement(scrollContainer);
     }
 
     private void ApplyStickyOffset(DomElement el)
