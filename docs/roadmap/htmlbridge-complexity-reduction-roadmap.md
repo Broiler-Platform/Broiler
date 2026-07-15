@@ -2033,6 +2033,42 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 
+**Finding — `position-visibility` is entangled with the scroll-container CB decision (2026-07-14
+investigation; the naive engine port was tried and reverted after two lever-on regressions).** A native
+engine port (project `position-visibility` onto the box, and in the placement post-pass set
+`display:none` when the anchor is `visibility:hidden` or scrolled out of an intervening clip container)
+is straightforward *except* for one ordering subtlety the bridge relies on: the bridge runs
+`ResolvePositionVisibility` **before** it applies `position:relative` to scroll containers used as a
+position-area CB (`ResolveAnchorPositions` steps 3c vs 3e — the deferral is deliberate, see the
+`scrollContainersNeedingRelative` comment), so during the bridge's visibility check the scroll container
+is **not yet** the target's containing block and its `IsAnchorVisibleForTarget` "the clip container *is*
+the target's CB → no intervening clip → visible" exception does not fire; the scrolled-out anchor
+therefore hides the target. The engine only sees the **final** serialized DOM, where that scroll
+container *is* already `position:relative` (the scroll-simulation expansion above adds it for native
+boxes too), so the engine's equivalent exception fires and the target is (incorrectly) kept visible —
+and, symmetrically, the naive geometry check hid two boxes it should not have
+(`position-visibility-anchors-visible-with-position`, `position-visibility-remove-anchors-visible` both
+regressed to 98.7 % MissingContent lever-on). Because every `position-visibility` corpus test already
+passes via the bridge (this is a parity move with no corpus gain), the port must reproduce the bridge's
+pre-`position:relative` CB view exactly — e.g. compute the anchor-visibility CB from the box's *original*
+(pre-native) positioning, or drive the whole hiding decision from a snapshot the bridge hands to the
+engine — before the bridge's `ResolvePositionVisibility` can be skipped. Left on the bridge path for now.
+
+**Finding — `position-try` needs the `@position-try` rules plumbed into the engine first (2026-07-14
+assessment).** The bridge's `TryApplyFallback` (`PositionTry.cs`) selects a fallback by (1) reading the
+box's already-**baked** base `left`/`top`/`width`/`height` inline styles, (2) testing overflow, then (3)
+overlaying each named `@position-try` rule's declarations, resolving its `anchor()` insets, and testing
+fit. The blocker for a native port is step (3): `@position-try` is a stylesheet **at-rule**, not a
+per-element cascaded property, so — unlike `position-area`/`anchor-name`/`position-try` longhands, which
+project onto the box via `SharedRendererCascade` — its rule *bodies* never reach `Broiler.Layout` (the
+engine consumes cascaded box properties only, never the stylesheet). A native `position-try` therefore
+needs a new data path: the parsed `@position-try` name→declarations map (already modelled canonically as
+`Broiler.CSS.PositionTryRule`, P5.3) must be handed to the engine's post-pass, and the fallback
+apply/re-place/re-test loop reimplemented on the box tree. Until that infrastructure lands,
+`position-try` boxes stay gate-excluded and baked (`IsMvpNativeAnchorBox` excludes `position-try`); this
+is why `position-try-grid-001` — which also combines `anchor()` insets and grid abspos — fails identically
+on both the baked and native paths and is not a native-gate regression.
+
 The DOM-entangled bridge concerns (anchor registry *building* now trivial on the box tree; both the
 relatively- and absolutely-positioned inline-CB cases now handled by the engine's real §10.1 inline-box
 geometry rather than the bridge's DOM-move estimator; and an intervening scroll container now handled by
