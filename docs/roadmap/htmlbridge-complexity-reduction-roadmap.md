@@ -2196,6 +2196,22 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   stay green. Two pre-existing environmental `DomBridge_SerializeToHtml_*` (iframe-scroll / viewport-zoom)
   Cli failures confirmed identical on the stashed baseline. Zero regressions. Groundwork for the full scroll
   model (which would also unblock sticky); the entangled cases and sticky itself remain on the bridge.
+
+  **Finding — the document scrolling element and fixed-descendant cases are NOT positively validatable here
+  (2026-07-15 investigation; the native handoff was extended to them and reverted).** Extending the native
+  handoff to the `<html>` document scrolling element is *safe* (baked-vs-native parity holds), but its
+  positive path cannot be exercised in a synthetic fixture: `documentElement.scrollTop = N` resolves to `0`
+  through `SetElementScrollOffsetsWithBehavior` → `ResolveElementScrollOffsets` (the `clamp` /
+  `CanProgrammaticallyScroll` / `GetScrollBounds` machinery, entangled with visual-viewport tracking since
+  `trackVisualViewport = ReferenceEquals(element, DocumentElement)`), so page scroll never actually applies
+  — baked and native both render unscrolled, making the extension an unvalidated no-op. The
+  fixed-descendant case is separately un-validatable: a `position:fixed` child of an `overflow:hidden` scroll
+  container paints in **neither** path (a renderer limitation clips fixed descendants of clipping ancestors),
+  so there is no visible fixed box to assert parity on. The engine translate already handles fixed correctly
+  in principle (`OffsetTop`/`OffsetLeft` skip `position:fixed` at every depth, so no reparenting is needed —
+  the bridge's `CollectFixedDescendants` reparenting only undoes the DOM-shift wrapper's renderer bug), but
+  that correctness can't be *demonstrated* here. Both cases were therefore left on the bridge path; they need
+  an environment where page scroll and fixed-in-scroll actually render.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
