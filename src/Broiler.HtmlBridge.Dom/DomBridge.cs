@@ -98,6 +98,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // maps — is owned by the single BrowsingContextManager (was ten fields scattered across
     // SubDocuments.cs / DomBridge.WindowContext.cs / DomBridge.cs). The bridge keeps the algorithms.
     private readonly Dom.Runtime.BrowsingContextManager _browsingContexts = new();
+    // Phase 3 (P3.18): the browsing-context window-resolution behaviour (canonicalise/resolve a window,
+    // and the RunWithWindowContext global switch) is owned by WindowContextManager, reached through the
+    // narrow IWindowContextHost contract (see DomBridge.WindowContextHost.cs); DomBridge.WindowContext.cs
+    // keeps thin delegators. It reads the sub-window state from _browsingContexts and _eventTargets.
+    private readonly Dom.Runtime.WindowContextManager _windowContext;
     // Phase 3 (P3.10): the whole web-messaging feature — window.postMessage, MessageChannel/
     // MessagePort (which own the P2.6 MessagePortRegistry state) and the generic EventTarget dispatch
     // shared with sub-windows — lives in MessagingBinding, reached through the narrow IMessagingHost
@@ -188,6 +193,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _attributes = new Dom.Features.AttributesBinding(this);
         _subDocuments = new Dom.Features.SubDocumentBinding(this);
         _subWindows = new Dom.Features.SubWindowBinding(this, _browsingContexts, _eventTargets, _messaging);
+        _windowContext = new Dom.Runtime.WindowContextManager(this, _browsingContexts, _eventTargets);
         _document = new DomDocument();
         DocumentElement = CreateBridgeElement("html");
         // Phase 4 item 1 (final sentinel): the canonical DomDocument is the document root — the JS

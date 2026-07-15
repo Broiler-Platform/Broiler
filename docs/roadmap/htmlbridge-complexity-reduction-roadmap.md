@@ -910,12 +910,33 @@ public-API-snapshot suites (60) pass; the broader window-context / sub-resource 
 the six standing environmental failures (the three `DomBridge_SerializeToHtml_*` zoom/srcdoc and the three
 real-HTTP `HttpSubResourceTests.Iframe_*`) identical on the stashed committed-P3.16 baseline → zero regressions.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.17 named-accessor / relocated-infra /
-shared-write-hub / wide-explicit-host / no-host-static / state-owner pattern is the template for any residual
-coupling: Element/geometry, Window/Document, SVG, the last Frames/browsing-context residue (the `WindowContext.cs`
-window-resolution *algorithms* — the sub-window *object* is now the `SubWindowBinding` module, P3.17, and the
-**state** the `BrowsingContextManager`, P3.16), Canvas (better done with Phase 6, which dissolves
-`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
+Status: **P3.18 completed** 2026-07-15 (branch `claude/htmlbridge-phase-5-hixy7x`) — the **browsing-context
+window-resolution algorithms**, the last Frames residue. The six `WindowContext.cs` methods —
+`ResolveCurrentWindow`/`ResolveOwnerWindow`/`GetCanonicalWindow` (canonicalise/resolve a window candidate
+against the sub-window state) and `RunWithWindowContext`/`GetWindowDocument`/`GetWindowParent` (the global
+`window`/`document`/`location`/`parent`/`postMessage`/`self`/`top` switch and its document/parent lookups) —
+now live in the single `WindowContextManager` owner (namespace `Broiler.HtmlBridge.Dom.Runtime`). It reads the
+sub-window identity from the P3.16 `BrowsingContextManager` and the owner-window map from the `EventTargetRegistry`
+(both held directly), and reaches the JS context (eval, global read/write) + the main window/document + the
+sub-document builder through the narrow `IWindowContextHost` contract (`DomBridge.WindowContextHost.cs`,
+explicit interface members). `DomBridge.WindowContext.cs` is now **thin delegators** to the owner (the same
+P2.4/P2.5/P2.6 "behaviour owner, bridge forwards" shape), so the callers are unchanged — `MessagingBinding`
+reaches them through `IMessagingHost` and the sub-document script runner calls `RunWithWindowContext` directly.
+Behaviour-preserving; no public-API change (owner + contract internal — snapshot unchanged). Tests:
+`Broiler.Cli.Tests/WindowContextManagerTests.cs` (co-location / ownership guards; the behaviour — cross-window
+`postMessage` owner-window resolution and sub-document scripts running under the context switch — is covered
+end-to-end by the existing WebMessaging + SubDocument suites). Regression check: the WebMessaging /
+MessagingBinding / SubDocumentBinding / SubWindowBinding / architecture-guard / public-API-snapshot / lifetime
+suites (75) pass; the broader window-context / sub-resource / cross-doc set is 132/138 with the same six standing
+environmental failures → zero regressions. **This completes the Frames feature's modularization:** state in
+`BrowsingContextManager` (P3.16), the sub-document object in `SubDocumentBinding` (P3.13), the sub-window object
+in `SubWindowBinding` (P3.17), and the window-resolution behaviour in `WindowContextManager` (P3.18).
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.18 named-accessor / relocated-infra /
+shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
+any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
+`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
+done** (P3.13/P3.16/P3.17/P3.18).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
