@@ -387,7 +387,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // post-pass — every anchor now has final geometry — gated off by default.
             // Runs before the fragment tree is built (that happens after PerformLayout).
             if (ParentBox == null && NativeAnchorPlacement.Enabled)
+            {
+                // Native scroll offsets first (P5.8d.2b scroll expansion), so anchor geometry
+                // (and everything downstream) sees the scrolled content.
+                RunScrollSimulation(this);
                 RunNativeAnchorPlacement(this);
+            }
         }
         catch (Exception ex)
         {

@@ -2163,6 +2163,39 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   with no corpus gain (like `position-visibility`), but it **removes `EnsureContainingBlockPositioning`
   entirely from the bridge's native render path** — one full AnchorResolver pass off the Phase 4 item-2
   inline-write list.
+- **P5.8d.2b — native scroll offset (seventeenth expansion, FIRST INCREMENT) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-sk540t`; Broiler.Layout + bridge, both parent-repo, additive,
+  default-off). The **first native scroll geometry in the engine** — the beginning of the
+  `ApplyScrollSimulation` port the sticky/scroll findings named as the prerequisite. The bridge's
+  `ApplyScrollSimulation` simulates a script-set `scrollTop`/`scrollLeft` by DOM-wrapping a scroll
+  container's children in a `position:relative` div shifted by the negative offset (plus a
+  `visibility:hidden` top-clip hack). This increment moves the **plain non-document, no-anchor-page** case
+  to the engine:
+  - **Engine.** New `Engine/CssBox.Scroll.cs` — `RunScrollSimulation`, a root post-pass run (gated by
+    `NativeAnchorPlacement.Enabled`) **before** `RunNativeAnchorPlacement` so downstream geometry sees the
+    scrolled content. For each box carrying `data-broiler-scroll-top`/`-left` it translates the container's
+    child boxes by the negative offset via the existing `OffsetTop`/`OffsetLeft` (which recurse the subtree
+    and already skip `position:fixed`, CSS2.1 §9.6.1); the container's own `overflow` box clips the shifted
+    content at paint. Notably the direct box translation clips the top edge correctly **without** the
+    bridge's `visibility:hidden` workaround (that hack existed because the bridge's `position:relative`
+    wrapper confused the renderer's top clip).
+  - **Bridge.** In native mode, for a non-document scroll container on a page with **no anchor content**
+    (`DocumentHasAnchorContent()` — no registered `anchor-name`), `ApplyScrollSimulation` writes the offset
+    as `data-broiler-scroll-top`/`-left` and skips the wrapper-div DOM mutation entirely (no inline
+    `position`/`top`/`left`/`visibility` writes reach the render). Scoped to no-anchor documents so it never
+    crosses the anchor-scroll-container / position-visibility machinery (the eleventh/thirteenth expansions),
+    which keeps the bridge's DOM-shift; every other case (the `<html>` document scrolling element, fixed
+    descendant reparenting, and any anchor page) stays on the bridge path.
+  Tests: `Broiler.Wpt.Tests/NativeScrollParityWptTests.cs` (full render: a JS-`scrollTop` `overflow:hidden`
+  container — the scrolled marker lands in the same rectangle baked vs native, AND content scrolled entirely
+  above the top edge is clipped away in both, proving the native overflow clip matches). Regression check:
+  full `Broiler.Layout.Tests` (177; pre-existing arch-guard fail identical on baseline) green;
+  css-anchor-position **default-off byte-identical (31/8)** and **lever-on unchanged (6 fails, identical
+  set)** — anchor pages keep the bridge scroll path via the no-anchor scoping, so the whole anchor corpus is
+  unaffected; the `ScrollContainerAnchorParity` (eleventh) and `NativePositionVisibility` (thirteenth) suites
+  stay green. Two pre-existing environmental `DomBridge_SerializeToHtml_*` (iframe-scroll / viewport-zoom)
+  Cli failures confirmed identical on the stashed baseline. Zero regressions. Groundwork for the full scroll
+  model (which would also unblock sticky); the entangled cases and sticky itself remain on the bridge.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
@@ -2183,10 +2216,15 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   (`ResolveFixedPositionSizing`, done above); (b) **needs a new engine feature** — the engine genuinely
   lacks it, so a port is engine-layout work, not a bridge extraction, and it affects *all* pages (not just
   anchor pages) so the eventual production flip carries broad risk. Verified engine gaps:
-  `ResolveStickyPositioning` (no `position:sticky` in the engine), `ApplyScrollSimulation` (no scroll-offset
-  model — scroll is only the bridge's DOM-shift), `ApplyVisualViewportSerializationState` (no pinch-zoom /
-  `zoom`), and `InsertDialogBackdrops`/`ApplyDialogUAPositioning` (no top-layer painting). Each is its own
-  engine feature + broad-corpus parity effort, larger than a lever-gated slice. **`EnsureContainingBlockPositioning`
+  `ResolveStickyPositioning` (no `position:sticky` in the engine), `ApplyVisualViewportSerializationState`
+  (no pinch-zoom / `zoom`), and `InsertDialogBackdrops`/`ApplyDialogUAPositioning` (no top-layer painting).
+  Each is its own engine feature + broad-corpus parity effort, larger than a lever-gated slice.
+  **`ApplyScrollSimulation` now has a native FIRST INCREMENT (seventeenth expansion below): the engine has a
+  scroll-offset post-pass (`CssBox.RunScrollSimulation`), and the bridge hands off non-document scroll
+  containers on no-anchor pages to it — so that case renders with no DOM-shift wrapper / inline writes. The
+  entangled remainder (the document scrolling element, fixed-descendant reparenting, and anchor-scroll
+  containers) stays on the bridge's DOM-shift, and the full model that would also unblock sticky is still to
+  come.** **`EnsureContainingBlockPositioning`
   — the engine's `FindPositionedContainingBlock` gap for `transform`/`contain`/`will-change` containing
   blocks — is now RESOLVED (sixteenth expansion above): the engine recognises all three natively under the
   lever (with `will-change` projected onto the box), so the pass is skipped **entirely** in native mode — no
@@ -2200,10 +2238,15 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   using its *flow* position (y=0) rather than its pinned *paint* position (probe: the box pins correctly to
   `Y=10` but serialises with `visibility:hidden`+`data-broiler-scroll-hidden`). Matching the bridge would
   reproduce that bug. (3) **Scroll-model dependency** — sticky is inherently scroll-dependent and the engine
-  has no scroll-offset model; it is coupled to `ApplyScrollSimulation` (itself an unported bridge pass whose
-  DOM-shift is the only scroll representation). The correct sequence is to give the engine a real scroll
-  model first (port `ApplyScrollSimulation`), which unblocks both scroll and sticky and fixes the
-  flow-vs-paint hiding bug, and to do it in an environment with a sticky corpus. Left on the bridge path.
+  has no scroll-offset model; it is coupled to `ApplyScrollSimulation` (whose DOM-shift is the only scroll
+  representation). The correct sequence is to give the engine a real scroll model first (port
+  `ApplyScrollSimulation`), which unblocks both scroll and sticky and fixes the flow-vs-paint hiding bug, and
+  to do it in an environment with a sticky corpus. **Update (seventeenth expansion below): the engine now has
+  a scroll-offset post-pass, and the plain non-anchor scroll-container case is native — the first step of
+  that model. But sticky stays blocked here: it still has no corpus, and the remaining scroll cases the
+  full model needs (the document scrolling element, fixed reparenting, and the anchor-scroll-container /
+  position-visibility interaction that reproduces the flow-vs-paint hiding bug) are unbuilt.** Left on the
+  bridge path.
 
   **Finding — dialog/backdrop is a renderer-submodule feature, not a parent-repo post-pass slice (2026-07-15
   investigation).** It *is* validatable — 7 `anchor-position-top-layer-*` corpus tests, all passing — and has
@@ -2222,9 +2265,11 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   renderer effort, and all-or-nothing for parity (a partial port breaks the 7 passing tests). Best done as its
   own submodule feature, not folded into the lever-gated anchor cutover. Left on the bridge path.
 
-  Still bridge-only: dialog/backdrop, sticky, scroll simulation, visual-viewport (the engine-feature set
-  above; transform/contain CBs are now native — sixteenth expansion), and the opposing-inset /
-  auto-min-content-sized position-try bases (the engine's
+  Still bridge-only: dialog/backdrop, sticky, the entangled scroll cases (document scrolling element, fixed
+  reparenting, anchor-scroll containers — the plain non-anchor case is native as of the seventeenth
+  expansion), visual-viewport (the engine-feature set above; transform/contain/will-change CBs are now
+  native — sixteenth expansion), and the opposing-inset / auto-min-content-sized position-try bases (the
+  engine's
   `TryApplyPositionTryFallback` supports these geometries but the bridge gate keeps them baked pending per-case
   parity). **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler
   clamps an explicit position-area size to the grid cell (P5.5 `PositionAreaGrid.ResolveElementBox`) and a
