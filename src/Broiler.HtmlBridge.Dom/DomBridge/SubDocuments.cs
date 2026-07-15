@@ -13,38 +13,22 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
-    // ── Phase 6: Sub-document cache ──────────────────────────────────────────
-    private readonly Dictionary<DomElement, JSObject> _subDocumentCache = [];
-    private readonly Dictionary<DomElement, JSObject> _subWindowCache = [];
-    private readonly Dictionary<DomElement, string> _subDocumentLocationCache = [];
-    private readonly Dictionary<DomElement, string> _subDocumentBaseUrlCache = [];
-    private readonly HashSet<DomElement> _objectLoadFailures = [];
-    private readonly HashSet<DomElement> _onloadFired = [];
-
-    // ── Phase 4 (P4.4b): regime-A nested-browsing-context sever ──────────────
-    // The materialised sub-document of an <iframe>/<object>/<frame> is no longer an in-tree
-    // #subdoc-root child of the container; it is a canonical DomDocument referenced through
-    // these maps. The render path projects it into the box tree via the content-document
-    // resolver (see ResolveContentDocumentForRender), and the reverse map recovers a
-    // sub-document's owning frame where the old code walked ParentEl(#subdoc-root).
-    private readonly Dictionary<DomElement, DomDocument> _contentDocuments = [];
-    private readonly Dictionary<DomDocument, DomElement> _documentContainers = [];
+    // The nested-browsing-context state — the per-container sub-document/sub-window JS-object identity,
+    // location/base-URL caches, object-load-failure and onload-fired marks, the reverse
+    // sub-window→container map, the current-window override, and the P4.4b severed content-document
+    // maps — is owned by _browsingContexts (P3.16 BrowsingContextManager, declared in DomBridge.cs).
+    // The builders / resolvers / onload dispatch below stay bridge-owned and reach it through that owner.
 
     private DomDocument? GetContentDocument(DomElement containerElement) =>
-        _contentDocuments.TryGetValue(containerElement, out var document) ? document : null;
+        _browsingContexts.GetContentDocument(containerElement);
 
     /// <summary>The frame element a severed sub-document belongs to, or null for the main /
     /// a detached (createDocument) document. Replaces <c>ParentEl(#subdoc-root)</c>.</summary>
     private DomElement? GetFrameForContentDocument(DomNode? docRoot) =>
-        docRoot is DomDocument document && _documentContainers.TryGetValue(document, out var frame)
-            ? frame
-            : null;
+        docRoot is DomDocument document ? _browsingContexts.GetContainerForDocument(document) : null;
 
-    private void LinkContentDocument(DomElement containerElement, DomDocument document)
-    {
-        _contentDocuments[containerElement] = document;
-        _documentContainers[document] = containerElement;
-    }
+    private void LinkContentDocument(DomElement containerElement, DomDocument document) =>
+        _browsingContexts.LinkContentDocument(containerElement, document);
 
     /// <summary>The content-document resolver handed to the layout view (P4.4b): maps a
     /// nested-browsing-context container to its severed sub-document so the box builder
@@ -54,17 +38,15 @@ public sealed partial class DomBridge
 
     private void InvalidateCachedSubDocument(DomElement containerElement)
     {
-        if (_contentDocuments.TryGetValue(containerElement, out var existingDocument))
+        // Order preserved from the pre-P3.16 code: release the old content document's element
+        // runtime state while the maps still reference it, then unlink and drop the per-container caches.
+        if (_browsingContexts.GetContentDocument(containerElement) is { } existingDocument)
         {
             RemoveElementsRecursive(existingDocument);
-            _documentContainers.Remove(existingDocument);
-            _contentDocuments.Remove(containerElement);
+            _browsingContexts.UnlinkContentDocument(containerElement);
         }
 
-        _subDocumentCache.Remove(containerElement);
-        _subWindowCache.Remove(containerElement);
-        _subDocumentLocationCache.Remove(containerElement);
-        _subDocumentBaseUrlCache.Remove(containerElement);
+        _browsingContexts.RemoveContainerCaches(containerElement);
     }
 
     /// <summary>
@@ -76,7 +58,7 @@ public sealed partial class DomBridge
     private void FireSubDocumentOnload(DomElement element)
     {
         if (_jsContext == null) return;
-        if (_onloadFired.Contains(element)) return;
+        if (_browsingContexts.HasOnloadFired(element)) return;
 
         var tag = element.TagName?.ToLowerInvariant();
         if (tag != "iframe" && tag != "object") return;
@@ -88,7 +70,7 @@ public sealed partial class DomBridge
         // Ensure the sub-document is loaded (this triggers the fetch if needed)
         GetOrCreateSubDocument(element);
 
-        _onloadFired.Add(element);
+        _browsingContexts.MarkOnloadFired(element);
 
         // Fire the onload handler
         try
@@ -135,7 +117,7 @@ public sealed partial class DomBridge
     /// </summary>
     private bool IsObjectLoadFailed(DomElement objectElement)
     {
-        if (_objectLoadFailures.Contains(objectElement))
+        if (_browsingContexts.HasObjectLoadFailed(objectElement))
             return true;
 
         // Check if this is the first access — probe the resource
@@ -146,7 +128,7 @@ public sealed partial class DomBridge
         var (_, contentType) = TryFetchSubResource(resourceUrl, GetInheritedSubDocumentBaseUrl(objectElement));
         if (string.Equals(contentType, FetchFailedContentType, StringComparison.Ordinal))
         {
-            _objectLoadFailures.Add(objectElement);
+            _browsingContexts.MarkObjectLoadFailed(objectElement);
             return true;
         }
 
@@ -161,7 +143,7 @@ public sealed partial class DomBridge
     /// </summary>
     internal JSObject GetOrCreateSubDocument(DomElement containerElement)
     {
-        if (_subDocumentCache.TryGetValue(containerElement, out var cached))
+        if (_browsingContexts.TryGetSubDocument(containerElement, out var cached))
             return cached;
 
         var executeHtmlScripts = false;
@@ -172,8 +154,8 @@ public sealed partial class DomBridge
             if (string.Equals(containerElement.TagName, "iframe", StringComparison.OrdinalIgnoreCase) &&
                 TryGetAttribute(containerElement, "srcdoc", out var srcDoc))
             {
-                _subDocumentLocationCache[containerElement] = "about:srcdoc";
-                _subDocumentBaseUrlCache[containerElement] = GetInheritedSubDocumentBaseUrl(containerElement);
+                _browsingContexts.SetLocation(containerElement, "about:srcdoc");
+                _browsingContexts.SetBaseUrl(containerElement, GetInheritedSubDocumentBaseUrl(containerElement));
                 docRoot = BuildSubDocumentFromHtml(srcDoc, containerElement);
                 htmlToExecute = srcDoc;
                 executeHtmlScripts = true;
@@ -185,8 +167,8 @@ public sealed partial class DomBridge
                 var resolvedUrl = ResolveSubResourceUrl(resourceUrl, GetInheritedSubDocumentBaseUrl(containerElement));
                 if (!string.IsNullOrWhiteSpace(resolvedUrl))
                 {
-                    _subDocumentLocationCache[containerElement] = resolvedUrl;
-                    _subDocumentBaseUrlCache[containerElement] = resolvedUrl;
+                    _browsingContexts.SetLocation(containerElement, resolvedUrl);
+                    _browsingContexts.SetBaseUrl(containerElement, resolvedUrl);
                 }
 
                 var (fetchedContent, contentType) = TryFetchSubResource(resourceUrl, GetInheritedSubDocumentBaseUrl(containerElement));
@@ -222,141 +204,10 @@ public sealed partial class DomBridge
         }
 
         var doc = _subDocuments.BuildDocument(docRoot);
-        _subDocumentCache[containerElement] = doc;
+        _browsingContexts.SetSubDocument(containerElement, doc);
         if (executeHtmlScripts && !string.IsNullOrEmpty(htmlToExecute))
             ExecuteSubDocumentScripts(containerElement, htmlToExecute);
         return doc;
-    }
-
-    private JSObject GetOrCreateSubWindow(DomElement containerElement)
-    {
-        if (_subWindowCache.TryGetValue(containerElement, out var cached))
-            return cached;
-
-        var subDocument = GetOrCreateSubDocument(containerElement);
-        var subWindow = new JSObject();
-        _subWindowCache[containerElement] = subWindow;
-        _subWindowContainers[subWindow] = containerElement;
-        _eventTargets.SetOwnerWindow(subWindow, subWindow);
-        _messaging.InstallEventTargetApi(subWindow, "DomBridge.subWindow.dispatchEvent");
-        _messaging.RegisterWindowMessaging(subWindow);
-
-        subWindow.FastAddProperty((KeyString)"document",
-            new JSFunction((in _) => GetOrCreateSubDocument(containerElement), "get document"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        var locationHref = GetSubWindowLocationHref(containerElement);
-        var iframeLocation = new JSObject();
-        iframeLocation.FastAddValue((KeyString)"href",
-            new JSString(locationHref), JSPropertyAttributes.EnumerableConfigurableValue);
-        if (Uri.TryCreate(locationHref, UriKind.Absolute, out var locationUri))
-        {
-            iframeLocation.FastAddValue((KeyString)"protocol", new JSString(locationUri.Scheme + ":"), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"host", new JSString(locationUri.IsDefaultPort ? locationUri.Host : $"{locationUri.Host}:{locationUri.Port}"), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"hostname", new JSString(locationUri.Host), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"pathname", new JSString(locationUri.AbsolutePath), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"search", new JSString(locationUri.Query), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"hash", new JSString(locationUri.Fragment), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"origin", new JSString($"{locationUri.Scheme}://{(locationUri.IsDefaultPort ? locationUri.Host : $"{locationUri.Host}:{locationUri.Port}")}"), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
-        else
-        {
-            iframeLocation.FastAddValue((KeyString)"search", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"hash", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
-        subWindow.FastAddValue((KeyString)"location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        subWindow.FastAddProperty((KeyString)"scrollX", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get scrollX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"scrollY", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get scrollY"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"pageXOffset", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"pageYOffset", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        subWindow.FastAddValue((KeyString)"scroll", new JSFunction((in a) => JsSubDocumentsScroll006Core(containerElement, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue((KeyString)"scrollTo", new JSFunction((in a) => JsSubDocumentsScrollTo007Core(containerElement, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue((KeyString)"scrollBy", new JSFunction((in a) => JsSubDocumentsScrollBy008Core(containerElement, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        subWindow.FastAddValue((KeyString)"self", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue((KeyString)"window", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["Event"] is { } eventCtor)
-            subWindow.FastAddValue((KeyString)"Event", eventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["CustomEvent"] is { } customEventCtor)
-            subWindow.FastAddValue((KeyString)"CustomEvent", customEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["MouseEvent"] is { } mouseEventCtor)
-            subWindow.FastAddValue((KeyString)"MouseEvent", mouseEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["FocusEvent"] is { } focusEventCtor)
-            subWindow.FastAddValue((KeyString)"FocusEvent", focusEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["KeyboardEvent"] is { } keyboardEventCtor)
-            subWindow.FastAddValue((KeyString)"KeyboardEvent", keyboardEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["WheelEvent"] is { } wheelEventCtor)
-            subWindow.FastAddValue((KeyString)"WheelEvent", wheelEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["UIEvent"] is { } uiEventCtor)
-            subWindow.FastAddValue((KeyString)"UIEvent", uiEventCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_jsContext?["MessageChannel"] is { } messageChannelCtor)
-            subWindow.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        var parentWindow = GetParentWindowForSubDocument(containerElement);
-        if (parentWindow != null)
-        {
-            subWindow.FastAddValue((KeyString)"parent", parentWindow, JSPropertyAttributes.EnumerableConfigurableValue);
-        }
-
-        subWindow.FastAddValue((KeyString)"top", _windowJSObject ?? subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        subDocument.FastAddValue((KeyString)"defaultView", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // window.getComputedStyle — sub-window needs its own copy so that
-        // doc.defaultView.getComputedStyle(node, "") resolves CSS rules from
-        // the sub-document's <style> elements rather than the main document.
-        var bridgeForSubStyle = this;
-        subWindow.FastAddValue((KeyString)"getComputedStyle", new JSFunction((in a) => JsSubDocumentsGetComputedStyle009Core(bridgeForSubStyle, in a), "getComputedStyle", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        return subWindow;
-    }
-
-    private string GetSubWindowLocationHref(DomElement containerElement)
-    {
-        if (_subDocumentLocationCache.TryGetValue(containerElement, out var cachedLocation) &&
-            !string.IsNullOrWhiteSpace(cachedLocation))
-        {
-            return cachedLocation;
-        }
-
-        if (string.Equals(containerElement.TagName, "iframe", StringComparison.OrdinalIgnoreCase) &&
-            HasAttr(containerElement, "srcdoc"))
-            return "about:srcdoc";
-
-        var resolvedUrl = ResolveSubResourceUrl(GetSubResourceUrl(containerElement), GetInheritedSubDocumentBaseUrl(containerElement));
-        return !string.IsNullOrWhiteSpace(resolvedUrl) ? resolvedUrl : "about:blank";
-    }
-
-    private double GetSubWindowScrollOffset(DomElement containerElement, bool vertical)
-    {
-        var scrollingElement = GetSubDocumentScrollingElement(containerElement);
-        return scrollingElement == null ? 0 : GetElementScrollOffset(scrollingElement, vertical);
-    }
-
-    private void SetSubWindowScrollOffsets(DomElement containerElement, double? left = null, double? top = null, bool relative = false, string? behavior = null)
-    {
-        var scrollingElement = GetSubDocumentScrollingElement(containerElement);
-        if (scrollingElement == null)
-            return;
-
-        SetElementScrollOffsetsWithBehavior(scrollingElement, left, top, relative: relative, clamp: false, behavior: behavior);
-    }
-
-    private DomElement? GetSubDocumentScrollingElement(DomElement containerElement)
-    {
-        var document = GetContentDocument(containerElement);
-        return document == null ? null : GetDocumentElement(document);
     }
 
     private static DomElement? FindBodyElement(DomElement documentElement) =>
@@ -364,23 +215,11 @@ public sealed partial class DomBridge
             !IsText(c) &&
             string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
 
-    private JSObject? GetParentWindowForSubDocument(DomElement containerElement)
-    {
-        // The container's owning document is a severed sub-document DomDocument when the container is
-        // itself nested in another frame; recover that frame via the reverse map (P4.4c: the owning
-        // document comes from the canonical tree, was OwnerDocRoot / ParentEl(#subdoc-root)).
-        var parentFrame = GetFrameForContentDocument(GetOwningDocument(containerElement));
-        if (parentFrame != null)
-            return GetOrCreateSubWindow(parentFrame);
-
-        return _windowJSObject;
-    }
-
     private string GetInheritedSubDocumentBaseUrl(DomElement containerElement)
     {
         var parentFrame = GetFrameForContentDocument(GetOwningDocument(containerElement));
         if (parentFrame != null &&
-            _subDocumentBaseUrlCache.TryGetValue(parentFrame, out var parentBaseUrl) &&
+            _browsingContexts.TryGetBaseUrl(parentFrame, out var parentBaseUrl) &&
             !string.IsNullOrWhiteSpace(parentBaseUrl))
         {
             return parentBaseUrl;
@@ -391,7 +230,7 @@ public sealed partial class DomBridge
 
     private string GetSubDocumentBaseUrl(DomElement containerElement)
     {
-        return _subDocumentBaseUrlCache.TryGetValue(containerElement, out var baseUrl) &&
+        return _browsingContexts.TryGetBaseUrl(containerElement, out var baseUrl) &&
                !string.IsNullOrWhiteSpace(baseUrl)
             ? baseUrl
             : GetInheritedSubDocumentBaseUrl(containerElement);
@@ -502,7 +341,7 @@ public sealed partial class DomBridge
             extraction.DeferredScripts.Count == 0)
             return;
 
-        var subWindow = GetOrCreateSubWindow(containerElement);
+        var subWindow = _subWindows.GetOrCreate(containerElement);
 
         RunWithWindowContext(subWindow, () =>
         {
@@ -616,7 +455,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Gets the resource URL for a container element (iframe src or object data).
     /// </summary>
-    private static string GetSubResourceUrl(DomElement containerElement)
+    internal static string GetSubResourceUrl(DomElement containerElement)
     {
         var tag = containerElement.TagName?.ToLowerInvariant();
         if (tag == "iframe")

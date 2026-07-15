@@ -1563,7 +1563,7 @@ public sealed partial class DomBridge
     {
         if (IsCurrentIframeCrossOrigin(element))
             return JSNull.Value;
-        return GetOrCreateSubWindow(element);
+        return _subWindows.GetOrCreate(element);
     }
 
 
@@ -1580,7 +1580,7 @@ public sealed partial class DomBridge
         SetAttr(element, "src", a.Length > 0 ? a[0].ToString() : string.Empty);
         // Invalidate cached sub-document when src changes
         InvalidateCachedSubDocument(element);
-        _onloadFired.Remove(element);
+        _browsingContexts.ClearOnloadFired(element);
         // Fire onload for the new resource
         bridgeForSrc.FireSubDocumentOnload(element);
         return JSUndefined.Value;
@@ -1591,7 +1591,7 @@ public sealed partial class DomBridge
     {
         SetAttr(element, "srcdoc", a.Length > 0 ? a[0].ToString() : string.Empty);
         InvalidateCachedSubDocument(element);
-        _onloadFired.Remove(element);
+        _browsingContexts.ClearOnloadFired(element);
         bridgeForSrc.FireSubDocumentOnload(element);
         return JSUndefined.Value;
     }

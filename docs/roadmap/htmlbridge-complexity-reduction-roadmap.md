@@ -397,12 +397,12 @@ Behavior-preserving; no public-API change (both internal). Tests:
 tests + existing messaging/network suites pass). Full-suite regression check vs the P2.5 baseline:
 every candidate fails identically in isolation on both sides → zero regressions.
 
-**Deferred within "browsing-context state" (a follow-up, not blocking Phase 3):** the sub-window and
-sub-document content caches in `SubDocuments.cs` (`_subWindowCache`/`_subWindowContainers`,
+**Deferred within "browsing-context state" (a follow-up, not blocking Phase 3) — DONE in P3.16:** the
+sub-window and sub-document content caches in `SubDocuments.cs` (`_subWindowCache`/`_subWindowContainers`,
 `_subDocumentCache`, `_subDocumentLocationCache`, `_subDocumentBaseUrlCache`, `_objectLoadFailures`,
-`_onloadFired`) and `_currentWindowOverride` are not yet consolidated into a `BrowsingContextManager`
-— they are largely internal to `SubDocuments.cs` and intertwined with sub-document resolution. P2.6
-took the cross-file cohesive slice (ports) and the resource-loader seam.
+`_onloadFired`) and `_currentWindowOverride` are now consolidated into the single `BrowsingContextManager`
+(see the P3.16 status under Phase 3). P2.6 took the cross-file cohesive slice (ports) and the resource-loader
+seam; P3.16 took the rest.
 
 ## Phase 2 outcome
 
@@ -413,8 +413,8 @@ bridge state now has explicit single owners (all internal, in `Broiler.HtmlBridg
 event listeners were de-globalized off the process-static `ElementRuntimeState` onto an instance
 `ConditionalWeakTable`. Not fully met and carried forward: two simultaneous sessions are still not
 isolated (blocked at the Broiler.JS engine's shared globals — a JS-engine concern, not the bridge),
-and the remaining process-static `ElementRuntimeState`/`PositionAreaResolutions` tables plus the
-sub-document caches above are still to be de-globalized/consolidated.
+and the remaining process-static `ElementRuntimeState`/`PositionAreaResolutions` tables are still to be
+de-globalized (the sub-document caches above are now consolidated into `BrowsingContextManager` — P3.16).
 
 Two findings recorded for later phases:
 
@@ -856,12 +856,87 @@ architecture-guard suites reproduce an **identical** failure set with the change
 selector and Acid3 border-shorthand environmental fails) → zero regressions. This takes `StyleSheets.cs`
 under the 750-line exit-criterion limit.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.15 named-accessor / relocated-infra /
-shared-write-hub / wide-explicit-host / no-host-static pattern is the template for any residual coupling:
-Element/geometry, Window/Document, SVG, the **rest** of Frames/browsing-contexts (the
-`BrowsingContextManager` consolidating the sub-window / content-document caches, the sub-window object and
-`WindowContext.cs`), Canvas (better done with Phase 6, which dissolves
-`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
+Status: **P3.16 completed** 2026-07-15 (branch `claude/htmlbridge-phase-5-hixy7x`) — the **browsing-context
+state authority**, the frames-feature owner Phase 2/P2.6 deferred and P3.10/P3.13 left bridge-owned "pending a
+future `BrowsingContextManager`". A single `BrowsingContextManager` (namespace
+`Broiler.HtmlBridge.Dom.Runtime`) now owns the ten scattered nested-browsing-context fields — the per-container
+(`<iframe>`/`<object>`/`<frame>`) sub-document and sub-window JS-object identity, the location/base-URL caches,
+the object-load-failure and onload-fired marks, the reverse sub-window→container map, the current-window
+override, and the P4.4b severed content-document maps — behind a narrow surface (`TryGet/SetSubDocument`,
+`TryGet/SetSubWindow`+`IsSubWindow`/`SubWindows`/`TryGetSubWindowContainer`, `TryGet/SetLocation`+`BaseUrl`,
+`Has/Mark/Clear*` load marks, `Link/Unlink/GetContentDocument`+`GetContainerForDocument`, `RemoveContainerCaches`,
+`ResetSession`). It replaces the six caches in `SubDocuments.cs`, the two content-document maps there, and
+`_subWindowContainers`/`_currentWindowOverride` in `DomBridge.cs` (~48 sites across `SubDocuments.cs`,
+`DomBridge.WindowContext.cs`, `JsObjects.cs`, `DomBridge.Lifetime.cs`, `DomBridge.cs`). The bridge keeps the
+**algorithms** (sub-document/-window builders, window resolution in `WindowContext.cs`, resource loading, onload
+dispatch) and reaches the state through the owner; no back-reference. Behaviour-preserving: the deliberately
+**asymmetric** sub-window lifecycle is exactly preserved — the container→sub-window map is dropped per container
+(`RemoveContainerCaches`, was `InvalidateCachedSubDocument`) while the reverse map is bulk-cleared only on session
+reset (`ResetSession`, was `ClearRuntimeSessionState`), and `InvalidateCachedSubDocument`'s
+`RemoveElementsRecursive`-before-unlink order is kept. No public-API change (the owner is internal; snapshot
+unchanged). Tests: `Broiler.Cli.Tests/BrowsingContextManagerTests.cs` (surface unit tests + the two asymmetry
+characterizations + an ownership guard that the ten scattered fields are gone and `_browsingContexts` is present).
+Regression check: the BrowsingContextRootMigration / SubDocumentBinding / SubDocumentSeverMigration /
+SubdocRootGuardRemoval / MessagingBinding / WebMessaging / DomBridgeSessionLifetime / DialogBinding suites (59)
+and the architecture-guard + public-API-snapshot suites (17) pass; the broader window-context / sub-resource /
+cross-doc set is 126/129 with the three standing environmental `DomBridge_SerializeToHtml_*` zoom/srcdoc
+failures identical on the stashed baseline → zero regressions. **Finding:** the six sub-document caches + the two
+content-document maps were never bulk-cleared (only per-container removal), so they were a strong-ref leak across
+re-parse; the consolidation preserves that behaviour (a later single-`Clear()` leak-fix is now trivial — the
+owner is one seam — but was kept out of this behaviour-preserving slice).
+
+Status: **P3.17 completed** 2026-07-15 (branch `claude/htmlbridge-phase-5-hixy7x`) — the **nested-browsing-context
+`window` (sub-window) object**, the residual Frames surface P3.13 deferred. The sub-window JS object built for
+an `<iframe>`/`<object>`/`<frame>` — its `document`/`location`/`self`/`window`/`parent`/`top` wiring, the scroll
+surface (`scrollX`/`scrollY`/`pageXOffset`/`pageYOffset` + `scroll`/`scrollTo`/`scrollBy`), the mirrored event
+constructors and its own `getComputedStyle` — plus the five sub-window-scoped helpers (location href, scroll
+offset read/write, scrolling-element and parent-window resolution) and the four scroll/getComputedStyle
+callbacks are now the co-located `SubWindowBinding` module (namespace `Broiler.HtmlBridge.Dom.Features`), moved
+out of the 1280-line `SubDocuments.cs` and the deleted `JsFunctionCallbacks/SubDocuments.cs`. It holds direct
+references to the shared owners it installs on the sub-window (the P3.16 `BrowsingContextManager`, the
+`EventTargetRegistry`, the `MessagingBinding`) and reaches everything else — the sub-document builder it wraps
+(mutual recursion), sub-resource URL resolution, scroll geometry, computed style, the global event constructors
+— through the narrow `ISubWindowHost` contract (14 members), implemented via explicit interface members in
+`DomBridge.SubWindowHost.cs`, so no callback touches an arbitrary bridge private field. The three
+`GetOrCreateSubWindow` call sites (`DomBridge.cs`, `JsObjects.cs` contentWindow getter, `SubDocuments.cs`) now
+call `_subWindows.GetOrCreate`; the numbered `JsSubDocuments…006…009Core` callbacks were renamed
+`Scroll`/`ScrollTo`/`ScrollBy`/`GetComputedStyle`; `GetSubResourceUrl` widened `private`→`internal static`.
+Behaviour-preserving; no public-API change (module + contract internal — snapshot unchanged; a module, not a new
+`DomBridge` partial). Tests: `Broiler.Cli.Tests/SubWindowBindingModuleTests.cs` (co-location / host-contract /
+builder-moved-off-bridge guards + an `<iframe srcdoc>` `contentWindow` characterization exercising
+`getComputedStyle`/`scrollX`/`scroll`/`self`/`window`). Regression check: the SubDocumentBinding /
+SubDocumentSeverMigration / BrowsingContextRootMigration / MessagingBinding / WebMessaging / architecture-guard /
+public-API-snapshot suites (60) pass; the broader window-context / sub-resource / cross-doc set is 132/138 with
+the six standing environmental failures (the three `DomBridge_SerializeToHtml_*` zoom/srcdoc and the three
+real-HTTP `HttpSubResourceTests.Iframe_*`) identical on the stashed committed-P3.16 baseline → zero regressions.
+
+Status: **P3.18 completed** 2026-07-15 (branch `claude/htmlbridge-phase-5-hixy7x`) — the **browsing-context
+window-resolution algorithms**, the last Frames residue. The six `WindowContext.cs` methods —
+`ResolveCurrentWindow`/`ResolveOwnerWindow`/`GetCanonicalWindow` (canonicalise/resolve a window candidate
+against the sub-window state) and `RunWithWindowContext`/`GetWindowDocument`/`GetWindowParent` (the global
+`window`/`document`/`location`/`parent`/`postMessage`/`self`/`top` switch and its document/parent lookups) —
+now live in the single `WindowContextManager` owner (namespace `Broiler.HtmlBridge.Dom.Runtime`). It reads the
+sub-window identity from the P3.16 `BrowsingContextManager` and the owner-window map from the `EventTargetRegistry`
+(both held directly), and reaches the JS context (eval, global read/write) + the main window/document + the
+sub-document builder through the narrow `IWindowContextHost` contract (`DomBridge.WindowContextHost.cs`,
+explicit interface members). `DomBridge.WindowContext.cs` is now **thin delegators** to the owner (the same
+P2.4/P2.5/P2.6 "behaviour owner, bridge forwards" shape), so the callers are unchanged — `MessagingBinding`
+reaches them through `IMessagingHost` and the sub-document script runner calls `RunWithWindowContext` directly.
+Behaviour-preserving; no public-API change (owner + contract internal — snapshot unchanged). Tests:
+`Broiler.Cli.Tests/WindowContextManagerTests.cs` (co-location / ownership guards; the behaviour — cross-window
+`postMessage` owner-window resolution and sub-document scripts running under the context switch — is covered
+end-to-end by the existing WebMessaging + SubDocument suites). Regression check: the WebMessaging /
+MessagingBinding / SubDocumentBinding / SubWindowBinding / architecture-guard / public-API-snapshot / lifetime
+suites (75) pass; the broader window-context / sub-resource / cross-doc set is 132/138 with the same six standing
+environmental failures → zero regressions. **This completes the Frames feature's modularization:** state in
+`BrowsingContextManager` (P3.16), the sub-document object in `SubDocumentBinding` (P3.13), the sub-window object
+in `SubWindowBinding` (P3.17), and the window-resolution behaviour in `WindowContextManager` (P3.18).
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.18 named-accessor / relocated-infra /
+shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
+any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
+`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
+done** (P3.13/P3.16/P3.17/P3.18).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
@@ -2226,8 +2301,23 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   Cli failures confirmed identical on the stashed baseline. Zero regressions. Groundwork for the full scroll
   model (which would also unblock sticky); the entangled cases and sticky itself remain on the bridge.
 
-  **Finding — the document scrolling element and fixed-descendant cases are NOT positively validatable here
-  (2026-07-15 investigation; the native handoff was extended to them and reverted).** Extending the native
+  **Finding — the document scrolling element IS validatable here after all — CORRECTED and RESOLVED
+  (2026-07-15; the twentieth expansion below extends the native handoff to `<html>` and proves parity).**
+  The earlier claim (kept below for the record) that `documentElement.scrollTop = N` "resolves to 0 … so page
+  scroll never actually applies" was a **non-scrollable-fixture artefact**: the synthetic fixture did not
+  establish a scrollable root, so `GetScrollBounds`'s `maxTop = scrollHeight − clientHeight` was 0 and the
+  offset clamped away. A probe with a scrollable root (a `body { height: 900px }` page, a `position:absolute`
+  marker at `top: 150px`, `documentElement.scrollTop = 100`) renders the marker at absolute y **50** in the
+  **baked** path (150 − 100) — i.e. page scroll *does* apply — so the native path is exercisable and the
+  extension is not a no-op. The fixed-descendant concern is likewise resolved: the same fixture's
+  `position:fixed` box paints at its unscrolled row in **both** paths (it is a child of the *body*, not of an
+  `overflow:hidden` clipping ancestor, so the renderer clip limitation does not apply), confirming
+  `OffsetTop`/`OffsetLeft` skip `position:fixed` at every depth with no reparenting. See the twentieth
+  expansion for the shipped change and its parity test.
+
+  **(Superseded) Finding — the document scrolling element and fixed-descendant cases are NOT positively
+  validatable here (2026-07-15 investigation; the native handoff was extended to them and reverted).**
+  Extending the native
   handoff to the `<html>` document scrolling element is *safe* (baked-vs-native parity holds), but its
   positive path cannot be exercised in a synthetic fixture: `documentElement.scrollTop = N` resolves to `0`
   through `SetElementScrollOffsetsWithBehavior` → `ResolveElementScrollOffsets` (the `clamp` /
@@ -2239,8 +2329,8 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   so there is no visible fixed box to assert parity on. The engine translate already handles fixed correctly
   in principle (`OffsetTop`/`OffsetLeft` skip `position:fixed` at every depth, so no reparenting is needed —
   the bridge's `CollectFixedDescendants` reparenting only undoes the DOM-shift wrapper's renderer bug), but
-  that correctness can't be *demonstrated* here. Both cases were therefore left on the bridge path; they need
-  an environment where page scroll and fixed-in-scroll actually render.
+  that correctness can't be *demonstrated* here. **(Corrected above — the "resolves to 0" premise was a
+  non-scrollable-fixture artefact.)**
 - **P5.8d.2b — combined `anchor()` + `anchor-size()` (eighteenth expansion) — COMPLETED** 2026-07-15
   (branch `claude/htmlbridge-phase-5-ke2wvn`; **bridge only, additive, default-off**). A box that both
   **sizes** to its anchor (`anchor-size()` in `width`/`height`) **and** positions against it (`anchor()`
@@ -2273,12 +2363,142 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   exercises the combined path** (the corpus's `anchor-size()` tests are `transform-005` — combined with
   `position-area`, not `anchor()` insets — and `anchor-size-css-zoom` — zoom-gated), so validation is the
   exact-geometry unit + pipeline + full-render tests plus no-regression. Zero regressions.
+- **P5.8d.2b — `position: sticky` (nineteenth expansion, FIRST INCREMENT) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-hixy7x`; Broiler.Layout + bridge, both parent-repo, additive,
+  default-off). **The first native `position: sticky` in the engine** (it had none) — and the resolution of
+  the sticky "blocked here" finding below for the **non-document scroll-container** case. It builds directly
+  on the seventeenth expansion's scroll model: a sticky box inside a non-document `overflow`-clipping scroll
+  container on a no-anchor page is now pinned by the Broiler.Layout engine instead of the bridge pre-baking
+  `position: relative` + a computed offset. Landed:
+  - **Engine.** New `Engine/CssBox.Sticky.cs` — `RunStickyPositioning`, a root post-pass run (gated by
+    `NativeAnchorPlacement.Enabled`) from `PerformLayout` **after** `RunScrollSimulation` (so it reads the
+    scroll-shifted geometry), **before** `RunNativeAnchorPlacement`. For each `position: sticky` box it finds
+    the nearest `IsScrollClipContainer` ancestor (the scrollport = that box's content box) and the box's
+    `ContainingBlock`, computes the physical-inset pin (a `top`/`left` inset pins the box toward the end when
+    it scrolls above the inset line; a `bottom`/`right` inset pins it toward the start when it scrolls past
+    the far edge — mirroring the bridge's `ComputeStickyShift`), clamps the shift so the box never leaves its
+    containing block's content box (CSS Positioned Layout 3 §6.3), and offsets the box. Because the engine
+    reads the box's already-scroll-shifted `Bounds`, the pin formula needs no scroll value of its own. First
+    increment: physical-inset "pin to an edge", reposition-only, px/percent insets. The renderer treats the
+    unrecognised `sticky` value as `static`, so the box is laid out in flow and this pass then offsets it.
+  - **Bridge.** `ResolveStickyPositioning` skips its `sticky → relative` pre-bake for a box the engine
+    handles — `IsMvpNativeStickyBox`: a no-anchor page (`!DocumentHasAnchorContent()`, so none of the
+    anchor-scroll / position-visibility machinery runs and the container reaches the engine via
+    `data-broiler-scroll-*`) whose scroll container is a **non-document** clipping element — leaving
+    `position: sticky` on the box to survive to the engine. Default off → the gate is
+    `if (!(NativeAnchorPlacement && …)) ApplyStickyOffset(el)`, so `ResolveStickyPositioning` is byte-identical
+    for every existing caller. Document/page-scroll sticky and anchor pages stay baked.
+  - **Why non-document-only.** The engine has no document-scroll model (the seventeenth expansion's first
+    increment left the `<html>` scrolling element on the bridge), so page-scroll sticky cannot yet be pinned
+    natively. And the bridge's DOM-shift scroll simulation is the sticky "blocked" finding's buggy reference —
+    but in native mode a no-anchor non-document scroll container uses the seventeenth expansion's DOM-shift-free
+    native scroll path (no `visibility:hidden` clip hack), so the native sticky path is free of that bug.
+  Validation (the render-parity model can't be used — the baked reference is buggy for scrolled sticky, and
+  there is no sticky corpus in this checkout): `Broiler.Layout.Tests/NativeStickyPlacementTests.cs` (13 unit
+  cases: top/bottom/left/right pin, no-pin-when-below-the-line, percent inset against the scrollport,
+  containing-block clamp, no-scroll-container no-op, non-sticky ignored, `ParseStickyInset` theory) +
+  `Broiler.Cli.Tests/NativeStickyBridgeModeTests.cs` (native mode leaves `position: sticky` un-baked; default
+  bakes `position: relative`) + `Broiler.Wpt.Tests/NativeStickyWptTests.cs` (**full render**: a JS-`scrollTop`
+  sticky box pins to the scrollport edge at the engine-computed row — a position that is neither the unscrolled
+  nor the pure-scroll position, so it is uniquely the engine's pin). Regression check: full `Broiler.Layout.Tests`
+  (192 pass; the pre-existing environmental arch-guard fail identical on the stashed baseline) green; the
+  existing bridge `StickyPositioningTests` (baked path) and the anchor/scroll Wpt + Cli suites green;
+  **css-anchor-position default-off byte-identical (8-fail — all gates are no-ops when the flags are off) and
+  lever-on unchanged (6-fail, identical set — the corpus is all anchor pages, so the sticky handoff is off
+  there)**. Zero regressions. The entangled remainder (document/page-scroll sticky — done in the twenty-first
+  expansion — and the anchor-page sticky/scroll/position-visibility interaction) stays on the bridge until the
+  full scroll model lands.
+
+- **P5.8d.2b — native document/page scroll (twentieth expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-hixy7x`; **bridge only, additive, default-off**). Extends the
+  seventeenth expansion's native scroll model to the **document scrolling element** (`<html>`) — the case it
+  left on the bridge's DOM-shift, and the resolution of the "not positively validatable here" finding above
+  (whose "resolves to 0" premise was a non-scrollable-fixture artefact). On a no-anchor page the bridge now
+  writes `data-broiler-scroll-top`/`-left` on `<html>` (skipping the DOM-shift wrapper, its fixed-descendant
+  reparenting, and the top-clip `visibility:hidden` hack) and the engine's `CssBox.RunScrollSimulation`
+  translates the page content; the viewport clips it, and `OffsetTop`/`OffsetLeft` skip `position:fixed` at
+  every depth (CSS2.1 §9.6.1) so fixed boxes stay pinned with **no reparenting**. The single change is
+  dropping the `!isDocScrollingElement` carve-out from the native-handoff gate (still scoped
+  `NativeAnchorPlacement && !DocumentHasAnchorContent()` — anchor pages keep the DOM-shift for the
+  position-visibility / anchor-scroll machinery; default off is byte-identical). Tests:
+  `Broiler.Wpt.Tests/NativeDocScrollWptTests.cs` (full render: a 900px page scrolled 100px places its abspos
+  marker at the scrolled row and leaves a `position:fixed` box unmoved — engine translation and bridge
+  DOM-shift **agree pixel-wise**). Regression check: the scroll/sticky/anchor/position-visibility Wpt suites
+  (18) green; **css-anchor-position default-off byte-identical (8-fail) and lever-on unchanged (6-fail,
+  identical set)** — anchor pages keep the bridge scroll path, so the anchor corpus is untouched. Zero
+  regressions. **Unblocks** page/document-scroll sticky (done — twenty-first expansion below) and the
+  modal-dialog document-scroll adjustment the dialog/backdrop feature needs (still a follow-up: dialog also
+  needs the modality/top-layer channel + `IsAnchorAccessible`).
+
+- **P5.8d.2b — page/document-scroll sticky (twenty-first expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-hixy7x`; Broiler.Layout + bridge, both parent-repo, additive,
+  default-off). Completes the sticky feature by adding the case the nineteenth expansion excluded: a sticky
+  box pinned to the **document scrolling element** (page scroll), now that the twentieth expansion made
+  `<html>` scroll native. Two small changes:
+  - **Engine.** `CssBox.Sticky.cs` gains a viewport-scrollport fallback: `TryGetStickyScrollport` returns the
+    nearest scroll-clip ancestor's content box, or — when there is none — the **viewport**
+    (`LayoutEnvironment.ViewportSize` at the origin). The engine's document-scroll pass has already applied
+    the page scroll to the box's geometry, so a viewport-anchored sticky box pins against the fixed viewport
+    rect with the same `ComputeStickyShift` math (refactored to take the scrollport edges directly).
+  - **Bridge.** `IsMvpNativeStickyBox` drops the `!IsDocumentElement(scrollContainer)` carve-out (still
+    scoped to no-anchor pages), so a document-scroll sticky box is handed off too.
+  **Native mode fixes a pre-existing bridge bug here:** the bridge's baked document-scroll sticky pins the box
+  by the inset *even at `scrollTop = 0`* (it reads the box's offset within the document scrolling element as
+  0), rendering it at natural+inset instead of natural; the engine is correct (no pin until scrolled past the
+  inset line). So validation is **native-only** (baked is not a valid reference), not baked-vs-native parity.
+  Tests: `Broiler.Layout.Tests/NativeStickyPlacementTests.cs` (+1 viewport-pin, +1 viewport-no-op; the former
+  `NoScrollContainer_IsNoOp` becomes `NoClipContainer_PinsAgainstViewport`);
+  `Broiler.Wpt.Tests/NativePageScrollStickyWptTests.cs` (full render: a 900px page's sticky box sits at its
+  natural row at `scrollTop:0` and pins to viewport y 20 at `scrollTop:200`). Regression check: the
+  scroll/sticky/anchor/position-visibility Wpt suites (20) and the sticky engine/bridge-mode suites green;
+  **css-anchor-position default-off byte-identical (8-fail) and lever-on unchanged (6-fail, identical set)**.
+  Zero regressions. Sticky's remaining bridge-only case is the **anchor page** (the anchor-scroll /
+  position-visibility interaction still uses the bridge's DOM-shift).
+
+- **P5.8d.2b — modal-dialog `anchor()` placement (twenty-second expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-hixy7x`; **bridge only, additive, default-off**). Moves the
+  **pixel-relevant part of the 7 `anchor-position-top-layer-*` corpus tests** onto the engine — a top-layer
+  modal `<dialog>` positioned by `anchor()` insets against a scrolled anchor — and **corrects the
+  dialog/backdrop finding below** (which assumed this needed a modality/top-layer channel, `IsAnchorAccessible`
+  promoted into the engine, and the document-scroll model). It needs **none** of those:
+  - **The bridge DOM-shift already provides the scroll.** These are anchor pages, so document scroll uses the
+    bridge's DOM-shift (the twentieth expansion's native scroll is scoped to no-anchor pages); the anchor's box
+    geometry the engine reads already reflects the scroll, so the "document-scroll adjustment the engine MVP
+    does not do" — the stated reason modal targets were excluded — is unnecessary (the engine reads post-shift
+    geometry; the fixed modal target does not scroll). Empirically the engine places the target correctly with
+    zero adjustment.
+  - **The engine needs no top-layer accessibility model.** The bridge gate `IsMvpNativeAnchorInsetBox` already
+    requires every referenced anchor to be registered **and** `IsAnchorAccessible`, so an inaccessible-anchor
+    modal target (a succeeding top-layer anchor — `top-layer-006`; or a non-modal target seeing a top-layer
+    anchor — `top-layer-005`) stays **baked** with its correct fallback; the engine only ever places a modal
+    target against an accessible registered anchor (the `-001…-004`/`-007` cases). Confirmed by tracing: the
+    accessible cases resolve `--a` in the engine at the scrolled `(200,200)`; the inaccessible cases produce no
+    engine resolution.
+  - **`::backdrop` box-gen and the top-layer paint stay bridge/submodule but are pixel-irrelevant here** (every
+    test declares `dialog::backdrop { background: transparent }` and nothing overlaps), and the modal UA
+    `position:fixed` + dialog box styling stay on the bridge (a separate UA-stylesheet concern) — this slice
+    moves only the anchor *geometry*.
+
+  The single change is relaxing the `IsMvpNativeAnchorInsetBox` fixed/modal exclusion to admit a **modal
+  dialog** (`position:fixed` + `!isModalDialog` keeps a non-modal fixed target baked). Tests:
+  `Broiler.Wpt.Tests/NativeModalDialogAnchorWptTests.cs` (full render: a modal dialog anchored to a scrolled
+  abspos anchor lands at `(300,200)`; baked & native agree — so the corpus behaviour is locked into CI, since
+  the `top-layer-*` corpus otherwise runs only via the manual runner). Regression check: **all 7
+  `anchor-position-top-layer-*` tests pass lever-on** (now via the engine for the accessible cases);
+  **css-anchor-position default-off byte-identical (8-fail) and lever-on unchanged (6-fail, identical set)**;
+  the anchor-inset/combined/size/opposing/position-try/scroll Wpt (15) and the anchor/dialog Cli (10) suites
+  green. Zero regressions. The full dialog/backdrop feature (visible `::backdrop` scrims, top-layer paint over
+  overlapping content, popover UA box styling) remains the separate submodule effort the finding describes;
+  this slice takes only the anchor-geometry part the corpus actually exercises.
+
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
   CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
   ~~scroll simulation~~ → ~~`position-visibility`~~ → dialog/backdrop → ~~position-try (anchor()-inset handoff
-  subset)~~ → ~~transform/contain/will-change containing blocks~~ → ~~combined `anchor()` + `anchor-size()`~~.
+  subset)~~ → ~~transform/contain/will-change containing blocks~~ → ~~combined `anchor()` + `anchor-size()`~~ →
+  ~~`position: sticky` (non-document scroll container)~~ → ~~document/page scroll~~ → ~~page-scroll sticky~~ →
+  ~~modal-dialog `anchor()` (top-layer geometry)~~.
   (Childless auto/explicit/percentage sizing,
   `box-sizing:border-box`, percentage margin/padding/inset box props, shared-name scope resolution,
   writing-mode percentage basis, relatively-positioned inline containing blocks, `anchor()` physical insets,
@@ -2294,7 +2514,9 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   (`ResolveFixedPositionSizing`, done above); (b) **needs a new engine feature** — the engine genuinely
   lacks it, so a port is engine-layout work, not a bridge extraction, and it affects *all* pages (not just
   anchor pages) so the eventual production flip carries broad risk. Verified engine gaps:
-  `ResolveStickyPositioning` (no `position:sticky` in the engine), `ApplyVisualViewportSerializationState`
+  `ResolveStickyPositioning` (**partly closed — the nineteenth expansion gives the engine
+  `CssBox.RunStickyPositioning` for the non-document scroll-container case; page/document-scroll and
+  anchor-page sticky remain**), `ApplyVisualViewportSerializationState`
   (no pinch-zoom / `zoom`), and `InsertDialogBackdrops`/`ApplyDialogUAPositioning` (whose 7 validation tests
   turn out to be a **scroll-dependent, anchor-entangled modal-dialog path** — a transparent backdrop, modal
   UA positioning, `anchor()` insets, `IsAnchorAccessible`, and a document-scroll adjustment — NOT the
@@ -2327,11 +2549,27 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   that model. But sticky stays blocked here: it still has no corpus, and the remaining scroll cases the
   full model needs (the document scrolling element, fixed reparenting, and the anchor-scroll-container /
   position-visibility interaction that reproduces the flow-vs-paint hiding bug) are unbuilt.** Left on the
-  bridge path.
+  bridge path. **Update — RESOLVED for the non-document scroll-container case (nineteenth expansion above).**
+  Blocker (3) is what unblocked it: the seventeenth expansion's native scroll model gives the engine the
+  scroll-shifted geometry, and its **DOM-shift-free** native scroll path (for a no-anchor non-document
+  scroll container) means blocker (2)'s buggy `visibility:hidden` reference does not apply on the native
+  path — so `CssBox.RunStickyPositioning` pins those boxes and the bridge hands them off
+  (`IsMvpNativeStickyBox`). Blocker (1) is worked around exactly as this finding's own sequencing implies is
+  necessary: the validation is engine unit + a **native-only** full-render pin assertion + a bridge-mode
+  handoff test, not baked-vs-native parity. Still blocked here and left on the bridge: **page/document-scroll
+  sticky** (the engine has no document-scroll model) and **anchor-page sticky** (the anchor-scroll /
+  position-visibility interaction still uses the bridge's buggy DOM-shift) — they need the rest of the scroll
+  model.
 
   **Finding — dialog/backdrop is scroll-dependent and anchor-entangled, NOT a standalone renderer feature
   (2026-07-15 deep investigation; corrects the earlier "renderer-submodule feature, no scroll dependency"
-  assessment below).** The only validation is 7 `anchor-position-top-layer-*` corpus tests, and reading them
+  assessment below).** *(Partly superseded — the twenty-second expansion above moved the pixel-relevant
+  anchor **geometry** of all 7 tests to the engine with a one-line gate change. The predicted prerequisites
+  were wrong: the bridge DOM-shift on an anchor page already supplies the scroll, so no engine document-scroll
+  adjustment is needed; and the bridge gate's existing `IsAnchorAccessible` check keeps inaccessible-anchor
+  targets baked, so no engine top-layer-accessibility model is needed. Only the visible-scrim / top-layer-paint
+  / UA-box-styling remains — a separate submodule effort, pixel-irrelevant for these particular tests.)* The
+  only validation is 7 `anchor-position-top-layer-*` corpus tests, and reading them
   overturns the earlier framing:
   - **The `::backdrop` scrim is pixel-irrelevant here.** Every one of the 7 tests declares
     `dialog::backdrop { background: transparent; }`, so the backdrop paints nothing — the assertion is the
@@ -2376,10 +2614,16 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   renderer effort, and all-or-nothing for parity (a partial port breaks the 7 passing tests). Best done as its
   own submodule feature, not folded into the lever-gated anchor cutover. Left on the bridge path.
 
-  Still bridge-only: dialog/backdrop, sticky, the entangled scroll cases (document scrolling element, fixed
-  reparenting, anchor-scroll containers — the plain non-anchor case is native as of the seventeenth
-  expansion), visual-viewport (the engine-feature set above; transform/contain/will-change CBs are now
-  native — sixteenth expansion), and the opposing-inset / auto-min-content-sized position-try bases (the
+  Still bridge-only: dialog/backdrop's **visible-scrim / top-layer-paint / UA-box-styling** part (its
+  anchor-*geometry* — the pixel-relevant part of the 7 top-layer corpus tests — is native as of the
+  twenty-second expansion), sticky's **anchor-page** case only (the non-document scroll-container
+  case is native as of the nineteenth expansion and page/document-scroll sticky as of the twenty-first — the
+  anchor page's anchor-scroll / position-visibility interaction keeps the bridge DOM-shift), the remaining
+  entangled scroll case (anchor-scroll containers — the plain non-anchor container is native as of the
+  seventeenth expansion and the document scrolling element as of the twentieth; fixed descendants need no
+  reparenting on the native path), visual-viewport (the engine-feature set above;
+  transform/contain/will-change CBs are now native — sixteenth expansion), and the opposing-inset /
+  auto-min-content-sized position-try bases (the
   engine's
   `TryApplyPositionTryFallback` supports these geometries but the bridge gate keeps them baked pending per-case
   parity). **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler

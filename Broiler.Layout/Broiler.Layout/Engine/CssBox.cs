@@ -391,6 +391,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // Native scroll offsets first (P5.8d.2b scroll expansion), so anchor geometry
                 // (and everything downstream) sees the scrolled content.
                 RunScrollSimulation(this);
+                // position:sticky pinning (P5.8d.2b sticky expansion): after scroll so it reads
+                // the scrolled geometry; independent of the anchor pass that follows.
+                RunStickyPositioning(this);
                 RunNativeAnchorPlacement(this);
             }
         }

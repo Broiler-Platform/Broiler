@@ -47,15 +47,21 @@ public sealed partial class DomBridge
 
                 if ((clips || isDocScrollingElement) && el.ChildNodes.Count > 0)
                 {
-                    // Native mode (P5.8d.2b scroll expansion): for a non-document scroll
-                    // container on a page with no anchor content, hand the scroll offset to the
-                    // Broiler.Layout engine via data attributes instead of DOM-shifting the
-                    // content. The engine's scroll post-pass (CssBox.RunScrollSimulation)
-                    // translates the container's content and its overflow box clips it — no
-                    // wrapper div, no inline position/top/left/visibility writes reach the render.
+                    // Native mode (P5.8d.2b scroll expansion): for a scroll container on a page
+                    // with no anchor content, hand the scroll offset to the Broiler.Layout engine
+                    // via data attributes instead of DOM-shifting the content. The engine's scroll
+                    // post-pass (CssBox.RunScrollSimulation) translates the container's content and
+                    // its overflow box (or the viewport, for the document scrolling element) clips
+                    // it — no wrapper div, no inline position/top/left/visibility writes, and no
+                    // fixed-descendant reparenting (OffsetTop/OffsetLeft skip position:fixed at
+                    // every depth, CSS2.1 §9.6.1). The document scrolling element (<html>) is
+                    // included (P5.8d.2b document-scroll increment): the earlier revert assumed
+                    // page scroll never applied, but that was a non-scrollable synthetic fixture —
+                    // with a scrollable root (tall content) documentElement.scrollTop resolves
+                    // normally and the engine translation is validated to match the DOM-shift.
                     // Scoped to no-anchor documents so this never crosses the anchor-scroll-
                     // container / position-visibility machinery, which keeps the DOM-shift below.
-                    if (NativeAnchorPlacement && !isDocScrollingElement && !DocumentHasAnchorContent())
+                    if (NativeAnchorPlacement && !DocumentHasAnchorContent())
                     {
                         if (scrollTop != 0)
                             SetAttr(el, "data-broiler-scroll-top",
