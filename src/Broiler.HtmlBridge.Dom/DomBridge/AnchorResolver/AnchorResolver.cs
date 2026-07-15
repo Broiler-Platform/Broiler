@@ -65,8 +65,11 @@ public sealed partial class DomBridge
         // 1b. Parse @position-try at-rules from stylesheets.
         var positionTryRules = ParsePositionTryRules();
 
-        // 2. Resolve anchor() function values on elements.
-        ResolveAnchorFunctions(DocumentElement, anchorRegistry);
+        // 2. Resolve anchor() function values on elements. Native mode passes the
+        //    parsed @position-try rules so the anchor()-inset MVP gate can hand off a
+        //    position-try box only when the engine has its fallback rules (via the
+        //    NativeAnchorPlacement.PositionTryRules channel).
+        ResolveAnchorFunctions(DocumentElement, anchorRegistry, positionTryRules);
 
         // 3. Resolve position-area values on anchored elements.
         //    Collects scroll containers that need position:relative but

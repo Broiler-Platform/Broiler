@@ -2017,19 +2017,67 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   `~AnchorNameScope`/`~AnchorInlineContainingBlock`/`~PositionTryFallback`/`~NativeAnchor`/`~ScrollContainer`,
   18) green; **default-off byte-identical (8-fail / 31-pass)**; **lever-on unchanged (7-fail / 32-pass)** with
   the identical pre-existing anchor-tail fail *set* — zero regressions.
+- **P5.8d.2b — `@position-try` fallback (twelfth expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-9m00kh`; Broiler.Layout + bridge + Wpt runner, all parent-repo,
+  additive, default-off). A box in the **anchor()-inset position-try handoff subset** now selects and
+  applies its `@position-try` fallback natively — the engine equivalent of the bridge's
+  `TryApplyFallback` pre-bake, and the first non-placement feature moved off the bridge. Two grounding
+  facts from the investigation corrected the earlier "needs a new data path" assessment:
+  - **The engine already receives the parsed stylesheet.** `CssAnimationResolver.ResolveAnimations(box,
+    styleSet.AuthorStyleSheet)` (`DomParser.cs:253` call site) threads the `CssStyleSheet` (with at-rules
+    as `CssAtRule`) into layout for `@keyframes` — so at-rules *do* reach Broiler.Layout, just at the
+    per-box cascade site, not the root post-pass. This slice therefore uses a **parent-repo-only**
+    thread-static channel (mirroring the `NativeAnchorPlacement.Enabled` lever) rather than a submodule
+    edit: `NativeAnchorPlacement.PositionTryRules` (a name→declarations map), parsed via the canonical
+    `Broiler.CSS.PositionTryRule` model.
+  - **The base placement is already native.** An anchor()-inset base is placed by the P5.8d.2b
+    anchor()-insets pass, so the fallback loop just runs after it.
+  Landed:
+  - **Engine.** `CssBox.TryApplyPositionTryFallback` (`Engine/CssBox.Anchor.cs`, run from the post-pass
+    after base placement): reads the box's post-placement geometry in the CB frame, overflow-tests it via
+    the promoted `AnchorGeometry.Overflows`, and — if it overflows — walks `position-try-fallbacks`,
+    overlaying each `@position-try` rule's `left`/`right`/`top`/`bottom`/`width`/`height`/`inset:auto`
+    declarations (resolving embedded `anchor()` via the scoped `AnchorRegistry` + `AnchorGeometry.ResolveEdge`,
+    exactly as the base pass) and applying the first candidate that `AnchorGeometry.Fits` — a faithful port
+    of the bridge's `TryApplyFallback`. Reposition + (childless) resize.
+  - **Bridge.** `IsMvpNativeAnchorInsetBox` now admits position-try when `NativePositionTryHandoffSupported`
+    holds (its `@position-try` rules are available to the engine, a definite pixel `width`+`height`, single
+    inset per axis) — threaded the parsed rules into `ResolveAnchorFunctions` for the gate. In native mode
+    a handoff box is left un-baked (base + fallback owned by the engine); every other position-try box is
+    baked as today **and** neutralized inline (`position-try-fallbacks: none`) so the engine's fallback pass
+    skips the already-baked box. Both the base (step 2) and the fallback (step 3b) use the *same* predicate,
+    so the handoff/bake decision cannot disagree.
+  - **Runner.** `RenderWithNativeAnchor` parses the `@position-try` rules from the (serialised) HTML's
+    `<style>` blocks and sets the channel around the render.
+  Tests: `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` +5 (base-fits no-op, base-overflows applies
+  first fitting fallback, no-rules keeps base, `inset:auto` reset, first-fitting skips overflowing);
+  `Broiler.Cli.Tests/NativePositionTryPipelineTests.cs` (real parse→cascade→layout: fallback applied via
+  the channel; a no-rules control keeps the overflowing base) + `NativePositionTryBridgeModeTests.cs`
+  (native mode leaves the handoff box un-baked); `Broiler.Wpt.Tests/NativePositionTryWptTests.cs` (full
+  render; baked & native agree pixel-wise). Regression check: full `Broiler.Layout.Tests` (161, incl. the
+  pre-existing environmental arch-guard fail identical on baseline) green; **default-off byte-identical**
+  (the css-anchor-position subset is the same 8-fail / 31-pass, and all bridge changes are gated behind
+  `NativeAnchorPlacement`); **lever-on improves 7-fail → 6-fail** — `position-try-grid-001` (an anchor()-inset
+  + position-try test) now goes native and **passes**, with **zero regressions** (JSON failure-set diff:
+  `{+position-try-grid-001}`, nothing removed). This is the **first corpus position-try test to go native**.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
   CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
-  ~~scroll simulation~~ → `position-visibility` → dialog/backdrop → position-try.
-  (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, percentage margin/padding/inset box
-  props, shared-name scope resolution, writing-mode percentage basis, relatively-positioned inline
-  containing blocks, `anchor()` physical insets, `anchor-size()` sizing, opposing-inset sizing, abspos-inline
-  containing blocks, AND intervening scroll containers now land natively — see the eleven expansions above.)
-  Each remaining feature is currently excluded by
+  ~~scroll simulation~~ → `position-visibility` → dialog/backdrop → ~~position-try (anchor()-inset handoff
+  subset)~~. (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, percentage
+  margin/padding/inset box props, shared-name scope resolution, writing-mode percentage basis,
+  relatively-positioned inline containing blocks, `anchor()` physical insets, `anchor-size()` sizing,
+  opposing-inset sizing, abspos-inline containing blocks, intervening scroll containers, AND the
+  anchor()-inset `@position-try` fallback subset now land natively — see the twelve expansions above.)
+  Still bridge-only: `position-visibility` (blocked by the scroll-container CB ordering, see the finding
+  below), dialog/backdrop, and the non-anchor()-inset position-try bases (position-area base, opposing-inset
+  base, auto/min-content sizing — the engine's `TryApplyPositionTryFallback` supports these geometries but
+  the bridge gate keeps them baked pending per-case parity). Each remaining feature is currently excluded by
   `IsMvpNativeAnchorBox`/`IsMvpNativeAnchorInsetBox`/`IsMvpNativeAnchorSizeBox` (or `CanApplyNativeAnchorSize`)
-  and stays on the bridge path (baked + `position-area: none`), so enabling the lever globally is already safe
-  (proven above); the expansions widen the gate one feature at a time as the engine grows to reproduce them.
+  and stays on the bridge path (baked + `position-area: none` / `position-try-fallbacks: none`), so enabling
+  the lever globally is already safe (proven above); the expansions widen the gate one feature at a time as
+  the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
 
@@ -2066,20 +2114,24 @@ needs a new data path: the parsed `@position-try` name→declarations map (alrea
 `Broiler.CSS.PositionTryRule`, P5.3) must be handed to the engine's post-pass, and the fallback
 apply/re-place/re-test loop reimplemented on the box tree.
 
+**Resolved (2026-07-15) — the twelfth expansion above landed (a) + (c), grounding-corrected.** The
+"never reaches Broiler.Layout" premise was imprecise: `CssAnimationResolver.ResolveAnimations` already
+threads `styleSet.AuthorStyleSheet` (at-rules included) into layout for `@keyframes` — so the channel is a
+**parent-repo-only** thread-static (`NativeAnchorPlacement.PositionTryRules`, parsed via the canonical
+`PositionTryRule` model), no submodule edit needed. Both the per-box groundwork (below) and the rule-body
+channel (a) plus the fallback apply/re-test loop (c, `CssBox.TryApplyPositionTryFallback`) are now in place;
+(b) the native base is reused from the anchor()-inset pass. `position-try-grid-001` now goes native and
+**passes lever-on** (it was the failing example this finding cited). Remaining: the loop supports
+position-area / opposing-inset / auto-sized bases geometrically, but the bridge gate
+(`NativePositionTryHandoffSupported`) hands off only the anchor()-inset + definite-size + single-inset
+subset pending per-case parity for the other bases.
+
 **Groundwork landed (2026-07-14):** the per-box half of that input is now in place — `position-try-fallbacks`
 is projected onto `CssBox` (`CssBoxProperties.PositionTryFallbacks`, plus the `CssUtils` get/set arms), the
 P5.8b pattern applied to the fallback list. It is **inert** (nothing reads it yet — no behaviour change; the
 css-anchor-position subset is byte-identical, 31/8 default-off and 32/7 lever-on), so the box now carries the
 ordered fallback names the post-pass will consume. Test: `Broiler.Layout.Tests/AnchorPropertyProjectionTests.cs`
-(+1 theory row + round-trip). Still to build: (a) the `@position-try` **rule-body** channel from the
-bridge/runner into the post-pass (the parsed `PositionTryRule` map), (b) the base placement of a
-position-try box made native (its `position-area`/`anchor()` base must be on the engine so the fallback loop
-has a base to overflow-test), and (c) the fallback apply/re-place/re-test loop itself (reusing the promoted
-`AnchorGeometry.Overflows`/`Fits` and the engine's existing `anchor()`-inset / position-area placement).
-Until (a)–(c) land, `position-try` boxes stay gate-excluded and baked (`IsMvpNativeAnchorBox` excludes
-`position-try`); this
-is why `position-try-grid-001` — which also combines `anchor()` insets and grid abspos — fails identically
-on both the baked and native paths and is not a native-gate regression.
+(+1 theory row + round-trip). **Now consumed** by the twelfth expansion's `TryApplyPositionTryFallback`.
 
 The DOM-entangled bridge concerns (anchor registry *building* now trivial on the box tree; both the
 relatively- and absolutely-positioned inline-CB cases now handled by the engine's real §10.1 inline-box

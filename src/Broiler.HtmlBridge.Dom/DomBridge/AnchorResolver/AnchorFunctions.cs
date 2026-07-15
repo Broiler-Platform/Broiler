@@ -16,7 +16,8 @@ public sealed partial class DomBridge
     // canonical Broiler.CSS.AnchorFunction model (Phase 5 item 4). These callbacks
     // keep only the used-value geometry; AnchorFunction.Rewrite/RewriteSize supply
     // the parsed AnchorFunctionRef/AnchorSizeFunctionRef.
-    private void ResolveAnchorFunctions(DomElement element, Dictionary<string, AnchorInfo> anchorRegistry)
+    private void ResolveAnchorFunctions(DomElement element, Dictionary<string, AnchorInfo> anchorRegistry,
+        Dictionary<string, Dictionary<string, string>>? positionTryRules = null)
     {
         var cssProps = CollectMatchedRuleProperties(element);
 
@@ -42,7 +43,7 @@ public sealed partial class DomBridge
         // post-pass resolves it natively (see CssBox.TryApplyAnchorInsetPlacement). Every
         // other anchor() box is baked below.
         if (hasAnchorRef && NativeAnchorPlacement &&
-            IsMvpNativeAnchorInsetBox(element, cssProps, anchorRegistry))
+            IsMvpNativeAnchorInsetBox(element, cssProps, anchorRegistry, positionTryRules))
             hasAnchorRef = false;
 
         if (hasAnchorRef)
@@ -162,7 +163,7 @@ public sealed partial class DomBridge
         // throws "Collection was modified" (WPT content-visibility-anchor-positioning)
         // or overflows the ToList() copy. SnapshotChildren tolerates both.
         foreach (var child in SnapshotChildren(element))
-            ResolveAnchorFunctions(child, anchorRegistry);
+            ResolveAnchorFunctions(child, anchorRegistry, positionTryRules);
     }
 
     /// <summary>
@@ -177,7 +178,8 @@ public sealed partial class DomBridge
     /// </summary>
     private bool IsMvpNativeAnchorInsetBox(
         DomElement element, Dictionary<string, string> cssProps,
-        Dictionary<string, AnchorInfo> anchorRegistry)
+        Dictionary<string, AnchorInfo> anchorRegistry,
+        Dictionary<string, Dictionary<string, string>>? positionTryRules = null)
     {
         // Merge inline styles over matched-rule props (inline wins), matching what the
         // engine cascade projects onto the box.
@@ -185,8 +187,13 @@ public sealed partial class DomBridge
         foreach (var kv in InlineStyle(element))
             merged[kv.Key] = kv.Value;
 
-        // No position-try (out of the MVP subset).
-        if (merged.ContainsKey("position-try-fallbacks") || merged.ContainsKey("position-try"))
+        // position-try is admitted only for the tight subset the engine's native fallback
+        // pass reproduces (P5.8d.2b position-try expansion): the @position-try rule bodies
+        // must be available to the engine (the channel) and the box's base must be a
+        // definite-size, single-inset-per-axis reposition. Otherwise the box (base +
+        // fallback) stays fully baked on the bridge path.
+        if ((merged.ContainsKey("position-try-fallbacks") || merged.ContainsKey("position-try"))
+            && !NativePositionTryHandoffSupported(merged, positionTryRules))
             return false;
 
         // Fixed / modal-dialog targets get a document-scroll adjustment the engine MVP
@@ -271,6 +278,50 @@ public sealed partial class DomBridge
     /// opposing pair of insets determines the used size.</summary>
     private static bool IsAutoLength(string? value) =>
         string.IsNullOrWhiteSpace(value) || value!.Trim() == "auto";
+
+    /// <summary>
+    /// Whether an anchor()-inset box's <c>position-try</c> is the tight subset the engine's
+    /// native fallback pass (<c>CssBox.TryApplyPositionTryFallback</c>) reproduces exactly,
+    /// so the bridge can hand off the box (base + fallback) instead of pre-baking it. Requires:
+    /// the parsed <c>@position-try</c> rules are available to the engine and every referenced
+    /// fallback name resolves to one; a definite pixel <c>width</c> AND <c>height</c> (the
+    /// engine overflow-tests the laid-out size, which for an <c>auto</c>/<c>min-content</c>
+    /// width would need the bridge's min-content estimator the engine has no equivalent for);
+    /// and no opposing insets on the base (single inset per axis — the base is a
+    /// reposition-only anchor()-inset placement). Every other position-try box stays baked.
+    /// </summary>
+    private bool NativePositionTryHandoffSupported(
+        Dictionary<string, string> merged,
+        Dictionary<string, Dictionary<string, string>>? positionTryRules)
+    {
+        if (positionTryRules == null || positionTryRules.Count == 0)
+            return false;
+
+        string? fallbacks = merged.GetValueOrDefault("position-try-fallbacks")
+            ?? merged.GetValueOrDefault("position-try");
+        if (string.IsNullOrWhiteSpace(fallbacks))
+            return false;
+        var names = PositionTryRule.ParseFallbackList(fallbacks);
+        if (names.Length == 0)
+            return false;
+        foreach (var name in names)
+            if (!positionTryRules.ContainsKey(name))
+                return false;
+
+        // Definite pixel width AND height (the engine reads the laid-out size for its overflow
+        // test; a non-px width has no bridge-matching engine size).
+        if (!TryParsePx(merged.GetValueOrDefault("width")).HasValue ||
+            !TryParsePx(merged.GetValueOrDefault("height")).HasValue)
+            return false;
+
+        // No opposing insets — the base is a single-inset-per-axis reposition.
+        if (HasInset(merged, "left") && HasInset(merged, "right"))
+            return false;
+        if (HasInset(merged, "top") && HasInset(merged, "bottom"))
+            return false;
+
+        return true;
+    }
 
     /// <summary>
     /// Whether an element's <c>anchor-size()</c> sizing is the MVP subset the engine's native
