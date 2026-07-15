@@ -647,6 +647,7 @@ internal abstract partial class CssBoxProperties
     public string PositionAnchor { get; set; } = "auto";
     public string PositionArea { get; set; } = "none";
     public string PositionTry { get; set; } = "normal";
+    public string PositionTryFallbacks { get; set; } = "none";
 
     public string LineHeight
     {

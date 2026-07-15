@@ -64,6 +64,15 @@ public sealed partial class DomBridge
                         ? null
                         : ComputePositionAreaRect(
                             element, anchor, positionArea, scrollContainer);
+
+                // A native (un-baked) box whose containing block is the anchor's scroll
+                // container still needs that scroll container to establish the CB the
+                // engine resolves — the baked path adds position:relative below (inside
+                // the rect!=null block); do the same here so the native CB frame matches.
+                // (P5.8d.2b scroll-simulation expansion.)
+                if (rect == null && scrollContainer != null)
+                    scrollContainersNeedingRelative.Add(scrollContainer);
+
                 if (rect != null)
                 {
                     // Preserve position:fixed when the element already has it;
@@ -401,20 +410,30 @@ public sealed partial class DomBridge
     /// subset (P5.8d.2b) — the boxes the Broiler.Layout engine's placement post-pass
     /// currently reproduces exactly, so the bridge can hand them off instead of
     /// pre-baking. Requires: an explicit dashed-ident <c>position-anchor</c> that names a
-    /// registered anchor, no intervening scroll container, and no <c>position-try</c> or
-    /// <c>anchor()</c>/<c>anchor-size()</c> on the element (those entangled features stay on
-    /// the bridge path until later expansions). Both block and inline containing blocks
-    /// (relative or abspos/fixed) are in the subset — the engine places against the real
-    /// inline-box geometry the bridge estimator could not.
+    /// registered anchor, and no <c>position-try</c> or <c>anchor()</c>/<c>anchor-size()</c>
+    /// on the element (those entangled features stay on the bridge path until later
+    /// expansions). Both block and inline containing blocks (relative or abspos/fixed) are
+    /// in the subset — the engine places against the real inline-box geometry the bridge
+    /// estimator could not. An intervening scroll container (the anchor's scroll container
+    /// is the box's containing block) is also in the subset (P5.8d.2b scroll-simulation
+    /// expansion): the bridge's <c>ApplyScrollSimulation</c> DOM-shifts the scrolled
+    /// content before render, so the engine reads the already-scrolled anchor geometry.
     /// </summary>
     private bool IsMvpNativeAnchorBox(
         DomElement element, string positionAnchor, Dictionary<string, string> cssProps,
         DomElement? scrollContainer)
     {
-        // No intervening scroll container (the anchor's scroll container is not this
-        // box's containing block).
-        if (scrollContainer != null)
-            return false;
+        // An intervening scroll container (the anchor's scroll container is this box's
+        // containing block) is now IN the MVP subset (P5.8d.2b scroll-simulation
+        // expansion). The bridge's ApplyScrollSimulation pre-pass DOM-shifts the scroll
+        // container's content (wrapping it in a position:relative offset div) before the
+        // final render, so the engine's box tree already carries the scrolled anchor
+        // geometry; the native post-pass reads the shifted anchor border box and places
+        // the target against it. The scroll container is still registered as the box's
+        // containing block below (scrollContainersNeedingRelative) in native mode too, so
+        // the CB frame the engine resolves is identical to the baked path — verified
+        // baked-vs-native pixel-identical by ScrollContainerAnchorParityTests (with and
+        // without a scroll offset, positioned and static scroll containers).
 
         // An explicit, named anchor — a dashed-ident like `--a`, not the default `auto`.
         var anchorName = positionAnchor.Trim();
