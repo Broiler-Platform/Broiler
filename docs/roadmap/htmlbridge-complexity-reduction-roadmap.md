@@ -826,10 +826,39 @@ pass unchanged; the only failures (the `:lang` selector, the three zoom/srcdoc
 `ScriptEngineExecuteTests.DomBridge_SerializeToHtml_*`, and the `HttpClientMigrationTests` reflection guard)
 are the standing environmental set, confirmed identical at baseline in isolation → zero regressions.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.14 named-accessor / relocated-infra /
+Status: **P3.15 completed** 2026-07-15 (branch `claude/htmlbridge-phase-5-ke2wvn`) — the **CSSOM stylesheet /
+CSS-rule object model** slice, the sibling of P3.14's declaration. The JS `CSSRuleList`/`CSSRule` object
+model is the fifteenth co-located module: `StyleSheetBinding` (namespace `Broiler.HtmlBridge.Dom.Features`,
+split `StyleSheetBinding.cs` / `.Rules.cs` / `.Callbacks.cs` to stay under the 750-line/file guideline) owns
+the rule-list + keyframe builders (`ParseCssRuleStrings`, `BuildCssRuleListObject`, `BuildNestedRuleObjects`/
+`BuildNestedKeyframeObjects`, `BuildCssKeyframeRuleObject`), the per-rule `CSSRule` builder for every rule
+kind (`BuildCssRuleObject` — style/`@media`/`@supports`/`@layer`/`@keyframes`/`@font-face`/`@page`/
+`@property`/`@counter-style`/`@import`/`@namespace`, reading selector/prelude metadata from the neutral
+`Broiler.CSS.Cssom.CssomRuleMetadata` projection), and the ~20 `JsStyleSheets…002…028Core` callbacks (the
+`length`/`item`/`cssRules`/`insertRule`/`deleteRule` operations and the per-kind `cssText` serializers) —
+all moved out of the **918-line `StyleSheets.cs`** (now 141) and the deleted `JsFunctionCallbacks/
+StyleSheets.cs`.
+
+**Like `ClassListBinding` (P3.6) and `StyleDeclarationBinding` (P3.14) it is an internal *static* class with
+no host contract** — pure CSSOM-IDL logic over the shared `Broiler.CSS` rule model, the canonical
+`CssParser`/`CssSerializer`, and `StyleDeclarationBinding.BuildRuleDeclaration` (P3.14) for a rule's `style`;
+the one bridge helper it needs is the neutral static `DomBridge.ParseStyle`. The **`CSSStyleSheet` object
+itself** stays bridge-owned in `DomBridge.BuildStyleSheetObject` (`StyleSheets.cs`) — its per-element
+identity cache (`_styleSheetCache`), the live `cssRules` collection, and the `insertRule`/`deleteRule`
+mutation bookkeeping that marks the shared model mutated (`RulesMutated` runtime state,
+`EnsureStyleSheetRulesCurrent`) are runtime-state coupled; it calls into the module for the rule objects and
+the six sheet callbacks (widened to `internal static`). Behaviour-preserving; no public-API change (module +
+callbacks internal). Tests: `Broiler.Cli.Tests/StyleSheetBindingModuleTests.cs` (co-location/static guard +
+selectorText/rule.style/cssText, insertRule/deleteRule live-collection mutation, and `@media`/`@keyframes`
+rule-kind characterizations through the JS engine). Regression check vs the P3.14/pre-change baseline: the
+SelectorsAndCssom / StyleDeclarationBinding / Acid3CssCompliance / CssStyleDeclarationValidation and
+architecture-guard suites reproduce an **identical** failure set with the change stashed (the standing `:lang`
+selector and Acid3 border-shorthand environmental fails) → zero regressions. This takes `StyleSheets.cs`
+under the 750-line exit-criterion limit.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.15 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static pattern is the template for any residual coupling:
-the CSSOM **stylesheet** objects (CSSStyleSheet/CSSRule in `StyleSheets.cs`, the sibling of P3.14's
-declaration), Element/geometry, Window/Document, SVG, the **rest** of Frames/browsing-contexts (the
+Element/geometry, Window/Document, SVG, the **rest** of Frames/browsing-contexts (the
 `BrowsingContextManager` consolidating the sub-window / content-document caches, the sub-window object and
 `WindowContext.cs`), Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
