@@ -2226,8 +2226,23 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   Cli failures confirmed identical on the stashed baseline. Zero regressions. Groundwork for the full scroll
   model (which would also unblock sticky); the entangled cases and sticky itself remain on the bridge.
 
-  **Finding — the document scrolling element and fixed-descendant cases are NOT positively validatable here
-  (2026-07-15 investigation; the native handoff was extended to them and reverted).** Extending the native
+  **Finding — the document scrolling element IS validatable here after all — CORRECTED and RESOLVED
+  (2026-07-15; the twentieth expansion below extends the native handoff to `<html>` and proves parity).**
+  The earlier claim (kept below for the record) that `documentElement.scrollTop = N` "resolves to 0 … so page
+  scroll never actually applies" was a **non-scrollable-fixture artefact**: the synthetic fixture did not
+  establish a scrollable root, so `GetScrollBounds`'s `maxTop = scrollHeight − clientHeight` was 0 and the
+  offset clamped away. A probe with a scrollable root (a `body { height: 900px }` page, a `position:absolute`
+  marker at `top: 150px`, `documentElement.scrollTop = 100`) renders the marker at absolute y **50** in the
+  **baked** path (150 − 100) — i.e. page scroll *does* apply — so the native path is exercisable and the
+  extension is not a no-op. The fixed-descendant concern is likewise resolved: the same fixture's
+  `position:fixed` box paints at its unscrolled row in **both** paths (it is a child of the *body*, not of an
+  `overflow:hidden` clipping ancestor, so the renderer clip limitation does not apply), confirming
+  `OffsetTop`/`OffsetLeft` skip `position:fixed` at every depth with no reparenting. See the twentieth
+  expansion for the shipped change and its parity test.
+
+  **(Superseded) Finding — the document scrolling element and fixed-descendant cases are NOT positively
+  validatable here (2026-07-15 investigation; the native handoff was extended to them and reverted).**
+  Extending the native
   handoff to the `<html>` document scrolling element is *safe* (baked-vs-native parity holds), but its
   positive path cannot be exercised in a synthetic fixture: `documentElement.scrollTop = N` resolves to `0`
   through `SetElementScrollOffsetsWithBehavior` → `ResolveElementScrollOffsets` (the `clamp` /
@@ -2239,8 +2254,8 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   so there is no visible fixed box to assert parity on. The engine translate already handles fixed correctly
   in principle (`OffsetTop`/`OffsetLeft` skip `position:fixed` at every depth, so no reparenting is needed —
   the bridge's `CollectFixedDescendants` reparenting only undoes the DOM-shift wrapper's renderer bug), but
-  that correctness can't be *demonstrated* here. Both cases were therefore left on the bridge path; they need
-  an environment where page scroll and fixed-in-scroll actually render.
+  that correctness can't be *demonstrated* here. **(Corrected above — the "resolves to 0" premise was a
+  non-scrollable-fixture artefact.)**
 - **P5.8d.2b — combined `anchor()` + `anchor-size()` (eighteenth expansion) — COMPLETED** 2026-07-15
   (branch `claude/htmlbridge-phase-5-ke2wvn`; **bridge only, additive, default-off**). A box that both
   **sizes** to its anchor (`anchor-size()` in `width`/`height`) **and** positions against it (`anchor()`
@@ -2318,13 +2333,35 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   there)**. Zero regressions. The entangled remainder (document/page-scroll sticky, and the anchor-page
   sticky/scroll/position-visibility interaction) stays on the bridge until the full scroll model lands.
 
+- **P5.8d.2b — native document/page scroll (twentieth expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-hixy7x`; **bridge only, additive, default-off**). Extends the
+  seventeenth expansion's native scroll model to the **document scrolling element** (`<html>`) — the case it
+  left on the bridge's DOM-shift, and the resolution of the "not positively validatable here" finding above
+  (whose "resolves to 0" premise was a non-scrollable-fixture artefact). On a no-anchor page the bridge now
+  writes `data-broiler-scroll-top`/`-left` on `<html>` (skipping the DOM-shift wrapper, its fixed-descendant
+  reparenting, and the top-clip `visibility:hidden` hack) and the engine's `CssBox.RunScrollSimulation`
+  translates the page content; the viewport clips it, and `OffsetTop`/`OffsetLeft` skip `position:fixed` at
+  every depth (CSS2.1 §9.6.1) so fixed boxes stay pinned with **no reparenting**. The single change is
+  dropping the `!isDocScrollingElement` carve-out from the native-handoff gate (still scoped
+  `NativeAnchorPlacement && !DocumentHasAnchorContent()` — anchor pages keep the DOM-shift for the
+  position-visibility / anchor-scroll machinery; default off is byte-identical). Tests:
+  `Broiler.Wpt.Tests/NativeDocScrollWptTests.cs` (full render: a 900px page scrolled 100px places its abspos
+  marker at the scrolled row and leaves a `position:fixed` box unmoved — engine translation and bridge
+  DOM-shift **agree pixel-wise**). Regression check: the scroll/sticky/anchor/position-visibility Wpt suites
+  (18) green; **css-anchor-position default-off byte-identical (8-fail) and lever-on unchanged (6-fail,
+  identical set)** — anchor pages keep the bridge scroll path, so the anchor corpus is untouched. Zero
+  regressions. **Unblocks** page/document-scroll sticky (the nineteenth expansion's excluded case — the
+  engine can now see the page-scrolled geometry) and the modal-dialog document-scroll adjustment the
+  dialog/backdrop feature needs; both remain follow-ups (the engine's sticky pass still needs a
+  viewport-as-scroll-container path, and dialog needs the modality/top-layer channel + `IsAnchorAccessible`).
+
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
   CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
   ~~scroll simulation~~ → ~~`position-visibility`~~ → dialog/backdrop → ~~position-try (anchor()-inset handoff
   subset)~~ → ~~transform/contain/will-change containing blocks~~ → ~~combined `anchor()` + `anchor-size()`~~ →
-  ~~`position: sticky` (non-document scroll container)~~.
+  ~~`position: sticky` (non-document scroll container)~~ → ~~document/page scroll~~.
   (Childless auto/explicit/percentage sizing,
   `box-sizing:border-box`, percentage margin/padding/inset box props, shared-name scope resolution,
   writing-mode percentage basis, relatively-positioned inline containing blocks, `anchor()` physical insets,
@@ -2435,9 +2472,11 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   own submodule feature, not folded into the lever-gated anchor cutover. Left on the bridge path.
 
   Still bridge-only: dialog/backdrop, sticky's **page/document-scroll and anchor-page** cases (the
-  non-document scroll-container case is native as of the nineteenth expansion), the entangled scroll cases
-  (document scrolling element, fixed reparenting, anchor-scroll containers — the plain non-anchor case is
-  native as of the seventeenth expansion), visual-viewport (the engine-feature set above;
+  non-document scroll-container case is native as of the nineteenth expansion — the engine's sticky pass still
+  needs a viewport-as-scroll-container path to use the now-native document scroll), the remaining entangled
+  scroll case (anchor-scroll containers — the plain non-anchor container is native as of the seventeenth
+  expansion and the document scrolling element as of the twentieth; fixed descendants need no reparenting on
+  the native path), visual-viewport (the engine-feature set above;
   transform/contain/will-change CBs are now native — sixteenth expansion), and the opposing-inset /
   auto-min-content-sized position-try bases (the
   engine's
