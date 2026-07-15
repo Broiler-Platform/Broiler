@@ -103,11 +103,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// <summary>
     /// Whether this box establishes a containing block for absolutely-positioned
     /// descendants through a property other than <c>position</c> — a non-<c>none</c>
-    /// <c>transform</c> (CSS Transforms 1 §4) or a <c>contain</c> value of
-    /// <c>layout</c>/<c>paint</c>/<c>strict</c>/<c>content</c> (CSS Containment §2).
-    /// Mirrors the subset of the bridge's <c>EstablishesContainingBlock</c> that the engine
-    /// models natively; <c>will-change</c> is not projected onto the box, so a
-    /// will-change-only containing block stays on the bridge path. Consulted by
+    /// <c>transform</c> (CSS Transforms 1 §4), a <c>contain</c> value of
+    /// <c>layout</c>/<c>paint</c>/<c>strict</c>/<c>content</c> (CSS Containment §2), or
+    /// <c>will-change: transform</c> (CSS Will Change 1 §3 — a will-change hint for a
+    /// property that would itself create one). Mirrors the bridge's
+    /// <c>EstablishesContainingBlock</c> exactly (minus the <c>position</c> branch handled
+    /// by the caller), so the two paths agree. Consulted by
     /// <see cref="FindPositionedContainingBlock"/> only under the native-anchor lever.
     /// </summary>
     internal bool EstablishesNonPositionAbsPosContainingBlock()
@@ -122,6 +123,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (c.Contains("layout") || c.Contains("paint") || c.Contains("strict") || c.Contains("content"))
                 return true;
         }
+
+        if (!string.IsNullOrWhiteSpace(WillChange)
+            && WillChange.Contains("transform", System.StringComparison.OrdinalIgnoreCase))
+            return true;
 
         return false;
     }

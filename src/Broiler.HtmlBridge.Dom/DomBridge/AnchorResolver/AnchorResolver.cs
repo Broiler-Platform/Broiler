@@ -154,14 +154,15 @@ public sealed partial class DomBridge
             ResolveFixedPositionSizing(viewportWidth, viewportHeight);
 
         // 6. Ensure elements that establish containing blocks via non-position
-        //    properties (contain:layout, transform) get position:relative so the
-        //    Broiler renderer treats them as containing blocks for abspos children.
-        //    Native mode (P5.8d.2b transform/contain CB expansion): the Broiler.Layout
-        //    engine now resolves transform/contain containing blocks natively
-        //    (CssBox.FindPositionedContainingBlock under the lever), so the transform/contain
-        //    position:relative pre-bake is dropped; only a will-change-only containing block
-        //    still needs it (the engine does not model will-change).
-        EnsureContainingBlockPositioning(DocumentElement);
+        //    properties (contain:layout, transform, will-change:transform) get
+        //    position:relative so the Broiler renderer treats them as containing blocks for
+        //    abspos children. Native mode (P5.8d.2b transform/contain CB expansion): the
+        //    Broiler.Layout engine now resolves all of these natively
+        //    (CssBox.FindPositionedContainingBlock + EstablishesNonPositionAbsPosContainingBlock
+        //    under the lever), so this pre-bake is skipped entirely — no inline position:relative
+        //    write reaches the native render path.
+        if (!NativeAnchorPlacement)
+            EnsureContainingBlockPositioning(DocumentElement);
 
         // 7. Strip CSS rules with unsupported properties (anchor(), inset,
         //    anchor-name) from the stylesheet so the renderer doesn't

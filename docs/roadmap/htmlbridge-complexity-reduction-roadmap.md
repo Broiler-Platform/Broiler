@@ -2123,53 +2123,58 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   default-off byte-identical; **lever-on the css-anchor-position subset is unchanged (6 fails, identical
   set)** — the `position-fixed` anchor tests still pass. (This WPT checkout has no non-anchor fixed-element
   corpus; the redundancy is proven by the engine-vs-bridge agreement.) Zero regressions.
-- **P5.8d.2b — transform/contain containing block (sixteenth expansion) — COMPLETED** 2026-07-15
+- **P5.8d.2b — transform/contain/will-change containing block (sixteenth expansion) — COMPLETED** 2026-07-15
   (branch `claude/htmlbridge-phase-5-sk540t`; Broiler.Layout + bridge, both parent-repo, additive,
   default-off). The bridge's **`EnsureContainingBlockPositioning`** pass — which pre-bakes inline
   `position:relative` onto every element that establishes an abspos containing block through a
   non-position property (`transform`, `contain: layout/paint/strict/content`, `will-change: transform`)
-  so the renderer's `position`-only CB resolution treats it as a containing block — is now, for its
-  transform/contain cases, resolved **natively by the engine** instead of pre-baked. This is the last of
-  the *general* (non-anchor) AnchorResolver passes' geometry to move, and the resolution of the "engine
-  gap" the triage below recorded. Landed:
+  so the renderer's `position`-only CB resolution treats it as a containing block — is now resolved
+  **natively by the engine** and **skipped entirely in native mode**. This is the last of the *general*
+  (non-anchor) AnchorResolver passes' geometry to move, and the resolution of the "engine gap" the triage
+  below recorded. Landed in two steps (transform/contain first, then the will-change completion):
   - **Engine.** `CssBox.FindPositionedContainingBlock` (the abspos CB walk) now, **under the native-anchor
     lever**, also returns a box that establishes a containing block via a non-`none` `transform`
-    (CSS Transforms 1 §4) or `contain: layout/paint/strict/content` (CSS Containment §2) — a new
-    `EstablishesNonPositionAbsPosContainingBlock` predicate mirroring the bridge's
-    `EstablishesContainingBlock` (minus `will-change`, which is not projected onto the box). Gated by
-    `NativeAnchorPlacement.Enabled`, so default-off layout is byte-identical. On the baked path the box is
-    already `position:relative` (from the pass), so the pre-existing `position` check returned it — the
-    native recognition returns the *same* box, which is why baked and native agree.
-  - **Bridge.** `EnsureContainingBlockPositioning` skips the `position:relative` write in native mode for
-    a transform/contain-established CB (a new `EstablishesContainingBlockViaWillChangeOnly` keeps only the
-    will-change-only case on the bridge, since the engine does not model `will-change`) — removing those
-    inline writes from the native render path. Default-off writes exactly as before.
-  Tests: `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` +9 (a `contain:layout`/`transform` CB is
-  resolved natively and the target fills the inner cell, a plain **static** block control climbs to the
-  root — proving the recognition binds it — and the predicate mirror-table); `Broiler.Wpt.Tests/
+    (CSS Transforms 1 §4), `contain: layout/paint/strict/content` (CSS Containment §2), or
+    `will-change: transform` (CSS Will Change 1 §3) — a new `EstablishesNonPositionAbsPosContainingBlock`
+    predicate mirroring the bridge's `EstablishesContainingBlock` exactly. `will-change` is now projected
+    onto the box (`CssBoxProperties.WillChange` + the `CssUtils` get/set arms — a parent-repo-only add; the
+    cascade already emits the declared property to the ignored-name sink, so no submodule/CSS-engine change
+    was needed). Gated by `NativeAnchorPlacement.Enabled`, so default-off layout is byte-identical. On the
+    baked path the box is already `position:relative` (from the pass), so the pre-existing `position` check
+    returned it — the native recognition returns the *same* box, which is why baked and native agree.
+  - **Bridge.** `ResolveAnchorPositions` now **skips `EnsureContainingBlockPositioning` entirely in native
+    mode** (`if (!NativeAnchorPlacement)`), so **no `position:relative` write from this pass reaches the
+    native render path**. Default mode bakes exactly as before.
+  Tests: `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` +12 (a `contain:layout`/`transform`/
+  `will-change:transform` CB is resolved natively and the target fills the inner cell, a plain **static**
+  block control climbs to the root — proving the recognition binds it — and the predicate mirror-table);
+  `Broiler.Cli.Tests/NativeAnchorWillChangeCbPipelineTests.cs` (REAL parse → cascade → layout: a
+  `will-change: transform` box, NOT pre-baked to relative by this harness, is resolved as the CB by the
+  engine and the auto-sized target fills the 140×140 inner cell — proving both that the cascade projects
+  `will-change` onto the box and that the engine recognises it); `Broiler.Wpt.Tests/
   NativeAnchorContainCbWptTests.cs` (full render: a `contain:layout` CB anchored box, the corpus
   `transform-010/015/016` pattern, placed by the engine and pixel-agreeing baked vs native — an auto-sized
   fill that would fill the 340-wide viewport cell if the CB weren't recognised, so the fill size proves the
-  `contain` box is the CB). Regression check: full `Broiler.Layout.Tests` (172, the pre-existing
+  `contain` box is the CB). Regression check: full `Broiler.Layout.Tests` (177, the pre-existing
   environmental arch-guard fail identical on baseline) green; **default-off byte-identical (31 pass / 8
   fail)**; **lever-on the css-anchor-position subset is unchanged (6 fails, identical set — verified against
   the stashed baseline), with transform/contain match% pixel-identical** (`transform-010/016` 100 %,
   `transform-015` 100 %, `abs-inline-container`/`inline-container` 95.81 %). Zero regressions. A parity move
-  with no corpus gain (like `position-visibility`), but it drains the transform/contain `position:relative`
-  writes from the bridge's native render path — leaving `EnsureContainingBlockPositioning` writing only for
-  will-change-only CBs.
+  with no corpus gain (like `position-visibility`), but it **removes `EnsureContainingBlockPositioning`
+  entirely from the bridge's native render path** — one full AnchorResolver pass off the Phase 4 item-2
+  inline-write list.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
   CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
   ~~scroll simulation~~ → ~~`position-visibility`~~ → dialog/backdrop → ~~position-try (anchor()-inset handoff
-  subset)~~ → ~~transform/contain containing blocks~~. (Childless auto/explicit/percentage sizing,
+  subset)~~ → ~~transform/contain/will-change containing blocks~~. (Childless auto/explicit/percentage sizing,
   `box-sizing:border-box`, percentage margin/padding/inset box props, shared-name scope resolution,
   writing-mode percentage basis, relatively-positioned inline containing blocks, `anchor()` physical insets,
   `anchor-size()` sizing, opposing-inset sizing, abspos-inline containing blocks, intervening scroll
   containers, the anchor()-inset `@position-try` fallback subset, `position-visibility`, `anchor-center`,
-  redundant fixed-position sizing, AND transform/contain containing blocks now land natively — see the
-  sixteen expansions above.)
+  redundant fixed-position sizing, AND transform/contain/will-change containing blocks now land natively —
+  see the sixteen expansions above.)
 
   **Triage of the remaining AnchorResolver passes (2026-07-15):** the anchor-specific, lever-gated passes
   are now on the engine (placement MVPs, `position-visibility`, `anchor-center`). The rest are *general*
@@ -2182,10 +2187,10 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   model — scroll is only the bridge's DOM-shift), `ApplyVisualViewportSerializationState` (no pinch-zoom /
   `zoom`), and `InsertDialogBackdrops`/`ApplyDialogUAPositioning` (no top-layer painting). Each is its own
   engine feature + broad-corpus parity effort, larger than a lever-gated slice. **`EnsureContainingBlockPositioning`
-  — the engine's `FindPositionedContainingBlock` gap for `transform`/`contain` containing blocks — is now
-  RESOLVED (sixteenth expansion above): the engine recognises them natively under the lever, so the
-  transform/contain `position:relative` pre-bake is dropped in native mode (only the will-change-only case,
-  which the engine does not model, stays on the bridge).**
+  — the engine's `FindPositionedContainingBlock` gap for `transform`/`contain`/`will-change` containing
+  blocks — is now RESOLVED (sixteenth expansion above): the engine recognises all three natively under the
+  lever (with `will-change` projected onto the box), so the pass is skipped **entirely** in native mode — no
+  `position:relative` pre-bake reaches the native render path.**
 
   **Finding — `position:sticky` is blocked here (2026-07-15 investigation).** Three compounding blockers make
   a responsible port infeasible in this environment: (1) **no corpus** — this WPT checkout has zero sticky

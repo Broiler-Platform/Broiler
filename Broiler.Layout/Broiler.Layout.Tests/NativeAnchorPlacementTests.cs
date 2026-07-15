@@ -646,17 +646,20 @@ public sealed class NativeAnchorPlacementTests
     }
 
     [Theory]
-    [InlineData("translateX(10px)", "none")]
-    [InlineData("rotate(5deg)", "none")]
-    [InlineData("none", "layout")]
-    [InlineData("none", "paint")]
-    [InlineData("none", "strict")]
-    [InlineData("none", "content")]
-    public void Pass_TransformOrContainCb_IsResolvedNatively_WhenFlagOn(string transform, string contain)
+    [InlineData("translateX(10px)", "none", "auto")]
+    [InlineData("rotate(5deg)", "none", "auto")]
+    [InlineData("none", "layout", "auto")]
+    [InlineData("none", "paint", "auto")]
+    [InlineData("none", "strict", "auto")]
+    [InlineData("none", "content", "auto")]
+    [InlineData("none", "none", "transform")]          // will-change: transform
+    [InlineData("none", "none", "opacity, transform")] // will-change list containing transform
+    public void Pass_TransformOrContainCb_IsResolvedNatively_WhenFlagOn(string transform, string contain, string willChange)
     {
         var (root, cb) = NonPositionCbFixture(out var target);
         cb.Transform = transform;
         cb.Contain = contain;
+        cb.WillChange = willChange;
 
         try
         {
@@ -697,23 +700,27 @@ public sealed class NativeAnchorPlacementTests
     }
 
     [Theory]
-    [InlineData("none", "none", false)]
-    [InlineData("translateX(1px)", "none", true)]
-    [InlineData("rotate(1deg)", "none", true)]
-    [InlineData("", "none", false)]
-    [InlineData("none", "layout", true)]
-    [InlineData("none", "paint", true)]
-    [InlineData("none", "strict", true)]
-    [InlineData("none", "content", true)]
-    [InlineData("none", "size", false)]       // size containment alone does not establish a CB
-    [InlineData("none", "", false)]
+    [InlineData("none", "none", "auto", false)]
+    [InlineData("translateX(1px)", "none", "auto", true)]
+    [InlineData("rotate(1deg)", "none", "auto", true)]
+    [InlineData("", "none", "auto", false)]
+    [InlineData("none", "layout", "auto", true)]
+    [InlineData("none", "paint", "auto", true)]
+    [InlineData("none", "strict", "auto", true)]
+    [InlineData("none", "content", "auto", true)]
+    [InlineData("none", "size", "auto", false)]       // size containment alone does not establish a CB
+    [InlineData("none", "", "auto", false)]
+    [InlineData("none", "none", "transform", true)]           // will-change: transform
+    [InlineData("none", "none", "opacity, transform", true)]  // will-change list containing transform
+    [InlineData("none", "none", "opacity", false)]            // will-change without transform
     public void EstablishesNonPositionAbsPosContainingBlock_MirrorsBridgePredicate(
-        string transform, string contain, bool expected)
+        string transform, string contain, string willChange, bool expected)
     {
         var root = Box(null, new PointF(0, 0), new SizeF(100, 100));
         var b = Box(root, new PointF(0, 0), new SizeF(10, 10));
         b.Transform = transform;
         b.Contain = contain;
+        b.WillChange = willChange;
         Assert.Equal(expected, b.EstablishesNonPositionAbsPosContainingBlock());
     }
 

@@ -11,9 +11,13 @@ public sealed partial class DomBridge
     /// <summary>
     /// For elements that establish containing blocks via CSS properties that
     /// Broiler's renderer does not understand (e.g. <c>contain:layout</c>,
-    /// <c>transform</c>), adds <c>position:relative</c> to their inline
-    /// styles so the renderer treats them as containing blocks for absolutely
-    /// positioned descendants.
+    /// <c>transform</c>, <c>will-change:transform</c>), adds <c>position:relative</c> to
+    /// their inline styles so the renderer treats them as containing blocks for absolutely
+    /// positioned descendants. Called only on the default (baked) path — in native mode the
+    /// Broiler.Layout engine resolves these containing blocks itself
+    /// (<see cref="EstablishesContainingBlock"/>'s engine mirror,
+    /// <c>CssBox.EstablishesNonPositionAbsPosContainingBlock</c>), so
+    /// <see cref="ResolveAnchorPositions"/> skips this pass entirely.
     /// </summary>
     private void EnsureContainingBlockPositioning(DomElement root) => EnsureContainingBlockPositioningTree(root);
 
@@ -31,15 +35,7 @@ public sealed partial class DomBridge
 
             if (!alreadyPositioned && EstablishesContainingBlock(props))
             {
-                // Native mode (P5.8d.2b transform/contain CB expansion): the Broiler.Layout
-                // engine now resolves transform/contain containing blocks natively
-                // (CssBox.FindPositionedContainingBlock under the lever), so the bridge no
-                // longer pre-bakes position:relative for them — removing that inline write
-                // from the native render path. A containing block established ONLY by
-                // will-change:transform stays on the bridge path (the engine does not project
-                // will-change onto the box).
-                if (!NativeAnchorPlacement || EstablishesContainingBlockViaWillChangeOnly(props))
-                    InlineStyle(el)["position"] = "relative";
+                InlineStyle(el)["position"] = "relative";
             }
         }
 
@@ -85,36 +81,5 @@ public sealed partial class DomBridge
             return true;
 
         return false;
-    }
-
-    /// <summary>
-    /// Whether the element (already known to <see cref="EstablishesContainingBlock"/>)
-    /// does so <em>only</em> through <c>will-change: transform</c> — it has no
-    /// <c>transform</c> and no containment (<c>contain: layout/paint/strict/content</c>).
-    /// The Broiler.Layout engine recognises transform/contain containing blocks natively
-    /// under the native-anchor lever but does not model <c>will-change</c>, so in native
-    /// mode only these will-change-only boxes still need the bridge's
-    /// <c>position:relative</c> pre-bake.
-    /// </summary>
-    private static bool EstablishesContainingBlockViaWillChangeOnly(Dictionary<string, string> props)
-    {
-        // Transform and containment are both resolved by the engine under the lever.
-        if (props.TryGetValue("transform", out var transform) &&
-            !string.IsNullOrWhiteSpace(transform) &&
-            !string.Equals(transform, "none", StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        if (props.TryGetValue("contain", out var contain) && !string.IsNullOrWhiteSpace(contain))
-        {
-            var containLower = contain.ToLowerInvariant();
-            if (containLower.Contains("layout") || containLower.Contains("paint") ||
-                containLower.Contains("strict") || containLower.Contains("content"))
-                return false;
-        }
-
-        // Reaches here only when EstablishesContainingBlock was already true and the reason
-        // is neither transform nor containment — i.e. will-change:transform.
-        return props.TryGetValue("will-change", out var willChange) &&
-               willChange.Contains("transform", StringComparison.OrdinalIgnoreCase);
     }
 }
