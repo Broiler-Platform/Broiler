@@ -207,12 +207,19 @@ public sealed partial class DomBridge
             && !NativePositionTryHandoffSupported(merged, positionTryRules))
             return false;
 
-        // Fixed / modal-dialog targets get a document-scroll adjustment the engine MVP
-        // does not apply — keep them baked.
+        // A NON-modal fixed target gets a document-scroll adjustment the engine MVP does not
+        // apply — keep it baked. A MODAL dialog (top-layer, UA position:fixed) IS handed off
+        // (P5.8d.2b modal-dialog anchor() expansion): on an anchor page document scroll uses
+        // the bridge DOM-shift (DocumentHasAnchorContent scopes out the native scroll), so the
+        // anchor's box geometry the engine reads already reflects the scroll and no adjustment
+        // is needed. The engine has no top-layer accessibility model, but it does not need one:
+        // the registered+`IsAnchorAccessible` check below keeps a modal target whose anchor is
+        // inaccessible (a succeeding top-layer anchor, or a non-modal target seeing a top-layer
+        // anchor) baked, so the engine only ever places a modal target against an accessible
+        // registered anchor.
         var position = merged.GetValueOrDefault("position");
-        if (position == "fixed")
-            return false;
-        if (GetElementRuntimeState(element).Dialog.Modal.TryGet(out var modal) && modal is true)
+        bool isModalDialog = GetElementRuntimeState(element).Dialog.Modal.TryGet(out var modal) && modal is true;
+        if (position == "fixed" && !isModalDialog)
             return false;
 
         // Every anchor()/anchor-size() must be an anchor() in a physical inset; any

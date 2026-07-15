@@ -2380,13 +2380,50 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   Zero regressions. Sticky's remaining bridge-only case is the **anchor page** (the anchor-scroll /
   position-visibility interaction still uses the bridge's DOM-shift).
 
+- **P5.8d.2b — modal-dialog `anchor()` placement (twenty-second expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-hixy7x`; **bridge only, additive, default-off**). Moves the
+  **pixel-relevant part of the 7 `anchor-position-top-layer-*` corpus tests** onto the engine — a top-layer
+  modal `<dialog>` positioned by `anchor()` insets against a scrolled anchor — and **corrects the
+  dialog/backdrop finding below** (which assumed this needed a modality/top-layer channel, `IsAnchorAccessible`
+  promoted into the engine, and the document-scroll model). It needs **none** of those:
+  - **The bridge DOM-shift already provides the scroll.** These are anchor pages, so document scroll uses the
+    bridge's DOM-shift (the twentieth expansion's native scroll is scoped to no-anchor pages); the anchor's box
+    geometry the engine reads already reflects the scroll, so the "document-scroll adjustment the engine MVP
+    does not do" — the stated reason modal targets were excluded — is unnecessary (the engine reads post-shift
+    geometry; the fixed modal target does not scroll). Empirically the engine places the target correctly with
+    zero adjustment.
+  - **The engine needs no top-layer accessibility model.** The bridge gate `IsMvpNativeAnchorInsetBox` already
+    requires every referenced anchor to be registered **and** `IsAnchorAccessible`, so an inaccessible-anchor
+    modal target (a succeeding top-layer anchor — `top-layer-006`; or a non-modal target seeing a top-layer
+    anchor — `top-layer-005`) stays **baked** with its correct fallback; the engine only ever places a modal
+    target against an accessible registered anchor (the `-001…-004`/`-007` cases). Confirmed by tracing: the
+    accessible cases resolve `--a` in the engine at the scrolled `(200,200)`; the inaccessible cases produce no
+    engine resolution.
+  - **`::backdrop` box-gen and the top-layer paint stay bridge/submodule but are pixel-irrelevant here** (every
+    test declares `dialog::backdrop { background: transparent }` and nothing overlaps), and the modal UA
+    `position:fixed` + dialog box styling stay on the bridge (a separate UA-stylesheet concern) — this slice
+    moves only the anchor *geometry*.
+
+  The single change is relaxing the `IsMvpNativeAnchorInsetBox` fixed/modal exclusion to admit a **modal
+  dialog** (`position:fixed` + `!isModalDialog` keeps a non-modal fixed target baked). Tests:
+  `Broiler.Wpt.Tests/NativeModalDialogAnchorWptTests.cs` (full render: a modal dialog anchored to a scrolled
+  abspos anchor lands at `(300,200)`; baked & native agree — so the corpus behaviour is locked into CI, since
+  the `top-layer-*` corpus otherwise runs only via the manual runner). Regression check: **all 7
+  `anchor-position-top-layer-*` tests pass lever-on** (now via the engine for the accessible cases);
+  **css-anchor-position default-off byte-identical (8-fail) and lever-on unchanged (6-fail, identical set)**;
+  the anchor-inset/combined/size/opposing/position-try/scroll Wpt (15) and the anchor/dialog Cli (10) suites
+  green. Zero regressions. The full dialog/backdrop feature (visible `::backdrop` scrims, top-layer paint over
+  overlapping content, popover UA box styling) remains the separate submodule effort the finding describes;
+  this slice takes only the anchor-geometry part the corpus actually exercises.
+
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
   CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
   ~~scroll simulation~~ → ~~`position-visibility`~~ → dialog/backdrop → ~~position-try (anchor()-inset handoff
   subset)~~ → ~~transform/contain/will-change containing blocks~~ → ~~combined `anchor()` + `anchor-size()`~~ →
-  ~~`position: sticky` (non-document scroll container)~~ → ~~document/page scroll~~ → ~~page-scroll sticky~~.
+  ~~`position: sticky` (non-document scroll container)~~ → ~~document/page scroll~~ → ~~page-scroll sticky~~ →
+  ~~modal-dialog `anchor()` (top-layer geometry)~~.
   (Childless auto/explicit/percentage sizing,
   `box-sizing:border-box`, percentage margin/padding/inset box props, shared-name scope resolution,
   writing-mode percentage basis, relatively-positioned inline containing blocks, `anchor()` physical insets,
@@ -2451,7 +2488,13 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
 
   **Finding — dialog/backdrop is scroll-dependent and anchor-entangled, NOT a standalone renderer feature
   (2026-07-15 deep investigation; corrects the earlier "renderer-submodule feature, no scroll dependency"
-  assessment below).** The only validation is 7 `anchor-position-top-layer-*` corpus tests, and reading them
+  assessment below).** *(Partly superseded — the twenty-second expansion above moved the pixel-relevant
+  anchor **geometry** of all 7 tests to the engine with a one-line gate change. The predicted prerequisites
+  were wrong: the bridge DOM-shift on an anchor page already supplies the scroll, so no engine document-scroll
+  adjustment is needed; and the bridge gate's existing `IsAnchorAccessible` check keeps inaccessible-anchor
+  targets baked, so no engine top-layer-accessibility model is needed. Only the visible-scrim / top-layer-paint
+  / UA-box-styling remains — a separate submodule effort, pixel-irrelevant for these particular tests.)* The
+  only validation is 7 `anchor-position-top-layer-*` corpus tests, and reading them
   overturns the earlier framing:
   - **The `::backdrop` scrim is pixel-irrelevant here.** Every one of the 7 tests declares
     `dialog::backdrop { background: transparent; }`, so the backdrop paints nothing — the assertion is the
@@ -2496,7 +2539,9 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   renderer effort, and all-or-nothing for parity (a partial port breaks the 7 passing tests). Best done as its
   own submodule feature, not folded into the lever-gated anchor cutover. Left on the bridge path.
 
-  Still bridge-only: dialog/backdrop, sticky's **anchor-page** case only (the non-document scroll-container
+  Still bridge-only: dialog/backdrop's **visible-scrim / top-layer-paint / UA-box-styling** part (its
+  anchor-*geometry* — the pixel-relevant part of the 7 top-layer corpus tests — is native as of the
+  twenty-second expansion), sticky's **anchor-page** case only (the non-document scroll-container
   case is native as of the nineteenth expansion and page/document-scroll sticky as of the twenty-first — the
   anchor page's anchor-scroll / position-visibility interaction keeps the bridge DOM-shift), the remaining
   entangled scroll case (anchor-scroll containers — the plain non-anchor container is native as of the
