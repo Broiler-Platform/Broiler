@@ -145,9 +145,13 @@ public sealed partial class DomBridge
             anchorRegistry, positionTryRules);
 
         // 5. Ensure fixed-position elements from CSS have explicit pixel
-        //    dimensions (the Broiler renderer does not resolve width/height
-        //    from opposing inset values).
-        ResolveFixedPositionSizing(viewportWidth, viewportHeight);
+        //    dimensions from opposing inset values (e.g. top:0;bottom:0). Native mode (P5.8d.2b)
+        //    relies on the Broiler.Layout engine, which resolves this natively (CSS2.1 §10.3.7,
+        //    incl. the fixed→viewport containing block and the `inset` shorthand — verified to
+        //    agree with this pre-bake), so the bridge pass is redundant and skipped, removing its
+        //    inline width/height/inset writes.
+        if (!NativeAnchorPlacement)
+            ResolveFixedPositionSizing(viewportWidth, viewportHeight);
 
         // 6. Ensure elements that establish containing blocks via non-position
         //    properties (contain:layout, transform) get position:relative so the

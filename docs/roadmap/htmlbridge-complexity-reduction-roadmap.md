@@ -2110,6 +2110,19 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   Regression check: default-off byte-identical; **lever-on the css-anchor-position subset is unchanged (6 fails,
   identical set)** and `anchor-center-scroll-001` (its one corpus render test) improves **99.4 %→100 %** — the
   native centring is exact where the bridge estimator was a hair off. Zero regressions.
+- **P5.8d.2b — fixed-position sizing (fifteenth expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-9m00kh`; bridge only, additive, default-off). The bridge's
+  `ResolveFixedPositionSizing` pass — which pre-baked inline `width`/`height` on `position:fixed` boxes
+  from opposing insets (`top:0;bottom:0` → full height) — is now **redundant** and skipped in native mode:
+  the Broiler.Layout engine already resolves it natively (CSS2.1 §10.3.7, including the fixed→viewport
+  containing block via `FixedPositioningViewport()` and the `inset` shorthand), producing the identical
+  size, so gating the pass cannot visually regress. This is the first *general* (non-anchor) AnchorResolver
+  pass shown redundant and removed, not re-implemented. Tests: `Broiler.Cli.Tests/NativeFixedSizingTests.cs`
+  (the engine sizes a fixed opposing-inset box and the `inset` shorthand to 740×560 in an 800×600 viewport;
+  native mode leaves the box un-baked while default mode bakes inline width/height). Regression check:
+  default-off byte-identical; **lever-on the css-anchor-position subset is unchanged (6 fails, identical
+  set)** — the `position-fixed` anchor tests still pass. (This WPT checkout has no non-anchor fixed-element
+  corpus; the redundancy is proven by the engine-vs-bridge agreement.) Zero regressions.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
