@@ -67,6 +67,17 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (box.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed || box.ParentBox == null)
                 return box;
 
+            // Native anchor mode (P5.8d.2b transform/contain CB expansion): a box that
+            // establishes a containing block for absolutely-positioned descendants through a
+            // non-position property — a non-none transform (CSS Transforms 1 §4) or
+            // contain: layout/paint/strict/content (CSS Containment §2) — is that containing
+            // block. On the baked path the bridge's EnsureContainingBlockPositioning pre-bakes
+            // position:relative onto the same boxes, so the position check above already
+            // returns them; recognising them here lets native mode drop that pre-bake. Gated
+            // by the native-anchor lever so default-off layout is byte-identical.
+            if (NativeAnchorPlacement.Enabled && box.EstablishesNonPositionAbsPosContainingBlock())
+                return box;
+
             // RF-BRIDGE-1b Track 3.2: a nested browsing context's sub-viewport
             // (#subdoc-root) is the initial containing block for its subtree, so an
             // absolutely-positioned descendant with no positioned ancestor resolves
@@ -88,6 +99,32 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     }
 
     private bool IsInitialContainingBlock(CssBox cb) => cb.ParentBox == null && LayoutEnvironment != null;
+
+    /// <summary>
+    /// Whether this box establishes a containing block for absolutely-positioned
+    /// descendants through a property other than <c>position</c> — a non-<c>none</c>
+    /// <c>transform</c> (CSS Transforms 1 §4) or a <c>contain</c> value of
+    /// <c>layout</c>/<c>paint</c>/<c>strict</c>/<c>content</c> (CSS Containment §2).
+    /// Mirrors the subset of the bridge's <c>EstablishesContainingBlock</c> that the engine
+    /// models natively; <c>will-change</c> is not projected onto the box, so a
+    /// will-change-only containing block stays on the bridge path. Consulted by
+    /// <see cref="FindPositionedContainingBlock"/> only under the native-anchor lever.
+    /// </summary>
+    internal bool EstablishesNonPositionAbsPosContainingBlock()
+    {
+        if (!string.IsNullOrWhiteSpace(Transform)
+            && !string.Equals(Transform, "none", System.StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (!string.IsNullOrWhiteSpace(Contain))
+        {
+            var c = Contain.ToLowerInvariant();
+            if (c.Contains("layout") || c.Contains("paint") || c.Contains("strict") || c.Contains("content"))
+                return true;
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// RF-BRIDGE-1b Track 3.2: the viewport a <c>position:fixed</c> descendant of this

@@ -619,6 +619,105 @@ public sealed class NativeAnchorPlacementTests
     }
 
     // ------------------------------------------------------------------
+    // transform / contain containing block (P5.8d.2b transform/contain CB expansion)
+    // ------------------------------------------------------------------
+
+    // CB 200×200 at (100,100) that establishes an abspos containing block through a
+    // NON-position property (the caller sets Transform or Contain); it is NOT
+    // position:relative. Anchor --a is a 20×20 box at (140,140) → right/bottom (160,160).
+    // Returns a childless auto-size (fill-the-cell) bottom-right target at the origin: when
+    // the CB is recognised, the box fills the [160..300]×[160..300] cell (140×140 at
+    // (160,160)); when it is NOT, the containing block climbs to the 1000×1000 root and the
+    // box fills the far larger [160..1000]² cell — so the used SIZE discriminates the two.
+    private static (CssBox root, CssBox cb) NonPositionCbFixture(out CssBox target)
+    {
+        var root = Box(null, new PointF(0, 0), new SizeF(1000, 1000));
+        root.Display = "block"; // so an abspos box climbing to the root resolves the viewport
+                                //  (not the root's inline bounding box), discriminating the two paths
+        var cb = Box(root, new PointF(100, 100), new SizeF(200, 200));
+        cb.Display = "block"; // a real (non-inline) block, but NOT positioned
+        var anchor = Box(cb, new PointF(140, 140), new SizeF(20, 20));
+        anchor.AnchorName = "--a";
+        target = Box(cb, new PointF(0, 0), new SizeF(0, 0));
+        target.Position = "absolute";
+        target.PositionArea = "bottom right";
+        target.PositionAnchor = "--a";
+        return (root, cb);
+    }
+
+    [Theory]
+    [InlineData("translateX(10px)", "none")]
+    [InlineData("rotate(5deg)", "none")]
+    [InlineData("none", "layout")]
+    [InlineData("none", "paint")]
+    [InlineData("none", "strict")]
+    [InlineData("none", "content")]
+    public void Pass_TransformOrContainCb_IsResolvedNatively_WhenFlagOn(string transform, string contain)
+    {
+        var (root, cb) = NonPositionCbFixture(out var target);
+        cb.Transform = transform;
+        cb.Contain = contain;
+
+        try
+        {
+            NativeAnchorPlacement.Enabled = true;
+            CssBox.RunNativeAnchorPlacement(root);
+        }
+        finally { NativeAnchorPlacement.Enabled = false; }
+
+        // The CB is the 200×200 box at (100,100), so the bottom-right cell is
+        // [160..300]×[160..300] = 140×140 at (160,160) — not the root-based cell.
+        Assert.Equal(160, target.Location.X, 3);
+        Assert.Equal(160, target.Location.Y, 3);
+        Assert.Equal(140, target.Size.Width, 3);
+        Assert.Equal(140, target.Size.Height, 3);
+    }
+
+    [Fact]
+    public void Pass_PlainStaticCb_ClimbsToRoot_NotRecognizedAsContainingBlock()
+    {
+        // Control: a plain static block (no transform, no containment) does NOT establish an
+        // abspos containing block, so the target resolves against the 1000×1000 root and
+        // fills the far larger [160..1000]² cell — proving the transform/contain recognition
+        // above is what binds the box to the inner block.
+        var (root, cb) = NonPositionCbFixture(out var target);
+        _ = cb;
+
+        try
+        {
+            NativeAnchorPlacement.Enabled = true;
+            CssBox.RunNativeAnchorPlacement(root);
+        }
+        finally { NativeAnchorPlacement.Enabled = false; }
+
+        Assert.Equal(160, target.Location.X, 3);
+        Assert.Equal(160, target.Location.Y, 3);
+        Assert.Equal(840, target.Size.Width, 3);
+        Assert.Equal(840, target.Size.Height, 3);
+    }
+
+    [Theory]
+    [InlineData("none", "none", false)]
+    [InlineData("translateX(1px)", "none", true)]
+    [InlineData("rotate(1deg)", "none", true)]
+    [InlineData("", "none", false)]
+    [InlineData("none", "layout", true)]
+    [InlineData("none", "paint", true)]
+    [InlineData("none", "strict", true)]
+    [InlineData("none", "content", true)]
+    [InlineData("none", "size", false)]       // size containment alone does not establish a CB
+    [InlineData("none", "", false)]
+    public void EstablishesNonPositionAbsPosContainingBlock_MirrorsBridgePredicate(
+        string transform, string contain, bool expected)
+    {
+        var root = Box(null, new PointF(0, 0), new SizeF(100, 100));
+        var b = Box(root, new PointF(0, 0), new SizeF(10, 10));
+        b.Transform = transform;
+        b.Contain = contain;
+        Assert.Equal(expected, b.EstablishesNonPositionAbsPosContainingBlock());
+    }
+
+    // ------------------------------------------------------------------
     // @position-try fallback (P5.8d.2b position-try expansion)
     // ------------------------------------------------------------------
 

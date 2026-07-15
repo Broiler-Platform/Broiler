@@ -156,6 +156,11 @@ public sealed partial class DomBridge
         // 6. Ensure elements that establish containing blocks via non-position
         //    properties (contain:layout, transform) get position:relative so the
         //    Broiler renderer treats them as containing blocks for abspos children.
+        //    Native mode (P5.8d.2b transform/contain CB expansion): the Broiler.Layout
+        //    engine now resolves transform/contain containing blocks natively
+        //    (CssBox.FindPositionedContainingBlock under the lever), so the transform/contain
+        //    position:relative pre-bake is dropped; only a will-change-only containing block
+        //    still needs it (the engine does not model will-change).
         EnsureContainingBlockPositioning(DocumentElement);
 
         // 7. Strip CSS rules with unsupported properties (anchor(), inset,
