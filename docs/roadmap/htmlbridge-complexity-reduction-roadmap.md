@@ -2109,6 +2109,41 @@ pre-`position:relative` CB view exactly — e.g. compute the anchor-visibility C
 (pre-native) positioning, or drive the whole hiding decision from a snapshot the bridge hands to the
 engine — before the bridge's `ResolvePositionVisibility` can be skipped. Left on the bridge path for now.
 
+**Root cause proven (2026-07-15) — the two cases are indistinguishable in the final DOM the engine sees.**
+Empirically: `position-visibility-anchors-visible.html` (a **static** scroll container that becomes the
+target's position-area CB) references a render where the target is **hidden**; `-with-position.html` (an
+**authored `position:relative`** scroll container) references one where the target is **shown**. The *only*
+difference is the scroller's authored `position`. In native mode the bridge injects inline `position:relative`
+on the static scroller (for placement + the scroll-simulation expansion), so **both** documents reach the
+engine with the scroller `position:relative` — the box tree, the CB chain, and the box-tree ancestry are then
+identical for the two, yet they require opposite visibility results. No amount of engine-side geometry can
+separate them from the final DOM alone; the authored distinction has been erased. (The engine also has **no
+scroll-offset property** — scroll is modelled only by the bridge's `ApplyScrollSimulation` DOM-shift — so the
+visibility geometry must be read from shifted box positions + `overflow` clip rects, not a scroll value.)
+
+**Actionable design for the port (so a future focused effort can execute it):**
+1. **Signal the anchor-induced CB.** When the bridge applies deferred `position:relative` to a *previously
+   unpositioned* scroll container (`scrollContainersNeedingRelative`, step 3e), in native mode also stamp a
+   benign metadata attribute (e.g. `data-broiler-anchor-cb`) on it. This is the one bit the engine cannot
+   re-derive; an authored-`relative` scroller (`-with-position`) is *not* stamped, so the two cases separate.
+2. **Engine visibility pass.** Project `position-visibility` onto `CssBox`; in the anchor post-pass, for each
+   anchor-positioned target compute anchor visibility over the box tree — `visibility:hidden` inheritance, and
+   whether the anchor's (scroll-shifted) border box lies within the visible clip rect of each `overflow`-clipping
+   ancestor that is an ancestor of the anchor but **not** of the target's CB — where a `data-broiler-anchor-cb`
+   scroller is treated as **not** the CB (i.e. still intervening), reproducing the bridge's pre-`position:relative`
+   view. Hide by suppressing the box (`Display = "none"` is honoured at `CssBox.cs:655`, but verify a post-layout
+   set actually removes it from paint; otherwise add a paint-skip flag).
+3. **Skip the bridge pass in native mode**, deleting the `InlineStyle(el)["display"]="none"` write (the Phase 4
+   item-2 concern). Default-off keeps `ResolvePositionVisibility` byte-identical.
+4. **Parity bar:** all **14** `position-visibility` corpus tests pass default-off today, so the port must keep
+   14/14 lever-on (chained-001/002/003, both/position-fixed, css-visibility, stacked-child, after-scroll-out,
+   anchors-valid, initial, and the static/relative/JS-override scroller trio). This is the hard part — the
+   bridge uses *estimated* offsets (`ComputeNaturalOffsetInContainer`) while the engine has real geometry, so
+   each case must be re-validated, not assumed.
+This is a coordinated re-architecture (a new bridge→engine metadata channel + a geometric visibility pass +
+14-test parity), not a behaviour-preserving extraction — larger than one slice, and still zero corpus gain.
+Left on the bridge path.
+
 **Finding — `position-try` needs the `@position-try` rules plumbed into the engine first (2026-07-14
 assessment).** The bridge's `TryApplyFallback` (`PositionTry.cs`) selects a fallback by (1) reading the
 box's already-**baked** base `left`/`top`/`width`/`height` inline styles, (2) testing overflow, then (3)
