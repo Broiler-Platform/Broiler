@@ -2233,8 +2233,11 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   lacks it, so a port is engine-layout work, not a bridge extraction, and it affects *all* pages (not just
   anchor pages) so the eventual production flip carries broad risk. Verified engine gaps:
   `ResolveStickyPositioning` (no `position:sticky` in the engine), `ApplyVisualViewportSerializationState`
-  (no pinch-zoom / `zoom`), and `InsertDialogBackdrops`/`ApplyDialogUAPositioning` (no top-layer painting).
-  Each is its own engine feature + broad-corpus parity effort, larger than a lever-gated slice.
+  (no pinch-zoom / `zoom`), and `InsertDialogBackdrops`/`ApplyDialogUAPositioning` (whose 7 validation tests
+  turn out to be a **scroll-dependent, anchor-entangled modal-dialog path** — a transparent backdrop, modal
+  UA positioning, `anchor()` insets, `IsAnchorAccessible`, and a document-scroll adjustment — NOT the
+  standalone renderer feature first assumed; see the corrected finding below). Each is its own engine feature +
+  broad-corpus parity effort, larger than a lever-gated slice.
   **`ApplyScrollSimulation` now has a native FIRST INCREMENT (seventeenth expansion below): the engine has a
   scroll-offset post-pass (`CssBox.RunScrollSimulation`), and the bridge hands off non-document scroll
   containers on no-anchor pages to it — so that case renders with no DOM-shift wrapper / inline writes. The
@@ -2264,8 +2267,38 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   position-visibility interaction that reproduces the flow-vs-paint hiding bug) are unbuilt.** Left on the
   bridge path.
 
-  **Finding — dialog/backdrop is a renderer-submodule feature, not a parent-repo post-pass slice (2026-07-15
-  investigation).** It *is* validatable — 7 `anchor-position-top-layer-*` corpus tests, all passing — and has
+  **Finding — dialog/backdrop is scroll-dependent and anchor-entangled, NOT a standalone renderer feature
+  (2026-07-15 deep investigation; corrects the earlier "renderer-submodule feature, no scroll dependency"
+  assessment below).** The only validation is 7 `anchor-position-top-layer-*` corpus tests, and reading them
+  overturns the earlier framing:
+  - **The `::backdrop` scrim is pixel-irrelevant here.** Every one of the 7 tests declares
+    `dialog::backdrop { background: transparent; }`, so the backdrop paints nothing — the assertion is the
+    anchored dialog's *position* (a lime box). So `::backdrop` box-generation, while genuinely absent from the
+    renderer, is **not what these tests validate**, and there is **no standalone dialog/backdrop corpus** in
+    this checkout to validate the visible-scrim path against. (The renderer *does* already generate
+    pseudo-element boxes — `ApplyPseudoElementBoxes`/`CreatePseudoElementBox` for `::before`/`::after`,
+    `DomParser.cs:363` — so `::backdrop` box-gen would *extend* that machinery, not build it from scratch;
+    but it is unneeded for parity here.)
+  - **What the tests actually exercise is a modal-dialog native-anchor path.** They `showModal()` a
+    `<dialog>` and anchor it with `anchor()` insets (`top: anchor(top); left: anchor(right)`), then
+    `document.scrollingElement.scrollTop = 100` with `body { height: 300vh }`. The pixel-relevant behaviour is
+    (a) modal-dialog UA positioning (`position:fixed`, `ApplyDialogUAPositioning`), (b) `anchor()`-inset
+    placement, (c) **anchor accessibility** (`IsAnchorAccessible` — a top-layer-order rule deciding whether a
+    target may see a given anchor; this is the actual subject of tests 003–006), and (d) a **document-scroll
+    adjustment** for the fixed/modal target.
+  - **It is therefore blocked behind the scroll model, like sticky — not independent of it.** Modal dialogs
+    are deliberately **excluded** from the native `anchor()`-inset handoff (`IsMvpNativeAnchorInsetBox`,
+    `AnchorFunctions.cs:204`) precisely because *"fixed / modal-dialog targets get a document-scroll adjustment
+    the engine MVP does not do"* (`AnchorFunctions.cs:199`), and the tests page-scroll. So a native port needs
+    the engine scroll model (the seventeenth expansion's first increment, not yet the document-scroll case)
+    **plus** a modality/top-layer runtime-state channel **plus** `IsAnchorAccessible` promoted into the
+    engine's `AnchorRegistry`. It is a coordinated anchor-machinery + scroll effort, not a renderer-submodule
+    box-gen slice — and all-or-nothing for the 7 tests. Left on the bridge path; correct sequence is scroll
+    model first, then the modal-dialog anchor path (which also delivers dialog/backdrop's pixel-relevant part).
+  The original (now-superseded) renderer-submodule framing is kept below for context.
+
+  **(Superseded) Finding — dialog/backdrop as a renderer-submodule feature (2026-07-15).** It *is*
+  validatable — 7 `anchor-position-top-layer-*` corpus tests, all passing — and has
   no scroll dependency, so unlike sticky it is not blocked; but it is the largest category-2 item and is
   structurally different from the anchor slices, which were pure post-layout *repositioning* in the parent-repo
   engine. The bridge's `ApplyDialogUAPositioning`/`ApplyPopoverUAPositioning`/`InsertDialogBackdrops` do four
