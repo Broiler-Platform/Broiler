@@ -93,8 +93,12 @@ public sealed partial class DomBridge
         ResolvePositionTryFallbacks(DocumentElement, anchorRegistry, positionTryRules);
 
         // 3c. Resolve position-visibility: hide anchor-positioned elements
-        //     whose anchor is not visible or does not exist.
-        ResolvePositionVisibility(DocumentElement, anchorRegistry);
+        //     whose anchor is not visible or does not exist. Native mode (P5.8d.2b) resolves
+        //     this in the Broiler.Layout engine post-pass instead (CssBox.ResolvePositionVisibility),
+        //     so the bridge stops writing display:none; the scroll-container marker stamped in
+        //     step 3e gives the engine the pre-position:relative CB view the decision needs.
+        if (!NativeAnchorPlacement)
+            ResolvePositionVisibility(DocumentElement, anchorRegistry);
 
         // 3d. Apply deferred DOM moves (inline CB → block ancestor promotion).
         //     Must be done after all position-area resolution is complete
@@ -121,7 +125,15 @@ public sealed partial class DomBridge
                 (scPos == "relative" || scPos == "absolute" ||
                  scPos == "fixed" || scPos == "sticky");
             if (!alreadyPositioned)
+            {
                 InlineStyle(sc)["position"] = "relative";
+                // Native mode: mark this scroller so the engine's position-visibility pass knows
+                // its position:relative is anchor-induced (not authored) and must still count as an
+                // intervening clip container — reproducing the bridge's pre-position:relative CB
+                // view without which a static-scroller target would be wrongly kept visible.
+                if (NativeAnchorPlacement)
+                    SetAttr(sc, "data-broiler-anchor-cb", "1");
+            }
         }
 
         // 4. Insert backdrop elements for modal dialogs.

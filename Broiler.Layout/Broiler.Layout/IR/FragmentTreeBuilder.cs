@@ -38,7 +38,15 @@ internal static class FragmentTreeBuilder
         if (!contentHidden)
         {
             foreach (var child in box.Boxes)
+            {
+                // position-visibility (P5.8d.2b): the native anchor post-pass sets
+                // PositionHidden on an anchor-positioned box whose anchor is not visible.
+                // Exclude it (and its subtree) from the paint tree after layout — the
+                // engine equivalent of the bridge writing display:none.
+                if (child.PositionHidden)
+                    continue;
                 children.Add(BuildFragment(child, hasTransformAncestor));
+            }
         }
 
         List<LineFragment>? lines = null;

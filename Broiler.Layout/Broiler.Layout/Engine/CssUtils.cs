@@ -96,6 +96,7 @@ internal static partial class CssUtils
             "position-area" => cssBox.PositionArea,
             "position-try" => cssBox.PositionTry,
             "position-try-fallbacks" => cssBox.PositionTryFallbacks,
+            "position-visibility" => cssBox.PositionVisibility,
             "line-height" => cssBox.LineHeight,
             "vertical-align" => cssBox.VerticalAlign,
             "text-indent" => cssBox.TextIndent,
@@ -594,6 +595,9 @@ internal static partial class CssUtils
                 break;
             case "position-try-fallbacks":
                 cssBox.PositionTryFallbacks = value;
+                break;
+            case "position-visibility":
+                cssBox.PositionVisibility = value;
                 break;
             case "line-height":
                 cssBox.LineHeight = value;

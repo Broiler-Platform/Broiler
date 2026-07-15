@@ -33,6 +33,9 @@ partial class CssBox
         if (registry.Count == 0)
             return;
         ApplyNativeAnchorPlacement(root, registry);
+        // position-visibility (P5.8d.2b): hide anchor-positioned targets whose anchor is not
+        // visible. Runs after placement so the anchor's final (scroll-shifted) geometry is known.
+        ResolvePositionVisibility(root, registry);
     }
 
     /// <summary>

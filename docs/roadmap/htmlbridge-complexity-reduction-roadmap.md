@@ -2060,18 +2060,55 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   `NativeAnchorPlacement`); **lever-on improves 7-fail → 6-fail** — `position-try-grid-001` (an anchor()-inset
   + position-try test) now goes native and **passes**, with **zero regressions** (JSON failure-set diff:
   `{+position-try-grid-001}`, nothing removed). This is the **first corpus position-try test to go native**.
+- **P5.8d.2b — `position-visibility` (thirteenth expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-9m00kh`; Broiler.Layout + bridge, both parent-repo, additive,
+  default-off). The **first non-placement, non-position-try bridge pass moved to the engine**, and the
+  resolution of the finding below (which had said "left on the bridge path"). An anchor-positioned target
+  whose anchor is not visible is now hidden by the Broiler.Layout engine's post-pass
+  (`CssBox.ResolvePositionVisibility`) instead of the bridge writing `display:none` — the roadmap's target
+  behaviour for the Phase 4 item-2 unblock. Landed:
+  - **Engine.** `position-visibility` is projected onto `CssBox` (default sentinel **`"normal"`** = unset, so
+    an unset position-area target takes the implicit anchors-visible — `position-visibility-initial` — while an
+    explicit `always` never hides — `-remove-anchors-visible`). A new `CssBox.Visibility.cs` pass walks each
+    target: authored `visibility:hidden` inheritance, a hidden (`PositionHidden`) subtree (chained anchors), a
+    fixed anchor (never clipped), and otherwise whether the anchor is scrolled out of an **intervening** clip
+    container — a clip ancestor of the anchor that is not the target's (visibility) containing block.
+    `anchors-valid` hides when no `position-anchor`/`anchor()` names a registered anchor. Hiding uses a new
+    post-layout `CssBox.PositionHidden` flag that `FragmentTreeBuilder` excludes from the paint tree (no
+    `display:none` — `display:none` is only honoured *during* layout).
+  - **The CB-ordering fix (the reverted-attempt blocker).** The bridge decides visibility *before* it applies
+    anchor-induced `position:relative` to a scroll-container CB, so a **static** scroller's scrolled-out anchor
+    hides its target while an authored **`position:relative`** scroller's does not — but both reach the engine
+    with the scroller `position:relative`. The bridge now stamps `data-broiler-anchor-cb` on scrollers it makes
+    relative (step 3e) **and** on the scroll-simulation offset wrapper; the engine's visibility CB skips stamped
+    boxes, so a stamped (anchor-induced) scroller stays intervening while an authored-relative scroller is the CB
+    → the two cases separate. A second marker, `data-broiler-scroll-hidden`, tags the `visibility:hidden` the
+    scroll simulation injects to clip scrolled-out content, so the engine treats it as "scrolled out" (subject to
+    the CB exception) rather than authored `visibility:hidden`. (Also: the engine's clip-container test now
+    recognises the two-value `overflow: hidden scroll` shorthand the cascade stores un-normalised.)
+  - **Bridge.** `ResolvePositionVisibility` is skipped in native mode (deleting the `InlineStyle["display"]="none"`
+    write); the two markers are stamped only in native mode.
+  Tests: `Broiler.Wpt.Tests/NativePositionVisibilityWptTests.cs` (full render: static scroller hides the target,
+  authored-relative scroller shows it, baked & native agree). Regression check: **all 14 `position-visibility`
+  corpus tests pass lever-on** (they passed via the bridge before; now via the engine — chained-001/002/003,
+  both/position-fixed, css-visibility, stacked-child ×2, after-scroll-out, anchors-valid, initial, and the
+  static/relative/JS-override scroller trio) and **default-off (14/14, byte-identical)**; the full
+  css-anchor-position subset is **byte-identical default-off (31/8)** and **lever-on unchanged (6 fails, identical
+  set — zero regressions)**. Full `Broiler.Layout.Tests` (156, the pre-existing environmental arch-guard fail
+  identical on baseline) and the Cli/Wpt anchor suites green. Zero corpus gain (a parity move), but it removes the
+  position-visibility `display:none` DOM write from the bridge's render path.
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
   CB)~~ → ~~`anchor()` insets~~ → ~~`anchor-size()`~~ → ~~opposing-inset sizing~~ → ~~abspos-inline CB~~ →
-  ~~scroll simulation~~ → `position-visibility` → dialog/backdrop → ~~position-try (anchor()-inset handoff
+  ~~scroll simulation~~ → ~~`position-visibility`~~ → dialog/backdrop → ~~position-try (anchor()-inset handoff
   subset)~~. (Childless auto/explicit/percentage sizing, `box-sizing:border-box`, percentage
   margin/padding/inset box props, shared-name scope resolution, writing-mode percentage basis,
   relatively-positioned inline containing blocks, `anchor()` physical insets, `anchor-size()` sizing,
-  opposing-inset sizing, abspos-inline containing blocks, intervening scroll containers, AND the
-  anchor()-inset `@position-try` fallback subset now land natively — see the twelve expansions above.)
-  Still bridge-only: `position-visibility` (blocked by the scroll-container CB ordering, see the finding
-  below), dialog/backdrop, and the opposing-inset / auto-min-content-sized position-try bases (the engine's
+  opposing-inset sizing, abspos-inline containing blocks, intervening scroll containers, the
+  anchor()-inset `@position-try` fallback subset, AND `position-visibility` now land natively — see the
+  thirteen expansions above.)
+  Still bridge-only: dialog/backdrop and the opposing-inset / auto-min-content-sized position-try bases (the engine's
   `TryApplyPositionTryFallback` supports these geometries but the bridge gate keeps them baked pending per-case
   parity). **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler
   clamps an explicit position-area size to the grid cell (P5.5 `PositionAreaGrid.ResolveElementBox`) and a
@@ -2087,6 +2124,12 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
   item-2 unblock** — once every feature is on the engine path.
+
+**Finding — `position-visibility` is entangled with the scroll-container CB decision — RESOLVED 2026-07-15
+(see the thirteenth expansion above; the design below was executed and all 14 corpus tests pass lever-on).**
+The `data-broiler-anchor-cb` marker (on both the anchor-induced-relative scroller and the scroll-sim wrapper)
+plus a `data-broiler-scroll-hidden` marker for the sim's injected `visibility:hidden` gave the engine exactly
+the pre-`position:relative` CB view the decision needs. The original analysis is kept below for context.
 
 **Finding — `position-visibility` is entangled with the scroll-container CB decision (2026-07-14
 investigation; the naive engine port was tried and reverted after two lever-on regressions).** A native

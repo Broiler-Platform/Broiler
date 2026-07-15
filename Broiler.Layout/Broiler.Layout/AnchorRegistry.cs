@@ -110,6 +110,29 @@ public sealed class AnchorRegistry
     public bool TryResolveRect(string anchorName, Func<object?, bool>? inScope, out AnchorRect rect)
         => TryResolve(anchorName, inScope, out rect);
 
+    /// <summary>Whether the name has at least one registered candidate.</summary>
+    public bool Contains(string anchorName) => _anchors.ContainsKey(anchorName);
+
+    /// <summary>
+    /// Resolves the acceptable anchor's registered <b>scope token</b> for a query (the source
+    /// box the caller passed to <see cref="Register"/>), using the same scope binding as the rect
+    /// resolution. Lets the position-visibility pass reach the anchor's own box (to test whether
+    /// it is scrolled out / <c>visibility:hidden</c>). Returns <c>null</c> when unregistered or
+    /// the token is not of type <typeparamref name="T"/>.
+    /// </summary>
+    public T? ResolveScope<T>(string anchorName, Func<object?, bool>? inScope) where T : class
+    {
+        if (!_anchors.TryGetValue(anchorName, out var list) || list.Count == 0)
+            return null;
+        (AnchorRect Rect, object? Scope)? chosen = null;
+        if (inScope != null && list.Count > 1)
+            foreach (var c in list)
+                if (inScope(c.Scope))
+                    chosen = c;
+        chosen ??= list[^1];
+        return chosen.Value.Scope as T;
+    }
+
     /// <summary>
     /// Resolves the <c>position-area</c> grid cell for an anchored box against the
     /// named anchor (in the query's scope, per <paramref name="inScope"/>) and the box's
