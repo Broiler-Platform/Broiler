@@ -62,4 +62,42 @@ public sealed class AnchorInsetLiveGeometryTests
         Assert.Equal(70, Read(context, "document.getElementById('r').offsetLeft"), 3);
         Assert.Equal(80, Read(context, "document.getElementById('r').offsetTop"), 3);
     }
+
+    // #a anchor 50×70; #s sized by anchor-size(); #p adds padding+border in content-box.
+    private const string SizeHtml = @"<!DOCTYPE html><html><head><style>
+  #cb { position: relative; width: 400px; height: 400px; }
+  #a  { position: absolute; left: 100px; top: 100px; width: 50px; height: 70px; anchor-name: --a; }
+  #s  { position: absolute; position-anchor: --a; left: 0; top: 0;
+        width: anchor-size(--a width); height: anchor-size(--a height); }
+  #p  { position: absolute; position-anchor: --a; left: 0; top: 0;
+        width: anchor-size(--a width); height: anchor-size(--a height);
+        padding: 10px; border: 5px solid; }
+</style></head><body>
+  <div id='cb'><div id='a'></div><div id='s'></div><div id='p'></div></div>
+</body></html>";
+
+    [Fact]
+    public void AnchorSize_LiveDimensions_ResolveToAnchorSize()
+    {
+        using var context = new JSContext();
+        new DomBridge().Attach(context, SizeHtml, "file:///anchor-size-live.html");
+
+        // #s: content-box, no padding/border → offset size == the anchor's 50×70.
+        Assert.Equal(50, Read(context, "document.getElementById('s').offsetWidth"), 3);
+        Assert.Equal(70, Read(context, "document.getElementById('s').offsetHeight"), 3);
+        // getBoundingClientRect agrees.
+        Assert.Equal(50, Read(context, "document.getElementById('s').getBoundingClientRect().width"), 3);
+        Assert.Equal(70, Read(context, "document.getElementById('s').getBoundingClientRect().height"), 3);
+    }
+
+    [Fact]
+    public void AnchorSize_ContentBox_AddsPaddingAndBorderToBorderBox()
+    {
+        using var context = new JSContext();
+        new DomBridge().Attach(context, SizeHtml, "file:///anchor-size-live.html");
+
+        // #p: content-box 50×70 + padding 10 each side (20) + border 5 each side (10) = 80×100.
+        Assert.Equal(80, Read(context, "document.getElementById('p').offsetWidth"), 3);
+        Assert.Equal(100, Read(context, "document.getElementById('p').offsetHeight"), 3);
+    }
 }

@@ -137,4 +137,80 @@ public sealed partial class DomBridge
 
         return (offsetLeft, offsetTop);
     }
+
+    /// <summary>
+    /// Resolves the live border-box <c>offsetWidth</c>/<c>offsetHeight</c> of a box whose
+    /// <c>width</c>/<c>height</c> use <c>anchor-size()</c>, or <c>null</c> when it has no such
+    /// dimension. Each axis component is <c>null</c> when that axis is not <c>anchor-size()</c>-sized
+    /// (the caller keeps the shared snapshot for it). Like the render bake
+    /// (<see cref="ResolveAnchorSizeFunctions"/>), the resolved value is the anchor's frame-independent
+    /// dimension via <c>AnchorGeometry.ResolveSize</c>; it is the used <em>content</em> size, so for the
+    /// default <c>content-box</c> sizing the axis's padding + border is added to report the border box
+    /// (a <c>border-box</c> box reports the resolved value directly).
+    /// </summary>
+    internal (double? width, double? height)? ResolveAnchorSizeForElement(DomElement element)
+    {
+        var cssProps = CollectMatchedRuleProperties(element);
+        foreach (var kv in InlineStyle(element))
+            cssProps[kv.Key] = kv.Value;
+
+        string width = cssProps.GetValueOrDefault("width") ?? string.Empty;
+        string height = cssProps.GetValueOrDefault("height") ?? string.Empty;
+
+        static bool HasAnchorSize(string v) => v.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase);
+        if (!HasAnchorSize(width) && !HasAnchorSize(height))
+            return null;
+
+        var anchorRegistry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);
+        BuildAnchorRegistry(anchorRegistry);
+        BuildInlineAnchorRegistry(anchorRegistry);
+
+        string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor");
+
+        double? ResolveContentPx(string value)
+        {
+            bool resolvable = true;
+            var rewritten = AnchorFunction.RewriteSize(value, r =>
+            {
+                var name = string.IsNullOrEmpty(r.Name) ? (implicitAnchor ?? string.Empty) : r.Name!;
+                if (!anchorRegistry.TryGetValue(name, out var anchor))
+                {
+                    resolvable = false;
+                    return "0px";
+                }
+                return AnchorGeometry.ResolveSize(r.Dimension, anchor.Width, anchor.Height)
+                    .ToString(CultureInfo.InvariantCulture) + "px";
+            });
+            return resolvable ? TryParsePx(rewritten) : null;
+        }
+
+        // Padding / border come from the computed longhands (the `padding`/`border` shorthands
+        // are not expanded in the matched-rule map), so the content→border-box conversion below
+        // matches the used box the renderer would paint for the baked content width.
+        var computed = GetComputedProps(element);
+        bool borderBox = string.Equals(
+            (computed.GetValueOrDefault("box-sizing") ?? string.Empty).Trim(),
+            "border-box", StringComparison.OrdinalIgnoreCase);
+
+        double AxisPaddingBorder(string padStart, string padEnd, string borderStart, string borderEnd) =>
+            (TryParsePx(computed.GetValueOrDefault(padStart)) ?? 0)
+            + (TryParsePx(computed.GetValueOrDefault(padEnd)) ?? 0)
+            + (TryParsePx(computed.GetValueOrDefault(borderStart)) ?? 0)
+            + (TryParsePx(computed.GetValueOrDefault(borderEnd)) ?? 0);
+
+        double? usedWidth = null;
+        if (HasAnchorSize(width) && ResolveContentPx(width) is { } cw)
+            usedWidth = borderBox ? cw
+                : cw + AxisPaddingBorder("padding-left", "padding-right", "border-left-width", "border-right-width");
+
+        double? usedHeight = null;
+        if (HasAnchorSize(height) && ResolveContentPx(height) is { } ch)
+            usedHeight = borderBox ? ch
+                : ch + AxisPaddingBorder("padding-top", "padding-bottom", "border-top-width", "border-bottom-width");
+
+        if (usedWidth is null && usedHeight is null)
+            return null;
+
+        return (usedWidth, usedHeight);
+    }
 }

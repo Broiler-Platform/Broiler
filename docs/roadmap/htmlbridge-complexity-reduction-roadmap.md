@@ -3204,6 +3204,29 @@ other offset/`getBoundingClientRect` reads are byte-identical. Tests:
 `GoogleSearchPolyfill` SVG hit-testing tests — all fail identically on the pre-change baseline). Another read-path
 query family onto the one live geometry model.
 
+**Landed (2026-07-16, follow-up) — `anchor-size()` completes the anchor-family live read model.** The last
+anchor gap: a box sized by `anchor-size()` (`width/height: anchor-size(--a …)`) reported `offsetWidth/Height = 0`
+and `getBoundingClientRect = 0×0` during script (probe), because the non-native renderer cannot resolve
+`anchor-size()` live (the bake `ResolveAnchorSizeFunctions` runs after script). `DomBridge.ResolveAnchorSizeForElement`
+(`AnchorInsetQueries.cs`) reuses the same canonical `Broiler.Layout.AnchorGeometry.ResolveSize` the bake uses
+(the anchor's frame-independent width/height) and returns the used **border-box** size — the resolved content
+size, plus the axis's computed padding + border for the default `content-box` sizing (`border-box` reports the
+resolved value directly; padding/border read from `GetComputedProps`, the resolved longhands). Wired into
+`GetOffsetWidth/Height` (after the position-area check) and generalised the `ComputeUnzoomedLayoutRect` anchor
+branch so it now composes independently: SIZE from the position-area used box, or the snapshot border box with each
+`anchor-size()` axis overridden; POSITION from the offsetParent invariant when the box is anchor-*placed*
+(position-area / `anchor()` inset) or the snapshot when it is only anchor-*sized* (placed normally) — so a box that
+both sizes and positions by anchor functions is handled too. Blast radius is boxes with an `anchor-size()` in
+`width`/`height` (the resolver returns `null` — before building the registry — otherwise). Tests:
+`AnchorInsetLiveGeometryTests` (+`AnchorSize_LiveDimensions_ResolveToAnchorSize` → the anchor's 50×70,
+`getBoundingClientRect` agreeing; +`AnchorSize_ContentBox_AddsPaddingAndBorderToBorderBox` → 50×70 content + 20
+padding + 10 border = 80×100). css-anchor-position corpus **unchanged (33/6, identical set)**; the geometry / anchor
+/ hit-testing Cli suites add **zero regressions** (the same 5 pre-existing environmental fails — the standing
+`DomBridge_AnchorSize_…` exercises the *bake*'s `style.width`, not this live read path, so it is untouched). With
+this, all three anchor mechanisms — position-area, `anchor()` insets, and `anchor-size()` — report consistent live
+geometry across `offsetLeft/Top/Width/Height` and `getBoundingClientRect`, the read-model consolidation the
+LayoutSnapshot endgame needs.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 

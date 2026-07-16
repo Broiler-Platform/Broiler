@@ -129,6 +129,11 @@ public sealed partial class DomBridge
             if (resolved != null)
                 return resolved.Value.width;
 
+            // A live anchor-size() width resolves the box's used size the same way —
+            // the pre-bake snapshot sizes an unresolved anchor-size() box to 0.
+            if (ResolveAnchorSizeForElement(element) is { width: { } anchorWidth })
+                return anchorWidth;
+
             if (TryGetSharedLayoutGeometry(element, out var shared))
                 return UnzoomSharedExtent(shared.BorderBox.Width, element);
 
@@ -150,6 +155,9 @@ public sealed partial class DomBridge
             var resolved = ResolvePositionAreaForElement(element);
             if (resolved != null)
                 return resolved.Value.height;
+
+            if (ResolveAnchorSizeForElement(element) is { height: { } anchorHeight })
+                return anchorHeight;
 
             if (TryGetSharedLayoutGeometry(element, out var shared))
                 return UnzoomSharedExtent(shared.BorderBox.Height, element);
@@ -511,48 +519,68 @@ public sealed partial class DomBridge
 
     private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)
     {
-        // A live anchor resolution (position-area grid placement, or an anchor() physical
-        // inset) wins over the shared renderer snapshot — the non-native renderer lays such a
-        // box out at 0×0 / the static origin before the render bake runs, so getBoundingClientRect
-        // would disagree with the (already-corrected) offset getters for a box read during script
-        // (css-anchor-position position-area-anchor-partially-outside and anchor() tests read
-        // geometry live). The document POSITION is composed from the standard offsetParent
-        // invariant (border-box edge = offsetParent border-box origin + its border + the element's
-        // offset), reusing the offset getters. The SIZE is the position-area resolution's used box,
-        // or — for an anchor() inset box, which the renderer sizes correctly — the snapshot border
-        // box. Zoom/transform stay approximate on this live path, as elsewhere.
+        // A live anchor resolution (position-area grid placement, an anchor() physical inset,
+        // or anchor-size() sizing) wins over the shared renderer snapshot — the non-native
+        // renderer lays such a box out at 0×0 / the static origin before the render bake runs, so
+        // getBoundingClientRect would disagree with the (already-corrected) offset getters for a box
+        // read during script (css-anchor-position position-area-anchor-partially-outside and the
+        // anchor()/anchor-size() tests read geometry live). POSITION: when the box is anchor-*placed*
+        // (position-area or anchor() inset) it is composed from the standard offsetParent invariant
+        // (border-box edge = offsetParent border-box origin + its border + the element's offset),
+        // reusing the offset getters; an only-anchor-*sized* box keeps the snapshot position (it is
+        // placed normally). SIZE: the position-area resolution's used box, or the snapshot border box
+        // with each anchor-size() axis overridden by its resolved dimension. Zoom/transform stay
+        // approximate on this live path, as elsewhere.
         var areaResolution = ResolvePositionAreaForElement(element);
-        bool insetPositioned = areaResolution is null
-            && ResolveAnchorInsetForElement(element) is { } ins && (ins.left is not null || ins.top is not null);
-        if (areaResolution is not null || insetPositioned)
+        (double? left, double? top)? insetResolution = null;
+        (double? width, double? height)? sizeResolution = null;
+        if (areaResolution is null)
         {
+            insetResolution = ResolveAnchorInsetForElement(element);
+            sizeResolution = ResolveAnchorSizeForElement(element);
+        }
+        bool anchorPlaced = areaResolution is not null
+            || (insetResolution is { } ins && (ins.left is not null || ins.top is not null));
+        bool anchorSized = sizeResolution is { } sz && (sz.width is not null || sz.height is not null);
+        if (anchorPlaced || anchorSized)
+        {
+            bool haveSnapshot = TryGetSharedLayoutGeometry(element, out var snapBox);
+            var z = GetUsedZoomForElement(element);
+            var iz = z > 0.0001 ? 1.0 / z : 1.0;
+
             double width, height;
             if (areaResolution is { } ar)
             {
                 width = ar.width;
                 height = ar.height;
             }
-            else if (TryGetSharedLayoutGeometry(element, out var box))
+            else
             {
-                var z = GetUsedZoomForElement(element);
-                var iz = z > 0.0001 ? 1.0 / z : 1.0;
-                width = box.BorderBox.Width * iz;
-                height = box.BorderBox.Height * iz;
+                width = haveSnapshot ? snapBox.BorderBox.Width * iz : 0;
+                height = haveSnapshot ? snapBox.BorderBox.Height * iz : 0;
+                if (sizeResolution?.width is { } aw) width = aw;
+                if (sizeResolution?.height is { } ah) height = ah;
+            }
+
+            double left, top;
+            if (anchorPlaced)
+            {
+                left = GetOffsetLeftForDomElement(element);
+                top = GetOffsetTopForDomElement(element);
+                if (GetOffsetParentForDomElement(element) is { } offsetParent)
+                {
+                    var parentRect = ComputeUnzoomedLayoutRect(offsetParent);
+                    left += parentRect.Left + GetClientLeftForDomElement(offsetParent);
+                    top += parentRect.Top + GetClientTopForDomElement(offsetParent);
+                }
             }
             else
             {
-                width = 0;
-                height = 0;
+                // Only anchor-*sized* — the box is placed normally, so its snapshot origin is right.
+                left = haveSnapshot ? snapBox.BorderBox.Left : 0;
+                top = haveSnapshot ? snapBox.BorderBox.Top : 0;
             }
 
-            double left = GetOffsetLeftForDomElement(element);
-            double top = GetOffsetTopForDomElement(element);
-            if (GetOffsetParentForDomElement(element) is { } offsetParent)
-            {
-                var parentRect = ComputeUnzoomedLayoutRect(offsetParent);
-                left += parentRect.Left + GetClientLeftForDomElement(offsetParent);
-                top += parentRect.Top + GetClientTopForDomElement(offsetParent);
-            }
             return (left, top, width, height);
         }
 
