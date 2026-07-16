@@ -384,14 +384,15 @@ public sealed partial class DomBridge
         List<(DomElement child, DomElement inlineCB, DomElement blockAncestor,
             double offX, double offY)> promotions)
     {
-        // Native mode (P5.8d.2b inline-CB expansion): when an inline containing block holds
-        // a native-MVP position-area box, the engine lays out the whole inline subtree
-        // (anchor + positioned boxes) against the real inline-box geometry, so this bridge
-        // promotion must NOT DOM-move any of that inline CB's abspos children — doing so
-        // would tear the anchor out of the target's containing block and break the native
-        // placement. Skip collecting from such an inline CB (still recurse for nested ones).
+        // When an inline containing block holds a native-MVP position-area box, the engine lays
+        // out the whole inline subtree (anchor + positioned boxes) against the real inline-box
+        // geometry, so this bridge promotion must NOT DOM-move any of that inline CB's abspos
+        // children — doing so would tear the anchor out of the target's containing block and break
+        // the native placement. Skip collecting from such an inline CB (still recurse for nested
+        // ones). The NativeAnchorPlacement flag check is dropped in Phase 4 item-2 step 5 (a
+        // provable no-op on the native default path, where it was already true).
         if (!IsText(element) && IsInlineContainingBlock(element) &&
-            !(NativeAnchorPlacement && InlineCbHasNativeAnchorBox(element)))
+            !InlineCbHasNativeAnchorBox(element))
         {
             var (offX, offY, blockAncestor) = ComputeInlineCBOffset(element);
             if (blockAncestor != null)
