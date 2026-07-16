@@ -14,10 +14,9 @@ namespace Broiler.Wpt.Tests;
 /// <c>anchor-name: --a</c>, and a modal <c>&lt;dialog&gt;</c> target
 /// (<c>top: anchor(top); left: anchor(right)</c>). With <c>scrollTop = 100</c> the absolute
 /// anchor scrolls to (200,200); the modal target (top-layer, UA <c>position:fixed</c>) does not
-/// scroll and anchors to the scrolled anchor → its top-left lands at (300,200). Both the bridge
-/// pre-bake (lever off) and the engine's native placement (lever on) must agree — the baked path
-/// is correct here (the corpus passes both ways), so this asserts baked-vs-native parity plus the
-/// exact placement.</para>
+/// scroll and anchors to the scrolled anchor → its top-left lands at (300,200). The engine's
+/// native placement (lever on) is asserted at that exact position. (The baked path this once
+/// compared against was retired in Phase 4 item-2 step 5.)</para>
 /// </summary>
 [Xunit.Collection("NativeAnchorWpt")]
 public class NativeModalDialogAnchorWptTests : IDisposable
@@ -84,16 +83,5 @@ public class NativeModalDialogAnchorWptTests : IDisposable
         // Anchor scrolled to (200,200), 100×100 → target at its top (200) / right (300).
         Assert.True(System.Math.Abs(green.x0 - 300) <= 2, $"target left={green.x0}, expected ~300.");
         Assert.True(System.Math.Abs(green.y0 - 200) <= 2, $"target top={green.y0}, expected ~200.");
-    }
-
-    [Fact]
-    public void BakedAndNativePaths_Agree_OnModalDialogAnchor()
-    {
-        var baked = Render(native: false);
-        var native = Render(native: true);
-
-        Assert.True(baked.count > 0 && native.count > 0, "target missing in one of the paths.");
-        Assert.True(System.Math.Abs(baked.x0 - native.x0) <= 2, $"left differs: baked={baked.x0}, native={native.x0}.");
-        Assert.True(System.Math.Abs(baked.y0 - native.y0) <= 2, $"top differs: baked={baked.y0}, native={native.y0}.");
     }
 }

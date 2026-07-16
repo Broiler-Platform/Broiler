@@ -83,17 +83,4 @@ public class NativeAnchorOpposingInsetWptTests : IDisposable
         Assert.True(System.Math.Abs(red.x1 - 109) <= 2, $"red right={red.x1}, expected ~109 (width 50).");
         Assert.True(System.Math.Abs(red.y1 - 79) <= 2, $"red bottom={red.y1}, expected ~79 (height 30).");
     }
-
-    [Fact]
-    public void BridgeAndEnginePaths_Agree_OnOpposingInsetBox()
-    {
-        var baked = Render(nativeAnchor: false);
-        var native = Render(nativeAnchor: true);
-
-        Assert.True(baked.count > 0 && native.count > 0, "target box missing in one of the paths.");
-        Assert.True(System.Math.Abs(baked.x0 - native.x0) <= 2, $"left differs: baked={baked.x0}, native={native.x0}.");
-        Assert.True(System.Math.Abs(baked.y0 - native.y0) <= 2, $"top differs: baked={baked.y0}, native={native.y0}.");
-        Assert.True(System.Math.Abs(baked.x1 - native.x1) <= 2, $"right differs: baked={baked.x1}, native={native.x1}.");
-        Assert.True(System.Math.Abs(baked.y1 - native.y1) <= 2, $"bottom differs: baked={baked.y1}, native={native.y1}.");
-    }
 }
