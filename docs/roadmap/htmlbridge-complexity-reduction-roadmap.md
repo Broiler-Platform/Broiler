@@ -2916,6 +2916,57 @@ further is gated on separate feature work (native dialog/backdrop, visual-viewpo
 `min-content` position-try) plus the optional follow-up of fully retiring the `NativeAnchorPlacement` lever once
 the last ALWAYS marker-stamp no longer needs it.
 
+---
+
+## Native dialog / backdrop feature track (started 2026-07-16)
+
+Goal: make CSS dialog/popover/`::backdrop` rendering native so the bridge's three ALWAYS passes
+(`ApplyDialogUAPositioning`, `ApplyPopoverUAPositioning`, `InsertDialogBackdrops` in `AnchorResolver/Dialogs.cs`)
+can be deleted — feature (a) above. Scoping recon + a first-slice spike established the shape and the blockers.
+
+**Recon (what exists vs. faked):**
+- The three passes run **WPT-runner-only** (`ResolveAnchorPositions` is called only from `WptTestRunner.cs`,
+  never production `CaptureService`) — so this is low-risk like the anchor track, and the native version must
+  live in the shared engine/render path (which benefits production too, where dialogs currently get no handling).
+- **Zero WPT corpus gain is available:** the only pixel-runnable tests are the 7 `anchor-position-top-layer-001..007`
+  reftests, and they already pass via the bridge bake; backdrop/popover behavior is already unit-tested
+  (`ScriptEngineExecuteTests`, `NativeModalDialogAnchorWptTests`). This track is *pure* complexity reduction.
+- **`::backdrop` cascade already works** (Broiler.CSS `GetCascadedStyle(el,"::backdrop")`); there is **no native
+  box** for it (would follow `::before`/`::after` `CreatePseudoElementBox` in `DomParser.cs`, Broiler.HTML).
+  `<dialog>` UA styling is only `display:none` (`CssDefaults.DefaultStyleSheet` + `CssUserAgentDefaults`); **no
+  native top layer** in layout or paint (`PaintWalker.Stacking.cs`) — faked via the bridge's giant z-index.
+- **No main-repo-only slice exists.** The engine's `Broiler.Layout` post-pass mechanism only *offsets*
+  already-laid-out geometry (`CssBox.Scroll`/`Anchor`); `position:fixed`, box generation, UA styling, and paint
+  order are all layout-time / cascade / paint concerns that live in the **Broiler.HTML / Broiler.CSS submodules**
+  (out of session GitHub scope → push 403 → **patch workflow**, payoff deferred to a maintainer applying it).
+
+**First-slice spike — native UA `<dialog>` stylesheet — BLOCKED, reverted, blockers isolated.** Attempted adding
+UA `dialog` rules to `CssDefaults.DefaultStyleSheet` to replace the bridge's baked white-box defaults + `display:block`.
+Rigorous drop-in validation (add UA rule, remove the corresponding bridge bake, confirm the 7 reftests + unit
+tests stay green) surfaced two concrete, foundational blockers that gate *any* UA-stylesheet dialog slice:
+  1. **Display / open-state (`:not([open])`):** `dialog { display: block }` alone **is** a validated drop-in for
+     the bridge's `display:block` bake (modal test green with the bake removed). But hiding *closed* dialogs needs
+     `dialog:not([open]) { display: none }`, and that rule **wrongly hides `showModal()`-opened dialogs**: the
+     bridge sets `open=""` (`DialogHost.SetOpenAttribute`) and `HasAttr(el,"open")` sees it, yet the engine's
+     re-parsed cascade evaluates `:not([open])` as matching — the open state isn't reaching the engine selector
+     (empty-value-attribute serialization or `:not([attr])` matching; root cause is in the serializer/DOM/engine,
+     not the UA sheet). Until fixed, native display can't distinguish open from closed dialogs.
+  2. **Chrome / cascade origin-precedence:** a UA `dialog { border:1px solid black; padding:1em }` rule regresses
+     `anchor-position-top-layer-003/004/006` (97.5%) because the tests' author reset `dialog { border:0; padding:0 }`
+     — same specificity, author origin — does **not** override the UA rule. Author-normal must beat UA-normal;
+     Broiler's cascade leaks the UA border/padding through. (The `background` part is fine — ID rules override it.)
+
+**Conclusion / revised track order.** The UA-stylesheet slice is not "add a rule" — it is gated on two engine/CSS
+foundation fixes that are the real first slices: **(A)** reflect dialog open-state into the engine cascade so
+`dialog:not([open])` works (serialize `open` as a boolean attribute / fix empty-value-attr handling, or fix
+`:not([attr])` matching), and **(B)** fix author-vs-UA origin precedence for equal-specificity shorthands so
+author dialog resets win. Both are bounded but cross-cutting (serializer/DOM/cascade, likely Broiler.HTML/CSS
+submodules). Only after (A)+(B) can the UA `<dialog>` sheet land as a real drop-in; native `::backdrop`
+box-generation and native top-layer paint (both Broiler.HTML) follow. No code shipped this slice — the tree is
+clean (submodule at its pinned SHA); the value delivered is the evidence-based blocker isolation above.
+
+---
+
 **Finding — `position-visibility` is entangled with the scroll-container CB decision — RESOLVED 2026-07-15
 (see the thirteenth expansion above; the design below was executed and all 14 corpus tests pass lever-on).**
 The `data-broiler-anchor-cb` marker (on both the anchor-induced-relative scroller and the scroll-sim wrapper)
