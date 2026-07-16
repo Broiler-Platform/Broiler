@@ -2940,30 +2940,33 @@ can be deleted — feature (a) above. Scoping recon + a first-slice spike establ
   order are all layout-time / cascade / paint concerns that live in the **Broiler.HTML / Broiler.CSS submodules**
   (out of session GitHub scope → push 403 → **patch workflow**, payoff deferred to a maintainer applying it).
 
-**First-slice spike — native UA `<dialog>` stylesheet — BLOCKED, reverted, blockers isolated.** Attempted adding
-UA `dialog` rules to `CssDefaults.DefaultStyleSheet` to replace the bridge's baked white-box defaults + `display:block`.
-Rigorous drop-in validation (add UA rule, remove the corresponding bridge bake, confirm the 7 reftests + unit
-tests stay green) surfaced two concrete, foundational blockers that gate *any* UA-stylesheet dialog slice:
-  1. **Display / open-state (`:not([open])`):** `dialog { display: block }` alone **is** a validated drop-in for
-     the bridge's `display:block` bake (modal test green with the bake removed). But hiding *closed* dialogs needs
-     `dialog:not([open]) { display: none }`, and that rule **wrongly hides `showModal()`-opened dialogs**: the
-     bridge sets `open=""` (`DialogHost.SetOpenAttribute`) and `HasAttr(el,"open")` sees it, yet the engine's
-     re-parsed cascade evaluates `:not([open])` as matching — the open state isn't reaching the engine selector
-     (empty-value-attribute serialization or `:not([attr])` matching; root cause is in the serializer/DOM/engine,
-     not the UA sheet). Until fixed, native display can't distinguish open from closed dialogs.
-  2. **Chrome / cascade origin-precedence:** a UA `dialog { border:1px solid black; padding:1em }` rule regresses
-     `anchor-position-top-layer-003/004/006` (97.5%) because the tests' author reset `dialog { border:0; padding:0 }`
-     — same specificity, author origin — does **not** override the UA rule. Author-normal must beat UA-normal;
-     Broiler's cascade leaks the UA border/padding through. (The `background` part is fine — ID rules override it.)
+**First-slice spike — native UA `<dialog>` stylesheet.** Adding UA `dialog` rules to
+`CssDefaults.DefaultStyleSheet` to replace the bridge's baked defaults. Rigorous drop-in validation (add UA rule,
+remove the corresponding bridge bake, confirm the 7 reftests + unit tests stay green) surfaced two blockers:
+  1. **Display / open-state (`:not([open])`) — ROOT-CAUSED + FIXED 2026-07-16.** `dialog { display: block }` alone
+     **is** a validated drop-in for the bridge's `display:block` bake, but hiding *closed* dialogs needs
+     `dialog:not([open]) { display: none }`, and that rule wrongly hid `showModal()`-opened dialogs. Root cause: a
+     general **`CssSelectorMatcher` bug** — `MatchesCompound` stripped all `[attr]` selectors from the compound
+     *before* extracting pseudo-classes, so the `[open]` nested in `:not([open])` was hoisted into a top-level
+     *positive* filter and left an empty `:not()`, **inverting** the match (it matched dialogs that *have* `open`).
+     Fixed by reordering `ProcessPseudoClasses` (bracket-aware `ExtractPseudos` + recursive matcher) before the
+     attribute strip. Shipped as **`patches/0001-css-fix-not-attr-selector.patch`** (Broiler.CSS) with a regression
+     test; full css corpus unchanged (36 fails), 215 unit tests pass. The UA display rules ship as
+     **`patches/0002-html-native-dialog-ua-display.patch`** (Broiler.HTML, depends on 0001). End-to-end validated:
+     with both patches applied and the bridge `display:block` bake removed, `NativeModalDialogAnchorWptTests`
+     passes and the corpus stays 33/6 — so the bake is deletable (kept as the CI fallback until the patches land;
+     see `patches/README.md`).
+  2. **Chrome / cascade origin-precedence — STILL OPEN (blocker B).** A UA `dialog { border:1px solid black;
+     padding:1em }` rule regresses `anchor-position-top-layer-003/004/006` (97.5%) because the tests' author reset
+     `dialog { border:0; padding:0 }` — same specificity, author origin — does **not** override the UA rule.
+     Author-normal must beat UA-normal; Broiler's cascade leaks the UA border/padding through. (The `background`
+     part is fine — ID rules override it.) This gates the UA box-chrome rules, not display.
 
-**Conclusion / revised track order.** The UA-stylesheet slice is not "add a rule" — it is gated on two engine/CSS
-foundation fixes that are the real first slices: **(A)** reflect dialog open-state into the engine cascade so
-`dialog:not([open])` works (serialize `open` as a boolean attribute / fix empty-value-attr handling, or fix
-`:not([attr])` matching), and **(B)** fix author-vs-UA origin precedence for equal-specificity shorthands so
-author dialog resets win. Both are bounded but cross-cutting (serializer/DOM/cascade, likely Broiler.HTML/CSS
-submodules). Only after (A)+(B) can the UA `<dialog>` sheet land as a real drop-in; native `::backdrop`
-box-generation and native top-layer paint (both Broiler.HTML) follow. No code shipped this slice — the tree is
-clean (submodule at its pinned SHA); the value delivered is the evidence-based blocker isolation above.
+**Revised track order.** Slice 1a (native dialog **display** + the `:not([attr])` matcher fix) is **done, shipped as
+patches 0001+0002, end-to-end validated** — landing the `display:block` bake deletion once a maintainer applies
+them. Remaining: **(B)** fix author-vs-UA origin precedence for equal-specificity shorthands (unblocks the UA box
+chrome), then modal centering / `position:fixed`, native `::backdrop` box-generation, and native top-layer paint
+(all Broiler.HTML). Each further slice deletes a further piece of `Dialogs.cs`.
 
 ---
 
