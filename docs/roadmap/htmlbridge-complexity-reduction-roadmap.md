@@ -961,6 +961,14 @@ Exit criteria:
 - DomBridge is a composition/compatibility facade, targeted at 500-800 lines and
   one primary class file.
 - No production source file exceeds 750 lines without a documented exemption.
+  **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
+  a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
+  module (the P3.x pattern) rather than another giant partial. The nine current
+  over-limit files (`LayoutMetrics.cs` 2332, `JsFunctionCallbacks/JsObjects.cs` 1599,
+  `JsObjects.cs` 1286, `JsFunctionCallbacks/Registration.cs` 1184, `SubDocuments.cs`
+  1152, `DomBridge.cs` 1013, `DomBridge.Serialization.cs` 951, `Utilities.cs` 894,
+  `AnimationResolver.cs` 760) are listed as documented debt to shrink — the guard
+  surfaces one to de-list once it drops under the limit, so the ratchet keeps closing.
 
 ### Phase 4 - eliminate parallel DOM state
 

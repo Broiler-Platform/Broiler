@@ -189,4 +189,74 @@ public class HtmlBridgeArchitectureGuardTests
             .Distinct()
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
+
+    // Roadmap Phase 3 exit criterion: "No production source file exceeds 750 lines without a
+    // documented exemption." This guard enforces that for the HtmlBridge assemblies (the god-object
+    // focus of Phase 3): a NEW oversized file fails the test, forcing the work into a smaller module
+    // (the P3.x feature-module pattern) rather than another giant partial. The exemptions below are
+    // the pre-existing debt the decomposition is chipping away at — each is a file to SHRINK, not a
+    // ceiling to grow into; when one drops to 750 lines its entry should be removed. Raising the
+    // limit or adding an exemption is a deliberate, reviewed act, not the default.
+    private const int MaxProductionFileLines = 750;
+
+    // Documented Phase-3 debt: files that still exceed the limit (line counts as of 2026-07-16).
+    private static readonly HashSet<string> OversizedFileExemptions = new(StringComparer.Ordinal)
+    {
+        "src/Broiler.HtmlBridge.Dom/DomBridge/LayoutMetrics.cs",
+        "src/Broiler.HtmlBridge.Dom/DomBridge/JsFunctionCallbacks/JsObjects.cs",
+        "src/Broiler.HtmlBridge.Dom/DomBridge/JsObjects.cs",
+        "src/Broiler.HtmlBridge.Dom/DomBridge/JsFunctionCallbacks/Registration.cs",
+        "src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs",
+        "src/Broiler.HtmlBridge.Dom/DomBridge.cs",
+        "src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.cs",
+        "src/Broiler.HtmlBridge.Dom/DomBridge/Utilities.cs",
+        "src/Broiler.HtmlBridge.Dom/DomBridge/AnimationResolver.cs",
+    };
+
+    [Fact]
+    public void No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit()
+    {
+        var root = FindRepositoryRoot();
+        string[] bridgeDirs =
+        [
+            "src/Broiler.HtmlBridge.Core", "src/Broiler.HtmlBridge.Dom",
+            "src/Broiler.HtmlBridge.Rendering", "src/Broiler.HtmlBridge.Scripting",
+        ];
+
+        var offenders = new List<string>();
+        var staleExemptions = new List<string>();
+
+        foreach (var dir in bridgeDirs)
+        {
+            var full = Path.Combine(root, dir);
+            if (!Directory.Exists(full))
+                continue;
+
+            foreach (var file in Directory.EnumerateFiles(full, "*.cs", SearchOption.AllDirectories))
+            {
+                if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                    || file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                    continue;
+
+                var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
+                var lines = File.ReadAllLines(file).Length;
+                bool exempt = OversizedFileExemptions.Contains(rel);
+
+                if (lines > MaxProductionFileLines && !exempt)
+                    offenders.Add($"{rel} ({lines} lines)");
+                else if (lines <= MaxProductionFileLines && exempt)
+                    staleExemptions.Add(rel);
+            }
+        }
+
+        Assert.True(offenders.Count == 0,
+            $"New/grown HtmlBridge source files exceed {MaxProductionFileLines} lines (roadmap Phase 3: split "
+            + "into a feature module rather than growing the god object):\n  " + string.Join("\n  ", offenders));
+
+        // A file that has been reduced under the limit should be taken off the debt list so the ratchet
+        // keeps closing — surface it rather than silently allow it to grow back.
+        Assert.True(staleExemptions.Count == 0,
+            "These files no longer exceed the limit; remove them from OversizedFileExemptions:\n  "
+            + string.Join("\n  ", staleExemptions));
+    }
 }
