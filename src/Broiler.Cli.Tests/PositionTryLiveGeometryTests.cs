@@ -6,11 +6,18 @@ namespace Broiler.Cli.Tests;
 /// <summary>
 /// Live-geometry (Phase 5 endgame) regression coverage for a <c>position-try</c> box whose base
 /// placement overflows and selects a fallback, read via <c>offsetLeft/Top/Width</c> during script
-/// — before the render bake (<c>ResolveAnchorPositions</c>) runs. Mirrors the css-anchor-position
-/// <c>position-try-002</c> shape: a min-content box whose base overflows the inset-modified
-/// containing block, so fallback <c>--f1</c> places it to the right of the anchor.
-/// <see cref="DomBridge.ResolvePositionTryForElement"/> drives the same
-/// <c>ComputeFallbackPlacement</c> core the bake uses.
+/// — before the render bake (<c>ResolveAnchorPositions</c>) runs. The first case mirrors the
+/// css-anchor-position <c>position-try-002</c> shape: a min-content box whose base overflows the
+/// inset-modified containing block, so fallback <c>--f1</c> places it to the right of the anchor.
+/// <para>
+/// Both cases are engine-native-authoritative once the LayoutSnapshot endgame patch (0005) is
+/// applied: <c>HeadlessLayoutView</c> enables native anchor placement and threads the
+/// <c>@position-try</c> rules, so the geometry snapshot carries the resolved fallback (verified
+/// with the bridge resolvers short-circuited — see the roadmap's endgame increment-2 note). Until
+/// the patch lands, CI clones the submodule at its pinned SHA and the equivalent bridge resolver
+/// (<see cref="DomBridge.ResolvePositionTryForElement"/>, the same <c>ComputeFallbackPlacement</c>
+/// core the bake uses) supplies the geometry — either way these assertions hold.
+/// </para>
 /// </summary>
 public sealed class PositionTryLiveGeometryTests
 {

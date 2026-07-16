@@ -2925,18 +2925,22 @@ native" = making both unconditional and retiring the flag.
      `NativeAnchorPlacement` lever).
    - **Residual until the feature goes native:** `ApplyVisualViewportSerializationState` (visual-viewport —
      blocked on the **LayoutSnapshot endgame**), and the non-MVP bake branches inside the thinned PER-ELEMENT
-     passes — most notably the **`min-content` position-try base** and any position-area/anchor() box outside
+     passes — the **`max-content` / `fit-content` position-try base** (`min-content` went native in P5.8d.2b,
+     retiring feature (c)'s render-side half; `max-content`/`fit-content` stay baked *deliberately*, pending a
+     validating corpus test, not an engine limitation) and any position-area/anchor() box outside
      `IsMvpNative…Box` (position-try/anchor() entanglement, or no registered dashed-ident anchor). These bake
      only the residue `IsMvpNative…Box` rejects; each shrinks to nothing as the engine gains the corresponding
      capability.
 
    **There is no safe deletion available at step 6** — every remaining write is either an ALWAYS pass or a
    not-yet-native residue, so removing it would break a still-baked feature (CI clones by pointer and renders
-   the baked HTML). Further reduction is gated on three independent **feature** efforts, each its own multi-step
+   the baked HTML). Further reduction is gated on independent **feature** efforts, each its own multi-step
    track outside this complexity-reduction roadmap: (a) native dialog/backdrop rendering (submodule), (b) the
-   visual-viewport LayoutSnapshot endgame, (c) engine `min-content` position-try sizing. When each lands, its
-   residual bake (and, for (a)+(c), a further slice of the corresponding thinned pass) can be deleted, and once
-   the step-3e marker no longer needs it the `NativeAnchorPlacement` lever itself can be fully retired.
+   visual-viewport LayoutSnapshot endgame, and (c) the residual `max-content`/`fit-content` position-try bake
+   (feature (c)'s `min-content` part landed in P5.8d.2b — render-side — and in the LayoutSnapshot endgame
+   increment 2 — live-read side; only the `max-content`/`fit-content` estimator-parity slice remains). When each
+   lands, its residual bake (and, for (a)+(c), a further slice of the corresponding thinned pass) can be deleted,
+   and once the step-3e marker no longer needs it the `NativeAnchorPlacement` lever itself can be fully retired.
 
 **Risk:** low — WPT/test-only, no production-render change; the corpus *improves* under the flip (33/6 > 31/8).
 The real costs are (a) the full-corpus lever-on validation gap (step 1), and (b) losing baked-path test
@@ -3350,9 +3354,26 @@ short-circuited (the offset getter precedence is position-area → position-try 
 anchor-size → snapshot, so the anchor-inset resolver — which would otherwise return the *base*
 `anchor()` inset — must also be silenced to reach the snapshot). The full 29-test anchor/live-geometry
 suite stays green with the resolvers restored. Delivered in the same submodule patch
-(`patches/0005-…`, regenerated to include both increments). **Still bridge-only:** a `min-content`
-position-try box, whose fallback sizing needs the engine's intrinsic-size support (blocker (c)) —
-its `OverflowingBase_…` test fails from the snapshot alone by design and keeps the bridge resolver.
+(`patches/0005-…`, regenerated to include both increments).
+
+**Correction (2026-07-16) — `min-content` position-try is native in the live snapshot too, not
+bridge-only.** The increment-2 note originally recorded a `min-content` position-try box as
+"still bridge-only, blocked on feature (c)". That was wrong on both counts, and the error was the
+**resolver-precedence artifact**, not a `min-content` limitation: when only
+`ResolvePositionTryForElement` is short-circuited, `ResolveAnchorInsetForElement` still intercepts
+with the box's *base* `anchor()` inset before the snapshot is ever read, so the offset looks like the
+un-flipped base. Re-validated with **both** resolvers silenced (patch applied),
+`PositionTryLiveGeometryTests.OverflowingBase_SelectsFallback_LiveOffsets` (the `position-try-002`
+`min-content` shape) passes **from the snapshot alone**. An engine-side probe confirms *why*: the
+`min-content` box reaches `CssBox.TryApplyPositionTryFallback` with its `position-try-fallbacks`
+intact (i.e. **handed off, not baked**) and its `Bounds.Width` already the laid-out intrinsic `200`,
+so the native pass applies the fallback using the engine's real intrinsic width. This is consistent
+with **P5.8d.2b** above, which already retired the render-side `min-content` bake ("the render-side
+half of feature (c)") via `AxisSizeHandoffSupported` / `OpposingAxisSizable`. So feature (c)'s
+`min-content` part is resolved on **both** the render and live-read sides; the only position-try
+residue that still bakes is `max-content` / `fit-content` (deliberately, pending a validating corpus
+test — not an engine limitation; see P5.8d.2b). Net: the live read model is snapshot-authoritative
+for position-try fallback across fixed-size **and** `min-content` boxes.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.

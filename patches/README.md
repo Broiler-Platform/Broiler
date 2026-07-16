@@ -111,21 +111,25 @@ Validated (patch applied):
 - `PositionAreaLiveGeometryTests` pass **from the snapshot alone** (bridge
   `ResolvePositionAreaForElement` short-circuited to `return null`) — the snapshot is authoritative
   for position-area geometry.
-- `PositionTryLiveGeometryTests.FixedSizeOverflowingBase_SelectsFallback_LiveOffsets` (a fixed-size
-  position-try box whose base overflows) passes **from the snapshot alone** with *both* the
-  `ResolvePositionTryForElement` and `ResolveAnchorInsetForElement` resolvers short-circuited —
-  proving the snapshot carries the native *fallback* placement (the offset getter's resolver
-  precedence is position-area → position-try → anchor-inset → anchor-size → snapshot, so the
-  anchor-inset resolver must also be silenced to reach the snapshot).
+- Both the fixed-size (`FixedSizeOverflowingBase_…`) **and** the `min-content`
+  (`OverflowingBase_…`, the `position-try-002` shape) position-try live tests pass **from the snapshot
+  alone** with *both* the `ResolvePositionTryForElement` and `ResolveAnchorInsetForElement` resolvers
+  short-circuited — proving the snapshot carries the native *fallback* placement. Both resolvers must
+  be silenced because the offset getter precedence is position-area → position-try → anchor-inset →
+  anchor-size → snapshot, so the anchor-inset resolver would otherwise intercept with the box's *base*
+  `anchor()` inset. (An engine probe confirms the `min-content` box is handed off, not baked: it
+  reaches `CssBox.TryApplyPositionTryFallback` with `position-try-fallbacks` intact and `Bounds.Width`
+  already the laid-out intrinsic `200`, so the native pass flips it using the engine's real intrinsic
+  width — consistent with P5.8d.2b, which retired the render-side `min-content` bake.)
 - The full anchor/live-geometry suite (29 tests) stays green with the resolvers restored.
 
-Remaining bridge-only case: a **`min-content`** position-try box, whose fallback sizing the engine
-cannot yet resolve (blocker (c), engine intrinsic-size position-try sizing). It still falls to the
-bridge's `ResolvePositionTryForElement`, so `OverflowingBase_SelectsFallback_LiveOffsets` (a
-min-content box) fails from the snapshot alone by design.
+So the live read model is snapshot-authoritative for position-try fallback across **fixed-size and
+`min-content`** boxes. The only position-try residue that still bakes is `max-content` / `fit-content`
+(deliberate, pending a validating corpus test — see P5.8d.2b), not a live-read gap.
 
 The bridge live anchor resolvers remain the **active main-repo CI fallback** and must stay until
 this patch lands and the pointer is bumped (CI clones the submodule by pointer, so without the
 patch the snapshot carries static placement and the resolvers supply the resolved geometry). Once
 0005 lands, the resolvers can be retired incrementally (position-area first, then anchor insets and
-size, then fixed-size position-try; the `min-content` position-try residue stays until blocker (c)).
+size, then position-try — fixed-size and `min-content` together; the `max-content`/`fit-content`
+estimator-parity slice is the only piece that waits).
