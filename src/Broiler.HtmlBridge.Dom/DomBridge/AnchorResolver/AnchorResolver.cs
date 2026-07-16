@@ -84,12 +84,11 @@ public sealed partial class DomBridge
             DocumentElement, anchorRegistry, scrollContainersNeedingRelative,
             deferredDomMoves);
 
-        // 3a2. Resolve align-self/justify-self: anchor-center on elements
-        //      that have position-anchor but no position-area. Native mode (P5.8d.2b) centres
-        //      these in the engine post-pass (CssBox.TryApplyAnchorCenter) instead, so the
-        //      align-self/justify-self + position-anchor CSS survives to the render un-baked.
-        if (!NativeAnchorPlacement)
-            ResolveAnchorCenter(DocumentElement, anchorRegistry);
+        // 3a2. align-self/justify-self: anchor-center on elements with position-anchor but no
+        //      position-area is centred natively by the engine post-pass
+        //      (CssBox.TryApplyAnchorCenter), so the align-self/justify-self + position-anchor
+        //      CSS reaches the render un-baked. The redundant bridge `ResolveAnchorCenter` pass
+        //      was deleted in Phase 4 item-2 step 3 now that native is the default.
 
         // 3b. Resolve position-try-fallbacks for elements whose base
         //     style overflows the containing block.
