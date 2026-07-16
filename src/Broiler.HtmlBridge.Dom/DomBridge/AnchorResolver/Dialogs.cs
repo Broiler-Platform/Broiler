@@ -157,9 +157,11 @@ public sealed partial class DomBridge
 
             // Ensure the dialog has UA default styles.
             // Check both inline styles and CSS rules before applying defaults.
+            // NB: `display: block` is no longer baked here — the native UA rule
+            // `dialog { display: block }` (Broiler.HTML CssDefaults, patches
+            // 0001+0002, now applied and pinned) supplies it through the real
+            // cascade, so the bridge pre-bake is redundant.
             var dialogProps = GetComputedProps(dialog);
-            if (!InlineStyle(dialog).ContainsKey("display"))
-                InlineStyle(dialog)["display"] = "block";
             if (!InlineStyle(dialog).ContainsKey("border") &&
                 !dialogProps.ContainsKey("border") &&
                 !dialogProps.ContainsKey("border-width"))

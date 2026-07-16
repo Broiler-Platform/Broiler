@@ -2798,7 +2798,9 @@ native" = making both unconditional and retiring the flag.
   `ApplyScrollSimulation` (native uses `data-broiler-scroll-*` instead of the DOM-shift). Full deletion of
   these is blocked by the still-baked features (below).
 - **ALWAYS — never deletable via this flag** (no native handling): `ApplyDialogUAPositioning` /
-  `ApplyPopoverUAPositioning` / `InsertDialogBackdrops` (dialog/backdrop — submodule feature),
+  `ApplyPopoverUAPositioning` / `InsertDialogBackdrops` (dialog/backdrop — submodule feature; its `display:block`
+  pre-bake **was deleted 2026-07-16** once the native UA `dialog { display: block }` rule landed, and its
+  box-chrome bake becomes deletable once patches 0003+0004 land — see the dialog/backdrop track below),
   `ReplaceRootWithReplacedContent` (CSS Content 3 root replacement), `ApplyVisualViewportSerializationState`
   (visual-viewport — see its finding above), and the step-3e scroller→`position:relative` loop.
 - **Native-support markers — must be PRESERVED, not deleted:** `data-broiler-anchor-cb`,
@@ -2955,17 +2957,37 @@ remove the corresponding bridge bake, confirm the 7 reftests + unit tests stay g
      **`patches/0002-html-native-dialog-ua-display.patch`** (Broiler.HTML, depends on 0001). End-to-end validated:
      with both patches applied and the bridge `display:block` bake removed, `NativeModalDialogAnchorWptTests`
      passes and the corpus stays 33/6 — so the bake is deletable (kept as the CI fallback until the patches land;
-     see `patches/README.md`).
-  2. **Chrome / cascade origin-precedence — STILL OPEN (blocker B).** A UA `dialog { border:1px solid black;
-     padding:1em }` rule regresses `anchor-position-top-layer-003/004/006` (97.5%) because the tests' author reset
-     `dialog { border:0; padding:0 }` — same specificity, author origin — does **not** override the UA rule.
-     Author-normal must beat UA-normal; Broiler's cascade leaks the UA border/padding through. (The `background`
-     part is fine — ID rules override it.) This gates the UA box-chrome rules, not display.
+     see `patches/README.md`). **LANDED 2026-07-16:** patches 0001+0002 are applied and pinned (`Broiler.CSS`
+     `ce521e3`, `Broiler.HTML` `000274e`), so the patch files are retired and the **bridge `display:block`
+     pre-bake is now deleted** from `InsertDialogBackdrops` (main-repo). Committed CI state validated: the 7
+     `anchor-position-top-layer-*` reftests, `NativeModalDialogAnchorWptTests`, and the bridge
+     `Dialog`/`Backdrop`/`Popover` unit tests are green off the pinned UA `dialog { display: block }` rule.
+  2. **Chrome / cascade origin-precedence — ROOT-CAUSED + RESOLVED 2026-07-16 (blocker B).** The "border/padding
+     leak" framing was **imprecise**: an isolated `CssStyleEngine` repro shows author `border:0`/`padding:0`
+     shorthands *do* override the equal-specificity UA `border`/`padding` shorthands (they compete at the same
+     shorthand key). The property that actually leaked is **`background`**: the tests' `#target { background: lime }`
+     (an author *shorthand*) failed to override a UA `background-color: white` **longhand**, because the post-cascade
+     shorthand expansion is `!ContainsKey`-gated and keeps any already-present longhand regardless of origin. Only
+     `margin`/`padding` seeded their longhands into the cascade, so `background` (and, symmetrically, the border
+     families as longhands) leaked. **Fix (Broiler.CSS, `patches/0003`):** generalise the longhand seeding
+     (`AddShorthandLonghandSlots`) to reuse the canonical `ExpandCssShorthands` expander for every modelled
+     shorthand, so a shorthand competes for its longhands by origin/specificity/source order. The
+     `border`/`border-<side>` shorthands are **excluded** — their omitted-component reset to initial is owned by the
+     separate, origin-blind `ApplyBorderShorthandResets` pass (which needs those longhands *absent*), so seeding
+     them would defeat that reset (this is also why the pre-existing `table`/`td` grey-`border-color` `DomParser`
+     workaround still stands). Regression test `ShorthandLonghandOriginTests`; the full available css corpus (147
+     tests) is **byte-identical 36-fail with and without the fix** (verified by failure-set diff — zero blast
+     radius). **UA box-chrome (Broiler.HTML, `patches/0004`, depends on 0003):**
+     `dialog { … border:1px solid black; padding:1em; background-color:white }`. With both patches the corpus stays
+     33/6 and all 7 top-layer tests pass at 99.9–100% (vs 97.5–98.7% for six of them with the UA chrome but no
+     cascade fix — blocker B reproduced and then cleared). The bridge box-chrome bake is **kept as the CI fallback**
+     until the patches land; the follow-up deletes it (see `patches/README.md`).
 
-**Revised track order.** Slice 1a (native dialog **display** + the `:not([attr])` matcher fix) is **done, shipped as
-patches 0001+0002, end-to-end validated** — landing the `display:block` bake deletion once a maintainer applies
-them. Remaining: **(B)** fix author-vs-UA origin precedence for equal-specificity shorthands (unblocks the UA box
-chrome), then modal centering / `position:fixed`, native `::backdrop` box-generation, and native top-layer paint
+**Revised track order.** Slice 1a (native dialog **display** + the `:not([attr])` matcher fix) **landed** (patches
+0001+0002 applied+pinned; bridge `display:block` bake deleted). Slice 1b (native dialog **box chrome** + the
+shorthand-vs-longhand origin-precedence cascade fix — the resolution of blocker B) is **done and end-to-end
+validated, shipped as patches 0003+0004** — landing the box-chrome bake deletion once a maintainer applies them.
+Remaining: modal centering / `position:fixed`, native `::backdrop` box-generation, and native top-layer paint
 (all Broiler.HTML). Each further slice deletes a further piece of `Dialogs.cs`.
 
 ---

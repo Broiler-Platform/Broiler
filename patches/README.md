@@ -13,45 +13,65 @@ cd <Submodule>
 git am < ../patches/NNNN-<slug>.patch     # or: git apply
 ```
 
-## Native dialog/backdrop track — display slice (2026-07-16)
+## Native dialog/backdrop track — box-chrome slice (2026-07-16)
 
-Two patches make CSS `<dialog>` **display** native, so the bridge's `display:block` pre-bake
-in `src/Broiler.HtmlBridge.Dom/DomBridge/AnchorResolver/Dialogs.cs`
-(`InsertDialogBackdrops`) can be deleted. **Apply in order — 0002 depends on 0001.**
+Two patches make the native UA `<dialog>` **box chrome** (border/padding/background) work
+through the real cascade, so the bridge's box-chrome pre-bake in
+`src/Broiler.HtmlBridge.Dom/DomBridge/AnchorResolver/Dialogs.cs` (`InsertDialogBackdrops`) can
+be deleted. **Apply in order — 0004 depends on 0003.**
 
-### 0001-css-fix-not-attr-selector.patch → `Broiler.CSS`
+The **display** slice that preceded this (patches 0001 + 0002 — the `:not([attr])`
+selector-matcher fix and the UA `dialog { display: block }` rule) has **landed**: it is in the
+pinned submodule commits (`Broiler.CSS` `ce521e3`, `Broiler.HTML` `000274e`), so those patch
+files are removed and the bridge `display: block` pre-bake in `InsertDialogBackdrops` has been
+deleted (it was the CI fallback that is no longer needed).
 
-General selector-matcher bug fix (not dialog-specific). `CssSelectorMatcher.MatchesCompound`
-stripped every `[attr]` selector from the compound *before* extracting pseudo-classes, so a
-nested attribute selector inside `:not()` / `:is()` / `:where()` (e.g. the `[open]` in
-`:not([open])`) was hoisted into a top-level **positive** filter and left an empty `:not()`,
-**inverting** the match — `dialog:not([open])` matched *open* dialogs. The fix reorders
-`ProcessPseudoClasses` (bracket-aware `ExtractPseudos` + recursive matcher) to run before the
-attribute strip. Includes a regression test (`Matches_Not_With_Nested_Attribute_Selector`),
-covering `:not`/`:is` with nested attribute selectors and the empty-value boolean-attribute
-(`open=""`) case. Full css WPT corpus unchanged (36 fails); 215 `Broiler.CSS.Dom.Tests` pass
-(the 2 `CssDomArchitectureTests` failures are pre-existing/environmental).
+### 0003-css-shorthand-longhand-origin-precedence.patch → `Broiler.CSS`
 
-### 0002-html-native-dialog-ua-display.patch → `Broiler.HTML`
+General cascade correctness fix (not dialog-specific). A higher-precedence author *shorthand*
+(e.g. `background: lime`) failed to override a lower-precedence user-agent *longhand* (e.g.
+`background-color: white`): the post-cascade shorthand expansion is `!ContainsKey`-gated, so it
+keeps any already-present longhand regardless of origin. Only `margin`/`padding` seeded their
+longhands into the cascade, so the leak hit `background` (and, symmetrically, the border
+families). The fix generalises the longhand seeding (`AddShorthandLonghandSlots`) to reuse the
+canonical `ExpandCssShorthands` expander for every modelled shorthand, so each shorthand competes
+for its longhands by origin/specificity/source order.
 
-Adds native UA `<dialog>` display rules to `CssDefaults.DefaultStyleSheet`:
-`dialog { display: block }` + `dialog:not([open]) { display: none }` (and drops `dialog` from
-the blanket `template, dialog, [hidden] { display: none }`). Replaces the bridge's
-`display:block` bake and also fixes bare non-modal `<dialog open>` (the bridge only handled
-modal dialogs). **Requires 0001** — without the `:not([attr])` fix, `dialog:not([open])` is
-inverted and hides open dialogs.
+The `border` / `border-<side>` shorthands are **excluded** from seeding because their
+omitted-component reset to initial is handled by the separate, origin-blind
+`ApplyBorderShorthandResets` pass (which requires those longhands to be *absent* from the map);
+seeding them would defeat that reset (an `!important border: 1px solid` could no longer reset an
+earlier `border: … red`). This is why the pre-existing `table`/`td` grey-border-color workaround
+in `DomParser` (`CssDefaults.cs` note) still stands — the border-longhand-vs-author-shorthand case
+is deliberately out of scope here.
 
-### Follow-up once 0001 + 0002 are applied and the pointers bumped
+Includes a regression test (`ShorthandLonghandOriginTests`). Full available css WPT corpus
+(CSS2, css-align, css-backgrounds, css-animations, css-anchor-position; 147 tests) is
+**byte-identical** with and without the fix (36 fails, identical set); 218 `Broiler.CSS.Dom.Tests`
+pass (the 2 `CssDomArchitectureTests` failures are pre-existing/environmental).
 
-Delete the `display:block` pre-bake in `InsertDialogBackdrops` (the `if
-(!InlineStyle(dialog).ContainsKey("display")) InlineStyle(dialog)["display"] = "block";`
-block). It is the **active main-repo CI fallback** and must stay until the patches land (CI
-clones submodules by pointer, so it renders open dialogs until the UA rule is live). Removing
-it was validated end-to-end: with 0001 + 0002 applied and the bake removed,
-`NativeModalDialogAnchorWptTests` passes and the css-anchor-position corpus stays 33/6.
+### 0004-html-native-dialog-ua-box-chrome.patch → `Broiler.HTML`
 
-Not covered by this slice (later dialog/backdrop track work): UA box **chrome**
-(border/padding/background) — blocked on an author-vs-UA origin-precedence gap
-(`anchor-position-top-layer-003/004/006`); modal centering / `position:fixed`; native
-`::backdrop` box generation; native top-layer paint. See the native dialog/backdrop track
-section in `docs/roadmap/htmlbridge-complexity-reduction-roadmap.md`.
+Extends the native UA dialog rule in `CssDefaults.DefaultStyleSheet` with the box chrome the
+bridge pre-bakes for modal dialogs: `dialog { … border: 1px solid black; padding: 1em;
+background-color: white }`. Applies to every rendered (open) dialog through the cascade — matching
+the HTML UA stylesheet, which styles all dialogs, not only modal ones (an improvement over the
+bridge's modal-only bake). **Requires 0003** — without the shorthand-vs-longhand fix, the UA
+`background-color: white` longhand leaks past an author `background` reset and regresses WPT
+`anchor-position-top-layer-003/004/006` (to ~97.5%). With both patches applied, the
+css-anchor-position corpus stays 33/6 and all 7 top-layer tests pass at 99.9–100%.
+
+### Follow-up once 0003 + 0004 are applied and the pointers bumped
+
+Delete the box-chrome pre-bake in `InsertDialogBackdrops` (the `border-width`/`border-style`/
+`border-color`, `padding`, and `background-color` writes). It is the **active main-repo CI
+fallback** and must stay until the patches land (CI clones submodules by pointer, so it styles
+modal dialogs until the UA rule is live). Removing it was validated end-to-end: with 0003 + 0004
+applied and the box-chrome bake removed, the 7 `anchor-position-top-layer-*` tests and the
+`NativeModalDialogAnchorWptTests` / bridge `Dialog`/`Backdrop`/`Popover` unit tests pass and the
+css-anchor-position corpus stays 33/6.
+
+Not covered by this slice (later dialog/backdrop track work): modal centering / `position: fixed`,
+native `::backdrop` box generation, and native top-layer paint (all `Broiler.HTML`). See the
+native dialog/backdrop track section in
+`docs/roadmap/htmlbridge-complexity-reduction-roadmap.md`.
