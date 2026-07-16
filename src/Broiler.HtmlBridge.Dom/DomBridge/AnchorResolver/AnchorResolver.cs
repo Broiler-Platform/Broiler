@@ -72,9 +72,10 @@ public sealed partial class DomBridge
         ResolveAnchorFunctions(DocumentElement, anchorRegistry, positionTryRules);
 
         // 3. Resolve position-area values on anchored elements.
-        //    Collects scroll containers that need position:relative but
-        //    defers adding it until after position-visibility resolution,
-        //    so IsAnchorVisibleForTarget is not affected by the new CB.
+        //    Collects scroll containers that need position:relative but defers stamping it
+        //    (step 3e) until after the deferred DOM moves, tagging each anchor-induced scroller
+        //    with data-broiler-anchor-cb so the engine's native position-visibility pass still
+        //    treats it as an intervening clip container.
         var scrollContainersNeedingRelative = new HashSet<DomElement>();
         var deferredDomMoves = new List<(DomElement element, DomElement oldParent, DomElement newParent)>();
         // Native mode (P5.8d) makes this a per-element decision: MVP-subset boxes are
@@ -94,13 +95,12 @@ public sealed partial class DomBridge
         //     style overflows the containing block.
         ResolvePositionTryFallbacks(DocumentElement, anchorRegistry, positionTryRules);
 
-        // 3c. Resolve position-visibility: hide anchor-positioned elements
-        //     whose anchor is not visible or does not exist. Native mode (P5.8d.2b) resolves
-        //     this in the Broiler.Layout engine post-pass instead (CssBox.ResolvePositionVisibility),
-        //     so the bridge stops writing display:none; the scroll-container marker stamped in
-        //     step 3e gives the engine the pre-position:relative CB view the decision needs.
-        if (!NativeAnchorPlacement)
-            ResolvePositionVisibility(DocumentElement, anchorRegistry);
+        // 3c. position-visibility (hide anchor-positioned elements whose anchor is not visible or
+        //     does not exist) is resolved natively by the Broiler.Layout engine post-pass
+        //     (CssBox.ResolvePositionVisibility); the scroll-container marker stamped in step 3e
+        //     gives the engine the pre-position:relative CB view the decision needs. The redundant
+        //     bridge `ResolvePositionVisibility` display:none pre-bake was deleted in Phase 4
+        //     item-2 step 3 now that native is the default.
 
         // 3d. Apply deferred DOM moves (inline CB → block ancestor promotion).
         //     Must be done after all position-area resolution is complete
