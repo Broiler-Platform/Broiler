@@ -2784,6 +2784,43 @@ in the engine; but `position-visibility`, dialog/backdrop, `anchor-scope`/scopin
 later cutover expansions: the engine operates on boxes, not the DOM, so these are re-implementations, not
 moves — which is why the MVP subset deliberately excludes them.
 
+**Finding — the LIVE geometry path (`offsetWidth`/`offsetLeft` during script) does not reflect
+`position-area` sizing; `position-area-anchor-partially-outside` is the exposed corpus test (2026-07-16
+investigation).** Distinct from every anchor-cutover expansion above: those move the *render* bake
+(`ResolveAnchorPositions` → inline styles the raster reads), but `position-area-anchor-partially-outside`
+is a `testharness` test that reads `anchored.offsetLeft/Top/Width/Height` **live during JS**, before
+`ResolveAnchorPositions` runs. The bridge resolves anchor positioning as a batch render-prep pass, not as
+live layout, so the geometry the offset getters return comes from either the RF-BRIDGE shared-renderer
+snapshot (`SharedLayoutGeometry.cs`, `UseSharedLayoutGeometry = true` by default) or the per-property
+`ResolvePositionAreaForElement` estimator. Root cause, pinned by probe (anchor `right:-50;top:-50` 100×100
+in a `position:relative` 400×400 CB with a 2px border, `#anchored` `align-self/justify-self:stretch`,
+`position-area: span-all` → expected `(0,-50,450,450)`):
+- **`offsetWidth`/`offsetHeight` return 0** because `GetOffsetWidthForDomElement`/`…Height…`
+  (`LayoutMetrics.cs:114,133`) consult `TryGetSharedLayoutGeometry` **before**
+  `ResolvePositionAreaForElement`, and the non-native renderer lays a `position-area` `stretch` abspos box
+  out at 0×0 (it never applies the grid-cell fill live). `GetOffsetLeftForDomElement`/`…Top…`
+  (`LayoutMetrics.cs:155,169`) use the **opposite** order — estimator first — so they *do* track the
+  anchor (e.g. `right span-all` → left ≈ 452). This width/height-vs-left/top ordering **inconsistency** is
+  the immediate defect: a box with a live `position-area` resolution should report that resolution's size
+  just as it reports its position.
+- The estimator itself is then **~2px off** (`span-all` → `(0,-48,452,448)` vs `(0,-50,450,450)`): the
+  anchor's coordinates in `ComputePositionAreaRect` are measured relative to the CB's **border** box, not
+  its **padding** box, so a bordered CB shifts the grid by the border width. (Only manifests with a
+  bordered CB — most corpus fixtures are borderless, which is why no other test exposes it.)
+- The estimator also returns the grid **cell**, not the **used box** (`PositionAreaGrid.ComputeCell`, not
+  `ResolveElementBox`), so it is exact only for `stretch` (cell = used box); a non-`stretch` `position-area`
+  box would report the cell size. This test is all-`stretch`, so that limitation is latent here.
+
+A responsible fix is a coordinated live-geometry slice, **not** a one-liner: reorder the width/height
+getters to prefer the resolution (consistent with left/top), switch the live estimator to
+`PositionAreaGrid.ResolveElementBox` so non-`stretch` boxes are correct too, and correct the border-box vs
+padding-box anchor frame — then re-validate the **entire** css-anchor-position corpus (30 passing
+`position-area` offset/`offsetWidth` assertions) plus the RF-BRIDGE offset tests, since all of it flows
+through these getters and the shared-snapshot ordering. It is the first concrete instance of the Phase 5
+endgame below ("one layout pass services all geometry queries") biting a *read* path rather than the render
+bake, and is best done as its own slice with that full-corpus regression gate. Left as-is; the render path
+(`position-area` pixel tests) is unaffected because the render bake is a separate pass.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 
