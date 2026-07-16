@@ -3159,6 +3159,27 @@ class as the other `position-area` fails), **not** the offset geometry this fix 
 correctness fix for scripted `offsetLeft/Top/Width/Height` (and the render bake's bordered-CB frame), with a
 regression test and zero regressions — not a corpus gain.
 
+**Landed (2026-07-16, follow-up) — `getBoundingClientRect` joins the live position-area read model.** The
+offset-getter fix above left one query on the pre-bake snapshot: `getBoundingClientRect`
+(`ComputeUnzoomedLayoutRect`, `LayoutMetrics.cs`) still read the RF-BRIDGE shared box — a 0×0 rect before
+the grid-cell placement is baked — so a scripted `position-area` box reported its resolved used size via
+`offsetWidth`/`Height` but `0` via `getBoundingClientRect` (and likewise for position). The runner scores
+these tests on **pixels** and does not execute the testharness `getBoundingClientRect` assertions
+(`support/test-common.js`), so no corpus test flipped — but scripted pages saw two disagreeing geometry
+APIs. `ComputeUnzoomedLayoutRect` now takes the live `ResolvePositionAreaForElement` resolution when present
+(before the snapshot): the used-box **size** is the resolution's, and the document **position** is composed
+from the standard offsetParent invariant (`offsetParent` border-box origin + its `clientLeft/Top` border +
+the element's `offsetLeft/Top`), reusing the already-corrected offset getters rather than the pre-bake
+snapshot. Blast radius is `position-area` boxes only (the resolution is `null` otherwise), so every
+non-`position-area` `getBoundingClientRect` is byte-identical; zoom/transform stay approximate on this live
+path as elsewhere. Test: `PositionAreaLiveGeometryTests.GetBoundingClientRect_LivePositionArea_AgreesWithOffsetGetters`
+(a non-stretch 40×30 box whose `getBoundingClientRect` width/height match `offsetWidth/Height` and whose
+origin matches the offsetParent invariant). css-anchor-position corpus **unchanged (33/6, identical set)**;
+the geometry Cli suites pass with only the standing headless `Range_GetBoundingClientRect` environmental fail
+(confirmed identical with the change stashed). Zero regressions — another read-path query moved onto the one
+live geometry model, shrinking the getBoundingClientRect-vs-offset divergence the LayoutSnapshot endgame
+retires.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 

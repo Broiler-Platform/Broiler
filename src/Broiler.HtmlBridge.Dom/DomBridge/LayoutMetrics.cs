@@ -503,6 +503,29 @@ public sealed partial class DomBridge
 
     private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)
     {
+        // A live position-area resolution wins over the shared renderer snapshot (which
+        // reports a 0×0 box before the grid-cell placement is baked), matching the offset
+        // getters — so getBoundingClientRect stays consistent with offsetLeft/Top/Width/
+        // Height for a position-area box read during script (css-anchor-position
+        // position-area-anchor-partially-outside reads geometry live, before the render
+        // bake). The used-box SIZE is the resolution's; the document POSITION is composed
+        // from the standard offsetParent invariant (border-box edge = offsetParent
+        // border-box origin + its border + the element's offset), reusing the already-
+        // corrected offset getters rather than the pre-bake snapshot. Zoom/transform stay
+        // approximate on this live path, as elsewhere in the live position-area geometry.
+        if (ResolvePositionAreaForElement(element) is { } resolvedArea)
+        {
+            double left = GetOffsetLeftForDomElement(element);
+            double top = GetOffsetTopForDomElement(element);
+            if (GetOffsetParentForDomElement(element) is { } offsetParent)
+            {
+                var parentRect = ComputeUnzoomedLayoutRect(offsetParent);
+                left += parentRect.Left + GetClientLeftForDomElement(offsetParent);
+                top += parentRect.Top + GetClientTopForDomElement(offsetParent);
+            }
+            return (left, top, resolvedArea.width, resolvedArea.height);
+        }
+
         // RF-BRIDGE-1b: the element's rect comes from the renderer's real layout (border
         // box, document coords), which powers getBoundingClientRect and offset top/left.
         // The snapshot is in zoom-baked space and ComputeRenderedRect re-applies zoom to
