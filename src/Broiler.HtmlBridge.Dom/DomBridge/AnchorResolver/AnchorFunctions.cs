@@ -245,14 +245,19 @@ public sealed partial class DomBridge
             return false;
 
         // Opposing insets on an axis size the box. The engine resolves that size (border box
-        // fills the inset-modified CB minus margins) only for a childless box with an auto
-        // length on that axis; a childful box (needs a re-flow) or an explicit length
-        // (over-constrained) stays baked.
+        // fills the inset-modified CB minus margins) for a childless box with an auto length on
+        // that axis; OR, for a `min-content` length, the engine sizes the box from its real
+        // laid-out intrinsic width (so a childful box is fine — the size comes from layout, not
+        // the inset-sizing path). An explicit length combined with opposing insets is
+        // over-constrained and stays baked.
+        static bool OpposingAxisSizable(bool childless, string? length) =>
+            (childless && IsAutoLength(length))
+            || string.Equals((length ?? string.Empty).Trim(), "min-content", StringComparison.OrdinalIgnoreCase);
         if (HasInset(merged, "left") && HasInset(merged, "right")
-            && !(childless && IsAutoLength(merged.GetValueOrDefault("width"))))
+            && !OpposingAxisSizable(childless, merged.GetValueOrDefault("width")))
             return false;
         if (HasInset(merged, "top") && HasInset(merged, "bottom")
-            && !(childless && IsAutoLength(merged.GetValueOrDefault("height"))))
+            && !OpposingAxisSizable(childless, merged.GetValueOrDefault("height")))
             return false;
 
         // Every referenced anchor must be registered, accessible, and moved by no scroll
@@ -358,6 +363,17 @@ public sealed partial class DomBridge
         bool opposing = HasInset(merged, startInset) && HasInset(merged, endInset);
         if (TryParsePx(merged.GetValueOrDefault(lengthProp)).HasValue)
             return !opposing;
+        // A `min-content` base is handed off: the engine's native position-try pass reads the box's
+        // real laid-out intrinsic size for its overflow test (CssBox.TryApplyPositionTryFallback),
+        // which is at least as correct as — and, for content the bridge's crude
+        // EstimateMinContentWidth heuristic mis-measures, more correct than — the baked estimate.
+        // Validated by position-try-002 (an opposing-inset min-content base) rendering identically
+        // native. `max-content`/`fit-content` stay baked: the bridge estimator measures them as
+        // min-content, so handing the engine's (different, real) max/fit size off would diverge from
+        // that baked reference with no corpus test to validate the flip.
+        if (string.Equals((merged.GetValueOrDefault(lengthProp) ?? string.Empty).Trim(),
+                "min-content", StringComparison.OrdinalIgnoreCase))
+            return true;
         return childless && opposing && IsAutoLength(merged.GetValueOrDefault(lengthProp));
     }
 

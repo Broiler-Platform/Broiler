@@ -2527,9 +2527,32 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   (the corpus's only opposing-inset position-try test, `position-try-002`, has a `min-content` width and an
   inline-spacer child, so the `min-content`/childful exclusions keep it baked), so validation is the
   exact-geometry unit + bridge-mode + full-render tests plus no-regression. The remaining position-try
-  sub-case is the `min-content`/free-`auto`-sized base (`position-try-002`), which needs the engine's real
-  intrinsic width to be validated against the bridge's estimator (a JS-`checkLayout` test, entangled with
-  the getBoundingClientRect path) and stays baked.
+  sub-case is the `min-content`/free-`auto`-sized base (`position-try-002`) — handed off in the next
+  expansion.
+
+- **P5.8d.2b — `min-content` position-try base (twenty-sixth expansion) — COMPLETED** 2026-07-16
+  (**bridge only, additive**). The last position-try sub-case: a box whose base is sized by `width:
+  min-content` on an opposing-inset axis (`position-try-002` — `left: 0; right: anchor(--a left);
+  width: min-content`, an inline-spacer child) now goes native. The earlier assessment ("needs the
+  engine's real intrinsic width validated against the bridge's estimator") is resolved by the validation
+  itself: **the engine's native position-try pass reads the box's *real laid-out* geometry** for its
+  overflow test (`CssBox.TryApplyPositionTryFallback`), so a min-content base is sized by actual layout
+  — at least as correct as, and for content the bridge's crude `EstimateMinContentWidth` (max of
+  children's explicit widths) mis-measures, *more* correct than, the baked estimate. Two bridge gates
+  widened: `AxisSizeHandoffSupported` admits a `min-content` length (the engine reads the laid-out
+  intrinsic size), and `IsMvpNativeAnchorInsetBox`'s opposing-inset check admits a `min-content` axis
+  even for a **childful** box (the size comes from layout, not the inset-sizing path that needs
+  childless) — via a shared `OpposingAxisSizable` helper. `max-content`/`fit-content` deliberately stay
+  baked: the bridge estimator measures them *as* min-content, so handing the engine's (different, real)
+  size off would diverge from that baked reference with no corpus test to validate the flip. Tests:
+  `NativePositionTryBridgeModeTests.MinContentBase_LeavesBoxUnbaked` (the `position-try-002` shape is left
+  un-baked in native mode). Regression check: **`position-try-002` renders natively at 100 %**
+  (previously passed baked); css-anchor-position **native 33/6 (identical set)**; the broad available css
+  corpus (147) **unchanged at 36 fails**; the anchor / position-try Cli suites add zero regressions (only
+  the pre-existing environmental `DomBridge_AnchorSize_…`). This retires the bridge's `min-content`
+  position-try bake — the render-side half of feature (c); the `EstimateMinContentWidth` heuristic is now
+  used only by boxes that still bake (none in the corpus) and the live-geometry read path
+  (`ResolvePositionTryForElement`), which stays approximate as documented.
 
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
@@ -2743,12 +2766,12 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   this to flip — visual-viewport stays baked (its gate is unconditional) while every native feature runs,
   exactly as the twenty-third expansion proved global lever-on already safe.
 
-  Remaining engine gaps: visual-viewport (per the finding above — deferred to the `LayoutSnapshot` endgame),
-  and the
-  auto-`min-content`-sized position-try base (the **opposing-inset** case is now native — twenty-third
-  expansion; the `min-content` case — `position-try-002`, a JS `checkLayout` test entangled with the
-  getBoundingClientRect path — stays baked pending validation of the engine's real intrinsic width against
-  the bridge's estimator). **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler
+  Remaining engine gaps: visual-viewport (per the finding above — deferred to the `LayoutSnapshot` endgame).
+  The auto-`min-content`-sized position-try base (the **opposing-inset** case went native in the
+  twenty-third expansion) is **now fully native — the `min-content` case is handed off too (2026-07-16;
+  see the `min-content` position-try expansion below)**: the engine reads the box's *real laid-out
+  intrinsic width* for its overflow test, so a min-content base no longer needs the bridge's crude
+  `EstimateMinContentWidth` heuristic. **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler
   clamps an explicit position-area size to the grid cell (P5.5 `PositionAreaGrid.ResolveElementBox`) and a
   cell is always inside the containing block, so a position-area base **never overflows** — its
   `@position-try` fallback is therefore **inert**, and no corpus test combines the two (all four `position-try`

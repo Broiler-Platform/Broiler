@@ -80,4 +80,26 @@ public sealed class NativePositionTryBridgeModeTests
         var native = ResolveAndSerialize(nativeMode: true, OpposingHtml);
         Assert.DoesNotContain("id=\"target\" style=", native);
     }
+
+    // A min-content position-try base (the position-try-002 shape): the engine reads the box's
+    // real laid-out intrinsic width for its overflow test, so the bridge now hands it off instead
+    // of pre-baking it with the crude EstimateMinContentWidth heuristic.
+    private const string MinContentHtml =
+        "<!DOCTYPE html><html><head><style>" +
+        "body { margin: 0; }" +
+        "#cb { position: relative; width: 400px; height: 400px; }" +
+        "#anchor { anchor-name: --a; margin-left: 100px; width: 100px; height: 100px; }" +
+        "#target { position: absolute; position-try-fallbacks: --f1; width: min-content; height: 100px;" +
+        " left: 0; right: anchor(--a left); top: anchor(--a top); }" +
+        "#target > span { display: inline-block; width: 200px; height: 100px; }" +
+        "@position-try --f1 { left: anchor(--a right); right: 0; top: anchor(--a top); }" +
+        "</style></head><body><div id='cb'><div id='anchor'></div>" +
+        "<div id='target'><span></span></div></div></body></html>";
+
+    [Fact]
+    public void MinContentBase_LeavesBoxUnbaked()
+    {
+        var native = ResolveAndSerialize(nativeMode: true, MinContentHtml);
+        Assert.DoesNotContain("id=\"target\" style=", native);
+    }
 }
