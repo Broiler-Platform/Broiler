@@ -303,13 +303,11 @@ public sealed partial class DomBridge
         if (string.IsNullOrWhiteSpace(fallbackList))
             return null;
 
-        var positionTryRules = ParsePositionTryRules();
+        var positionTryRules = GetPositionTryRulesForPass();
         if (positionTryRules.Count == 0)
             return null;
 
-        var anchorRegistry = new System.Collections.Generic.Dictionary<string, AnchorInfo>(System.StringComparer.Ordinal);
-        BuildAnchorRegistry(anchorRegistry);
-        BuildInlineAnchorRegistry(anchorRegistry);
+        var anchorRegistry = GetAnchorRegistryForPass();
 
         string? implicitAnchor = baseProps.GetValueOrDefault("position-anchor");
         double cbWidth = FindContainingBlockWidth(element);

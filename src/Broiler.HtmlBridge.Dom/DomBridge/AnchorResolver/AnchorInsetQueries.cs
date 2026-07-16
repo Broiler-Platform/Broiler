@@ -54,9 +54,7 @@ public sealed partial class DomBridge
         if (!HasAnchor(left) && !HasAnchor(right) && !HasAnchor(top) && !HasAnchor(bottom))
             return null;
 
-        var anchorRegistry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);
-        BuildAnchorRegistry(anchorRegistry);
-        BuildInlineAnchorRegistry(anchorRegistry);
+        var anchorRegistry = GetAnchorRegistryForPass();
 
         string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor");
         double cbW = FindContainingBlockWidth(element);
@@ -205,9 +203,7 @@ public sealed partial class DomBridge
         if (!HasAnchorSize(width) && !HasAnchorSize(height))
             return null;
 
-        var anchorRegistry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);
-        BuildAnchorRegistry(anchorRegistry);
-        BuildInlineAnchorRegistry(anchorRegistry);
+        var anchorRegistry = GetAnchorRegistryForPass();
 
         string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor");
 

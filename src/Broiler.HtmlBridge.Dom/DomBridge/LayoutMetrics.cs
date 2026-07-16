@@ -23,6 +23,41 @@ public sealed partial class DomBridge
     // renderer layout is the sole geometry source.
     private bool _layoutGeometryPassActive;
 
+    // Per-pass memos for the document-wide anchor inputs the live anchor-geometry resolvers
+    // (position-area / anchor()-inset / anchor-size() / position-try) all need: the anchor
+    // registry (a full Elements walk + per-anchor box computation) and the parsed @position-try
+    // rules (a tree walk + CSS parse). A single getBoundingClientRect over an anchor box invokes
+    // several resolvers (and each offset getter re-invokes them, plus the offsetParent recursion),
+    // so building these once per read pass — the DOM/styles are static within a WithLayoutGeometryCache
+    // pass — avoids the O(anchors) rebuild fan-out. Null outside a pass (each build is fresh, matching
+    // the render bake); cleared with the geometry snapshot when the owning pass ends.
+    private Dictionary<string, AnchorInfo>? _passAnchorRegistry;
+    private Dictionary<string, Dictionary<string, string>>? _passPositionTryRules;
+
+    /// <summary>The anchor registry (stylesheet + inline anchors), built once per read pass.</summary>
+    private Dictionary<string, AnchorInfo> GetAnchorRegistryForPass()
+    {
+        if (_layoutGeometryPassActive && _passAnchorRegistry is { } cached)
+            return cached;
+        var registry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);
+        BuildAnchorRegistry(registry);
+        BuildInlineAnchorRegistry(registry);
+        if (_layoutGeometryPassActive)
+            _passAnchorRegistry = registry;
+        return registry;
+    }
+
+    /// <summary>The parsed <c>@position-try</c> rules, parsed once per read pass.</summary>
+    private Dictionary<string, Dictionary<string, string>> GetPositionTryRulesForPass()
+    {
+        if (_layoutGeometryPassActive && _passPositionTryRules is { } cached)
+            return cached;
+        var rules = ParsePositionTryRules();
+        if (_layoutGeometryPassActive)
+            _passPositionTryRules = rules;
+        return rules;
+    }
+
     // Test seam retained so the equivalence tests compile. The shared snapshot is the
     // single geometry source now, so toggling this no longer selects an alternate path.
     internal static bool LayoutGeometryCacheEnabled = true;
@@ -63,6 +98,8 @@ public sealed partial class DomBridge
             {
                 // RF-BRIDGE-1b: the shared-geometry snapshot is scoped to the same pass.
                 ClearSharedGeometrySnapshot();
+                _passAnchorRegistry = null;
+                _passPositionTryRules = null;
                 _layoutGeometryPassActive = false;
             }
         }

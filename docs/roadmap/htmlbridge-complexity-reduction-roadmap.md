@@ -3295,6 +3295,19 @@ pre-existing environmental fails. **All four anchor mechanisms — position-area
 position-try entanglement; the *render*-side handoff of a `min-content` base to the engine still awaits the engine's
 real intrinsic width, per feature (c).)
 
+**Landed (2026-07-16, follow-up) — per-pass memo for the live anchor-geometry resolvers.** The four live
+resolvers (`ResolvePositionAreaForElement` / `…AnchorInset…` / `…AnchorSize…` / `…PositionTry…`) each rebuilt
+the document-wide anchor registry (a full `Elements` walk + per-anchor box computation) and re-parsed the
+`@position-try` rules on every call — and a single `getBoundingClientRect` over an anchor box invokes several
+resolvers, each offset getter re-invokes them, and `ComputeUnzoomedLayoutRect` recurses up the offsetParent
+chain, so those document-wide builds fanned out (the WPT #1113 concern the old estimators had). They are now
+built **once per read pass** via `GetAnchorRegistryForPass` / `GetPositionTryRulesForPass`, memoized in fields
+cleared with the shared-geometry snapshot when the owning `WithLayoutGeometryCache` pass ends (fresh outside a
+pass, matching the render bake). Behaviour-preserving (the registry/rules are stable within a static read
+pass): the 40 live-geometry / position-try / native-anchor / position-area Cli tests pass, the
+css-anchor-position corpus is **33/6 unchanged**, and the broad geometry/anchor/hit-testing sweep keeps only
+the pre-existing environmental fails.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 
