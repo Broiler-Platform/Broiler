@@ -7,12 +7,11 @@ namespace Broiler.Wpt.Tests;
 /// End-to-end proof of the Phase 5 native scroll-offset expansion (P5.8d.2b) through the
 /// full WPT render pipeline (<see cref="WptTestRunner.RenderHtmlFileBitmapPublic"/>).
 ///
-/// A JS-set <c>scrollTop</c> on an <c>overflow: hidden</c> container is rendered two ways:
-/// the bridge's DOM-shift (lever off — a <c>position:relative</c> wrapper offsets the
-/// content) and the Broiler.Layout engine's scroll post-pass (lever on — the bridge marks
-/// the container with <c>data-broiler-scroll-top</c> and the engine translates the content,
-/// clipped by the container's overflow box). Both must place the scrolled marker in the
-/// same spot.
+/// A JS-set <c>scrollTop</c> on an <c>overflow: hidden</c> container is rendered by the
+/// Broiler.Layout engine's scroll post-pass: the bridge marks the container with
+/// <c>data-broiler-scroll-top</c> and the engine translates the content, clipped by the
+/// container's overflow box. The bridge's baked DOM-shift wrapper was deleted in Phase 4
+/// item-2 step 5, so this is the only scroll path now.
 ///
 /// Fixture: a 100×100 <c>overflow:hidden</c> container at (20,20); inside it a 50px spacer,
 /// a 20px red marker (content-y 50–70), and a tall tail. With <c>scrollTop = 30</c> the
@@ -112,21 +111,6 @@ public class NativeScrollParityWptTests : IDisposable
     }
 
     [Fact]
-    public void BridgeAndEnginePaths_Agree_OnScrollOffset()
-    {
-        // Lever off → the bridge DOM-shifts; lever on → the engine translates. Both must
-        // place the scrolled marker in the same rectangle (native scroll parity).
-        var baked = Render(nativeAnchor: false);
-        var native = Render(nativeAnchor: true);
-
-        Assert.True(baked.count > 0 && native.count > 0, "marker missing in one of the paths.");
-        Assert.True(System.Math.Abs(baked.x0 - native.x0) <= 2, $"left differs: baked={baked.x0}, native={native.x0}.");
-        Assert.True(System.Math.Abs(baked.y0 - native.y0) <= 2, $"top differs: baked={baked.y0}, native={native.y0}.");
-        Assert.True(System.Math.Abs(baked.x1 - native.x1) <= 2, $"right differs: baked={baked.x1}, native={native.x1}.");
-        Assert.True(System.Math.Abs(baked.y1 - native.y1) <= 2, $"bottom differs: baked={baked.y1}, native={native.y1}.");
-    }
-
-    [Fact]
     public void NativeLeverOn_ClipsContentScrolledAboveTheTopEdge()
     {
         var red = Render(nativeAnchor: true, html: HtmlScrolledAbove);
@@ -135,16 +119,5 @@ public class NativeScrollParityWptTests : IDisposable
         // marker (content-y 10–30, scrollTop 40 → container-y -30..-10) must be clipped.
         Assert.True(red.count > 0, "no red painted at all — the visible marker should show.");
         Assert.True(red.y0 >= 20 - 1, $"red leaked above the container top edge (y0={red.y0}, container top=20).");
-    }
-
-    [Fact]
-    public void BridgeAndEnginePaths_Agree_WhenContentScrolledAboveTop()
-    {
-        var baked = Render(nativeAnchor: false, html: HtmlScrolledAbove);
-        var native = Render(nativeAnchor: true, html: HtmlScrolledAbove);
-
-        Assert.True(baked.count > 0 && native.count > 0, "visible marker missing in one of the paths.");
-        Assert.True(System.Math.Abs(baked.y0 - native.y0) <= 2, $"top differs: baked={baked.y0}, native={native.y0}.");
-        Assert.True(System.Math.Abs(baked.y1 - native.y1) <= 2, $"bottom differs: baked={baked.y1}, native={native.y1}.");
     }
 }

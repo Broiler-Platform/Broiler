@@ -47,126 +47,30 @@ public sealed partial class DomBridge
 
                 if ((clips || isDocScrollingElement) && el.ChildNodes.Count > 0)
                 {
-                    // Native mode (P5.8d.2b scroll expansion): for a scroll container on a page
-                    // with no anchor content, hand the scroll offset to the Broiler.Layout engine
-                    // via data attributes instead of DOM-shifting the content. The engine's scroll
-                    // post-pass (CssBox.RunScrollSimulation) translates the container's content and
-                    // its overflow box (or the viewport, for the document scrolling element) clips
-                    // it — no wrapper div, no inline position/top/left/visibility writes, and no
-                    // fixed-descendant reparenting (OffsetTop/OffsetLeft skip position:fixed at
-                    // every depth, CSS2.1 §9.6.1). The document scrolling element (<html>) is
-                    // included (P5.8d.2b document-scroll increment): the earlier revert assumed
-                    // page scroll never applied, but that was a non-scrollable synthetic fixture —
+                    // Hand the scroll offset to the Broiler.Layout engine via data attributes
+                    // instead of DOM-shifting the content. The engine's scroll post-pass
+                    // (CssBox.RunScrollSimulation) translates the container's content and its
+                    // overflow box (or the viewport, for the document scrolling element) clips it —
+                    // no wrapper div, no inline position/top/left/visibility writes, and no
+                    // fixed-descendant reparenting (OffsetTop/OffsetLeft skip position:fixed at every
+                    // depth, CSS2.1 §9.6.1). The document scrolling element (<html>) is included:
                     // with a scrollable root (tall content) documentElement.scrollTop resolves
-                    // normally and the engine translation is validated to match the DOM-shift.
-                    // Scoped to no-anchor documents so this never crosses the anchor-scroll-
-                    // container / position-visibility machinery, which keeps the DOM-shift below.
-                    if (NativeAnchorPlacement)
-                    {
-                        if (scrollTop != 0)
-                            SetAttr(el, "data-broiler-scroll-top",
-                                scrollTop.ToString(CultureInfo.InvariantCulture));
-                        if (scrollLeft != 0)
-                            SetAttr(el, "data-broiler-scroll-left",
-                                scrollLeft.ToString(CultureInfo.InvariantCulture));
-
-                        // Recurse into children (nested scroll containers) and skip the DOM-shift.
-                        for (int i = 0; i < el.ChildNodes.Count; i++)
-                            if (ChildAt(el, i) is DomElement scrolledChild)
-                                ApplyScrollSimulationTree(scrolledChild);
-                        return;
-                    }
-
-                    // Wrap all children in a positioned div that shifts content
-                    // upward / leftward.  Using position:relative + top/left
-                    // ensures the shifted content is clipped correctly by the
-                    // container's overflow:hidden at all edges (including top),
-                    // avoiding the rendering artefact where negative-margin
-                    // spacers can leak above the container's top edge.
-                    var wrapper = CreateBridgeElement("div");
-                    InlineStyle(wrapper)["position"] = "relative";
-                    // Native mode: this scroll-offset wrapper is a rendering hack, not an authored
-                    // containing block, so mark it (like an anchor-induced-relative scroller) — the
-                    // engine's position-visibility pass must resolve a target's CB to the real
-                    // authored scroll container, not this wrapper (else an authored position:relative
-                    // scroller's target is wrongly hidden — position-visibility-anchors-visible-with-position).
-                    if (NativeAnchorPlacement)
-                        SetAttr(wrapper, "data-broiler-anchor-cb", "1");
+                    // normally and the engine translation matches. The flag check is dropped in
+                    // Phase 4 item-2 step 5 — the handoff is unconditional (a provable no-op on the
+                    // native default path, where the flag was already true); the retired baked
+                    // DOM-shift wrapper (and its scroll-hidden / anchor-cb markers) is deleted.
                     if (scrollTop != 0)
-                        InlineStyle(wrapper)["top"] =
-                            $"{(-scrollTop).ToString(CultureInfo.InvariantCulture)}px";
+                        SetAttr(el, "data-broiler-scroll-top",
+                            scrollTop.ToString(CultureInfo.InvariantCulture));
                     if (scrollLeft != 0)
-                        InlineStyle(wrapper)["left"] =
-                            $"{(-scrollLeft).ToString(CultureInfo.InvariantCulture)}px";
+                        SetAttr(el, "data-broiler-scroll-left",
+                            scrollLeft.ToString(CultureInfo.InvariantCulture));
 
-                    var originalChildren = SnapshotChildren(el);
-                    ClearChildren(el);
-                    el.AppendChild(wrapper);
-                    foreach (var child in originalChildren)
-                    {
-                        SetParent(child, wrapper);
-                        wrapper.AppendChild(child);
-                    }
-
-                    // For the document scrolling element, extract ALL
-                    // fixed-positioned descendants from the wrapper and
-                    // re-parent them as direct children of <html>.  This
-                    // prevents the Broiler renderer from incorrectly
-                    // shifting viewport-relative elements by the scroll
-                    // offset applied to the wrapper.
-                    if (isDocScrollingElement)
-                    {
-                        var fixedDescendants = new List<DomElement>();
-                        CollectFixedDescendants(wrapper, fixedDescendants);
-                        foreach (var fixedEl in fixedDescendants)
-                        {
-                            fixedEl.Remove();
-                            SetParent(fixedEl, el);
-                            el.AppendChild(fixedEl);
-                        }
-                    }
-
-                    // Hide normal-flow children that are entirely above the
-                    // scroll position.  This prevents coloured content from
-                    // leaking above the container's top edge (Broiler's
-                    // renderer clips overflow at the bottom but may not
-                    // fully clip at the top for position:relative offsets).
-                    // Skip this for the document scrolling element (<html>)
-                    // because its children are structural (<head>, <body>)
-                    // and must not be hidden — the viewport clips naturally.
-                    if (scrollTop > 0 && !isDocScrollingElement)
-                    {
-                        double childOffset = 0;
-                        foreach (var child in SnapshotChildren(wrapper))
-                        {
-                            if (IsText(child)) continue;
-                            var cp = GetComputedProps(child);
-                            var childPos = cp.GetValueOrDefault("position");
-                            if (childPos == "absolute" || childPos == "fixed")
-                                continue;
-                            double childH =
-                                TryParsePx(cp.GetValueOrDefault("height")) ?? 0;
-                            double childMT =
-                                TryParsePx(cp.GetValueOrDefault("margin-top")) ?? 0;
-                            childOffset += childMT;
-                            if (childOffset + childH <= scrollTop)
-                            {
-                                InlineStyle(child)["visibility"] = "hidden";
-                                // Native mode: this visibility:hidden is a scroll-clip hack, not an
-                                // authored value — mark it so the engine's position-visibility pass
-                                // does not mistake a scrolled-out anchor for an authored
-                                // visibility:hidden anchor (which would hide the target even when its
-                                // CB is the scroller — position-visibility-anchors-visible-with-position).
-                                if (NativeAnchorPlacement)
-                                    SetAttr(child, "data-broiler-scroll-hidden", "1");
-                                childOffset += childH;
-                            }
-                            else
-                            {
-                                break;
-                            }
-                        }
-                    }
+                    // Recurse into children (nested scroll containers) and skip the DOM-shift.
+                    for (int i = 0; i < el.ChildNodes.Count; i++)
+                        if (ChildAt(el, i) is DomElement scrolledChild)
+                            ApplyScrollSimulationTree(scrolledChild);
+                    return;
                 }
             }
         }
@@ -178,40 +82,7 @@ public sealed partial class DomBridge
                 ApplyScrollSimulationTree(child);
     }
 
-    /// <summary>
-    /// Recursively collects all descendants with <c>position: fixed</c>
-    /// (including generated backdrop divs) from the given subtree.
-    /// </summary>
-    private void CollectFixedDescendants(DomElement parent, List<DomElement> results)
-    {
-        foreach (var child in SnapshotChildren(parent))
-        {
-            if (IsText(child)) continue;
-            var cp = GetComputedProps(child);
-            var pos = cp.GetValueOrDefault("position");
-            if (pos == "fixed")
-            {
-                results.Add(child);
-            }
-            else
-            {
-                // Recurse into non-fixed elements to find fixed descendants.
-                CollectFixedDescendants(child, results);
-            }
-        }
-    }
-    
     private double GetScrollSimulationScaleFactor() => HasActiveVisualViewport() ? GetVisualViewportScale() : 1;
-
-    /// <summary>
-    /// Whether the document has any registered anchor (a named <c>anchor-name</c>) — i.e.
-    /// CSS anchor positioning could be active. Used to scope the native scroll handoff: when
-    /// there are no anchors, none of the anchor-scroll-container / position-visibility
-    /// machinery runs, so a scroll container can be handed to the engine's scroll post-pass
-    /// without any interaction with it. <c>_anchorCandidates</c> is populated by
-    /// <c>BuildAnchorRegistry</c> (step 1), well before scroll simulation (step 8).
-    /// </summary>
-    private bool DocumentHasAnchorContent() => _anchorCandidates is { Count: > 0 };
 
     private static bool HasOverflowClipping(Dictionary<string, string> props)
     {

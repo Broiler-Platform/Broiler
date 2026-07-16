@@ -4,15 +4,14 @@ using Broiler.HTML.Image;
 namespace Broiler.Wpt.Tests;
 
 /// <summary>
-/// Render parity for the Phase 5 scroll-simulation expansion (P5.8d.2b): a
+/// Native render checks for the Phase 5 scroll-simulation expansion (P5.8d.2b): a
 /// <c>position-area</c> box whose containing block is the anchor's <em>scroll
-/// container</em> now goes native (the bridge no longer pre-bakes it). The bridge's
-/// <c>ApplyScrollSimulation</c> pre-pass DOM-shifts the scrolled content before the
-/// final render, so the engine's box tree already carries the scrolled anchor
-/// geometry and its placement post-pass reads the shifted anchor border box. These
-/// tests prove the native (lever-on) render lands the box in the same cell as the
-/// baked (lever-off) render — with and without a JS scroll offset, and for both a
-/// positioned and a static scroll container.
+/// container</em> is placed natively. The bridge marks the scroll container with
+/// <c>data-broiler-scroll-*</c> and the engine's scroll post-pass shifts the content,
+/// so the placement post-pass reads the scrolled anchor border box. These tests pin
+/// the native (lever-on) placement — with and without a JS scroll offset, and for both
+/// a positioned and a static scroll container. (The baked DOM-shift path these once
+/// compared against was deleted in Phase 4 item-2 step 5.)
 /// </summary>
 [Xunit.Collection("NativeAnchorWpt")]
 public class ScrollContainerAnchorParityTests : IDisposable
@@ -67,22 +66,21 @@ public class ScrollContainerAnchorParityTests : IDisposable
         .Replace("{SC_POS}", positioned ? "position: relative; " : "")
         .Replace("{SCRIPT}", script);
 
+    // The bottom-right target's top-left corner sits at the anchor's right/bottom edge. Anchor is
+    // at content (100,100) 40x40 → edge (140,140); a scrollLeft=30/scrollTop=50 shifts it to
+    // (70,50) → edge (110,90). Placement is the same for a positioned or static scroll container CB.
     [Theory]
-    [InlineData(true, "")]                                                                          // positioned CB, no scroll
-    [InlineData(false, "")]                                                                         // static CB, no scroll
-    [InlineData(true, "<script>sc.scrollTop = 50; sc.scrollLeft = 30;</script>")]                   // positioned CB, scrolled
-    public void ScrollContainerCB_BakedAndNativePaths_Agree(bool positioned, string script)
+    [InlineData(true, "", 140, 140)]                                                                // positioned CB, no scroll
+    [InlineData(false, "", 140, 140)]                                                               // static CB, no scroll
+    [InlineData(true, "<script>sc.scrollTop = 50; sc.scrollLeft = 30;</script>", 110, 90)]          // positioned CB, scrolled
+    public void ScrollContainerCB_NativePlacement(bool positioned, string script, int expectX0, int expectY0)
     {
         string html = Html(positioned, script);
-        var baked = Render(html, nativeAnchor: false);
         var native = Render(html, nativeAnchor: true);
 
-        Assert.True(baked.count > 0, "baked path painted no target.");
         Assert.True(native.count > 0, "native path painted no target.");
-        Assert.True(System.Math.Abs(baked.x0 - native.x0) <= 2, $"left differs: baked={baked.x0}, native={native.x0}.");
-        Assert.True(System.Math.Abs(baked.y0 - native.y0) <= 2, $"top differs: baked={baked.y0}, native={native.y0}.");
-        Assert.True(System.Math.Abs(baked.x1 - native.x1) <= 2, $"right differs: baked={baked.x1}, native={native.x1}.");
-        Assert.True(System.Math.Abs(baked.y1 - native.y1) <= 2, $"bottom differs: baked={baked.y1}, native={native.y1}.");
+        Assert.True(System.Math.Abs(native.x0 - expectX0) <= 2, $"native left={native.x0}, expected ~{expectX0}.");
+        Assert.True(System.Math.Abs(native.y0 - expectY0) <= 2, $"native top={native.y0}, expected ~{expectY0}.");
     }
 
     [Fact]
