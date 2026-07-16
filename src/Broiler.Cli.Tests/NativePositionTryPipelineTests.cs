@@ -122,11 +122,9 @@ public sealed class NativePositionTryPipelineTests
     // measures it as 100. Base `left: anchor(--a left)` = 150, so the box spans [150,350] and
     // overflows the 300-wide CB *only when sized at the real 200*: at the mis-estimated 100 it would
     // span [150,250] and "fit", suppressing the fallback. The engine reads the box's real laid-out
-    // width for its overflow test, so it correctly overflows and applies --flip (`right: 0px`),
-    // landing the 200px box at left 100. This is why handing a max-content position-try box to the
-    // engine (rather than baking it with the estimate) is correct — the estimate would wrongly keep
-    // the base. (--flip uses `right: 0px`, not unitless `0`: the engine's ResolveTryEdge admits only
-    // px/percentage lengths, a pre-existing gap orthogonal to this max-content coverage.)
+    // width for its overflow test, so it correctly overflows and applies --flip (`right: 0`), landing
+    // the 200px box at left 100. This is why handing a max-content position-try box to the engine
+    // (rather than baking it with the estimate) is correct — the estimate would wrongly keep the base.
     private const string MaxContentHtml =
         "<!DOCTYPE html><html><head><style>" +
         "body { margin: 0; }" +
@@ -134,14 +132,14 @@ public sealed class NativePositionTryPipelineTests
         "#anchor { position: absolute; left: 150px; top: 0; width: 20px; height: 20px; anchor-name: --a; }" +
         "#target { position: absolute; top: 0; left: anchor(--a left); position-try-fallbacks: --flip; }" +
         "#target > span { display: inline-block; width: 100px; height: 50px; }" +
-        "@position-try --flip { left: auto; right: 0px; }" +
+        "@position-try --flip { left: auto; right: 0; }" +
         "</style></head><body><div id='cb'><div id='anchor'></div>" +
         "<div id='target'><span></span><span></span></div></div></body></html>";
 
     private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> MaxContentFlipRule =
         new Dictionary<string, IReadOnlyDictionary<string, string>>
         {
-            ["--flip"] = new Dictionary<string, string> { ["left"] = "auto", ["right"] = "0px" },
+            ["--flip"] = new Dictionary<string, string> { ["left"] = "auto", ["right"] = "0" },
         };
 
     private static BoxGeometry LayoutTargetOf(
@@ -196,5 +194,35 @@ public sealed class NativePositionTryPipelineTests
         // left-100 placement above is the fallback pass acting on the real max-content width.
         var box = LayoutTargetOf(MaxContentHtml, nativeAnchor: true, rules: null);
         Assert.Equal(150f, box.BorderBox.Left, 1);
+    }
+
+    // A fallback whose SOLE horizontal positioning inset is a unitless `right: 0` (common in real
+    // @position-try rules). The base `left: anchor(--a right)` = 80 puts the 40px box at [80,120],
+    // overflowing the 100 CB; --flip (`left: auto; right: 0`) should land it flush-right at [60,100].
+    // Regression guard for ResolveTryEdge: unitless `0` is a valid zero length (CssLength parses it
+    // with CssUnit.None), so it must resolve to 0 rather than being skipped (which left the box at 0).
+    private const string UnitlessZeroHtml =
+        "<!DOCTYPE html><html><head><style>" +
+        "body { margin: 0; }" +
+        "#cb { position: relative; width: 100px; height: 100px; }" +
+        "#anchor { position: absolute; left: 60px; top: 0; width: 20px; height: 20px; anchor-name: --a; }" +
+        "#target { position: absolute; top: 0; width: 40px; height: 20px;" +
+        " left: anchor(--a right); position-try-fallbacks: --flip; }" +
+        "@position-try --flip { left: auto; right: 0; }" +
+        "</style></head><body><div id='cb'><div id='anchor'></div><div id='target'></div></div></body></html>";
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> UnitlessZeroRule =
+        new Dictionary<string, IReadOnlyDictionary<string, string>>
+        {
+            ["--flip"] = new Dictionary<string, string> { ["left"] = "auto", ["right"] = "0" },
+        };
+
+    [Fact]
+    public void NativeFallback_UnitlessZeroInset_ResolvesToFlushEdge()
+    {
+        var box = LayoutTargetOf(UnitlessZeroHtml, nativeAnchor: true, rules: UnitlessZeroRule);
+        // right: 0 → box right edge flush with the 100px CB; 40px wide → left 60.
+        Assert.Equal(60f, box.BorderBox.Left, 1);
+        Assert.Equal(40f, box.BorderBox.Width, 1);
     }
 }
