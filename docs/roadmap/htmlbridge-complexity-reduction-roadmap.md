@@ -2654,6 +2654,35 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   renderer effort, and all-or-nothing for parity (a partial port breaks the 7 passing tests). Best done as its
   own submodule feature, not folded into the lever-gated anchor cutover. Left on the bridge path.
 
+  **Finding — native scroll on anchor pages: position-visibility is ready, but `RunScrollSimulation`
+  breaks the abspos-child scroller case (2026-07-16 investigation; the gate relaxation was tried and
+  reverted).** The scroll handoff is gated per-page by `!DocumentHasAnchorContent()`
+  (`ScrollSimulation.cs`), so an anchor page keeps the bridge's DOM-shift for *every* scroll container.
+  Relaxing that gate to `NativeAnchorPlacement` (native scroll on anchor pages too) was tried:
+  - **Position-visibility works with no marker — the assumed hard blocker is not one.** All **14
+    `position-visibility` corpus tests still pass** lever-on. The `data-broiler-scroll-hidden` marker the
+    thirteenth expansion added exists only because the DOM-shift's `position:relative` wrapper does not move
+    a box's `Bounds`, so the engine's geometric `AnchorScrolledOutOf` read was blind to it. Native scroll
+    shifts `Bounds` via `OffsetTop`/`OffsetLeft`, so that geometric check (already the `||` fallback at
+    `CssBox.Visibility.cs`) becomes authoritative and the marker is unneeded. The anchor-induced-CB marker
+    (`data-broiler-anchor-cb`) is stamped by the position-area pass (orchestrator step 3e), independent of
+    the DOM-shift, so the static-vs-authored-relative scroller distinction still holds.
+  - **The blocker is `RunScrollSimulation` on a scroller with an abspos anchor-centred child.**
+    `anchor-center-scroll-001` regresses hard (100 %→89.8 %): a probe of the full render shows the in-flow
+    anchor **and** the anchor-centred abspos box **vanish entirely** and the scroller's own background
+    mis-paints (orange only from y=100), where the DOM-shift renders them correctly. The fixture is an
+    `overflow:auto` **static** scroller holding an in-flow `#anchor` and an abspos `#anchored`
+    (`align-self:anchor-center`) whose containing block is the viewport (the static scroller is not a CB).
+    A first fix — having `RunScrollSimulation` skip an abspos child whose CB is not the scroller (CSS
+    Overflow 3: only in-flow content and abspos boxes with a CB inside the scroller move) — is correct in
+    principle but **did not** resolve the vanishing, so the breakage is deeper than the abspos-child shift
+    (likely the `overflow:auto` scroller's content-shift vs the anchor placement / box-tree interaction, or
+    a document/scroller compound offset). It needs focused work in the native scroll pass for anchor-page
+    scrollers, with the css-anchor-position **scroll + anchor-center + position-visibility** subset as the
+    parity gate, before the `DocumentHasAnchorContent` gate can relax. **Net: the position-visibility half
+    is proven ready; the scroll pass needs an abspos-child-scroller fix first.** Reverted; the bridge
+    DOM-shift stays for anchor pages.
+
   Still bridge-only: dialog/backdrop's **visible-scrim / top-layer-paint / UA-box-styling** part (its
   anchor-*geometry* — the pixel-relevant part of the 7 top-layer corpus tests — is native as of the
   twenty-second expansion), sticky's **anchor-page** case only (the non-document scroll-container
