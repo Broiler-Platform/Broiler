@@ -2784,14 +2784,13 @@ native" = making both unconditional and retiring the flag.
 
 **Pass inventory (see the twenty-plus expansions above for the native replacements):**
 
-- **WHOLE-SKIP — deletable outright** once native is unconditional (guarded by `if (!NativeAnchorPlacement)`
-  around the whole call, so in native mode they run for *no* box; the engine has a full replacement for each):
-  `ResolveAnchorCenter` (AnchorCenter.cs, 3 writes), `ResolvePositionVisibility` (Visibility.cs, 2 writes +
-  helper tree), `ResolveFixedPositionSizing` (FixedPosition.cs, 8 writes), `EnsureContainingBlockPositioning`
-  (ContainingBlocks.cs, 1 write), `NeutralizeStyleElementsForAnchorRules` (CssCleanup.cs, 1 `<style>`-text
-  rewrite — safe to drop: non-MVP boxes are suppressed by the per-element inline `position-area: none`, which
-  overrides the un-neutralized stylesheet rule). ≈15 inline writes + 1 style rewrite, plus their private
-  helpers and the baked-path characterization tests.
+- **WHOLE-SKIP — deletable outright, ALL FIVE DELETED 2026-07-16** (were guarded by `if (!NativeAnchorPlacement)`
+  around the whole call, so in native mode they ran for *no* box; the engine has a full replacement for each):
+  `ResolveAnchorCenter` (AnchorCenter.cs), `ResolvePositionVisibility` (Visibility.cs — visibility-only helpers
+  removed, shared anchor-lookup helpers kept), `ResolveFixedPositionSizing` (FixedPosition.cs),
+  `EnsureContainingBlockPositioning` (ContainingBlocks.cs — shared `EstablishesContainingBlock` helper kept),
+  `NeutralizeStyleElementsForAnchorRules` (CssCleanup.cs, whole file). ≈15 inline writes + 1 style rewrite, plus
+  their private helpers and the baked-path characterization tests, are gone. See the step 3–4 log below.
 - **PER-ELEMENT — thinnable only** (internal `IsMvpNative…Box` gate; the MVP-skip becomes unconditional but
   the **non-MVP bake branch stays**, because features not yet native still bake): `ResolveAnchorFunctions`,
   `ResolvePositionAreaValues` (non-MVP writes `position-area: none`), `ResolvePositionTryFallbacks` (non-MVP
@@ -2824,24 +2823,39 @@ native" = making both unconditional and retiring the flag.
    `persist-failed` job regenerates the full-suite `tests/wpt-baseline/failed-tests.json` manifest
    automatically (it is a 22,956-test artifact — not hand-edited); the full-suite (non-css) validation lands
    in CI on this branch, backed locally by the step-1 zero-regression result across the available css corpus.
-3–4. **Commit to native + delete the WHOLE-SKIP passes — IN PROGRESS 2026-07-16 (first pass landed).**
-   Refinement from executing it: this is done **per-pass, not as one big-bang**, because (a) some pass files
+3–4. **Commit to native + delete the WHOLE-SKIP passes — DONE 2026-07-16 (all five passes deleted).**
+   Refinement from executing it: this was done **per-pass, not as one big-bang**, because (a) some pass files
    share helpers with the surviving passes (`ContainingBlocks.cs`'s `EstablishesContainingBlock` is used by
-   PositionArea / InlineContainingBlocks / AnchorRegistry / Visibility, so only the pass method deletes, the
-   helper stays), and (b) several features have baked-vs-native **parity tests** whose baked assertion must be
-   dropped as the baked path goes. The `NativeAnchorPlacement` flag is **kept** (the PER-ELEMENT passes still
-   need it for non-MVP boxes); deleting a WHOLE-SKIP pass just removes its `if (!NativeAnchorPlacement) Pass()`
-   call + method, making that feature engine-only (the `=0` opt-out no longer bakes it — an accepted,
-   progressive degradation of the retired path). **Each deletion is a provable no-op for the native/default
-   path** (the pass was already skipped there), so the css-anchor-position corpus stays 33/6.
+   PositionArea / InlineContainingBlocks / AnchorRegistry / Visibility, and `Visibility.cs`'s
+   `FindElementByAnchorName` / `FindContainingBlockElement` / `FindAnchorContainingBlock` are used by
+   PositionArea / AnchorRegistry — so only the pass methods delete, the shared helpers stay), and (b) several
+   features have baked-vs-native **parity tests** whose baked assertion must be dropped as the baked path goes.
+   The `NativeAnchorPlacement` flag is **kept** (the PER-ELEMENT passes still need it for non-MVP boxes);
+   deleting a WHOLE-SKIP pass just removes its `if (!NativeAnchorPlacement) Pass()` call + method, making that
+   feature engine-only (the `=0` opt-out no longer bakes it — an accepted, progressive degradation of the
+   retired path). **Each deletion is a provable no-op for the native/default path** (the pass was already
+   skipped there), so the css-anchor-position corpus stayed 33/6 through every step and the full available css
+   corpus stayed at 36 fails (zero regression).
    - ✅ **`ResolveFixedPositionSizing` (FixedPosition.cs, 87 lines) deleted** — the redundant fixed-opposing-inset
      pre-bake (fifteenth expansion proved the engine does it identically, CSS2.1 §10.3.7). Fully self-contained
      (no shared helpers). `NativeFixedSizingTests` keeps its two engine-parity tests and drops the baked
-     assertion. Native corpus 33/6 unchanged; build + tests green.
-   - Remaining WHOLE-SKIP: `ResolveAnchorCenter` (AnchorCenter.cs), `ResolvePositionVisibility` (Visibility.cs —
-     251 lines, shares `EstablishesContainingBlock`), `EnsureContainingBlockPositioning` (ContainingBlocks.cs —
-     keep the shared helper), `NeutralizeStyleElementsForAnchorRules` (CssCleanup.cs). Each with its
-     parity-test update (NativeAnchorCenter / NativePositionVisibility / NativeAnchorContainCb WptTests).
+     assertion (renamed `BridgeNeverBakesFixedSize`).
+   - ✅ **`EnsureContainingBlockPositioning` (ContainingBlocks.cs) deleted** — non-position CB establishers
+     (contain / transform / will-change:transform) resolve natively via
+     `CssBox.FindPositionedContainingBlock` + `EstablishesNonPositionAbsPosContainingBlock`. Kept the shared
+     `EstablishesContainingBlock` helper; dropped the obsolete baked-vs-native parity test from
+     `NativeAnchorContainCbWptTests`.
+   - ✅ **`ResolveAnchorCenter` (AnchorCenter.cs) deleted** — the engine post-pass
+     `CssBox.TryApplyAnchorCenter` centres align-self/justify-self:anchor-center boxes. Self-contained; dropped
+     the parity test from `NativeAnchorCenterWptTests`.
+   - ✅ **`ResolvePositionVisibility` (Visibility.cs) deleted** — the engine post-pass
+     `CssBox.ResolvePositionVisibility`, fed by the `data-broiler-anchor-cb` marker, hides scrolled-out anchors.
+     Removed the pass + its visibility-only helpers; kept the shared anchor-lookup helpers
+     (`FindElementByAnchorName` / `FindContainingBlockElement` / `FindAnchorContainingBlock`); dropped the
+     baked assertions from `NativePositionVisibilityWptTests`.
+   - ✅ **`NeutralizeStyleElementsForAnchorRules` (CssCleanup.cs) deleted** — the engine post-pass consumes the
+     stylesheet's anchor rules directly, so they must reach the renderer un-stripped. Whole file deleted (all
+     helpers private, none shared).
 5. **Thin the 6 PER-ELEMENT passes** (per-pass PRs): drop the flag check, make the MVP-skip unconditional,
    keep the non-MVP bake + its marker. Each pass shrinks to "bake only the not-yet-native residue."
 6. **Residual bakes stay** until their features go native: dialog/backdrop (submodule), visual-viewport
