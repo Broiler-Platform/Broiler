@@ -5,12 +5,12 @@ namespace Broiler.Cli.Tests;
 
 /// <summary>
 /// Bridge half of the Phase 5 native <c>position: sticky</c> expansion (P5.8d.2b): a sticky
-/// box whose scroll container is a non-document clipping element on a no-anchor page is in the
-/// native MVP subset, so with <c>DomBridge.NativeAnchorPlacement</c> on the bridge stops
-/// pre-baking it — the box keeps its <c>position: sticky</c> and gets no baked inline
-/// <c>position: relative</c> override, leaving the pinning to the Broiler.Layout engine's
-/// sticky post-pass (validated to render correctly by <c>NativeStickyWptTests</c>). Default
-/// off rewrites sticky to relative + offset as before.
+/// box whose scroll container is a non-document clipping element is in the native MVP subset,
+/// so the bridge never pre-bakes it — the box keeps its <c>position: sticky</c> and gets no
+/// baked inline <c>position: relative</c> override, leaving the pinning to the Broiler.Layout
+/// engine's sticky post-pass (validated to render correctly by <c>NativeStickyWptTests</c>).
+/// Phase 4 item-2 step 5 dropped the <c>NativeAnchorPlacement</c> flag check from the pass, so
+/// the MVP-skip is unconditional (only a sticky box with no scroll container still bakes).
 /// </summary>
 public sealed class NativeStickyBridgeModeTests
 {
@@ -47,24 +47,13 @@ public sealed class NativeStickyBridgeModeTests
     }
 
     [Fact]
-    public void NativeMode_DoesNotBakeStickyToRelative()
+    public void MvpStickyBox_IsNeverBakedToRelative()
     {
+        // The bridge leaves position:sticky un-baked (no inline position:relative override) so the
+        // property survives to the engine's sticky post-pass. Step 5 made this unconditional — the
+        // flag no longer changes it, so a single mode suffices.
         var tag = StickyTag(ResolveAndSerialize(nativeMode: true));
-
-        // Went native: the bridge left position:sticky un-baked — no inline position:relative
-        // override — so the property survives to the engine's sticky post-pass.
-        var compact = tag.Replace(" ", "");
-        Assert.DoesNotContain("position:relative", compact);
-    }
-
-    [Fact]
-    public void DefaultMode_BakesStickyToRelative()
-    {
-        var tag = StickyTag(ResolveAndSerialize(nativeMode: false));
-
-        // Default (production) path rewrites sticky to relative for the static renderer.
-        var compact = tag.Replace(" ", "");
-        Assert.Contains("position:relative", compact);
+        Assert.DoesNotContain("position:relative", tag.Replace(" ", ""));
     }
 
     // Same sticky container, but the page also carries anchor content (an anchor-name box), so
@@ -92,13 +81,11 @@ public sealed class NativeStickyBridgeModeTests
     }
 
     [Fact]
-    public void NativeMode_OnAnchorPage_DoesNotBakeStickyToRelative()
+    public void OnAnchorPage_StickyBox_IsNeverBakedToRelative()
     {
+        // The sticky handoff is no longer scoped away from anchor pages: the box stays un-baked
+        // here too (the engine shifts its scroll container natively on an anchor page).
         var tag = StickyTag(ResolveAndSerializeAnchorPage(nativeMode: true));
         Assert.DoesNotContain("position:relative", tag.Replace(" ", ""));
-
-        // Default mode still bakes it — proving the handoff is native mode's doing on an anchor page.
-        var baked = StickyTag(ResolveAndSerializeAnchorPage(nativeMode: false));
-        Assert.Contains("position:relative", baked.Replace(" ", ""));
     }
 }

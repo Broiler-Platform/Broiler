@@ -28,13 +28,13 @@ public sealed partial class DomBridge
     {
         if (!IsText(el) && IsSticky(GetComputedProps(el)))
         {
-            // Native mode (P5.8d.2b sticky expansion): hand a sticky box whose scroll
-            // container is a non-document clipping element on a no-anchor page to the
-            // Broiler.Layout engine's sticky post-pass (CssBox.RunStickyPositioning) — leave
-            // position:sticky un-baked so it survives serialization → cascade → the engine,
-            // which pins it against the natively scroll-shifted scrollport. Every other sticky
-            // box (document/page scroll, or an anchor page) stays baked here.
-            if (!(NativeAnchorPlacement && IsMvpNativeStickyBox(el)))
+            // A sticky box with a scroll container is handed to the Broiler.Layout engine's sticky
+            // post-pass (CssBox.RunStickyPositioning): position:sticky is left un-baked so it
+            // survives serialization → cascade → the engine, which pins it against the natively
+            // scroll-shifted scrollport. The flag check is dropped in Phase 4 item-2 step 5 — the
+            // MVP-skip is unconditional (a provable no-op on the native default path, where the
+            // flag was already true); only the not-yet-native residue (no scroll container) bakes.
+            if (!IsMvpNativeStickyBox(el))
                 ApplyStickyOffset(el);
         }
 
