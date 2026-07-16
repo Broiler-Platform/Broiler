@@ -3398,6 +3398,25 @@ residue that still bakes is `max-content` / `fit-content` (deliberately, pending
 test — not an engine limitation; see P5.8d.2b). Net: the live read model is snapshot-authoritative
 for position-try fallback across fixed-size **and** `min-content` boxes.
 
+**Observation (2026-07-16) — increment 1 also carries native `position: sticky` (and scroll) into the
+live snapshot, and those have no bridge live-resolver fallback.** The engine runs scroll simulation,
+sticky pinning, and anchor placement as one root post-pass, all gated behind the single
+`NativeAnchorPlacement.Enabled` switch (`CssBox.PerformLayout`: `if (ParentBox == null &&
+NativeAnchorPlacement.Enabled) { RunScrollSimulation; RunStickyPositioning; RunNativeAnchorPlacement; }`).
+So flipping that switch in `HeadlessLayoutView` (increment 1 / patch 0005) enables **all three** in the
+shared geometry snapshot, not only anchor placement. Validated for sticky: a `position: sticky; top: 10px`
+box at the top of a tall scroll container reports `getBoundingClientRect().top == 10` (pinned) from the
+live snapshot **with patch 0005 applied**, versus `0` (un-pinned static flow position) at the pinned
+submodule SHA. Unlike the anchor family, sticky/scroll have **no bridge live resolver** (there is no
+`ResolveStickyForElement`; the bridge's `ApplyStickyOffset` bake is skipped for the native MVP subset,
+i.e. any sticky box with a scroll container), so their live read is **native-only**: correct once 0005
+lands, un-pinned/un-scrolled before it. This is the LayoutSnapshot-endgame direction (no new bridge
+geometry code — the gap closes when the patch lands rather than by adding a fallback resolver), but it
+means the *live-read* CSSOM values for sticky/scrolled boxes during script are a known gap on the CI
+fallback path until 0005 is applied (the *render* path already uses native placement, so painting is
+unaffected). No test is committed for this (it cannot pass at the pinned SHA); the finding is recorded
+here to inform the resolver-retirement / patch-landing sequence.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 
