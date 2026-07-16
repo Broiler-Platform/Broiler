@@ -61,7 +61,7 @@ public sealed partial class DomBridge
                     // normally and the engine translation is validated to match the DOM-shift.
                     // Scoped to no-anchor documents so this never crosses the anchor-scroll-
                     // container / position-visibility machinery, which keeps the DOM-shift below.
-                    if (NativeAnchorPlacement && !DocumentHasAnchorContent())
+                    if (NativeAnchorPlacement)
                     {
                         if (scrollTop != 0)
                             SetAttr(el, "data-broiler-scroll-top",

@@ -2654,43 +2654,52 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   renderer effort, and all-or-nothing for parity (a partial port breaks the 7 passing tests). Best done as its
   own submodule feature, not folded into the lever-gated anchor cutover. Left on the bridge path.
 
-  **Finding — native scroll on anchor pages: position-visibility is ready, but `RunScrollSimulation`
-  breaks the abspos-child scroller case (2026-07-16 investigation; the gate relaxation was tried and
-  reverted).** The scroll handoff is gated per-page by `!DocumentHasAnchorContent()`
-  (`ScrollSimulation.cs`), so an anchor page keeps the bridge's DOM-shift for *every* scroll container.
-  Relaxing that gate to `NativeAnchorPlacement` (native scroll on anchor pages too) was tried:
-  - **Position-visibility works with no marker — the assumed hard blocker is not one.** All **14
-    `position-visibility` corpus tests still pass** lever-on. The `data-broiler-scroll-hidden` marker the
-    thirteenth expansion added exists only because the DOM-shift's `position:relative` wrapper does not move
-    a box's `Bounds`, so the engine's geometric `AnchorScrolledOutOf` read was blind to it. Native scroll
-    shifts `Bounds` via `OffsetTop`/`OffsetLeft`, so that geometric check (already the `||` fallback at
-    `CssBox.Visibility.cs`) becomes authoritative and the marker is unneeded. The anchor-induced-CB marker
-    (`data-broiler-anchor-cb`) is stamped by the position-area pass (orchestrator step 3e), independent of
-    the DOM-shift, so the static-vs-authored-relative scroller distinction still holds.
-  - **The blocker is `RunScrollSimulation` on a scroller with an abspos anchor-centred child.**
-    `anchor-center-scroll-001` regresses hard (100 %→89.8 %): a probe of the full render shows the in-flow
-    anchor **and** the anchor-centred abspos box **vanish entirely** and the scroller's own background
-    mis-paints (orange only from y=100), where the DOM-shift renders them correctly. The fixture is an
-    `overflow:auto` **static** scroller holding an in-flow `#anchor` and an abspos `#anchored`
-    (`align-self:anchor-center`) whose containing block is the viewport (the static scroller is not a CB).
-    A first fix — having `RunScrollSimulation` skip an abspos child whose CB is not the scroller (CSS
-    Overflow 3: only in-flow content and abspos boxes with a CB inside the scroller move) — is correct in
-    principle but **did not** resolve the vanishing, so the breakage is deeper than the abspos-child shift
-    (likely the `overflow:auto` scroller's content-shift vs the anchor placement / box-tree interaction, or
-    a document/scroller compound offset). It needs focused work in the native scroll pass for anchor-page
-    scrollers, with the css-anchor-position **scroll + anchor-center + position-visibility** subset as the
-    parity gate, before the `DocumentHasAnchorContent` gate can relax. **Net: the position-visibility half
-    is proven ready; the scroll pass needs an abspos-child-scroller fix first.** Reverted; the bridge
-    DOM-shift stays for anchor pages.
+  **P5.8d.2b — native scroll on anchor pages (twenty-fourth expansion) — COMPLETED** 2026-07-16
+  (branch `claude/htmlbridge-phase-5-cj1q73`; Broiler.Layout + bridge, both parent-repo). The
+  `DocumentHasAnchorContent()` gate that kept anchor pages on the bridge's DOM-shift scroll for *every*
+  scroll container is removed: `ScrollSimulation.cs` now hands scroll to the engine on anchor pages too, so
+  the whole native anchor render path (scroll → sticky → anchor placement → position-visibility) runs on
+  one geometry model. Two parts:
+  - **Position-visibility needs no marker (the assumed hard blocker is not one).** All **14
+    `position-visibility` corpus tests pass** lever-on with native anchor-page scroll. The
+    `data-broiler-scroll-hidden` marker the thirteenth expansion added existed only because the DOM-shift's
+    `position:relative` wrapper does not move a box's `Bounds`, so the engine's geometric
+    `AnchorScrolledOutOf` read was blind to it. Native scroll shifts `Bounds` via `OffsetTop`/`OffsetLeft`,
+    so that geometric check (already the `||` fallback in `CssBox.Visibility.cs`) becomes authoritative and
+    the marker is unneeded. The anchor-induced-CB marker (`data-broiler-anchor-cb`) is stamped by the
+    position-area pass (orchestrator step 3e), independent of the DOM-shift, so the static-vs-authored
+    relative-scroller distinction still holds.
+  - **Root cause of the initial regression was a general margin-collapse/BFC bug, now fixed.** The first
+    attempt regressed `anchor-center-scroll-001` (the anchor and anchor-centred box vanished, the scroller
+    mis-painted). A box-geometry probe found the scroller itself sitting at y=100 in **both** flag states:
+    `#anchor`'s `margin-top:100` was collapsing *through* the bare `overflow:auto` scroller and, via the
+    first-child propagation in `MarginTopCollapse`, shifting the scroller down — but `overflow != visible`
+    establishes a BFC (CSS 2.1 §9.4.1/§8.3.1) and must **contain** that margin. The bridge's DOM-shift
+    wrapper had been accidentally masking this pre-existing engine bug; native scroll (no wrapper) exposed
+    it. Fix (`CssBox.Margins.cs`): the first-in-flow-child top-margin collapse now also requires the parent
+    **not** to establish a BFC via `overflow` (mirroring the existing `align-content` BFC guard). With the
+    scroller correctly at y=0, native scroll shifts its content and anchor-centring tracks the scrolled
+    anchor — `anchor-center-scroll-001` passes at **100 %**. (The earlier speculative "skip abspos children
+    whose CB is outside the scroller" tweak was unnecessary once the real cause was found, and was dropped.)
+  Validation: full `Broiler.Layout.Tests` (195 pass + the standing environmental arch-guard fail);
+  **the margin fix has zero blast radius — the full available css WPT corpus (147 tests: CSS2, css-align,
+  css-backgrounds, css-animations, css-anchor-position) is byte-identical 38-fail with and without it
+  (empty diff both ways)**; css-anchor-position **default-off 31/8 (identical)** and **lever-on 33/6,
+  identical fail set to baseline with `anchor-center-scroll-001` at 100 % and position-visibility 14/14**.
+  Zero regressions. **This removes the bridge's DOM-shift scroll from the native anchor render path
+  entirely** (anchor-scroll containers, document scroll, and now anchor pages are all native), and is the
+  prerequisite the sticky **anchor-page** case needs.
 
   Still bridge-only: dialog/backdrop's **visible-scrim / top-layer-paint / UA-box-styling** part (its
   anchor-*geometry* — the pixel-relevant part of the 7 top-layer corpus tests — is native as of the
   twenty-second expansion), sticky's **anchor-page** case only (the non-document scroll-container
-  case is native as of the nineteenth expansion and page/document-scroll sticky as of the twenty-first — the
-  anchor page's anchor-scroll / position-visibility interaction keeps the bridge DOM-shift), the remaining
-  entangled scroll case (anchor-scroll containers — the plain non-anchor container is native as of the
-  seventeenth expansion and the document scrolling element as of the twentieth; fixed descendants need no
-  reparenting on the native path), visual-viewport (the engine-feature set above;
+  case is native as of the nineteenth expansion and page/document-scroll sticky as of the twenty-first —
+  anchor-page scroll itself is now native as of the twenty-fourth expansion, so the remaining sticky work
+  is wiring `IsMvpNativeStickyBox`'s `!DocumentHasAnchorContent()` gate off now that the scroll shift it
+  needs is present on anchor pages). The former **entangled scroll case** (anchor-scroll containers) is now
+  native across the board — the plain non-anchor container (seventeenth expansion), the document scrolling
+  element (twentieth), and anchor pages (twenty-fourth); fixed descendants need no reparenting on the
+  native path. Remaining: visual-viewport (the engine-feature set above;
   transform/contain/will-change CBs are now native — sixteenth expansion), and the
   auto-`min-content`-sized position-try base (the **opposing-inset** case is now native — twenty-third
   expansion; the `min-content` case — `position-try-002`, a JS `checkLayout` test entangled with the

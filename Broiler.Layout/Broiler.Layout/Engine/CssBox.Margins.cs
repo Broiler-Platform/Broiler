@@ -118,7 +118,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         else if (_parentBox != null && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1
             // CSS Box Alignment §5.4: align-content != normal establishes
             // a BFC, which prevents parent–child margin collapsing.
-            && (_parentBox.AlignContent == null || _parentBox.AlignContent == "normal"))
+            && (_parentBox.AlignContent == null || _parentBox.AlignContent == "normal")
+            // CSS2.1 §8.3.1: margins do not collapse across a block-formatting-context
+            // boundary; overflow != visible establishes a BFC (§9.4.1), so the parent
+            // contains its first in-flow child's top margin instead of collapsing with it
+            // (a bare overflow:auto/hidden/scroll container — e.g. css-anchor-position
+            // anchor-center-scroll-001's scroller — otherwise gets shifted down by the
+            // child's margin via the propagation below).
+            && (_parentBox.Overflow == null || _parentBox.Overflow == CssConstants.Visible))
         {
             double parentEffective = Math.Max(_parentBox.ActualMarginTop, _parentBox.CollapsedMarginTop);
 
