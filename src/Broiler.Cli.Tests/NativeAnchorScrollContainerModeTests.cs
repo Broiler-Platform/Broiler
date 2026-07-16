@@ -6,12 +6,12 @@ namespace Broiler.Cli.Tests;
 /// <summary>
 /// Bridge half of the Phase 5 scroll-simulation expansion (P5.8d.2b): a
 /// <c>position-area</c> box whose containing block is the anchor's scroll container is
-/// now in the native MVP subset, so with <c>DomBridge.NativeAnchorPlacement</c> on the
-/// bridge stops pre-baking it — the box keeps its <c>position-area</c> and gets no
-/// baked inline <c>left</c>/<c>top</c> or <c>position-area: none</c> override, leaving
-/// the placement to the engine's post-pass (validated to render identically to the
-/// baked path by <c>ScrollContainerAnchorParityTests</c>). Default off pre-bakes as
-/// before.
+/// in the native MVP subset, so the bridge never pre-bakes it — the box keeps its
+/// <c>position-area</c> and gets no baked inline <c>left</c>/<c>top</c> or
+/// <c>position-area: none</c> override, leaving the placement to the engine's post-pass
+/// (validated to render correctly by <c>ScrollContainerAnchorParityTests</c>). Phase 4
+/// item-2 step 5 dropped the <c>NativeAnchorPlacement</c> flag check from the pass, so the
+/// MVP-skip is unconditional.
 /// </summary>
 public sealed class NativeAnchorScrollContainerModeTests
 {
@@ -50,26 +50,16 @@ public sealed class NativeAnchorScrollContainerModeTests
     }
 
     [Fact]
-    public void NativeMode_DoesNotBakeScrollContainerBox()
+    public void MvpScrollContainerBox_IsNeverBaked()
     {
         var tag = TargetTag(ResolveAndSerialize(nativeMode: true));
 
-        // Went native: no baked inline pixel placement and no neutralizing override —
-        // the engine post-pass places it from the surviving position-area CSS.
+        // The bridge leaves the box un-baked: no baked inline pixel placement and no
+        // neutralizing override — the engine post-pass places it from the surviving
+        // position-area CSS. Step 5 made this unconditional, so a single mode suffices.
         Assert.DoesNotContain("position-area: none", tag);
         Assert.DoesNotContain("position-area:none", tag);
         Assert.DoesNotContain("left:", tag.Replace(" ", ""));
         Assert.DoesNotContain("top:", tag.Replace(" ", ""));
-    }
-
-    [Fact]
-    public void DefaultMode_BakesScrollContainerBox()
-    {
-        var tag = TargetTag(ResolveAndSerialize(nativeMode: false));
-
-        // Default (production) path pre-bakes explicit inline pixel placement.
-        var compact = tag.Replace(" ", "");
-        Assert.Contains("left:", compact);
-        Assert.Contains("top:", compact);
     }
 }

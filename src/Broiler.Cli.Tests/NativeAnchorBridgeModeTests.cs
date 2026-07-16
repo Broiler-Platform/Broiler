@@ -5,12 +5,11 @@ namespace Broiler.Cli.Tests;
 
 /// <summary>
 /// Verifies the bridge half of the native anchor-placement cutover (Phase 5 item 3,
-/// P5.8d.2a): with <c>DomBridge.NativeAnchorPlacement</c> on, the bridge stops
-/// pre-baking <c>position-area</c> into inline pixels and leaves the
-/// <c>position-area</c>/<c>anchor-name</c>/<c>position-anchor</c> CSS intact through
-/// serialization, so the engine's post-pass can place the box during the final render.
-/// Default off reproduces today's behaviour (the anchor CSS is stripped and the box
-/// pre-baked), which is what keeps production unchanged.
+/// P5.8d.2a): the bridge does not pre-bake an MVP <c>position-area</c> box into inline
+/// pixels — it leaves the <c>position-area</c>/<c>anchor-name</c>/<c>position-anchor</c>
+/// CSS intact through serialization so the engine's post-pass can place the box during the
+/// final render. Phase 4 item-2 step 5 dropped the <c>NativeAnchorPlacement</c> flag check
+/// from the pass, so the MVP-skip is unconditional (only the non-MVP residue still bakes).
 /// </summary>
 public sealed class NativeAnchorBridgeModeTests
 {
