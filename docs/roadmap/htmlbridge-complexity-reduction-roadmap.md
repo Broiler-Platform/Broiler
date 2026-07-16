@@ -3227,6 +3227,28 @@ this, all three anchor mechanisms — position-area, `anchor()` insets, and `anc
 geometry across `offsetLeft/Top/Width/Height` and `getBoundingClientRect`, the read-model consolidation the
 LayoutSnapshot endgame needs.
 
+**Landed (2026-07-16, follow-up) — opposing-inset auto-sizing on the live `anchor()` path.** The `anchor()`-inset
+resolver's initial MVP handled a single physical inset per axis and left an opposing pair (which *sizes* rather
+than merely positions) to the snapshot; a box like `left: anchor(--a right); right: 50px` (auto width) therefore
+reported the base geometry the renderer laid out with the `anchor()` unresolved (probe: `offsetLeft 0`, `offsetWidth
+350` — the plain `right` inset resolved but not the `anchor()` `left`), not the correct `150` / `200`.
+`ResolveAnchorInsetForElement` now also handles an **opposing-inset pair with an `auto` length** (CSS 2.1 §10.3.7 /
+§10.6.4, the ninth expansion's engine sizing): it resolves both insets (`anchor()` via `AnchorGeometry.ResolveEdge`,
+or a plain px length) and returns the start-inset position plus the used border-box size spanning the gap (`CB −
+start − end − margins`); a definite/intrinsic length keeps the snapshot size and just gets the start-inset position.
+Its return grew to `(left, top, width, height)`, wired into `GetOffsetWidth/Height` and the `ComputeUnzoomedLayoutRect`
+size composition. **Recursion fix:** the single end-inset (`right`/`bottom`) branch needed the box's own extent and
+had called `GetOffsetWidth/Height` — which now call back into this resolver — so a right/bottom-anchored box recursed
+infinitely (caught as a `position-try-grid-001` crash → the corpus dipped to 32/7 before the fix); it now reads the
+extent directly from `anchor-size()`-or-snapshot via a local `SelfBorderBoxExtent`, never the offset getters.
+Test: `AnchorInsetLiveGeometryTests.OpposingInsets_AutoSize_SpanBetweenResolvedInsets` (a box spanning `left:
+anchor(--a right)` to `right: 50px` reports `(150,170)` 200×200, `getBoundingClientRect` agreeing). css-anchor-position
+corpus **back to 33/6, identical set** (the transient `position-try-grid-001` regression is resolved); the anchor /
+geometry / hit-testing Cli suites keep only the 5 pre-existing environmental fails. This closes the live-geometry gap
+for opposing-inset-sized `anchor()` boxes; the remaining live gap is a `position-try` box whose base *overflows* and
+selects a fallback (the fallback selection is still bake-only — position-try-002's live `offsetLeft`), a larger
+resolver deferred with the `min-content` position-try feature.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 

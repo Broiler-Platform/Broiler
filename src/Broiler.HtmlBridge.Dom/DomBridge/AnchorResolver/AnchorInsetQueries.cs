@@ -24,15 +24,18 @@ public sealed partial class DomBridge
     // getBoundingClientRect report the resolved anchor position during script.
 
     /// <summary>
-    /// Resolves the live <c>offsetLeft</c>/<c>offsetTop</c> (offsetParent-relative, CSS px) of a
-    /// box positioned by <c>anchor()</c> physical insets, or <c>null</c> when the element is not an
-    /// absolutely/fixed-positioned box with a resolvable <c>anchor()</c> inset. Each axis component
-    /// is <c>null</c> when that axis is not <c>anchor()</c>-positioned (the caller keeps the shared
-    /// snapshot for it). Reposition-only MVP: a single physical inset per axis; an opposing-inset
-    /// pair (which sizes rather than positions) is left to the snapshot, matching the render bake's
-    /// <see cref="IsMvpNativeAnchorInsetBox"/> scope.
+    /// Resolves the live <c>offsetLeft</c>/<c>offsetTop</c> (offsetParent-relative, CSS px) and, for
+    /// an opposing-inset pair with an <c>auto</c> length, the used border-box <c>width</c>/<c>height</c>
+    /// of a box positioned by <c>anchor()</c> physical insets, or <c>null</c> when the element is not an
+    /// absolutely/fixed-positioned box with a resolvable <c>anchor()</c> inset. Each component is
+    /// <c>null</c> when that axis is not <c>anchor()</c>-positioned / not opposing-<c>auto</c>-sized (the
+    /// caller keeps the shared snapshot for it). A single physical inset per axis positions the box; a
+    /// pair of opposing insets with an <c>auto</c> length additionally sizes it to span between them
+    /// (CSS 2.1 §10.3.7 / §10.6.4) — mirroring the render bake / engine (the ninth expansion's
+    /// opposing-inset sizing). A definite/intrinsic length on an opposing-inset axis keeps the snapshot
+    /// size and the start-inset position.
     /// </summary>
-    internal (double? left, double? top)? ResolveAnchorInsetForElement(DomElement element)
+    internal (double? left, double? top, double? width, double? height)? ResolveAnchorInsetForElement(DomElement element)
     {
         var cssProps = CollectMatchedRuleProperties(element);
         foreach (var kv in InlineStyle(element))
@@ -110,32 +113,73 @@ public sealed partial class DomBridge
         double marginBottom = TryParsePx(cssProps.GetValueOrDefault("margin-bottom")) ?? 0;
 
         static bool Set(string v) => !string.IsNullOrWhiteSpace(v) && !v.Trim().Equals("auto", StringComparison.OrdinalIgnoreCase);
+        // Resolves a physical inset that is either an anchor() (via ResolveInsetPx) or a plain px length.
+        double? ResolveAnyInset(string prop, string value) =>
+            HasAnchor(value) ? ResolveInsetPx(prop, value) : TryParsePx(value);
 
-        double? offsetLeft = null;
-        // Reposition-only: opposing insets (both sides set, one an anchor()) size the box — leave
-        // to the snapshot. Otherwise the box's used left edge is the resolved start inset (+ margin),
-        // or containing-block − end inset − border-box − margin for a right anchor.
-        if (!(Set(left) && Set(right)))
+        // An axis is sized by its opposing insets only when its length is auto (or unset);
+        // a definite/intrinsic length keeps the snapshot size and just gets the start-inset position.
+        bool widthAuto = !Set(cssProps.GetValueOrDefault("width") ?? string.Empty);
+        bool heightAuto = !Set(cssProps.GetValueOrDefault("height") ?? string.Empty);
+
+        // The box's own border-box extent, for a single end-inset (right/bottom) placement — read
+        // WITHOUT the offset getters (which now call back into this resolver, which would recurse):
+        // an anchor-size() dimension if present, else the shared snapshot.
+        double SelfBorderBoxExtent(bool horizontal)
         {
-            if (HasAnchor(left) && ResolveInsetPx("left", left) is { } l)
+            if (ResolveAnchorSizeForElement(element) is { } asz)
+            {
+                if (horizontal && asz.width is { } aw) return aw;
+                if (!horizontal && asz.height is { } ah) return ah;
+            }
+            if (TryGetSharedLayoutGeometry(element, out var box))
+                return UnzoomSharedExtent(horizontal ? box.BorderBox.Width : box.BorderBox.Height, element);
+            return 0;
+        }
+
+        double? offsetLeft = null, usedWidth = null;
+        if (HasAnchor(left) || HasAnchor(right))
+        {
+            if (Set(left) && Set(right))
+            {
+                // Opposing insets (at least one an anchor()): the box spans between them. Position
+                // is the start inset; an auto length is sized to fill the gap (border box =
+                // CB − left − right − horizontal margins), else the snapshot size is kept.
+                if (ResolveAnyInset("left", left) is { } lpx && ResolveAnyInset("right", right) is { } rpx)
+                {
+                    offsetLeft = lpx + marginLeft;
+                    if (widthAuto)
+                        usedWidth = System.Math.Max(0, cbW - lpx - rpx - marginLeft - marginRight);
+                }
+            }
+            else if (HasAnchor(left) && ResolveInsetPx("left", left) is { } l)
                 offsetLeft = l + marginLeft;
             else if (HasAnchor(right) && ResolveInsetPx("right", right) is { } r)
-                offsetLeft = cbW - r - GetOffsetWidthForDomElement(element, isRoot: false) - marginRight;
+                offsetLeft = cbW - r - SelfBorderBoxExtent(horizontal: true) - marginRight;
         }
 
-        double? offsetTop = null;
-        if (!(Set(top) && Set(bottom)))
+        double? offsetTop = null, usedHeight = null;
+        if (HasAnchor(top) || HasAnchor(bottom))
         {
-            if (HasAnchor(top) && ResolveInsetPx("top", top) is { } t)
+            if (Set(top) && Set(bottom))
+            {
+                if (ResolveAnyInset("top", top) is { } tpx && ResolveAnyInset("bottom", bottom) is { } bpx)
+                {
+                    offsetTop = tpx + marginTop;
+                    if (heightAuto)
+                        usedHeight = System.Math.Max(0, cbH - tpx - bpx - marginTop - marginBottom);
+                }
+            }
+            else if (HasAnchor(top) && ResolveInsetPx("top", top) is { } t)
                 offsetTop = t + marginTop;
             else if (HasAnchor(bottom) && ResolveInsetPx("bottom", bottom) is { } b)
-                offsetTop = cbH - b - GetOffsetHeightForDomElement(element, isRoot: false) - marginBottom;
+                offsetTop = cbH - b - SelfBorderBoxExtent(horizontal: false) - marginBottom;
         }
 
-        if (offsetLeft is null && offsetTop is null)
+        if (offsetLeft is null && offsetTop is null && usedWidth is null && usedHeight is null)
             return null;
 
-        return (offsetLeft, offsetTop);
+        return (offsetLeft, offsetTop, usedWidth, usedHeight);
     }
 
     /// <summary>

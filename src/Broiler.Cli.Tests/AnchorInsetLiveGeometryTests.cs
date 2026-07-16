@@ -100,4 +100,34 @@ public sealed class AnchorInsetLiveGeometryTests
         Assert.Equal(80, Read(context, "document.getElementById('p').offsetWidth"), 3);
         Assert.Equal(100, Read(context, "document.getElementById('p').offsetHeight"), 3);
     }
+
+    // #o: opposing insets with an auto size — left: anchor(--a right)=150, right: 50px (from CB right)
+    // → spans [150, 400−50=350], width 200; top: anchor(--a bottom)=170, bottom: 30px → height 200.
+    private const string OpposingHtml = @"<!DOCTYPE html><html><head><style>
+  #cb { position: relative; width: 400px; height: 400px; }
+  #a  { position: absolute; left: 100px; top: 100px; width: 50px; height: 70px; anchor-name: --a; }
+  #o  { position: absolute; position-anchor: --a;
+        left: anchor(--a right); right: 50px; top: anchor(--a bottom); bottom: 30px; }
+</style></head><body>
+  <div id='cb'><div id='a'></div><div id='o'></div></div>
+</body></html>";
+
+    [Fact]
+    public void OpposingInsets_AutoSize_SpanBetweenResolvedInsets()
+    {
+        using var context = new JSContext();
+        new DomBridge().Attach(context, OpposingHtml, "file:///opposing-inset-live.html");
+
+        Assert.Equal(150, Read(context, "document.getElementById('o').offsetLeft"), 3);
+        Assert.Equal(170, Read(context, "document.getElementById('o').offsetTop"), 3);
+        Assert.Equal(200, Read(context, "document.getElementById('o').offsetWidth"), 3);
+        Assert.Equal(200, Read(context, "document.getElementById('o').offsetHeight"), 3);
+
+        // getBoundingClientRect agrees with the offset getters.
+        Assert.Equal(200, Read(context, "document.getElementById('o').getBoundingClientRect().width"), 3);
+        double expectedLeft = Read(context, "document.getElementById('cb').getBoundingClientRect().left")
+            + Read(context, "document.getElementById('cb').clientLeft")
+            + Read(context, "document.getElementById('o').offsetLeft");
+        Assert.Equal(expectedLeft, Read(context, "document.getElementById('o').getBoundingClientRect().left"), 3);
+    }
 }

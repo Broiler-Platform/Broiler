@@ -134,6 +134,10 @@ public sealed partial class DomBridge
             if (ResolveAnchorSizeForElement(element) is { width: { } anchorWidth })
                 return anchorWidth;
 
+            // An opposing-inset auto-width anchor box is sized by the two resolved insets.
+            if (ResolveAnchorInsetForElement(element) is { width: { } insetWidth })
+                return insetWidth;
+
             if (TryGetSharedLayoutGeometry(element, out var shared))
                 return UnzoomSharedExtent(shared.BorderBox.Width, element);
 
@@ -158,6 +162,9 @@ public sealed partial class DomBridge
 
             if (ResolveAnchorSizeForElement(element) is { height: { } anchorHeight })
                 return anchorHeight;
+
+            if (ResolveAnchorInsetForElement(element) is { height: { } insetHeight })
+                return insetHeight;
 
             if (TryGetSharedLayoutGeometry(element, out var shared))
                 return UnzoomSharedExtent(shared.BorderBox.Height, element);
@@ -532,7 +539,7 @@ public sealed partial class DomBridge
         // with each anchor-size() axis overridden by its resolved dimension. Zoom/transform stay
         // approximate on this live path, as elsewhere.
         var areaResolution = ResolvePositionAreaForElement(element);
-        (double? left, double? top)? insetResolution = null;
+        (double? left, double? top, double? width, double? height)? insetResolution = null;
         (double? width, double? height)? sizeResolution = null;
         if (areaResolution is null)
         {
@@ -541,7 +548,8 @@ public sealed partial class DomBridge
         }
         bool anchorPlaced = areaResolution is not null
             || (insetResolution is { } ins && (ins.left is not null || ins.top is not null));
-        bool anchorSized = sizeResolution is { } sz && (sz.width is not null || sz.height is not null);
+        bool anchorSized = (sizeResolution is { } sz && (sz.width is not null || sz.height is not null))
+            || (insetResolution is { } isz && (isz.width is not null || isz.height is not null));
         if (anchorPlaced || anchorSized)
         {
             bool haveSnapshot = TryGetSharedLayoutGeometry(element, out var snapBox);
@@ -558,8 +566,11 @@ public sealed partial class DomBridge
             {
                 width = haveSnapshot ? snapBox.BorderBox.Width * iz : 0;
                 height = haveSnapshot ? snapBox.BorderBox.Height * iz : 0;
+                // anchor-size() sizing, then opposing-inset auto sizing, override the snapshot per axis.
                 if (sizeResolution?.width is { } aw) width = aw;
                 if (sizeResolution?.height is { } ah) height = ah;
+                if (insetResolution?.width is { } iw) width = iw;
+                if (insetResolution?.height is { } ih) height = ih;
             }
 
             double left, top;
