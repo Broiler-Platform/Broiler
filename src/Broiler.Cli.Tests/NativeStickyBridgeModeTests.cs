@@ -66,4 +66,39 @@ public sealed class NativeStickyBridgeModeTests
         var compact = tag.Replace(" ", "");
         Assert.Contains("position:relative", compact);
     }
+
+    // Same sticky container, but the page also carries anchor content (an anchor-name box), so
+    // DocumentHasAnchorContent() is true — the case the sticky handoff used to exclude. As of the
+    // sticky anchor-page expansion (native anchor-page scroll shifts the container), it now goes
+    // native too.
+    private const string AnchorPageHtml =
+        "<!DOCTYPE html><html><head><style>" +
+        "body { margin: 0; }" +
+        "#sc { overflow: hidden; width: 200px; height: 200px; }" +
+        "#content { height: 1000px; }" +
+        "#sticky { position: sticky; top: 10px; height: 30px; }" +
+        "#anchor { position: absolute; left: 250px; top: 250px; width: 20px; height: 20px; anchor-name: --a; }" +
+        "</style></head><body>" +
+        "<div id='sc'><div id='content'><div id='sticky'></div></div></div>" +
+        "<div id='anchor'></div></body></html>";
+
+    private static string ResolveAndSerializeAnchorPage(bool nativeMode)
+    {
+        using var context = new JSContext();
+        var bridge = new DomBridge { NativeAnchorPlacement = nativeMode };
+        bridge.Attach(context, AnchorPageHtml, Url);
+        bridge.ResolveAnchorPositions();
+        return bridge.SerializeToHtml();
+    }
+
+    [Fact]
+    public void NativeMode_OnAnchorPage_DoesNotBakeStickyToRelative()
+    {
+        var tag = StickyTag(ResolveAndSerializeAnchorPage(nativeMode: true));
+        Assert.DoesNotContain("position:relative", tag.Replace(" ", ""));
+
+        // Default mode still bakes it — proving the handoff is native mode's doing on an anchor page.
+        var baked = StickyTag(ResolveAndSerializeAnchorPage(nativeMode: false));
+        Assert.Contains("position:relative", baked.Replace(" ", ""));
+    }
 }

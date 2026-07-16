@@ -2690,16 +2690,34 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   entirely** (anchor-scroll containers, document scroll, and now anchor pages are all native), and is the
   prerequisite the sticky **anchor-page** case needs.
 
+  **P5.8d.2b — sticky on anchor pages (twenty-fifth expansion) — COMPLETED** 2026-07-16
+  (branch `claude/htmlbridge-phase-5-cj1q73`; **bridge only, additive, default-off**). Completes
+  `position: sticky` — the last remaining sticky case (anchor pages), which the nineteenth /
+  twenty-first expansions scoped out via `IsMvpNativeStickyBox`'s `!DocumentHasAnchorContent()` guard
+  because the anchor-scroll machinery kept the bridge's DOM-shift there. **The twenty-fourth expansion
+  removed that dependency:** anchor-page scroll is now native, so a sticky box's scroll container is
+  engine-shifted on an anchor page too and the engine's sticky post-pass (run after scroll, before anchor
+  placement) reads the shifted geometry. The single change is dropping the `DocumentHasAnchorContent()`
+  early-return from `IsMvpNativeStickyBox` — the gate is only consulted for actual `position: sticky` boxes
+  (of which the css-anchor-position corpus has none), so it is structurally corpus-neutral. Tests:
+  `Broiler.Wpt.Tests/NativeStickyAnchorPageWptTests.cs` (full render: a sticky box in an `overflow:hidden`
+  scroller on a page that also carries `anchor-name` content pins to the scrollport edge at the
+  engine-computed absolute y 50 — a native-only assertion, as with `NativeStickyWptTests`, since the baked
+  DOM-shift mis-pins a scrolled sticky box; probed native y=50 vs baked y=40) + `Broiler.Cli.Tests/
+  NativeStickyBridgeModeTests.cs` +1 (native mode leaves `position: sticky` un-baked on an anchor page;
+  default bakes `position: relative`). Regression check: full `Broiler.Layout.Tests` sticky suite (14) and
+  the Wpt/Cli sticky suites green; **css-anchor-position lever-on unchanged (33/6, identical set)** and
+  default-off byte-identical. Zero regressions. Sticky is now fully native under the lever; the only
+  bridge-only sticky path left is the flow-vs-paint DOM-shift bug on the *baked* (default) path, which the
+  cutover retires wholesale.
+
   Still bridge-only: dialog/backdrop's **visible-scrim / top-layer-paint / UA-box-styling** part (its
   anchor-*geometry* — the pixel-relevant part of the 7 top-layer corpus tests — is native as of the
-  twenty-second expansion), sticky's **anchor-page** case only (the non-document scroll-container
-  case is native as of the nineteenth expansion and page/document-scroll sticky as of the twenty-first —
-  anchor-page scroll itself is now native as of the twenty-fourth expansion, so the remaining sticky work
-  is wiring `IsMvpNativeStickyBox`'s `!DocumentHasAnchorContent()` gate off now that the scroll shift it
-  needs is present on anchor pages). The former **entangled scroll case** (anchor-scroll containers) is now
+  twenty-second expansion). The former **entangled scroll case** (anchor-scroll containers) is now
   native across the board — the plain non-anchor container (seventeenth expansion), the document scrolling
   element (twentieth), and anchor pages (twenty-fourth); fixed descendants need no reparenting on the
-  native path. Remaining: visual-viewport (the engine-feature set above;
+  native path. `position: sticky` is fully native (non-document scroll container — nineteenth;
+  page/document scroll — twenty-first; anchor pages — twenty-fifth). Remaining: visual-viewport (the engine-feature set above;
   transform/contain/will-change CBs are now native — sixteenth expansion), and the
   auto-`min-content`-sized position-try base (the **opposing-inset** case is now native — twenty-third
   expansion; the `min-content` case — `position-try-002`, a JS `checkLayout` test entangled with the
