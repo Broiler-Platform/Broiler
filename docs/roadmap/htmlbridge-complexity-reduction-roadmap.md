@@ -3446,36 +3446,56 @@ finds the engine never reads `zoom`).*
    against zoomed bases. It must be integrated into used-value resolution during the main layout pass — deep
    engine surgery — and every `DomBridge_SerializeToHtml_Scales_*_Zoom_*` test asserts the *bake* output, so
    they would all move to engine-geometry assertions. The large, general feature.
-2. **Visual-viewport pinch-zoom is a *uniform root* scale — tractable as a post-pass.** A uniform scale of
-   the whole document (`combinedZoom` folds `html{zoom}` × pinch `scale`, both root-level) preserves
-   relative layout, so it can be applied as a **root post-pass** that multiplies every box's position and
-   size by the factor — no reflow — slotting in beside `RunScrollSimulation` / `RunStickyPositioning` at
-   `CssBox.PerformLayout` (`CssBox.cs:389`), fed a thread-static `VisualViewportScale` channel on
-   `NativeAnchorPlacement` (the `PositionTryRules` precedent) plus the already-native root scroll.
+2. **Visual-viewport pinch-zoom is a *uniform root* scale — but NOT a box-tree post-pass (feasibility
+   finding, 2026-07-16).** A uniform scale of the whole document (`combinedZoom` folds `html{zoom}` × pinch
+   `scale`, both root-level) preserves relative layout, so *conceptually* it is a root transform. The
+   initial plan was a `CssBox` post-pass (beside `RunScrollSimulation`/`RunStickyPositioning` at
+   `CssBox.cs:389`) that multiplies every box's position and size by the factor. **That does not work**: a
+   box's geometry is not stored as scalable numbers. `Bounds`/`ActualRight`/`ActualBottom` derive from
+   `Location`+`Size` (scalable), but `PaddingBox`/`ContentBox` need `ActualBorder*Width`/`ActualPadding*`,
+   which are **getter-only, lazily computed from the CSS length *strings*** (`ActualPaddingTop =
+   ParseLengthWithLineHeight(PaddingTop, Size.Width)`), plus font metrics, line-box `Rectangles`, and
+   `Words`. Unlike the translate-only post-passes (scroll/sticky `OffsetTop/Left`; anchor also sets `Size`),
+   a *scale* would have to touch the entire computed box model — and the only way to scale a px length held
+   as a string is to rewrite the string, which is exactly the bridge's `ApplyZoomSerializationStyles` bake
+   we are trying to retire. So a main-repo box-tree scale is not viable.
+   **The clean native shape is a viewport transform applied where geometry leaves the box tree**, i.e. scale
+   the *extracted* `BoxGeometry` rects (BorderBox/PaddingBox/ContentBox all scale uniformly — correct for a
+   uniform factor) in `HtmlContainerInt.CollectLayoutGeometry` by a `NativeAnchorPlacement.VisualViewportScale`
+   channel, plus (if a pinch-zoomed page must *paint* scaled — the earlier finding says the render never
+   does) a paint transform. **Both extraction and paint live in the `Broiler.HTML` submodule**, so (b1) is a
+   *patch-workflow* change (like 0005), not a main-repo engine post-pass — and it is still coupled to the
+   bridge read path (below), which must divide the same channel scale back out for `offset*`. Net: (b) is
+   submodule-heavy with deferred payoff, closer to blocker (a) than to the main-repo anchor cutovers.
 
-*Recommended increment order.*
-- **(b1)** Native visual-viewport pinch-zoom as a uniform-root-scale post-pass (channel + `CssBox`
-  post-pass), retiring `ApplyVisualViewportSerializationState`. Matches the existing lever/post-pass
-  shape, with one **read-path coupling** to plumb: per CSSOM-View, pinch-zoom must leave
-  `getBoundingClientRect` / `offset*` *unaffected* (only `window.visualViewport.*` reflects it), so today
-  the bridge scales layout for the render *and then divides the scale back out* via `GetUsedZoomForElement`
-  (which reads the baked `zoom`). If the engine applies the pinch-scale natively instead of via a baked
-  `zoom` property, the read path no longer sees it in `GetUsedZoomForElement`, so the same
-  `VisualViewportScale` channel value must feed **both** the engine post-pass (render) **and** the bridge
-  read path's un-zoom (CSSOM) — (b1) is a coordinated engine+read-path change, not a pure post-pass. The
-  root-scroll seed the bake also writes (`DocumentElement.Scroll = visual-viewport page offset`) must
-  likewise be threaded so the native scroll pass still positions the zoomed viewport.
+*Recommended increment order (revised after the feasibility finding).*
+- **(b1)** Native visual-viewport pinch-zoom as a **viewport transform at geometry extraction** — scale the
+  `BoxGeometry` rects in `HtmlContainerInt.CollectLayoutGeometry` by a
+  `NativeAnchorPlacement.VisualViewportScale` channel (uniform, so BorderBox/PaddingBox/ContentBox all scale
+  correctly), retiring the render-side of `ApplyVisualViewportSerializationState`. **This is a `Broiler.HTML`
+  submodule change → patch workflow (403), deferred payoff** — there is *no* clean main-repo engine slice (a
+  `CssBox` box-tree scale is infeasible, per sub-problem 2). It also has a **read-path coupling**: per
+  CSSOM-View, pinch-zoom leaves `getBoundingClientRect`/`offset*` *unaffected* (only `window.visualViewport.*`
+  reflects it), so today the bridge scales for render then divides the scale back out via
+  `GetUsedZoomForElement` (reading the baked `zoom`). With a native channel scale, that same channel value
+  must feed **both** the extraction scale **and** the bridge read-path un-zoom, and the root-scroll seed the
+  bake writes (`DocumentElement.Scroll = visual-viewport page offset`) must be threaded to the native scroll
+  pass. So (b1) is a coordinated submodule-extraction + main-repo-read-path change, and — because the
+  extraction change is in the submodule — its geometry test only passes at the *patched* SHA, never on the
+  pinned-SHA CI (same constraint as the sticky/scroll live-read gap and patch 0005).
 - **(b2)** General engine `zoom` model (layout-time used-value scaling), retiring
-  `ApplyZoomSerializationStyles`. The large piece; do after (b1) proves the channel / read-path split.
+  `ApplyZoomSerializationStyles`. The large piece.
 - The read-path `GetUsedZoomForElement` un-zoom stays in the bridge throughout (CSSOM-View, item 5).
 
-*Validation caveat.* Both change render / serialization behaviour for zoomed pages with weak local
-validation: the only pixel-runnable zoom test (`anchor-size-css-zoom`) passes either way (both boxes ignore
-zoom identically), and the rest of the visual-viewport coverage is embedded C# HTML-string tests asserting
-the *bake* serialization (doubled sizes), which must be re-pointed at native geometry — there is no
-pinch-zoom pixel corpus. Land (b1)/(b2) **behind the `NativeAnchorPlacement` lever** (off by default; on in
-the WPT native run + `HeadlessLayoutView`) so the baked path stays the CI fallback until parity is proven,
-exactly like the anchor cutover.
+*Bottom line — (b) is submodule-heavy with deferred payoff, like blocker (a), NOT a main-repo cutover.*
+Every native shape lands in `Broiler.HTML` (extraction / paint) or requires a from-scratch engine zoom
+model; none is a clean, CI-testable, main-repo increment. Validation is also weak: the only pixel-runnable
+zoom test (`anchor-size-css-zoom`) passes either way (both boxes ignore zoom identically), and the rest of
+the visual-viewport coverage is embedded C# HTML-string tests asserting the *bake* serialization, which the
+native path would re-point. Recommendation: treat (b) as a patch-workflow feature track (author the
+extraction-scale patch + read-path threading together, validated only at the applied SHA), or defer it with
+(a) until the submodule remotes are in session scope — rather than forcing a fragile main-repo box-tree
+scale.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
