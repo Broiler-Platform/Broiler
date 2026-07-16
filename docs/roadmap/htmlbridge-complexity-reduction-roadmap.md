@@ -2814,8 +2814,16 @@ native" = making both unconditional and retiring the flag.
    failures, 2 fixed** (`position-area-scrolling-002`, `position-try-grid-001`). Every non-anchor page is
    byte-for-byte unchanged — the native scroll/sticky handoffs regress nothing outside css-anchor-position,
    and the corpus strictly improves (38→36). The flip is safe to make the default.
-2. **Flip the runner default + rebaseline (1 PR, reversible).** Default `BROILER_WPT_NATIVE_ANCHOR` on;
-   update the corpus baselines from 31/8 to 33/6. Keep the flag so it can be toggled back.
+2. **Flip the runner default + rebaseline (reversible) — DONE 2026-07-16.** `WptTestRunner.NativeAnchorPlacement`
+   now defaults **on** (`BROILER_WPT_NATIVE_ANCHOR` reads as an opt-*out*: `=0`/`false`/`off` forces the baked
+   path for rollback/comparison). Verified: the CLI css-anchor-position subset is **33/6 by default** (native)
+   and **31/8 with `=0`** (baked); the 34 native anchor/scroll/sticky/position-visibility `Broiler.Wpt.Tests`
+   pass with the flipped default; the Cli bridge-mode tests and the own-bridge geometry characterization tests
+   (`Wpt_CssomView_*`, which construct their own `DomBridge` at the bridge's own default) are untouched — the
+   change is confined to `WptTestRunner.cs`. CI does not set the env var, so it now runs native and the
+   `persist-failed` job regenerates the full-suite `tests/wpt-baseline/failed-tests.json` manifest
+   automatically (it is a 22,956-test artifact — not hand-edited); the full-suite (non-css) validation lands
+   in CI on this branch, backed locally by the step-1 zero-regression result across the available css corpus.
 3. **Commit to native (decision point).** Make both flags unconditional and retire the toggle. Requires
    accepting the native path as the sole WPT path (the baked path loses its runner coverage; bridge-mode
    characterization tests that assert the baked output are retired or converted).
