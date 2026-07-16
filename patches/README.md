@@ -75,3 +75,39 @@ Not covered by this slice (later dialog/backdrop track work): modal centering / 
 native `::backdrop` box generation, and native top-layer paint (all `Broiler.HTML`). See the
 native dialog/backdrop track section in
 `docs/roadmap/htmlbridge-complexity-reduction-roadmap.md`.
+
+## Engine-native live-geometry track (2026-07-16)
+
+Phase 5 LayoutSnapshot endgame. The script bridge answers element-geometry queries
+(`offsetLeft`/`getBoundingClientRect` during script) from a shared layout snapshot built by
+`HeadlessLayoutView` (the bridge's `ILayoutView`). Today that snapshot carries pre-bake static
+placement for CSS-anchor-positioned boxes, and the bridge's *live* anchor resolvers
+(`ResolvePositionAreaForElement` / `ResolveAnchorInsetForElement` / `ResolveAnchorSizeForElement`
+/ `ResolvePositionTryForElement` in `src/Broiler.HtmlBridge.Dom/DomBridge/AnchorResolver/`) patch
+the resolved geometry back in on read. The migration moves that resolution into the engine so the
+snapshot is authoritative and the bridge resolvers can eventually be deleted (mirrors the WPT
+native anchor-placement cutover P5.8d).
+
+Increment 1 enables `Broiler.Layout.Engine.NativeAnchorPlacement` around the headless geometry
+layout so the live snapshot carries engine-resolved position-area / `anchor()` / `anchor-size()`
+boxes. The enabling `InternalsVisibleTo Include="Broiler.HTML.Headless"` (the flag is `internal`
+to `Broiler.Layout`) is a **main-repo** change (`Broiler.Layout` is not a submodule) and has
+landed; only the `HeadlessLayoutView` edit is a submodule change (patch 0005).
+
+### 0005-html-native-live-geometry-headless.patch → `Broiler.HTML`
+
+`HeadlessLayoutView.GetGeometry` sets `NativeAnchorPlacement.Enabled = true` (thread-static
+save/restore) around `_container.GetLayoutGeometry(viewport)`, so the geometry snapshot the bridge
+reads is laid out with the engine's native anchor-positioning post-pass. Validated: with the patch
+applied, `PositionAreaLiveGeometryTests` pass **from the snapshot alone** (with the bridge's
+`ResolvePositionAreaForElement` short-circuited to `return null`), proving the snapshot is now
+authoritative for position-area geometry; the full anchor/live-geometry suite (25 tests) stays
+green. `@position-try` fallback rules are **not** threaded into the engine here yet, so a
+position-try box gets its native *base* placement while the bridge's live resolver still applies
+the fallback.
+
+The bridge live anchor resolvers remain the **active main-repo CI fallback** and must stay until
+this patch lands and the pointer is bumped (CI clones the submodule by pointer, so without the
+patch the snapshot carries static placement and the resolvers supply the resolved geometry). Once
+0005 lands, the resolvers can be retired incrementally (position-area first, then insets, size,
+and finally the position-try handoff once `@position-try` rules are threaded to the engine).

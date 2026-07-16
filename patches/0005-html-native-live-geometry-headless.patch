@@ -1,0 +1,51 @@
+From 061e390985ad4276cd9ca68197d137f8bc240514 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 16 Jul 2026 20:06:46 +0000
+Subject: [PATCH] Enable native anchor placement in headless live layout view
+
+HeadlessLayoutView (the script bridge's ILayoutView) now enables
+Broiler.Layout.Engine.NativeAnchorPlacement around its geometry layout so
+the live read model (offsetLeft/getBoundingClientRect during script) carries
+engine-resolved position-area / anchor() / anchor-size() geometry from the
+native placement post-pass instead of pre-bake static placement. Thread-static
+save/restore keeps concurrent layouts unaffected. @position-try fallback rules
+are not threaded here yet, so a position-try box gets its native base placement
+while the bridge's live resolver still applies the fallback.
+---
+ .../HeadlessLayoutView.cs                     | 20 ++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/Source/Broiler.HTML.Headless/HeadlessLayoutView.cs b/Source/Broiler.HTML.Headless/HeadlessLayoutView.cs
+index 7b1586c..a19989e 100644
+--- a/Source/Broiler.HTML.Headless/HeadlessLayoutView.cs
++++ b/Source/Broiler.HTML.Headless/HeadlessLayoutView.cs
+@@ -69,7 +69,25 @@ public sealed class HeadlessLayoutView : ILayoutView
+         // success, so a transient failure does not poison a later query.
+         _container.ContentDocumentResolver = contentDocumentResolver;
+         _container.SetDocumentWithStyleSet(document, baseUrl: baseUrl);
+-        var snapshot = _container.GetLayoutGeometry(viewport);
++
++        // Phase 5 LayoutSnapshot endgame: lay out with the engine's native anchor-positioning
++        // post-pass on, so the geometry the script bridge reads (offsetLeft/getBoundingClientRect
++        // during script) carries engine-resolved position-area / anchor() / anchor-size() boxes
++        // instead of the pre-bake 0×0/static placement — the read-model side of moving anchor
++        // placement into Broiler.Layout. Thread-static, so save/restore keeps concurrent layouts
++        // unaffected. (@position-try fallback rules are not threaded here yet — a position-try box
++        // gets its native BASE placement; the bridge's live resolver still applies the fallback.)
++        var previousEnabled = Broiler.Layout.Engine.NativeAnchorPlacement.Enabled;
++        Broiler.Layout.Engine.NativeAnchorPlacement.Enabled = true;
++        IReadOnlyDictionary<BDom.DomElement, BoxGeometry> snapshot;
++        try
++        {
++            snapshot = _container.GetLayoutGeometry(viewport);
++        }
++        finally
++        {
++            Broiler.Layout.Engine.NativeAnchorPlacement.Enabled = previousEnabled;
++        }
+ 
+         if (contentDocumentResolver is null)
+         {
+-- 
+2.43.0
+

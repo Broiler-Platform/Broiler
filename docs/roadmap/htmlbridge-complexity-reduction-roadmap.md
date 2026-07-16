@@ -3316,6 +3316,25 @@ pass): the 40 live-geometry / position-try / native-anchor / position-area Cli t
 css-anchor-position corpus is **33/6 unchanged**, and the broad geometry/anchor/hit-testing sweep keeps only
 the pre-existing environmental fails.
 
+**Landed (2026-07-16, endgame increment 1) — the live snapshot now carries engine-resolved anchor geometry.**
+The work items above resolve anchor geometry *in the bridge* (the four live resolvers patch the resolved rect
+back onto the snapshot's pre-bake static placement on read). This increment starts moving that resolution into
+the engine (step 3 above; mirrors the WPT native-anchor-placement cutover P5.8d). `HeadlessLayoutView`
+(the bridge's `ILayoutView`) now enables `Broiler.Layout.Engine.NativeAnchorPlacement` (thread-static
+save/restore) around the geometry layout, so the shared snapshot the bridge reads is laid out with the engine's
+native anchor-positioning post-pass — the snapshot itself carries engine-resolved position-area / `anchor()` /
+`anchor-size()` boxes. Proven authoritative: with the enablement active, `PositionAreaLiveGeometryTests` pass
+**from the snapshot alone** (bridge `ResolvePositionAreaForElement` temporarily short-circuited to `return null`),
+and the full 25-test anchor/live-geometry suite stays green. The enabling `InternalsVisibleTo` (the flag is
+`internal` to `Broiler.Layout`, which is **main-repo**, not a submodule) has landed; the `HeadlessLayoutView`
+edit is a `Broiler.HTML` submodule change delivered as `patches/0005-html-native-live-geometry-headless.patch`
+(remote out of scope → 403). Until 0005 lands and the pointer is bumped, CI clones the submodule at its pinned
+SHA (static placement in the snapshot) and the bridge live resolvers remain the **active fallback** — they stay
+in place and are retired incrementally *after* the patch lands (position-area first, then insets/size, and
+finally the position-try handoff once `@position-try` rules are threaded to the engine, which this increment does
+**not** do — a position-try box still gets its native *base* placement while the bridge resolver applies the
+fallback).
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 
