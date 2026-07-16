@@ -90,24 +90,42 @@ native anchor-placement cutover P5.8d).
 
 Increment 1 enables `Broiler.Layout.Engine.NativeAnchorPlacement` around the headless geometry
 layout so the live snapshot carries engine-resolved position-area / `anchor()` / `anchor-size()`
-boxes. The enabling `InternalsVisibleTo Include="Broiler.HTML.Headless"` (the flag is `internal`
-to `Broiler.Layout`) is a **main-repo** change (`Broiler.Layout` is not a submodule) and has
-landed; only the `HeadlessLayoutView` edit is a submodule change (patch 0005).
+boxes. Increment 2 additionally threads the document's `@position-try` at-rules into the engine's
+out-of-band `NativeAnchorPlacement.PositionTryRules` channel, so a position-try box whose base
+overflows carries its resolved *fallback* placement in the snapshot too, not merely its base. The
+enabling `InternalsVisibleTo Include="Broiler.HTML.Headless"` (the flag is `internal` to
+`Broiler.Layout`) is a **main-repo** change (`Broiler.Layout` is not a submodule) and has landed;
+only the `HeadlessLayoutView` edit is a submodule change (patch 0005).
 
 ### 0005-html-native-live-geometry-headless.patch → `Broiler.HTML`
 
-`HeadlessLayoutView.GetGeometry` sets `NativeAnchorPlacement.Enabled = true` (thread-static
+`HeadlessLayoutView.GetGeometry` sets `NativeAnchorPlacement.Enabled = true` **and**
+`NativeAnchorPlacement.PositionTryRules = ParsePositionTryRules(document)` (both thread-static,
 save/restore) around `_container.GetLayoutGeometry(viewport)`, so the geometry snapshot the bridge
-reads is laid out with the engine's native anchor-positioning post-pass. Validated: with the patch
-applied, `PositionAreaLiveGeometryTests` pass **from the snapshot alone** (with the bridge's
-`ResolvePositionAreaForElement` short-circuited to `return null`), proving the snapshot is now
-authoritative for position-area geometry; the full anchor/live-geometry suite (25 tests) stays
-green. `@position-try` fallback rules are **not** threaded into the engine here yet, so a
-position-try box gets its native *base* placement while the bridge's live resolver still applies
-the fallback.
+reads is laid out with the engine's native anchor-positioning post-pass, including the
+`@position-try` fallback pass. `ParsePositionTryRules` walks the document's `<style>` elements and
+parses them with the canonical `Broiler.CSS.PositionTryRule` model — the same rule bodies the
+bridge resolver and the WPT runner use.
+
+Validated (patch applied):
+- `PositionAreaLiveGeometryTests` pass **from the snapshot alone** (bridge
+  `ResolvePositionAreaForElement` short-circuited to `return null`) — the snapshot is authoritative
+  for position-area geometry.
+- `PositionTryLiveGeometryTests.FixedSizeOverflowingBase_SelectsFallback_LiveOffsets` (a fixed-size
+  position-try box whose base overflows) passes **from the snapshot alone** with *both* the
+  `ResolvePositionTryForElement` and `ResolveAnchorInsetForElement` resolvers short-circuited —
+  proving the snapshot carries the native *fallback* placement (the offset getter's resolver
+  precedence is position-area → position-try → anchor-inset → anchor-size → snapshot, so the
+  anchor-inset resolver must also be silenced to reach the snapshot).
+- The full anchor/live-geometry suite (29 tests) stays green with the resolvers restored.
+
+Remaining bridge-only case: a **`min-content`** position-try box, whose fallback sizing the engine
+cannot yet resolve (blocker (c), engine intrinsic-size position-try sizing). It still falls to the
+bridge's `ResolvePositionTryForElement`, so `OverflowingBase_SelectsFallback_LiveOffsets` (a
+min-content box) fails from the snapshot alone by design.
 
 The bridge live anchor resolvers remain the **active main-repo CI fallback** and must stay until
 this patch lands and the pointer is bumped (CI clones the submodule by pointer, so without the
 patch the snapshot carries static placement and the resolvers supply the resolved geometry). Once
-0005 lands, the resolvers can be retired incrementally (position-area first, then insets, size,
-and finally the position-try handoff once `@position-try` rules are threaded to the engine).
+0005 lands, the resolvers can be retired incrementally (position-area first, then anchor insets and
+size, then fixed-size position-try; the `min-content` position-try residue stays until blocker (c)).

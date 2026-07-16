@@ -47,4 +47,37 @@ public sealed class PositionTryLiveGeometryTests
             + Read(c, "document.getElementById('t').offsetLeft");
         Assert.Equal(expectedLeft, Read(c, "document.getElementById('t').getBoundingClientRect().left"), 3);
     }
+
+    // Fixed-size (non-min-content) position-try box: base overflows, fallback --flip fits. Unlike the
+    // min-content case above (blocked on engine intrinsic-size position-try sizing, blocker (c)), the
+    // engine's native @position-try pass CAN place and size this box, so — with HeadlessLayoutView
+    // threading the @position-try rule bodies into NativeAnchorPlacement.PositionTryRules (Phase 5
+    // endgame increment 2) — the live snapshot carries the resolved FALLBACK placement, not merely
+    // the base. Mirrors NativePositionTryPipelineTests' engine-level shape, read live through the bridge.
+    private const string FixedHtml = @"<!DOCTYPE html><html><head><style>
+  body { margin: 0; }
+  #cb { position: relative; width: 100px; height: 100px; }
+  #anchor { position: absolute; left: 70px; top: 70px; width: 20px; height: 20px; anchor-name: --a; }
+  #t { position: absolute; width: 30px; height: 30px;
+       left: anchor(--a right); top: anchor(--a bottom); position-try-fallbacks: --flip; }
+  @position-try --flip { left: auto; right: anchor(--a left); top: auto; bottom: anchor(--a top); }
+</style></head><body><div id='cb'><div id='anchor'></div><div id='t'></div></div></body></html>";
+
+    [Fact]
+    public void FixedSizeOverflowingBase_SelectsFallback_LiveOffsets()
+    {
+        using var c = new JSContext();
+        new DomBridge().Attach(c, FixedHtml, "file:///pt-fixed-live.html");
+
+        // Base left/top = anchor(--a right/bottom) = 90 → 30px box overflows the 100 CB.
+        // Fallback --flip (right:anchor(--a left)=70; bottom:anchor(--a top)=70) → border box at (40,40).
+        Assert.Equal(40, Read(c, "document.getElementById('t').offsetLeft"), 3);
+        Assert.Equal(40, Read(c, "document.getElementById('t').offsetTop"), 3);
+        Assert.Equal(30, Read(c, "document.getElementById('t').offsetWidth"), 3);
+        // getBoundingClientRect agrees with the offset getters.
+        double expectedLeft = Read(c, "document.querySelector('#cb').getBoundingClientRect().left")
+            + Read(c, "document.querySelector('#cb').clientLeft")
+            + Read(c, "document.getElementById('t').offsetLeft");
+        Assert.Equal(expectedLeft, Read(c, "document.getElementById('t').getBoundingClientRect().left"), 3);
+    }
 }

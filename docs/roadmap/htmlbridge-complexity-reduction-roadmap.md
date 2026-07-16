@@ -3335,6 +3335,25 @@ finally the position-try handoff once `@position-try` rules are threaded to the 
 **not** do — a position-try box still gets its native *base* placement while the bridge resolver applies the
 fallback).
 
+**Landed (2026-07-16, endgame increment 2) — the live snapshot now carries native position-try
+*fallback* placement too.** Increment 1 left one gap: `@position-try` fallback rules were not
+threaded into the engine, so a position-try box got only its native *base* placement in the
+snapshot and the bridge resolver still supplied the fallback. `HeadlessLayoutView.GetGeometry` now
+also parses the document's `@position-try` at-rules (via the canonical `Broiler.CSS.PositionTryRule`
+model — the same bodies the bridge resolver and WPT runner use) and hands them to the engine through
+the out-of-band `NativeAnchorPlacement.PositionTryRules` channel (thread-static, save/restore), so
+the engine's native `@position-try` pass applies the first non-overflowing fallback. Proven
+authoritative by a new `PositionTryLiveGeometryTests.FixedSizeOverflowingBase_…` test: a fixed-size
+position-try box whose base overflows reads its *fallback* offsets **from the snapshot alone** with
+*both* the `ResolvePositionTryForElement` and `ResolveAnchorInsetForElement` bridge resolvers
+short-circuited (the offset getter precedence is position-area → position-try → anchor-inset →
+anchor-size → snapshot, so the anchor-inset resolver — which would otherwise return the *base*
+`anchor()` inset — must also be silenced to reach the snapshot). The full 29-test anchor/live-geometry
+suite stays green with the resolvers restored. Delivered in the same submodule patch
+(`patches/0005-…`, regenerated to include both increments). **Still bridge-only:** a `min-content`
+position-try box, whose fallback sizing needs the engine's intrinsic-size support (blocker (c)) —
+its `OverflowingBase_…` test fails from the snapshot alone by design and keeps the bridge resolver.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 
