@@ -133,3 +133,42 @@ patch the snapshot carries static placement and the resolvers supply the resolve
 0005 lands, the resolvers can be retired incrementally (position-area first, then anchor insets and
 size, then position-try — fixed-size and `min-content` together; the `max-content`/`fit-content`
 estimator-parity slice is the only piece that waits).
+
+## Visual-viewport / CSS `zoom` endgame track (2026-07-16)
+
+Phase 5 LayoutSnapshot endgame, step-6 blocker (b). A document-root visual-viewport pinch-zoom (or
+`html { zoom }`) is a **uniform** scale of the whole document. Today the bridge fakes it by scaling
+every length-valued property into inline styles at serialization (`ApplyZoomSerializationStyles`, fed
+the pinch factor by `ApplyVisualViewportSerializationState`), because the layout engine has no `zoom`
+model. The endgame moves that to a **viewport transform where geometry leaves the box tree** — a
+main-repo box-tree scale is infeasible (a box's padding/border/font geometry is computed from CSS
+length *strings*, not stored as scalable numbers), so the scale is applied to the extracted
+`BoxGeometry` rects instead. See the design + feasibility finding in
+`docs/roadmap/htmlbridge-complexity-reduction-roadmap.md` (endgame section, blocker (b)).
+
+The enabling channel `Broiler.Layout.Engine.NativeAnchorPlacement.VisualViewportScale` (a thread-static
+`double`; `0`/`1` mean no scale) is a **main-repo** change and has landed (dormant — nothing in the
+committed tree sets it, so behaviour is unchanged). Only the extraction-scale consumer is a submodule
+change (patch 0006).
+
+### 0006-html-visual-viewport-extraction-scale.patch → `Broiler.HTML`
+
+`HtmlContainerInt.CollectLayoutGeometry` multiplies every collected element's three `BoxGeometry` rects
+(border / padding / content box) by `NativeAnchorPlacement.VisualViewportScale` about the document
+origin — exact for a uniform zoom — instead of the box tree being laid out from bridge-baked scaled
+lengths. Inert unless the channel is set.
+
+Validated (patch applied, local): with the channel at `2.0`, an abspos box (`left:50 top:60 width:100
+height:40 border:5 padding:10`) reports all three box-model rects scaled exactly ×2 (border box
+`50,60,110,50 → 100,120,220,100`; padding and content boxes scale uniformly too); at the default `0`
+the geometry is unchanged and the anchor / live-geometry Cli suites stay green. The validation test is
+**not committed** — it requires this patch, so it cannot pass at the pinned submodule SHA on CI (same
+constraint as patch 0005 / the sticky live-read gap).
+
+This is the **read-model half** of blocker (b1). Still to come (the *cutover*, which must land
+**together with** this patch because it breaks the bake-coupled visual-viewport tests without it):
+(1) the bridge sets the channel from `_visualViewportScale` (and threads the root-scroll seed) when
+native; (2) the read-path coupling — `GetUsedZoomForElement` must fold the same channel scale so
+`offset*` divides it back out (per CSSOM-View, pinch-zoom leaves `getBoundingClientRect`/`offset*`
+*unaffected*); (3) retiring `ApplyVisualViewportSerializationState`. General mid-tree `zoom: N`
+(reflow) is the separate (b2) engine-zoom feature and is **not** covered here.

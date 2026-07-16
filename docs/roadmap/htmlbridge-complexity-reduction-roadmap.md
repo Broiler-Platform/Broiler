@@ -3497,6 +3497,21 @@ extraction-scale patch + read-path threading together, validated only at the app
 (a) until the submodule remotes are in session scope — rather than forcing a fragile main-repo box-tree
 scale.
 
+**Landed (2026-07-16) — (b1) read-model half: the `VisualViewportScale` channel + extraction scale.** The
+main-repo channel `NativeAnchorPlacement.VisualViewportScale` (thread-static `double`; `0`/`1` = no scale)
+has landed **dormant** — nothing in the committed tree sets it, so behaviour is unchanged and the anchor /
+live-geometry Cli suites stay green. Its consumer, `HtmlContainerInt.CollectLayoutGeometry` scaling every
+element's three `BoxGeometry` rects by the channel about the document origin (exact for a uniform zoom), is
+a `Broiler.HTML` submodule change delivered as `patches/0006-html-visual-viewport-extraction-scale.patch`
+(remote out of scope → 403). Validated locally with the patch applied (channel `2.0` → all three box-model
+rects scale ×2; a bordered/padded abspos box `50,60,110,50 → 100,120,220,100`); the geometry test is not
+committed (it needs the patch, so it cannot pass at the pinned SHA on CI). **Still to come — the (b1)
+cutover, which must land *with* 0006** (it breaks the bake-coupled visual-viewport tests without it): the
+bridge sets the channel from `_visualViewportScale` + threads the root-scroll seed when native; the
+read-path coupling (`GetUsedZoomForElement` folds the same scale so `offset*` divides it back out per
+CSSOM-View); and retiring `ApplyVisualViewportSerializationState`. (b2) general mid-tree `zoom: N` remains
+the separate engine-zoom feature.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 
