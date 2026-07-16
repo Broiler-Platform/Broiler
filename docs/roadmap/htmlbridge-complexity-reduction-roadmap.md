@@ -2579,10 +2579,11 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   **native 33/6 (identical set)**; the broad available css corpus (147) **unchanged at 36 fails**; the
   anchor / position-try Cli suites add zero regressions. This
   **retires feature (c) entirely** — the last position-try base bake (`max-content`/`fit-content`) is now
-  handed off, so no position-try box bakes on the native path. (Orthogonal follow-up noted while adding
-  the test: the engine's `ResolveTryEdge` admits only px/percentage lengths, so a fallback with a *sole*
-  unitless `0` inset — e.g. `right: 0` with `left: auto` — is skipped; harmless where a paired anchor()
-  inset also positions the axis, but a real gap worth a one-line fix.)
+  handed off, so no position-try box bakes on the native path. (Orthogonal gap found and **fixed** while
+  adding the test: the engine's `ResolveTryEdge` admitted only px/percentage lengths, so a fallback with a
+  *sole* unitless `0` inset — e.g. `right: 0` with `left: auto`, common in real fallback rules — was
+  skipped and the box landed at the CB origin. Now a zero length in any unit resolves to `0`, via a shared
+  `AsCbLength` helper; test `NativePositionTryPipelineTests.NativeFallback_UnitlessZeroInset_ResolvesToFlushEdge`.)
 
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
