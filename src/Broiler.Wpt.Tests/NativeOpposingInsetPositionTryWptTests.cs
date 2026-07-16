@@ -11,11 +11,11 @@ namespace Broiler.Wpt.Tests;
 ///
 /// The base's horizontal axis is sized by a pair of opposing insets rather than a definite
 /// width (<c>left: anchor(--a right); right: 5px</c>, auto width, childless), which the earlier
-/// position-try handoff gate kept baked. It is now handed off: with the lever on the bridge does
-/// not pre-bake, and the Broiler.Layout engine sizes the box from the two insets
+/// position-try handoff gate kept baked. It is now handed off: the bridge does not pre-bake, and
+/// the Broiler.Layout engine sizes the box from the two insets
 /// (<c>CssBox.TryApplyAnchorInsetPlacement</c>'s opposing-inset path) and then applies the first
-/// fitting <c>@position-try</c> fallback (<c>CssBox.TryApplyPositionTryFallback</c>). With the
-/// lever off the bridge's <c>TryApplyFallback</c> pre-bakes; the two paths must agree.
+/// fitting <c>@position-try</c> fallback (<c>CssBox.TryApplyPositionTryFallback</c>). (The baked
+/// path this once compared against was retired in Phase 4 item-2 step 5.)
 ///
 /// Fixture: a 100×100 <c>position:relative</c> CB; a uniquely-named anchor <c>--a</c> (20×20 at
 /// (10,75) → right 30, top 75, bottom 95); a red target sized <c>left: anchor(--a right)</c> (30)
@@ -94,18 +94,5 @@ public class NativeOpposingInsetPositionTryWptTests : IDisposable
         Assert.True(System.Math.Abs(red.y0 - 45) <= 2, $"red top={red.y0}, expected ~45 (fallback).");
         Assert.True(System.Math.Abs(red.x1 - 94) <= 2, $"red right={red.x1}, expected ~94 (width 65).");
         Assert.True(System.Math.Abs(red.y1 - 74) <= 2, $"red bottom={red.y1}, expected ~74 (height 30).");
-    }
-
-    [Fact]
-    public void BridgeAndEnginePaths_Agree_OnOpposingInsetPositionTry()
-    {
-        var baked = Render(nativeAnchor: false);
-        var native = Render(nativeAnchor: true);
-
-        Assert.True(baked.count > 0 && native.count > 0, "target box missing in one of the paths.");
-        Assert.True(System.Math.Abs(baked.x0 - native.x0) <= 2, $"left differs: baked={baked.x0}, native={native.x0}.");
-        Assert.True(System.Math.Abs(baked.y0 - native.y0) <= 2, $"top differs: baked={baked.y0}, native={native.y0}.");
-        Assert.True(System.Math.Abs(baked.x1 - native.x1) <= 2, $"right differs: baked={baked.x1}, native={native.x1}.");
-        Assert.True(System.Math.Abs(baked.y1 - native.y1) <= 2, $"bottom differs: baked={baked.y1}, native={native.y1}.");
     }
 }

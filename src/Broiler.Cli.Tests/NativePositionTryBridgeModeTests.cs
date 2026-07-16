@@ -5,12 +5,12 @@ namespace Broiler.Cli.Tests;
 
 /// <summary>
 /// Verifies the bridge half of the native <c>@position-try</c> cutover (Phase 5,
-/// P5.8d.2b position-try expansion): with <c>DomBridge.NativeAnchorPlacement</c> on, a
-/// box in the anchor()-inset position-try handoff subset (definite size, single inset per
-/// axis, its <c>@position-try</c> rules available) keeps its <c>anchor()</c> base and
-/// <c>position-try-fallbacks</c> CSS through serialization — the engine's post-pass owns
-/// both the base placement and the fallback. Default off reproduces today's behaviour
-/// (the box is pre-baked and the anchor CSS neutralized), keeping production unchanged.
+/// P5.8d.2b position-try expansion): a box in the anchor()-inset position-try handoff
+/// subset (definite size, single inset per axis, its <c>@position-try</c> rules available)
+/// keeps its <c>anchor()</c> base and <c>position-try-fallbacks</c> CSS through
+/// serialization — the engine's post-pass owns both the base placement and the fallback.
+/// Phase 4 item-2 step 5 dropped the <c>NativeAnchorPlacement</c> flag check from the
+/// anchor()/position-try passes, so the handoff subset is un-baked unconditionally.
 /// </summary>
 public sealed class NativePositionTryBridgeModeTests
 {
@@ -72,21 +72,12 @@ public sealed class NativePositionTryBridgeModeTests
     }
 
     [Fact]
-    public void NativeMode_OpposingInsetBase_LeavesBoxUnbaked()
+    public void OpposingInsetBase_LeavesBoxUnbaked()
     {
-        // Native mode: the target is not touched — no baked inline style, so its opposing-inset
-        // anchor() base and position-try survive from the stylesheet to the engine's post-pass.
+        // The target is not touched — no baked inline style, so its opposing-inset anchor() base
+        // and position-try survive from the stylesheet to the engine's opposing-inset sizing +
+        // fallback post-pass. Step 5 made this unconditional, so a single mode suffices.
         var native = ResolveAndSerialize(nativeMode: true, OpposingHtml);
         Assert.DoesNotContain("id=\"target\" style=", native);
-
-        // Default mode bakes the fallback to concrete inline values, proving (a) the handoff is
-        // native mode's doing, not a no-op, and (b) the bridge's baked geometry matches the
-        // engine's native placement — the opposing-inset base sized to width 65 and the
-        // @position-try fallback pinned it to (30,45).
-        var baked = ResolveAndSerialize(nativeMode: false, OpposingHtml);
-        Assert.Contains("id=\"target\" style=", baked);
-        Assert.Contains("left: 30px", baked);
-        Assert.Contains("top: 45px", baked);
-        Assert.Contains("width: 65px", baked);
     }
 }

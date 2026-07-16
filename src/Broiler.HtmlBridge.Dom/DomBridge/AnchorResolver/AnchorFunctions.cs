@@ -37,20 +37,20 @@ public sealed partial class DomBridge
                 hasAnchorSizeRef = true;
         }
 
-        // Native mode (P5.8d.2b combined expansion): a box that uses both anchor-size() and
-        // anchor() insets is handed off as a unit — the engine sizes then places it in one
-        // post-pass. Neither pure gate admits it (each excludes the other function), so this
-        // single flag drives both the inset-skip below and the size-skip further down, keeping
-        // the two halves' bake/handoff decision in lockstep.
-        bool combinedMvp = NativeAnchorPlacement && hasAnchorRef && hasAnchorSizeRef &&
+        // A box that uses both anchor-size() and anchor() insets is handed off as a unit — the
+        // engine sizes then places it in one post-pass. Neither pure gate admits it (each excludes
+        // the other function), so this single flag drives both the inset-skip below and the
+        // size-skip further down, keeping the two halves' bake/handoff decision in lockstep. The
+        // NativeAnchorPlacement flag check is dropped in Phase 4 item-2 step 5 (a provable no-op on
+        // the native default path, where it was already true).
+        bool combinedMvp = hasAnchorRef && hasAnchorSizeRef &&
             IsMvpNativeAnchorCombinedBox(element, cssProps, anchorRegistry);
 
-        // Native mode (P5.8d.2b anchor()-insets expansion): for the MVP subset, skip
-        // baking the anchor() insets entirely so the box's `left/right/top/bottom:
-        // anchor(...)` CSS survives to the render and the Broiler.Layout engine's placement
-        // post-pass resolves it natively (see CssBox.TryApplyAnchorInsetPlacement). Every
-        // other anchor() box is baked below.
-        if (hasAnchorRef && NativeAnchorPlacement &&
+        // For the MVP subset, skip baking the anchor() insets entirely so the box's
+        // `left/right/top/bottom: anchor(...)` CSS survives to the render and the Broiler.Layout
+        // engine's placement post-pass resolves it natively (see CssBox.TryApplyAnchorInsetPlacement).
+        // Every other anchor() box is baked below.
+        if (hasAnchorRef &&
             (combinedMvp ||
              IsMvpNativeAnchorInsetBox(element, cssProps, anchorRegistry, positionTryRules)))
             hasAnchorRef = false;
@@ -157,13 +157,13 @@ public sealed partial class DomBridge
         }
 
         // Resolve anchor-size() function calls in both CSS and inline styles.
-        // Native mode (P5.8d.2b anchor-size() expansion): skip baking for the MVP subset so
-        // the box's `width/height: anchor-size(...)` survives to the engine's sizing pass
-        // (CssBox.TryApplyNativeAnchorSizing). The combined-box flag skips the size bake too,
-        // so a box that also has anchor() insets keeps both halves un-baked for the engine.
+        // Skip baking for the MVP subset so the box's `width/height: anchor-size(...)` survives to
+        // the engine's sizing pass (CssBox.TryApplyNativeAnchorSizing). The combined-box flag skips
+        // the size bake too, so a box that also has anchor() insets keeps both halves un-baked for
+        // the engine. The NativeAnchorPlacement flag check is dropped in Phase 4 item-2 step 5 (a
+        // provable no-op on the native default path, where it was already true).
         if (hasAnchorSizeRef &&
-            !(NativeAnchorPlacement &&
-              (combinedMvp || IsMvpNativeAnchorSizeBox(element, cssProps, anchorRegistry))))
+            !(combinedMvp || IsMvpNativeAnchorSizeBox(element, cssProps, anchorRegistry)))
         {
             ResolveAnchorSizeFunctions(element, cssProps, anchorRegistry);
         }
