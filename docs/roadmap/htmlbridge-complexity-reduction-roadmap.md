@@ -3512,6 +3512,36 @@ read-path coupling (`GetUsedZoomForElement` folds the same scale so `offset*` di
 CSSOM-View); and retiring `ApplyVisualViewportSerializationState`. (b2) general mid-tree `zoom: N` remains
 the separate engine-zoom feature.
 
+**Cutover-coupling finding (2026-07-16) — the (b1) cutover cannot be safely decomposed into CI-landable
+increments; it is one interdependent bundle, partly submodule.** Precise map of why each remaining piece is
+blocked:
+- **The read-path fold and the extraction-scale are inverse halves of one balance and must land together.**
+  This engine models pinch-zoom as a root-level zoom (like CSS `zoom`): `getBoundingClientRect` is scaled
+  ×scale, `offset*` is *unaffected*. Read-model parity needs BOTH the extraction `×scale` (patch 0006) AND
+  `GetUsedZoomForElement` folding the same scale at the root (so `offset* = snapshot/zoom` cancels to the
+  true value while `gBCR = …×zoom` stays scaled). Landing the fold *without* the extraction — e.g. on CI,
+  where 0006 is not applied — divides `offset*` by a scale nothing multiplied in → **halved, broken**
+  geometry. So the fold must gate on a `NativeVisualViewport` flag that is on *only* when 0006 is applied,
+  which cannot be detected at runtime; the flag defaults off and the native read path is never exercised on
+  CI (fully dormant, unvalidatable there).
+- **The live-path channel-setter is submodule + an `ILayoutView` API change.** The engine channel must be
+  set from the bridge's `_visualViewportScale` before `GetLayoutGeometry`; the live snapshot is built by
+  `HeadlessLayoutView`, which receives only a `DomDocument` (no zoom), so the pinch scale must be threaded
+  through `ILayoutView.GetGeometry` (main-repo API) + the bridge passing it + `HeadlessLayoutView` setting
+  the channel (submodule patch).
+- **The bake also serves the RENDER, so retiring it needs a paint transform (submodule).**
+  `ApplyZoomSerializationStyles` scales the *serialized* lengths, and WPT reftests render that serialized
+  HTML — so pinch *magnification* is a serialization/paint effect, not just a read-model one. Patch 0006
+  scales only the extracted `BoxGeometry` (read model); it does not magnify the paint. Fully retiring the
+  bake also requires a native paint transform for the zoomed viewport (Broiler.HTML / graphics submodule),
+  or a pinch-zoomed page stops rendering scaled.
+Net: past the delivered read-model mechanism (channel + 0006), (b1) is a coordinated bundle — a main-repo
+`NativeVisualViewport` flag + read-path fold, an `ILayoutView` threading change, a `HeadlessLayoutView`
+submodule setter, and a submodule paint transform — all landing together, validated only at the patched
+SHA. It is a patch-workflow feature track with deferred payoff, like blocker (a), not further main-repo
+increments. Recommend bundling it for a maintainer to apply with the submodule pointer bumps, or deferring
+until the `MaiRat/Broiler.*` remotes are in session push scope.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 
