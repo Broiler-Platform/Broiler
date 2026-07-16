@@ -3180,6 +3180,30 @@ the geometry Cli suites pass with only the standing headless `Range_GetBoundingC
 live geometry model, shrinking the getBoundingClientRect-vs-offset divergence the LayoutSnapshot endgame
 retires.
 
+**Landed (2026-07-16, follow-up) — `anchor()` physical insets join the live read model.** The live resolver
+above covered `position-area` boxes; a box positioned by `anchor()` physical insets
+(`left/top/right/bottom: anchor(--a …)`) was still on the pre-bake snapshot — the render bake
+(`ResolveAnchorFunctions`) runs *after* script, and the non-native renderer cannot resolve `anchor()` live, so
+such a box reported `offsetLeft/Top = 0` and `getBoundingClientRect` at the body origin during script (probe:
+a `left: anchor(--a right)` box reported `0`, not the anchor's `150`). New
+`DomBridge.ResolveAnchorInsetForElement` (`AnchorInsetQueries.cs`) is the `anchor()`-inset analogue of
+`ResolvePositionAreaForElement`: a lazy single-element resolver that reuses the canonical
+`Broiler.Layout.AnchorGeometry.ResolveEdge` (the exact geometry the bake uses — anchor lookup + accessibility +
+implicit `position-anchor` + fixed/modal scroll adjustment + intervening-scroll offset) to return the box's
+offsetParent-relative `offsetLeft/Top`. Reposition-only MVP (a single physical inset per axis; an opposing-inset
+pair, which *sizes* rather than positions, is left to the snapshot — matching the bake's `IsMvpNativeAnchorInsetBox`
+scope). Wired into `GetOffsetLeft/Top` (after the position-area check) and the unified
+`ComputeUnzoomedLayoutRect` anchor branch (the box's SIZE stays the snapshot's — the renderer sizes an
+explicit-size `anchor()` box correctly; only its position was wrong). Blast radius is abspos/fixed boxes with an
+`anchor()` inset (the resolver returns `null` — before building the registry — for every other element), so all
+other offset/`getBoundingClientRect` reads are byte-identical. Tests:
+`AnchorInsetLiveGeometryTests` (start insets → the anchor's right/bottom edge `(150,170)`; end insets → CB − inset
+− border-box `(70,80)`; `getBoundingClientRect` matches the offset getters). css-anchor-position corpus
+**unchanged (33/6, identical set)**; the geometry / anchor / hit-testing Cli suites add **zero regressions** (the
+5 failing there — the standing `Range_GetBoundingClientRect`, a `DomBridge_AnchorSize_…` and three
+`GoogleSearchPolyfill` SVG hit-testing tests — all fail identically on the pre-change baseline). Another read-path
+query family onto the one live geometry model.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 

@@ -167,6 +167,11 @@ public sealed partial class DomBridge
             if (resolved != null)
                 return resolved.Value.top;
 
+            // A live anchor() vertical inset resolves the box's top the same way, before the
+            // render bake — the pre-bake snapshot lays an anchor()-positioned box at the origin.
+            if (ResolveAnchorInsetForElement(element) is { top: { } insetTop })
+                return insetTop;
+
             var offsetParent = GetOffsetParentForDomElement(element);
             if (TryGetSharedOffset(element, offsetParent, vertical: true, out var sharedTop))
                 return sharedTop;
@@ -180,6 +185,9 @@ public sealed partial class DomBridge
             var resolved = ResolvePositionAreaForElement(element);
             if (resolved != null)
                 return resolved.Value.left;
+
+            if (ResolveAnchorInsetForElement(element) is { left: { } insetLeft })
+                return insetLeft;
 
             var offsetParent = GetOffsetParentForDomElement(element);
             if (TryGetSharedOffset(element, offsetParent, vertical: false, out var sharedLeft))
@@ -503,18 +511,40 @@ public sealed partial class DomBridge
 
     private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)
     {
-        // A live position-area resolution wins over the shared renderer snapshot (which
-        // reports a 0×0 box before the grid-cell placement is baked), matching the offset
-        // getters — so getBoundingClientRect stays consistent with offsetLeft/Top/Width/
-        // Height for a position-area box read during script (css-anchor-position
-        // position-area-anchor-partially-outside reads geometry live, before the render
-        // bake). The used-box SIZE is the resolution's; the document POSITION is composed
-        // from the standard offsetParent invariant (border-box edge = offsetParent
-        // border-box origin + its border + the element's offset), reusing the already-
-        // corrected offset getters rather than the pre-bake snapshot. Zoom/transform stay
-        // approximate on this live path, as elsewhere in the live position-area geometry.
-        if (ResolvePositionAreaForElement(element) is { } resolvedArea)
+        // A live anchor resolution (position-area grid placement, or an anchor() physical
+        // inset) wins over the shared renderer snapshot — the non-native renderer lays such a
+        // box out at 0×0 / the static origin before the render bake runs, so getBoundingClientRect
+        // would disagree with the (already-corrected) offset getters for a box read during script
+        // (css-anchor-position position-area-anchor-partially-outside and anchor() tests read
+        // geometry live). The document POSITION is composed from the standard offsetParent
+        // invariant (border-box edge = offsetParent border-box origin + its border + the element's
+        // offset), reusing the offset getters. The SIZE is the position-area resolution's used box,
+        // or — for an anchor() inset box, which the renderer sizes correctly — the snapshot border
+        // box. Zoom/transform stay approximate on this live path, as elsewhere.
+        var areaResolution = ResolvePositionAreaForElement(element);
+        bool insetPositioned = areaResolution is null
+            && ResolveAnchorInsetForElement(element) is { } ins && (ins.left is not null || ins.top is not null);
+        if (areaResolution is not null || insetPositioned)
         {
+            double width, height;
+            if (areaResolution is { } ar)
+            {
+                width = ar.width;
+                height = ar.height;
+            }
+            else if (TryGetSharedLayoutGeometry(element, out var box))
+            {
+                var z = GetUsedZoomForElement(element);
+                var iz = z > 0.0001 ? 1.0 / z : 1.0;
+                width = box.BorderBox.Width * iz;
+                height = box.BorderBox.Height * iz;
+            }
+            else
+            {
+                width = 0;
+                height = 0;
+            }
+
             double left = GetOffsetLeftForDomElement(element);
             double top = GetOffsetTopForDomElement(element);
             if (GetOffsetParentForDomElement(element) is { } offsetParent)
@@ -523,7 +553,7 @@ public sealed partial class DomBridge
                 left += parentRect.Left + GetClientLeftForDomElement(offsetParent);
                 top += parentRect.Top + GetClientTopForDomElement(offsetParent);
             }
-            return (left, top, resolvedArea.width, resolvedArea.height);
+            return (left, top, width, height);
         }
 
         // RF-BRIDGE-1b: the element's rect comes from the renderer's real layout (border
