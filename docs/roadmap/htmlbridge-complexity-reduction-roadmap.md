@@ -2802,8 +2802,10 @@ native" = making both unconditional and retiring the flag.
   `ReplaceRootWithReplacedContent` (CSS Content 3 root replacement), `ApplyVisualViewportSerializationState`
   (visual-viewport — see its finding above), and the step-3e scroller→`position:relative` loop.
 - **Native-support markers — must be PRESERVED, not deleted:** `data-broiler-anchor-cb`,
-  `data-broiler-scroll-top/left`, `data-broiler-scroll-hidden`, and the inline neutralizers
-  `position-area: none` / `position-try-fallbacks: none`. These are how the native path feeds the engine.
+  `data-broiler-scroll-top/left`, and the inline neutralizers `position-area: none` /
+  `position-try-fallbacks: none`. These are how the native path feeds the engine. (The
+  `data-broiler-scroll-hidden` marker was removed in step 5 together with the baked DOM-shift branch
+  that produced it — the engine's overflow box now clips scrolled-above content directly.)
 
 **Sequenced plan:**
 1. **Full-corpus lever-on validation (prerequisite) — DONE 2026-07-16, clean.** The flip turns on native
@@ -2877,16 +2879,42 @@ native" = making both unconditional and retiring the flag.
    The bridge `NativeAnchorPlacement` property is **still read** by the ALWAYS step-3e scroller→`position:relative`
    loop (it gates the `data-broiler-anchor-cb` marker), so it stays; fully retiring it (and its ~10 test setters
    + the WPT-runner lever) is a separate follow-up, not part of step 5.
-6. **Residual bakes stay** until their features go native: dialog/backdrop (submodule), visual-viewport
-   (LayoutSnapshot endgame), and the `min-content` position-try base. The ALWAYS passes stay regardless.
+6. **Residual bakes stay until their features go native — REVIEWED 2026-07-16, terminal state confirmed.**
+   Step 6 is not a deletion slice: it records the bridge anchor bakes that remain load-bearing after steps
+   1–5, and *why* none can be handed to the engine yet. An audit of the orchestrator (`ResolveAnchorPositions`)
+   and every surviving `InlineStyle(...)[...] =` write in `AnchorResolver/` confirms the remaining bakes are
+   exactly:
+   - **ALWAYS passes (no native handling exists — stay regardless of the lever):**
+     `ApplyDialogUAPositioning` / `ApplyPopoverUAPositioning` / `InsertDialogBackdrops` (dialog/backdrop UA
+     positioning — a **submodule feature**; native support would live in the renderer, not the bridge),
+     `ReplaceRootWithReplacedContent` (CSS Content 3 root replacement), and the step-3e
+     scroller→`position:relative` loop (+ its `data-broiler-anchor-cb` marker — the one remaining reader of the
+     `NativeAnchorPlacement` lever).
+   - **Residual until the feature goes native:** `ApplyVisualViewportSerializationState` (visual-viewport —
+     blocked on the **LayoutSnapshot endgame**), and the non-MVP bake branches inside the thinned PER-ELEMENT
+     passes — most notably the **`min-content` position-try base** and any position-area/anchor() box outside
+     `IsMvpNative…Box` (position-try/anchor() entanglement, or no registered dashed-ident anchor). These bake
+     only the residue `IsMvpNative…Box` rejects; each shrinks to nothing as the engine gains the corresponding
+     capability.
+
+   **There is no safe deletion available at step 6** — every remaining write is either an ALWAYS pass or a
+   not-yet-native residue, so removing it would break a still-baked feature (CI clones by pointer and renders
+   the baked HTML). Further reduction is gated on three independent **feature** efforts, each its own multi-step
+   track outside this complexity-reduction roadmap: (a) native dialog/backdrop rendering (submodule), (b) the
+   visual-viewport LayoutSnapshot endgame, (c) engine `min-content` position-try sizing. When each lands, its
+   residual bake (and, for (a)+(c), a further slice of the corresponding thinned pass) can be deleted, and once
+   the step-3e marker no longer needs it the `NativeAnchorPlacement` lever itself can be fully retired.
 
 **Risk:** low — WPT/test-only, no production-render change; the corpus *improves* under the flip (33/6 > 31/8).
 The real costs are (a) the full-corpus lever-on validation gap (step 1), and (b) losing baked-path test
 coverage as the flag retires (steps 3–5), which is acceptable since the baked path is being removed.
-**Status 2026-07-16: steps 1–5 all landed** — the default is flipped to native, all five WHOLE-SKIP passes are
-deleted, and all six PER-ELEMENT passes are thinned to their not-yet-native residue. Remaining: step 6 (the
-ALWAYS residual bakes stay until their features go native) and the optional follow-up of fully retiring the
-`NativeAnchorPlacement` lever once the last ALWAYS marker-stamp no longer needs it.
+**Status 2026-07-16: the Phase 4 item-2 deletion plan is complete through step 6.** The default is flipped to
+native (steps 1–2), all five WHOLE-SKIP passes are deleted (steps 3–4), all six PER-ELEMENT passes are thinned
+to their not-yet-native residue (step 5), and the step-6 audit confirms the terminal state: the only remaining
+bridge anchor bakes are the ALWAYS passes and the not-yet-native residue, none safely deletable now. Everything
+further is gated on separate feature work (native dialog/backdrop, visual-viewport LayoutSnapshot, engine
+`min-content` position-try) plus the optional follow-up of fully retiring the `NativeAnchorPlacement` lever once
+the last ALWAYS marker-stamp no longer needs it.
 
 **Finding — `position-visibility` is entangled with the scroll-container CB decision — RESOLVED 2026-07-15
 (see the thirteenth expansion above; the design below was executed and all 14 corpus tests pass lever-on).**
