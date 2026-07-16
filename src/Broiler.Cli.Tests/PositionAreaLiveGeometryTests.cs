@@ -59,6 +59,33 @@ public sealed class PositionAreaLiveGeometryTests
     }
 
     [Fact]
+    public void NonStretchExplicitSize_ReportsUsedBox_NotTheGridCell()
+    {
+        // A NON-stretch, explicitly-sized position-area box: borderless 300×300 CB, 100×100
+        // anchor at (100,100). position-area: bottom right selects the [200..300]×[200..300]
+        // cell (100×100); an explicit 40×30 box aligns within it toward the anchor corner.
+        // offsetWidth/Height must be the used 40×30, not the 100×100 grid cell — matching the
+        // render bake's PositionAreaGrid.ResolveElementBox.
+        const string html = @"<!DOCTYPE html><html><head><style>
+  #cb { position: relative; width: 300px; height: 300px; }
+  #a { position: absolute; left: 100px; top: 100px; width: 100px; height: 100px; anchor-name: --a; }
+  #t { position: absolute; position-anchor: --a; position-area: bottom right; width: 40px; height: 30px; }
+</style></head><body><div id='cb'><div id='a'></div><div id='t'></div></div></body></html>";
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///pa-nonstretch.html");
+
+        int Read(string prop) => (int)double.Parse(
+            context.Eval($"document.getElementById('t').{prop}").ToString()!,
+            System.Globalization.CultureInfo.InvariantCulture);
+
+        Assert.Equal(40, Read("offsetWidth"));  // used size, not the 100-wide cell
+        Assert.Equal(30, Read("offsetHeight")); // used size, not the 100-tall cell
+        Assert.Equal(200, Read("offsetLeft"));  // aligned to the anchor-side corner of the cell
+        Assert.Equal(200, Read("offsetTop"));
+    }
+
+    [Fact]
     public void BorderlessCb_IsUnaffected_ByThePaddingBoxFrame()
     {
         // Control: with no CB border the padding-box and border-box origins coincide, so the

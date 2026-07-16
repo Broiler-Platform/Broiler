@@ -2825,10 +2825,18 @@ concrete step of the Phase 5 endgame below ("one layout pass services all geomet
   case), so it only corrects the previously border-shifted bordered-CB grid. It fixes both the live path
   **and** the render bake (which shared the same `ComputePositionAreaRect` and was equally border-shifted —
   invisible to pixel tests because no pixel fixture pairs a bordered CB with this geometry).
-- **Not done (deferred, latent):** the live estimator still returns the grid **cell**, not
-  `PositionAreaGrid.ResolveElementBox`'s used box, so a *non-*`stretch` `position-area` box would over-report
-  its `offsetWidth`. No current corpus/JS test exercises that (all `position-area` offset boxes are
-  `stretch`), so it is left for the eventual `ResolveElementBox` unification.
+- **Used box (done 2026-07-16, follow-up slice).** `ResolvePositionAreaForElement` now feeds the grid cell
+  through `PositionAreaGrid.ResolveElementBox` (physical px insets + length/percentage `width`/`height`),
+  so it reports the element's **used box** — its used size (percentage against the cell, an explicit length
+  clamped to it, else fill the cell) and alignment offset — instead of the raw grid cell. This is exactly
+  what the render bake caches (`ResolvePositionAreaValues` → `SetPositionAreaResolution(finalLeft, finalTop,
+  borderBoxW, borderBoxH)`), so the live read model and the bake now agree for the common case; a
+  *non-*`stretch` or explicitly-sized box no longer over-reports its `offsetWidth`/`Height` as the cell.
+  The render bake's percentage-box-props / `box-sizing` / inline-CB branches (and border/padding on the
+  border box) stay approximate on the live path — no test exercises them and the render bake owns those.
+  A `stretch` box is unaffected (used box = cell), so the padding-box fix's fixture is unchanged. Test:
+  `PositionAreaLiveGeometryTests.NonStretchExplicitSize_ReportsUsedBox_NotTheGridCell` (an explicit 40×30
+  box in a 100×100 cell reports 40×30). Live-path only — the render pixel path is untouched.
 
 Validation: `Broiler.Cli.Tests/PositionAreaLiveGeometryTests.cs` pins the 6 representative
 `anchor-partially-outside` rows (bordered CB, partially-outside anchor) + a borderless control; the live
