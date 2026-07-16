@@ -2807,12 +2807,13 @@ native" = making both unconditional and retiring the flag.
   `position-area: none` / `position-try-fallbacks: none`. These are how the native path feeds the engine.
 
 **Sequenced plan:**
-1. **Full-corpus lever-on validation (prerequisite).** The flip turns on native scroll/sticky/anchor for
-   *every* page the WPT runner renders, not just anchor pages. Only the css-anchor-position subset is
-   validated lever-on so far (33/6 vs 31/8 default-off). Run the full available corpus (CSS2, css-align,
-   css-backgrounds, css-animations, css-anchor-position) **lever-on** and diff vs the default-off baseline
-   (the full corpus is 38-fail default-off — established during the twenty-fourth expansion) to confirm the
-   scroll/sticky handoffs don't regress non-anchor pages.
+1. **Full-corpus lever-on validation (prerequisite) — DONE 2026-07-16, clean.** The flip turns on native
+   scroll/sticky/anchor for *every* page the WPT runner renders, not just anchor pages. The full available
+   corpus (CSS2, css-align, css-backgrounds, css-animations, css-anchor-position; 147 tests) was run
+   **lever-on** and diffed against the default-off baseline (38 fails): **lever-on 36 fails, ZERO new
+   failures, 2 fixed** (`position-area-scrolling-002`, `position-try-grid-001`). Every non-anchor page is
+   byte-for-byte unchanged — the native scroll/sticky handoffs regress nothing outside css-anchor-position,
+   and the corpus strictly improves (38→36). The flip is safe to make the default.
 2. **Flip the runner default + rebaseline (1 PR, reversible).** Default `BROILER_WPT_NATIVE_ANCHOR` on;
    update the corpus baselines from 31/8 to 33/6. Keep the flag so it can be toggled back.
 3. **Commit to native (decision point).** Make both flags unconditional and retire the toggle. Requires
