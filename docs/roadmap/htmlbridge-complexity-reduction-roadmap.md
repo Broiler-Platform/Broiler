@@ -2856,16 +2856,37 @@ native" = making both unconditional and retiring the flag.
    - ✅ **`NeutralizeStyleElementsForAnchorRules` (CssCleanup.cs) deleted** — the engine post-pass consumes the
      stylesheet's anchor rules directly, so they must reach the renderer un-stripped. Whole file deleted (all
      helpers private, none shared).
-5. **Thin the 6 PER-ELEMENT passes** (per-pass PRs): drop the flag check, make the MVP-skip unconditional,
-   keep the non-MVP bake + its marker. Each pass shrinks to "bake only the not-yet-native residue."
+5. **Thin the 6 PER-ELEMENT passes — DONE 2026-07-16 (all six thinned).** Per-pass: drop the
+   `NativeAnchorPlacement &&` from the MVP gate so the MVP-skip is unconditional (a provable no-op on the
+   native default path, where the flag was always true), keeping the non-MVP bake + its marker. Each pass now
+   bakes only the not-yet-native residue. The css-anchor-position corpus stayed 33/6 and the full available css
+   corpus stayed at 36 fails throughout. As with steps 3–4, the retired baked (`=0`) path degrades for MVP
+   boxes and the baked-half of each pass's characterization/parity test was dropped.
+   - ✅ **`ResolveStickyPositioning`** — skip whenever `IsMvpNativeStickyBox` (any sticky with a scroll
+     container); only a scroll-container-less sticky still bakes.
+   - ✅ **`ApplyScrollSimulation`** — the flag gated a whole native-vs-baked branch, so dropping it made the
+     `data-broiler-scroll-*` handoff unconditional and **deleted the entire baked DOM-shift wrapper** (~90 lines
+     + `CollectFixedDescendants` + `DocumentHasAnchorContent`), never reached on the native path.
+   - ✅ **`ResolvePositionAreaValues`** — skip-bake whenever `IsMvpNativeAnchorBox`; the non-MVP
+     `position-area: none` neutralizer is stamped unconditionally.
+   - ✅ **`ResolveAnchorFunctions`** — all three MVP handoffs (combined, anchor()-inset, anchor-size()) un-gated.
+   - ✅ **`ResolvePositionTryFallbacks`** — skip-bake whenever `IsMvpNativeAnchorInsetBox`; non-handoff
+     `position-try` neutralizer stamped unconditionally.
+   - ✅ **`PromoteAbsPosFromInlineCBs`** — skip promotion whenever `InlineCbHasNativeAnchorBox`.
+
+   The bridge `NativeAnchorPlacement` property is **still read** by the ALWAYS step-3e scroller→`position:relative`
+   loop (it gates the `data-broiler-anchor-cb` marker), so it stays; fully retiring it (and its ~10 test setters
+   + the WPT-runner lever) is a separate follow-up, not part of step 5.
 6. **Residual bakes stay** until their features go native: dialog/backdrop (submodule), visual-viewport
    (LayoutSnapshot endgame), and the `min-content` position-try base. The ALWAYS passes stay regardless.
 
 **Risk:** low — WPT/test-only, no production-render change; the corpus *improves* under the flip (33/6 > 31/8).
 The real costs are (a) the full-corpus lever-on validation gap (step 1), and (b) losing baked-path test
-coverage when the flag retires (step 3), which is acceptable since the baked path is being removed. The
-smallest first increment that delivers value is steps 1–2 (validate + flip the default) followed by step 4
-(delete the WHOLE-SKIP passes) — the PER-ELEMENT thinning and the residue can follow independently.
+coverage as the flag retires (steps 3–5), which is acceptable since the baked path is being removed.
+**Status 2026-07-16: steps 1–5 all landed** — the default is flipped to native, all five WHOLE-SKIP passes are
+deleted, and all six PER-ELEMENT passes are thinned to their not-yet-native residue. Remaining: step 6 (the
+ALWAYS residual bakes stay until their features go native) and the optional follow-up of fully retiring the
+`NativeAnchorPlacement` lever once the last ALWAYS marker-stamp no longer needs it.
 
 **Finding — `position-visibility` is entangled with the scroll-container CB decision — RESOLVED 2026-07-15
 (see the thirteenth expansion above; the design below was executed and all 14 corpus tests pass lever-on).**
