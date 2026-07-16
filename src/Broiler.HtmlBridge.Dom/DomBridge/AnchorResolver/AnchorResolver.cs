@@ -150,16 +150,13 @@ public sealed partial class DomBridge
         //    pre-bake was proven redundant (P5.8d.2b) and is deleted now that native is the
         //    default (Phase 4 item-2 step 3) — see NativeFixedSizingTests for the engine parity.
 
-        // 6. Ensure elements that establish containing blocks via non-position
-        //    properties (contain:layout, transform, will-change:transform) get
-        //    position:relative so the Broiler renderer treats them as containing blocks for
-        //    abspos children. Native mode (P5.8d.2b transform/contain CB expansion): the
-        //    Broiler.Layout engine now resolves all of these natively
-        //    (CssBox.FindPositionedContainingBlock + EstablishesNonPositionAbsPosContainingBlock
-        //    under the lever), so this pre-bake is skipped entirely — no inline position:relative
-        //    write reaches the native render path.
-        if (!NativeAnchorPlacement)
-            EnsureContainingBlockPositioning(DocumentElement);
+        // 6. Elements that establish containing blocks via non-position properties
+        //    (contain:layout, transform, will-change:transform) are resolved natively by the
+        //    Broiler.Layout engine (CssBox.FindPositionedContainingBlock +
+        //    EstablishesNonPositionAbsPosContainingBlock), so no bridge pre-bake is needed. The
+        //    redundant `EnsureContainingBlockPositioning` pass — which baked position:relative
+        //    onto those establishers for the static renderer — was deleted in Phase 4 item-2
+        //    step 3 now that native is the default. See NativeAnchorContainCbWptTests for parity.
 
         // 7. Strip CSS rules with unsupported properties (anchor(), inset,
         //    anchor-name) from the stylesheet so the renderer doesn't
