@@ -325,16 +325,17 @@ internal sealed partial class WptTestRunner
 
     /// <summary>
     /// Native anchor-placement cutover lever (HtmlBridge complexity-reduction roadmap
-    /// Phase 5, P5.8d.2b). Default <c>false</c>. When on, the runner puts the DomBridge
-    /// into native anchor mode (so MVP-subset <c>position-area</c> boxes keep their CSS
-    /// instead of being pre-baked) and enables the Broiler.Layout engine's placement
-    /// post-pass (<c>NativeAnchorPlacement.Enabled</c>) around only the final render, so
-    /// the engine — not the bridge — positions those boxes. Overridden by the
-    /// <c>BROILER_WPT_NATIVE_ANCHOR</c> environment variable. Kept default-off until
-    /// pixel parity is proven feature-by-feature across the css-anchor-position suite.
+    /// Phase 5, P5.8d.2b / Phase 4 item-2 step 2). **Default <c>true</c>** since the flip
+    /// was validated across the full css corpus (lever-on 36 fails vs 38 default-off, zero
+    /// new failures, 2 fixed). When on, the runner puts the DomBridge into native anchor
+    /// mode (so MVP-subset boxes keep their CSS instead of being pre-baked) and enables the
+    /// Broiler.Layout engine's placement post-pass (<c>NativeAnchorPlacement.Enabled</c>)
+    /// around the final render, so the engine — not the bridge — positions those boxes.
+    /// The baked path is kept reachable for rollback/comparison: set
+    /// <c>BROILER_WPT_NATIVE_ANCHOR=0</c> (or <c>false</c>/<c>off</c>) to force it off.
     /// </summary>
     internal static bool NativeAnchorPlacement { get; set; } =
-        Environment.GetEnvironmentVariable("BROILER_WPT_NATIVE_ANCHOR") is "1" or "true" or "TRUE";
+        Environment.GetEnvironmentVariable("BROILER_WPT_NATIVE_ANCHOR") is not ("0" or "false" or "FALSE" or "off");
 
     /// <summary>
     /// File extensions treated as test files.

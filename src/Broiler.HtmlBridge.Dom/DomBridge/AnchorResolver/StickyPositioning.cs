@@ -28,13 +28,13 @@ public sealed partial class DomBridge
     {
         if (!IsText(el) && IsSticky(GetComputedProps(el)))
         {
-            // Native mode (P5.8d.2b sticky expansion): hand a sticky box whose scroll
-            // container is a non-document clipping element on a no-anchor page to the
-            // Broiler.Layout engine's sticky post-pass (CssBox.RunStickyPositioning) — leave
-            // position:sticky un-baked so it survives serialization → cascade → the engine,
-            // which pins it against the natively scroll-shifted scrollport. Every other sticky
-            // box (document/page scroll, or an anchor page) stays baked here.
-            if (!(NativeAnchorPlacement && IsMvpNativeStickyBox(el)))
+            // A sticky box with a scroll container is handed to the Broiler.Layout engine's sticky
+            // post-pass (CssBox.RunStickyPositioning): position:sticky is left un-baked so it
+            // survives serialization → cascade → the engine, which pins it against the natively
+            // scroll-shifted scrollport. The flag check is dropped in Phase 4 item-2 step 5 — the
+            // MVP-skip is unconditional (a provable no-op on the native default path, where the
+            // flag was already true); only the not-yet-native residue (no scroll container) bakes.
+            if (!IsMvpNativeStickyBox(el))
                 ApplyStickyOffset(el);
         }
 
@@ -48,19 +48,16 @@ public sealed partial class DomBridge
     /// <summary>
     /// Whether a <c>position: sticky</c> box is handled by the Broiler.Layout engine's native
     /// sticky post-pass in native mode (so the bridge skips pre-baking it to
-    /// <c>relative</c> + offset). Scoped exactly like the native scroll handoff
-    /// (<see cref="ApplyScrollSimulationTree"/>): a <em>no-anchor</em> page, so none of the
-    /// anchor-scroll / position-visibility machinery runs and any scroll container reaches the
-    /// engine via <c>data-broiler-scroll-*</c>. Both a non-document clipping scroll container
-    /// and the document scrolling element (page scroll) are handled — the latter since the
-    /// twentieth expansion made <c>&lt;html&gt;</c> scroll native, so the engine sees the
-    /// page-scrolled geometry and pins the box against the viewport
-    /// (<c>CssBox.TryGetStickyScrollport</c>).
+    /// <c>relative</c> + offset): the box has a scroll container (a non-document clipping element
+    /// or the document scrolling element for page scroll), which the engine pins against the
+    /// natively scroll-shifted scrollport (<c>CssBox.TryGetStickyScrollport</c>). Anchor pages are
+    /// included as of the twenty-fourth expansion: the native scroll handoff
+    /// (<see cref="ApplyScrollSimulationTree"/>) is no longer scoped to no-anchor pages, so a
+    /// sticky box's scroll container is engine-shifted on an anchor page too and the engine's
+    /// sticky pass (run after scroll, before anchor placement) reads the shifted geometry.
     /// </summary>
     private bool IsMvpNativeStickyBox(DomElement el)
     {
-        if (DocumentHasAnchorContent())
-            return false;
         return FindScrollContainer(el) != null;
     }
 

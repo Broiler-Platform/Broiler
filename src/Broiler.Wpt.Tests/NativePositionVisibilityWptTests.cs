@@ -5,19 +5,19 @@ namespace Broiler.Wpt.Tests;
 
 /// <summary>
 /// End-to-end proof of the Phase 5 native <c>position-visibility</c> cutover (P5.8d.2b) through the
-/// full WPT render pipeline. With the runner lever on, the bridge stops resolving
-/// <c>position-visibility</c> (no <c>display:none</c> write) and the Broiler.Layout engine's
-/// post-pass (<c>CssBox.ResolvePositionVisibility</c>) hides an anchor-positioned target whose
-/// anchor is scrolled out of an <em>intervening</em> clip container.
+/// full WPT render pipeline. The Broiler.Layout engine's post-pass
+/// (<c>CssBox.ResolvePositionVisibility</c>) hides an anchor-positioned target whose anchor is
+/// scrolled out of an <em>intervening</em> clip container; the bridge never bakes
+/// <c>display:none</c> (the redundant <c>ResolvePositionVisibility</c> pass was deleted in Phase 4
+/// item-2 step 3 now that native is the default).
 ///
-/// The two fixtures differ only in the scroll container's authored <c>position</c> — the exact case
-/// the bridge's pre-<c>position:relative</c> ordering distinguishes and the engine reproduces via the
-/// <c>data-broiler-anchor-cb</c> marker:
+/// The two fixtures differ only in the scroll container's authored <c>position</c>, which the engine
+/// distinguishes via the <c>data-broiler-anchor-cb</c> marker the bridge stamps on anchor-induced
+/// scrollers:
 /// - a <b>static</b> scroll container is not the target's CB, so its scrolled-out anchor is an
 ///   intervening clip → the target is <b>hidden</b>;
 /// - an authored <b>position:relative</b> scroll container IS the target's CB → no intervening clip →
 ///   the target is <b>shown</b>, even though the anchor is scrolled out.
-/// Both the baked (lever-off) and native (lever-on) paths agree.
 /// </summary>
 [Xunit.Collection("NativeAnchorWpt")]
 public class NativePositionVisibilityWptTests : IDisposable
@@ -80,19 +80,15 @@ public class NativePositionVisibilityWptTests : IDisposable
     [Fact]
     public void NativeLeverOn_StaticScroller_HidesTarget()
     {
-        // Intervening clip → hidden. Baked path hides it too, so both agree on "no red".
+        // Intervening clip → the engine hides the target (no red painted).
         Assert.Equal(0, RenderRedCount(nativeAnchor: true, ""));
-        Assert.Equal(0, RenderRedCount(nativeAnchor: false, ""));
     }
 
     [Fact]
     public void NativeLeverOn_RelativeScroller_ShowsTarget()
     {
-        // The scroller IS the target's CB → no intervening clip → shown (red present) under both
-        // the native and baked paths.
+        // The scroller IS the target's CB → no intervening clip → shown (red present).
         Assert.True(RenderRedCount(nativeAnchor: true, "position: relative;") > 0,
             "target should be visible under the native lever with a position:relative scroller.");
-        Assert.True(RenderRedCount(nativeAnchor: false, "position: relative;") > 0,
-            "target should be visible under the baked path with a position:relative scroller.");
     }
 }

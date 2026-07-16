@@ -8,14 +8,13 @@ namespace Broiler.Wpt.Tests;
 /// full WPT render pipeline (<see cref="WptTestRunner.RenderHtmlFileBitmapPublic"/>: parse →
 /// DomBridge anchor resolution → serialize → engine layout → raster).
 ///
-/// With the runner lever on, the bridge does <em>not</em> pre-bake a box in the anchor()-inset
-/// position-try handoff subset (its <c>anchor()</c> base and <c>position-try-fallbacks</c>
-/// survive serialization); the box is placed by the Broiler.Layout engine's post-pass, which
-/// fed the parsed <c>@position-try</c> rule bodies via the
-/// <c>NativeAnchorPlacement.PositionTryRules</c> channel selects and applies the first fitting
-/// fallback (<c>CssBox.TryApplyPositionTryFallback</c>). The same fixture with the lever off
-/// (the bridge's <c>TryApplyFallback</c> pre-bakes) lands the box in the same place, so the two
-/// paths agree.
+/// The bridge does <em>not</em> pre-bake a box in the anchor()-inset position-try handoff
+/// subset (its <c>anchor()</c> base and <c>position-try-fallbacks</c> survive serialization);
+/// the box is placed by the Broiler.Layout engine's post-pass, which — fed the parsed
+/// <c>@position-try</c> rule bodies via the <c>NativeAnchorPlacement.PositionTryRules</c>
+/// channel — selects and applies the first fitting fallback
+/// (<c>CssBox.TryApplyPositionTryFallback</c>). (The baked path this once compared against was
+/// retired in Phase 4 item-2 step 5.)
 ///
 /// Fixture: a 100×100 <c>position:relative</c> CB; a uniquely-named anchor <c>--a</c> (20×20 at
 /// (70,70)); a 30×30 red target whose base <c>left/top</c> are <c>anchor(--a right)</c>/
@@ -93,18 +92,5 @@ public class NativePositionTryWptTests : IDisposable
         Assert.True(System.Math.Abs(red.y0 - 40) <= 2, $"red top={red.y0}, expected ~40 (fallback).");
         Assert.True(System.Math.Abs(red.x1 - 69) <= 2, $"red right={red.x1}, expected ~69.");
         Assert.True(System.Math.Abs(red.y1 - 69) <= 2, $"red bottom={red.y1}, expected ~69.");
-    }
-
-    [Fact]
-    public void BridgeAndEnginePaths_Agree_OnPositionTryFallback()
-    {
-        var baked = Render(nativeAnchor: false);
-        var native = Render(nativeAnchor: true);
-
-        Assert.True(baked.count > 0 && native.count > 0, "target box missing in one of the paths.");
-        Assert.True(System.Math.Abs(baked.x0 - native.x0) <= 2, $"left differs: baked={baked.x0}, native={native.x0}.");
-        Assert.True(System.Math.Abs(baked.y0 - native.y0) <= 2, $"top differs: baked={baked.y0}, native={native.y0}.");
-        Assert.True(System.Math.Abs(baked.x1 - native.x1) <= 2, $"right differs: baked={baked.x1}, native={native.x1}.");
-        Assert.True(System.Math.Abs(baked.y1 - native.y1) <= 2, $"bottom differs: baked={baked.y1}, native={native.y1}.");
     }
 }

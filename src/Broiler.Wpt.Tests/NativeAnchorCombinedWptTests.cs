@@ -8,13 +8,11 @@ namespace Broiler.Wpt.Tests;
 /// (P5.8d.2b combined expansion) through the full WPT render pipeline (parse → DomBridge anchor
 /// resolution → serialize → HtmlPostProcessor → reparse → engine layout → raster).
 ///
-/// With the runner's <see cref="WptTestRunner.NativeAnchorPlacement"/> lever on, the bridge does
-/// <em>not</em> pre-bake a box that both sizes to its anchor (<c>anchor-size()</c> in
-/// <c>width</c>/<c>height</c>) and positions against it (<c>anchor()</c> in an inset); the box is
+/// The bridge does <em>not</em> pre-bake a box that both sizes to its anchor (<c>anchor-size()</c>
+/// in <c>width</c>/<c>height</c>) and positions against it (<c>anchor()</c> in an inset); the box is
 /// instead sized then placed by the Broiler.Layout engine's post-pass
-/// (<c>CssBox.TryApplyNativeAnchorSizing</c> then <c>TryApplyAnchorInsetPlacement</c>). The same
-/// fixture with the lever off (the bridge pre-bakes both halves) produces the same box, so the two
-/// paths agree.
+/// (<c>CssBox.TryApplyNativeAnchorSizing</c> then <c>TryApplyAnchorInsetPlacement</c>). (The baked
+/// path this once compared against was retired in Phase 4 item-2 step 5.)
 ///
 /// Fixture: a 200×200 <c>position:relative</c> containing block; a uniquely-named anchor
 /// <c>--a</c> (50×70, transparent) at (40,40) → right 90, bottom 110; and a red target sized to
@@ -94,18 +92,5 @@ public class NativeAnchorCombinedWptTests : IDisposable
         Assert.True(System.Math.Abs(red.y0 - 110) <= 2, $"red top={red.y0}, expected ~110 (anchor bottom).");
         Assert.True(System.Math.Abs(red.x1 - 139) <= 2, $"red right={red.x1}, expected ~139 (width 50).");
         Assert.True(System.Math.Abs(red.y1 - 179) <= 2, $"red bottom={red.y1}, expected ~179 (height 70).");
-    }
-
-    [Fact]
-    public void BridgeAndEnginePaths_Agree_OnCombinedBox()
-    {
-        var baked = Render(nativeAnchor: false);
-        var native = Render(nativeAnchor: true);
-
-        Assert.True(baked.count > 0 && native.count > 0, "target box missing in one of the paths.");
-        Assert.True(System.Math.Abs(baked.x0 - native.x0) <= 2, $"left differs: baked={baked.x0}, native={native.x0}.");
-        Assert.True(System.Math.Abs(baked.y0 - native.y0) <= 2, $"top differs: baked={baked.y0}, native={native.y0}.");
-        Assert.True(System.Math.Abs(baked.x1 - native.x1) <= 2, $"right differs: baked={baked.x1}, native={native.x1}.");
-        Assert.True(System.Math.Abs(baked.y1 - native.y1) <= 2, $"bottom differs: baked={baked.y1}, native={native.y1}.");
     }
 }

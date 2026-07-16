@@ -10,16 +10,15 @@ namespace Broiler.Wpt.Tests;
 ///
 /// The anchored target's containing block is established by <c>contain: layout</c> —
 /// a NON-position property (the css-anchor-position <c>transform-010/015/016</c>
-/// corpus pattern) — not by <c>position: relative</c>. On the baked path the bridge's
-/// <c>EnsureContainingBlockPositioning</c> pre-bakes <c>position: relative</c> onto the
-/// <c>contain: layout</c> box so the renderer treats it as the containing block; with
-/// the native lever on the bridge drops that write and the Broiler.Layout engine
+/// corpus pattern) — not by <c>position: relative</c>. The Broiler.Layout engine
 /// resolves the <c>contain</c> containing block natively
 /// (<c>CssBox.FindPositionedContainingBlock</c> +
-/// <c>EstablishesNonPositionAbsPosContainingBlock</c>). Both paths must place the box
-/// against the inner 200×200 box, not the viewport — so the auto-sized (fill-the-cell)
-/// target's SIZE, which would differ if the containing block climbed to the viewport,
-/// pins that the engine binds it to the <c>contain</c> box.
+/// <c>EstablishesNonPositionAbsPosContainingBlock</c>), so the bridge writes no
+/// position:relative pre-bake (the redundant <c>EnsureContainingBlockPositioning</c> pass
+/// was deleted in Phase 4 item-2 step 3). The box must land against the inner 200×200 box,
+/// not the viewport — so the auto-sized (fill-the-cell) target's SIZE, which would differ if
+/// the containing block climbed to the viewport, pins that the engine binds it to the
+/// <c>contain</c> box.
 ///
 /// Fixture: a 200×200 <c>contain: layout</c> box at the origin; a uniquely named anchor
 /// <c>--a</c> (20×20 at (40,40), right/bottom (60,60)); and an auto-sized red
@@ -100,19 +99,4 @@ public class NativeAnchorContainCbWptTests : IDisposable
         Assert.True(System.Math.Abs(red.y1 - 199) <= 2, $"red bottom={red.y1}, expected ~199 (fills the 140-tall cell).");
     }
 
-    [Fact]
-    public void BridgeAndEnginePaths_Agree_OnContainCb()
-    {
-        // Lever off → the bridge pre-bakes position:relative on the contain:layout box;
-        // lever on → the engine resolves the contain containing block natively. Both must
-        // bind the target to the inner box (same fill cell).
-        var baked = Render(nativeAnchor: false);
-        var native = Render(nativeAnchor: true);
-
-        Assert.True(baked.count > 0 && native.count > 0, "target box missing in one of the paths.");
-        Assert.True(System.Math.Abs(baked.x0 - native.x0) <= 2, $"left differs: baked={baked.x0}, native={native.x0}.");
-        Assert.True(System.Math.Abs(baked.y0 - native.y0) <= 2, $"top differs: baked={baked.y0}, native={native.y0}.");
-        Assert.True(System.Math.Abs(baked.x1 - native.x1) <= 2, $"right differs: baked={baked.x1}, native={native.x1}.");
-        Assert.True(System.Math.Abs(baked.y1 - native.y1) <= 2, $"bottom differs: baked={baked.y1}, native={native.y1}.");
-    }
 }

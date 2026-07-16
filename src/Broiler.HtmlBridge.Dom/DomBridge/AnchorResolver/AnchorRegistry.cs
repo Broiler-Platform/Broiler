@@ -247,16 +247,22 @@ public sealed partial class DomBridge
         if (border.Width <= 0 && border.Height <= 0)
             return false;
 
-        // The estimator expresses the box relative to the anchor's nearest
-        // containing-block-establishing ancestor's border-box origin (its ancestor
-        // walk stops there and folds in that ancestor's border+padding). Match that
-        // frame by subtracting the CB's document-space border-box origin.
+        // Express the box relative to the CB's PADDING-box origin — the containing
+        // block for absolutely-positioned content is the CB's padding box (CSS2.1
+        // §10.1), which is also the frame ComputePositionAreaRect's grid uses (its
+        // cbWidth/cbHeight are the padding-box dimensions at origin 0) and the frame
+        // the abspos-inset estimator produces (`cbW − right − width` off the padding
+        // box). Subtracting only the border-box origin left the anchor shifted by the
+        // CB's border width, which is invisible for a borderless CB (border = 0, the
+        // common case) but places the position-area grid one border-width off for a
+        // bordered CB (css-anchor-position position-area-anchor-partially-outside).
         double originX = 0, originY = 0;
         var cb = FindGeometryContainingBlockAncestor(element);
         if (cb != null && TryGetSharedLayoutGeometry(cb, out var cbGeometry))
         {
-            originX = cbGeometry.BorderBox.Left;
-            originY = cbGeometry.BorderBox.Top;
+            var cbProps = GetComputedProps(cb);
+            originX = cbGeometry.BorderBox.Left + (TryParsePx(cbProps.GetValueOrDefault("border-left-width")) ?? 0);
+            originY = cbGeometry.BorderBox.Top + (TryParsePx(cbProps.GetValueOrDefault("border-top-width")) ?? 0);
         }
 
         box = new AnchorInfo(

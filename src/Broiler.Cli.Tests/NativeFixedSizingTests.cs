@@ -8,11 +8,11 @@ using DomDocument = Broiler.Dom.DomDocument;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Verifies the Phase 5 native fixed-position sizing cutover (P5.8d.2b): the bridge's
-/// <c>ResolveFixedPositionSizing</c> pre-bake (inline width/height from opposing insets) is
-/// redundant because the Broiler.Layout engine resolves it natively (CSS2.1 §10.3.7, including the
-/// fixed→viewport containing block and the <c>inset</c> shorthand). In native mode the bridge skips
-/// the pass and leaves the CSS for the engine; the two paths agree.
+/// Verifies fixed-position sizing from opposing insets is resolved by the Broiler.Layout engine
+/// (CSS2.1 §10.3.7, including the fixed→viewport containing block and the <c>inset</c> shorthand).
+/// The bridge's redundant <c>ResolveFixedPositionSizing</c> pre-bake was deleted in Phase 4 item-2
+/// step 3 (native is the default), so the bridge never bakes fixed width/height — the CSS always
+/// reaches the engine, which sizes it.
 /// </summary>
 [Xunit.Collection("SharedGeometryStatics")]
 public sealed class NativeFixedSizingTests
@@ -67,22 +67,21 @@ public sealed class NativeFixedSizingTests
     }
 
     [Fact]
-    public void NativeMode_DoesNotBakeFixedSize_ButDefaultModeDoes()
+    public void BridgeNeverBakesFixedSize()
     {
-        static string ResolveAndSerialize(bool native)
+        static string ResolveAndSerialize()
         {
             using var context = new JSContext();
-            var bridge = new DomBridge { NativeAnchorPlacement = native };
+            var bridge = new DomBridge();
             bridge.Attach(context, OpposingInsetHtml, Url);
             bridge.ResolveAnchorPositions();
             return bridge.SerializeToHtml();
         }
 
-        // Default mode pre-bakes explicit width/height inline; native mode leaves the box to the
-        // engine (no baked width/height), so its inset CSS drives the engine's §10.3.7 sizing.
-        Assert.Contains("width", ResolveAndSerialize(native: false));
-        var native = ResolveAndSerialize(native: true);
-        Assert.DoesNotContain("width:", native);
-        Assert.DoesNotContain("height:", native);
+        // The ResolveFixedPositionSizing pre-bake is deleted, so no baked inline width/height is
+        // written — the inset CSS always reaches the engine's §10.3.7 sizing (asserted above).
+        var html = ResolveAndSerialize();
+        Assert.DoesNotContain("width:", html);
+        Assert.DoesNotContain("height:", html);
     }
 }

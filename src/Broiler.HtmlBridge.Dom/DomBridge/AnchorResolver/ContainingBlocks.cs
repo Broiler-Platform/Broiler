@@ -5,46 +5,16 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     // -----------------------------------------------------------------
-    // Containing block positioning
+    // Containing block establishment (shared helper)
     // -----------------------------------------------------------------
+    //
+    // The bridge's EnsureContainingBlockPositioning pre-bake (which added position:relative to
+    // transform/contain/will-change CB establishers so the static renderer treated them as CBs)
+    // was deleted in Phase 4 item-2 step 3 — the Broiler.Layout engine resolves these containing
+    // blocks natively (CssBox.EstablishesNonPositionAbsPosContainingBlock, the engine mirror of
+    // the helper below). EstablishesContainingBlock stays: PositionArea / InlineContainingBlocks /
+    // AnchorRegistry / Visibility still use it.
 
-    /// <summary>
-    /// For elements that establish containing blocks via CSS properties that
-    /// Broiler's renderer does not understand (e.g. <c>contain:layout</c>,
-    /// <c>transform</c>, <c>will-change:transform</c>), adds <c>position:relative</c> to
-    /// their inline styles so the renderer treats them as containing blocks for absolutely
-    /// positioned descendants. Called only on the default (baked) path — in native mode the
-    /// Broiler.Layout engine resolves these containing blocks itself
-    /// (<see cref="EstablishesContainingBlock"/>'s engine mirror,
-    /// <c>CssBox.EstablishesNonPositionAbsPosContainingBlock</c>), so
-    /// <see cref="ResolveAnchorPositions"/> skips this pass entirely.
-    /// </summary>
-    private void EnsureContainingBlockPositioning(DomElement root) => EnsureContainingBlockPositioningTree(root);
-
-    private void EnsureContainingBlockPositioningTree(DomElement el)
-    {
-        if (!IsText(el) && !IsComment(el))
-        {
-            var props = CollectMatchedRuleProperties(el);
-            foreach (var kv in InlineStyle(el))
-                props[kv.Key] = kv.Value;
-
-            // If the element already has explicit positioning, no change needed.
-            bool alreadyPositioned = props.TryGetValue("position", out var pos) &&
-                (pos == "relative" || pos == "absolute" || pos == "fixed" || pos == "sticky");
-
-            if (!alreadyPositioned && EstablishesContainingBlock(props))
-            {
-                InlineStyle(el)["position"] = "relative";
-            }
-        }
-
-        // Snapshot before recursing: the live child list can be mutated mid-walk
-        // (concurrent/lazy DOM edit) and throw, aborting resolution. SnapshotChildren
-        // tolerates that — same idiom as the other anchor-resolver tree walks.
-        foreach (var child in SnapshotChildren(el))
-            EnsureContainingBlockPositioningTree(child);
-    }
     /// <summary>
     /// Determines whether an element with the given CSS properties
     /// establishes a containing block for absolutely positioned descendants.

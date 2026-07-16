@@ -18,9 +18,9 @@ namespace Broiler.Wpt.Tests;
 /// at every depth, so they stay pinned with no reparenting).</para>
 ///
 /// <para>Fixture: a 900px body scrolled 100px. A red abspos marker at <c>top: 150px</c> shifts
-/// to absolute y 50; a green <c>position: fixed</c> box at <c>top: 20px</c> must NOT move. Both
-/// the bridge DOM-shift (lever off) and the engine translation (lever on) must produce the same
-/// picture.</para>
+/// to absolute y 50; a green <c>position: fixed</c> box at <c>top: 20px</c> must NOT move. The
+/// bridge's baked DOM-shift was deleted in Phase 4 item-2 step 5, so the engine translation is
+/// the only path now.</para>
 /// </summary>
 [Xunit.Collection("NativeAnchorWpt")]
 public class NativeDocScrollWptTests : IDisposable
@@ -88,19 +88,5 @@ public class NativeDocScrollWptTests : IDisposable
         // Fixed box must be unaffected by document scroll (stays at top:20).
         Assert.True(r.grnN > 0, "fixed box not painted.");
         Assert.True(System.Math.Abs(r.grnY - 20) <= 2, $"fixed box top={r.grnY}, expected ~20 (not scrolled).");
-    }
-
-    [Fact]
-    public void BakedAndNativePaths_Agree_OnDocumentScroll()
-    {
-        // Lever off → the bridge DOM-shifts the page; lever on → the engine translates. Both
-        // must place the scrolled marker AND the pinned fixed box in the same rows.
-        var baked = Render(native: false);
-        var native = Render(native: true);
-
-        Assert.True(baked.redN > 0 && native.redN > 0, "scrolled marker missing in one of the paths.");
-        Assert.True(baked.grnN > 0 && native.grnN > 0, "fixed box missing in one of the paths.");
-        Assert.True(System.Math.Abs(baked.redY - native.redY) <= 2, $"marker top differs: baked={baked.redY}, native={native.redY}.");
-        Assert.True(System.Math.Abs(baked.grnY - native.grnY) <= 2, $"fixed top differs: baked={baked.grnY}, native={native.grnY}.");
     }
 }

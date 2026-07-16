@@ -103,9 +103,30 @@ public sealed partial class DomBridge
         var rect = ComputePositionAreaRect(element, anchor, positionArea);
         if (rect == null) return null;
 
-        // Cache the resolved values.
-        SetPositionAreaResolution(element, rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
+        // Resolve the element's used box within the grid cell — its used size (percentage
+        // against the cell, an explicit length clamped to it, else fill the inset-modified
+        // cell) and alignment offset — via the canonical Broiler.Layout model, the same
+        // PositionAreaGrid.ResolveElementBox the render bake uses (which likewise caches the
+        // used box, not the raw cell — see ResolvePositionAreaValues). Without this the live
+        // offset getters reported the grid cell, so a non-stretch or explicitly-sized
+        // position-area box over-reported its offsetWidth/Height. Only the physical px insets
+        // and length/percentage width/height are threaded here; the render bake's percentage
+        // box-props / box-sizing / inline-CB branches stay approximate on the live path.
+        double insetTop = TryParsePx(cssProps.GetValueOrDefault("top")) ?? 0;
+        double insetRight = TryParsePx(cssProps.GetValueOrDefault("right")) ?? 0;
+        double insetBottom = TryParsePx(cssProps.GetValueOrDefault("bottom")) ?? 0;
+        double insetLeft = TryParsePx(cssProps.GetValueOrDefault("left")) ?? 0;
+        string? rawWidth = cssProps.GetValueOrDefault("width");
+        string? rawHeight = cssProps.GetValueOrDefault("height");
+        var used = Broiler.Layout.PositionAreaGrid.ResolveElementBox(
+            rect.Value, insetTop, insetRight, insetBottom, insetLeft,
+            TryParsePx(rawWidth), TryParsePercent(rawWidth),
+            TryParsePx(rawHeight), TryParsePercent(rawHeight),
+            Broiler.CSS.PositionAreaValue.Parse(positionArea));
 
-        return (rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
+        // Cache the resolved values.
+        SetPositionAreaResolution(element, used.Left, used.Top, used.Width, used.Height);
+
+        return (used.Left, used.Top, used.Width, used.Height);
     }
 }

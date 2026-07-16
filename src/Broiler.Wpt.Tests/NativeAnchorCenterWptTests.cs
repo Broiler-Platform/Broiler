@@ -5,10 +5,10 @@ namespace Broiler.Wpt.Tests;
 
 /// <summary>
 /// End-to-end proof of the Phase 5 native <c>anchor-center</c> cutover (P5.8d.2b) through the full
-/// WPT render pipeline. With the runner lever on, the bridge stops baking
-/// <c>align-self</c>/<c>justify-self: anchor-center</c> and the Broiler.Layout engine's post-pass
-/// (<c>CssBox.TryApplyAnchorCenter</c>) centres the box on its anchor. Baked (lever-off) and native
-/// (lever-on) paths agree.
+/// WPT render pipeline. The Broiler.Layout engine's post-pass (<c>CssBox.TryApplyAnchorCenter</c>)
+/// centres the box on its anchor, so the bridge never bakes
+/// <c>align-self</c>/<c>justify-self: anchor-center</c> (the redundant <c>ResolveAnchorCenter</c>
+/// pass was deleted in Phase 4 item-2 step 3 now that native is the default).
 ///
 /// Fixture: a 40×40 anchor at (100,100) → centre (120,120); a 20×20 red target with both
 /// <c>align-self</c> and <c>justify-self: anchor-center</c> → centred at (120,120), i.e. the box
@@ -82,17 +82,5 @@ public class NativeAnchorCenterWptTests : IDisposable
         Assert.True(System.Math.Abs(red.y0 - 110) <= 2, $"red top={red.y0}, expected ~110.");
         Assert.True(System.Math.Abs(red.x1 - 129) <= 2, $"red right={red.x1}, expected ~129.");
         Assert.True(System.Math.Abs(red.y1 - 129) <= 2, $"red bottom={red.y1}, expected ~129.");
-    }
-
-    [Fact]
-    public void BridgeAndEnginePaths_Agree_OnAnchorCenter()
-    {
-        var baked = Render(nativeAnchor: false);
-        var native = Render(nativeAnchor: true);
-        Assert.True(baked.count > 0 && native.count > 0, "target box missing in one of the paths.");
-        Assert.True(System.Math.Abs(baked.x0 - native.x0) <= 2, $"left differs: baked={baked.x0}, native={native.x0}.");
-        Assert.True(System.Math.Abs(baked.y0 - native.y0) <= 2, $"top differs: baked={baked.y0}, native={native.y0}.");
-        Assert.True(System.Math.Abs(baked.x1 - native.x1) <= 2, $"right differs: baked={baked.x1}, native={native.x1}.");
-        Assert.True(System.Math.Abs(baked.y1 - native.y1) <= 2, $"bottom differs: baked={baked.y1}, native={native.y1}.");
     }
 }

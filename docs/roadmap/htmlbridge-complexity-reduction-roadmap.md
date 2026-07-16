@@ -2491,6 +2491,46 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   overlapping content, popover UA box styling) remains the separate submodule effort the finding describes;
   this slice takes only the anchor-geometry part the corpus actually exercises.
 
+- **P5.8d.2b — opposing-inset `@position-try` base (twenty-third expansion) — COMPLETED** 2026-07-15
+  (branch `claude/htmlbridge-phase-5-cj1q73`; **bridge only, additive, default-off**). A `@position-try`
+  box whose **base** is sized on an axis by a pair of **opposing insets** (both insets present, an `auto`
+  length, childless — e.g. `left: anchor(--a right); right: 5px; width: auto`) now goes native — one of
+  the two remaining position-try sub-cases the twelfth expansion's handoff gate kept baked ("a definite
+  pixel width AND height … and no opposing insets on the base"). **No engine change needed:** the base is
+  sized by the ninth expansion's opposing-inset path (`CssBox.TryApplyAnchorInsetPlacement`, the
+  `childless && leftInset && rightInset && IsAutoLength(Width)` branch), and `TryApplyPositionTryFallback`
+  already reads the box's laid-out `Bounds` for its overflow test and computes `tryWidth = cbW − tryLeft −
+  rightPx` for opposing insets in a fallback — so the base sizing and the fallback loop compose with the
+  passes run in order (`TryApplyAnchorInsetPlacement` → `TryApplyPositionTryFallback`,
+  `CssBox.Anchor.cs:148,160`). This is a **pure bridge gate-widening** (like the eighteenth expansion):
+  - **Gate.** `NativePositionTryHandoffSupported`'s all-or-nothing "definite pixel width AND height, no
+    opposing insets" size check is replaced by a per-axis `AxisSizeHandoffSupported`: each axis is admitted
+    if it is EITHER a definite pixel length with a single inset (a reposition base, as before) OR — for a
+    **childless** box — an opposing-inset `auto` length (the engine sizes it from the two insets). A
+    `min-content`/free-`auto` length (no bridge-matching engine size) and a definite length combined with
+    opposing insets (over-constrained) still stay baked. The single `IsMvpNativeAnchorInsetBox` predicate
+    drives both the base-skip (`AnchorFunctions.cs`) and the fallback-skip (`PositionTry.cs`), so the
+    handoff decision stays in lockstep; `childless` is hoisted so both the position-try check and the
+    existing opposing-inset base check share it.
+  Tests: `Broiler.Layout.Tests/NativeAnchorPlacementTests.cs` +2 (an opposing-inset auto-width base that
+  overflows vertically → the `@position-try` fallback pins it above the anchor, sized 65 wide from the two
+  insets; and a base-fits no-op); `Broiler.Cli.Tests/NativePositionTryBridgeModeTests.cs` +1 (native mode
+  leaves the opposing-inset box un-baked; default mode bakes it to the identical `left:30px; top:45px;
+  width:65px` — proving the bridge estimator and the engine agree); `Broiler.Wpt.Tests/
+  NativeOpposingInsetPositionTryWptTests.cs` (full render: the engine sizes from the insets and applies the
+  fallback, baked & native agree pixel-wise at (30,45)–(94,74)). Regression check: full
+  `Broiler.Layout.Tests` (195 pass; the pre-existing environmental arch-guard fail identical on the stashed
+  baseline) green; the anchor/position Wpt (24) and Cli (24) suites green; **css-anchor-position default-off
+  byte-identical (8-fail / 31-pass)** (my gate only runs when both flags are on, off by default) **and
+  lever-on unchanged (6-fail / 33-pass, identical set)**. Zero regressions, and — as with the seventh /
+  eighth / eighteenth expansions — **no corpus pixel test exercises the childless opposing-inset auto path**
+  (the corpus's only opposing-inset position-try test, `position-try-002`, has a `min-content` width and an
+  inline-spacer child, so the `min-content`/childful exclusions keep it baked), so validation is the
+  exact-geometry unit + bridge-mode + full-render tests plus no-regression. The remaining position-try
+  sub-case is the `min-content`/free-`auto`-sized base (`position-try-002`), which needs the engine's real
+  intrinsic width to be validated against the bridge's estimator (a JS-`checkLayout` test, entangled with
+  the getBoundingClientRect path) and stays baked.
+
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
   ~~anchor-name scope/uniqueness~~ → ~~writing-mode % box props~~ → ~~inline-CB promotion (relative inline
@@ -2498,7 +2538,7 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   ~~scroll simulation~~ → ~~`position-visibility`~~ → dialog/backdrop → ~~position-try (anchor()-inset handoff
   subset)~~ → ~~transform/contain/will-change containing blocks~~ → ~~combined `anchor()` + `anchor-size()`~~ →
   ~~`position: sticky` (non-document scroll container)~~ → ~~document/page scroll~~ → ~~page-scroll sticky~~ →
-  ~~modal-dialog `anchor()` (top-layer geometry)~~.
+  ~~modal-dialog `anchor()` (top-layer geometry)~~ → ~~opposing-inset `@position-try` base~~.
   (Childless auto/explicit/percentage sizing,
   `box-sizing:border-box`, percentage margin/padding/inset box props, shared-name scope resolution,
   writing-mode percentage basis, relatively-positioned inline containing blocks, `anchor()` physical insets,
@@ -2614,19 +2654,101 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   renderer effort, and all-or-nothing for parity (a partial port breaks the 7 passing tests). Best done as its
   own submodule feature, not folded into the lever-gated anchor cutover. Left on the bridge path.
 
+  **P5.8d.2b — native scroll on anchor pages (twenty-fourth expansion) — COMPLETED** 2026-07-16
+  (branch `claude/htmlbridge-phase-5-cj1q73`; Broiler.Layout + bridge, both parent-repo). The
+  `DocumentHasAnchorContent()` gate that kept anchor pages on the bridge's DOM-shift scroll for *every*
+  scroll container is removed: `ScrollSimulation.cs` now hands scroll to the engine on anchor pages too, so
+  the whole native anchor render path (scroll → sticky → anchor placement → position-visibility) runs on
+  one geometry model. Two parts:
+  - **Position-visibility needs no marker (the assumed hard blocker is not one).** All **14
+    `position-visibility` corpus tests pass** lever-on with native anchor-page scroll. The
+    `data-broiler-scroll-hidden` marker the thirteenth expansion added existed only because the DOM-shift's
+    `position:relative` wrapper does not move a box's `Bounds`, so the engine's geometric
+    `AnchorScrolledOutOf` read was blind to it. Native scroll shifts `Bounds` via `OffsetTop`/`OffsetLeft`,
+    so that geometric check (already the `||` fallback in `CssBox.Visibility.cs`) becomes authoritative and
+    the marker is unneeded. The anchor-induced-CB marker (`data-broiler-anchor-cb`) is stamped by the
+    position-area pass (orchestrator step 3e), independent of the DOM-shift, so the static-vs-authored
+    relative-scroller distinction still holds.
+  - **Root cause of the initial regression was a general margin-collapse/BFC bug, now fixed.** The first
+    attempt regressed `anchor-center-scroll-001` (the anchor and anchor-centred box vanished, the scroller
+    mis-painted). A box-geometry probe found the scroller itself sitting at y=100 in **both** flag states:
+    `#anchor`'s `margin-top:100` was collapsing *through* the bare `overflow:auto` scroller and, via the
+    first-child propagation in `MarginTopCollapse`, shifting the scroller down — but `overflow != visible`
+    establishes a BFC (CSS 2.1 §9.4.1/§8.3.1) and must **contain** that margin. The bridge's DOM-shift
+    wrapper had been accidentally masking this pre-existing engine bug; native scroll (no wrapper) exposed
+    it. Fix (`CssBox.Margins.cs`): the first-in-flow-child top-margin collapse now also requires the parent
+    **not** to establish a BFC via `overflow` (mirroring the existing `align-content` BFC guard). With the
+    scroller correctly at y=0, native scroll shifts its content and anchor-centring tracks the scrolled
+    anchor — `anchor-center-scroll-001` passes at **100 %**. (The earlier speculative "skip abspos children
+    whose CB is outside the scroller" tweak was unnecessary once the real cause was found, and was dropped.)
+  Validation: full `Broiler.Layout.Tests` (195 pass + the standing environmental arch-guard fail);
+  **the margin fix has zero blast radius — the full available css WPT corpus (147 tests: CSS2, css-align,
+  css-backgrounds, css-animations, css-anchor-position) is byte-identical 38-fail with and without it
+  (empty diff both ways)**; css-anchor-position **default-off 31/8 (identical)** and **lever-on 33/6,
+  identical fail set to baseline with `anchor-center-scroll-001` at 100 % and position-visibility 14/14**.
+  Zero regressions. **This removes the bridge's DOM-shift scroll from the native anchor render path
+  entirely** (anchor-scroll containers, document scroll, and now anchor pages are all native), and is the
+  prerequisite the sticky **anchor-page** case needs.
+
+  **P5.8d.2b — sticky on anchor pages (twenty-fifth expansion) — COMPLETED** 2026-07-16
+  (branch `claude/htmlbridge-phase-5-cj1q73`; **bridge only, additive, default-off**). Completes
+  `position: sticky` — the last remaining sticky case (anchor pages), which the nineteenth /
+  twenty-first expansions scoped out via `IsMvpNativeStickyBox`'s `!DocumentHasAnchorContent()` guard
+  because the anchor-scroll machinery kept the bridge's DOM-shift there. **The twenty-fourth expansion
+  removed that dependency:** anchor-page scroll is now native, so a sticky box's scroll container is
+  engine-shifted on an anchor page too and the engine's sticky post-pass (run after scroll, before anchor
+  placement) reads the shifted geometry. The single change is dropping the `DocumentHasAnchorContent()`
+  early-return from `IsMvpNativeStickyBox` — the gate is only consulted for actual `position: sticky` boxes
+  (of which the css-anchor-position corpus has none), so it is structurally corpus-neutral. Tests:
+  `Broiler.Wpt.Tests/NativeStickyAnchorPageWptTests.cs` (full render: a sticky box in an `overflow:hidden`
+  scroller on a page that also carries `anchor-name` content pins to the scrollport edge at the
+  engine-computed absolute y 50 — a native-only assertion, as with `NativeStickyWptTests`, since the baked
+  DOM-shift mis-pins a scrolled sticky box; probed native y=50 vs baked y=40) + `Broiler.Cli.Tests/
+  NativeStickyBridgeModeTests.cs` +1 (native mode leaves `position: sticky` un-baked on an anchor page;
+  default bakes `position: relative`). Regression check: full `Broiler.Layout.Tests` sticky suite (14) and
+  the Wpt/Cli sticky suites green; **css-anchor-position lever-on unchanged (33/6, identical set)** and
+  default-off byte-identical. Zero regressions. Sticky is now fully native under the lever; the only
+  bridge-only sticky path left is the flow-vs-paint DOM-shift bug on the *baked* (default) path, which the
+  cutover retires wholesale.
+
   Still bridge-only: dialog/backdrop's **visible-scrim / top-layer-paint / UA-box-styling** part (its
   anchor-*geometry* — the pixel-relevant part of the 7 top-layer corpus tests — is native as of the
-  twenty-second expansion), sticky's **anchor-page** case only (the non-document scroll-container
-  case is native as of the nineteenth expansion and page/document-scroll sticky as of the twenty-first — the
-  anchor page's anchor-scroll / position-visibility interaction keeps the bridge DOM-shift), the remaining
-  entangled scroll case (anchor-scroll containers — the plain non-anchor container is native as of the
-  seventeenth expansion and the document scrolling element as of the twentieth; fixed descendants need no
-  reparenting on the native path), visual-viewport (the engine-feature set above;
-  transform/contain/will-change CBs are now native — sixteenth expansion), and the opposing-inset /
-  auto-min-content-sized position-try bases (the
-  engine's
-  `TryApplyPositionTryFallback` supports these geometries but the bridge gate keeps them baked pending per-case
-  parity). **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler
+  twenty-second expansion). The former **entangled scroll case** (anchor-scroll containers) is now
+  native across the board — the plain non-anchor container (seventeenth expansion), the document scrolling
+  element (twentieth), and anchor pages (twenty-fourth); fixed descendants need no reparenting on the
+  native path. `position: sticky` is fully native (non-document scroll container — nineteenth;
+  page/document scroll — twenty-first; anchor pages — twenty-fifth).
+
+  **Finding — visual-viewport is NOT a lever-gated extraction slice (2026-07-16 investigation).** Unlike
+  every scroll/sticky/anchor pass above — which moves *render* behaviour from a bridge DOM mutation to an
+  engine post-pass validated by pixel corpus tests — `ApplyVisualViewportSerializationState` does not have
+  an engine render target to move to:
+  - **`zoom` is never applied in the render.** A tree-wide search finds `zoom` nowhere in Broiler.Layout /
+    Broiler.HTML / Broiler.CSS layout or paint — only a `CssComputedDefaults` initial value (`"1"`) and a
+    supported-property listing. The engine has **no zoom model**. The pass's inline
+    `DocumentElement["zoom"] = combinedZoom` write is consumed **only** by the bridge's own geometry
+    (`GetUsedZoomForElement`, which divides `offset*`/`getBoundingClientRect` deltas to return unzoomed CSS
+    px). So the pinch-zoom `zoom` write is a **read-path/CSSOM-View concern, not a render one**; the render
+    of a pinch-zoomed page never scales.
+  - **Its only render-relevant effect is a document scroll**, and that is already native: the pass also does
+    `DocumentElement.Scroll.Set(visualViewportPageOffset)`, which feeds `ApplyScrollSimulation` → the
+    engine's `RunScrollSimulation` (native on all pages as of the twenty-fourth expansion).
+  So "native visual-viewport" would mean either (a) a **from-scratch engine zoom/pinch-zoom model** (render
+  scaling + zoom-aware geometry) — a broad, all-pages feature, not an extraction — which properly belongs to
+  the Phase 5 endgame's single `LayoutSnapshot` read model below, or (b) simply skipping the `zoom` write in
+  native mode, which is **not safe**: it would report layout-viewport instead of visual-viewport geometry on
+  a pinch-zoomed page with no engine replacement, and no pinch-zoom corpus exists here to validate against
+  (the one `DomBridge_SerializeToHtml_Persists_VisualViewport_*` Cli test is a standing environmental fail).
+  **Not a slice; folded into the `LayoutSnapshot` geometry endgame.** Also note: the lever does **not** need
+  this to flip — visual-viewport stays baked (its gate is unconditional) while every native feature runs,
+  exactly as the twenty-third expansion proved global lever-on already safe.
+
+  Remaining engine gaps: visual-viewport (per the finding above — deferred to the `LayoutSnapshot` endgame),
+  and the
+  auto-`min-content`-sized position-try base (the **opposing-inset** case is now native — twenty-third
+  expansion; the `min-content` case — `position-try-002`, a JS `checkLayout` test entangled with the
+  getBoundingClientRect path — stays baked pending validation of the engine's real intrinsic width against
+  the bridge's estimator). **A position-area base was investigated and deliberately NOT handed off (2026-07-15):** Broiler
   clamps an explicit position-area size to the grid cell (P5.5 `PositionAreaGrid.ResolveElementBox`) and a
   cell is always inside the containing block, so a position-area base **never overflows** — its
   `@position-try` fallback is therefore **inert**, and no corpus test combines the two (all four `position-try`
@@ -2639,7 +2761,214 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   the lever globally is already safe (proven above); the expansions widen the gate one feature at a time as
   the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
-  item-2 unblock** — once every feature is on the engine path.
+  item-2 unblock**. Detailed scoping below.
+
+#### Phase 4 item-2 deletion — scoping (2026-07-16)
+
+**Reframing (the single most important fact): the entire `AnchorResolver` bake is WPT-runner + test-only
+code.** `ResolveAnchorPositions` has **no production caller** — a full-tree search finds it invoked only
+from `Broiler.Wpt/WptTestRunner.cs` (2 sites) and tests (Cli.Tests ×16, Wpt.Tests ×5). The production
+capture path (`Broiler.Cli/CaptureService.ExecuteScriptsWithDom`) never calls it (Attach → run scripts →
+`FireWindowLoadEvent` → `ResolveAnimationSnapshots` → `SerializeToHtml`), and neither does `Broiler.DevConsole`.
+So **CSS anchor positioning does not run in production at all today** — the bake exists solely so the WPT
+runner can reproduce anchor layout with a static renderer, and the engine's native placement (which *does*
+run in the real render path, `CssBox.PerformLayout`) is gated off by the `[ThreadStatic] internal
+NativeAnchorPlacement.Enabled` flag that only the WPT runner + Cli tests set. **Consequence: deleting the
+bake is a code-complexity refactor of the `DomBridge` god object, not a production-behaviour change** — the
+risk surface is the WPT corpus and the test suite, not live rendering.
+
+**Two flags gate the bake/native split:** `DomBridge.NativeAnchorPlacement` (bridge, `internal` property,
+default false) and `Broiler.Layout.Engine.NativeAnchorPlacement.Enabled` (engine, `[ThreadStatic] internal`,
+default false); the WPT runner's `BROILER_WPT_NATIVE_ANCHOR` env var (default off) sets both. "Committing to
+native" = making both unconditional and retiring the flag.
+
+**Pass inventory (see the twenty-plus expansions above for the native replacements):**
+
+- **WHOLE-SKIP — deletable outright, ALL FIVE DELETED 2026-07-16** (were guarded by `if (!NativeAnchorPlacement)`
+  around the whole call, so in native mode they ran for *no* box; the engine has a full replacement for each):
+  `ResolveAnchorCenter` (AnchorCenter.cs), `ResolvePositionVisibility` (Visibility.cs — visibility-only helpers
+  removed, shared anchor-lookup helpers kept), `ResolveFixedPositionSizing` (FixedPosition.cs),
+  `EnsureContainingBlockPositioning` (ContainingBlocks.cs — shared `EstablishesContainingBlock` helper kept),
+  `NeutralizeStyleElementsForAnchorRules` (CssCleanup.cs, whole file). ≈15 inline writes + 1 style rewrite, plus
+  their private helpers and the baked-path characterization tests, are gone. See the step 3–4 log below.
+- **PER-ELEMENT — thinnable only** (internal `IsMvpNative…Box` gate; the MVP-skip becomes unconditional but
+  the **non-MVP bake branch stays**, because features not yet native still bake): `ResolveAnchorFunctions`,
+  `ResolvePositionAreaValues` (non-MVP writes `position-area: none`), `ResolvePositionTryFallbacks` (non-MVP
+  writes `position-try-fallbacks: none`), `PromoteAbsPosFromInlineCBs`, `ResolveStickyPositioning`,
+  `ApplyScrollSimulation` (native uses `data-broiler-scroll-*` instead of the DOM-shift). Full deletion of
+  these is blocked by the still-baked features (below).
+- **ALWAYS — never deletable via this flag** (no native handling): `ApplyDialogUAPositioning` /
+  `ApplyPopoverUAPositioning` / `InsertDialogBackdrops` (dialog/backdrop — submodule feature),
+  `ReplaceRootWithReplacedContent` (CSS Content 3 root replacement), `ApplyVisualViewportSerializationState`
+  (visual-viewport — see its finding above), and the step-3e scroller→`position:relative` loop.
+- **Native-support markers — must be PRESERVED, not deleted:** `data-broiler-anchor-cb`,
+  `data-broiler-scroll-top/left`, and the inline neutralizers `position-area: none` /
+  `position-try-fallbacks: none`. These are how the native path feeds the engine. (The
+  `data-broiler-scroll-hidden` marker was removed in step 5 together with the baked DOM-shift branch
+  that produced it — the engine's overflow box now clips scrolled-above content directly.)
+
+**Sequenced plan:**
+1. **Full-corpus lever-on validation (prerequisite) — DONE 2026-07-16, clean.** The flip turns on native
+   scroll/sticky/anchor for *every* page the WPT runner renders, not just anchor pages. The full available
+   corpus (CSS2, css-align, css-backgrounds, css-animations, css-anchor-position; 147 tests) was run
+   **lever-on** and diffed against the default-off baseline (38 fails): **lever-on 36 fails, ZERO new
+   failures, 2 fixed** (`position-area-scrolling-002`, `position-try-grid-001`). Every non-anchor page is
+   byte-for-byte unchanged — the native scroll/sticky handoffs regress nothing outside css-anchor-position,
+   and the corpus strictly improves (38→36). The flip is safe to make the default.
+2. **Flip the runner default + rebaseline (reversible) — DONE 2026-07-16.** `WptTestRunner.NativeAnchorPlacement`
+   now defaults **on** (`BROILER_WPT_NATIVE_ANCHOR` reads as an opt-*out*: `=0`/`false`/`off` forces the baked
+   path for rollback/comparison). Verified: the CLI css-anchor-position subset is **33/6 by default** (native)
+   and **31/8 with `=0`** (baked); the 34 native anchor/scroll/sticky/position-visibility `Broiler.Wpt.Tests`
+   pass with the flipped default; the Cli bridge-mode tests and the own-bridge geometry characterization tests
+   (`Wpt_CssomView_*`, which construct their own `DomBridge` at the bridge's own default) are untouched — the
+   change is confined to `WptTestRunner.cs`. CI does not set the env var, so it now runs native and the
+   `persist-failed` job regenerates the full-suite `tests/wpt-baseline/failed-tests.json` manifest
+   automatically (it is a 22,956-test artifact — not hand-edited); the full-suite (non-css) validation lands
+   in CI on this branch, backed locally by the step-1 zero-regression result across the available css corpus.
+3–4. **Commit to native + delete the WHOLE-SKIP passes — DONE 2026-07-16 (all five passes deleted).**
+   Refinement from executing it: this was done **per-pass, not as one big-bang**, because (a) some pass files
+   share helpers with the surviving passes (`ContainingBlocks.cs`'s `EstablishesContainingBlock` is used by
+   PositionArea / InlineContainingBlocks / AnchorRegistry / Visibility, and `Visibility.cs`'s
+   `FindElementByAnchorName` / `FindContainingBlockElement` / `FindAnchorContainingBlock` are used by
+   PositionArea / AnchorRegistry — so only the pass methods delete, the shared helpers stay), and (b) several
+   features have baked-vs-native **parity tests** whose baked assertion must be dropped as the baked path goes.
+   The `NativeAnchorPlacement` flag is **kept** (the PER-ELEMENT passes still need it for non-MVP boxes);
+   deleting a WHOLE-SKIP pass just removes its `if (!NativeAnchorPlacement) Pass()` call + method, making that
+   feature engine-only (the `=0` opt-out no longer bakes it — an accepted, progressive degradation of the
+   retired path). **Each deletion is a provable no-op for the native/default path** (the pass was already
+   skipped there), so the css-anchor-position corpus stayed 33/6 through every step and the full available css
+   corpus stayed at 36 fails (zero regression).
+   - ✅ **`ResolveFixedPositionSizing` (FixedPosition.cs, 87 lines) deleted** — the redundant fixed-opposing-inset
+     pre-bake (fifteenth expansion proved the engine does it identically, CSS2.1 §10.3.7). Fully self-contained
+     (no shared helpers). `NativeFixedSizingTests` keeps its two engine-parity tests and drops the baked
+     assertion (renamed `BridgeNeverBakesFixedSize`).
+   - ✅ **`EnsureContainingBlockPositioning` (ContainingBlocks.cs) deleted** — non-position CB establishers
+     (contain / transform / will-change:transform) resolve natively via
+     `CssBox.FindPositionedContainingBlock` + `EstablishesNonPositionAbsPosContainingBlock`. Kept the shared
+     `EstablishesContainingBlock` helper; dropped the obsolete baked-vs-native parity test from
+     `NativeAnchorContainCbWptTests`.
+   - ✅ **`ResolveAnchorCenter` (AnchorCenter.cs) deleted** — the engine post-pass
+     `CssBox.TryApplyAnchorCenter` centres align-self/justify-self:anchor-center boxes. Self-contained; dropped
+     the parity test from `NativeAnchorCenterWptTests`.
+   - ✅ **`ResolvePositionVisibility` (Visibility.cs) deleted** — the engine post-pass
+     `CssBox.ResolvePositionVisibility`, fed by the `data-broiler-anchor-cb` marker, hides scrolled-out anchors.
+     Removed the pass + its visibility-only helpers; kept the shared anchor-lookup helpers
+     (`FindElementByAnchorName` / `FindContainingBlockElement` / `FindAnchorContainingBlock`); dropped the
+     baked assertions from `NativePositionVisibilityWptTests`.
+   - ✅ **`NeutralizeStyleElementsForAnchorRules` (CssCleanup.cs) deleted** — the engine post-pass consumes the
+     stylesheet's anchor rules directly, so they must reach the renderer un-stripped. Whole file deleted (all
+     helpers private, none shared).
+5. **Thin the 6 PER-ELEMENT passes — DONE 2026-07-16 (all six thinned).** Per-pass: drop the
+   `NativeAnchorPlacement &&` from the MVP gate so the MVP-skip is unconditional (a provable no-op on the
+   native default path, where the flag was always true), keeping the non-MVP bake + its marker. Each pass now
+   bakes only the not-yet-native residue. The css-anchor-position corpus stayed 33/6 and the full available css
+   corpus stayed at 36 fails throughout. As with steps 3–4, the retired baked (`=0`) path degrades for MVP
+   boxes and the baked-half of each pass's characterization/parity test was dropped.
+   - ✅ **`ResolveStickyPositioning`** — skip whenever `IsMvpNativeStickyBox` (any sticky with a scroll
+     container); only a scroll-container-less sticky still bakes.
+   - ✅ **`ApplyScrollSimulation`** — the flag gated a whole native-vs-baked branch, so dropping it made the
+     `data-broiler-scroll-*` handoff unconditional and **deleted the entire baked DOM-shift wrapper** (~90 lines
+     + `CollectFixedDescendants` + `DocumentHasAnchorContent`), never reached on the native path.
+   - ✅ **`ResolvePositionAreaValues`** — skip-bake whenever `IsMvpNativeAnchorBox`; the non-MVP
+     `position-area: none` neutralizer is stamped unconditionally.
+   - ✅ **`ResolveAnchorFunctions`** — all three MVP handoffs (combined, anchor()-inset, anchor-size()) un-gated.
+   - ✅ **`ResolvePositionTryFallbacks`** — skip-bake whenever `IsMvpNativeAnchorInsetBox`; non-handoff
+     `position-try` neutralizer stamped unconditionally.
+   - ✅ **`PromoteAbsPosFromInlineCBs`** — skip promotion whenever `InlineCbHasNativeAnchorBox`.
+
+   The bridge `NativeAnchorPlacement` property is **still read** by the ALWAYS step-3e scroller→`position:relative`
+   loop (it gates the `data-broiler-anchor-cb` marker), so it stays; fully retiring it (and its ~10 test setters
+   + the WPT-runner lever) is a separate follow-up, not part of step 5.
+6. **Residual bakes stay until their features go native — REVIEWED 2026-07-16, terminal state confirmed.**
+   Step 6 is not a deletion slice: it records the bridge anchor bakes that remain load-bearing after steps
+   1–5, and *why* none can be handed to the engine yet. An audit of the orchestrator (`ResolveAnchorPositions`)
+   and every surviving `InlineStyle(...)[...] =` write in `AnchorResolver/` confirms the remaining bakes are
+   exactly:
+   - **ALWAYS passes (no native handling exists — stay regardless of the lever):**
+     `ApplyDialogUAPositioning` / `ApplyPopoverUAPositioning` / `InsertDialogBackdrops` (dialog/backdrop UA
+     positioning — a **submodule feature**; native support would live in the renderer, not the bridge),
+     `ReplaceRootWithReplacedContent` (CSS Content 3 root replacement), and the step-3e
+     scroller→`position:relative` loop (+ its `data-broiler-anchor-cb` marker — the one remaining reader of the
+     `NativeAnchorPlacement` lever).
+   - **Residual until the feature goes native:** `ApplyVisualViewportSerializationState` (visual-viewport —
+     blocked on the **LayoutSnapshot endgame**), and the non-MVP bake branches inside the thinned PER-ELEMENT
+     passes — most notably the **`min-content` position-try base** and any position-area/anchor() box outside
+     `IsMvpNative…Box` (position-try/anchor() entanglement, or no registered dashed-ident anchor). These bake
+     only the residue `IsMvpNative…Box` rejects; each shrinks to nothing as the engine gains the corresponding
+     capability.
+
+   **There is no safe deletion available at step 6** — every remaining write is either an ALWAYS pass or a
+   not-yet-native residue, so removing it would break a still-baked feature (CI clones by pointer and renders
+   the baked HTML). Further reduction is gated on three independent **feature** efforts, each its own multi-step
+   track outside this complexity-reduction roadmap: (a) native dialog/backdrop rendering (submodule), (b) the
+   visual-viewport LayoutSnapshot endgame, (c) engine `min-content` position-try sizing. When each lands, its
+   residual bake (and, for (a)+(c), a further slice of the corresponding thinned pass) can be deleted, and once
+   the step-3e marker no longer needs it the `NativeAnchorPlacement` lever itself can be fully retired.
+
+**Risk:** low — WPT/test-only, no production-render change; the corpus *improves* under the flip (33/6 > 31/8).
+The real costs are (a) the full-corpus lever-on validation gap (step 1), and (b) losing baked-path test
+coverage as the flag retires (steps 3–5), which is acceptable since the baked path is being removed.
+**Status 2026-07-16: the Phase 4 item-2 deletion plan is complete through step 6.** The default is flipped to
+native (steps 1–2), all five WHOLE-SKIP passes are deleted (steps 3–4), all six PER-ELEMENT passes are thinned
+to their not-yet-native residue (step 5), and the step-6 audit confirms the terminal state: the only remaining
+bridge anchor bakes are the ALWAYS passes and the not-yet-native residue, none safely deletable now. Everything
+further is gated on separate feature work (native dialog/backdrop, visual-viewport LayoutSnapshot, engine
+`min-content` position-try) plus the optional follow-up of fully retiring the `NativeAnchorPlacement` lever once
+the last ALWAYS marker-stamp no longer needs it.
+
+---
+
+## Native dialog / backdrop feature track (started 2026-07-16)
+
+Goal: make CSS dialog/popover/`::backdrop` rendering native so the bridge's three ALWAYS passes
+(`ApplyDialogUAPositioning`, `ApplyPopoverUAPositioning`, `InsertDialogBackdrops` in `AnchorResolver/Dialogs.cs`)
+can be deleted — feature (a) above. Scoping recon + a first-slice spike established the shape and the blockers.
+
+**Recon (what exists vs. faked):**
+- The three passes run **WPT-runner-only** (`ResolveAnchorPositions` is called only from `WptTestRunner.cs`,
+  never production `CaptureService`) — so this is low-risk like the anchor track, and the native version must
+  live in the shared engine/render path (which benefits production too, where dialogs currently get no handling).
+- **Zero WPT corpus gain is available:** the only pixel-runnable tests are the 7 `anchor-position-top-layer-001..007`
+  reftests, and they already pass via the bridge bake; backdrop/popover behavior is already unit-tested
+  (`ScriptEngineExecuteTests`, `NativeModalDialogAnchorWptTests`). This track is *pure* complexity reduction.
+- **`::backdrop` cascade already works** (Broiler.CSS `GetCascadedStyle(el,"::backdrop")`); there is **no native
+  box** for it (would follow `::before`/`::after` `CreatePseudoElementBox` in `DomParser.cs`, Broiler.HTML).
+  `<dialog>` UA styling is only `display:none` (`CssDefaults.DefaultStyleSheet` + `CssUserAgentDefaults`); **no
+  native top layer** in layout or paint (`PaintWalker.Stacking.cs`) — faked via the bridge's giant z-index.
+- **No main-repo-only slice exists.** The engine's `Broiler.Layout` post-pass mechanism only *offsets*
+  already-laid-out geometry (`CssBox.Scroll`/`Anchor`); `position:fixed`, box generation, UA styling, and paint
+  order are all layout-time / cascade / paint concerns that live in the **Broiler.HTML / Broiler.CSS submodules**
+  (out of session GitHub scope → push 403 → **patch workflow**, payoff deferred to a maintainer applying it).
+
+**First-slice spike — native UA `<dialog>` stylesheet.** Adding UA `dialog` rules to
+`CssDefaults.DefaultStyleSheet` to replace the bridge's baked defaults. Rigorous drop-in validation (add UA rule,
+remove the corresponding bridge bake, confirm the 7 reftests + unit tests stay green) surfaced two blockers:
+  1. **Display / open-state (`:not([open])`) — ROOT-CAUSED + FIXED 2026-07-16.** `dialog { display: block }` alone
+     **is** a validated drop-in for the bridge's `display:block` bake, but hiding *closed* dialogs needs
+     `dialog:not([open]) { display: none }`, and that rule wrongly hid `showModal()`-opened dialogs. Root cause: a
+     general **`CssSelectorMatcher` bug** — `MatchesCompound` stripped all `[attr]` selectors from the compound
+     *before* extracting pseudo-classes, so the `[open]` nested in `:not([open])` was hoisted into a top-level
+     *positive* filter and left an empty `:not()`, **inverting** the match (it matched dialogs that *have* `open`).
+     Fixed by reordering `ProcessPseudoClasses` (bracket-aware `ExtractPseudos` + recursive matcher) before the
+     attribute strip. Shipped as **`patches/0001-css-fix-not-attr-selector.patch`** (Broiler.CSS) with a regression
+     test; full css corpus unchanged (36 fails), 215 unit tests pass. The UA display rules ship as
+     **`patches/0002-html-native-dialog-ua-display.patch`** (Broiler.HTML, depends on 0001). End-to-end validated:
+     with both patches applied and the bridge `display:block` bake removed, `NativeModalDialogAnchorWptTests`
+     passes and the corpus stays 33/6 — so the bake is deletable (kept as the CI fallback until the patches land;
+     see `patches/README.md`).
+  2. **Chrome / cascade origin-precedence — STILL OPEN (blocker B).** A UA `dialog { border:1px solid black;
+     padding:1em }` rule regresses `anchor-position-top-layer-003/004/006` (97.5%) because the tests' author reset
+     `dialog { border:0; padding:0 }` — same specificity, author origin — does **not** override the UA rule.
+     Author-normal must beat UA-normal; Broiler's cascade leaks the UA border/padding through. (The `background`
+     part is fine — ID rules override it.) This gates the UA box-chrome rules, not display.
+
+**Revised track order.** Slice 1a (native dialog **display** + the `:not([attr])` matcher fix) is **done, shipped as
+patches 0001+0002, end-to-end validated** — landing the `display:block` bake deletion once a maintainer applies
+them. Remaining: **(B)** fix author-vs-UA origin precedence for equal-specificity shorthands (unblocks the UA box
+chrome), then modal centering / `position:fixed`, native `::backdrop` box-generation, and native top-layer paint
+(all Broiler.HTML). Each further slice deletes a further piece of `Dialogs.cs`.
+
+---
 
 **Finding — `position-visibility` is entangled with the scroll-container CB decision — RESOLVED 2026-07-15
 (see the thirteenth expansion above; the design below was executed and all 14 corpus tests pass lever-on).**
@@ -2723,9 +3052,11 @@ threads `styleSet.AuthorStyleSheet` (at-rules included) into layout for `@keyfra
 channel (a) plus the fallback apply/re-test loop (c, `CssBox.TryApplyPositionTryFallback`) are now in place;
 (b) the native base is reused from the anchor()-inset pass. `position-try-grid-001` now goes native and
 **passes lever-on** (it was the failing example this finding cited). Remaining: the loop supports
-position-area / opposing-inset / auto-sized bases geometrically, but the bridge gate
-(`NativePositionTryHandoffSupported`) hands off only the anchor()-inset + definite-size + single-inset
-subset pending per-case parity for the other bases.
+position-area / opposing-inset / auto-sized bases geometrically; the bridge gate
+(`NativePositionTryHandoffSupported`) now hands off the anchor()-inset definite-size single-inset subset
+(twelfth expansion) **and** the childless opposing-inset auto-sized base (twenty-third expansion), leaving
+only the `min-content`/free-`auto`-sized base pending per-case parity (the engine's real intrinsic width
+vs the bridge's estimator).
 
 **Groundwork landed (2026-07-14):** the per-box half of that input is now in place — `position-try-fallbacks`
 is projected onto `CssBox` (`CssBoxProperties.PositionTryFallbacks`, plus the `CssUtils` get/set arms), the
@@ -2741,6 +3072,70 @@ reading the anchor's already-`ApplyScrollSimulation`-shifted box geometry rather
 in the engine; but `position-visibility`, dialog/backdrop, `anchor-scope`/scoping) are the hard part of the
 later cutover expansions: the engine operates on boxes, not the DOM, so these are re-implementations, not
 moves — which is why the MVP subset deliberately excludes them.
+
+**Finding + fix — the LIVE geometry path (`offsetWidth`/`offsetLeft` during script) did not reflect
+`position-area` sizing; `position-area-anchor-partially-outside` exposed it (2026-07-16 investigation, fix
+landed same day — see "Landed" below).** Distinct from every anchor-cutover expansion above: those move the *render* bake
+(`ResolveAnchorPositions` → inline styles the raster reads), but `position-area-anchor-partially-outside`
+is a `testharness` test that reads `anchored.offsetLeft/Top/Width/Height` **live during JS**, before
+`ResolveAnchorPositions` runs. The bridge resolves anchor positioning as a batch render-prep pass, not as
+live layout, so the geometry the offset getters return comes from either the RF-BRIDGE shared-renderer
+snapshot (`SharedLayoutGeometry.cs`, `UseSharedLayoutGeometry = true` by default) or the per-property
+`ResolvePositionAreaForElement` estimator. Root cause, pinned by probe (anchor `right:-50;top:-50` 100×100
+in a `position:relative` 400×400 CB with a 2px border, `#anchored` `align-self/justify-self:stretch`,
+`position-area: span-all` → expected `(0,-50,450,450)`):
+- **`offsetWidth`/`offsetHeight` return 0** because `GetOffsetWidthForDomElement`/`…Height…`
+  (`LayoutMetrics.cs:114,133`) consult `TryGetSharedLayoutGeometry` **before**
+  `ResolvePositionAreaForElement`, and the non-native renderer lays a `position-area` `stretch` abspos box
+  out at 0×0 (it never applies the grid-cell fill live). `GetOffsetLeftForDomElement`/`…Top…`
+  (`LayoutMetrics.cs:155,169`) use the **opposite** order — estimator first — so they *do* track the
+  anchor (e.g. `right span-all` → left ≈ 452). This width/height-vs-left/top ordering **inconsistency** is
+  the immediate defect: a box with a live `position-area` resolution should report that resolution's size
+  just as it reports its position.
+- The estimator itself is then **~2px off** (`span-all` → `(0,-48,452,448)` vs `(0,-50,450,450)`): the
+  anchor's coordinates in `ComputePositionAreaRect` are measured relative to the CB's **border** box, not
+  its **padding** box, so a bordered CB shifts the grid by the border width. (Only manifests with a
+  bordered CB — most corpus fixtures are borderless, which is why no other test exposes it.)
+- The estimator also returns the grid **cell**, not the **used box** (`PositionAreaGrid.ComputeCell`, not
+  `ResolveElementBox`), so it is exact only for `stretch` (cell = used box); a non-`stretch` `position-area`
+  box would report the cell size. This test is all-`stretch`, so that limitation is latent here.
+
+**Landed (2026-07-16) — the live-geometry offset correctness fix (two of the three parts).** The first
+concrete step of the Phase 5 endgame below ("one layout pass services all geometry queries") biting a
+*read* path rather than the render bake:
+- **Offset-getter ordering.** `GetOffsetWidthForDomElement`/`…Height…` (`LayoutMetrics.cs`) now consult
+  `ResolvePositionAreaForElement` **before** the RF-BRIDGE shared snapshot, matching `offsetLeft/Top` — so
+  a live `position-area` box reports its resolved used size instead of the pre-bake renderer's 0. Blast
+  radius is `position-area` boxes only (the resolution is `null` otherwise); the shared snapshot stays the
+  source for every non-`position-area` element.
+- **Padding-box anchor frame.** `TryGetAnchorLayoutBox` (`AnchorRegistry.cs`) now expresses the anchor
+  relative to the CB's **padding**-box origin (border-box origin + CB border), the frame the grid and the
+  abspos-inset estimator already use. This is a **no-op for a borderless CB** (border = 0 — the common
+  case), so it only corrects the previously border-shifted bordered-CB grid. It fixes both the live path
+  **and** the render bake (which shared the same `ComputePositionAreaRect` and was equally border-shifted —
+  invisible to pixel tests because no pixel fixture pairs a bordered CB with this geometry).
+- **Used box (done 2026-07-16, follow-up slice).** `ResolvePositionAreaForElement` now feeds the grid cell
+  through `PositionAreaGrid.ResolveElementBox` (physical px insets + length/percentage `width`/`height`),
+  so it reports the element's **used box** — its used size (percentage against the cell, an explicit length
+  clamped to it, else fill the cell) and alignment offset — instead of the raw grid cell. This is exactly
+  what the render bake caches (`ResolvePositionAreaValues` → `SetPositionAreaResolution(finalLeft, finalTop,
+  borderBoxW, borderBoxH)`), so the live read model and the bake now agree for the common case; a
+  *non-*`stretch` or explicitly-sized box no longer over-reports its `offsetWidth`/`Height` as the cell.
+  The render bake's percentage-box-props / `box-sizing` / inline-CB branches (and border/padding on the
+  border box) stay approximate on the live path — no test exercises them and the render bake owns those.
+  A `stretch` box is unaffected (used box = cell), so the padding-box fix's fixture is unchanged. Test:
+  `PositionAreaLiveGeometryTests.NonStretchExplicitSize_ReportsUsedBox_NotTheGridCell` (an explicit 40×30
+  box in a 100×100 cell reports 40×30). Live-path only — the render pixel path is untouched.
+
+Validation: `Broiler.Cli.Tests/PositionAreaLiveGeometryTests.cs` pins the 6 representative
+`anchor-partially-outside` rows (bordered CB, partially-outside anchor) + a borderless control; the live
+probe matches all **11/11** subtests exactly. css-anchor-position corpus **default-off 31/8 and lever-on
+33/6, both the identical fail set to baseline** — zero regressions. **No corpus-pass flip:**
+`position-area-anchor-partially-outside` is scored by the runner on **pixels**, and it stays failing at
+94.2 % on a `MissingContent` rendering cap (the box is not fully painted — the same inline/rendering-fidelity
+class as the other `position-area` fails), **not** the offset geometry this fix corrects. So this is a
+correctness fix for scripted `offsetLeft/Top/Width/Height` (and the render bake's bordered-CB frame), with a
+regression test and zero regressions — not a corpus gain.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.

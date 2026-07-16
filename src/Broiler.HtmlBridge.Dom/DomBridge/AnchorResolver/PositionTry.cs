@@ -69,26 +69,24 @@ public sealed partial class DomBridge
 
             if (!string.IsNullOrWhiteSpace(fallbacks) && positionTryRules.Count > 0)
             {
-                // Native mode (P5.8d.2b position-try expansion): a box in the anchor()-inset
-                // position-try handoff subset had its base left un-baked in
-                // ResolveAnchorFunctions (same IsMvpNativeAnchorInsetBox predicate); the
-                // engine's post-pass applies the fallback from the PositionTryRules channel,
+                // A box in the anchor()-inset position-try handoff subset had its base left
+                // un-baked in ResolveAnchorFunctions (same IsMvpNativeAnchorInsetBox predicate);
+                // the engine's post-pass applies the fallback from the PositionTryRules channel,
                 // so skip baking and leave the position-try + anchor() CSS intact. Every other
-                // position-try box is baked here and, in native mode, has its position-try
-                // neutralized inline so the engine's fallback pass skips the already-baked box.
-                if (NativeAnchorPlacement &&
-                    IsMvpNativeAnchorInsetBox(element, cssProps, anchorRegistry, positionTryRules))
+                // position-try box is baked here and has its position-try neutralized inline so
+                // the engine's fallback pass skips the already-baked box. The NativeAnchorPlacement
+                // flag check is dropped in Phase 4 item-2 step 5 (a provable no-op on the native
+                // default path, where it was already true); the neutralizer is stamped
+                // unconditionally (harmless on the retired baked path).
+                if (IsMvpNativeAnchorInsetBox(element, cssProps, anchorRegistry, positionTryRules))
                 {
                     // handed off to the engine — the bridge does not touch this box
                 }
                 else
                 {
                     TryApplyFallback(element, cssProps, anchorRegistry, positionTryRules, fallbacks!);
-                    if (NativeAnchorPlacement)
-                    {
-                        InlineStyle(element)["position-try-fallbacks"] = "none";
-                        InlineStyle(element)["position-try"] = "normal";
-                    }
+                    InlineStyle(element)["position-try-fallbacks"] = "none";
+                    InlineStyle(element)["position-try"] = "normal";
                 }
             }
         }

@@ -54,12 +54,13 @@ public sealed partial class DomBridge
                 // Compute the grid cell using the anchor's scroll container
                 // (or the element's own CB) as the containing block.
                 //
-                // Native mode (P5.8d): for the MVP subset, skip pre-baking entirely
-                // (rect stays null) so the box's position-area/position-anchor CSS
-                // survives to the render and the Broiler.Layout engine's placement
-                // post-pass positions it natively. Every other box is baked below.
+                // For the MVP subset, skip pre-baking entirely (rect stays null) so the box's
+                // position-area/position-anchor CSS survives to the render and the Broiler.Layout
+                // engine's placement post-pass positions it natively. Every other box is baked
+                // below. The flag check is dropped in Phase 4 item-2 step 5 — the MVP-skip is
+                // unconditional (a provable no-op on the native default path, where the flag was
+                // already true); only the not-yet-native residue is baked.
                 var rect =
-                    NativeAnchorPlacement &&
                     IsMvpNativeAnchorBox(element, positionAnchor, cssProps, scrollContainer)
                         ? null
                         : ComputePositionAreaRect(
@@ -380,12 +381,12 @@ public sealed partial class DomBridge
                     // Use border-box dimensions (matching offsetWidth/offsetHeight).
                     SetPositionAreaResolution(element, finalLeft, finalTop, borderBoxW, borderBoxH);
 
-                    // Native mode (P5.8d), non-MVP box: this box was just baked into
-                    // explicit inline pixel values, so neutralize position-area on it
-                    // (inline wins the cascade) to stop the engine's placement post-pass
-                    // from repositioning an already-placed box.
-                    if (NativeAnchorPlacement)
-                        InlineStyle(element)["position-area"] = "none";
+                    // Non-MVP box: this box was just baked into explicit inline pixel values, so
+                    // neutralize position-area on it (inline wins the cascade) to stop the engine's
+                    // placement post-pass from repositioning an already-placed box. Stamped
+                    // unconditionally as of Phase 4 item-2 step 5 (harmless on the retired baked
+                    // path, where the engine post-pass does not run).
+                    InlineStyle(element)["position-area"] = "none";
                 }
             }
         }
