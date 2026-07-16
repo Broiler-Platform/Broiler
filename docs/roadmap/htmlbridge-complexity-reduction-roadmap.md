@@ -2761,7 +2761,76 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   the lever globally is already safe (proven above); the expansions widen the gate one feature at a time as
   the engine grows to reproduce them.
 - **Then** thin/delete the now-unreached bridge `AnchorResolver` inline-dict writes — the **Phase 4
-  item-2 unblock** — once every feature is on the engine path.
+  item-2 unblock**. Detailed scoping below.
+
+#### Phase 4 item-2 deletion — scoping (2026-07-16)
+
+**Reframing (the single most important fact): the entire `AnchorResolver` bake is WPT-runner + test-only
+code.** `ResolveAnchorPositions` has **no production caller** — a full-tree search finds it invoked only
+from `Broiler.Wpt/WptTestRunner.cs` (2 sites) and tests (Cli.Tests ×16, Wpt.Tests ×5). The production
+capture path (`Broiler.Cli/CaptureService.ExecuteScriptsWithDom`) never calls it (Attach → run scripts →
+`FireWindowLoadEvent` → `ResolveAnimationSnapshots` → `SerializeToHtml`), and neither does `Broiler.DevConsole`.
+So **CSS anchor positioning does not run in production at all today** — the bake exists solely so the WPT
+runner can reproduce anchor layout with a static renderer, and the engine's native placement (which *does*
+run in the real render path, `CssBox.PerformLayout`) is gated off by the `[ThreadStatic] internal
+NativeAnchorPlacement.Enabled` flag that only the WPT runner + Cli tests set. **Consequence: deleting the
+bake is a code-complexity refactor of the `DomBridge` god object, not a production-behaviour change** — the
+risk surface is the WPT corpus and the test suite, not live rendering.
+
+**Two flags gate the bake/native split:** `DomBridge.NativeAnchorPlacement` (bridge, `internal` property,
+default false) and `Broiler.Layout.Engine.NativeAnchorPlacement.Enabled` (engine, `[ThreadStatic] internal`,
+default false); the WPT runner's `BROILER_WPT_NATIVE_ANCHOR` env var (default off) sets both. "Committing to
+native" = making both unconditional and retiring the flag.
+
+**Pass inventory (see the twenty-plus expansions above for the native replacements):**
+
+- **WHOLE-SKIP — deletable outright** once native is unconditional (guarded by `if (!NativeAnchorPlacement)`
+  around the whole call, so in native mode they run for *no* box; the engine has a full replacement for each):
+  `ResolveAnchorCenter` (AnchorCenter.cs, 3 writes), `ResolvePositionVisibility` (Visibility.cs, 2 writes +
+  helper tree), `ResolveFixedPositionSizing` (FixedPosition.cs, 8 writes), `EnsureContainingBlockPositioning`
+  (ContainingBlocks.cs, 1 write), `NeutralizeStyleElementsForAnchorRules` (CssCleanup.cs, 1 `<style>`-text
+  rewrite — safe to drop: non-MVP boxes are suppressed by the per-element inline `position-area: none`, which
+  overrides the un-neutralized stylesheet rule). ≈15 inline writes + 1 style rewrite, plus their private
+  helpers and the baked-path characterization tests.
+- **PER-ELEMENT — thinnable only** (internal `IsMvpNative…Box` gate; the MVP-skip becomes unconditional but
+  the **non-MVP bake branch stays**, because features not yet native still bake): `ResolveAnchorFunctions`,
+  `ResolvePositionAreaValues` (non-MVP writes `position-area: none`), `ResolvePositionTryFallbacks` (non-MVP
+  writes `position-try-fallbacks: none`), `PromoteAbsPosFromInlineCBs`, `ResolveStickyPositioning`,
+  `ApplyScrollSimulation` (native uses `data-broiler-scroll-*` instead of the DOM-shift). Full deletion of
+  these is blocked by the still-baked features (below).
+- **ALWAYS — never deletable via this flag** (no native handling): `ApplyDialogUAPositioning` /
+  `ApplyPopoverUAPositioning` / `InsertDialogBackdrops` (dialog/backdrop — submodule feature),
+  `ReplaceRootWithReplacedContent` (CSS Content 3 root replacement), `ApplyVisualViewportSerializationState`
+  (visual-viewport — see its finding above), and the step-3e scroller→`position:relative` loop.
+- **Native-support markers — must be PRESERVED, not deleted:** `data-broiler-anchor-cb`,
+  `data-broiler-scroll-top/left`, `data-broiler-scroll-hidden`, and the inline neutralizers
+  `position-area: none` / `position-try-fallbacks: none`. These are how the native path feeds the engine.
+
+**Sequenced plan:**
+1. **Full-corpus lever-on validation (prerequisite).** The flip turns on native scroll/sticky/anchor for
+   *every* page the WPT runner renders, not just anchor pages. Only the css-anchor-position subset is
+   validated lever-on so far (33/6 vs 31/8 default-off). Run the full available corpus (CSS2, css-align,
+   css-backgrounds, css-animations, css-anchor-position) **lever-on** and diff vs the default-off baseline
+   (the full corpus is 38-fail default-off — established during the twenty-fourth expansion) to confirm the
+   scroll/sticky handoffs don't regress non-anchor pages.
+2. **Flip the runner default + rebaseline (1 PR, reversible).** Default `BROILER_WPT_NATIVE_ANCHOR` on;
+   update the corpus baselines from 31/8 to 33/6. Keep the flag so it can be toggled back.
+3. **Commit to native (decision point).** Make both flags unconditional and retire the toggle. Requires
+   accepting the native path as the sole WPT path (the baked path loses its runner coverage; bridge-mode
+   characterization tests that assert the baked output are retired or converted).
+4. **Delete the 5 WHOLE-SKIP passes** (1 focused PR): the methods, their private helpers, the
+   `if (!NativeAnchorPlacement)` call sites, and the baked-path tests. Net ≈−15 inline writes + a `<style>`
+   rewrite and several hundred lines off `DomBridge`.
+5. **Thin the 6 PER-ELEMENT passes** (per-pass PRs): drop the flag check, make the MVP-skip unconditional,
+   keep the non-MVP bake + its marker. Each pass shrinks to "bake only the not-yet-native residue."
+6. **Residual bakes stay** until their features go native: dialog/backdrop (submodule), visual-viewport
+   (LayoutSnapshot endgame), and the `min-content` position-try base. The ALWAYS passes stay regardless.
+
+**Risk:** low — WPT/test-only, no production-render change; the corpus *improves* under the flip (33/6 > 31/8).
+The real costs are (a) the full-corpus lever-on validation gap (step 1), and (b) losing baked-path test
+coverage when the flag retires (step 3), which is acceptable since the baked path is being removed. The
+smallest first increment that delivers value is steps 1–2 (validate + flip the default) followed by step 4
+(delete the WHOLE-SKIP passes) — the PER-ELEMENT thinning and the residue can follow independently.
 
 **Finding — `position-visibility` is entangled with the scroll-container CB decision — RESOLVED 2026-07-15
 (see the thirteenth expansion above; the design below was executed and all 14 corpus tests pass lever-on).**
