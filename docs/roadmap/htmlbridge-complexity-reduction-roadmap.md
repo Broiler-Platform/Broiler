@@ -2824,12 +2824,24 @@ native" = making both unconditional and retiring the flag.
    `persist-failed` job regenerates the full-suite `tests/wpt-baseline/failed-tests.json` manifest
    automatically (it is a 22,956-test artifact — not hand-edited); the full-suite (non-css) validation lands
    in CI on this branch, backed locally by the step-1 zero-regression result across the available css corpus.
-3. **Commit to native (decision point).** Make both flags unconditional and retire the toggle. Requires
-   accepting the native path as the sole WPT path (the baked path loses its runner coverage; bridge-mode
-   characterization tests that assert the baked output are retired or converted).
-4. **Delete the 5 WHOLE-SKIP passes** (1 focused PR): the methods, their private helpers, the
-   `if (!NativeAnchorPlacement)` call sites, and the baked-path tests. Net ≈−15 inline writes + a `<style>`
-   rewrite and several hundred lines off `DomBridge`.
+3–4. **Commit to native + delete the WHOLE-SKIP passes — IN PROGRESS 2026-07-16 (first pass landed).**
+   Refinement from executing it: this is done **per-pass, not as one big-bang**, because (a) some pass files
+   share helpers with the surviving passes (`ContainingBlocks.cs`'s `EstablishesContainingBlock` is used by
+   PositionArea / InlineContainingBlocks / AnchorRegistry / Visibility, so only the pass method deletes, the
+   helper stays), and (b) several features have baked-vs-native **parity tests** whose baked assertion must be
+   dropped as the baked path goes. The `NativeAnchorPlacement` flag is **kept** (the PER-ELEMENT passes still
+   need it for non-MVP boxes); deleting a WHOLE-SKIP pass just removes its `if (!NativeAnchorPlacement) Pass()`
+   call + method, making that feature engine-only (the `=0` opt-out no longer bakes it — an accepted,
+   progressive degradation of the retired path). **Each deletion is a provable no-op for the native/default
+   path** (the pass was already skipped there), so the css-anchor-position corpus stays 33/6.
+   - ✅ **`ResolveFixedPositionSizing` (FixedPosition.cs, 87 lines) deleted** — the redundant fixed-opposing-inset
+     pre-bake (fifteenth expansion proved the engine does it identically, CSS2.1 §10.3.7). Fully self-contained
+     (no shared helpers). `NativeFixedSizingTests` keeps its two engine-parity tests and drops the baked
+     assertion. Native corpus 33/6 unchanged; build + tests green.
+   - Remaining WHOLE-SKIP: `ResolveAnchorCenter` (AnchorCenter.cs), `ResolvePositionVisibility` (Visibility.cs —
+     251 lines, shares `EstablishesContainingBlock`), `EnsureContainingBlockPositioning` (ContainingBlocks.cs —
+     keep the shared helper), `NeutralizeStyleElementsForAnchorRules` (CssCleanup.cs). Each with its
+     parity-test update (NativeAnchorCenter / NativePositionVisibility / NativeAnchorContainCb WptTests).
 5. **Thin the 6 PER-ELEMENT passes** (per-pass PRs): drop the flag check, make the MVP-skip unconditional,
    keep the non-MVP bake + its marker. Each pass shrinks to "bake only the not-yet-native residue."
 6. **Residual bakes stay** until their features go native: dialog/backdrop (submodule), visual-viewport
