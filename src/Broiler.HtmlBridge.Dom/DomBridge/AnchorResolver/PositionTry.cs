@@ -105,7 +105,9 @@ public sealed partial class DomBridge
         double cbWidth = FindContainingBlockWidth(element);
         double cbHeight = FindContainingBlockHeight(element);
 
-        // Check if the base style overflows the IMCB.
+        // Check if the base style overflows the IMCB. The base insets are already baked
+        // to inline px here; the live read path (ResolvePositionTryForElement) resolves them
+        // fresh and calls the same ComputeFallbackPlacement core.
         double baseLeft = TryParsePx(InlineStyle(element).GetValueOrDefault("left")) ?? 0;
         double baseTop = TryParsePx(InlineStyle(element).GetValueOrDefault("top")) ?? 0;
         double baseRight = TryParsePx(InlineStyle(element).GetValueOrDefault("right")) ??
@@ -117,10 +119,6 @@ public sealed partial class DomBridge
         double baseHeight = TryParsePx(InlineStyle(element).GetValueOrDefault("height")) ??
                             TryParsePx(baseProps.GetValueOrDefault("height")) ?? 0;
 
-        // Compute IMCB (inset-modified containing block) dimensions.
-        double imcbWidth = cbWidth - baseLeft - baseRight;
-        double imcbHeight = cbHeight - baseTop - baseBottom;
-
         // Estimate content width for min-content/max-content.
         string? widthVal = baseProps.GetValueOrDefault("width");
         bool hasAutoWidth = widthVal == "min-content" || widthVal == "max-content" ||
@@ -131,11 +129,41 @@ public sealed partial class DomBridge
             baseWidth = EstimateMinContentWidth(element);
         }
 
+        if (ComputeFallbackPlacement(baseProps, anchorRegistry, positionTryRules, fallbackList,
+                baseLeft, baseTop, baseRight, baseBottom, baseWidth, baseHeight, cbWidth, cbHeight) is { } placed)
+        {
+            InlineStyle(element)["left"] = $"{placed.left.ToString(CultureInfo.InvariantCulture)}px";
+            InlineStyle(element)["top"] = $"{placed.top.ToString(CultureInfo.InvariantCulture)}px";
+            InlineStyle(element)["width"] = $"{placed.width.ToString(CultureInfo.InvariantCulture)}px";
+            InlineStyle(element)["height"] = $"{placed.height.ToString(CultureInfo.InvariantCulture)}px";
+            InlineStyle(element).Remove("right");
+            InlineStyle(element).Remove("bottom");
+            InlineStyle(element).Remove("inset");
+        }
+    }
+
+    /// <summary>
+    /// The pure <c>@position-try</c> fallback algorithm shared by the render bake
+    /// (<see cref="TryApplyFallback"/>) and the live read path
+    /// (<see cref="ResolvePositionTryForElement"/>): given the base placement geometry, tests
+    /// whether it overflows and, if so, returns the first fallback whose resolved placement fits
+    /// (or <c>null</c> when the base fits or none fits). Reposition + resize; <c>anchor()</c> insets
+    /// in a fallback resolve through <see cref="AnchorGeometry"/>, matching the base.
+    /// </summary>
+    private (double left, double top, double width, double height)? ComputeFallbackPlacement(
+        Dictionary<string, string> baseProps, Dictionary<string, AnchorInfo> anchorRegistry,
+        Dictionary<string, Dictionary<string, string>> positionTryRules, string fallbackList,
+        double baseLeft, double baseTop, double baseRight, double baseBottom,
+        double baseWidth, double baseHeight, double cbWidth, double cbHeight)
+    {
+        double imcbWidth = cbWidth - baseLeft - baseRight;
+        double imcbHeight = cbHeight - baseTop - baseBottom;
+
         bool baseOverflows = AnchorGeometry.Overflows(
             baseLeft, baseTop, baseWidth, baseHeight, cbWidth, cbHeight, imcbWidth, imcbHeight);
 
         if (!baseOverflows)
-            return; // Base style fits; no fallback needed.
+            return null; // Base style fits; no fallback needed.
 
         // Parse the fallback list (comma-separated @position-try names).
         var names = PositionTryRule.ParseFallbackList(fallbackList);
@@ -245,18 +273,79 @@ public sealed partial class DomBridge
             bool fits = AnchorGeometry.Fits(tryLeft, tryTop, tryWidth, tryHeight, cbWidth, cbHeight);
 
             if (fits)
-            {
-                // Apply the fallback: set resolved values as inline styles.
-                InlineStyle(element)["left"] = $"{tryLeft.ToString(CultureInfo.InvariantCulture)}px";
-                InlineStyle(element)["top"] = $"{tryTop.ToString(CultureInfo.InvariantCulture)}px";
-                InlineStyle(element)["width"] = $"{tryWidth.ToString(CultureInfo.InvariantCulture)}px";
-                InlineStyle(element)["height"] = $"{tryHeight.ToString(CultureInfo.InvariantCulture)}px";
-                InlineStyle(element).Remove("right");
-                InlineStyle(element).Remove("bottom");
-                InlineStyle(element).Remove("inset");
-                return;
-            }
+                return (tryLeft, tryTop, tryWidth, tryHeight);
         }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Live read-path counterpart of <see cref="TryApplyFallback"/>: for an absolutely/fixed
+    /// positioned box with <c>position-try-fallbacks</c> whose base placement overflows, returns the
+    /// selected fallback's offsetParent-relative <c>left</c>/<c>top</c> and used border-box
+    /// <c>width</c>/<c>height</c> (or <c>null</c> when the box has no fallback, the base fits, or no
+    /// fallback fits — the base geometry then comes from the other live resolvers). Resolves the base
+    /// <c>anchor()</c> insets fresh (the render bake has not run during script) and drives the same
+    /// <see cref="ComputeFallbackPlacement"/> core the bake uses.
+    /// </summary>
+    internal (double? left, double? top, double? width, double? height)? ResolvePositionTryForElement(DomElement element)
+    {
+        var baseProps = CollectMatchedRuleProperties(element);
+        foreach (var kv in InlineStyle(element))
+            baseProps[kv.Key] = kv.Value;
+
+        var position = (baseProps.GetValueOrDefault("position") ?? string.Empty).Trim().ToLowerInvariant();
+        if (position is not ("absolute" or "fixed"))
+            return null;
+
+        string? fallbackList = baseProps.GetValueOrDefault("position-try-fallbacks")
+            ?? baseProps.GetValueOrDefault("position-try");
+        if (string.IsNullOrWhiteSpace(fallbackList))
+            return null;
+
+        var positionTryRules = ParsePositionTryRules();
+        if (positionTryRules.Count == 0)
+            return null;
+
+        var anchorRegistry = new System.Collections.Generic.Dictionary<string, AnchorInfo>(System.StringComparer.Ordinal);
+        BuildAnchorRegistry(anchorRegistry);
+        BuildInlineAnchorRegistry(anchorRegistry);
+
+        string? implicitAnchor = baseProps.GetValueOrDefault("position-anchor");
+        double cbWidth = FindContainingBlockWidth(element);
+        double cbHeight = FindContainingBlockHeight(element);
+
+        double ResolveBaseInset(string prop)
+        {
+            var v = baseProps.GetValueOrDefault(prop);
+            if (string.IsNullOrWhiteSpace(v) || v.Trim().Equals("auto", System.StringComparison.OrdinalIgnoreCase))
+                return 0;
+            if (v.Contains("anchor(", System.StringComparison.OrdinalIgnoreCase))
+            {
+                var rewritten = AnchorFunction.Rewrite(v, r =>
+                    ResolveAnchorEdge(r, anchorRegistry, prop, cbWidth, cbHeight, implicitAnchor));
+                return TryParsePx(rewritten) ?? 0;
+            }
+            return TryParsePx(v) ?? 0;
+        }
+
+        double baseLeft = ResolveBaseInset("left");
+        double baseTop = ResolveBaseInset("top");
+        double baseRight = ResolveBaseInset("right");
+        double baseBottom = ResolveBaseInset("bottom");
+
+        double baseWidth = TryParsePx(baseProps.GetValueOrDefault("width")) ?? 0;
+        double baseHeight = TryParsePx(baseProps.GetValueOrDefault("height")) ?? 0;
+        string? widthVal = baseProps.GetValueOrDefault("width");
+        bool hasAutoWidth = widthVal is "min-content" or "max-content" or "auto" or "fit-content";
+        if (hasAutoWidth && baseWidth == 0)
+            baseWidth = EstimateMinContentWidth(element);
+
+        if (ComputeFallbackPlacement(baseProps, anchorRegistry, positionTryRules, fallbackList,
+                baseLeft, baseTop, baseRight, baseBottom, baseWidth, baseHeight, cbWidth, cbHeight) is { } placed)
+            return (placed.left, placed.top, placed.width, placed.height);
+
+        return null;
     }
 
     /// <summary>

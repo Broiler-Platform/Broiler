@@ -3245,9 +3245,32 @@ Test: `AnchorInsetLiveGeometryTests.OpposingInsets_AutoSize_SpanBetweenResolvedI
 anchor(--a right)` to `right: 50px` reports `(150,170)` 200×200, `getBoundingClientRect` agreeing). css-anchor-position
 corpus **back to 33/6, identical set** (the transient `position-try-grid-001` regression is resolved); the anchor /
 geometry / hit-testing Cli suites keep only the 5 pre-existing environmental fails. This closes the live-geometry gap
-for opposing-inset-sized `anchor()` boxes; the remaining live gap is a `position-try` box whose base *overflows* and
-selects a fallback (the fallback selection is still bake-only — position-try-002's live `offsetLeft`), a larger
-resolver deferred with the `min-content` position-try feature.
+for opposing-inset-sized `anchor()` boxes.
+
+**Landed (2026-07-16, follow-up) — `position-try` fallback selection joins the live read model (the last anchor
+gap).** A box with `position-try-fallbacks` whose base placement *overflows* the inset-modified containing block
+reported its **base** geometry during script, not the selected fallback's (probe on the `position-try-002` shape:
+`offsetLeft 0`, not the fallback's `200`) — the fallback selection ran only in the render bake (`TryApplyFallback`),
+after script. Rather than duplicate that intricate algorithm, its core — the overflow test + the fallback loop
+(resolve each `@position-try` rule's `anchor()` insets via `AnchorGeometry`, test `Fits`, take the first) — was
+**extracted into a shared pure `ComputeFallbackPlacement`** that both the bake and the new live resolver drive; the
+bake now computes its base geometry from the already-baked inline insets and calls it, a behaviour-preserving refactor
+(the position-try corpus + Cli bake tests are unchanged). `DomBridge.ResolvePositionTryForElement` resolves the base
+`anchor()` insets **fresh** (the bake has not run live), estimates the `min-content` base width (the same
+`EstimateMinContentWidth` the bake uses), and returns the fitting fallback's `left/top/width/height` — wired into all
+four offset getters *before* the base `anchor()`-inset resolver (a fallback overrides the base) and into
+`ComputeUnzoomedLayoutRect`. Returns `null` (before the `@position-try` tree walk) for a box with no
+`position-try-fallbacks`, and when the base fits or no fallback fits (base geometry then comes from the other
+resolvers), so blast radius is position-try boxes whose base overflows. Test:
+`PositionTryLiveGeometryTests.OverflowingBase_SelectsFallback_LiveOffsets` (the `position-try-002` shape: base 100px
+IMCB vs 200 min-content overflows → fallback `--f1` places the box at `offsetLeft 200`, width 200, `getBoundingClientRect`
+agreeing). css-anchor-position corpus **unchanged (33/6, identical set)**; the 21 live-geometry + position-try Cli
+tests pass (the bake extraction is behaviour-preserving) and the broad anchor/geometry/hit-testing sweep keeps only the
+pre-existing environmental fails. **All four anchor mechanisms — position-area, `anchor()` insets (single + opposing),
+`anchor-size()`, and `position-try` fallback — now report consistent live geometry** across
+`offsetLeft/Top/Width/Height` and `getBoundingClientRect`. (This is the CSSOM-read half of the `min-content`
+position-try entanglement; the *render*-side handoff of a `min-content` base to the engine still awaits the engine's
+real intrinsic width, per feature (c).)
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.

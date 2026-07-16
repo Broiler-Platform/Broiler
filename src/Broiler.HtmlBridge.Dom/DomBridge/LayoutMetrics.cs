@@ -134,6 +134,10 @@ public sealed partial class DomBridge
             if (ResolveAnchorSizeForElement(element) is { width: { } anchorWidth })
                 return anchorWidth;
 
+            // A position-try fallback sizes the box when it applies.
+            if (ResolvePositionTryForElement(element) is { width: { } tryWidth })
+                return tryWidth;
+
             // An opposing-inset auto-width anchor box is sized by the two resolved insets.
             if (ResolveAnchorInsetForElement(element) is { width: { } insetWidth })
                 return insetWidth;
@@ -163,6 +167,9 @@ public sealed partial class DomBridge
             if (ResolveAnchorSizeForElement(element) is { height: { } anchorHeight })
                 return anchorHeight;
 
+            if (ResolvePositionTryForElement(element) is { height: { } tryHeight })
+                return tryHeight;
+
             if (ResolveAnchorInsetForElement(element) is { height: { } insetHeight })
                 return insetHeight;
 
@@ -182,6 +189,10 @@ public sealed partial class DomBridge
             if (resolved != null)
                 return resolved.Value.top;
 
+            // A position-try fallback (when the base overflows) overrides the base placement.
+            if (ResolvePositionTryForElement(element) is { top: { } tryTop })
+                return tryTop;
+
             // A live anchor() vertical inset resolves the box's top the same way, before the
             // render bake — the pre-bake snapshot lays an anchor()-positioned box at the origin.
             if (ResolveAnchorInsetForElement(element) is { top: { } insetTop })
@@ -200,6 +211,9 @@ public sealed partial class DomBridge
             var resolved = ResolvePositionAreaForElement(element);
             if (resolved != null)
                 return resolved.Value.left;
+
+            if (ResolvePositionTryForElement(element) is { left: { } tryLeft })
+                return tryLeft;
 
             if (ResolveAnchorInsetForElement(element) is { left: { } insetLeft })
                 return insetLeft;
@@ -541,15 +555,19 @@ public sealed partial class DomBridge
         var areaResolution = ResolvePositionAreaForElement(element);
         (double? left, double? top, double? width, double? height)? insetResolution = null;
         (double? width, double? height)? sizeResolution = null;
+        (double? left, double? top, double? width, double? height)? tryResolution = null;
         if (areaResolution is null)
         {
+            tryResolution = ResolvePositionTryForElement(element);
             insetResolution = ResolveAnchorInsetForElement(element);
             sizeResolution = ResolveAnchorSizeForElement(element);
         }
         bool anchorPlaced = areaResolution is not null
+            || (tryResolution is { } tr && (tr.left is not null || tr.top is not null))
             || (insetResolution is { } ins && (ins.left is not null || ins.top is not null));
         bool anchorSized = (sizeResolution is { } sz && (sz.width is not null || sz.height is not null))
-            || (insetResolution is { } isz && (isz.width is not null || isz.height is not null));
+            || (insetResolution is { } isz && (isz.width is not null || isz.height is not null))
+            || (tryResolution is { } tsz && (tsz.width is not null || tsz.height is not null));
         if (anchorPlaced || anchorSized)
         {
             bool haveSnapshot = TryGetSharedLayoutGeometry(element, out var snapBox);
@@ -566,11 +584,13 @@ public sealed partial class DomBridge
             {
                 width = haveSnapshot ? snapBox.BorderBox.Width * iz : 0;
                 height = haveSnapshot ? snapBox.BorderBox.Height * iz : 0;
-                // anchor-size() sizing, then opposing-inset auto sizing, override the snapshot per axis.
+                // anchor-size(), opposing-inset auto, then position-try fallback sizing override the snapshot.
                 if (sizeResolution?.width is { } aw) width = aw;
                 if (sizeResolution?.height is { } ah) height = ah;
                 if (insetResolution?.width is { } iw) width = iw;
                 if (insetResolution?.height is { } ih) height = ih;
+                if (tryResolution?.width is { } tw) width = tw;
+                if (tryResolution?.height is { } th) height = th;
             }
 
             double left, top;
