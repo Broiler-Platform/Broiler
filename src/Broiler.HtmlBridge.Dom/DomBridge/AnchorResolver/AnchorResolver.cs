@@ -157,12 +157,12 @@ public sealed partial class DomBridge
         //    onto those establishers for the static renderer — was deleted in Phase 4 item-2
         //    step 3 now that native is the default. See NativeAnchorContainCbWptTests for parity.
 
-        // 7. Strip CSS rules with unsupported properties (anchor(), inset,
-        //    anchor-name) from the stylesheet so the renderer doesn't
-        //    misinterpret them. Native mode (P5.8d) keeps position-area/anchor-name/
-        //    position-anchor so the engine's post-pass can consume them.
-        if (!NativeAnchorPlacement)
-            NeutralizeStyleElementsForAnchorRules(DocumentElement);
+        // 7. The stylesheet's anchor-positioning rules (position-area, anchor-name,
+        //    position-anchor, anchor()/anchor-size()) are consumed directly by the engine's
+        //    native post-pass, so they must reach the renderer un-stripped. The bridge's
+        //    `NeutralizeStyleElementsForAnchorRules` pass — which rewrote <style> text to strip
+        //    those rules for the static renderer — was deleted in Phase 4 item-2 step 3 now that
+        //    native is the default.
 
         // 7a. Persist active visual-viewport pinch-zoom state into the DOM so
         //     the static renderer can reproduce zoomed fixed-position pages.
