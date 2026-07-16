@@ -107,4 +107,41 @@ if [ -f "$REPO_DIR/.gitmodules" ]; then
   fi
 fi
 
+# --- 3. Branch-base freshness check (warn only) --------------------------------
+# The container's repo baseline is snapshotted when the environment is
+# provisioned. `main` here is force-rewritten as each change lands (its history
+# churns rather than growing linearly), so a freshly-designated task branch can
+# be based on a commit that `main` no longer contains — docs it added (the
+# roadmap files) and prior work are then missing locally.
+#
+# Detect that specific case — HEAD has *diverged* from origin/main (neither
+# contains the other), which is what a force-rewrite of the base looks like —
+# and warn. A branch that is merely ahead (local commits on top of main) or
+# behind (main advanced normally) is NOT flagged. This never resets anything:
+# a branch may carry unpushed work, so reconciliation is the agent's call.
+check_branch_base() {
+  if ! git -C "$REPO_DIR" fetch --quiet origin main 2>/dev/null; then
+    log "war: could not fetch origin/main to check branch freshness (egress?)."
+    return 0
+  fi
+  # origin/main ⊇ HEAD (behind/current) or HEAD ⊇ origin/main (ahead) → healthy.
+  if git -C "$REPO_DIR" merge-base --is-ancestor HEAD FETCH_HEAD 2>/dev/null \
+     || git -C "$REPO_DIR" merge-base --is-ancestor FETCH_HEAD HEAD 2>/dev/null; then
+    return 0
+  fi
+  local base
+  base="$(git -C "$REPO_DIR" merge-base HEAD FETCH_HEAD 2>/dev/null || echo '?')"
+  log "war: this branch has DIVERGED from the latest origin/main — its base is"
+  log "     not in main's current history. origin/main was likely force-rewritten"
+  log "     after this container was provisioned, so files/work it added (e.g."
+  log "     docs/roadmap/*) may be MISSING here. Reconcile before working:"
+  log "       git fetch origin main"
+  log "     then, if this branch has no commits of its own beyond the shared base"
+  log "     (${base}), recreate it from main keeping the name:"
+  log "       git checkout -B <this-branch> origin/main"
+  log "     otherwise REBASE your commits onto it (git rebase origin/main)."
+  log "     Never reset/force-restart a branch that carries unpushed commits."
+}
+check_branch_base
+
 log "Done."

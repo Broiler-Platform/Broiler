@@ -3,6 +3,32 @@
 These notes persist across sessions. Keep them accurate; update when the
 workflow changes.
 
+## Start of task: reconcile with the latest `origin/main` first
+
+This container's repo baseline is snapshotted when the environment is
+provisioned, and `main` here is **force-rewritten** as each change lands (its
+history churns rather than growing linearly). So a freshly-designated task
+branch can be based on a commit `main` no longer contains — files it added (the
+`docs/roadmap/*` files, prior work) are then **missing locally**, and a doc the
+task references will look like it "doesn't exist." The `SessionStart` hook warns
+when it detects this (a `war:` line: HEAD has *diverged* from `origin/main`).
+
+Before starting work, reconcile — and let what the branch carries decide how:
+
+1. `git fetch origin main`.
+2. **Branch has no commits of its own** beyond a commit already in `origin/main`
+   (a fresh task branch, or one carrying only already-merged history): recreate
+   it from the latest main, keeping the name —
+   `git fetch origin main && git checkout -B <branch> origin/main`. A
+   force-with-lease push is fine (it held only merged history).
+3. **Branch carries unmerged commits of its own:** **rebase** them onto the
+   refreshed main (`git rebase origin/main`). Never reset or force-restart a
+   branch with unpushed work — you would lose it.
+
+Skip only when a fetch shows the branch is already contained in / ahead of
+`origin/main`. When unsure, check `git merge-base --is-ancestor HEAD
+origin/main` before touching files.
+
 ## Submodules: modify them; push if allowed, otherwise deliver as a PATCH
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS`, and
@@ -68,8 +94,9 @@ something to attempt from inside the container.
 ## Build & test
 
 - .NET 10 SDK; build with `dotnet build <project> -c Release`.
-- The `SessionStart` hook (`.claude/hooks/session-start.sh`) provisions the SDK
-  and initializes submodules.
+- The `SessionStart` hook (`.claude/hooks/session-start.sh`) provisions the SDK,
+  initializes submodules, and warns if the branch has diverged from
+  `origin/main` (see "Start of task" above).
 - WPT runner: `dotnet run --project src/Broiler.Wpt -- --wpt-dir tests/wpt
   --reference-dir tests/wpt/references [--subset <path>] [--failure-images <dir>]`.
   Pixel pass threshold is 99% match (≤1% differing pixels).
