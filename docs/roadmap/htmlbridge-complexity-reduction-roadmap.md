@@ -2717,8 +2717,34 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   native across the board — the plain non-anchor container (seventeenth expansion), the document scrolling
   element (twentieth), and anchor pages (twenty-fourth); fixed descendants need no reparenting on the
   native path. `position: sticky` is fully native (non-document scroll container — nineteenth;
-  page/document scroll — twenty-first; anchor pages — twenty-fifth). Remaining: visual-viewport (the engine-feature set above;
-  transform/contain/will-change CBs are now native — sixteenth expansion), and the
+  page/document scroll — twenty-first; anchor pages — twenty-fifth).
+
+  **Finding — visual-viewport is NOT a lever-gated extraction slice (2026-07-16 investigation).** Unlike
+  every scroll/sticky/anchor pass above — which moves *render* behaviour from a bridge DOM mutation to an
+  engine post-pass validated by pixel corpus tests — `ApplyVisualViewportSerializationState` does not have
+  an engine render target to move to:
+  - **`zoom` is never applied in the render.** A tree-wide search finds `zoom` nowhere in Broiler.Layout /
+    Broiler.HTML / Broiler.CSS layout or paint — only a `CssComputedDefaults` initial value (`"1"`) and a
+    supported-property listing. The engine has **no zoom model**. The pass's inline
+    `DocumentElement["zoom"] = combinedZoom` write is consumed **only** by the bridge's own geometry
+    (`GetUsedZoomForElement`, which divides `offset*`/`getBoundingClientRect` deltas to return unzoomed CSS
+    px). So the pinch-zoom `zoom` write is a **read-path/CSSOM-View concern, not a render one**; the render
+    of a pinch-zoomed page never scales.
+  - **Its only render-relevant effect is a document scroll**, and that is already native: the pass also does
+    `DocumentElement.Scroll.Set(visualViewportPageOffset)`, which feeds `ApplyScrollSimulation` → the
+    engine's `RunScrollSimulation` (native on all pages as of the twenty-fourth expansion).
+  So "native visual-viewport" would mean either (a) a **from-scratch engine zoom/pinch-zoom model** (render
+  scaling + zoom-aware geometry) — a broad, all-pages feature, not an extraction — which properly belongs to
+  the Phase 5 endgame's single `LayoutSnapshot` read model below, or (b) simply skipping the `zoom` write in
+  native mode, which is **not safe**: it would report layout-viewport instead of visual-viewport geometry on
+  a pinch-zoomed page with no engine replacement, and no pinch-zoom corpus exists here to validate against
+  (the one `DomBridge_SerializeToHtml_Persists_VisualViewport_*` Cli test is a standing environmental fail).
+  **Not a slice; folded into the `LayoutSnapshot` geometry endgame.** Also note: the lever does **not** need
+  this to flip — visual-viewport stays baked (its gate is unconditional) while every native feature runs,
+  exactly as the twenty-third expansion proved global lever-on already safe.
+
+  Remaining engine gaps: visual-viewport (per the finding above — deferred to the `LayoutSnapshot` endgame),
+  and the
   auto-`min-content`-sized position-try base (the **opposing-inset** case is now native — twenty-third
   expansion; the `min-content` case — `position-try-002`, a JS `checkLayout` test entangled with the
   getBoundingClientRect path — stays baked pending validation of the engine's real intrinsic width against
