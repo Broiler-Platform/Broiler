@@ -120,12 +120,17 @@ public sealed partial class DomBridge
             if (ShouldReportZeroOffsetMetrics(element))
                 return 0;
 
-            if (TryGetSharedLayoutGeometry(element, out var shared))
-                return UnzoomSharedExtent(shared.BorderBox.Width, element);
-
+            // A live position-area resolution takes precedence over the shared
+            // renderer snapshot, matching offset-left/top below: the non-native
+            // renderer lays a position-area box out before its grid-cell placement
+            // is baked, so its shared border box is 0 — the resolution is the box's
+            // actual used size (css-anchor-position position-area-anchor-partially-outside).
             var resolved = ResolvePositionAreaForElement(element);
             if (resolved != null)
                 return resolved.Value.width;
+
+            if (TryGetSharedLayoutGeometry(element, out var shared))
+                return UnzoomSharedExtent(shared.BorderBox.Width, element);
 
             return 0;
         });
@@ -139,12 +144,15 @@ public sealed partial class DomBridge
             if (ShouldReportZeroOffsetMetrics(element))
                 return 0;
 
-            if (TryGetSharedLayoutGeometry(element, out var shared))
-                return UnzoomSharedExtent(shared.BorderBox.Height, element);
-
+            // See GetOffsetWidthForDomElement: a live position-area resolution wins
+            // over the shared renderer snapshot (which is 0 pre-bake), matching
+            // offset-left/top.
             var resolved = ResolvePositionAreaForElement(element);
             if (resolved != null)
                 return resolved.Value.height;
+
+            if (TryGetSharedLayoutGeometry(element, out var shared))
+                return UnzoomSharedExtent(shared.BorderBox.Height, element);
 
             return 0;
         });
