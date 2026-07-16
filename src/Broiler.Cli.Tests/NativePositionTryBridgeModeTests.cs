@@ -102,4 +102,48 @@ public sealed class NativePositionTryBridgeModeTests
         var native = ResolveAndSerialize(nativeMode: true, MinContentHtml);
         Assert.DoesNotContain("id=\"target\" style=", native);
     }
+
+    // A max-content position-try base with TWO inline-block children (so max-content = 200 but the
+    // bridge's crude EstimateMinContentWidth — max of child widths — measures it as 100). The engine
+    // reads the box's real laid-out max-content width for its overflow test, so the bridge now hands
+    // it off (the identical read-real-size mechanism as min-content) instead of pre-baking it with
+    // the wrong estimate. `#anchor` supplies the required anchor() base inset.
+    private const string MaxContentHtml =
+        "<!DOCTYPE html><html><head><style>" +
+        "body { margin: 0; }" +
+        "#cb { position: relative; width: 400px; height: 400px; }" +
+        "#anchor { anchor-name: --a; margin-left: 100px; width: 100px; height: 100px; }" +
+        "#target { position: absolute; position-try-fallbacks: --f1; width: max-content; height: 100px;" +
+        " left: 0; right: anchor(--a left); top: anchor(--a top); }" +
+        "#target > span { display: inline-block; width: 100px; height: 100px; }" +
+        "@position-try --f1 { left: anchor(--a right); right: 0; top: anchor(--a top); }" +
+        "</style></head><body><div id='cb'><div id='anchor'></div>" +
+        "<div id='target'><span></span><span></span></div></div></body></html>";
+
+    [Fact]
+    public void MaxContentBase_LeavesBoxUnbaked()
+    {
+        var native = ResolveAndSerialize(nativeMode: true, MaxContentHtml);
+        Assert.DoesNotContain("id=\"target\" style=", native);
+    }
+
+    // Same shape with `width: fit-content` — also handed off (bare intrinsic keyword).
+    private const string FitContentHtml =
+        "<!DOCTYPE html><html><head><style>" +
+        "body { margin: 0; }" +
+        "#cb { position: relative; width: 400px; height: 400px; }" +
+        "#anchor { anchor-name: --a; margin-left: 100px; width: 100px; height: 100px; }" +
+        "#target { position: absolute; position-try-fallbacks: --f1; width: fit-content; height: 100px;" +
+        " left: 0; right: anchor(--a left); top: anchor(--a top); }" +
+        "#target > span { display: inline-block; width: 100px; height: 100px; }" +
+        "@position-try --f1 { left: anchor(--a right); right: 0; top: anchor(--a top); }" +
+        "</style></head><body><div id='cb'><div id='anchor'></div>" +
+        "<div id='target'><span></span><span></span></div></div></body></html>";
+
+    [Fact]
+    public void FitContentBase_LeavesBoxUnbaked()
+    {
+        var native = ResolveAndSerialize(nativeMode: true, FitContentHtml);
+        Assert.DoesNotContain("id=\"target\" style=", native);
+    }
 }

@@ -2550,9 +2550,7 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   widened: `AxisSizeHandoffSupported` admits a `min-content` length (the engine reads the laid-out
   intrinsic size), and `IsMvpNativeAnchorInsetBox`'s opposing-inset check admits a `min-content` axis
   even for a **childful** box (the size comes from layout, not the inset-sizing path that needs
-  childless) — via a shared `OpposingAxisSizable` helper. `max-content`/`fit-content` deliberately stay
-  baked: the bridge estimator measures them *as* min-content, so handing the engine's (different, real)
-  size off would diverge from that baked reference with no corpus test to validate the flip. Tests:
+  childless) — via a shared `OpposingAxisSizable` helper. Tests:
   `NativePositionTryBridgeModeTests.MinContentBase_LeavesBoxUnbaked` (the `position-try-002` shape is left
   un-baked in native mode). Regression check: **`position-try-002` renders natively at 100 %**
   (previously passed baked); css-anchor-position **native 33/6 (identical set)**; the broad available css
@@ -2561,6 +2559,30 @@ extraction (higher risk). Detailed design below (P5.8b–d).** Two grounding cor
   position-try bake — the render-side half of feature (c); the `EstimateMinContentWidth` heuristic is now
   used only by boxes that still bake (none in the corpus) and the live-geometry read path
   (`ResolvePositionTryForElement`), which stays approximate as documented.
+
+- **P5.8d.2b — `max-content` / `fit-content` position-try base (twenty-seventh expansion) — COMPLETED**
+  2026-07-16 (**bridge only, additive**). The `min-content` expansion above initially left
+  `max-content`/`fit-content` baked "pending a corpus test to validate the flip". That deferral is now
+  resolved: all three intrinsic keywords go through the **identical engine mechanism** — the native
+  position-try pass reads the box's *real laid-out extent* (`Bounds.Width`) for its overflow test, which
+  differs between min/max/fit-content only in the size the engine already computes during normal layout.
+  So the same handoff is correct, and it *fixes* a latent bug: the bridge's `EstimateMinContentWidth`
+  (max of child widths) measures a `max-content` box **as** min-content, so a baked `max-content` box
+  could suppress a fallback its real (wider) size actually needs. The two gates (`OpposingAxisSizable`
+  and `AxisSizeHandoffSupported`) now share an `IsEngineSizedIntrinsic` helper admitting bare
+  `min-content` / `max-content` / `fit-content` (the functional `fit-content(<length>)` form stays
+  baked). Tests: `NativePositionTryBridgeModeTests.MaxContentBase_LeavesBoxUnbaked` /
+  `FitContentBase_LeavesBoxUnbaked` (a two-child box, so real max-content 200 ≠ estimator 100, is left
+  un-baked) and `NativePositionTryPipelineTests.NativeMaxContentBase_RealWidthDrivesFallback` (the engine
+  applies the fallback driven by the real 200px width — a fallback the mis-estimate 100 would wrongly
+  suppress; the without-rules control keeps the overflowing base). Regression check: css-anchor-position
+  **native 33/6 (identical set)**; the broad available css corpus (147) **unchanged at 36 fails**; the
+  anchor / position-try Cli suites add zero regressions. This
+  **retires feature (c) entirely** — the last position-try base bake (`max-content`/`fit-content`) is now
+  handed off, so no position-try box bakes on the native path. (Orthogonal follow-up noted while adding
+  the test: the engine's `ResolveTryEdge` admits only px/percentage lengths, so a fallback with a *sole*
+  unitless `0` inset — e.g. `right: 0` with `left: auto` — is skipped; harmless where a paired anchor()
+  inset also positions the axis, but a real gap worth a one-line fix.)
 
 - **Remaining P5.8d.2b (the entangled expansions, each its own PR + parity gate):** the lever stays
   default-off until each feature is on the engine path — ~~percentage box props~~ → ~~box-sizing~~ →
@@ -2925,22 +2947,21 @@ native" = making both unconditional and retiring the flag.
      `NativeAnchorPlacement` lever).
    - **Residual until the feature goes native:** `ApplyVisualViewportSerializationState` (visual-viewport —
      blocked on the **LayoutSnapshot endgame**), and the non-MVP bake branches inside the thinned PER-ELEMENT
-     passes — the **`max-content` / `fit-content` position-try base** (`min-content` went native in P5.8d.2b,
-     retiring feature (c)'s render-side half; `max-content`/`fit-content` stay baked *deliberately*, pending a
-     validating corpus test, not an engine limitation) and any position-area/anchor() box outside
-     `IsMvpNative…Box` (position-try/anchor() entanglement, or no registered dashed-ident anchor). These bake
-     only the residue `IsMvpNative…Box` rejects; each shrinks to nothing as the engine gains the corresponding
-     capability.
+     passes for any position-area/anchor() box outside `IsMvpNative…Box` (position-try/anchor() entanglement,
+     or no registered dashed-ident anchor). These bake only the residue `IsMvpNative…Box` rejects; each shrinks
+     to nothing as the engine gains the corresponding capability. **Feature (c) — engine intrinsic-size
+     position-try — is now fully retired:** `min-content` (P5.8d.2b) and `max-content`/`fit-content`
+     (twenty-seventh expansion) all hand off, so **no position-try base bakes** on the native path.
 
    **There is no safe deletion available at step 6** — every remaining write is either an ALWAYS pass or a
    not-yet-native residue, so removing it would break a still-baked feature (CI clones by pointer and renders
-   the baked HTML). Further reduction is gated on independent **feature** efforts, each its own multi-step
-   track outside this complexity-reduction roadmap: (a) native dialog/backdrop rendering (submodule), (b) the
-   visual-viewport LayoutSnapshot endgame, and (c) the residual `max-content`/`fit-content` position-try bake
-   (feature (c)'s `min-content` part landed in P5.8d.2b — render-side — and in the LayoutSnapshot endgame
-   increment 2 — live-read side; only the `max-content`/`fit-content` estimator-parity slice remains). When each
-   lands, its residual bake (and, for (a)+(c), a further slice of the corresponding thinned pass) can be deleted,
-   and once the step-3e marker no longer needs it the `NativeAnchorPlacement` lever itself can be fully retired.
+   the baked HTML). Further reduction is gated on two remaining independent **feature** efforts, each its own
+   multi-step track outside this complexity-reduction roadmap: (a) native dialog/backdrop rendering (submodule)
+   and (b) the visual-viewport LayoutSnapshot endgame. (Feature (c), engine intrinsic-size position-try sizing,
+   is **done** — min-content and max/fit-content position-try bases all hand off natively; render-side and, via
+   the LayoutSnapshot endgame increments 1–2, live-read side.) When (a)/(b) land, the corresponding residual
+   bake (and a further slice of the corresponding thinned pass) can be deleted, and once the step-3e marker no
+   longer needs it the `NativeAnchorPlacement` lever itself can be fully retired.
 
 **Risk:** low — WPT/test-only, no production-render change; the corpus *improves* under the flip (33/6 > 31/8).
 The real costs are (a) the full-corpus lever-on validation gap (step 1), and (b) losing baked-path test
@@ -2949,9 +2970,10 @@ coverage as the flag retires (steps 3–5), which is acceptable since the baked 
 native (steps 1–2), all five WHOLE-SKIP passes are deleted (steps 3–4), all six PER-ELEMENT passes are thinned
 to their not-yet-native residue (step 5), and the step-6 audit confirms the terminal state: the only remaining
 bridge anchor bakes are the ALWAYS passes and the not-yet-native residue, none safely deletable now. Everything
-further is gated on separate feature work (native dialog/backdrop, visual-viewport LayoutSnapshot, engine
-`min-content` position-try) plus the optional follow-up of fully retiring the `NativeAnchorPlacement` lever once
-the last ALWAYS marker-stamp no longer needs it.
+further is gated on separate feature work (native dialog/backdrop, visual-viewport LayoutSnapshot — feature (c)
+engine intrinsic-size position-try is now **done**: min-content and max/fit-content bases all hand off natively)
+plus the optional follow-up of fully retiring the `NativeAnchorPlacement` lever once the last ALWAYS
+marker-stamp no longer needs it.
 
 ---
 

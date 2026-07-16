@@ -116,4 +116,85 @@ public sealed class NativePositionTryPipelineTests
             System.Math.Abs(box.BorderBox.Left - 40f) < 1 && System.Math.Abs(box.BorderBox.Top - 40f) < 1,
             $"box was unexpectedly at the fallback position without the native flag: {box.BorderBox}");
     }
+
+    // #target is a `width: max-content` box with TWO 100px inline-block children, so its real
+    // laid-out width is 200 — but the bridge's crude EstimateMinContentWidth (max of child widths)
+    // measures it as 100. Base `left: anchor(--a left)` = 150, so the box spans [150,350] and
+    // overflows the 300-wide CB *only when sized at the real 200*: at the mis-estimated 100 it would
+    // span [150,250] and "fit", suppressing the fallback. The engine reads the box's real laid-out
+    // width for its overflow test, so it correctly overflows and applies --flip (`right: 0px`),
+    // landing the 200px box at left 100. This is why handing a max-content position-try box to the
+    // engine (rather than baking it with the estimate) is correct — the estimate would wrongly keep
+    // the base. (--flip uses `right: 0px`, not unitless `0`: the engine's ResolveTryEdge admits only
+    // px/percentage lengths, a pre-existing gap orthogonal to this max-content coverage.)
+    private const string MaxContentHtml =
+        "<!DOCTYPE html><html><head><style>" +
+        "body { margin: 0; }" +
+        "#cb { position: relative; width: 300px; height: 100px; }" +
+        "#anchor { position: absolute; left: 150px; top: 0; width: 20px; height: 20px; anchor-name: --a; }" +
+        "#target { position: absolute; top: 0; left: anchor(--a left); position-try-fallbacks: --flip; }" +
+        "#target > span { display: inline-block; width: 100px; height: 50px; }" +
+        "@position-try --flip { left: auto; right: 0px; }" +
+        "</style></head><body><div id='cb'><div id='anchor'></div>" +
+        "<div id='target'><span></span><span></span></div></div></body></html>";
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> MaxContentFlipRule =
+        new Dictionary<string, IReadOnlyDictionary<string, string>>
+        {
+            ["--flip"] = new Dictionary<string, string> { ["left"] = "auto", ["right"] = "0px" },
+        };
+
+    private static BoxGeometry LayoutTargetOf(
+        string html, bool nativeAnchor,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? rules)
+    {
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, Url);
+        DomDocument document = bridge.GetRenderDocument();
+
+        using var container = new HtmlContainer
+        {
+            Location = new PointF(0, 0),
+            AvoidAsyncImagesLoading = true,
+            AvoidImagesLateLoading = true,
+        };
+        container.SetDocumentWithStyleSet(document, baseUrl: Url);
+
+        IReadOnlyDictionary<DomElement, BoxGeometry> geometry;
+        try
+        {
+            NativeAnchorPlacement.Enabled = nativeAnchor;
+            NativeAnchorPlacement.PositionTryRules = rules;
+            geometry = container.GetLayoutGeometry(new SizeF(800, 600));
+        }
+        finally
+        {
+            NativeAnchorPlacement.Enabled = false;
+            NativeAnchorPlacement.PositionTryRules = null;
+        }
+
+        var target = document.GetElementById("target");
+        Assert.NotNull(target);
+        Assert.True(geometry.ContainsKey(target!), "target box has no geometry");
+        return geometry[target!];
+    }
+
+    [Fact]
+    public void NativeMaxContentBase_RealWidthDrivesFallback()
+    {
+        var box = LayoutTargetOf(MaxContentHtml, nativeAnchor: true, rules: MaxContentFlipRule);
+        // Real width 200 → base overflows → --flip (right:0) lands the box at left 100, width 200.
+        Assert.Equal(200f, box.BorderBox.Width, 1);
+        Assert.Equal(100f, box.BorderBox.Left, 1);
+    }
+
+    [Fact]
+    public void NativeMaxContentBase_WithoutRules_KeepsOverflowingBase()
+    {
+        // No rules → no fallback; the box stays at its overflowing base (left 150), proving the
+        // left-100 placement above is the fallback pass acting on the real max-content width.
+        var box = LayoutTargetOf(MaxContentHtml, nativeAnchor: true, rules: null);
+        Assert.Equal(150f, box.BorderBox.Left, 1);
+    }
 }
