@@ -177,65 +177,6 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetChildren081Core(DomElement element, in Arguments a)
-    {
-        var result = new List<JSValue>();
-        foreach (var child in ChildElements(element))
-        {
-            if (!IsText(child))
-                result.Add(ToJSObject(child));
-        }
-
-        return new JSArray(result);
-    }
-
-
-    private JSValue JsJsObjectsGetFirstElementChild083Core(DomElement element, in Arguments a)
-    {
-        var first = ChildElements(element).FirstOrDefault(c => !IsText(c));
-        return first != null ? ToJSObject(first) : JSNull.Value;
-    }
-
-
-    private JSValue JsJsObjectsGetLastElementChild084Core(DomElement element, in Arguments a)
-    {
-        var last = ChildElements(element).LastOrDefault(c => !IsText(c));
-        return last != null ? ToJSObject(last) : JSNull.Value;
-    }
-
-
-    private JSValue JsJsObjectsGetNextElementSibling085Core(DomElement element, in Arguments a)
-    {
-        if (ParentEl(element) == null)
-            return JSNull.Value;
-        var siblings = ChildElements(ParentEl(element)).ToList();
-        var idx = siblings.IndexOf(element);
-        for (var i = idx + 1; i < siblings.Count; i++)
-        {
-            if (!IsText(siblings[i]))
-                return ToJSObject(siblings[i]);
-        }
-
-        return JSNull.Value;
-    }
-
-
-    private JSValue JsJsObjectsGetPreviousElementSibling086Core(DomElement element, in Arguments a)
-    {
-        if (ParentEl(element) == null)
-            return JSNull.Value;
-        var siblings = ChildElements(ParentEl(element)).ToList();
-        var idx = siblings.IndexOf(element);
-        for (var i = idx - 1; i >= 0; i--)
-        {
-            if (!IsText(siblings[i]))
-                return ToJSObject(siblings[i]);
-        }
-
-        return JSNull.Value;
-    }
-
-
     private JSValue JsJsObjectsAttachShadow087Core(DomElement element, in Arguments a)
     {
         if (GetShadowRoot(element) != null)

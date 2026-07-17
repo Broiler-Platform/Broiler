@@ -1214,7 +1214,26 @@ environmental `Lang_Matches_XmlLang_Ancestor` / `CssEscape_InSelector_DecodedToU
 `Bridge_Selector_Surface…` selector-engine tests) fail identically at the P3.43 baseline — pre-existing
 environment/rendering failures, not regressions. `Broiler.HtmlBridge.Dom` builds clean (0 warnings).
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.44 named-accessor / relocated-infra /
+Status: **P3.45 completed** 2026-07-17 (same branch) — the **DOM element-traversal accessors**, the sixth slice off
+`JsFunctionCallbacks/JsObjects.cs`. `ElementTraversalBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the 5 element-path callbacks: `children`, `firstElementChild`, `lastElementChild`,
+`nextElementSibling` and `previousElementSibling` — the element-only siblings of the P3.41 node accessors (was the
+bridge's `JsJsObjectsGetChildren081Core`..`GetPreviousElementSibling086Core`). This is the cleanest slice yet: the
+element-child enumeration (`ChildElements`), the element-parent walk (`ParentEl`) and the text-node test (`IsText`)
+are all already `internal static` and called directly, leaving a single-member `IElementTraversalHost` contract for
+just the JS-wrapper factory (`ToJSObject`, `DomBridge.ElementTraversalHost.cs`, explicit interface member). The
+element-path registration in `JsObjects.cs` now calls `Dom.Features.ElementTraversalBinding.<Op>`; the callbacks
+are gone from `JsFunctionCallbacks/JsObjects.cs` (947 → 888 lines). Behaviour-preserving; no public-API change
+(module + contract internal). Tests: `Broiler.Cli.Tests/ElementTraversalBindingModuleTests.cs` (co-location /
+host-contract / five-callbacks-moved-off-bridge guards + an end-to-end characterization that interleaves text and
+comment nodes so element-only traversal must skip them — `children.length`, `first`/`lastElementChild`,
+`next`/`previousElementSibling` and the null ends through the bridge). Regression check: the element-traversal +
+architecture-guard suites pass (83 + 14); the one failure in that subset
+(`Range_GetBoundingClientRect_Includes_DisplayContents_Descendants`, a layout/geometry Range test swept in by the
+`Traversal` class-name filter) fails identically at the P3.44 baseline — pre-existing, unrelated.
+`Broiler.HtmlBridge.Dom` builds clean (0 warnings).
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.45 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

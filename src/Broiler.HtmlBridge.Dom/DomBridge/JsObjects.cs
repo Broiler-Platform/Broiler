@@ -427,7 +427,7 @@ public sealed partial class DomBridge
 
         // children (read-only) — element children only (no text nodes)
         obj.FastAddProperty((KeyString)"children",
-            new JSFunction((in a) => JsJsObjectsGetChildren081Core(element, in a), "get children"),
+            new JSFunction((in a) => Dom.Features.ElementTraversalBinding.GetChildren(this, element, in a), "get children"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // childElementCount (read-only)
@@ -437,22 +437,22 @@ public sealed partial class DomBridge
 
         // firstElementChild (read-only)
         obj.FastAddProperty((KeyString)"firstElementChild",
-            new JSFunction((in a) => JsJsObjectsGetFirstElementChild083Core(element, in a), "get firstElementChild"),
+            new JSFunction((in a) => Dom.Features.ElementTraversalBinding.GetFirstElementChild(this, element, in a), "get firstElementChild"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // lastElementChild (read-only)
         obj.FastAddProperty((KeyString)"lastElementChild",
-            new JSFunction((in a) => JsJsObjectsGetLastElementChild084Core(element, in a), "get lastElementChild"),
+            new JSFunction((in a) => Dom.Features.ElementTraversalBinding.GetLastElementChild(this, element, in a), "get lastElementChild"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // nextElementSibling (read-only)
         obj.FastAddProperty((KeyString)"nextElementSibling",
-            new JSFunction((in a) => JsJsObjectsGetNextElementSibling085Core(element, in a), "get nextElementSibling"),
+            new JSFunction((in a) => Dom.Features.ElementTraversalBinding.GetNextElementSibling(this, element, in a), "get nextElementSibling"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // previousElementSibling (read-only)
         obj.FastAddProperty((KeyString)"previousElementSibling",
-            new JSFunction((in a) => JsJsObjectsGetPreviousElementSibling086Core(element, in a), "get previousElementSibling"),
+            new JSFunction((in a) => Dom.Features.ElementTraversalBinding.GetPreviousElementSibling(this, element, in a), "get previousElementSibling"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // -- DOM manipulation methods --
