@@ -81,7 +81,7 @@ public sealed partial class DomBridge
 
         // Remove all CSS-derived properties (keep inline ones AND JS-set ones).
         var keysToRemove = InlineStyle(element).Keys
-            .Where(k => !inlineStyleProps.Contains(k) && !GetElementRuntimeState(element).JsSetStyleProps.Contains(k))
+            .Where(k => !inlineStyleProps.Contains(k) && !InlineStyleStateFor(element).JsSetStyleProps.Contains(k))
             .ToList();
         foreach (var key in keysToRemove)
             InlineStyle(element).Remove(key);

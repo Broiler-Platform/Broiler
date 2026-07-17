@@ -391,8 +391,11 @@ Two findings recorded for later phases:
       `SelectorsBindingModuleTests`, `SelectorsAndCssomTests`, `CssRenderingTests`,
       `PositionAreaLiveGeometryTests`, `AnchorInsetLiveGeometryTests`, `Acid3RegressionTests`,
       `Acid3CssSelectorRegressionTests`, `SharedLayoutGeometryTests`, `DomImplementationTests` — 308
-      relevant tests) stays green. (`ElementRuntimeState` now holds only the inline-style trio; renaming it
-      to match is optional cosmetic follow-up.)
+      relevant tests) stays green. Follow-up rename (2026-07-17): with only the inline-style concern left,
+      the misnamed `ElementRuntimeState` class → `InlineStyleRuntimeState`, `GetElementRuntimeState` →
+      `InlineStyleStateFor`, and `_elementRuntimeStates` → `_inlineStyleStates`; the now-grab-bag state file
+      `DomBridge/ElementRuntimeState.cs` → `DomBridge/RuntimeStates.cs` (it holds the per-concern
+      `*RuntimeState` DTOs, `EventListenerRegistration` and `RuntimeValue`). Pure rename, build-verified.
 
 Goal: make hidden state dependencies explicit while preserving behavior.
 

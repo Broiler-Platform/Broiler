@@ -128,11 +128,11 @@ public sealed partial class DomBridge
         {
             // Setting element.style = "prop: val; ..." parses as cssText
             InlineStyle(element).Clear();
-            GetElementRuntimeState(element).JsSetStyleProps.Clear();
+            InlineStyleStateFor(element).JsSetStyleProps.Clear();
             foreach (var kv in ParseStyle(s.ToString(), reportDrops: true))
             {
                 InlineStyle(element)[kv.Key] = kv.Value;
-                GetElementRuntimeState(element).JsSetStyleProps.Add(kv.Key);
+                InlineStyleStateFor(element).JsSetStyleProps.Add(kv.Key);
             }
 
             // Phase 4 item 2: write-through so getAttribute("style") observes the assignment.
