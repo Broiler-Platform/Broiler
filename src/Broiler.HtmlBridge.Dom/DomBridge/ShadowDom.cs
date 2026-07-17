@@ -1,14 +1,27 @@
+using System.Runtime.CompilerServices;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.Runtime;
+using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
-    private static DomElement? GetShadowRoot(DomElement element)
+    // Phase 2 item 4 (de-globalization, 2026-07-17): the per-element shadow-DOM linkage (a host's
+    // shadow root, a root's host, and the root's mode) was the Shadow slot of the process-static
+    // ElementRuntimeState table; it is now a per-bridge instance table, owned by the session's bridge.
+    // Still element-keyed, so it GCs with the element and the cloneNode copy (see CloneDomElement) is
+    // preserved. The former static GetShadowRoot / GetShadowHost helpers became instance methods (all
+    // their callers were already on the bridge instance), so no cross-class host threading was needed.
+    private readonly ConditionalWeakTable<DomElement, ShadowRuntimeState> _shadowRuntimeStates = [];
+
+    private ShadowRuntimeState ShadowStateFor(DomElement element) =>
+        _shadowRuntimeStates.GetValue(element, static _ => new ShadowRuntimeState());
+
+    private DomElement? GetShadowRoot(DomElement element)
     {
-        if (GetElementRuntimeState(element).Shadow.Root.TryGet(out var rawShadowRoot) &&
+        if (ShadowStateFor(element).Root.TryGet(out var rawShadowRoot) &&
             rawShadowRoot is DomElement root)
         {
             return root;
@@ -17,11 +30,11 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private static DomElement? GetShadowHost(DomElement? shadowRoot)
+    private DomElement? GetShadowHost(DomElement? shadowRoot)
     {
         if (shadowRoot != null &&
             string.Equals(shadowRoot.TagName, "#shadow-root", StringComparison.Ordinal) &&
-            GetElementRuntimeState(shadowRoot).Shadow.Host.TryGet(out var rawHost) &&
+            ShadowStateFor(shadowRoot).Host.TryGet(out var rawHost) &&
             rawHost is DomElement host)
         {
             return host;

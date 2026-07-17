@@ -71,7 +71,7 @@ public sealed partial class DomBridge
             // position is used instead of its document position.
             bool targetIsFixed =
                 (cssProps.GetValueOrDefault("position") ?? InlineStyle(element).GetValueOrDefault("position")) == "fixed" ||
-                (GetElementRuntimeState(element).Dialog.Modal.TryGet(out var tModal) && tModal is true);
+                (DialogStateFor(element).Modal.TryGet(out var tModal) && tModal is true);
             double scrollAdjY = 0, scrollAdjX = 0;
             if (targetIsFixed)
             {

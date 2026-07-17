@@ -49,21 +49,13 @@ internal sealed class ElementRuntimeState
 
     public FormControlRuntimeState FormControl { get; } = new();
 
-    // Phase 2 item 4 (de-globalization, 2026-07-17): the Scroll slot was moved out of this
-    // process-static table into a per-bridge instance table (DomBridge._scrollRuntimeStates,
-    // reached via ScrollStateFor); the clone copy lives in CloneDomElement now. See
-    // ScrollRuntimeState below (still used by that instance table).
-
-    public DialogRuntimeState Dialog { get; } = new();
-
-    public ShadowRuntimeState Shadow { get; } = new();
-
-    // Phase 2 item 4 (de-globalization, 2026-07-17): the StyleSheet, Document and Animation slots were
-    // moved out of this process-static table into per-bridge instance tables
-    // (DomBridge._styleSheetRuntimeStates via StyleSheetStateFor, _documentRuntimeStates via
-    // DocumentStateFor, _animationRuntimeStates via AnimationStateFor); their clone copies live in
-    // CloneDomElement now. See StyleSheetRuntimeState / DocumentRuntimeState / AnimationRuntimeState
-    // below (still used by those instance tables).
+    // Phase 2 item 4 (de-globalization, 2026-07-17): the Scroll, Dialog, Shadow, StyleSheet, Document
+    // and Animation slots were moved out of this process-static table into per-bridge instance tables
+    // (DomBridge._scrollRuntimeStates via ScrollStateFor, _dialogRuntimeStates via DialogStateFor,
+    // _shadowRuntimeStates via ShadowStateFor, _styleSheetRuntimeStates via StyleSheetStateFor,
+    // _documentRuntimeStates via DocumentStateFor, _animationRuntimeStates via AnimationStateFor); their
+    // clone copies live in CloneDomElement now. See the *RuntimeState classes below (still used by
+    // those instance tables). Only FormControl and the inline-style trio remain in this static table.
 
     public void CopyRuntimeValuesTo(ElementRuntimeState target)
     {
@@ -72,16 +64,9 @@ internal sealed class ElementRuntimeState
         FormControl.DefaultSelected.CopyTo(target.FormControl.DefaultSelected);
         FormControl.SelectedIndex.CopyTo(target.FormControl.SelectedIndex);
         FormControl.ReturnValue.CopyTo(target.FormControl.ReturnValue);
-        // Scroll offsets are copied separately in CloneDomElement (moved to a per-bridge
-        // instance table; this static-table struct no longer owns them).
-        Dialog.Modal.CopyTo(target.Dialog.Modal);
-        Dialog.TopLayerOrder.CopyTo(target.Dialog.TopLayerOrder);
-        Dialog.PopoverOpen.CopyTo(target.Dialog.PopoverOpen);
-        Shadow.Root.CopyTo(target.Shadow.Root);
-        Shadow.Host.CopyTo(target.Shadow.Host);
-        Shadow.Mode.CopyTo(target.Shadow.Mode);
-        // StyleSheet, Document and Animation state are copied separately in CloneDomElement (moved to
-        // per-bridge instance tables; this static-table struct no longer owns them).
+        // Scroll, Dialog, Shadow, StyleSheet, Document and Animation state are copied separately in
+        // CloneDomElement (moved to per-bridge instance tables; this static-table struct no longer
+        // owns them).
     }
 }
 

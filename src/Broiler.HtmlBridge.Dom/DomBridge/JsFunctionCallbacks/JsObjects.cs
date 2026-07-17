@@ -108,7 +108,7 @@ public sealed partial class DomBridge
         var shadowRoot = GetShadowRoot(element);
         if (shadowRoot == null)
             return JSNull.Value;
-        var mode = GetElementRuntimeState(element).Shadow.Mode.TryGet(out var rawMode) ? rawMode as string : null;
+        var mode = ShadowStateFor(element).Mode.TryGet(out var rawMode) ? rawMode as string : null;
         return string.Equals(mode, "open", StringComparison.OrdinalIgnoreCase) ? ToJSObject(shadowRoot) : JSNull.Value;
     }
 
@@ -196,10 +196,10 @@ public sealed partial class DomBridge
         // SetParent links the shadow root to its host, so GetOwningDocument derives the shadow root's
         // owning document from the host's tree position — no OwnerDocRoot inheritance needed (P4.4c).
         SetParent(shadowRoot, element);
-        GetElementRuntimeState(shadowRoot).Shadow.Host.Set(element);
-        GetElementRuntimeState(shadowRoot).Shadow.Mode.Set(mode);
-        GetElementRuntimeState(element).Shadow.Root.Set(shadowRoot);
-        GetElementRuntimeState(element).Shadow.Mode.Set(mode);
+        ShadowStateFor(shadowRoot).Host.Set(element);
+        ShadowStateFor(shadowRoot).Mode.Set(mode);
+        ShadowStateFor(element).Root.Set(shadowRoot);
+        ShadowStateFor(element).Mode.Set(mode);
         return ToJSObject(shadowRoot);
     }
 

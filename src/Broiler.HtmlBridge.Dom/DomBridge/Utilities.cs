@@ -365,11 +365,22 @@ public sealed partial class DomBridge
         // (The namespace was carried at construction via CreateBridgeElementNS above.)
         // Copy browser-runtime values (e.g., checked state for inputs).
         GetElementRuntimeState(element).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
-        // Scroll offsets, stylesheet state, the document viewport flag and the animation timeline
-        // moved out of ElementRuntimeState into per-bridge instance tables (Phase 2 item 4
-        // de-globalization), so copy them here to preserve cloneNode semantics.
+        // Scroll offsets, dialog/popover top-layer state, shadow-DOM linkage, stylesheet state, the
+        // document viewport flag and the animation timeline moved out of ElementRuntimeState into
+        // per-bridge instance tables (Phase 2 item 4 de-globalization), so copy them here to preserve
+        // cloneNode semantics.
         ScrollStateFor(element).Left.CopyTo(ScrollStateFor(clone).Left);
         ScrollStateFor(element).Top.CopyTo(ScrollStateFor(clone).Top);
+        var sourceDialog = DialogStateFor(element);
+        var cloneDialog = DialogStateFor(clone);
+        sourceDialog.Modal.CopyTo(cloneDialog.Modal);
+        sourceDialog.TopLayerOrder.CopyTo(cloneDialog.TopLayerOrder);
+        sourceDialog.PopoverOpen.CopyTo(cloneDialog.PopoverOpen);
+        var sourceShadow = ShadowStateFor(element);
+        var cloneShadow = ShadowStateFor(clone);
+        sourceShadow.Root.CopyTo(cloneShadow.Root);
+        sourceShadow.Host.CopyTo(cloneShadow.Host);
+        sourceShadow.Mode.CopyTo(cloneShadow.Mode);
         var sourceSheet = StyleSheetStateFor(element);
         var cloneSheet = StyleSheetStateFor(clone);
         sourceSheet.FetchedCss.CopyTo(cloneSheet.FetchedCss);

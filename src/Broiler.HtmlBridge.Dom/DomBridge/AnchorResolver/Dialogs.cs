@@ -1,9 +1,23 @@
+using System.Runtime.CompilerServices;
+using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
+    // Phase 2 item 4 (de-globalization, 2026-07-17): the per-element dialog / popover top-layer state
+    // (modal flag, top-layer order, popover-open flag) was the Dialog slot of the process-static
+    // ElementRuntimeState table; it is now a per-bridge instance table, owned by the session's bridge.
+    // Still element-keyed, so it GCs with the element and the cloneNode copy (see CloneDomElement) is
+    // preserved. The former static TopLayerOrderOf / IsAnchorAccessible / FindModalDialogs /
+    // FindOpenPopovers helpers became instance methods (all their callers were already on the bridge
+    // instance), so no cross-class host threading was needed.
+    private readonly ConditionalWeakTable<DomElement, DialogRuntimeState> _dialogRuntimeStates = [];
+
+    private DialogRuntimeState DialogStateFor(DomElement element) =>
+        _dialogRuntimeStates.GetValue(element, static _ => new DialogRuntimeState());
+
     // -----------------------------------------------------------------
     // Dialog UA default positioning
     // -----------------------------------------------------------------
@@ -27,8 +41,8 @@ public sealed partial class DomBridge
     private void StampTopLayerOrder(DomElement el, int order) =>
         SetAttr(el, TopLayerOrderAttr, order.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
-    private static int TopLayerOrderOf(DomElement el) =>
-        GetElementRuntimeState(el).Dialog.TopLayerOrder.TryGet(out var o) && o is int oi ? oi : 0;
+    private int TopLayerOrderOf(DomElement el) =>
+        DialogStateFor(el).TopLayerOrder.TryGet(out var o) && o is int oi ? oi : 0;
 
     /// <summary>
     /// Applies the UA default <c>position: fixed</c> to modal dialog elements
@@ -45,7 +59,7 @@ public sealed partial class DomBridge
                 continue;
             if (!HasAttr(el, "open"))
                 continue;
-            if (!(GetElementRuntimeState(el).Dialog.Modal.TryGet(out var m) && m is true))
+            if (!(DialogStateFor(el).Modal.TryGet(out var m) && m is true))
                 continue;
 
             // Mark the open modal dialog as a top-layer box (native paint reads this; inert on
@@ -87,7 +101,7 @@ public sealed partial class DomBridge
     {
         foreach (var el in Elements)
         {
-            if (!(GetElementRuntimeState(el).Dialog.PopoverOpen.TryGet(out var open) && open is true))
+            if (!(DialogStateFor(el).PopoverOpen.TryGet(out var open) && open is true))
                 continue;
 
             var props = GetComputedProps(el);
@@ -313,14 +327,14 @@ public sealed partial class DomBridge
     /// <item>Non-top-layer anchors are always accessible.</item>
     /// </list>
     /// </remarks>
-    private static bool IsAnchorAccessible(DomElement? anchorElement, DomElement targetElement)
+    private bool IsAnchorAccessible(DomElement? anchorElement, DomElement targetElement)
     {
         if (anchorElement == null) return true;
 
         bool anchorIsTopLayer =
-            GetElementRuntimeState(anchorElement).Dialog.Modal.TryGet(out var am) && am is true;
+            DialogStateFor(anchorElement).Modal.TryGet(out var am) && am is true;
         bool targetIsTopLayer =
-            GetElementRuntimeState(targetElement).Dialog.Modal.TryGet(out var tm) && tm is true;
+            DialogStateFor(targetElement).Modal.TryGet(out var tm) && tm is true;
 
         if (!anchorIsTopLayer)
             return true; // Non-top-layer anchors are accessible from anywhere.
@@ -329,16 +343,16 @@ public sealed partial class DomBridge
             return false; // Non-top-layer target cannot see top-layer anchor.
 
         // Both are in top layer — anchor must have been added BEFORE the target.
-        int anchorOrder = GetElementRuntimeState(anchorElement).Dialog.TopLayerOrder.TryGet(out var ao) && ao is int aoi ? aoi : 0;
-        int targetOrder = GetElementRuntimeState(targetElement).Dialog.TopLayerOrder.TryGet(out var to) && to is int toi ? toi : 0;
+        int anchorOrder = DialogStateFor(anchorElement).TopLayerOrder.TryGet(out var ao) && ao is int aoi ? aoi : 0;
+        int targetOrder = DialogStateFor(targetElement).TopLayerOrder.TryGet(out var to) && to is int toi ? toi : 0;
 
         return anchorOrder < targetOrder;
     }
-    private static void FindModalDialogs(DomElement element, List<(DomElement, DomElement, bool)> results)
+    private void FindModalDialogs(DomElement element, List<(DomElement, DomElement, bool)> results)
     {
         if (string.Equals(element.TagName, "dialog", StringComparison.OrdinalIgnoreCase) &&
             HasAttr(element, "open") &&
-            GetElementRuntimeState(element).Dialog.Modal.TryGet(out var isModal) &&
+            DialogStateFor(element).Modal.TryGet(out var isModal) &&
             isModal is bool modal && modal &&
             ParentEl(element) != null)
         {
@@ -355,10 +369,10 @@ public sealed partial class DomBridge
     // Popover API (HTML §popover): an element whose showPopover() ran (and whose
     // hidePopover() did not tear it down — see PopoverKeepsOverlayOnHide) is in
     // the top layer and generates a ::backdrop, just like a modal dialog.
-    private static void FindOpenPopovers(DomElement element, List<(DomElement, DomElement, bool)> results)
+    private void FindOpenPopovers(DomElement element, List<(DomElement, DomElement, bool)> results)
     {
         if (ParentEl(element) != null &&
-            GetElementRuntimeState(element).Dialog.PopoverOpen.TryGet(out var open) &&
+            DialogStateFor(element).PopoverOpen.TryGet(out var open) &&
             open is true)
         {
             results.Add((element, ParentEl(element), true));

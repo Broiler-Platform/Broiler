@@ -63,7 +63,7 @@ public sealed partial class DomBridge
         // A fixed / modal target reads the anchor's viewport (scroll-adjusted) position, matching
         // the render bake (ResolveAnchorFunctions).
         bool targetIsFixed = position == "fixed" ||
-            (GetElementRuntimeState(element).Dialog.Modal.TryGet(out var tModal) && tModal is true);
+            (DialogStateFor(element).Modal.TryGet(out var tModal) && tModal is true);
         double scrollAdjX = 0, scrollAdjY = 0;
         if (targetIsFixed)
         {
