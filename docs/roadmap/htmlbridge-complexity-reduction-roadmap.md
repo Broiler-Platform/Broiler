@@ -3542,6 +3542,35 @@ SHA. It is a patch-workflow feature track with deferred payoff, like blocker (a)
 increments. Recommend bundling it for a maintainer to apply with the submodule pointer bumps, or deferring
 until the `MaiRat/Broiler.*` remotes are in session push scope.
 
+**Landed (2026-07-16) — the (b1) read-model cutover, bundled behind `DomBridge.NativeVisualViewport`
+(default off).** Rather than the `ILayoutView` signature change (which would break the pinned-SHA
+`HeadlessLayoutView`'s interface impl), the bridge sets the engine channel itself: the whole read-model
+cutover is main-repo and lands **dormant** (nothing turns the flag on in the committed tree, so behaviour
+is unchanged — 34 anchor/live-geometry tests green, and the 5 pre-existing zoom/visual-viewport
+environmental fails are unchanged with the flag off). Pieces:
+- `Broiler.Layout.csproj`: `InternalsVisibleTo` for `Broiler.HtmlBridge.Dom` (the bridge writes the channel).
+- `DomBridge.NativeVisualViewport` flag.
+- `SharedLayoutGeometry.BuildSharedGeometrySnapshot` sets `NativeAnchorPlacement.VisualViewportScale` (from
+  `GetVisualViewportScale()` when the flag is on and pinch is active, else `0`) around `GetGeometry`,
+  thread-static save/restore — so the extraction (patch 0006) scales the snapshot.
+- `LayoutMetrics.GetUsedZoomForElement` folds the pinch scale as the root used-zoom base
+  (`RootUsedZoomBase`) when the flag is on — so `offset*` divides the extraction scale back out and
+  `getBoundingClientRect` keeps it (this model treats pinch-zoom as a root zoom).
+
+Validated **end-to-end locally** (flag on + patch 0006 applied): a pinch-zoom `scale = 2` leaves
+`offsetLeft`/`offsetWidth` unaffected and scales `getBoundingClientRect().left`/`width` ×2 — the two halves
+(extraction ×2, fold ÷2) balance exactly. The test is **not committed** (needs 0006, so it cannot pass at
+the pinned SHA on CI).
+
+**Activation** = apply patch 0006, bump the `Broiler.HTML` pointer, and flip `NativeVisualViewport` on in
+the live construction. **Two follow-ups remain before/at activation:** (i) **snapshot cache key** — the
+visual-viewport scale is not part of `HeadlessLayoutView`'s `(document, version, viewport, baseUrl)` cache
+key, so a `visualViewport.scale` change with no DOM mutation would serve a stale (unscaled) snapshot; the
+scale (or a viewport-metrics bump) must join the key. (ii) the **render/paint half** (magnifying a
+pinch-zoomed page's paint) is still the WPT-runner `zoom` bake's job — the read-model cutover leaves that
+bake in place, so retiring it fully still needs the submodule paint transform noted above. (b2) general
+mid-tree `zoom: N` remains separate.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 

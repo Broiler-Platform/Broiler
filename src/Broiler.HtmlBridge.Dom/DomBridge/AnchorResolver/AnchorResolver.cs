@@ -34,6 +34,21 @@ public sealed partial class DomBridge
     internal bool NativeAnchorPlacement { get; set; }
 
     /// <summary>
+    /// Phase 5 LayoutSnapshot endgame, blocker (b) — visual-viewport. When on, the bridge stops
+    /// depending on the DOM `zoom` bake for the document-root pinch-zoom of the geometry read model:
+    /// it sets <c>Broiler.Layout.Engine.NativeAnchorPlacement.VisualViewportScale</c> around the
+    /// shared geometry snapshot (so the extracted <c>BoxGeometry</c> is scaled natively — requires
+    /// <c>patches/0006-html-visual-viewport-extraction-scale.patch</c>), and folds the same scale
+    /// into <see cref="GetUsedZoomForElement"/> as a root-level zoom so <c>offset*</c> divides it
+    /// back out and <c>getBoundingClientRect</c> keeps it (CSSOM-View: pinch-zoom is a root zoom in
+    /// this model). Off by default — the extraction scale and the read-path fold are inverse halves
+    /// of one balance, so enabling the fold without the (submodule) extraction would halve
+    /// <c>offset*</c>; the flag activates both together only once 0006 is applied. When off,
+    /// visual-viewport geometry is unchanged (the WPT-runner `zoom` bake path is untouched).
+    /// </summary>
+    internal bool NativeVisualViewport { get; set; }
+
+    /// <summary>
     /// Resolves <c>anchor()</c> function values and inserts <c>::backdrop</c>
     /// placeholder elements for modal dialogs.  Must be called after script
     /// execution and before serialization.

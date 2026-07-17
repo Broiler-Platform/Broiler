@@ -32,6 +32,11 @@
          NativeAnchorPlacement around its geometry layout so the live read model
          carries engine-resolved anchor geometry (Phase 5 LayoutSnapshot endgame). -->
     <InternalsVisibleTo Include="Broiler.HTML.Headless" />
+    <!-- The script bridge sets NativeAnchorPlacement.VisualViewportScale around the
+         geometry snapshot (behind DomBridge.NativeVisualViewport) so the extracted
+         BoxGeometry carries the document-root pinch-zoom scale natively instead of the
+         DOM zoom bake (Phase 5 LayoutSnapshot endgame, blocker (b) — visual-viewport). -->
+    <InternalsVisibleTo Include="Broiler.HtmlBridge.Dom" />
   </ItemGroup>
 
 </Project>

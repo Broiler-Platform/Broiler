@@ -700,9 +700,20 @@ public sealed partial class DomBridge
     {
         var props = GetComputedProps(element);
         var specifiedZoom = props.GetValueOrDefault("zoom");
-        var parentZoom = ParentEl(element) != null ? GetUsedZoomForElement(ParentEl(element)) : 1.0;
+        var parentZoom = ParentEl(element) != null ? GetUsedZoomForElement(ParentEl(element)) : RootUsedZoomBase();
         return ResolveSpecifiedZoom(specifiedZoom, parentZoom);
     }
+
+    /// <summary>
+    /// The used-zoom base at the document root. Normally <c>1.0</c>; in native visual-viewport mode
+    /// (<see cref="NativeVisualViewport"/>) the document-root pinch-zoom scale is folded in here as a
+    /// root-level zoom, matching the extraction scale (<see cref="Broiler.Layout.Engine.NativeAnchorPlacement.VisualViewportScale"/>,
+    /// patch 0006) — so a scaled <c>BoxGeometry</c> divides back to unaffected <c>offset*</c> while
+    /// <c>getBoundingClientRect</c> stays scaled (this model treats pinch-zoom as a root zoom). Off the
+    /// native path this is <c>1.0</c>, so the DOM `zoom` bake continues to carry the factor unchanged.
+    /// </summary>
+    private double RootUsedZoomBase() =>
+        NativeVisualViewport && HasActiveVisualViewport() ? GetVisualViewportScale() : 1.0;
 
     private static double ResolveSpecifiedZoom(string? specifiedZoom, double parentZoom)
     {

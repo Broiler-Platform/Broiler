@@ -87,10 +87,27 @@ public sealed partial class DomBridge
         {
             var document = GetRenderDocument();
             var viewport = new SizeF(_viewportWidth, _viewportHeight);
-            // P4.4b: a materialised iframe/object sub-document is no longer an in-tree
-            // #subdoc-root child — hand the layout view the resolver so it projects each
-            // referenced content document as a sub-viewport and composes its geometry.
-            return LayoutView.GetGeometry(document, viewport, _pageUrl, ResolveContentDocumentForRender);
+
+            // Native visual-viewport (Phase 5 endgame, blocker (b)): hand the document-root
+            // pinch-zoom scale to the geometry extraction (CollectLayoutGeometry scales the
+            // BoxGeometry rects by it — patch 0006) via the thread-static channel, so the snapshot
+            // carries the pinch scale natively instead of the DOM `zoom` bake. Thread-static
+            // save/restore keeps concurrent layouts unaffected. Off the native path (default) the
+            // channel is left at 0 (no scale) and the WPT-runner zoom bake path is untouched.
+            var previousVisualViewportScale = Broiler.Layout.Engine.NativeAnchorPlacement.VisualViewportScale;
+            Broiler.Layout.Engine.NativeAnchorPlacement.VisualViewportScale =
+                NativeVisualViewport && HasActiveVisualViewport() ? GetVisualViewportScale() : 0.0;
+            try
+            {
+                // P4.4b: a materialised iframe/object sub-document is no longer an in-tree
+                // #subdoc-root child — hand the layout view the resolver so it projects each
+                // referenced content document as a sub-viewport and composes its geometry.
+                return LayoutView.GetGeometry(document, viewport, _pageUrl, ResolveContentDocumentForRender);
+            }
+            finally
+            {
+                Broiler.Layout.Engine.NativeAnchorPlacement.VisualViewportScale = previousVisualViewportScale;
+            }
         }
         catch
         {

@@ -165,10 +165,18 @@ the geometry is unchanged and the anchor / live-geometry Cli suites stay green. 
 **not committed** — it requires this patch, so it cannot pass at the pinned submodule SHA on CI (same
 constraint as patch 0005 / the sticky live-read gap).
 
-This is the **read-model half** of blocker (b1). Still to come (the *cutover*, which must land
-**together with** this patch because it breaks the bake-coupled visual-viewport tests without it):
-(1) the bridge sets the channel from `_visualViewportScale` (and threads the root-scroll seed) when
-native; (2) the read-path coupling — `GetUsedZoomForElement` must fold the same channel scale so
-`offset*` divides it back out (per CSSOM-View, pinch-zoom leaves `getBoundingClientRect`/`offset*`
-*unaffected*); (3) retiring `ApplyVisualViewportSerializationState`. General mid-tree `zoom: N`
-(reflow) is the separate (b2) engine-zoom feature and is **not** covered here.
+This is the submodule half of the (b1) read-model cutover. The **main-repo half has landed dormant**
+behind `DomBridge.NativeVisualViewport` (default off): `SharedLayoutGeometry` sets the
+`VisualViewportScale` channel from `GetVisualViewportScale()` around the geometry snapshot, and
+`LayoutMetrics.GetUsedZoomForElement` folds the same scale as the root used-zoom base so `offset*` divides
+it back out while `getBoundingClientRect` keeps it (CSSOM-View: pinch-zoom is a root zoom in this model).
+Validated end-to-end locally **with this patch applied and the flag on**: `visualViewport.scale = 2` leaves
+`offsetLeft`/`offsetWidth` unaffected and scales `getBoundingClientRect` ×2.
+
+**To activate:** apply this patch, bump the `Broiler.HTML` pointer, and flip `NativeVisualViewport` on in
+the live bridge construction. **Before activation, address the snapshot cache key:** the visual-viewport
+scale is not part of `HeadlessLayoutView`'s `(document, version, viewport, baseUrl)` cache key, so a
+`visualViewport.scale` change with no DOM mutation would serve a stale snapshot — the scale must join the
+key. **Not covered:** the render/paint half (magnifying a pinch-zoomed page's paint) is still the
+WPT-runner `zoom` bake's job, so `ApplyVisualViewportSerializationState` stays until a native paint
+transform lands; and general mid-tree `zoom: N` (reflow) is the separate (b2) engine-zoom feature.
