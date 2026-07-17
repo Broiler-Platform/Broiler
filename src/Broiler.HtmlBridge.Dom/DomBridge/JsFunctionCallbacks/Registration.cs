@@ -97,37 +97,6 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationAddEventListener136Core(in Arguments a)
-    {
-        if (a.Length < 2)
-            return JSUndefined.Value;
-        var type = a[0].ToString();
-        Dom.Features.EventListenerBinding.AddListener(
-            _eventTargets.WindowListenersForAdd(type), a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsRegistrationRemoveEventListener137Core(in Arguments a)
-    {
-        if (a.Length < 2)
-            return JSUndefined.Value;
-        var type = a[0].ToString();
-        Dom.Features.EventListenerBinding.RemoveListener(
-            _eventTargets.TryGetWindowListeners(type, out var listeners) ? listeners : null,
-            a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsRegistrationDispatchEvent138Core(in Arguments a)
-    {
-        if (a.Length == 0 || a[0] is not JSObject evt)
-            return JSBoolean.True;
-        return DispatchWindowEvent(evt);
-    }
-
-
     private JSValue JsRegistrationSetScale143Core(in Arguments a)
     {
         if (a.Length > 0)

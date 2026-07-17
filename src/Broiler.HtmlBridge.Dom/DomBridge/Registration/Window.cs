@@ -149,9 +149,11 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"scroll", new JSFunction(JsRegistrationScroll133Core, "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"scrollTo", new JSFunction(JsRegistrationScrollTo134Core, "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"scrollBy", new JSFunction(JsRegistrationScrollBy135Core, "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"addEventListener", new JSFunction(JsRegistrationAddEventListener136Core, "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"removeEventListener", new JSFunction(JsRegistrationRemoveEventListener137Core, "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"dispatchEvent", new JSFunction(JsRegistrationDispatchEvent138Core, "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        // window addEventListener / removeEventListener / dispatchEvent, co-located in the
+        // WindowEventTargetBinding feature module (Phase 3).
+        window.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.AddEventListener(this, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"dispatchEvent", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.DispatchEvent(this, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         _messaging.RegisterWindowMessaging(window);
 
