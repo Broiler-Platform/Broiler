@@ -1288,8 +1288,8 @@ Exit criteria:
 - No production source file exceeds 750 lines without a documented exemption.
   **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
   a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
-  module (the P3.x pattern) rather than another giant partial. The remaining three
-  over-limit files (`LayoutMetrics.cs` 2343, `JsObjects.cs` 1286, `SubDocuments.cs` 1152)
+  module (the P3.x pattern) rather than another giant partial. The remaining two
+  over-limit files (`LayoutMetrics.cs` 2343, `JsObjects.cs` 1286)
   are listed as
   documented debt to shrink — the guard surfaces one to de-list once it drops under the limit,
   so the ratchet keeps closing. Three files are **de-listed** as of 2026-07-17:
@@ -1374,6 +1374,28 @@ Exit criteria:
   `Acid3SvgAndParsingRegressionTests`, `Acid3HtmlElementRegressionTests`, `DoctypeSentinelMigrationTests`,
   `InlineStyleDropDiagnosticsTests`, `InlineStyleWriteThroughTests`, 90 tests with the guard) stays
   green. Debt list: six → five files.
+
+  **De-list 2026-07-17.** A fifth exempt-file shrink. `SubDocuments.cs` (1152) mixed two concerns
+  beyond its name; both were split into sibling partials. The generic HTML-fragment DOM-mutation
+  helpers — per-node cache teardown (`RemoveElementsRecursive`), `normalize()` text coalescing,
+  indexed child removal/insertion, and the `innerHTML` / `outerHTML` / `insertAdjacentHTML` /
+  child-node-argument fragment builders (`SetElementInnerHtml` / `SetElementOuterHtml`,
+  `BuildAdjacentHtmlNodes`, `BuildChildNodeArgumentNodes`, `InsertNodeAt`, `GetInsertAdjacentTarget`,
+  `TryBuildInnerHtmlFragmentContainer`, `IsVoidHtmlElementTag`) — went into
+  `DomBridge/HtmlFragmentMutation.cs` (329 lines). The XML/XHTML sub-document construction and
+  sub-document script execution (`BuildSubDocumentFromXml`, `BuildDomElementFromXElement`,
+  `ExecuteSubDocumentScripts`, `CollectScriptContent`, `GetTextContentRecursive`) went into
+  `DomBridge/SubDocuments.XmlAndScripts.cs` (163 lines); a dead orphan doc-comment at the file tail
+  was dropped, and the now-unused `System.Text` / `System.Xml.Linq` usings were removed from the
+  original. Pure partial-class relocation — no signature, accessibility, or logic change, so
+  behaviour-identical by construction; `SubDocuments.cs` drops 1152 → 694 and its
+  `OversizedFileExemptions` entry is removed. `Broiler.HtmlBridge.Dom` builds clean and the guard is
+  green (14/14, 0 offenders / 0 stale exemptions); the fragment-mutation / sub-document coverage
+  (`InnerHtmlParallelStateRemovalTests`, `SubDocumentBindingModuleTests`,
+  `SubDocumentSeverMigrationTests`, `DocumentFragmentSentinelMigrationTests`, `DomImplementationTests`,
+  `HtmlDomInterfacesTests`, `DomEdgeCasePhase4Tests`, `IsEqualNodePromotionTests`,
+  `SvgDomAndCrossDocTests`, `Acid3RegressionTests`, 204 tests with the guard) stays green. Debt list:
+  five → four files.
 
 ### Phase 4 - eliminate parallel DOM state
 

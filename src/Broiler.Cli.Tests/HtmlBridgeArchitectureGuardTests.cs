@@ -211,7 +211,12 @@ public class HtmlBridgeArchitectureGuardTests
         // JsFunctionCallbacks/Registration.cs de-listed 2026-07-17: nine feature modules
         // (P3.19–P3.27: console, crypto, sendBeacon, matchMedia, timers, write/writeln, node
         // factories, element queries, live collections, node mutation) dropped it from 1184 to 684.
-        "src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs",
+        // SubDocuments.cs de-listed 2026-07-17: two cohesive clusters were split out — the generic
+        // HTML-fragment DOM-mutation helpers (RemoveElementsRecursive, NormalizeNode, RemoveChildAt,
+        // insertAdjacent/innerHTML/outerHTML builders) into DomBridge/HtmlFragmentMutation.cs, and
+        // XML/XHTML sub-document construction plus sub-document script execution
+        // (BuildSubDocumentFromXml, BuildDomElementFromXElement, ExecuteSubDocumentScripts) into
+        // DomBridge/SubDocuments.XmlAndScripts.cs — dropping it from 1152 to 694 lines.
         // DomBridge.cs de-listed 2026-07-17: two cohesive behaviour clusters were split out of the
         // facade into sibling partials — the window-load lifecycle / window-event dispatch
         // (FireWindowLoadEvent, DispatchWindowEvent, BuildWindowFramesArray/CollectWindowFrames) into
