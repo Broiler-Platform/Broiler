@@ -73,30 +73,6 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationScroll133Core(in Arguments a)
-    {
-        var (left, top, behavior) = GetScrollArguments(a);
-        SetElementScrollOffsetsWithBehavior(DocumentElement, left, top, clamp: false, behavior: behavior);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsRegistrationScrollTo134Core(in Arguments a)
-    {
-        var (left, top, behavior) = GetScrollArguments(a);
-        SetElementScrollOffsetsWithBehavior(DocumentElement, left, top, clamp: false, behavior: behavior);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsRegistrationScrollBy135Core(in Arguments a)
-    {
-        var (left, top, behavior) = GetScrollArguments(a);
-        SetElementScrollOffsetsWithBehavior(DocumentElement, left, top, relative: true, clamp: false, behavior: behavior);
-        return JSUndefined.Value;
-    }
-
-
     private JSValue JsRegistrationSetScale143Core(in Arguments a)
     {
         if (a.Length > 0)

@@ -1035,7 +1035,22 @@ GoogleSearchPolyfill `VisualViewport_ScrollIntoView_*` tests — which add a `sc
 on a visual-viewport scroll — still pass, confirming the firing path end-to-end; `Broiler.HtmlBridge.Dom` builds
 clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.34 named-accessor / relocated-infra /
+Status: **P3.35 completed** 2026-07-17 (same branch) — the **`window` scroll methods**. `WindowScrollBinding`
+(namespace `Broiler.HtmlBridge.Dom.Features`) co-locates `window.scroll`, `window.scrollTo`, `window.scrollBy` (was
+the bridge's `JsRegistrationScroll133Core`/`ScrollTo134Core`/`ScrollBy135Core`). Each parses the JS scroll
+arguments and applies the offset to the document (scrolling) element with the requested scroll behavior —
+`scroll`/`scrollTo` absolute (identical; `scroll` now delegates to `scrollTo`), `scrollBy` relative — all reached
+through the three-member `IWindowScrollHost` contract (`DomBridge.WindowScrollHost.cs`, explicit interface members):
+the scrolling element, `GetScrollArguments` parser and the `SetElementScrollOffsetsWithBehavior` primitive.
+`Registration/Window.cs` now registers `Dom.Features.WindowScrollBinding.<Op>(this, in a)`; the callbacks are gone
+from `JsFunctionCallbacks/Registration.cs` (150 → 126 lines). Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/WindowScrollBindingModuleTests.cs` (co-location / host-contract /
+three-callbacks-moved-off-bridge guards + a characterization — `scrollTo(0,100)`→100, `scrollBy(0,50)`→150,
+`scroll(0,25)`→25 read back via `window.scrollY` — through the bridge). Regression check: the window-scroll and
+architecture-guard suites pass (19+), including the GoogleSearchPolyfill `Window_Scroll_APIs_Update_Root_Scroll_
+Offsets_And_VisualViewport` oracle; `Broiler.HtmlBridge.Dom` builds clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.35 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

@@ -146,9 +146,10 @@ public sealed partial class DomBridge
         window.FastAddProperty((KeyString)"pageXOffset", new JSFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
         window.FastAddProperty((KeyString)"pageYOffset", new JSFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        window.FastAddValue((KeyString)"scroll", new JSFunction(JsRegistrationScroll133Core, "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"scrollTo", new JSFunction(JsRegistrationScrollTo134Core, "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"scrollBy", new JSFunction(JsRegistrationScrollBy135Core, "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        // window scroll / scrollTo / scrollBy, co-located in the WindowScrollBinding feature module (Phase 3).
+        window.FastAddValue((KeyString)"scroll", new JSFunction((in a) => Dom.Features.WindowScrollBinding.Scroll(this, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"scrollTo", new JSFunction((in a) => Dom.Features.WindowScrollBinding.ScrollTo(this, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"scrollBy", new JSFunction((in a) => Dom.Features.WindowScrollBinding.ScrollBy(this, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         // window addEventListener / removeEventListener / dispatchEvent, co-located in the
         // WindowEventTargetBinding feature module (Phase 3).
         window.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.AddEventListener(this, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
