@@ -1,0 +1,221 @@
+From 4e369bcbf45adb5ddbe81e4519e7fd9810db8ee9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 17 Jul 2026 08:00:51 +0000
+Subject: [PATCH] Native document-root viewport zoom at paint (render-half of
+ visual-viewport)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Broiler.HTML.Image.BCanvas (the render-path rasterizer, distinct from
+Broiler.Graphics.BCanvas) gains the same uniform Scale as patch 0008. GraphicsAdapter
+overrides RGraphics.PushViewportScale/PopViewportScale to compose the scale onto the
+raster BCanvas — raster-only (it deliberately does NOT bump _activeCompatLayerDepth,
+which would flip CanUseRaster off and bypass the scale). HtmlContainerInt gains a
+ViewportZoom property applied in PerformPaint AFTER the device-space viewport clip, so
+page content magnifies while the clip stays in device pixels; HtmlContainer forwards it.
+
+So a pinch-zoomed page can paint magnified natively instead of via the bridge's
+serialized zoom-length bake. Validated by a pixel test (a green box left:10 top:10 20x20
+covers device (45,45) only at ViewportZoom 2, and starts at 20 not 10) and zero
+regression across the graphics/render suites (identical 17 pre-existing Skia/environmental
+fails with and without).
+---
+ .../Adapters/GraphicsAdapter.cs               | 12 ++++++
+ Source/Broiler.HTML.Image/BCanvas.cs          | 42 +++++++++++--------
+ Source/Broiler.HTML.Image/HtmlContainer.cs    | 10 +++++
+ .../HtmlContainerInt.cs                       | 17 ++++++++
+ 4 files changed, 63 insertions(+), 18 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs b/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
+index e1d770f..0401860 100644
+--- a/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
++++ b/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
+@@ -341,6 +341,18 @@ internal sealed class GraphicsAdapter : RGraphics
+         _activeCompatLayerDepth = Math.Max(0, _activeCompatLayerDepth - 1);
+     }
+ 
++    public override void PushViewportScale(float scale)
++    {
++        // Raster-pipeline only: compose a uniform scale onto BCanvas. Deliberately does NOT touch
++        // _activeCompatLayerDepth — that would flip CanUseRaster off and route every subsequent draw
++        // to the compat backend, bypassing the scale. When there is no raster canvas (the stub compat
++        // backend) this is a no-op; the document-root viewport zoom targets the Broiler raster path.
++        _rasterCanvas?.Save();
++        _rasterCanvas?.Scale(scale);
++    }
++
++    public override void PopViewportScale() => _rasterCanvas?.Restore();
++
+     public override RImage? CreateLinearGradientTile(int width, int height, BColor[] colors, float[] positions, float angle)
+     {
+         if (width <= 0 || height <= 0 || colors == null || colors.Length == 0)
+diff --git a/Source/Broiler.HTML.Image/BCanvas.cs b/Source/Broiler.HTML.Image/BCanvas.cs
+index 4911cec..0f41979 100644
+--- a/Source/Broiler.HTML.Image/BCanvas.cs
++++ b/Source/Broiler.HTML.Image/BCanvas.cs
+@@ -12,8 +12,9 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+     private readonly Stack<LayerState> _layerStack = new();
+     private readonly List<ClipOperation> _clipOperations = [];
+     private PointF _translation;
++    private float _scale = 1f;
+ 
+-    public void Save() => _stateStack.Push(new CanvasState(_translation, _clipOperations.Count));
++    public void Save() => _stateStack.Push(new CanvasState(_translation, _scale, _clipOperations.Count));
+ 
+     public void Restore()
+     {
+@@ -22,6 +23,7 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+ 
+         var state = _stateStack.Pop();
+         _translation = state.Translation;
++        _scale = state.Scale;
+ 
+         while (_clipOperations.Count > state.ClipOperationCount)
+             _clipOperations.RemoveAt(_clipOperations.Count - 1);
+@@ -30,6 +32,10 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+     public void Translate(float dx, float dy) =>
+         _translation = new PointF(_translation.X + dx, _translation.Y + dy);
+ 
++    /// <summary>Composes a uniform scale about the surface origin (document-root viewport zoom):
++    /// draws map point -> point*scale + translation. Uniform-only; byte-identical at scale 1.</summary>
++    public void Scale(float scale) => _scale *= scale;
++
+     public void Clear(BColor color)
+     {
+         CurrentTarget.ErasePixels(color);
+@@ -51,10 +57,10 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         double cornerSwY) =>
+         _clipOperations.Add(ClipOperation.IncludeRounded(
+             Translate(rect),
+-            (float)cornerNw, (float)cornerNwY,
+-            (float)cornerNe, (float)cornerNeY,
+-            (float)cornerSe, (float)cornerSeY,
+-            (float)cornerSw, (float)cornerSwY));
++            (float)cornerNw * _scale, (float)cornerNwY * _scale,
++            (float)cornerNe * _scale, (float)cornerNeY * _scale,
++            (float)cornerSe * _scale, (float)cornerSeY * _scale,
++            (float)cornerSw * _scale, (float)cornerSwY * _scale));
+ 
+     public void PopClip()
+     {
+@@ -86,7 +92,7 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+     {
+         var p1 = Translate(start);
+         var p2 = Translate(end);
+-        float radius = Math.Max(0.5f, strokeWidth / 2f);
++        float radius = Math.Max(0.5f, strokeWidth * _scale / 2f);
+ 
+         int minX = Math.Max(0, (int)Math.Floor(Math.Min(p1.X, p2.X) - radius));
+         int minY = Math.Max(0, (int)Math.Floor(Math.Min(p1.Y, p2.Y) - radius));
+@@ -551,10 +557,10 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+     private BBitmap CurrentTarget => _layerStack.Count > 0 ? _layerStack.Peek().Bitmap : _rootBitmap;
+ 
+     private RectangleF Translate(RectangleF rect) =>
+-        new(rect.X + _translation.X, rect.Y + _translation.Y, rect.Width, rect.Height);
++        new(rect.X * _scale + _translation.X, rect.Y * _scale + _translation.Y, rect.Width * _scale, rect.Height * _scale);
+ 
+     private PointF Translate(PointF point) =>
+-        new(point.X + _translation.X, point.Y + _translation.Y);
++        new(point.X * _scale + _translation.X, point.Y * _scale + _translation.Y);
+ 
+     private bool IsVisible(int x, int y)
+     {
+@@ -716,16 +722,16 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         float cy = rect.Y + (rect.Height / 2f);
+         float sin = (float)Math.Sin(radians);
+         float cos = (float)Math.Cos(radians);
+-        // CSS Images 3 §3.4.2: the gradient line runs through the box centre and
+-        // its length is abs(W·sin A) + abs(H·cos A) — the projection of the box
+-        // onto the gradient direction, so the start/end sit on the perpendiculars
+-        // through the two nearest corners. Using max(W, H) instead over-extends
+-        // the line on non-square boxes (e.g. a wide, short tile), compressing the
+-        // visible colour run to the middle of the gradient.
+-        float halfLen = (Math.Abs(rect.Width * sin) + Math.Abs(rect.Height * cos)) / 2f;
++        // CSS Images 3 §3.4.2: the gradient line runs through the box centre and
++        // its length is abs(W·sin A) + abs(H·cos A) — the projection of the box
++        // onto the gradient direction, so the start/end sit on the perpendiculars
++        // through the two nearest corners. Using max(W, H) instead over-extends
++        // the line on non-square boxes (e.g. a wide, short tile), compressing the
++        // visible colour run to the middle of the gradient.
++        float halfLen = (Math.Abs(rect.Width * sin) + Math.Abs(rect.Height * cos)) / 2f;
+         return (
+-            new PointF(cx - (sin * halfLen), cy + (cos * halfLen)),
+-            new PointF(cx + (sin * halfLen), cy - (cos * halfLen)));
++            new PointF(cx - (sin * halfLen), cy + (cos * halfLen)),
++            new PointF(cx + (sin * halfLen), cy - (cos * halfLen)));
+     }
+ 
+     private static BColor SampleGradientColor(IReadOnlyList<BColor> colors, IReadOnlyList<float> positions, float t)
+@@ -844,7 +850,7 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         return inside;
+     }
+ 
+-    private readonly record struct CanvasState(PointF Translation, int ClipOperationCount);
++    private readonly record struct CanvasState(PointF Translation, float Scale, int ClipOperationCount);
+ 
+     private sealed record LayerState(BBitmap Bitmap, float Opacity, string BlendMode);
+ 
+diff --git a/Source/Broiler.HTML.Image/HtmlContainer.cs b/Source/Broiler.HTML.Image/HtmlContainer.cs
+index f5bc687..a373de8 100644
+--- a/Source/Broiler.HTML.Image/HtmlContainer.cs
++++ b/Source/Broiler.HTML.Image/HtmlContainer.cs
+@@ -88,6 +88,16 @@ public sealed class HtmlContainer : IDisposable
+         set => HtmlContainerInt.ScrollOffset = value;
+     }
+ 
++    /// <summary>
++    /// Uniform document-root viewport zoom (pinch-zoom / <c>html { zoom }</c>) applied at paint;
++    /// default 1. See <see cref="HtmlContainerInt.ViewportZoom"/>.
++    /// </summary>
++    public float ViewportZoom
++    {
++        get => HtmlContainerInt.ViewportZoom;
++        set => HtmlContainerInt.ViewportZoom = value;
++    }
++
+     public SizeF MaxSize
+     {
+         get => HtmlContainerInt.MaxSize;
+diff --git a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+index 7e2de02..85dfa32 100644
+--- a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
++++ b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+@@ -89,6 +89,14 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
+ 
+     public PointF ScrollOffset { get; set; }
+ 
++    /// <summary>
++    /// Uniform document-root viewport zoom (pinch-zoom / <c>html { zoom }</c>) applied at paint. When
++    /// not 1, the paint scales page content by this factor about the surface origin, so a pinch-zoomed
++    /// page renders magnified natively — instead of the bridge baking scaled CSS lengths into the DOM
++    /// (Phase 5 LayoutSnapshot endgame, blocker (b) render half). Default 1 (no scale).
++    /// </summary>
++    public float ViewportZoom { get; set; } = 1f;
++
+     public PointF Location { get; set; }
+ 
+     public SizeF MaxSize { get; set; }
+@@ -886,10 +894,19 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
+ 
+         g.PushClip(viewport);
+ 
++        // Document-root viewport zoom (blocker (b) render half): scale page content AFTER the
++        // device-space viewport clip, so the content magnifies while the clip stays in device pixels.
++        bool zoomed = MathF.Abs(ViewportZoom - 1f) > 0.0001f && ViewportZoom > 0f;
++        if (zoomed)
++            g.PushViewportScale(ViewportZoom);
++
+         var displayList = CreateDisplayList(viewport);
+         if (displayList.Items.Count > 0)
+             RGraphicsRasterBackend.Instance.Render(displayList, g);
+ 
++        if (zoomed)
++            g.PopViewportScale();
++
+         g.PopClip();
+     }
+ 
+-- 
+2.43.0
+

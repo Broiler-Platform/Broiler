@@ -205,25 +205,41 @@ exists, but the raster surface itself could not scale.
 
 ### 0008-graphics-bcanvas-uniform-scale.patch → `Broiler.Graphics`
 
-Gives `BCanvas` a uniform `Scale(float)` composed with its existing `_translation`: every draw maps
-`point → point*scale + translation` through the two central `Translate(rect)`/`Translate(point)` helpers,
-with scalar device dimensions (line stroke width, rounded-clip corner radii) scaled too; saved/restored by
-`Save`/`Restore`. Uniform-only (not a full affine — exact for a viewport zoom). At scale `1` (default)
-every path is byte-identical to the prior translate-only behaviour. Includes a `Broiler.Graphics.Tests`
-case (`BCanvas scales draws about the origin`): a 2× scale maps layout rect `(1,1,2,2)` to device
-`(2,2,4,4)`, and `Restore` returns the scale to 1. All existing `BCanvas` tests pass unchanged. This is
-the foundational rasterizer capability the render half was missing.
+Gives `Broiler.Graphics.BCanvas` a uniform `Scale(float)` composed with its existing `_translation`: every
+draw maps `point → point*scale + translation` through the two central `Translate(rect)`/`Translate(point)`
+helpers, with scalar device dimensions (line stroke width, rounded-clip corner radii) scaled too;
+saved/restored by `Save`/`Restore`. Uniform-only (not a full affine — exact for a viewport zoom). At scale
+`1` (default) every path is byte-identical to the prior translate-only behaviour. Also adds virtual
+`RGraphics.PushViewportScale(float)`/`PopViewportScale()` (default no-op) so a backend can apply a
+document-root viewport zoom after the device-space viewport clip. Includes a `Broiler.Graphics.Tests` case
+(`BCanvas scales draws about the origin`). All existing `BCanvas` tests pass unchanged.
 
-**Remaining render-half wiring (not yet authored — the mechanical completion after 0008):**
-1. A scale hook from paint to `BCanvas`: an `OpenGraphics(clip, translation, scale)` overload (mirroring
-   the existing translation overload at `BBitmap.cs:204`) calling `rasterCanvas.Scale`, or route
-   `GraphicsAdapter.SaveTransformLayer` (the matrix path) to `BCanvas.Scale` for a pure-scale matrix and
-   flip `TransformItem` to raster-compatible in `RGraphicsRasterBackend.IsRasterCompatibleItem`.
-2. A document-root viewport-zoom applied in `HtmlContainerInt.CreateDisplayList` (the single wrap point,
-   alongside the existing scroll composition) or at `HtmlContainer.PerformPaint`, driven by a
-   `ViewportZoom` the caller sets.
-3. The zoom source: thread the bridge's `_visualViewportScale` to the render entry (`HtmlRender` /
-   `WptTestRunner.RenderHtmlFileBitmap`), and — the cutover — have that path **stop** relying on
-   `DomBridge.SerializeToHtml`'s `zoom` bake for pinch-zoom and instead paint the unscaled document with
-   the viewport zoom, so `ApplyVisualViewportSerializationState` can retire. Needs pixel validation
-   (there is no pinch-zoom reftest corpus today).
+> Note: there are **two** `BCanvas` classes — `Broiler.Graphics.BCanvas` (this patch; used by the
+> standalone/WebAssembly graphics paths and `Broiler.Graphics.Tests`) and `Broiler.HTML.Image.BCanvas`
+> (the one the HTML render path actually uses, patched in **0009**). The `RGraphics` hook here is what
+> 0009's `GraphicsAdapter` override targets.
+
+### 0009-html-viewport-zoom-paint.patch → `Broiler.HTML` (depends on 0008's `RGraphics` hook)
+
+Wires the viewport zoom through the HTML render path:
+- `Broiler.HTML.Image.BCanvas` gets the same uniform `Scale` as 0008 (it is a separate copy from
+  `Broiler.Graphics.BCanvas` and is the rasterizer `GraphicsAdapter._rasterCanvas` resolves to).
+- `GraphicsAdapter` overrides `PushViewportScale`/`PopViewportScale` to compose the scale onto the raster
+  `BCanvas` — **raster-only**: it deliberately does NOT bump `_activeCompatLayerDepth` (that flips
+  `CanUseRaster` off and would route every draw to the compat backend, bypassing the scale).
+- `HtmlContainerInt.ViewportZoom` (default 1) is applied in `PerformPaint` **after** the device-space
+  viewport clip, so page content magnifies while the clip stays in device pixels; `HtmlContainer` forwards it.
+
+Validated end-to-end locally (0008 + 0009 applied): a pixel test renders a green `left:10 top:10 20×20` box
+at `ViewportZoom` 1 vs 2 — device pixel (45,45) is background at zoom 1 and inside the magnified green box at
+zoom 2, and the box origin moves from 10 to 20 (scaled about the origin). **Zero regression**: the
+graphics/render suites fail the identical 17 pre-existing Skia/environmental tests with and without the
+patches (a Skia backend is absent in this container). The pixel test is not committed (it needs the
+patches, so it cannot pass at the pinned SHA on CI).
+
+**Remaining for full bake retirement — the cutover (not yet authored):** thread the bridge's
+`_visualViewportScale` to the render entry (`HtmlRender` / `WptTestRunner.RenderHtmlFileBitmap`) as
+`HtmlContainer.ViewportZoom`, and have that path **stop** relying on `DomBridge.SerializeToHtml`'s `zoom`
+bake for pinch-zoom — painting the unscaled document with the viewport zoom instead — so
+`ApplyVisualViewportSerializationState` can retire. Needs pixel validation (there is no pinch-zoom reftest
+corpus today). General mid-tree `zoom: N` (reflow) remains the separate (b2) engine-zoom feature.

@@ -3589,6 +3589,24 @@ the WPT/paint path stops relying on the serialization `zoom` bake — at which p
 `ApplyVisualViewportSerializationState` can retire (needs pixel validation; no pinch-zoom reftest corpus
 today). (b2) general mid-tree `zoom: N` (reflow) remains the separate engine-zoom feature.
 
+**Landed (2026-07-17) — (b) render/paint half, mechanical wiring (patch 0009).** The 0008 rasterizer
+primitive is now wired end-to-end through the HTML render path. Two subtleties surfaced. First, the
+render path does **not** use `Broiler.Graphics.BCanvas` (the standalone/WebAssembly/test copy patch 0008
+scales) — `GraphicsAdapter._rasterCanvas` resolves to a **separate** `Broiler.HTML.Image.BCanvas`, so patch
+0009 replicates the same `Scale(float)` primitive there. Second, `GraphicsAdapter.PushViewportScale`
+composes the scale onto that raster surface **raster-only** — it must not touch `_activeCompatLayerDepth`,
+or `CanUseRaster` flips off and draws bypass `BCanvas` entirely (paint then ignores the zoom). Patch 0009
+adds: `Broiler.HTML.Image.BCanvas.Scale`; `GraphicsAdapter.Push/PopViewportScale` (Save+Scale / Restore,
+raster-only) overriding the no-op `RGraphics` hooks from 0008; and `HtmlContainerInt.ViewportZoom`
+(default 1, surfaced on `HtmlContainer`) applied in `PerformPaint` *after* the device-space viewport clip
+(`PushClip(viewport)` → `PushViewportScale` → paint → `PopViewportScale` → `PopClip`), guarded so
+`ViewportZoom == 1` is a no-op. Validated end-to-end locally (0008+0009 applied): a pixel test painted a
+green box at `ViewportZoom = 2` and confirmed it magnified about the origin; the graphics/render suites
+fail the identical 17 pre-existing Skia/environmental tests with and without the patches (zero regression).
+Still remaining (the non-mechanical cutover): thread the bridge's `_visualViewportScale` into the render
+entry (`HtmlContainerInt.ViewportZoom`) and stop the serialization `zoom` bake for pinch-zoom, retiring
+`ApplyVisualViewportSerializationState` — the one step that needs pixel validation with no reftest corpus.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 
