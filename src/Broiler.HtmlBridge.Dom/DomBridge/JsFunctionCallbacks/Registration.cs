@@ -966,32 +966,6 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationSendBeacon124Core(JSObject? window, in Arguments a)
-    {
-        if (a.Length == 0 || a[0].IsNullOrUndefined)
-            return JSBoolean.False;
-        try
-        {
-            // Per sendBeacon semantics, failure to queue because no live fetch entry
-            // point is available should return false instead of throwing.
-            if (window[(KeyString)"fetch"] is not JSFunction currentFetch)
-                return JSBoolean.False;
-            var options = new JSObject();
-            options[(KeyString)"method"] = new JSString("POST");
-            options[(KeyString)"keepalive"] = JSBoolean.True;
-            if (a.Length > 1 && !a[1].IsNullOrUndefined)
-                options[(KeyString)"body"] = new JSString(a[1].ToString());
-            currentFetch.InvokeFunction(new Arguments(currentFetch, a[0], options));
-            return JSBoolean.True;
-        }
-        catch (Exception ex)
-        {
-            RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.navigator.sendBeacon", $"sendBeacon error: {ex.Message}", ex);
-            return JSBoolean.False;
-        }
-    }
-
-
     private JSValue JsRegistrationScroll133Core(in Arguments a)
     {
         var (left, top, behavior) = GetScrollArguments(a);

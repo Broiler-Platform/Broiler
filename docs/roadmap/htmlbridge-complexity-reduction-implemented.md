@@ -787,7 +787,19 @@ Tests: `Broiler.Cli.Tests/CryptoBindingModuleTests.cs` (co-location / callback-m
 Regression check: `Broiler.HtmlBridge.Dom` builds clean; the Console/Crypto module suites and the line-limit guard
 pass; no production reference to the removed callback remains.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.20 named-accessor / relocated-infra /
+Status: **P3.21 completed** 2026-07-17 (same branch) — **`navigator.sendBeacon`**, the third slice off the
+registration grab-bag. `BeaconBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns the beacon send —
+delegating a keep-alive `POST` to the window's own `fetch` and returning `false` (never throwing) when it cannot
+queue, per the Beacon spec (was the bridge's `JsRegistrationSendBeacon124Core`). It reads only the supplied
+`window` and routes errors to `RenderLogger`, touching **no bridge instance state**, so it is a pure static class
+with **no host contract**. `Registration/Window.cs` now registers `Dom.Features.BeaconBinding.Send(window, in a)`;
+the callback is gone from `JsFunctionCallbacks/Registration.cs` (1122 → 1096 lines). Behaviour-preserving; no
+public-API change (module internal). Tests: `Broiler.Cli.Tests/BeaconBindingModuleTests.cs` (co-location /
+callback-moved-off-bridge guards + a characterization that stubs `window.fetch` to observe the keep-alive-POST
+delegation deterministically without network, plus the no-data → `false` contract). Regression check:
+`Broiler.HtmlBridge.Dom` builds clean; the module suites and the line-limit guard pass.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.21 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

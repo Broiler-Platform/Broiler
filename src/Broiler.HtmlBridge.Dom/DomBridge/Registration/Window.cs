@@ -133,7 +133,7 @@ public sealed partial class DomBridge
         navigatorObj.FastAddValue((KeyString)"vendor", new JSString(""), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // sendBeacon(url, data) — queues a fire-and-forget POST via fetch semantics
-        navigatorObj.FastAddValue((KeyString)"sendBeacon", new JSFunction((in a) => JsRegistrationSendBeacon124Core(window, in a), "sendBeacon", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        navigatorObj.FastAddValue((KeyString)"sendBeacon", new JSFunction((in a) => Dom.Features.BeaconBinding.Send(window, in a), "sendBeacon", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"navigator", navigatorObj, JSPropertyAttributes.EnumerableConfigurableValue);
 
         context["navigator"] = navigatorObj;
