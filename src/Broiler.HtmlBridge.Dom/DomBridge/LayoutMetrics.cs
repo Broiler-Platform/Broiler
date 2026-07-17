@@ -2337,7 +2337,7 @@ public sealed partial class DomBridge
     }
 
     [GeneratedRegex(@"scale\(\s*(?<value>[-+]?[0-9]*\.?[0-9]+)\s*\)", RegexOptions.IgnoreCase, "de-DE")]
-    private static partial Regex GetTransformScaleRegex();
+    private static partial System.Text.RegularExpressions.Regex GetTransformScaleRegex();
     [GeneratedRegex(@"[Mm]\s*(?<x>[-+]?[0-9]*\.?[0-9]+)(?:[\s,]+(?<y>[-+]?[0-9]*\.?[0-9]+))", RegexOptions.CultureInvariant)]
-    private static partial Regex TryResolveSvgTextPathStartRegex();
+    private static partial System.Text.RegularExpressions.Regex TryResolveSvgTextPathStartRegex();
 }

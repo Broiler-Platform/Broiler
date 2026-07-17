@@ -162,7 +162,7 @@ public sealed partial class DomBridge
         {
             var decoded = Uri.UnescapeDataString(payload);
             // Strip whitespace (RFC 2045 allows folding)
-            decoded = Regex.Replace(decoded, @"\s", string.Empty);
+            decoded = System.Text.RegularExpressions.Regex.Replace(decoded, @"\s", string.Empty);
             try
             {
                 var bytes = Convert.FromBase64String(decoded);
@@ -634,14 +634,14 @@ public sealed partial class DomBridge
     /// such as U+212A (Kelvin sign).
     /// Colons are NOT allowed (use <see cref="ValidXmlQualifiedNamePattern"/> for qualified names).
     /// </summary>
-    private static readonly Regex ValidXmlNamePattern = ValidXmlNamePatternRegex();
+    private static readonly System.Text.RegularExpressions.Regex ValidXmlNamePattern = ValidXmlNamePatternRegex();
 
     /// <summary>
     /// Regex for valid XML QName: either a simple name or prefix:localName
     /// where both prefix and localName are valid XML names (no colons).
     /// Uses Unicode categories per XML 1.0 §2.3.
     /// </summary>
-    private static readonly Regex ValidXmlQualifiedNamePattern = ValidXmlQualifiedNamePatternRegex();
+    private static readonly System.Text.RegularExpressions.Regex ValidXmlQualifiedNamePattern = ValidXmlQualifiedNamePatternRegex();
 
     /// <summary>
     /// Throws a proper <c>DOMException</c> with the given name/code via the JS-registered constructor.
@@ -888,7 +888,7 @@ public sealed partial class DomBridge
     }
 
     [GeneratedRegex(@"^[\p{L}_][\p{L}\p{N}_.\-]*$", RegexOptions.Compiled)]
-    private static partial Regex ValidXmlNamePatternRegex();
+    private static partial System.Text.RegularExpressions.Regex ValidXmlNamePatternRegex();
     [GeneratedRegex(@"^[\p{L}_][\p{L}\p{N}_.\-]*(?::[\p{L}_][\p{L}\p{N}_.\-]*)?$", RegexOptions.Compiled)]
-    private static partial Regex ValidXmlQualifiedNamePatternRegex();
+    private static partial System.Text.RegularExpressions.Regex ValidXmlQualifiedNamePatternRegex();
 }

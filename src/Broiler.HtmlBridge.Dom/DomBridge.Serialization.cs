@@ -941,11 +941,11 @@ public sealed partial class DomBridge
     }
 
     [GeneratedRegex(@"-?\d*\.?\d+(?:[eE][+-]?\d+)?")]
-    private static partial Regex ScaleSvgPointRegex();
+    private static partial System.Text.RegularExpressions.Regex ScaleSvgPointRegex();
 
     [GeneratedRegex(@"-?\d*\.?\d+(?:[eE][+-]?\d+)?")]
-    private static partial Regex ScaleSvgPathRegex();
+    private static partial System.Text.RegularExpressions.Regex ScaleSvgPathRegex();
 
     [GeneratedRegex(@"(?<![\w.-])(-?\d*\.?\d+)px(?:\s*/|(?=\s|$))", RegexOptions.IgnoreCase)]
-    private static partial Regex FontShortHandRegex();
+    private static partial System.Text.RegularExpressions.Regex FontShortHandRegex();
 }

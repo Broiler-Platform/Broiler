@@ -420,9 +420,9 @@ public sealed partial class DomBridge
         return result;
     }
 
-    private static readonly Regex StepsPattern = StepsPatternRegex();
+    private static readonly System.Text.RegularExpressions.Regex StepsPattern = StepsPatternRegex();
 
-    private static readonly Regex CubicBezierPattern = CubicBezierPatternRegex();
+    private static readonly System.Text.RegularExpressions.Regex CubicBezierPattern = CubicBezierPatternRegex();
 
     private static double ApplyTimingFunction(double progress, string timingFunction)
     {
@@ -613,9 +613,9 @@ public sealed partial class DomBridge
     // Value interpolation
     // -----------------------------------------------------------------
 
-    private static readonly Regex RgbPattern = RgbPatternRegex();
+    private static readonly System.Text.RegularExpressions.Regex RgbPattern = RgbPatternRegex();
 
-    private static readonly Regex RgbaPattern = RgbaPatternRegex();
+    private static readonly System.Text.RegularExpressions.Regex RgbaPattern = RgbaPatternRegex();
 
     /// <summary>
     /// Attempts to interpolate between two CSS values at the given progress.
@@ -750,11 +750,11 @@ public sealed partial class DomBridge
     }
 
     [GeneratedRegex(@"steps\(\s*(\d+)\s*(?:,\s*(start|end|jump-start|jump-end|jump-none|jump-both))?\s*\)", RegexOptions.Compiled)]
-    private static partial Regex StepsPatternRegex();
+    private static partial System.Text.RegularExpressions.Regex StepsPatternRegex();
     [GeneratedRegex(@"cubic-bezier\(\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*\)", RegexOptions.Compiled)]
-    private static partial Regex CubicBezierPatternRegex();
+    private static partial System.Text.RegularExpressions.Regex CubicBezierPatternRegex();
     [GeneratedRegex(@"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex RgbPatternRegex();
+    private static partial System.Text.RegularExpressions.Regex RgbPatternRegex();
     [GeneratedRegex(@"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex RgbaPatternRegex();
+    private static partial System.Text.RegularExpressions.Regex RgbaPatternRegex();
 }

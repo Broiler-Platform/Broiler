@@ -1033,7 +1033,7 @@ internal static partial class Program
         public required int Milestone { get; init; }
         public required string Channel { get; init; }
         public required string Platform { get; init; }
-        public required DateTime GeneratedAtUtc { get; init; }
+        public required System.DateTime GeneratedAtUtc { get; init; }
         public required ChromiumReleaseInfo Release { get; init; }
         public required ChromiumSourceInfo Chromium { get; init; }
         public required ChromiumPinnedDependency V8 { get; init; }
@@ -1047,7 +1047,7 @@ internal static partial class Program
     {
         public required string Version { get; init; }
         public string? PreviousVersion { get; init; }
-        public required DateTime PublishedAtUtc { get; init; }
+        public required System.DateTime PublishedAtUtc { get; init; }
         public required int ChromiumMainBranchPosition { get; init; }
     }
 
@@ -1095,7 +1095,7 @@ internal static partial class Program
         public string? Name { get; init; }
         public required string Repository { get; init; }
         public required string Revision { get; init; }
-        public required DateTime GeneratedAtUtc { get; init; }
+        public required System.DateTime GeneratedAtUtc { get; init; }
         public required int Total { get; init; }
         public required int Passed { get; init; }
         public required int Failed { get; init; }
@@ -1120,7 +1120,7 @@ internal static partial class Program
 
     internal sealed class BenchmarkReport
     {
-        public required DateTime GeneratedAtUtc { get; init; }
+        public required System.DateTime GeneratedAtUtc { get; init; }
         public required List<BenchmarkMetric> Results { get; init; }
     }
 

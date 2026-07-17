@@ -870,7 +870,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     //  HTML parsing helpers
     // ------------------------------------------------------------------
 
-    private static readonly Regex DocTypePattern = DocTypePatternRegex();
+    private static readonly System.Text.RegularExpressions.Regex DocTypePattern = DocTypePatternRegex();
 
     private void ParseHtml(string html)
     {
@@ -1009,5 +1009,5 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         CssDeclarationValidator.IsAcceptableDeclarationValue(property, CssPriority.Strip(value));
 
     [GeneratedRegex(@"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex DocTypePatternRegex();
+    private static partial System.Text.RegularExpressions.Regex DocTypePatternRegex();
 }

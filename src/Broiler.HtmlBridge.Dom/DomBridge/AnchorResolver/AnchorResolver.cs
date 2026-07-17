@@ -305,5 +305,5 @@ public sealed partial class DomBridge
     }
 
     [GeneratedRegex(@"url\(\s*(['""]?)(?<u>[^'""\)]+)\1\s*\)", RegexOptions.IgnoreCase)]
-    private static partial Regex ExtractContentImageUrlRegex();
+    private static partial System.Text.RegularExpressions.Regex ExtractContentImageUrlRegex();
 }

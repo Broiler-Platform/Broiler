@@ -14,7 +14,7 @@ internal static class Diagnostics
     {
         try
         {
-            File.AppendAllText(LogPath, $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
+            File.AppendAllText(LogPath, $"{System.DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
         }
         catch
         {
