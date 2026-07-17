@@ -20,7 +20,7 @@ own status entries for the specifics; the summary below is the quick view.
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | Bulk delivered | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); de-globalizing process-static `ElementRuntimeState`/`PositionAreaResolutions` tables deferred (in scope). |
-| 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, SVG, Canvas modules still to come; DomBridge facade line-count target (500–800) unmet, tracked as ratcheted debt. |
+| 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, SVG, Canvas modules still to come; `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17) — three larger files (`LayoutMetrics.cs`, `JsObjects.cs`, `SubDocuments.cs`) remain as ratcheted debt. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
 
@@ -1288,9 +1288,9 @@ Exit criteria:
 - No production source file exceeds 750 lines without a documented exemption.
   **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
   a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
-  module (the P3.x pattern) rather than another giant partial. The remaining four
-  over-limit files (`LayoutMetrics.cs` 2343, `JsObjects.cs` 1286, `SubDocuments.cs` 1152,
-  `DomBridge.cs` 1013) are listed as
+  module (the P3.x pattern) rather than another giant partial. The remaining three
+  over-limit files (`LayoutMetrics.cs` 2343, `JsObjects.cs` 1286, `SubDocuments.cs` 1152)
+  are listed as
   documented debt to shrink — the guard surfaces one to de-list once it drops under the limit,
   so the ratchet keeps closing. Three files are **de-listed** as of 2026-07-17:
   `AnimationResolver.cs` (was 760; see ratchet maintenance below),
@@ -1357,6 +1357,23 @@ Exit criteria:
   exemptions); the SVG-serialization / zoom coverage (`SvgDomAndCrossDocTests`,
   `SvgDomDynamicContentTests`, `SharedGeometryZoomSizeTests`, `Acid3SvgAndParsingRegressionTests`,
   81 tests) stays green. Debt list: seven → six files.
+
+  **De-list 2026-07-17.** A fourth exempt-file shrink — and the first to touch the primary facade
+  `DomBridge.cs` (1013) itself, moving it toward the exit-criterion 500–800-line facade target. Two
+  cohesive behaviour clusters (neither composition/compat facade material) were split into sibling
+  partials: the window `load` lifecycle and window-target event dispatch (`FireWindowLoadEvent`,
+  the two `DispatchWindowEvent` overloads, `BuildWindowFramesArray` / `CollectWindowFrames`) into
+  `DomBridge.WindowLoad.cs` (209 lines), and initial HTML/doctype ingestion plus inline-style
+  parsing (`ParseHtml`, `ParseStyle`, `IsAcceptableInlineValue`, the `DocTypePattern` field and its
+  `[GeneratedRegex]`) into `DomBridge.HtmlParsing.cs` (159 lines). The now-unused
+  `using System.Text.RegularExpressions` was dropped from the facade. Pure partial-class relocation —
+  no signature, accessibility, or logic change, so behaviour-identical by construction; `DomBridge.cs`
+  drops 1013 → 682 (now inside the 500–800 facade band) and its `OversizedFileExemptions` entry is
+  removed. `Broiler.HtmlBridge.Dom` builds clean and the guard is green (14/14, 0 offenders / 0 stale
+  exemptions); the load-event / parsing / inline-style coverage (`Acid3RegressionTests`,
+  `Acid3SvgAndParsingRegressionTests`, `Acid3HtmlElementRegressionTests`, `DoctypeSentinelMigrationTests`,
+  `InlineStyleDropDiagnosticsTests`, `InlineStyleWriteThroughTests`, 90 tests with the guard) stays
+  green. Debt list: six → five files.
 
 ### Phase 4 - eliminate parallel DOM state
 

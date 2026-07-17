@@ -212,7 +212,12 @@ public class HtmlBridgeArchitectureGuardTests
         // (P3.19–P3.27: console, crypto, sendBeacon, matchMedia, timers, write/writeln, node
         // factories, element queries, live collections, node mutation) dropped it from 1184 to 684.
         "src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs",
-        "src/Broiler.HtmlBridge.Dom/DomBridge.cs",
+        // DomBridge.cs de-listed 2026-07-17: two cohesive behaviour clusters were split out of the
+        // facade into sibling partials — the window-load lifecycle / window-event dispatch
+        // (FireWindowLoadEvent, DispatchWindowEvent, BuildWindowFramesArray/CollectWindowFrames) into
+        // DomBridge.WindowLoad.cs, and initial HTML/doctype/inline-style parsing (ParseHtml,
+        // ParseStyle, IsAcceptableInlineValue, DocTypePattern) into DomBridge.HtmlParsing.cs —
+        // dropping the facade from 1013 to 682 lines (within the 500-800 facade target).
         // DomBridge.Serialization.cs de-listed 2026-07-17: its cohesive SVG zoom-serialization
         // attribute-scaling cluster (ApplyZoomSerializationSvgAttributes and the ScaleSvg* / SVG
         // font-relative-unit resolution helpers, the SVG unit sets, and the three [GeneratedRegex]
