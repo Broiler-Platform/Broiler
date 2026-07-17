@@ -86,18 +86,12 @@ public sealed partial class DomBridge
         // document.lastChild (getter — returns last child of document, typically documentElement)
         document.FastAddProperty((KeyString)"lastChild", new JSFunction((in _) => _document.ChildNodes.Count > 0 ? ToJSObject(ChildAt(_document, ^1)) : JSNull.Value, "get lastChild"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // document.childNodes (getter — returns children of document node: [DOCTYPE, documentElement])
-        document.FastAddProperty((KeyString)"childNodes", new JSFunction(JsRegistrationGetChildNodes046Core, "get childNodes"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.removeChild(child)
-        var docNodeForMutation = _document;
-        document.FastAddValue((KeyString)"removeChild", new JSFunction((in a) => JsRegistrationRemoveChild047Core(docNodeForMutation, in a), "removeChild", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.appendChild(child)
-        document.FastAddValue((KeyString)"appendChild", new JSFunction((in a) => JsRegistrationAppendChild048Core(docNodeForMutation, in a), "appendChild", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.insertBefore(newChild, refChild)
-        document.FastAddValue((KeyString)"insertBefore", new JSFunction((in a) => JsRegistrationInsertBefore049Core(docNodeForMutation, in a), "insertBefore", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document-node mutation — childNodes/removeChild/appendChild/insertBefore, co-located in the
+        // NodeMutationBinding feature module (Phase 3).
+        document.FastAddProperty((KeyString)"childNodes", new JSFunction((in a) => Dom.Features.NodeMutationBinding.GetChildNodes(this, in a), "get childNodes"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddValue((KeyString)"removeChild", new JSFunction((in a) => Dom.Features.NodeMutationBinding.RemoveChild(this, in a), "removeChild", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"appendChild", new JSFunction((in a) => Dom.Features.NodeMutationBinding.AppendChild(this, in a), "appendChild", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"insertBefore", new JSFunction((in a) => Dom.Features.NodeMutationBinding.InsertBefore(this, in a), "insertBefore", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.forms — collection of all <form> elements with named access
         document.FastAddProperty((KeyString)"forms", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetForms(this, in a), "get forms"), null, JSPropertyAttributes.EnumerableConfigurableProperty);

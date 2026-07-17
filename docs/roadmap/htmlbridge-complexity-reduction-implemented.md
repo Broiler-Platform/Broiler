@@ -905,7 +905,37 @@ four-callbacks-moved-off-bridge guards + a collection characterization through t
 access, image count, href-only link count, stylesheet count). Regression check: the DocumentCollection, StyleSheet,
 Form, DOM-interface and architecture-guard suites pass (75); `Broiler.HtmlBridge.Dom` builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.27 named-accessor / relocated-infra /
+Status: **P3.28 completed** 2026-07-17 (same branch) — the **`document`-node mutation methods**, the tenth
+slice off the registration grab-bag, **which dropped it under the 750-line guard and de-listed it.**
+`NodeMutationBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates `document.childNodes` (getter),
+`document.removeChild`, `document.appendChild`, `document.insertBefore` (was `JsRegistrationGetChildNodes046Core`..
+`InsertBefore049Core`). Each resolves its argument node, performs the structural move on the document node via the
+bridge's neutral `internal static` tree helpers (`ChildIndexOf`/`SetParent`/`InsertChildAt`/`ParentEl`/
+`RemoveNthChild`/`ChildElements`), and fires the mutation-observer / node-iterator notifications. The document node,
+wrapper factory, reverse lookup (`FindDomNodeByJSObject`) and the three notifications are reached through the
+six-member `INodeMutationHost` contract (`DomBridge.NodeMutationHost.cs`, explicit interface members); the
+registration's `docNodeForMutation` local is gone (the module sources the document node from the host).
+`Registration/Document.cs` now registers `Dom.Features.NodeMutationBinding.<Op>(this, in a)`; the callbacks are gone
+from `JsFunctionCallbacks/Registration.cs` (**791 → 684 lines — under the limit**). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/NodeMutationBindingModuleTests.cs`
+(co-location / host-contract / four-callbacks-moved-off-bridge guards + a document-node mutation characterization —
+detach and re-attach the documentElement via `removeChild`/`appendChild`/`insertBefore`, `childNodes` count
+`1→0→1`, subtree survives — through the bridge). **Grab-bag de-listed:** `JsFunctionCallbacks/Registration.cs` is
+removed from the guard's `OversizedFileExemptions` (debt list eight → seven). Regression check: the binding-module,
+mutation-observer, HtmlDom and architecture-guard suites pass (179); `Broiler.HtmlBridge.Dom` builds clean.
+
+**Grab-bag decomposition summary (P3.19–P3.28).** `JsFunctionCallbacks/Registration.cs` went **1184 → 684 lines**
+as ten features were peeled into co-located modules: `ConsoleBinding` (P3.19), `CryptoBinding` (P3.20),
+`BeaconBinding` (P3.21), `MatchMediaBinding` (P3.22), `TimerBinding` (P3.23), `DocumentWriteBinding` (P3.24),
+`DocumentFactoryBinding` (P3.25), `DocumentQueryBinding` (P3.26), `DocumentCollectionBinding` (P3.27),
+`NodeMutationBinding` (P3.28) — spanning stateless (no-host) modules, `BrowserEventLoop`-parameter modules, and
+narrow-host-contract modules. What remains in the file is the residual document/window surface (structural
+accessors `body`/`head`/`title`, hit-testing `elementFromPoint`/`elementsFromPoint`, the document-level factories
+`createDocument`/`createHTMLDocument`/`createDocumentType` + `createEvent`, the document/window event-listener and
+scroll wiring, `getComputedStyle`, cookies, and the performance/scroll/scale helpers), now comfortably under the
+guard.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.28 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
@@ -936,13 +966,14 @@ Exit criteria:
 - No production source file exceeds 750 lines without a documented exemption.
   **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
   a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
-  module (the P3.x pattern) rather than another giant partial. The remaining eight
+  module (the P3.x pattern) rather than another giant partial. The remaining seven
   over-limit files (`LayoutMetrics.cs` 2332, `JsFunctionCallbacks/JsObjects.cs` 1599,
-  `JsObjects.cs` 1286, `JsFunctionCallbacks/Registration.cs` 1144 — was 1184 before P3.19,
-  `SubDocuments.cs` 1152, `DomBridge.cs` 1013, `DomBridge.Serialization.cs` 951,
-  `Utilities.cs` 894) are listed as documented debt to shrink — the guard surfaces one to
-  de-list once it drops under the limit, so the ratchet keeps closing. `AnimationResolver.cs`
-  (was 760) is **de-listed** as of 2026-07-17 (see ratchet maintenance below).
+  `JsObjects.cs` 1286, `SubDocuments.cs` 1152, `DomBridge.cs` 1013,
+  `DomBridge.Serialization.cs` 951, `Utilities.cs` 894) are listed as documented debt to
+  shrink — the guard surfaces one to de-list once it drops under the limit, so the ratchet
+  keeps closing. Two files are **de-listed** as of 2026-07-17: `AnimationResolver.cs` (was
+  760; see ratchet maintenance below) and `JsFunctionCallbacks/Registration.cs` (was 1184 →
+  684 after the P3.19–P3.28 grab-bag decomposition — nine feature modules peeled out).
 
   **Ratchet maintenance 2026-07-17.** The guard caught its first *new* over-limit file:
   `AnchorResolver/AnchorFunctions.cs` had grown 748 → 767 lines as the Phase 5 native

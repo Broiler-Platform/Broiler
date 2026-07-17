@@ -205,7 +205,9 @@ public class HtmlBridgeArchitectureGuardTests
         "src/Broiler.HtmlBridge.Dom/DomBridge/LayoutMetrics.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge/JsFunctionCallbacks/JsObjects.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge/JsObjects.cs",
-        "src/Broiler.HtmlBridge.Dom/DomBridge/JsFunctionCallbacks/Registration.cs",
+        // JsFunctionCallbacks/Registration.cs de-listed 2026-07-17: nine feature modules
+        // (P3.19–P3.27: console, crypto, sendBeacon, matchMedia, timers, write/writeln, node
+        // factories, element queries, live collections, node mutation) dropped it from 1184 to 684.
         "src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.cs",
