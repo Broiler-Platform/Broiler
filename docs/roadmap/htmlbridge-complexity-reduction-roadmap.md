@@ -3568,10 +3568,26 @@ addressed** by `patches/0007-html-visual-viewport-snapshot-cache-key.patch`: `He
 adds the `VisualViewportScale` channel value to its `(document, version, viewport, baseUrl)` key, so a
 `visualViewport.scale` change (not a DOM mutation, so it doesn't bump `DomDocument.Version`) re-lays-out
 instead of serving a stale snapshot. Validated end-to-end locally (0005+0006+0007, flag on): reading
-`getBoundingClientRect().width` = 100, then `visualViewport.scale = 2`, then re-reading = 200. **Remaining
-before full retirement:** (ii) the **render/paint half** (magnifying a pinch-zoomed page's paint) is still
-the WPT-runner `zoom` bake's job — the read-model cutover leaves that bake in place, so retiring it fully
-still needs the submodule paint transform noted above. (b2) general mid-tree `zoom: N` remains separate.
+`getBoundingClientRect().width` = 100, then `visualViewport.scale = 2`, then re-reading = 200.
+
+**Landed (2026-07-16) — (b) render/paint half, foundational rasterizer capability (patch 0008).** The
+render side (magnifying a pinch-zoomed page's *paint*) was blocked because the software rasterizer
+`BCanvas` was **translate-only** — a document-root viewport zoom had no way to scale painted pixels (the
+WPT path magnifies only because `ApplyZoomSerializationStyles` bakes scaled lengths into the serialized
+HTML it re-parses and paints 1:1). The paint pipeline's transform plumbing (`TransformItem` IR,
+`RGraphics.SaveTransformLayer`, the single `PaintWalker.Paint` / `CreateDisplayList` wrap point) already
+existed; the missing piece was scale on the raster surface itself.
+`patches/0008-graphics-bcanvas-uniform-scale.patch` (`Broiler.Graphics` submodule) adds `BCanvas.Scale(float)`
+— a uniform scale composed with the existing `_translation` through the two central `Translate` helpers,
+plus scalar device dimensions (stroke width, corner radii); `Save`/`Restore`-scoped; byte-identical at
+scale 1. Validated by a `Broiler.Graphics.Tests` case (a 2× scale maps layout `(1,1,2,2)` → device
+`(2,2,4,4)`; all existing `BCanvas` tests pass unchanged). **Remaining (mechanical) render-half wiring**
+(see `patches/README.md`): a paint→`BCanvas.Scale` hook (an `OpenGraphics(clip, translation, scale)`
+overload, or routing the pure-scale `SaveTransformLayer` matrix to it), a document-root viewport-zoom in
+`CreateDisplayList`/`PerformPaint`, and threading the bridge's `_visualViewportScale` to the render entry so
+the WPT/paint path stops relying on the serialization `zoom` bake — at which point
+`ApplyVisualViewportSerializationState` can retire (needs pixel validation; no pinch-zoom reftest corpus
+today). (b2) general mid-tree `zoom: N` (reflow) remains the separate engine-zoom feature.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.

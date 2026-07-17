@@ -191,3 +191,39 @@ Validated end-to-end locally (0005 + 0006 + 0007 applied, flag on): on a single 
 `getBoundingClientRect().width` = 100, then `visualViewport.scale = 2`, then re-reading returns 200 (the
 snapshot re-lays-out) — without the key change it would return the stale 100. The test is not committed (it
 needs the patches, so it cannot pass at the pinned SHA on CI).
+
+## Visual-viewport RENDER/paint half (2026-07-16)
+
+The 0005–0007 track is the read-model (CSSOM geometry) side of blocker (b). The **render** side —
+magnifying a pinch-zoomed page's *paint* — is a separate, larger piece: the software rasterizer
+`BCanvas` was **translate-only**, so a document-root viewport zoom had no way to scale the painted pixels
+(the current WPT-runner path magnifies only because `ApplyZoomSerializationStyles` bakes scaled CSS
+lengths into the serialized HTML that gets re-parsed and painted 1:1). The paint pipeline is
+`CssBox` → `FragmentTreeBuilder` → `PaintWalker.Paint` → `DisplayList` → `RGraphicsRasterBackend` →
+`RGraphics`/`BCanvas` → bitmap; the `TransformItem` IR + `RGraphics.SaveTransformLayer` plumbing already
+exists, but the raster surface itself could not scale.
+
+### 0008-graphics-bcanvas-uniform-scale.patch → `Broiler.Graphics`
+
+Gives `BCanvas` a uniform `Scale(float)` composed with its existing `_translation`: every draw maps
+`point → point*scale + translation` through the two central `Translate(rect)`/`Translate(point)` helpers,
+with scalar device dimensions (line stroke width, rounded-clip corner radii) scaled too; saved/restored by
+`Save`/`Restore`. Uniform-only (not a full affine — exact for a viewport zoom). At scale `1` (default)
+every path is byte-identical to the prior translate-only behaviour. Includes a `Broiler.Graphics.Tests`
+case (`BCanvas scales draws about the origin`): a 2× scale maps layout rect `(1,1,2,2)` to device
+`(2,2,4,4)`, and `Restore` returns the scale to 1. All existing `BCanvas` tests pass unchanged. This is
+the foundational rasterizer capability the render half was missing.
+
+**Remaining render-half wiring (not yet authored — the mechanical completion after 0008):**
+1. A scale hook from paint to `BCanvas`: an `OpenGraphics(clip, translation, scale)` overload (mirroring
+   the existing translation overload at `BBitmap.cs:204`) calling `rasterCanvas.Scale`, or route
+   `GraphicsAdapter.SaveTransformLayer` (the matrix path) to `BCanvas.Scale` for a pure-scale matrix and
+   flip `TransformItem` to raster-compatible in `RGraphicsRasterBackend.IsRasterCompatibleItem`.
+2. A document-root viewport-zoom applied in `HtmlContainerInt.CreateDisplayList` (the single wrap point,
+   alongside the existing scroll composition) or at `HtmlContainer.PerformPaint`, driven by a
+   `ViewportZoom` the caller sets.
+3. The zoom source: thread the bridge's `_visualViewportScale` to the render entry (`HtmlRender` /
+   `WptTestRunner.RenderHtmlFileBitmap`), and — the cutover — have that path **stop** relying on
+   `DomBridge.SerializeToHtml`'s `zoom` bake for pinch-zoom and instead paint the unscaled document with
+   the viewport zoom, so `ApplyVisualViewportSerializationState` can retire. Needs pixel validation
+   (there is no pinch-zoom reftest corpus today).
