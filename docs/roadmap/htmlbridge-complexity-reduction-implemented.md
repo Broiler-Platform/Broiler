@@ -830,7 +830,24 @@ bridge's event-loop drain — `setTimeout`/`setInterval`/`requestAnimationFrame`
 not, handles are numeric ids). Regression check: the TimerAndAsync, BrowserEventLoop, and architecture-guard suites
 pass (56); `Broiler.HtmlBridge.Dom` builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.23 named-accessor / relocated-infra /
+Status: **P3.24 completed** 2026-07-17 (same branch) — **`document.write` / `document.writeln`**, the sixth
+slice off the registration grab-bag. `DocumentWriteBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates both (was the bridge's `JsRegistrationWrite036Core`/`JsRegistrationWriteln037Core`): `write` parses its
+argument as an HTML fragment and inserts the nodes at the parser insertion point — right after the currently
+executing `<script>`, else appended to `<body>` — and `writeln` is `write` with a trailing newline. The document
+root, element list, current-script index and the HTML-fragment parser are reached through the four-member
+`IDocumentWriteHost` contract (`DomBridge.DocumentWriteHost.cs`, explicit interface members); the structural moves
+use the bridge's neutral `internal static` tree helpers (`ChildElements`/`ParentEl`/`ChildIndexOf`/`SetParent`/
+`InsertChildAt`). `Registration/Document.cs` now registers `Dom.Features.DocumentWriteBinding.Write(this, in a)` /
+`Writeln(writeFn, in a)`; the callbacks are gone from `JsFunctionCallbacks/Registration.cs` (1044 → 977 lines —
+now under 1000). Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/DocumentWriteBindingModuleTests.cs` (co-location / host-contract / callbacks-moved-off-bridge
+guards + a characterization that builds its assertion markers at runtime and appends them via `createElement`, so
+they appear only in the rendered output and prove the written/`writeln`-ed nodes were inserted and are queryable via
+`getElementById`). Regression check: the Acid3 (which exercises `document.write` heavily), write-named, and
+architecture-guard suites pass (62); `Broiler.HtmlBridge.Dom` builds clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.24 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

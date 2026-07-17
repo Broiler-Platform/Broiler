@@ -67,12 +67,13 @@ public sealed partial class DomBridge
 
     private void RegisterDocumentWriting(JSObject document)
     {
-        // document.write(html) — parse and insert at the current script position
-        document.FastAddValue((KeyString)"write", new JSFunction(JsRegistrationWrite036Core, "write", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.write(html) — parse and insert at the current script position (Phase 3:
+        // co-located DocumentWriteBinding feature module).
+        document.FastAddValue((KeyString)"write", new JSFunction((in a) => Dom.Features.DocumentWriteBinding.Write(this, in a), "write", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.writeln(html) — same as write, with trailing newline
         var writeFn = (JSFunction)document[(KeyString)"write"];
-        document.FastAddValue((KeyString)"writeln", new JSFunction((in a) => JsRegistrationWriteln037Core(writeFn, in a), "writeln", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"writeln", new JSFunction((in a) => Dom.Features.DocumentWriteBinding.Writeln(writeFn, in a), "writeln", 1), JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     private void RegisterDocumentNodeAndCollectionApis(JSContext context, JSObject document)
