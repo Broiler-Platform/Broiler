@@ -3098,8 +3098,23 @@ synthesis (and its author-geometry / position-try helpers) from `Dialogs.cs`.
   it beneath. Validated by a render test showing pixel-parity with the baked `<div>` (a visible backdrop
   beneath the dialog) — the visible-backdrop case the reftest corpus lacks — plus the transparent-backdrop
   no-regression reftests.
-- **Modal centering / `position:fixed`** has **no corpus**: every modal in the top-layer corpus is
-  `anchor()`-positioned, none centered, and the bridge does not center them (it only applies `position:fixed`).
+- **Modal centering / `position:fixed`** has **no corpus** (every modal in the top-layer corpus is
+  `anchor()`-positioned, none centered) and is **blocked on an engine work item, not a bridge/DomParser
+  slice** (investigated 2026-07-17; attempt reverted). A native modal centres via the UA
+  `dialog:modal { position:fixed; inset:0; margin:auto }` — but the `Broiler.Layout` engine does not
+  implement **auto-margin centring for out-of-flow boxes** (CSS2.1 §10.3.7 horizontal / §10.6.4 vertical):
+  the normal-flow centring in `CssBox.ResolveBlockUsedWidth` is explicitly gated `Position != absolute &&
+  != fixed`, and `PositionAbsoluteBox` only handles the one-inset case, so `left:0;right:0;width:W;
+  margin:auto` left-aligns at the origin instead of centring. Adding it hits two further engine snags: (1)
+  `ActualMarginLeft`'s getter **lossily rewrites** `margin-left:auto → "0"` on first read and caches
+  `_actualMarginLeft`, so a later "both margins auto?" test fails and re-setting the margin string does not
+  refresh the cached used value; and (2) `Size.Height` is not yet resolved when the fixed/abspos position is
+  computed, so vertical centring needs a size-known phase. The clean fix is a focused engine feature —
+  implement §10.3.7/§10.6.4 auto-margin centring for abspos/fixed (general, CI-unit-testable, benefits any
+  centred overlay, not just modals), preserving `margin:auto` non-lossily (compute the used 0 without
+  overwriting the specified value) and running after used size is known — then a one-line DomParser UA rule
+  (`inset:0; margin:auto` on a top-layer `<dialog>` with auto insets) centres modals. Deferred as its own
+  engine increment.
 - **Anchor-track render residue** stays exhausted (established earlier): the only un-handed-off case is a
   `position-area` box that *also* uses `position-try`, for which **no WPT test exists**, so widening the MVP
   gate has no observable payoff.
