@@ -1233,7 +1233,31 @@ architecture-guard suites pass (83 + 14); the one failure in that subset
 `Traversal` class-name filter) fails identically at the P3.44 baseline — pre-existing, unrelated.
 `Broiler.HtmlBridge.Dom` builds clean (0 warnings).
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.45 named-accessor / relocated-infra /
+Status: **P3.46 completed** 2026-07-17 (same branch) — the **DOM `EventTarget` methods**, the seventh slice off
+`JsFunctionCallbacks/JsObjects.cs`, **which drops it under the 750-line guard and de-lists it.**
+`EventTargetBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the 6 callbacks registered on every
+node/element wrapper: `addEventListener`, `removeEventListener`, `dispatchEvent` and the synthetic-event convenience
+methods `click`, `focus` and `blur` (was the bridge's `JsJsObjectsAddEventListener097Core`..`Blur103Core`). This
+wires the JS-facing methods to the already-extracted events subsystem: registration semantics stay in
+`EventListenerBinding` (P3.x) and the capture→target→bubble engine in `EventDispatchBinding`, called directly; the
+per-node listener store, the dispatch delegator and the window JS object (the synthetic focus/blur UIEvents' `view`)
+are reached through the three-member `IEventTargetHost` contract (`DomBridge.EventTargetHost.cs`, explicit interface
+members). Node-type/attribute/runtime-state helpers, the radio-group mutual-exclusion walk (`UncheckRadioSiblings`,
+widened `private static`→`internal static`) and the no-op function factory (`UndefinedFunction`) are the bridge's
+`internal static` helpers, called directly; the byte-identical `focus`/`blur` bodies are factored into one
+`DispatchSyntheticFocusEvent` helper (a small net simplification). All four registration paths in `JsObjects.cs` now
+call `Dom.Features.EventTargetBinding.<Op>`; the callbacks are gone from `JsFunctionCallbacks/JsObjects.cs`
+(888 → 727 lines, a 161-line drop). **De-listed:** the member file is removed from the guard's
+`OversizedFileExemptions` (debt list seven → six over-limit files); the ratchet's stale-exemption check now enforces
+it stays under 750. Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/EventTargetBindingModuleTests.cs` (co-location / host-contract / six-callbacks-moved-off-bridge
+guards + end-to-end characterizations: `addEventListener`→`dispatchEvent`→`removeEventListener` handler lifecycle,
+and `click` toggling a checkbox's `checked` while firing its click listener). Regression check: the
+EventListener/dispatch/click/focus/blur/submit/radio suites pass (194) with zero failures; the architecture-guard
+suite passes green (0 offenders / 0 stale exemptions) after the de-list. `Broiler.HtmlBridge.Dom` builds clean
+(0 warnings).
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
@@ -1264,14 +1288,17 @@ Exit criteria:
 - No production source file exceeds 750 lines without a documented exemption.
   **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
   a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
-  module (the P3.x pattern) rather than another giant partial. The remaining seven
-  over-limit files (`LayoutMetrics.cs` 2332, `JsFunctionCallbacks/JsObjects.cs` 1599,
-  `JsObjects.cs` 1286, `SubDocuments.cs` 1152, `DomBridge.cs` 1013,
-  `DomBridge.Serialization.cs` 951, `Utilities.cs` 894) are listed as documented debt to
-  shrink — the guard surfaces one to de-list once it drops under the limit, so the ratchet
-  keeps closing. Two files are **de-listed** as of 2026-07-17: `AnimationResolver.cs` (was
-  760; see ratchet maintenance below) and `JsFunctionCallbacks/Registration.cs` (was 1184 →
-  684 after the P3.19–P3.28 grab-bag decomposition — nine feature modules peeled out).
+  module (the P3.x pattern) rather than another giant partial. The remaining six
+  over-limit files (`LayoutMetrics.cs` 2332, `JsObjects.cs` 1286, `SubDocuments.cs` 1152,
+  `DomBridge.cs` 1013, `DomBridge.Serialization.cs` 951, `Utilities.cs` 894) are listed as
+  documented debt to shrink — the guard surfaces one to de-list once it drops under the limit,
+  so the ratchet keeps closing. Three files are **de-listed** as of 2026-07-17:
+  `AnimationResolver.cs` (was 760; see ratchet maintenance below),
+  `JsFunctionCallbacks/Registration.cs` (was 1184 → 684 after the P3.19–P3.28 grab-bag
+  decomposition — nine feature modules peeled out) and
+  `JsFunctionCallbacks/JsObjects.cs` (was 1599 → 727 after the P3.40–P3.46 element/node
+  member decomposition — seven feature modules peeled out: CharacterData, node accessors,
+  element attributes, node relationships, Element selectors, element traversal, EventTarget).
 
   **Ratchet maintenance 2026-07-17.** The guard caught its first *new* over-limit file:
   `AnchorResolver/AnchorFunctions.cs` had grown 748 → 767 lines as the Phase 5 native

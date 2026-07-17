@@ -447,7 +447,7 @@ public sealed partial class DomBridge
     /// Recursively unchecks all radio inputs with the given name within the scope,
     /// except for the specified element. Used for radio button mutual exclusion.
     /// </summary>
-    private static void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
+    internal static void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
     {
         foreach (var child in ChildElements(scope))
         {

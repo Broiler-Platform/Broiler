@@ -506,33 +506,33 @@ public sealed partial class DomBridge
 
         // addEventListener(type, listener, useCapture)
         obj.FastAddValue((KeyString)"addEventListener",
-            new JSFunction((in a) => JsJsObjectsAddEventListener097Core(element, in a), "addEventListener", 3),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, element, in a), "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // removeEventListener(type, listener, useCapture)
         obj.FastAddValue((KeyString)"removeEventListener",
-            new JSFunction((in a) => JsJsObjectsRemoveEventListener098Core(element, in a), "removeEventListener", 3),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, element, in a), "removeEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // dispatchEvent(event) — DOM Events Level 3 with capture/target/bubble phases
         obj.FastAddValue((KeyString)"dispatchEvent",
-            new JSFunction((in a) => JsJsObjectsDispatchEvent099Core(bridge, element, in a), "dispatchEvent", 1),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, element, in a), "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // element.click() — creates and dispatches a MouseEvent
         // For checkboxes and radio buttons, toggles checked state.
         obj.FastAddValue((KeyString)"click",
-            new JSFunction((in _) => JsJsObjectsClick101Core(bridge, element, in _), "click", 0),
+            new JSFunction((in _) => Dom.Features.EventTargetBinding.Click(this, element, in _), "click", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // element.focus() — creates and dispatches a FocusEvent-like object
         obj.FastAddValue((KeyString)"focus",
-            new JSFunction((in _) => JsJsObjectsFocus102Core(bridge, element, in _), "focus", 0),
+            new JSFunction((in _) => Dom.Features.EventTargetBinding.Focus(this, element, in _), "focus", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // element.blur() — creates and dispatches a FocusEvent-like object
         obj.FastAddValue((KeyString)"blur",
-            new JSFunction((in _) => JsJsObjectsBlur103Core(bridge, element, in _), "blur", 0),
+            new JSFunction((in _) => Dom.Features.EventTargetBinding.Blur(this, element, in _), "blur", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // on* inline event handler properties (onclick, onload, etc.)
@@ -879,15 +879,15 @@ public sealed partial class DomBridge
 
         // -- EventTarget --
         obj.FastAddValue((KeyString)"addEventListener",
-            new JSFunction((in a) => JsJsObjectsAddEventListener097Core(node, in a), "addEventListener", 3),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, node, in a), "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"removeEventListener",
-            new JSFunction((in a) => JsJsObjectsRemoveEventListener098Core(node, in a), "removeEventListener", 3),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, node, in a), "removeEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"dispatchEvent",
-            new JSFunction((in a) => JsJsObjectsDispatchEvent099Core(bridge, node, in a), "dispatchEvent", 1),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, node, in a), "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Node type constants (exist on all Node objects).
@@ -1021,15 +1021,15 @@ public sealed partial class DomBridge
 
         // -- EventTarget --
         obj.FastAddValue((KeyString)"addEventListener",
-            new JSFunction((in a) => JsJsObjectsAddEventListener097Core(node, in a), "addEventListener", 3),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, node, in a), "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"removeEventListener",
-            new JSFunction((in a) => JsJsObjectsRemoveEventListener098Core(node, in a), "removeEventListener", 3),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, node, in a), "removeEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"dispatchEvent",
-            new JSFunction((in a) => JsJsObjectsDispatchEvent099Core(bridge, node, in a), "dispatchEvent", 1),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, node, in a), "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Node type constants (exist on all Node objects).
@@ -1263,13 +1263,13 @@ public sealed partial class DomBridge
 
         // -- EventTarget --
         obj.FastAddValue((KeyString)"addEventListener",
-            new JSFunction((in a) => JsJsObjectsAddEventListener097Core(node, in a), "addEventListener", 3),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, node, in a), "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
         obj.FastAddValue((KeyString)"removeEventListener",
-            new JSFunction((in a) => JsJsObjectsRemoveEventListener098Core(node, in a), "removeEventListener", 3),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, node, in a), "removeEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
         obj.FastAddValue((KeyString)"dispatchEvent",
-            new JSFunction((in a) => JsJsObjectsDispatchEvent099Core(bridge, node, in a), "dispatchEvent", 1),
+            new JSFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, node, in a), "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Node type constants (exist on all Node objects).
