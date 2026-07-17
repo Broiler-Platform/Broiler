@@ -950,7 +950,23 @@ public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/Docume
 tagName, `title` read of the parsed `<title>` and a round-trip set — through the bridge). Regression check: the
 DocumentStructure, HtmlDom and architecture-guard suites pass (51); `Broiler.HtmlBridge.Dom` builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.29 named-accessor / relocated-infra /
+Status: **P3.30 completed** 2026-07-17 (same branch) — **`document.createEvent`**, the legacy DOM Events Level 3
+factory. `LegacyEventBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns the ~320-line builder that returns
+a plain event object pre-populated with the union of UI/Mouse/Keyboard/Wheel/Custom event fields plus the legacy
+`init*Event` (`initEvent`/`initUIEvent`/`initMouseEvent`/`initKeyboardEvent`/`initWheelEvent`/`initCustomEvent`) and
+propagation-control methods (`stopPropagation`/`preventDefault`/`cancelBubble`/`returnValue`) — was the bridge's
+`JsRegistrationCreateEvent033Core`. It builds a self-contained JS object with closures over its own state and
+touches **no bridge instance state**, so — like `ConsoleBinding` / `CryptoBinding` — it is a pure static class with
+**no host contract** (registered by method group, `new JSFunction(Dom.Features.LegacyEventBinding.Create, …)`). This
+is the single biggest callback moved out of the grab-bag: `JsFunctionCallbacks/Registration.cs` **653 → 328 lines**.
+Behaviour-preserving; no public-API change (module internal). Tests:
+`Broiler.Cli.Tests/LegacyEventBindingModuleTests.cs` (co-location / callback-moved-off-bridge guards + a
+characterization — `createEvent('Event')`, `initEvent` sets type/bubbles/cancelable, `preventDefault` on a
+cancelable event sets `defaultPrevented`, the propagation methods are present — through the bridge). Regression
+check: the DomEvents (51, a heavy `createEvent` user), DomEventsEdgeCase and architecture-guard suites pass;
+`Broiler.HtmlBridge.Dom` builds clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.30 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
