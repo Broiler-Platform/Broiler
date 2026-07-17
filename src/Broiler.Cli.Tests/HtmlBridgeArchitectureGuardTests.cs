@@ -214,7 +214,10 @@ public class HtmlBridgeArchitectureGuardTests
         "src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.cs",
-        "src/Broiler.HtmlBridge.Dom/DomBridge/Utilities.cs",
+        // Utilities.cs de-listed 2026-07-17: its cohesive DOM name-validation / DOMException /
+        // JS-constructor-globals cluster (ThrowDOMException, ValidateElementName/QualifiedName,
+        // RegisterDOMException/Node/SVGLength, and the two XML-name regex patterns) was split into
+        // the sibling partial Utilities.NameValidation.cs, dropping it from 894 to 626 lines.
         // AnimationResolver.cs de-listed 2026-07-17: its CSS timing-function/easing cluster was
         // split into the sibling partial AnimationResolver.Timing.cs, dropping it to 644 lines.
     };

@@ -1288,9 +1288,9 @@ Exit criteria:
 - No production source file exceeds 750 lines without a documented exemption.
   **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
   a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
-  module (the P3.x pattern) rather than another giant partial. The remaining six
-  over-limit files (`LayoutMetrics.cs` 2332, `JsObjects.cs` 1286, `SubDocuments.cs` 1152,
-  `DomBridge.cs` 1013, `DomBridge.Serialization.cs` 951, `Utilities.cs` 894) are listed as
+  module (the P3.x pattern) rather than another giant partial. The remaining five
+  over-limit files (`LayoutMetrics.cs` 2343, `JsObjects.cs` 1286, `SubDocuments.cs` 1152,
+  `DomBridge.cs` 1013, `DomBridge.Serialization.cs` 951) are listed as
   documented debt to shrink — the guard surfaces one to de-list once it drops under the limit,
   so the ratchet keeps closing. Three files are **de-listed** as of 2026-07-17:
   `AnimationResolver.cs` (was 760; see ratchet maintenance below),
@@ -1324,6 +1324,20 @@ Exit criteria:
   dropping `AnimationResolver.cs` to 644. Pure partial-class relocation (behaviour-identical); its
   entry was removed from `OversizedFileExemptions`, so the ratchet's stale-exemption check now
   enforces it stays under 750. Debt list: nine → eight files.
+
+  **De-list 2026-07-17.** A second exempt-file shrink under the same ratchet action.
+  `DomBridge/Utilities.cs` (894) — the grab-bag of internal helpers — had its cohesive DOM
+  name-validation cluster together with the JS-side constructor globals it validates against
+  (`ThrowDOMException`, `ValidateElementName` / `ValidateQualifiedName`, `RegisterDOMException`,
+  `RegisterNodeConstructor`, `RegisterSVGLength`, and the two `[GeneratedRegex]`
+  `ValidXmlNamePattern` / `ValidXmlQualifiedNamePattern` patterns with their backing fields) split
+  into the sibling `DomBridge` partial `DomBridge/Utilities.NameValidation.cs` (286 lines), dropping
+  `Utilities.cs` to 626. Pure partial-class relocation — no signature, accessibility, or logic
+  change, so behaviour-identical by construction; its entry was removed from
+  `OversizedFileExemptions`, so the stale-exemption check now enforces it stays under 750.
+  `Broiler.HtmlBridge.Dom` builds clean and the guard is green (14/14, 0 offenders / 0 stale
+  exemptions); the `NamespaceAndDomCoreTests` / `DomImplementationTests` name-validation coverage
+  (27 tests) stays green. Debt list: eight → seven files.
 
 ### Phase 4 - eliminate parallel DOM state
 
