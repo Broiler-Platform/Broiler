@@ -1398,6 +1398,26 @@ EventListener/dispatch/click/focus/blur/submit/radio suites pass (194) with zero
 suite passes green (0 offenders / 0 stale exemptions) after the de-list. `Broiler.HtmlBridge.Dom` builds clean
 (0 warnings).
 
+Status: **P3.47 completed** 2026-07-17 (same branch) — the **DOM `ChildNode` mixin**, a further slice off the
+node-wrapper registration in `JsObjects.cs`. `ChildNodeBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the four `ChildNode` methods registered on every node wrapper — `remove()`, `before()`, `after()` and
+`replaceWith()` (was the bridge's `JsJsObjectsRemove093Core`..`ReplaceWith096Core`). Pure DOM tree mutation: the
+neutral static tree helpers it uses (`ParentEl`, `ChildIndexOf`, `RemoveNthChild`, `SetParent`) stay the bridge's
+`internal static` helpers, called directly; the child-node argument builder (`BuildChildNodeArgumentNodes`), the
+side-effecting insertion primitive (`InsertNodeAt`), style-scope invalidation (`InvalidateStyleScope`) and the
+node-iterator / mutation-observer notifications (`NotifyNodeIteratorPreRemoval`, `NotifyChildRemoved`) are reached
+through the five-member `IChildNodeHost` contract (`DomBridge.ChildNodeHost.cs`, explicit interface members).
+Distinct from the document-level `NodeMutationBinding` (appendChild/removeChild/insertBefore on the document node,
+via `INodeMutationHost`): the mixin positions argument nodes relative to an arbitrary context node. All three
+registration paths (the element path in `JsObjects.cs` and the two node paths in `JsObjects.NonElementNodes.cs`) now
+call `Dom.Features.ChildNodeBinding.<Op>(this, …)`; the callbacks are gone from `JsFunctionCallbacks/JsObjects.cs`
+(727 → 654 lines). Behaviour-preserving (the parent is hoisted once up front exactly as the originals did to survive
+detachment); no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/ChildNodeBindingModuleTests.cs` (co-location / host-contract / four-callbacks-moved-off-bridge
+guards + an end-to-end characterization driving `before`/`after`/`remove` (incl. a detached-node no-op) /
+`replaceWith` through the bridge). Regression check: the ChildNode / NodeMutation / HtmlDomInterface / clone /
+DOM-edge-case / architecture-guard suites pass (105); `Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves

@@ -177,19 +177,19 @@ public sealed partial class DomBridge
 
         // -- ChildNode mixin --
         obj.FastAddValue((KeyString)"remove",
-            new JSFunction((in a) => JsJsObjectsRemove093Core(node, in a), "remove", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.Remove(this, node, in a), "remove", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"before",
-            new JSFunction((in a) => JsJsObjectsBefore094Core(node, in a), "before", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.Before(this, node, in a), "before", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"after",
-            new JSFunction((in a) => JsJsObjectsAfter095Core(node, in a), "after", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.After(this, node, in a), "after", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"replaceWith",
-            new JSFunction((in a) => JsJsObjectsReplaceWith096Core(node, in a), "replaceWith", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.ReplaceWith(this, node, in a), "replaceWith", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- EventTarget --
@@ -319,19 +319,19 @@ public sealed partial class DomBridge
 
         // -- ChildNode mixin --
         obj.FastAddValue((KeyString)"remove",
-            new JSFunction((in a) => JsJsObjectsRemove093Core(node, in a), "remove", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.Remove(this, node, in a), "remove", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"before",
-            new JSFunction((in a) => JsJsObjectsBefore094Core(node, in a), "before", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.Before(this, node, in a), "before", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"after",
-            new JSFunction((in a) => JsJsObjectsAfter095Core(node, in a), "after", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.After(this, node, in a), "after", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"replaceWith",
-            new JSFunction((in a) => JsJsObjectsReplaceWith096Core(node, in a), "replaceWith", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.ReplaceWith(this, node, in a), "replaceWith", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- EventTarget --

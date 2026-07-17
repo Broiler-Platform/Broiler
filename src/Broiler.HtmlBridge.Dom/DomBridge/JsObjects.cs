@@ -487,19 +487,19 @@ public sealed partial class DomBridge
 
         // remove() — ChildNode.remove() per DOM Living Standard
         obj.FastAddValue((KeyString)"remove",
-            new JSFunction((in a) => JsJsObjectsRemove093Core(element, in a), "remove", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.Remove(this, element, in a), "remove", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"before",
-            new JSFunction((in a) => JsJsObjectsBefore094Core(element, in a), "before", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.Before(this, element, in a), "before", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"after",
-            new JSFunction((in a) => JsJsObjectsAfter095Core(element, in a), "after", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.After(this, element, in a), "after", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"replaceWith",
-            new JSFunction((in a) => JsJsObjectsReplaceWith096Core(element, in a), "replaceWith", 0),
+            new JSFunction((in a) => Dom.Features.ChildNodeBinding.ReplaceWith(this, element, in a), "replaceWith", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- DOM events --
