@@ -618,20 +618,20 @@ public sealed partial class DomBridge
 
         // querySelector on elements
         obj.FastAddValue((KeyString)"querySelector",
-            new JSFunction((in a) => JsJsObjectsQuerySelector126Core(bridge, element, in a), "querySelector", 1),
+            new JSFunction((in a) => Dom.Features.SelectorsBinding.QuerySelector(this, element, in a), "querySelector", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // querySelectorAll on elements
         obj.FastAddValue((KeyString)"querySelectorAll",
-            new JSFunction((in a) => JsJsObjectsQuerySelectorAll127Core(bridge, element, in a), "querySelectorAll", 1),
+            new JSFunction((in a) => Dom.Features.SelectorsBinding.QuerySelectorAll(this, element, in a), "querySelectorAll", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"matches",
-            new JSFunction((in a) => JsJsObjectsMatches128Core(element, in a), "matches", 1),
+            new JSFunction((in a) => Dom.Features.SelectorsBinding.Matches(element, in a), "matches", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"closest",
-            new JSFunction((in a) => JsJsObjectsClosest129Core(bridge, element, in a), "closest", 1),
+            new JSFunction((in a) => Dom.Features.SelectorsBinding.Closest(this, element, in a), "closest", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"insertAdjacentElement",
@@ -648,7 +648,7 @@ public sealed partial class DomBridge
 
         // getElementsByTagName on elements — searches descendants in tree order
         obj.FastAddValue((KeyString)"getElementsByTagName",
-            new JSFunction((in a) => JsJsObjectsGetElementsByTagName133Core(bridge, element, in a), "getElementsByTagName", 1),
+            new JSFunction((in a) => Dom.Features.SelectorsBinding.GetElementsByTagName(this, element, in a), "getElementsByTagName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getContext(contextType) — for <canvas> elements

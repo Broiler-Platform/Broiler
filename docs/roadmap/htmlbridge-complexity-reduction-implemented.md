@@ -1194,7 +1194,27 @@ failure in that subset (`Phase7_Layout_Friend_Surface…`, a CSS box-tree friend
 `Contains` name filter) fails identically at the P3.42 baseline — pre-existing, unrelated. `Broiler.HtmlBridge.Dom`
 builds clean (0 warnings).
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.43 named-accessor / relocated-infra /
+Status: **P3.44 completed** 2026-07-17 (same branch) — the **DOM `Element` selector API**, the fifth slice off
+`JsFunctionCallbacks/JsObjects.cs`. `SelectorsBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the 5
+element-path callbacks: `querySelector`, `querySelectorAll`, `matches`, `closest` and `getElementsByTagName` (was the
+bridge's `JsJsObjectsQuerySelector126Core`..`Closest129Core` and `GetElementsByTagName133Core`). Selector matching
+(`MatchesSelector`, already `internal static` and shared with `DocumentQueryBinding`) and the element-parent walk
+(`ParentEl`) are called directly; the descendant selector search (`FindInDescendants`) and the by-tag descendant
+collector (`CollectDescendantsByTag`) — both `private static` taking the concrete bridge for its JS-object cache —
+plus the plain JS-wrapper factory (`ToJSObject`) are reached through the three-member `ISelectorsHost` contract
+(`DomBridge.SelectorsHost.cs`, explicit interface members forwarding to the statics with `this`). The element-path
+registration in `JsObjects.cs` now calls `Dom.Features.SelectorsBinding.<Op>`; the callbacks are gone from
+`JsFunctionCallbacks/JsObjects.cs` (990 → 947 lines). Behaviour-preserving; no public-API change (module + contract
+internal). Tests: `Broiler.Cli.Tests/SelectorsBindingModuleTests.cs` (co-location / host-contract /
+five-callbacks-moved-off-bridge guards + an end-to-end characterization exercising `querySelector`/
+`querySelectorAll` scoping, compound `.x.y` selectors, `matches` true/false, `closest` ancestor walk and
+`getElementsByTagName` through the bridge). Regression check: the architecture-guard + selector suites pass (175);
+the ten failures in that subset (Skia/font rendering-parity `M5_Curated_Parity`/`HtmlRender_Curated_*` cases and the
+environmental `Lang_Matches_XmlLang_Ancestor` / `CssEscape_InSelector_DecodedToUnicode` /
+`Bridge_Selector_Surface…` selector-engine tests) fail identically at the P3.43 baseline — pre-existing
+environment/rendering failures, not regressions. `Broiler.HtmlBridge.Dom` builds clean (0 warnings).
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.44 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

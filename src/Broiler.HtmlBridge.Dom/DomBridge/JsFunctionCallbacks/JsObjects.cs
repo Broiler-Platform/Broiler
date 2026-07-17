@@ -820,40 +820,6 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsQuerySelector126Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
-        return FindInDescendants(element, sel, false, bridge);
-    }
-
-
-    private JSValue JsJsObjectsQuerySelectorAll127Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
-        return FindInDescendants(element, sel, true, bridge);
-    }
-
-
-    private JSValue JsJsObjectsMatches128Core(DomElement element, in Arguments a)
-    {
-        var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
-        return MatchesSelector(element, sel, element) ? JSBoolean.True : JSBoolean.False;
-    }
-
-
-    private JSValue JsJsObjectsClosest129Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
-        for (DomElement? current = element; current != null && !current.TagName.StartsWith('#'); current = ParentEl(current))
-        {
-            if (MatchesSelector(current, sel, element))
-                return bridge.ToJSObject(current);
-        }
-
-        return JSNull.Value;
-    }
-
-
     private JSValue JsJsObjectsInsertAdjacentElement130Core(DomElement element, in Arguments a)
     {
         if (a.Length < 2)
@@ -911,15 +877,6 @@ public sealed partial class DomBridge
             InsertNodeAt(parent, node, index++);
         ResetComputedStyleEngines();
         return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsGetElementsByTagName133Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        var tagSearch = a.Length > 0 ? a[0].ToString().ToLowerInvariant() : string.Empty;
-        var results = new List<JSValue>();
-        CollectDescendantsByTag(element, tagSearch, results, bridge);
-        return new JSArray(results);
     }
 
 
