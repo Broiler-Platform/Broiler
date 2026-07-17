@@ -808,12 +808,7 @@ partial class CssBox
         double basis = property is AnchorInsetProperty.Left or AnchorInsetProperty.Right ? cbW : cbH;
 
         if (!value.Contains("anchor(", System.StringComparison.OrdinalIgnoreCase))
-        {
-            var plain = new CssLength(value);
-            if (plain.HasError) return null;
-            if (plain.IsPercentage) return basis * plain.Number;
-            return plain.Unit == CssUnit.Px ? plain.Number : null;
-        }
+            return AsCbLength(new CssLength(value), basis);
 
         string rewritten = AnchorFunction.Rewrite(value, r =>
         {
@@ -827,9 +822,20 @@ partial class CssBox
             return v.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
         });
 
-        var len = new CssLength(rewritten);
+        return AsCbLength(new CssLength(rewritten), basis);
+    }
+
+    /// <summary>
+    /// Projects a parsed <c>@position-try</c> inset length onto a containing-block-frame px value:
+    /// a percentage of <paramref name="basis"/>, a <c>px</c> length, or <c>0</c> in any unit
+    /// (a unitless/zero length is zero — <c>CssLength</c> parses bare <c>0</c> with
+    /// <see cref="CssUnit.None"/>, and <c>right: 0</c> is common in fallback rules). Any other
+    /// unit (em/vw/… with no font/viewport context here) or a parse error yields <c>null</c>.
+    /// </summary>
+    private static double? AsCbLength(CssLength len, double basis)
+    {
         if (len.HasError) return null;
         if (len.IsPercentage) return basis * len.Number;
-        return len.Unit == CssUnit.Px ? len.Number : null;
+        return len.Unit == CssUnit.Px || len.Number == 0 ? len.Number : null;
     }
 }

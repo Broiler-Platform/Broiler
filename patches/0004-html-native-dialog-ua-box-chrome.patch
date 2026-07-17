@@ -1,0 +1,56 @@
+From 12580c446d40d5ce7245cf4960b92d319fb71256 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 16 Jul 2026 13:58:47 +0000
+Subject: [PATCH] Add native UA <dialog> box chrome (border/padding/background)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Extends the native UA dialog rule with the box chrome the bridge's
+InsertDialogBackdrops pre-bakes for modal dialogs (border:1px solid black;
+padding:1em; white background), so it applies to every rendered (open) dialog
+through the real cascade — matching the HTML UA stylesheet, which styles all
+dialogs, not only modal ones.
+
+Requires the Broiler.CSS shorthand-vs-longhand origin-precedence fix (patch
+0003): without it a UA `background-color: white` longhand leaks past an author
+`background` shorthand reset, regressing WPT anchor-position-top-layer-003/
+004/006. With both applied the css-anchor-position corpus stays 33/6 and all 7
+top-layer tests pass at 99.9-100%.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ Source/Broiler.HTML.Core/CssDefaults.cs | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Core/CssDefaults.cs b/Source/Broiler.HTML.Core/CssDefaults.cs
+index 047fc1b..f2ac049 100644
+--- a/Source/Broiler.HTML.Core/CssDefaults.cs
++++ b/Source/Broiler.HTML.Core/CssDefaults.cs
+@@ -132,13 +132,17 @@ internal static class CssDefaults
+         /* HTML5 text-level elements – inline by default */
+         mark            { background-color: yellow; color: black }
+ 
+-        /* HTML <dialog> — native UA display (open dialogs are block boxes; closed are
+-           display:none). Requires the :not([open]) selector-matcher fix. */
+-        dialog          { display: block }
+-        dialog:not([open]) { display: none }
+-
++        /* HTML <dialog> — native UA display + box chrome (open dialogs are block boxes
++           with a border, padding and white background; closed are display:none).
++           Requires the :not([open]) selector-matcher fix, and — so an author reset such
++           as `dialog { border:0; background:transparent }` overrides these equal-
++           specificity UA rules — the shorthand-vs-longhand origin-precedence cascade fix
++           (author `background` shorthand must beat this UA `background-color` longhand). */
++        dialog          { display: block; border: 1px solid black; padding: 1em; background-color: white }
++        dialog:not([open]) { display: none }
++
+         /* Hidden elements (HTML5) */
+-        template,
++        template,
+         [hidden]        { display: none }
+         style, title,
+         script, link,
+-- 
+2.43.0
+

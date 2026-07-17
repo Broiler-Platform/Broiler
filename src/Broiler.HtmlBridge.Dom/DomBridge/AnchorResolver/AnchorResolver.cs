@@ -34,6 +34,49 @@ public sealed partial class DomBridge
     internal bool NativeAnchorPlacement { get; set; }
 
     /// <summary>
+    /// Phase 5 LayoutSnapshot endgame, blocker (b) — visual-viewport. When on, the bridge stops
+    /// depending on the DOM `zoom` bake for the document-root pinch-zoom of the geometry read model:
+    /// it sets <c>Broiler.Layout.Engine.NativeAnchorPlacement.VisualViewportScale</c> around the
+    /// shared geometry snapshot (so the extracted <c>BoxGeometry</c> is scaled natively — requires
+    /// <c>patches/0006-html-visual-viewport-extraction-scale.patch</c>), and folds the same scale
+    /// into <see cref="GetUsedZoomForElement"/> as a root-level zoom so <c>offset*</c> divides it
+    /// back out and <c>getBoundingClientRect</c> keeps it (CSSOM-View: pinch-zoom is a root zoom in
+    /// this model). Off by default — the extraction scale and the read-path fold are inverse halves
+    /// of one balance, so enabling the fold without the (submodule) extraction would halve
+    /// <c>offset*</c>; the flag activates both together only once 0006 is applied. When off,
+    /// visual-viewport geometry is unchanged (the WPT-runner `zoom` bake path is untouched).
+    /// </summary>
+    internal bool NativeVisualViewport { get; set; }
+
+    /// <summary>
+    /// Phase 5 native dialog/backdrop track — top-layer paint. When on, the bridge stamps a
+    /// benign <c>data-broiler-top-layer</c> order marker on open modal dialogs, open popovers,
+    /// and synthesized <c>::backdrop</c>s (<c>Dialogs.cs</c>). The Broiler.Layout
+    /// <c>FragmentTreeBuilder</c> projects it to <see cref="Broiler.Layout.IR.Fragment.TopLayerOrder"/>,
+    /// and the renderer's native top-layer paint pass (<c>PaintWalker.PaintTopLayer</c>) paints
+    /// those boxes above every ordinary stacking context — the correct CSS Position 4 §top-layer
+    /// behaviour, replacing the bridge's approximate very-large-z-index emulation. Off by default:
+    /// the marker is inert until the renderer's native-top-layer paint patch is applied (the
+    /// pinned <c>PaintWalker</c> never reads the projected order), so stamping stays gated to the
+    /// native render path (the WPT runner enables it alongside <see cref="NativeAnchorPlacement"/>)
+    /// and the default/production serialization is unchanged.
+    /// </summary>
+    internal bool NativeTopLayer { get; set; }
+
+    /// <summary>
+    /// Phase 5 native dialog/backdrop track — native <c>::backdrop</c>. When on, the bridge stops
+    /// synthesizing a backdrop <c>&lt;div&gt;</c> in <c>InsertDialogBackdrops</c> and instead
+    /// stamps the resolved backdrop background (<c>data-broiler-backdrop</c>) on the top-layer
+    /// element; the renderer generates the <c>::backdrop</c> box natively (Broiler.HTML DomParser,
+    /// patch 0011, which depends on the 0010 top-layer paint). Off by default and — unlike
+    /// <see cref="NativeTopLayer"/> — <em>not</em> auto-enabled by the WPT runner: the synthesized
+    /// <c>&lt;div&gt;</c> is the CI fallback until patch 0011 is applied (the pinned renderer would
+    /// otherwise drop backdrops entirely on the WPT path). Requires <see cref="NativeTopLayer"/> to
+    /// also be on (the native backdrop is painted by the top-layer pass).
+    /// </summary>
+    internal bool NativeBackdrop { get; set; }
+
+    /// <summary>
     /// Resolves <c>anchor()</c> function values and inserts <c>::backdrop</c>
     /// placeholder elements for modal dialogs.  Must be called after script
     /// execution and before serialization.

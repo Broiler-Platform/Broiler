@@ -338,6 +338,16 @@ internal sealed partial class WptTestRunner
         Environment.GetEnvironmentVariable("BROILER_WPT_NATIVE_ANCHOR") is not ("0" or "false" or "FALSE" or "off");
 
     /// <summary>
+    /// Native <c>::backdrop</c> lever (Phase 5 native dialog/backdrop track). Default OFF — unlike
+    /// <see cref="NativeAnchorPlacement"/>, this is not on by default, because the native
+    /// <c>::backdrop</c> box generation lives in an unapplied submodule patch (0011); with it off
+    /// the bridge keeps synthesizing the backdrop <c>&lt;div&gt;</c> (the CI fallback). Turned on
+    /// by the native-backdrop render validation once patch 0011 is applied locally.
+    /// </summary>
+    internal static bool NativeBackdrop { get; set; } =
+        Environment.GetEnvironmentVariable("BROILER_WPT_NATIVE_BACKDROP") is ("1" or "true" or "TRUE" or "on");
+
+    /// <summary>
     /// File extensions treated as test files.
     /// </summary>
     private static readonly HashSet<string> TestExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -2058,7 +2068,7 @@ internal sealed partial class WptTestRunner
             // Even with no inline scripts, we still need to process anchor
             // positioning, animation snapshots, etc. via the DomBridge.
             using var context2 = new JSContext();
-            var bridge2 = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement };
+            var bridge2 = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop };
             bridge2.Attach(context2, html, url);
             // Inject browser API stubs so onload handlers etc. can reference them.
             try { context2.Eval(BrowserApiStubs); } catch { /* best-effort */ }
@@ -2071,7 +2081,7 @@ internal sealed partial class WptTestRunner
         }
 
         using var context = new JSContext();
-        var bridge = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement };
+        var bridge = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop };
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
         {

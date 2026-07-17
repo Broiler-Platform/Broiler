@@ -871,6 +871,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                 GetAbsoluteContainingBlockPaddingBox(cb, out double cbPadLeft, out double cbPadTop, out double cbPadWidth, out double cbPadHeight);
 
+                ResolveOverconstrainedAutoMargins(cbPadWidth, cbPadHeight);
+
                 float newX = Location.X, newY = Location.Y;
 
                 if (Left != null && Left != CssConstants.Auto)
@@ -938,6 +940,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     // sub-viewport rect carries both the origin (composed onto the frame
                     // content box by the later LayoutSubdocument translate) and the size.
                     var vp = FixedPositioningViewport();
+
+                    ResolveOverconstrainedAutoMargins(vp.Width, vp.Height);
+
                     float newX = Location.X, newY = Location.Y;
 
                     if (hasLeft)
@@ -1493,6 +1498,74 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// anchored)offsets, then apply CSS Box Alignment §6.1 justify-self /
     /// align-selfself-alignment within the inset-modified containing block.
     /// </summary>
+    /// <summary>
+    /// CSS2.1 §10.3.7 (inline axis) / §10.6.4 (block axis): for an absolutely-positioned or fixed
+    /// box that over-constrains an axis — both opposing insets set and a definite size — with
+    /// <em>both</em> margins on that axis <c>auto</c>, the auto margins take equal shares of the
+    /// leftover space, centring the box. Resolves those auto margins to the equal px value (and
+    /// refreshes the cached used margins) so the normal positioning below — which adds the used
+    /// margin to the inset — places the box centred. Only the exact over-constrained + both-auto
+    /// case is touched; a one-inset box, or one with a non-auto margin, is left to the existing
+    /// rules, so ordinary abspos layout is unchanged. Powers native modal <c>&lt;dialog&gt;</c>
+    /// centring (<c>inset:0; margin:auto</c>).
+    /// </summary>
+    internal void ResolveOverconstrainedAutoMargins(double cbWidth, double cbHeight)
+    {
+        bool changed = false;
+
+        bool hasLeft = Left != null && Left != CssConstants.Auto;
+        bool hasRight = Right != null && Right != CssConstants.Auto;
+        if (hasLeft && hasRight && IsSpecifiedMarginLeftAuto && IsSpecifiedMarginRightAuto
+            && IsDefiniteBorderBoxWidth())
+        {
+            double l = CssLengthParser.ParseLength(Left, cbWidth, GetEmHeight());
+            double r = CssLengthParser.ParseLength(Right, cbWidth, GetEmHeight());
+            var m = (Math.Max(0, cbWidth - l - r - Size.Width) / 2)
+                .ToString("F4", CultureInfo.InvariantCulture) + "px";
+            MarginLeft = m;
+            MarginRight = m;
+            changed = true;
+        }
+
+        bool hasTop = Top != null && Top != CssConstants.Auto;
+        bool hasBottom = Bottom != null && Bottom != CssConstants.Auto;
+        if (hasTop && hasBottom && IsSpecifiedMarginTopAuto && IsSpecifiedMarginBottomAuto
+            && IsDefiniteBorderBoxHeight(out double boxHeight))
+        {
+            double t = CssLengthParser.ParseLength(Top, cbHeight, GetEmHeight());
+            double b = CssLengthParser.ParseLength(Bottom, cbHeight, GetEmHeight());
+            var m = (Math.Max(0, cbHeight - t - b - boxHeight) / 2)
+                .ToString("F4", CultureInfo.InvariantCulture) + "px";
+            MarginTop = m;
+            MarginBottom = m;
+            changed = true;
+        }
+
+        if (changed)
+            InvalidateActualMargins();
+    }
+
+    // The used border-box inline size is known (Size.Width has been resolved by positioning time)
+    // when width is an explicit, non-intrinsic value — the case §10.3.7 centring needs.
+    private bool IsDefiniteBorderBoxWidth() =>
+        Width != CssConstants.Auto && !string.IsNullOrEmpty(Width) && !IsIntrinsicWidthKeyword(Width);
+
+    // The used border-box block size for §10.6.4 centring: Size.Height once resolved, else derived
+    // from an explicit non-percentage height (mirrors the bottom-anchored fixed/abspos fallback).
+    // False when the height is auto/percentage and not yet resolved — vertical centring is skipped.
+    private bool IsDefiniteBorderBoxHeight(out double boxHeight)
+    {
+        boxHeight = Size.Height;
+        if (boxHeight > 0)
+            return true;
+        if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height) && !Height.Contains('%'))
+        {
+            boxHeight = ResolveSpecifiedHeightToBorderBox(CssLengthParser.ParseLength(Height, 0, GetEmHeight()));
+            return boxHeight > 0;
+        }
+        return false;
+    }
+
     private void PositionAbsoluteBox()
     {
         if (Position == CssConstants.Absolute)

@@ -20,7 +20,10 @@ public sealed class LayoutArchitectureTests
         var project = XDocument.Load(FindProjectPath());
         var references = project
             .Descendants("ProjectReference")
-            .Select(static element => Path.GetFileNameWithoutExtension((string?)element.Attribute("Include")))
+            // Normalise Windows-style backslash separators so the file-name extraction works on
+            // any host — Path.GetFileNameWithoutExtension does not treat '\' as a separator on Linux.
+            .Select(static element => Path.GetFileNameWithoutExtension(
+                ((string?)element.Attribute("Include"))?.Replace('\\', '/')))
             .OrderBy(static name => name, StringComparer.Ordinal)
             .ToArray();
 
@@ -49,7 +52,13 @@ public sealed class LayoutArchitectureTests
                 "Broiler.DevConsole.Tests",
                 "Broiler.HTML",
                 "Broiler.HTML.Dom",
+                // Headless live-geometry snapshot (Phase 5 engine-native live geometry) reads the
+                // internal box tree via HeadlessLayoutView.
+                "Broiler.HTML.Headless",
                 "Broiler.HTML.Orchestration",
+                // The bridge writes the Phase 5 visual-viewport channel
+                // (NativeAnchorPlacement.VisualViewportScale) around the shared geometry snapshot.
+                "Broiler.HtmlBridge.Dom",
                 "Broiler.Layout.Tests",
                 // The WPT runner toggles NativeAnchorPlacement.Enabled around the final
                 // render for the Phase 5 native anchor-placement cutover (P5.8d.2b).

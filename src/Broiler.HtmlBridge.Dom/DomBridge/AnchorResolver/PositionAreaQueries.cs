@@ -92,9 +92,7 @@ public sealed partial class DomBridge
             return null;
 
         // Build anchor registry on-the-fly.
-        var anchorRegistry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);
-        BuildAnchorRegistry(anchorRegistry);
-        BuildInlineAnchorRegistry(anchorRegistry);
+        var anchorRegistry = GetAnchorRegistryForPass();
 
         var anchor = ResolveAnchorForElement(positionAnchor, element, anchorRegistry);
         if (anchor is null)

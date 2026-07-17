@@ -30,4 +30,20 @@ internal static class NativeAnchorPlacement
     /// </summary>
     [System.ThreadStatic]
     public static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? PositionTryRules;
+
+    /// <summary>
+    /// The document-root visual-viewport / root-`zoom` uniform scale factor for the geometry read
+    /// model (Phase 5 LayoutSnapshot endgame, blocker (b) — visual-viewport). A pinch-zoom (or
+    /// `html { zoom }`) is a <em>uniform</em> scale of the whole document, so rather than baking
+    /// scaled lengths into the DOM (the retiring <c>DomBridge.ApplyZoomSerializationStyles</c> /
+    /// <c>ApplyVisualViewportSerializationState</c> path) the box tree is laid out at unit scale and
+    /// the factor is applied where geometry <em>leaves</em> the tree — the extracted
+    /// <c>BoxGeometry</c> rects are multiplied by this factor (all three box-model levels scale
+    /// uniformly, which is correct for a uniform zoom). Thread-static, so a caller enables it for one
+    /// layout/extraction and restores it. <c>0</c> (the default) and <c>1</c> both mean "no scale".
+    /// Only a uniform <em>root</em> zoom belongs here; mid-tree <c>zoom: N</c> reflows and stays on
+    /// the general engine-zoom path (blocker (b2)).
+    /// </summary>
+    [System.ThreadStatic]
+    public static double VisualViewportScale;
 }

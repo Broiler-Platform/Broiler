@@ -110,4 +110,45 @@ public sealed class PositionAreaLiveGeometryTests
         Assert.Equal(100, W());
         Assert.Equal(100, H());
     }
+
+    [Fact]
+    public void GetBoundingClientRect_LivePositionArea_AgreesWithOffsetGetters()
+    {
+        // getBoundingClientRect must report the same live position-area geometry as
+        // offsetLeft/Top/Width/Height: before this fix the offset getters preferred the
+        // live resolution but getBoundingClientRect read the pre-bake shared snapshot
+        // (a 0×0 box), so a scripted page saw inconsistent size and position. Fixture:
+        // a non-stretch, explicitly-sized box so the used box (40×30) differs from the
+        // 100×100 grid cell — the size the snapshot could never report live.
+        const string html = @"<!DOCTYPE html><html><head><style>
+  #cb { position: relative; width: 300px; height: 300px; }
+  #a { position: absolute; left: 100px; top: 100px; width: 100px; height: 100px; anchor-name: --a; }
+  #t { position: absolute; position-anchor: --a; position-area: bottom right; width: 40px; height: 30px; }
+</style></head><body><div id='cb'><div id='a'></div><div id='t'></div></div></body></html>";
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///pa-gbcr.html");
+
+        double D(string expr) => double.Parse(
+            context.Eval(expr).ToString()!, System.Globalization.CultureInfo.InvariantCulture);
+
+        // Size: the getBoundingClientRect box matches offsetWidth/Height (the used 40×30),
+        // not the pre-bake snapshot's 0.
+        Assert.Equal(D("document.getElementById('t').offsetWidth"),
+            D("document.getElementById('t').getBoundingClientRect().width"), 3);
+        Assert.Equal(D("document.getElementById('t').offsetHeight"),
+            D("document.getElementById('t').getBoundingClientRect().height"), 3);
+
+        // Position: the getBoundingClientRect origin equals the standard offsetParent
+        // invariant — offsetParent border-box left + its clientLeft (border) + offsetLeft —
+        // so the box's document rect is internally consistent with the offset getters.
+        double expectedLeft = D("document.getElementById('cb').getBoundingClientRect().left")
+            + D("document.getElementById('cb').clientLeft")
+            + D("document.getElementById('t').offsetLeft");
+        double expectedTop = D("document.getElementById('cb').getBoundingClientRect().top")
+            + D("document.getElementById('cb').clientTop")
+            + D("document.getElementById('t').offsetTop");
+        Assert.Equal(expectedLeft, D("document.getElementById('t').getBoundingClientRect().left"), 3);
+        Assert.Equal(expectedTop, D("document.getElementById('t').getBoundingClientRect().top"), 3);
+    }
 }
