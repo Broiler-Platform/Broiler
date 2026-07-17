@@ -105,28 +105,6 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationAddEventListener146Core(in Arguments a)
-    {
-        if (a.Length > 1 && a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) && a[1] is JSFunction listener)
-        {
-            _eventTargets.AddVisualViewportScrollListener(listener);
-        }
-
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsRegistrationRemoveEventListener147Core(in Arguments a)
-    {
-        if (a.Length > 1 && a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) && a[1] is JSFunction listener)
-        {
-            _eventTargets.RemoveVisualViewportScrollListener(listener);
-        }
-
-        return JSUndefined.Value;
-    }
-
-
     private JSValue JsRegistrationSetCookie149Core(ref string? cookieStore, in Arguments a)
     {
         if (a.Length > 0)

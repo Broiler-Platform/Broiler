@@ -1018,7 +1018,24 @@ three-callbacks-moved-off-bridge guards + an add→dispatch→remove→dispatch 
 Regression check: the DomEvents, DomEventsEdgeCase and architecture-guard suites pass (98);
 `Broiler.HtmlBridge.Dom` builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.33 named-accessor / relocated-infra /
+Status: **P3.34 completed** 2026-07-17 (same branch) — the **`window.visualViewport` EventTarget methods**,
+completing the EventTarget-wiring trilogy (P3.32 document, P3.33 window). `VisualViewportEventTargetBinding`
+(namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the visualViewport `addEventListener` /
+`removeEventListener` (was the bridge's `JsRegistrationAddEventListener146Core`/`RemoveEventListener147Core`). Only
+the `scroll` event is supported; a `scroll` listener is added to / removed from the visual-viewport store (owned by
+the P2.5 `EventTargetRegistry`) through the two-member `IVisualViewportEventTargetHost` contract
+(`DomBridge.VisualViewportEventTargetHost.cs`, explicit interface members); any other type is a no-op.
+`Registration/Window.cs` now registers `Dom.Features.VisualViewportEventTargetBinding.<Op>(this, in a)`; the
+callbacks are gone from `JsFunctionCallbacks/Registration.cs` (172 → 150 lines). Behaviour-preserving; no
+public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/VisualViewportEventTargetBindingModuleTests.cs` (co-location / host-contract /
+two-callbacks-moved-off-bridge guards + a callable-without-throwing characterization: `scroll` add/remove and a
+non-scroll no-op). Regression check: the EventTargetRegistry and architecture-guard suites pass (26), and the
+GoogleSearchPolyfill `VisualViewport_ScrollIntoView_*` tests — which add a `scroll` listener and assert it **fires**
+on a visual-viewport scroll — still pass, confirming the firing path end-to-end; `Broiler.HtmlBridge.Dom` builds
+clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.34 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

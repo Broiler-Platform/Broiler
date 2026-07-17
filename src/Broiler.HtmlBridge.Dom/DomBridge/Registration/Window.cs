@@ -180,8 +180,10 @@ public sealed partial class DomBridge
         visualViewport.FastAddProperty((KeyString)"pageLeft", new JSFunction((in _) => new JSNumber(GetVisualViewportPageOffset(vertical: false)), "get pageLeft"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
         visualViewport.FastAddProperty((KeyString)"pageTop", new JSFunction((in _) => new JSNumber(GetVisualViewportPageOffset(vertical: true)), "get pageTop"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        visualViewport.FastAddValue((KeyString)"addEventListener", new JSFunction(JsRegistrationAddEventListener146Core, "addEventListener", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        visualViewport.FastAddValue((KeyString)"removeEventListener", new JSFunction(JsRegistrationRemoveEventListener147Core, "removeEventListener", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        // visualViewport addEventListener / removeEventListener (scroll), co-located in the
+        // VisualViewportEventTargetBinding feature module (Phase 3).
+        visualViewport.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => Dom.Features.VisualViewportEventTargetBinding.AddEventListener(this, in a), "addEventListener", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        visualViewport.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => Dom.Features.VisualViewportEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         window.FastAddValue((KeyString)"visualViewport", visualViewport, JSPropertyAttributes.EnumerableConfigurableValue);
         context["visualViewport"] = visualViewport;
