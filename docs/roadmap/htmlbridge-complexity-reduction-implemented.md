@@ -20,7 +20,7 @@ own status entries for the specifics; the summary below is the quick view.
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | Bulk delivered | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); de-globalizing process-static `ElementRuntimeState`/`PositionAreaResolutions` tables deferred (in scope). |
-| 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, SVG, Canvas modules still to come; `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17) — three larger files (`LayoutMetrics.cs`, `JsObjects.cs`, `SubDocuments.cs`) remain as ratcheted debt. |
+| 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, SVG, Canvas modules still to come; `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
 
@@ -1288,11 +1288,15 @@ Exit criteria:
 - No production source file exceeds 750 lines without a documented exemption.
   **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
   a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
-  module (the P3.x pattern) rather than another giant partial. The one remaining
-  over-limit file (`LayoutMetrics.cs` 2343)
-  is listed as
-  documented debt to shrink — the guard surfaces one to de-list once it drops under the limit,
-  so the ratchet keeps closing. Three files are **de-listed** as of 2026-07-17:
+  module (the P3.x pattern) rather than another giant partial. **The debt list is now empty as of
+  2026-07-17** — every HtmlBridge production file is under the 750-line limit, so the guard runs as a
+  pure ratchet (`OversizedFileExemptions` holds no entries; any new/grown over-limit file fails).
+  The guard surfaced each debt file to de-list once it dropped under the limit,
+  so the ratchet kept closing. Three files were **de-listed** early on 2026-07-17:
+  `AnimationResolver.cs` (was 760; see ratchet maintenance below),
+  `JsFunctionCallbacks/Registration.cs` (was 1184 → 684 after the P3.19–P3.28 grab-bag
+  decomposition — nine feature modules peeled out) and
+  `JsFunctionCallbacks/JsObjects.cs` (was 1599 → 727 after the P3.40–P3.46 element/node
   `AnimationResolver.cs` (was 760; see ratchet maintenance below),
   `JsFunctionCallbacks/Registration.cs` (was 1184 → 684 after the P3.19–P3.28 grab-bag
   decomposition — nine feature modules peeled out) and
@@ -1413,6 +1417,36 @@ Exit criteria:
   the guard) stays green. With this de-list the live `OversizedFileExemptions` set holds a single
   entry — `LayoutMetrics.cs` (2343) is now the only HtmlBridge production file still over the
   750-line limit.
+
+  **De-list 2026-07-17 — ratchet fully closed.** The last and largest debt file,
+  `DomBridge/LayoutMetrics.cs` (2343, ~3× the limit), was decomposed into four cohesive sibling
+  partials, leaving the core box-metric accessors (`clientWidth`/`offsetWidth`/`scrollWidth`/…,
+  offset/scroll-parent resolution, bounding-client-rect, and the shared-geometry read-pass cache)
+  behind:
+  - `LayoutMetrics.SvgAndZoom.cs` (380 lines) — SVG geometry/text-metric resolution, element
+    zoom / transform-scale resolution, and the border-box size helpers (plus the two
+    `[GeneratedRegex]` transform-scale / text-path patterns).
+  - `LayoutMetrics.Scrolling.cs` (583 lines) — the scrolling surface: `scrollIntoView`
+    option/argument parsing, element scroll-offset get/set with behaviour, scroll-event dispatch,
+    visual-viewport scroll/scale, and programmatic-scrollability / overflow analysis.
+  - `LayoutMetrics.ScrollGeometry.cs` (400 lines) — scroll-container / fixed-position ancestor
+    resolution, rendered-descendant enumeration, and the `scrollIntoView` physical-offset /
+    scroll-coordinate / scroll-inset geometry conversions.
+  - `LayoutMetrics.CssLength.cs` (393 lines) — CSS `<length>` / `calc()`-style math evaluation
+    against a viewport / containing-block basis, and the font-size / line-height reference
+    resolution it depends on.
+
+  Extracted verbatim (line-range moves) — pure partial-class relocation, no signature,
+  accessibility, or logic change, so behaviour-identical by construction; `LayoutMetrics.cs` drops
+  2343 → 676 and its `OversizedFileExemptions` entry is removed. **This empties the debt list: every
+  HtmlBridge production file is now under 750 lines, and the guard runs as a pure ratchet
+  (0 offenders / 0 exemptions).** `Broiler.HtmlBridge.Dom` builds clean and the guard is green
+  (14/14); the geometry / scroll / SVG / viewport coverage (`LayoutGeometryCacheEquivalenceTests`,
+  `LayoutGeometryCompletenessTests`, `SharedLayoutGeometryTests`, `SharedGeometryZoomSizeTests`,
+  `SharedScrollOverflowTests`, `SvgDomAndCrossDocTests`, `SvgDomDynamicContentTests`,
+  `VisualViewportEventTargetBindingModuleTests`, `WindowScrollBindingModuleTests`,
+  `PositionAreaLiveGeometryTests`, `AnchorInsetLiveGeometryTests`, `AbsPosInlineCbGeometryTests`,
+  133 tests with the guard) stays green.
 
 ### Phase 4 - eliminate parallel DOM state
 

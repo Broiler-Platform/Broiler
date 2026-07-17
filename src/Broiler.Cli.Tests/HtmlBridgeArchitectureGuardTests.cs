@@ -199,10 +199,19 @@ public class HtmlBridgeArchitectureGuardTests
     // limit or adding an exemption is a deliberate, reviewed act, not the default.
     private const int MaxProductionFileLines = 750;
 
-    // Documented Phase-3 debt: files that still exceed the limit (line counts as of 2026-07-16).
+    // Documented Phase-3 debt: files that still exceed the limit. This set is now EMPTY — as of
+    // 2026-07-17 every HtmlBridge production file is under the 750-line limit, so the guard runs as a
+    // pure ratchet (any new/grown over-limit file fails). The de-list history below records how each
+    // former debt file was decomposed into feature-module / sibling partials; keep it for provenance.
     private static readonly HashSet<string> OversizedFileExemptions = new(StringComparer.Ordinal)
     {
-        "src/Broiler.HtmlBridge.Dom/DomBridge/LayoutMetrics.cs",
+        // LayoutMetrics.cs de-listed 2026-07-17: the last and largest debt file (2343 lines) was split
+        // into four cohesive sibling partials — SVG geometry/text + element zoom/transform
+        // (LayoutMetrics.SvgAndZoom.cs), the scrollIntoView / scroll-offset / visual-viewport /
+        // scrollability surface (LayoutMetrics.Scrolling.cs), scroll-container / fixed-position /
+        // scroll-offset geometry (LayoutMetrics.ScrollGeometry.cs), and CSS length/math + font/line-height
+        // resolution (LayoutMetrics.CssLength.cs) — leaving the core box-metric accessors and the
+        // shared-geometry cache behind and dropping it from 2343 to 676 lines. Exemption set now empty.
         // JsFunctionCallbacks/JsObjects.cs de-listed 2026-07-17: six feature modules
         // (P3.40–P3.45: CharacterData, node accessors, element attributes, node relationships,
         // Element selectors, element traversal) plus the EventTarget slice (P3.46: addEventListener/
