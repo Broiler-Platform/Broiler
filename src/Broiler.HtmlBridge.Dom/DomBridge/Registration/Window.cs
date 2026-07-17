@@ -16,7 +16,7 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"document", document, JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.localStorage — in-memory stub backed by a plain JSObject
-        window.FastAddValue((KeyString)"localStorage", BuildLocalStorageObject(), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"localStorage", Dom.Features.WebStorageBinding.BuildLocalStorage(), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.matchMedia(query) — evaluates basic media queries
         window.FastAddValue((KeyString)"matchMedia", new JSFunction((in a) => Dom.Features.MatchMediaBinding.MatchMedia(this, in a), "matchMedia", 1), JSPropertyAttributes.EnumerableConfigurableValue);

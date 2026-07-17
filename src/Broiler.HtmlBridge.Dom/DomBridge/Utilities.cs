@@ -532,40 +532,6 @@ public sealed partial class DomBridge
     // style / CSSStyleDeclaration (element.style, rule.style, getComputedStyle result) moved to the
     // Phase 3 (P3.14) StyleDeclarationBinding feature module (Broiler.HtmlBridge.Dom.Features).
 
-    /// <summary>
-    /// Builds an in-memory <c>localStorage</c> stub exposing <c>getItem</c>,
-    /// <c>setItem</c>, <c>removeItem</c>, and <c>clear</c>.
-    /// Bracket-notation access (e.g. <c>localStorage["key"]</c>) naturally
-    /// falls through to JSObject property lookup.
-    /// </summary>
-    private static JSObject BuildLocalStorageObject()
-    {
-        var storage = new JSObject();
-        var store = new Dictionary<string, string>();
-
-        // localStorage.getItem(key)
-        storage.FastAddValue((KeyString)"getItem",
-            new JSFunction((in a) => JsUtilitiesGetItem029Core(store, in a), "getItem", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // localStorage.setItem(key, value)
-        storage.FastAddValue((KeyString)"setItem",
-            new JSFunction((in a) => JsUtilitiesSetItem030Core(storage, store, in a), "setItem", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // localStorage.removeItem(key)
-        storage.FastAddValue((KeyString)"removeItem",
-            new JSFunction((in a) => JsUtilitiesRemoveItem031Core(storage, store, in a), "removeItem", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // localStorage.clear()
-        storage.FastAddValue((KeyString)"clear",
-            new JSFunction((in a) => JsUtilitiesClear032Core(storage, store, in a), "clear", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        return storage;
-    }
-
 #if !BROILER_CLI
     /// <summary>
     /// Builds a minimal Canvas 2D rendering context exposing basic drawing

@@ -1418,6 +1418,25 @@ guards + an end-to-end characterization driving `before`/`after`/`remove` (incl.
 `replaceWith` through the bridge). Regression check: the ChildNode / NodeMutation / HtmlDomInterface / clone /
 DOM-edge-case / architecture-guard suites pass (105); `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.48 completed** 2026-07-17 (same branch) — the **Web Storage `localStorage` object**, a
+self-contained slice off the window registration. `WebStorageBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates the whole `localStorage` stub — its `getItem` / `setItem` /
+`removeItem` / `clear` over an in-memory `Dictionary<string,string>` (with the value mirrored onto the
+storage JSObject so bracket-notation `localStorage["key"]` falls through to property lookup) plus the
+`BuildLocalStorage` factory (was the bridge's `BuildLocalStorageObject`). Because the store is a plain
+dictionary and the callbacks touch **no bridge state**, this is — like `ClassListBinding` /
+`StyleDeclarationBinding` — an **internal static class with no host contract** (the cleanest kind of
+slice). The window registration (`Registration/Window.cs`) now calls
+`Dom.Features.WebStorageBinding.BuildLocalStorage()`; the factory and the four callbacks
+(`JsUtilitiesGetItem029Core`..`Clear032Core`) are gone from `DomBridge/Utilities.cs` and
+`JsFunctionCallbacks/Utilities.cs` (the latter now holds only the Canvas 2D callbacks — better moved with
+Phase 6). Behaviour-preserving; no public-API change (module internal). Tests:
+`Broiler.Cli.Tests/WebStorageBindingModuleTests.cs` (feature-module / no-host-contract /
+builder-and-four-callbacks-moved-off-bridge guards + a direct round-trip characterization:
+`setItem`/`getItem`, the bracket-notation mirror, a missing key, key-scoped `removeItem` and `clear`
+invoked on the built object). Regression check: the guard / window-scroll / clone / Acid3 suites pass (65);
+`Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
