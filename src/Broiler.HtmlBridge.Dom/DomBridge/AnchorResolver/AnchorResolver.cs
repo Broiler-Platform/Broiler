@@ -64,6 +64,19 @@ public sealed partial class DomBridge
     internal bool NativeTopLayer { get; set; }
 
     /// <summary>
+    /// Phase 5 native dialog/backdrop track — native <c>::backdrop</c>. When on, the bridge stops
+    /// synthesizing a backdrop <c>&lt;div&gt;</c> in <c>InsertDialogBackdrops</c> and instead
+    /// stamps the resolved backdrop background (<c>data-broiler-backdrop</c>) on the top-layer
+    /// element; the renderer generates the <c>::backdrop</c> box natively (Broiler.HTML DomParser,
+    /// patch 0011, which depends on the 0010 top-layer paint). Off by default and — unlike
+    /// <see cref="NativeTopLayer"/> — <em>not</em> auto-enabled by the WPT runner: the synthesized
+    /// <c>&lt;div&gt;</c> is the CI fallback until patch 0011 is applied (the pinned renderer would
+    /// otherwise drop backdrops entirely on the WPT path). Requires <see cref="NativeTopLayer"/> to
+    /// also be on (the native backdrop is painted by the top-layer pass).
+    /// </summary>
+    internal bool NativeBackdrop { get; set; }
+
+    /// <summary>
     /// Resolves <c>anchor()</c> function values and inserts <c>::backdrop</c>
     /// placeholder elements for modal dialogs.  Must be called after script
     /// execution and before serialization.

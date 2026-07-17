@@ -284,3 +284,43 @@ since the marker is inert and the emulation is retained.
 Delete the `ApplyPopoverUAPositioning` `z-index = TopLayerZIndexBase + order` write (the emulation
 the native pass supersedes), then continue the track: native `::backdrop` box generation and modal
 centering / `position: fixed`, each of which deletes a further piece of `Dialogs.cs`.
+
+## Native dialog/backdrop track — native ::backdrop slice (2026-07-17)
+
+Builds on the top-layer paint (0010): the bridge stops synthesizing a backdrop `<div>` (a
+box-tree mutation) and the renderer generates a native `::backdrop` box instead — the largest
+remaining piece of `InsertDialogBackdrops`.
+
+The split is mostly **main-repo** (committed): `CssBox.TopLayerOrder`/`CssBoxProperties`
+(Broiler.Layout) so a renderer-*generated* box can carry a top-layer order (a native `::backdrop`
+has no element to hold the `data-broiler-top-layer` attribute); `FragmentTreeBuilder.GetTopLayerOrder`
+prefers that field, else the attribute; and `Dialogs.cs`, under the new `DomBridge.NativeBackdrop`
+flag, stamps the resolved backdrop background (`data-broiler-backdrop` — the UA modal/popover scrim
+default folded with any author `background`) on the top-layer element and skips the `<div>`.
+
+`NativeBackdrop` is **off by default and — unlike `NativeTopLayer` — not auto-enabled by the WPT
+runner**: the synthesized `<div>` is the CI fallback until 0011 lands (the pinned renderer would
+otherwise drop backdrops on the WPT path). Enable locally with `BROILER_WPT_NATIVE_BACKDROP=1`.
+
+### 0011-html-native-backdrop-box.patch → `Broiler.HTML` (depends on 0010)
+
+`DomParser.GenerateNativeBackdrops` post-pass: for each element the bridge marked with
+`data-broiler-backdrop`, generate a `::backdrop` box as a sibling **before** the element (so the
+0010 top-layer paint's document-order tiebreak paints it beneath), `position:fixed; inset:0`
+(viewport-filling, resolved natively) with the resolved background, overlaying author `::backdrop`
+*geometry* from the cascade, and `TopLayerOrder` from the element's `data-broiler-top-layer` marker.
+Author `::backdrop` `position-try-fallbacks` are not yet carried natively (no corpus); the baked
+`<div>` path still handles them.
+
+Validated end-to-end locally (0010 + 0011 applied, both levers on): a modal dialog with a visible
+`::backdrop` renders **pixel-identical to the baked `<div>` path** (a 100×100 blue dialog on top of
+a red backdrop filling the 300×300 viewport). The css-anchor-position corpus stays 33/6/1 with the
+native path, and — on the committed/CI state (patches not applied, `NativeBackdrop` off) — the
+`<div>` fallback keeps it byte-identical. The render-validation test is not committed (it needs the
+patches, so it cannot pass at the pinned SHA on CI).
+
+### Follow-up once 0010 + 0011 are applied and the pointer bumped
+
+Flip `NativeBackdrop` on for the WPT/production path; the bridge's backdrop-`<div>` synthesis (and
+its author-geometry / position-try-backdrop helpers) then delete from `Dialogs.cs`, leaving only the
+modal box-chrome and the resolved-background computation.

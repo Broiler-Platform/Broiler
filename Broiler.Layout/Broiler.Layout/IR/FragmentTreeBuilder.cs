@@ -333,6 +333,11 @@ internal static class FragmentTreeBuilder
 
     private static int? GetTopLayerOrder(CssBox box)
     {
+        // A renderer-generated top-layer box (e.g. a native ::backdrop) carries its order in the
+        // box field directly — it has no element to hold the data-broiler-top-layer attribute.
+        if (box.TopLayerOrder is int fieldOrder)
+            return fieldOrder;
+
         var raw = box.GetAttribute(TopLayerAttr);
         if (!string.IsNullOrEmpty(raw) &&
             int.TryParse(raw, System.Globalization.NumberStyles.Integer,

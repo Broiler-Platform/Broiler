@@ -18,6 +18,12 @@ public sealed partial class DomBridge
     // projected order), so stamping it is safe on the current baked path.
     private const string TopLayerOrderAttr = "data-broiler-top-layer";
 
+    // Native ::backdrop marker: the resolved backdrop background (UA modal/popover scrim default
+    // folded with any author `background`) the renderer materialises into a native ::backdrop
+    // box. Only stamped in NativeTopLayer mode; on the baked path the bridge inserts a styled
+    // <div> instead. Inert until the native-::backdrop renderer patch lands.
+    private const string BackdropBgAttr = "data-broiler-backdrop";
+
     private void StampTopLayerOrder(DomElement el, int order) =>
         SetAttr(el, TopLayerOrderAttr, order.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
@@ -135,50 +141,60 @@ public sealed partial class DomBridge
             var backdropBg = GetBackdropBackground(
                 dialog, isPopover ? "transparent" : "rgb(229, 229, 229)");
 
-            // Insert a backdrop div BEFORE the dialog.
-            // Use 'position: fixed' with explicit pixel viewport dimensions
-            // because the Broiler renderer cannot resolve opposing insets.
-            // These viewport-covering defaults materialise the ::backdrop UA
-            // style (position:fixed; inset:0); any author-declared geometry
-            // overlaid below overrides them, so an explicitly sized/positioned
-            // backdrop is honoured instead of always filling the viewport.
-            var backdropStyle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            if (NativeBackdrop)
             {
-                ["position"] = "fixed",
-                ["top"] = "0",
-                ["left"] = "0",
-                ["width"] = $"{vpW}px",
-                ["height"] = $"{vpH}px",
-                ["background-color"] = backdropBg,
-            };
-
-            var backdropDecls = GetSyncedScopedEngine(dialog)
-                .GetCascadedDeclaredValues(dialog, "::backdrop");
-            OverlayBackdropAuthorGeometry(backdropDecls, backdropStyle);
-
-            var backdrop = CreateBridgeElement("div");
-            foreach (var kv in backdropStyle)
-                InlineStyle(backdrop)[kv.Key] = kv.Value;
-            // Mark the ::backdrop as top-layer with its element's order. It is inserted just
-            // before the dialog/popover below, so the native pass's document-order tiebreak
-            // paints it directly beneath its element yet above ordinary page content (inert on
-            // the baked path, where the fixed viewport-covering div stacks in DOM order).
-            if (NativeTopLayer)
-                StampTopLayerOrder(backdrop, TopLayerOrderOf(dialog));
-            SetParent(backdrop, parent);
-
-            int idx = ChildIndexOf(parent, dialog);
-            if (idx >= 0)
-                InsertChildAt(parent, idx, backdrop);
-
-            // If the ::backdrop declares position-try-fallbacks and its base
-            // geometry overflows the containing block, resolve the fallback
-            // now: the main position-try pass (ResolvePositionTryFallbacks) ran
-            // before this backdrop div existed, so it never saw it.
-            if (backdropStyle.ContainsKey("position-try-fallbacks") ||
-                backdropStyle.ContainsKey("position-try"))
+                // Native ::backdrop: don't mutate the box tree with a synthesized <div>. Stamp the
+                // resolved backdrop background on the element and let the renderer generate the
+                // ::backdrop box natively (Broiler.HTML DomParser, patch 0011) as a top-layer box
+                // beneath the dialog. The resolved background already folds the UA modal/popover
+                // scrim default with any author `background` (which the renderer cannot decide
+                // without the modal/popover runtime state); the renderer overlays author ::backdrop
+                // *geometry* from the ::backdrop cascade. Author position-try-fallbacks on a
+                // ::backdrop are not yet carried natively (no corpus); the baked path below still
+                // handles them.
+                SetAttr(dialog, BackdropBgAttr, backdropBg);
+            }
+            else
             {
-                ResolvePositionTryFallbacksTree(backdrop, anchorRegistry, positionTryRules);
+                // Insert a backdrop div BEFORE the dialog.
+                // Use 'position: fixed' with explicit pixel viewport dimensions
+                // because the Broiler renderer cannot resolve opposing insets.
+                // These viewport-covering defaults materialise the ::backdrop UA
+                // style (position:fixed; inset:0); any author-declared geometry
+                // overlaid below overrides them, so an explicitly sized/positioned
+                // backdrop is honoured instead of always filling the viewport.
+                var backdropStyle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["position"] = "fixed",
+                    ["top"] = "0",
+                    ["left"] = "0",
+                    ["width"] = $"{vpW}px",
+                    ["height"] = $"{vpH}px",
+                    ["background-color"] = backdropBg,
+                };
+
+                var backdropDecls = GetSyncedScopedEngine(dialog)
+                    .GetCascadedDeclaredValues(dialog, "::backdrop");
+                OverlayBackdropAuthorGeometry(backdropDecls, backdropStyle);
+
+                var backdrop = CreateBridgeElement("div");
+                foreach (var kv in backdropStyle)
+                    InlineStyle(backdrop)[kv.Key] = kv.Value;
+                SetParent(backdrop, parent);
+
+                int idx = ChildIndexOf(parent, dialog);
+                if (idx >= 0)
+                    InsertChildAt(parent, idx, backdrop);
+
+                // If the ::backdrop declares position-try-fallbacks and its base
+                // geometry overflows the containing block, resolve the fallback
+                // now: the main position-try pass (ResolvePositionTryFallbacks) ran
+                // before this backdrop div existed, so it never saw it.
+                if (backdropStyle.ContainsKey("position-try-fallbacks") ||
+                    backdropStyle.ContainsKey("position-try"))
+                {
+                    ResolvePositionTryFallbacksTree(backdrop, anchorRegistry, positionTryRules);
+                }
             }
 
             // The white-box UA defaults below (display:block, border, padding,

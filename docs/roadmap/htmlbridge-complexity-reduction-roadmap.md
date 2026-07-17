@@ -3069,24 +3069,36 @@ z-index emulation still drives the top layer and the corpus is byte-identical. C
 `TopLayerFragmentProjectionTests`. Follow-up once 0010 is applied and the pointer bumped: delete the
 `ApplyPopoverUAPositioning` z-index write the pass supersedes.
 
-**Track status after slice 1c — the *pixel-validatable* dialog-track (and anchor-track) increments are now
-exhausted; what remains is maintainer patch-application or corpus-gapped.** A systematic sweep after 0010
-landed:
-- **Native `::backdrop` box generation** (the largest remaining piece of `Dialogs.cs`) is scoped but is a
-  *larger* feature than the recent slices, and **has no pixel corpus**: every `::backdrop` in the local
-  corpus is `background: transparent` (the 7 `anchor-position-top-layer-*` tests) — an invisible scrim — so
-  no reftest exercises a visible backdrop. Its visual behaviour (UA dimming scrim, author `background`,
-  author geometry overlay, and the `position-try-backdrop` fallback `InsertDialogBackdrops` runs) is covered
-  only by bridge *unit* tests today. It also needs a design change 0010 does not yet carry: a natively
-  *generated* `::backdrop` box has no DOM element, so it cannot carry the `data-broiler-top-layer` attribute
-  the current projection reads — the top-layer order must move to a `CssBox`/`Fragment` field the generator
-  can set directly (DomParser projecting the attribute into that field for stamped elements, and setting it
-  on the generated backdrop as `dialog-order − 1` so it paints beneath). Correct box-tree placement:
-  generate it as a child of the dialog box with `position:fixed; inset:0` and its own top-layer order, so
-  `PaintTopLayer` lifts it out and paints it beneath the dialog. This is a multi-part Broiler.HTML/CSS
-  effort (box generation + UA `::backdrop` defaults + gating the bridge div), validatable by unit tests plus
-  the transparent-backdrop no-regression reftests — a dedicated slice, not a quick increment.
-- **Modal centering / `position:fixed`** likewise has **no corpus**: every modal in the top-layer corpus is
+**Landed (2026-07-17) — (a) native `::backdrop` box generation (slice 1d, patch 0011 + main-repo
+IR/marker).** Builds on 0010: the bridge stops synthesizing a backdrop `<div>` (a box-tree mutation) and
+the renderer generates a native `::backdrop` box. Mostly main-repo: `CssBox.TopLayerOrder`
+(`CssBoxProperties`) lets a renderer-*generated* box carry a top-layer order (a native `::backdrop` has no
+element to hold the `data-broiler-top-layer` attribute); `FragmentTreeBuilder.GetTopLayerOrder` prefers the
+field, else the attribute; and `Dialogs.cs`, under the new `DomBridge.NativeBackdrop` flag, stamps the
+resolved backdrop background (`data-broiler-backdrop` — UA modal/popover scrim default folded with any
+author `background`) on the element and skips the `<div>`. `NativeBackdrop` is **off by default and not
+auto-enabled in WPT** (unlike `NativeTopLayer`): the `<div>` is the CI fallback until 0011 lands, so the
+pinned renderer never drops backdrops. Patch 0011 (`Broiler.HTML`, depends on 0010):
+`DomParser.GenerateNativeBackdrops` generates the `::backdrop` as a sibling before the element
+(`position:fixed; inset:0`, resolved background, author `::backdrop` geometry overlaid, `TopLayerOrder` from
+the element's marker) so the top-layer paint's tiebreak paints it beneath. Validated (both patches + both
+levers on): a modal with a *visible* `::backdrop` renders pixel-identical to the baked `<div>` (100×100 blue
+dialog over a red viewport-filling backdrop) — the visible-backdrop case with no reftest corpus — and the
+corpus stays 33/6/1; on the committed/CI state (`NativeBackdrop` off) the `<div>` fallback keeps it
+byte-identical. Author `::backdrop` `position-try-fallbacks` stay on the baked path (no corpus). Follow-up
+once 0010+0011 apply and the pointer bumps: flip `NativeBackdrop` on and delete the backdrop-`<div>`
+synthesis (and its author-geometry / position-try helpers) from `Dialogs.cs`.
+
+**Track status after slice 1c.** A systematic sweep after 0010 landed:
+- **Native `::backdrop` box generation** (the largest remaining piece of `Dialogs.cs`) is now **done —
+  slice 1d, patch 0011 + main-repo IR/marker** (landing note below). It resolved the design points the
+  earlier scoping flagged: the top-layer order moved to a `CssBox.TopLayerOrder` field so a renderer-
+  *generated* box (no element, no attribute) can carry it, and the `::backdrop` is generated as a sibling
+  *before* the element (order = the element's) so the 0010 top-layer paint's document-order tiebreak paints
+  it beneath. Validated by a render test showing pixel-parity with the baked `<div>` (a visible backdrop
+  beneath the dialog) — the visible-backdrop case the reftest corpus lacks — plus the transparent-backdrop
+  no-regression reftests.
+- **Modal centering / `position:fixed`** has **no corpus**: every modal in the top-layer corpus is
   `anchor()`-positioned, none centered, and the bridge does not center them (it only applies `position:fixed`).
 - **Anchor-track render residue** stays exhausted (established earlier): the only un-handed-off case is a
   `position-area` box that *also* uses `position-try`, for which **no WPT test exists**, so widening the MVP

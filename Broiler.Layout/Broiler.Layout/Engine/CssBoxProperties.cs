@@ -752,6 +752,15 @@ internal abstract partial class CssBoxProperties
     public string LineBreak { get; set; } = "auto";
     public string Opacity { get; set; } = "1";
     public string ZIndex { get; set; } = CssConstants.Auto;
+
+    // CSS Position 4 §top-layer: non-null when this box is in the top layer (an open modal
+    // <dialog>, an open popover, or a synthesized ::backdrop). Projected onto
+    // Fragment.TopLayerOrder so the paint lifts it above ordinary stacking. Carries the order for
+    // boxes the renderer *generates* (a native ::backdrop has no element to hold the
+    // data-broiler-top-layer attribute FragmentTreeBuilder reads for stamped elements); null for
+    // ordinary boxes, which stack normally.
+    public int? TopLayerOrder { get; set; }
+
     public string BoxShadow { get; set; } = "none";
     public string TextShadow { get; set; } = "none";
     public string MixBlendMode { get; set; } = "normal";
