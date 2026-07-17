@@ -72,30 +72,4 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSValue JsRegistrationGetCurrentTime152Core(DomElement element, in Arguments _)
-    {
-        if (GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.TryGet(out var value) && value is double currentTimeMs)
-        {
-            return new JSNumber(currentTimeMs);
-        }
-
-        return new JSNumber(0);
-    }
-
-
-    private static JSValue JsRegistrationSetCurrentTime153Core(DomElement element, in Arguments a)
-    {
-        if (a.Length > 0)
-            GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.Set(a[0].DoubleValue);
-        return JSUndefined.Value;
-    }
-
-
-    private static JSValue JsRegistrationThen154Core(JSObject? ready, in Arguments a)
-    {
-        if (a.Length > 0 && a[0] is JSFunction fn)
-            fn.InvokeFunction(new Arguments(JSUndefined.Value, JSUndefined.Value));
-        return ready;
-    }
-
 }

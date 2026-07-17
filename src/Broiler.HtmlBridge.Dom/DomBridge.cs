@@ -219,7 +219,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public IReadOnlyList<DomElement> Elements =>
         [.. _document.InclusiveDescendants().OfType<DomElement>()];
 
-    private static ElementRuntimeState GetElementRuntimeState(DomNode node) =>
+    internal static ElementRuntimeState GetElementRuntimeState(DomNode node) =>
         ElementRuntimeStates.GetValue(node, static _ => new ElementRuntimeState());
 
     /// <summary>
