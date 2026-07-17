@@ -300,8 +300,8 @@ public sealed partial class DomBridge
 
         var combinedZoom = GetUsedZoomForElement(DocumentElement) * scale;
         InlineStyle(DocumentElement)["zoom"] = combinedZoom.ToString("0.###", CultureInfo.InvariantCulture);
-        GetElementRuntimeState(DocumentElement).Scroll.Left.Set(GetVisualViewportPageOffset(vertical: false));
-        GetElementRuntimeState(DocumentElement).Scroll.Top.Set(GetVisualViewportPageOffset(vertical: true));
+        ScrollStateFor(DocumentElement).Left.Set(GetVisualViewportPageOffset(vertical: false));
+        ScrollStateFor(DocumentElement).Top.Set(GetVisualViewportPageOffset(vertical: true));
     }
 
     [GeneratedRegex(@"url\(\s*(['""]?)(?<u>[^'""\)]+)\1\s*\)", RegexOptions.IgnoreCase)]

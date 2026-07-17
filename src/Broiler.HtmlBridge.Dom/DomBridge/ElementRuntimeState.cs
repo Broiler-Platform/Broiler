@@ -49,7 +49,10 @@ internal sealed class ElementRuntimeState
 
     public FormControlRuntimeState FormControl { get; } = new();
 
-    public ScrollRuntimeState Scroll { get; } = new();
+    // Phase 2 item 4 (de-globalization, 2026-07-17): the Scroll slot was moved out of this
+    // process-static table into a per-bridge instance table (DomBridge._scrollRuntimeStates,
+    // reached via ScrollStateFor); the clone copy lives in CloneDomElement now. See
+    // ScrollRuntimeState below (still used by that instance table).
 
     public DialogRuntimeState Dialog { get; } = new();
 
@@ -68,8 +71,8 @@ internal sealed class ElementRuntimeState
         FormControl.DefaultSelected.CopyTo(target.FormControl.DefaultSelected);
         FormControl.SelectedIndex.CopyTo(target.FormControl.SelectedIndex);
         FormControl.ReturnValue.CopyTo(target.FormControl.ReturnValue);
-        Scroll.Left.CopyTo(target.Scroll.Left);
-        Scroll.Top.CopyTo(target.Scroll.Top);
+        // Scroll offsets are copied separately in CloneDomElement (moved to a per-bridge
+        // instance table; this static-table struct no longer owns them).
         Dialog.Modal.CopyTo(target.Dialog.Modal);
         Dialog.TopLayerOrder.CopyTo(target.Dialog.TopLayerOrder);
         Dialog.PopoverOpen.CopyTo(target.Dialog.PopoverOpen);

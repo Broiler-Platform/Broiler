@@ -506,8 +506,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     internal bool TryGetStoredScrollOffset(DomElement element, bool vertical, out double offset)
     {
         var slot = vertical
-            ? GetElementRuntimeState(element).Scroll.Top
-            : GetElementRuntimeState(element).Scroll.Left;
+            ? ScrollStateFor(element).Top
+            : ScrollStateFor(element).Left;
         if (slot.TryGet(out var value) && value is double storedOffset)
         {
             offset = storedOffset;

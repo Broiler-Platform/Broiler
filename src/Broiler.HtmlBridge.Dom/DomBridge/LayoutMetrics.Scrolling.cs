@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Boolean;
@@ -6,6 +7,7 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.HtmlBridge.Logging;
+using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
 using System.Globalization;
 
@@ -20,6 +22,17 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
+    // Phase 2 item 4 (de-globalization, 2026-07-17): the per-element JS-visible scroll offset was
+    // the Scroll slot of the process-static ElementRuntimeState table; it is now a per-bridge
+    // instance table, so the scroll memo is owned by the session's bridge rather than the process.
+    // Still an element-keyed ConditionalWeakTable, so a detached element's offset GCs with it, and
+    // the cloneNode copy (see CloneDomElement) is preserved. All scroll-offset access is on the
+    // bridge instance, so this needed no static-helper cascade (unlike the remaining concerns).
+    private readonly ConditionalWeakTable<DomElement, ScrollRuntimeState> _scrollRuntimeStates = [];
+
+    private ScrollRuntimeState ScrollStateFor(DomElement element) =>
+        _scrollRuntimeStates.GetValue(element, static _ => new ScrollRuntimeState());
+
     private void ScrollElementIntoView(DomElement element,
         string? block = null, string? inline = null, string? behavior = null)
     {
@@ -238,8 +251,8 @@ public sealed partial class DomBridge
                     var queuedPreviousTop = GetElementScrollOffset(element, vertical: true);
                     var queuedPreviousVisualPageLeft = trackVisualViewport ? GetVisualViewportPageOffset(vertical: false) : 0;
                     var queuedPreviousVisualPageTop = trackVisualViewport ? GetVisualViewportPageOffset(vertical: true) : 0;
-                    GetElementRuntimeState(element).Scroll.Left.Set(targetLeft);
-                    GetElementRuntimeState(element).Scroll.Top.Set(targetTop);
+                    ScrollStateFor(element).Left.Set(targetLeft);
+                    ScrollStateFor(element).Top.Set(targetTop);
                     NotifyVisualViewportScrollIfNeeded(queuedPreviousVisualPageLeft, queuedPreviousVisualPageTop, trackVisualViewport);
                     DispatchScrollEventIfNeeded(element, queuedPreviousLeft, queuedPreviousTop);
                     DispatchScrollEndEventIfNeeded(element, queuedPreviousLeft, queuedPreviousTop);
@@ -249,15 +262,15 @@ public sealed partial class DomBridge
 
             // Approximate smooth scrolling with a visible intermediate frame before
             // finishing on the next queued frame.
-            GetElementRuntimeState(element).Scroll.Left.Set(previousLeft + ((targetLeft - previousLeft) / 2.0));
-            GetElementRuntimeState(element).Scroll.Top.Set(previousTop + ((targetTop - previousTop) / 2.0));
+            ScrollStateFor(element).Left.Set(previousLeft + ((targetLeft - previousLeft) / 2.0));
+            ScrollStateFor(element).Top.Set(previousTop + ((targetTop - previousTop) / 2.0));
             NotifyVisualViewportScrollIfNeeded(previousVisualPageLeft, previousVisualPageTop, trackVisualViewport);
             DispatchScrollEventIfNeeded(element, previousLeft, previousTop);
             return;
         }
 
-        GetElementRuntimeState(element).Scroll.Left.Set(targetLeft);
-        GetElementRuntimeState(element).Scroll.Top.Set(targetTop);
+        ScrollStateFor(element).Left.Set(targetLeft);
+        ScrollStateFor(element).Top.Set(targetTop);
         NotifyVisualViewportScrollIfNeeded(previousVisualPageLeft, previousVisualPageTop, trackVisualViewport);
         DispatchScrollEventIfNeeded(element, previousLeft, previousTop);
         DispatchScrollEndEventIfNeeded(element, previousLeft, previousTop);

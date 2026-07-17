@@ -68,8 +68,8 @@ public sealed partial class DomBridge
         if (targetIsFixed)
         {
             var docEl = DocumentElement;
-            if (GetElementRuntimeState(docEl).Scroll.Top.TryGet(out var stv) && stv is double st) scrollAdjY = st;
-            if (GetElementRuntimeState(docEl).Scroll.Left.TryGet(out var slv) && slv is double sl) scrollAdjX = sl;
+            if (ScrollStateFor(docEl).Top.TryGet(out var stv) && stv is double st) scrollAdjY = st;
+            if (ScrollStateFor(docEl).Left.TryGet(out var slv) && slv is double sl) scrollAdjX = sl;
         }
 
         // Resolves one physical inset's anchor() to a px value in the containing-block frame,

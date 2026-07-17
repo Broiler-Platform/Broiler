@@ -365,6 +365,10 @@ public sealed partial class DomBridge
         // (The namespace was carried at construction via CreateBridgeElementNS above.)
         // Copy browser-runtime values (e.g., checked state for inputs).
         GetElementRuntimeState(element).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
+        // Scroll offsets moved out of ElementRuntimeState into the per-bridge instance table
+        // (Phase 2 item 4 de-globalization), so copy them here to preserve cloneNode semantics.
+        ScrollStateFor(element).Left.CopyTo(ScrollStateFor(clone).Left);
+        ScrollStateFor(element).Top.CopyTo(ScrollStateFor(clone).Top);
         // Carry the memoized position-area resolution too (was ElementRuntimeState.Layout,
         // now the bridge-level PositionAreaResolutions cache — see PositionAreaQueries.cs).
         CopyPositionAreaResolution(element, clone);
