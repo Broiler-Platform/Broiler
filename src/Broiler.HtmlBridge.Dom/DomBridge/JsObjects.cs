@@ -164,7 +164,7 @@ public sealed partial class DomBridge
         {
             bridge.SyncStyleAttributeFromInlineStyle(element);
             bridge.InvalidateStyleScope(element);
-        });
+        }, onPositionAreaInvalidate: bridge.ClearPositionAreaResolution);
         obj.FastAddProperty((KeyString)"style",
             new JSFunction((in a) => styleObj, "get style"),
             new JSFunction((in a) => JsJsObjectsSetStyle025Core(bridge, element, in a), "set style"),

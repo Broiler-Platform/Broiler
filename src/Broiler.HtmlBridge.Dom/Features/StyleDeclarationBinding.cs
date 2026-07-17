@@ -21,10 +21,11 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// canonical <see cref="Broiler.CSS.CssPropertyNames"/>/<see cref="Broiler.CSS.CssPriority"/> helpers, so
 /// — like <see cref="ClassListBinding"/> — it is an <b>internal static class with no host contract</b>.
 /// The map <em>production</em> (the inline-style store, the engine cascade for computed style) and the
-/// invalidation side effects stay in the bridge: callers pass the computed map and an <c>onMutation</c>
-/// callback, and the module reaches the shared inline-style store and the "set via JS" bookkeeping
-/// through the neutral static <c>DomBridge</c> helpers (<c>InlineStyle</c>, <c>ParseStyle</c>,
-/// <c>IsAcceptableInlineValue</c>, <c>ExpandCssShorthands</c>, <c>ClearPositionAreaResolution</c>,
+/// invalidation side effects stay in the bridge: callers pass the computed map, an <c>onMutation</c>
+/// callback and (for inline declarations) an <c>onPositionAreaInvalidate</c> callback that clears the
+/// bridge-instance position-area memo, and the module reaches the shared inline-style store and the
+/// "set via JS" bookkeeping through the neutral static <c>DomBridge</c> helpers (<c>InlineStyle</c>,
+/// <c>ParseStyle</c>, <c>IsAcceptableInlineValue</c>, <c>ExpandCssShorthands</c>,
 /// <c>Mark/Unmark/Clear/InlineStylePropsSetByJs</c>).
 /// </para>
 /// </summary>
@@ -40,9 +41,10 @@ internal static partial class StyleDeclarationBinding
 
     /// <summary>Builds the writable <c>element.style</c> CSSStyleDeclaration. Was
     /// <c>DomBridge.BuildStyleObject(element, onMutation, parentRule)</c>.</summary>
-    internal static JSObject BuildInlineDeclaration(DomElement element, Action? onMutation = null, JSValue? parentRule = null)
+    internal static JSObject BuildInlineDeclaration(DomElement element, Action? onMutation = null, JSValue? parentRule = null,
+        Action<DomElement>? onPositionAreaInvalidate = null)
     {
-        var style = new CssStyleDeclaration(element, onMutation);
+        var style = new CssStyleDeclaration(element, onMutation, onPositionAreaInvalidate);
 
         style.FastAddProperty((KeyString)"cssText",
             new JSFunction((in a) => InlineGetCssText(element, in a), "get cssText"),
@@ -164,7 +166,8 @@ internal static partial class StyleDeclarationBinding
 
     // -------- declaration JS object types --------
 
-    private sealed class CssStyleDeclaration(DomElement element, Action? onMutation = null) : JSObject
+    private sealed class CssStyleDeclaration(DomElement element, Action? onMutation = null,
+        Action<DomElement>? onPositionAreaInvalidate = null) : JSObject
     {
         protected override bool SetValue(KeyString name, JSValue value, JSValue receiver, bool throwError = true)
         {
@@ -193,9 +196,11 @@ internal static partial class StyleDeclarationBinding
                 }
 
                 // Invalidate cached position-area resolution when relevant
-                // properties change so offset queries recompute.
+                // properties change so offset queries recompute. The memo is now a
+                // per-bridge-instance table, so the owning bridge threads its clear in
+                // via onPositionAreaInvalidate (was a static DomBridge.ClearPositionAreaResolution).
                 if (kebab is "position-area" or "position-anchor")
-                    DomBridge.ClearPositionAreaResolution(element);
+                    onPositionAreaInvalidate?.Invoke(element);
 
                 onMutation?.Invoke();
             }

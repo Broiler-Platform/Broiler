@@ -19,7 +19,7 @@ own status entries for the specifics; the summary below is the quick view.
 |---|---|---|
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
-| 2 — document services & single state authority | Bulk delivered | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); de-globalizing process-static `ElementRuntimeState`/`PositionAreaResolutions` tables deferred (in scope). |
+| 2 — document services & single state authority | Bulk delivered | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); process-static `PositionAreaResolutions` table de-globalized to a per-bridge instance (2026-07-17), leaving the larger process-static `ElementRuntimeState` table still to de-globalize (in scope). |
 | 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, SVG, Canvas modules still to come; `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
@@ -240,8 +240,10 @@ bridge state now has explicit single owners (all internal, in `Broiler.HtmlBridg
 event listeners were de-globalized off the process-static `ElementRuntimeState` onto an instance
 `ConditionalWeakTable`. Not fully met and carried forward: two simultaneous sessions are still not
 isolated (blocked at the Broiler.JS engine's shared globals — a JS-engine concern, not the bridge),
-and the remaining process-static `ElementRuntimeState`/`PositionAreaResolutions` tables are still to be
-de-globalized (the sub-document caches above are now consolidated into `BrowsingContextManager` — P3.16).
+and the process-static per-element runtime tables are being de-globalized incrementally: the
+`PositionAreaResolutions` memo is now a per-bridge instance table (2026-07-17 — see the de-list note
+below), leaving the larger process-static `ElementRuntimeState` table still to do (the sub-document
+caches above are now consolidated into `BrowsingContextManager` — P3.16).
 
 Two findings recorded for later phases:
 
@@ -252,9 +254,29 @@ Two findings recorded for later phases:
   guarantees *sequential* re-attach isolation. Full simultaneous isolation needs JS-engine work
   (out of this roadmap's scope).
 - **De-globalizing the process-static per-element runtime tables** (`ElementRuntimeStates`,
-  `PositionAreaResolutions`) is deferred: it is a 155-call-site / 24-file cascade through the
-  project's ~284 static helpers, and the tables are weak + node-keyed (they GC with the session's
-  nodes, so they do not leak or cross sessions today). Its own later PR under item 4.
+  `PositionAreaResolutions`) is being done incrementally. Both tables are weak + node-keyed (they GC
+  with the session's nodes, so they do not leak or cross sessions today), so this is a correctness/
+  ownership cleanup rather than a leak fix.
+  - **`PositionAreaResolutions` — done (2026-07-17).** The position-area memo (a
+    `ConditionalWeakTable<DomElement, …>` with four accessors, all in
+    `AnchorResolver/PositionAreaQueries.cs`) was made a **per-bridge instance** field
+    (`_positionAreaResolutions`) and its four accessors instance methods. Every caller was already in
+    an instance context except one: the static `StyleDeclarationBinding.CssStyleDeclaration.SetValue`
+    (inline `el.style.position-area = …` mutation) called the former static
+    `DomBridge.ClearPositionAreaResolution`. Rather than open the static-helper cascade, a narrow
+    `Action<DomElement>? onPositionAreaInvalidate` callback was threaded through
+    `BuildInlineDeclaration` → `CssStyleDeclaration`; the sole builder call site (the instance
+    `ToJSObject` in `JsObjects.cs`) passes `bridge.ClearPositionAreaResolution`. Behaviour-identical
+    (same CWT/GC semantics, same invalidation and clone-copy paths); `Broiler.HtmlBridge.Dom` builds
+    clean and the position-area / position-try / CSSOM style-declaration coverage
+    (`PositionAreaLiveGeometryTests`, `PositionTryLiveGeometryTests`, `NativePositionTryBridgeModeTests`,
+    `NativePositionTryPipelineTests`, `CssStyleDeclarationValidationTests`,
+    `StyleDeclarationBindingModuleTests`, `SelectorsAndCssomTests`, `DomImplementationTests`) stays
+    green.
+  - **`ElementRuntimeStates` — still deferred.** The larger table is a genuine cascade: its 87
+    accessor call sites reach it through the `internal static GetElementRuntimeState(node)` helper,
+    and many callers are themselves static helpers, so making it instance ripples through the
+    project's ~284 static helpers (a 155-call-site / 24-file cascade). Its own later PR under item 4.
 
 Goal: make hidden state dependencies explicit while preserving behavior.
 
