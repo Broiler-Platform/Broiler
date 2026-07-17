@@ -77,6 +77,32 @@ internal abstract partial class CssBoxProperties
     private double _actualMarginBottom = double.NaN;
     private double _actualMarginRight = double.NaN;
     private double _actualMarginLeft = double.NaN;
+
+    // CSS2.1 §8.3: a used margin of `auto` resolves to 0, and the ActualMargin* getters below
+    // rewrite the specified string `auto → "0"` (a caching side-effect). That loses the fact that
+    // the margin was *specified* auto — which the §10.3.7/§10.6.4 abspos/fixed auto-margin centring
+    // needs. Latch it here (set when a getter first sees `auto`, before the rewrite) so the
+    // centring can ask <see cref="IsSpecifiedMarginLeftAuto"/> after the string has been zeroed.
+    private bool _marginLeftWasAuto;
+    private bool _marginRightWasAuto;
+    private bool _marginTopWasAuto;
+    private bool _marginBottomWasAuto;
+
+    /// <summary>Whether <c>margin-left</c> was specified <c>auto</c> (survives the getter's used-value rewrite).</summary>
+    internal bool IsSpecifiedMarginLeftAuto => _marginLeftWasAuto || MarginLeft == CssConstants.Auto;
+    internal bool IsSpecifiedMarginRightAuto => _marginRightWasAuto || MarginRight == CssConstants.Auto;
+    internal bool IsSpecifiedMarginTopAuto => _marginTopWasAuto || MarginTop == CssConstants.Auto;
+    internal bool IsSpecifiedMarginBottomAuto => _marginBottomWasAuto || MarginBottom == CssConstants.Auto;
+
+    /// <summary>Drops the cached used margins so a subsequent <c>ActualMargin*</c> read reflects a
+    /// margin string just rewritten (e.g. auto-margin centring resolving an <c>auto</c> to a px value).</summary>
+    internal void InvalidateActualMargins()
+    {
+        _actualMarginLeft = double.NaN;
+        _actualMarginRight = double.NaN;
+        _actualMarginTop = double.NaN;
+        _actualMarginBottom = double.NaN;
+    }
     private double _actualBorderTopWidth = double.NaN;
     private double _actualBorderLeftWidth = double.NaN;
     private double _actualBorderBottomWidth = double.NaN;
@@ -1188,7 +1214,10 @@ internal abstract partial class CssBoxProperties
             if (double.IsNaN(_actualMarginTop))
             {
                 if (MarginTop == CssConstants.Auto)
+                {
+                    _marginTopWasAuto = true;
                     MarginTop = "0";
+                }
 
                 var actualMarginTop = ParseLengthWithLineHeight(MarginTop, Size.Width);
 
@@ -1215,7 +1244,10 @@ internal abstract partial class CssBoxProperties
             if (double.IsNaN(_actualMarginLeft))
             {
                 if (MarginLeft == CssConstants.Auto)
+                {
+                    _marginLeftWasAuto = true;
                     MarginLeft = "0";
+                }
 
                 var actualMarginLeft = ParseLengthWithLineHeight(MarginLeft, Size.Width);
 
@@ -1235,7 +1267,10 @@ internal abstract partial class CssBoxProperties
             if (double.IsNaN(_actualMarginBottom))
             {
                 if (MarginBottom == CssConstants.Auto)
+                {
+                    _marginBottomWasAuto = true;
                     MarginBottom = "0";
+                }
 
                 var actualMarginBottom = ParseLengthWithLineHeight(MarginBottom, Size.Width);
 
@@ -1256,7 +1291,10 @@ internal abstract partial class CssBoxProperties
             if (double.IsNaN(_actualMarginRight))
             {
                 if (MarginRight == CssConstants.Auto)
+                {
+                    _marginRightWasAuto = true;
                     MarginRight = "0";
+                }
 
                 var actualMarginRight = ParseLengthWithLineHeight(MarginRight, Size.Width);
 
