@@ -3562,14 +3562,16 @@ Validated **end-to-end locally** (flag on + patch 0006 applied): a pinch-zoom `s
 (extraction ×2, fold ÷2) balance exactly. The test is **not committed** (needs 0006, so it cannot pass at
 the pinned SHA on CI).
 
-**Activation** = apply patch 0006, bump the `Broiler.HTML` pointer, and flip `NativeVisualViewport` on in
-the live construction. **Two follow-ups remain before/at activation:** (i) **snapshot cache key** — the
-visual-viewport scale is not part of `HeadlessLayoutView`'s `(document, version, viewport, baseUrl)` cache
-key, so a `visualViewport.scale` change with no DOM mutation would serve a stale (unscaled) snapshot; the
-scale (or a viewport-metrics bump) must join the key. (ii) the **render/paint half** (magnifying a
-pinch-zoomed page's paint) is still the WPT-runner `zoom` bake's job — the read-model cutover leaves that
-bake in place, so retiring it fully still needs the submodule paint transform noted above. (b2) general
-mid-tree `zoom: N` remains separate.
+**Activation** = apply patches 0006 **and 0007**, bump the `Broiler.HTML` pointer, and flip
+`NativeVisualViewport` on in the live construction. **Follow-up (i) — snapshot cache key — is now
+addressed** by `patches/0007-html-visual-viewport-snapshot-cache-key.patch`: `HeadlessLayoutView.GetGeometry`
+adds the `VisualViewportScale` channel value to its `(document, version, viewport, baseUrl)` key, so a
+`visualViewport.scale` change (not a DOM mutation, so it doesn't bump `DomDocument.Version`) re-lays-out
+instead of serving a stale snapshot. Validated end-to-end locally (0005+0006+0007, flag on): reading
+`getBoundingClientRect().width` = 100, then `visualViewport.scale = 2`, then re-reading = 200. **Remaining
+before full retirement:** (ii) the **render/paint half** (magnifying a pinch-zoomed page's paint) is still
+the WPT-runner `zoom` bake's job — the read-model cutover leaves that bake in place, so retiring it fully
+still needs the submodule paint transform noted above. (b2) general mid-tree `zoom: N` remains separate.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.

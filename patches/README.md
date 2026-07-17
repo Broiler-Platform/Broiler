@@ -173,10 +173,21 @@ it back out while `getBoundingClientRect` keeps it (CSSOM-View: pinch-zoom is a 
 Validated end-to-end locally **with this patch applied and the flag on**: `visualViewport.scale = 2` leaves
 `offsetLeft`/`offsetWidth` unaffected and scales `getBoundingClientRect` ×2.
 
-**To activate:** apply this patch, bump the `Broiler.HTML` pointer, and flip `NativeVisualViewport` on in
-the live bridge construction. **Before activation, address the snapshot cache key:** the visual-viewport
-scale is not part of `HeadlessLayoutView`'s `(document, version, viewport, baseUrl)` cache key, so a
-`visualViewport.scale` change with no DOM mutation would serve a stale snapshot — the scale must join the
-key. **Not covered:** the render/paint half (magnifying a pinch-zoomed page's paint) is still the
-WPT-runner `zoom` bake's job, so `ApplyVisualViewportSerializationState` stays until a native paint
-transform lands; and general mid-tree `zoom: N` (reflow) is the separate (b2) engine-zoom feature.
+**To activate:** apply this patch **and 0007** (the snapshot cache key, below), bump the `Broiler.HTML`
+pointer, and flip `NativeVisualViewport` on in the live bridge construction. **Not covered:** the
+render/paint half (magnifying a pinch-zoomed page's paint) is still the WPT-runner `zoom` bake's job, so
+`ApplyVisualViewportSerializationState` stays until a native paint transform lands; and general mid-tree
+`zoom: N` (reflow) is the separate (b2) engine-zoom feature.
+
+### 0007-html-visual-viewport-snapshot-cache-key.patch → `Broiler.HTML` (depends on 0005)
+
+`HeadlessLayoutView.GetGeometry` adds the `NativeAnchorPlacement.VisualViewportScale` channel value (which
+`DomBridge` sets around the call) to its `(document, version, viewport, baseUrl)` snapshot cache key. The
+pinch scale scales the extracted geometry but is not a DOM mutation, so it does not bump
+`DomDocument.Version`; without this, a `visualViewport.scale` change on an otherwise-unchanged document
+would serve the stale, differently-scaled cached snapshot. Applies on top of 0005 (same file).
+
+Validated end-to-end locally (0005 + 0006 + 0007 applied, flag on): on a single bridge, reading
+`getBoundingClientRect().width` = 100, then `visualViewport.scale = 2`, then re-reading returns 200 (the
+snapshot re-lays-out) — without the key change it would return the stale 100. The test is not committed (it
+needs the patches, so it cannot pass at the pinned SHA on CI).
