@@ -213,7 +213,11 @@ public class HtmlBridgeArchitectureGuardTests
         // factories, element queries, live collections, node mutation) dropped it from 1184 to 684.
         "src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge.cs",
-        "src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.cs",
+        // DomBridge.Serialization.cs de-listed 2026-07-17: its cohesive SVG zoom-serialization
+        // attribute-scaling cluster (ApplyZoomSerializationSvgAttributes and the ScaleSvg* / SVG
+        // font-relative-unit resolution helpers, the SVG unit sets, and the three [GeneratedRegex]
+        // point/path/font-shorthand patterns) was split into the sibling partial
+        // DomBridge.Serialization.SvgZoom.cs, dropping it from 951 to 668 lines.
         // Utilities.cs de-listed 2026-07-17: its cohesive DOM name-validation / DOMException /
         // JS-constructor-globals cluster (ThrowDOMException, ValidateElementName/QualifiedName,
         // RegisterDOMException/Node/SVGLength, and the two XML-name regex patterns) was split into

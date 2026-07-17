@@ -1288,9 +1288,9 @@ Exit criteria:
 - No production source file exceeds 750 lines without a documented exemption.
   **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
   a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
-  module (the P3.x pattern) rather than another giant partial. The remaining five
+  module (the P3.x pattern) rather than another giant partial. The remaining four
   over-limit files (`LayoutMetrics.cs` 2343, `JsObjects.cs` 1286, `SubDocuments.cs` 1152,
-  `DomBridge.cs` 1013, `DomBridge.Serialization.cs` 951) are listed as
+  `DomBridge.cs` 1013) are listed as
   documented debt to shrink — the guard surfaces one to de-list once it drops under the limit,
   so the ratchet keeps closing. Three files are **de-listed** as of 2026-07-17:
   `AnimationResolver.cs` (was 760; see ratchet maintenance below),
@@ -1338,6 +1338,25 @@ Exit criteria:
   `Broiler.HtmlBridge.Dom` builds clean and the guard is green (14/14, 0 offenders / 0 stale
   exemptions); the `NamespaceAndDomCoreTests` / `DomImplementationTests` name-validation coverage
   (27 tests) stays green. Debt list: eight → seven files.
+
+  **De-list 2026-07-17.** A third exempt-file shrink under the same ratchet action.
+  `DomBridge.Serialization.cs` (951) had its cohesive SVG zoom-serialization attribute-scaling
+  cluster split into the sibling `DomBridge` partial `DomBridge.Serialization.SvgZoom.cs`
+  (300 lines): `ApplyZoomSerializationSvgAttributes` and the presentation/geometry scalers
+  (`ApplySvgPresentationAttribute`, `ScaleSvgLengthAttribute` / `…PointListAttribute` /
+  `…PathDataAttribute`, `ScaleSvgNumericMatch`, `TryScaleSvgLengthToken`), the SVG font-relative
+  unit resolution (`TryResolveSvgFontRelativeUnitPixels`, `ResolveOriginalNearest/RootSpecifiedFontSizePx`,
+  `TryGetSpecifiedFontSizePx`, `GetSvgFontRelativeUnitRatio`, `ResolveSvgLengthZoomFactor`,
+  `GetNearestExplicitFontSizeOwnerZoom`, `GetRootFontSizeOwnerZoom`), the four SVG unit sets, and
+  the three `[GeneratedRegex]` point/path/font-shorthand patterns. Only `ApplyZoomSerializationStyles`'s
+  entry call into the block stays in `Serialization.cs`; the now-unused
+  `using System.Text.RegularExpressions` was dropped from it. Pure partial-class relocation —
+  no signature, accessibility, or logic change, so behaviour-identical by construction;
+  `Serialization.cs` drops 951 → 668 and its `OversizedFileExemptions` entry is removed.
+  `Broiler.HtmlBridge.Dom` builds clean and the guard is green (14/14, 0 offenders / 0 stale
+  exemptions); the SVG-serialization / zoom coverage (`SvgDomAndCrossDocTests`,
+  `SvgDomDynamicContentTests`, `SharedGeometryZoomSizeTests`, `Acid3SvgAndParsingRegressionTests`,
+  81 tests) stays green. Debt list: seven → six files.
 
 ### Phase 4 - eliminate parallel DOM state
 
