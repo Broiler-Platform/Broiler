@@ -365,9 +365,9 @@ public sealed partial class DomBridge
         // (The namespace was carried at construction via CreateBridgeElementNS above.)
         // Copy browser-runtime values (e.g., checked state for inputs).
         GetElementRuntimeState(element).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
-        // Scroll offsets, stylesheet state and the document viewport flag moved out of
-        // ElementRuntimeState into per-bridge instance tables (Phase 2 item 4 de-globalization), so
-        // copy them here to preserve cloneNode semantics.
+        // Scroll offsets, stylesheet state, the document viewport flag and the animation timeline
+        // moved out of ElementRuntimeState into per-bridge instance tables (Phase 2 item 4
+        // de-globalization), so copy them here to preserve cloneNode semantics.
         ScrollStateFor(element).Left.CopyTo(ScrollStateFor(clone).Left);
         ScrollStateFor(element).Top.CopyTo(ScrollStateFor(clone).Top);
         var sourceSheet = StyleSheetStateFor(element);
@@ -377,6 +377,7 @@ public sealed partial class DomBridge
         cloneSheet.RulesSourceText = sourceSheet.RulesSourceText;
         cloneSheet.RulesMutated = sourceSheet.RulesMutated;
         DocumentStateFor(element).HasViewport.CopyTo(DocumentStateFor(clone).HasViewport);
+        AnimationStateFor(element).CurrentTimeMilliseconds.CopyTo(AnimationStateFor(clone).CurrentTimeMilliseconds);
         // Carry the memoized position-area resolution too (was ElementRuntimeState.Layout,
         // now the bridge-level PositionAreaResolutions cache — see PositionAreaQueries.cs).
         CopyPositionAreaResolution(element, clone);

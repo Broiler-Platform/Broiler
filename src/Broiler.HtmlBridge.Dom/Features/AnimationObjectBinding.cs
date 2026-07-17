@@ -1,7 +1,7 @@
-using Broiler.Dom;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.BuiltIns.Number;
+using Broiler.HtmlBridge.Dom.Runtime;
 
 namespace Broiler.HtmlBridge.Dom.Features;
 
@@ -9,7 +9,8 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// The Web Animations <c>Animation</c> object surface built by <c>BuildAnimationObject</c> — its
 /// <c>currentTime</c> get/set and its <c>ready</c>-promise <c>then</c> — co-located as an HtmlBridge
 /// feature module (Phase 3). <c>currentTime</c> reads/writes the element's animation timeline on the
-/// element's runtime state (via the bridge's neutral <c>internal static</c> <c>GetElementRuntimeState</c>);
+/// per-bridge <see cref="AnimationRuntimeState"/> the bridge resolves and hands in (Phase 2 item 4
+/// de-globalization — was the process-static <c>GetElementRuntimeState(element).Animation</c> slot);
 /// <c>then</c> is a synchronous promise shim that invokes its callback immediately and returns the
 /// <c>ready</c> object (touching no bridge state). These are pure static callbacks (the animation object
 /// is built in a static context), so the module has no host contract. Previously the bridge's
@@ -18,18 +19,18 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </summary>
 internal static class AnimationObjectBinding
 {
-    public static JSValue GetCurrentTime(DomElement element, in Arguments a)
+    public static JSValue GetCurrentTime(AnimationRuntimeState state, in Arguments a)
     {
-        if (DomBridge.GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.TryGet(out var value) && value is double currentTimeMs)
+        if (state.CurrentTimeMilliseconds.TryGet(out var value) && value is double currentTimeMs)
             return new JSNumber(currentTimeMs);
 
         return new JSNumber(0);
     }
 
-    public static JSValue SetCurrentTime(DomElement element, in Arguments a)
+    public static JSValue SetCurrentTime(AnimationRuntimeState state, in Arguments a)
     {
         if (a.Length > 0)
-            DomBridge.GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.Set(a[0].DoubleValue);
+            state.CurrentTimeMilliseconds.Set(a[0].DoubleValue);
         return JSUndefined.Value;
     }
 

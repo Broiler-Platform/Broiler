@@ -293,7 +293,7 @@ public sealed partial class DomBridge
 
         double currentTimeMs = 0;
         var hasCurrentTimeOverride = false;
-        if (GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.TryGet(out var currentTimeValue) &&
+        if (AnimationStateFor(element).CurrentTimeMilliseconds.TryGet(out var currentTimeValue) &&
             currentTimeValue is double currentTimeMsValue)
         {
             currentTimeMs = currentTimeMsValue;
