@@ -145,7 +145,7 @@ public sealed partial class DomBridge
         document.FastAddValue((KeyString)"dispatchEvent", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.DispatchEvent(this, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.contentType — returns the MIME type of the document
-        document.FastAddProperty((KeyString)"contentType", new JSFunction(JsRegistrationGetContentType063Core, "get contentType"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"contentType", new JSFunction((in a) => Dom.Features.WindowDocumentMiscBinding.GetContentType(this, in a), "get contentType"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.URL — returns the document URL
         document.FastAddProperty((KeyString)"URL", new JSFunction((in _) => new JSString(_pageUrl), "get URL"), null, JSPropertyAttributes.EnumerableConfigurableProperty);

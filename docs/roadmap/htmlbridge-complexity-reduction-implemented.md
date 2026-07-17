@@ -1079,7 +1079,39 @@ returns an empty object without throwing — through the bridge). Regression che
 the one failure is the documented pre-existing `:lang` `Lang_Matches_XmlLang_Ancestor`) and architecture-guard
 suites pass; `Broiler.HtmlBridge.Dom` builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.37 named-accessor / relocated-infra /
+Status: **P3.38 completed** 2026-07-17 (same branch) — the **Web Animations `Animation` object surface**.
+`AnimationObjectBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the animation object's
+`currentTime` get/set and its `ready`-promise `then` (built by `BuildAnimationObject`) — was the bridge's
+`JsRegistrationGetCurrentTime152Core`/`SetCurrentTime153Core`/`Then154Core`. `currentTime` reads/writes the
+element's animation timeline via the bridge's neutral `internal static` `GetElementRuntimeState` (widened
+`private`→`internal static`); `then` runs its callback synchronously and returns the `ready` object. These are
+pure static callbacks (the animation object is built in a static context), so the module has **no host contract**.
+`Registration/Animations.cs` now calls `Dom.Features.AnimationObjectBinding.{GetCurrentTime,SetCurrentTime,Then}`;
+the callbacks are gone from `JsFunctionCallbacks/Registration.cs` (101 → 75 lines). Behaviour-preserving; no
+public-API change (module internal). Tests: `Broiler.Cli.Tests/AnimationObjectBindingModuleTests.cs` (co-location /
+three-callbacks-moved-off-bridge guards + a characterization — an element with inline `animation` appears in
+`getAnimations()`, its `currentTime` round-trips a set value, and `ready.then` runs synchronously). Regression: the
+animation and architecture-guard suites pass (25).
+
+Status: **P3.39 completed** 2026-07-17 (same branch) — **the residual window/document singletons, which empties and
+DELETES the grab-bag file.** `WindowDocumentMiscBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) collects the
+last five one-off callbacks — `window.alert` (logs, headless), `performance.now`, `window.visualViewport.scale`
+setter, `document.contentType`, `document.cookie` setter (was `JsRegistrationAlert076Core`/`Now122Core`/
+`SetScale143Core`/`GetContentType063Core`/`SetCookie149Core`). These are genuinely independent one-offs (each ≤10
+lines) that don't individually warrant a module; collected here they are **not** a god-object grab-bag — no shared
+mutable state, and the two that touch the bridge (`contentType`→page URL, `scale`→`SetVisualViewportScale`) do so
+only through the two-member `IWindowDocumentMiscHost` contract (`DomBridge.WindowDocumentMiscHost.cs`), the rest
+being stateless or taking a by-ref cookie store. With these moved, `JsFunctionCallbacks/Registration.cs` held no
+callbacks and was **deleted** (was 1184 lines at session start). `Registration/Window.cs`/`Document.cs`/`Polyfills.cs`
+now register `Dom.Features.WindowDocumentMiscBinding.<Op>`. Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/WindowDocumentMiscBindingModuleTests.cs` (co-location / host-contract /
+five-callbacks-moved-off-bridge guards + a characterization exercising all five through the bridge —
+`alert`/`performance.now`/`visualViewport.scale`/`contentType`/`cookie`). Regression: the architecture-guard and
+module suites pass (20). **The `JsFunctionCallbacks/Registration.cs` grab-bag — 1184 lines of loose JS callbacks at
+the start of this program — is fully decomposed into 21 co-located feature modules (P3.19–P3.39) and no longer
+exists.**
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.39 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

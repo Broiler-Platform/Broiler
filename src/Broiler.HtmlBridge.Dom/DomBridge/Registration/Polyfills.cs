@@ -35,7 +35,7 @@ public sealed partial class DomBridge
         document.FastAddProperty(
             (KeyString)"cookie",
             new JSFunction((in _) => new JSString(cookieStore), "get cookie"),
-            new JSFunction((in a) => JsRegistrationSetCookie149Core(ref cookieStore, in a), "set cookie"),
+            new JSFunction((in a) => Dom.Features.WindowDocumentMiscBinding.SetCookie(ref cookieStore, in a), "set cookie"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
         // ---------------------------------------------------------------
         //  Google Search Compliance: Phase 3 (P2) — Fidelity polyfills
