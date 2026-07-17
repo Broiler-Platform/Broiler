@@ -8,23 +8,26 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
-    private static readonly CssSelectorMatcher SharedSelectorMatcher =
-        new(new BridgeSelectorStateProvider());
+    // Per-bridge selector matcher (Phase 2 item 4 de-globalization, 2026-07-17): the `:checked` state
+    // provider reads the per-bridge FormControl table, so the matcher (and MatchesSelector) is now an
+    // instance owned by the bridge — was a process-static shared matcher over the static runtime table.
+    // Initialized in the constructor (a field initializer cannot capture `this`).
+    private readonly CssSelectorMatcher _selectorMatcher;
 
-    internal static bool MatchesSelector(
+    internal bool MatchesSelector(
         DomElement element,
         string selector,
         DomElement? scope = null) =>
-        SharedSelectorMatcher.Matches(element, selector, scope);
+        _selectorMatcher.Matches(element, selector, scope);
 
-    private sealed class BridgeSelectorStateProvider : ICssSelectorStateProvider
+    private sealed class BridgeSelectorStateProvider(DomBridge bridge) : ICssSelectorStateProvider
     {
         public bool? IsChecked(DomElement element)
         {
             if (element is not DomElement bridgeElement)
                 return null;
 
-            return GetElementRuntimeState(bridgeElement).FormControl.Checked.TryGet(out var value)
+            return bridge.FormControlStateFor(bridgeElement).Checked.TryGet(out var value)
                 ? value is true
                 : null;
         }

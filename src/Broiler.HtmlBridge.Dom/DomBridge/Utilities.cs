@@ -47,7 +47,7 @@ public sealed partial class DomBridge
         var results = new List<JSValue>();
         var scope = root as DomElement;
         if (scope is not null && selector.Contains(":scope") &&
-            MatchesSelector(scope, selector, scope))
+            bridge.MatchesSelector(scope, selector, scope))
         {
             results.Add(bridge.ToJSObject(scope));
             if (!all)
@@ -63,7 +63,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in ChildElements(parent))
         {
-            if (!IsText(child) && MatchesSelector(child, selector, scope))
+            if (!IsText(child) && bridge.MatchesSelector(child, selector, scope))
             {
                 results.Add(bridge.ToJSObject(child));
                 if (!all) return;
@@ -363,12 +363,17 @@ public sealed partial class DomBridge
         // RF-BRIDGE-1c Phase F (F3c part 2d): element text lives in child DomText nodes, cloned by
         // the deep-clone loop below — no element-store TextContent scalar to copy.
         // (The namespace was carried at construction via CreateBridgeElementNS above.)
-        // Copy browser-runtime values (e.g., checked state for inputs).
-        GetElementRuntimeState(element).CopyRuntimeValuesTo(GetElementRuntimeState(clone));
-        // Scroll offsets, dialog/popover top-layer state, shadow-DOM linkage, stylesheet state, the
-        // document viewport flag and the animation timeline moved out of ElementRuntimeState into
-        // per-bridge instance tables (Phase 2 item 4 de-globalization), so copy them here to preserve
-        // cloneNode semantics.
+        // Copy browser-runtime values (e.g., checked state for inputs). Form-control, scroll offsets,
+        // dialog/popover top-layer state, shadow-DOM linkage, stylesheet state, the document viewport
+        // flag and the animation timeline all moved out of ElementRuntimeState into per-bridge instance
+        // tables (Phase 2 item 4 de-globalization), so copy each here to preserve cloneNode semantics.
+        var sourceForm = FormControlStateFor(element);
+        var cloneForm = FormControlStateFor(clone);
+        sourceForm.Value.CopyTo(cloneForm.Value);
+        sourceForm.Checked.CopyTo(cloneForm.Checked);
+        sourceForm.DefaultSelected.CopyTo(cloneForm.DefaultSelected);
+        sourceForm.SelectedIndex.CopyTo(cloneForm.SelectedIndex);
+        sourceForm.ReturnValue.CopyTo(cloneForm.ReturnValue);
         ScrollStateFor(element).Left.CopyTo(ScrollStateFor(clone).Left);
         ScrollStateFor(element).Top.CopyTo(ScrollStateFor(clone).Top);
         var sourceDialog = DialogStateFor(element);
@@ -471,7 +476,7 @@ public sealed partial class DomBridge
     /// Recursively unchecks all radio inputs with the given name within the scope,
     /// except for the specified element. Used for radio button mutual exclusion.
     /// </summary>
-    internal static void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
+    internal void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
     {
         foreach (var child in ChildElements(scope))
         {
@@ -483,7 +488,7 @@ public sealed partial class DomBridge
                     TryGetAttribute(child, "name", out var sn) &&
                     string.Equals(sn, radioName, StringComparison.Ordinal))
                 {
-                    GetElementRuntimeState(child).FormControl.Checked.Set(false);
+                    FormControlStateFor(child).Checked.Set(false);
                 }
 
                 UncheckRadioSiblings(child, except, radioName);

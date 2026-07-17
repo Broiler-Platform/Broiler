@@ -16,4 +16,7 @@ internal interface ISelectorsHost
     JSValue FindInDescendants(DomElement element, string selector, bool all);
     void CollectElementsByTagName(DomElement element, string tagName, List<JSValue> results);
     JSObject ToJSObject(DomNode node);
+    // Selector matching moved onto the host (Phase 2 item 4 de-globalization): MatchesSelector reads
+    // the per-bridge `:checked` state, so it is now a bridge-instance method rather than a static helper.
+    bool MatchesSelector(DomElement element, string selector, DomElement? scope = null);
 }

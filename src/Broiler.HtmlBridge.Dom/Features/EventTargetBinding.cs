@@ -67,19 +67,20 @@ internal static class EventTargetBinding
             var inputType = DomBridge.TryGetAttribute(element, "type", out var t) ? t.ToLowerInvariant() : "text";
             if (inputType == "checkbox")
             {
-                bool wasChecked = DomBridge.GetElementRuntimeState(element).FormControl.Checked.TryGet(out var cv) && cv is true || (!DomBridge.GetElementRuntimeState(element).FormControl.Checked.IsSet && DomBridge.HasAttr(element, "checked"));
-                DomBridge.GetElementRuntimeState(element).FormControl.Checked.Set(!wasChecked);
+                var checkedState = host.FormControlStateFor(element).Checked;
+                bool wasChecked = checkedState.TryGet(out var cv) && cv is true || (!checkedState.IsSet && DomBridge.HasAttr(element, "checked"));
+                checkedState.Set(!wasChecked);
             }
             else if (inputType == "radio")
             {
-                DomBridge.GetElementRuntimeState(element).FormControl.Checked.Set(true);
+                host.FormControlStateFor(element).Checked.Set(true);
                 // Radio mutual exclusion
                 if (DomBridge.TryGetAttribute(element, "name", out var radioName) && !string.IsNullOrEmpty(radioName))
                 {
                     var scope = element;
                     while (DomBridge.ParentEl(scope) != null)
                         scope = DomBridge.ParentEl(scope);
-                    DomBridge.UncheckRadioSiblings(scope, element, radioName);
+                    host.UncheckRadioSiblings(scope, element, radioName);
                 }
             }
         }

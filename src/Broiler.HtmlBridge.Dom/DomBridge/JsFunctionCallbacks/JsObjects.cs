@@ -413,7 +413,7 @@ public sealed partial class DomBridge
     {
         if (string.Equals(element.TagName, "select", StringComparison.OrdinalIgnoreCase))
             return new JSString(_select.GetValue(element));
-        if (GetElementRuntimeState(element).FormControl.Value.TryGet(out var domVal) && domVal is string sv)
+        if (FormControlStateFor(element).Value.TryGet(out var domVal) && domVal is string sv)
             return new JSString(sv);
         if (TryGetAttribute(element, "value", out var val))
             return new JSString(val);
@@ -426,7 +426,7 @@ public sealed partial class DomBridge
         var tag = element.TagName.ToLowerInvariant();
         var v = a.Length > 0 ? a[0].ToString() : string.Empty;
         if (tag == "input")
-            GetElementRuntimeState(element).FormControl.Value.Set(v); // IDL value, not reflected
+            FormControlStateFor(element).Value.Set(v); // IDL value, not reflected
         else if (tag == "select")
             _select.SetValue(element, v);
         else
@@ -438,7 +438,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsGetChecked108Core(DomElement element, in Arguments a)
     {
         // IDL property takes precedence over content attribute
-        if (GetElementRuntimeState(element).FormControl.Checked.TryGet(out var v))
+        if (FormControlStateFor(element).Checked.TryGet(out var v))
             return v is true ? JSBoolean.True : JSBoolean.False;
         return HasAttr(element, "checked") ? JSBoolean.True : JSBoolean.False;
     }
@@ -447,7 +447,7 @@ public sealed partial class DomBridge
     private JSValue JsJsObjectsSetChecked109Core(DomElement element, in Arguments a)
     {
         bool newVal = a.Length > 0 && a[0].BooleanValue;
-        GetElementRuntimeState(element).FormControl.Checked.Set(newVal);
+        FormControlStateFor(element).Checked.Set(newVal);
         if (newVal)
         {
             // Radio button mutual exclusion: uncheck others in same group

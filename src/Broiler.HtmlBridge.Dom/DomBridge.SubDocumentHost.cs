@@ -66,6 +66,8 @@ public sealed partial class DomBridge : ISubDocumentHost
         CollectByTagName(root, tag, results);
     void ISubDocumentHost.CollectMatching(DomNode root, Func<DomElement, bool> predicate, List<JSValue> results) =>
         CollectMatching(root, predicate, results);
+    bool ISubDocumentHost.MatchesSelector(DomElement element, string selector, DomElement? scope) =>
+        MatchesSelector(element, selector, scope);
 
     List<DomNode> ISubDocumentHost.BuildChildNodeArgumentNodes(in Arguments arguments) =>
         BuildChildNodeArgumentNodes(arguments);

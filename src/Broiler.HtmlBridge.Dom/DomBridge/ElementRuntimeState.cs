@@ -47,27 +47,15 @@ internal sealed class ElementRuntimeState
     /// </summary>
     public bool StyleSeeded { get; set; }
 
-    public FormControlRuntimeState FormControl { get; } = new();
-
-    // Phase 2 item 4 (de-globalization, 2026-07-17): the Scroll, Dialog, Shadow, StyleSheet, Document
-    // and Animation slots were moved out of this process-static table into per-bridge instance tables
-    // (DomBridge._scrollRuntimeStates via ScrollStateFor, _dialogRuntimeStates via DialogStateFor,
-    // _shadowRuntimeStates via ShadowStateFor, _styleSheetRuntimeStates via StyleSheetStateFor,
-    // _documentRuntimeStates via DocumentStateFor, _animationRuntimeStates via AnimationStateFor); their
-    // clone copies live in CloneDomElement now. See the *RuntimeState classes below (still used by
-    // those instance tables). Only FormControl and the inline-style trio remain in this static table.
-
-    public void CopyRuntimeValuesTo(ElementRuntimeState target)
-    {
-        FormControl.Value.CopyTo(target.FormControl.Value);
-        FormControl.Checked.CopyTo(target.FormControl.Checked);
-        FormControl.DefaultSelected.CopyTo(target.FormControl.DefaultSelected);
-        FormControl.SelectedIndex.CopyTo(target.FormControl.SelectedIndex);
-        FormControl.ReturnValue.CopyTo(target.FormControl.ReturnValue);
-        // Scroll, Dialog, Shadow, StyleSheet, Document and Animation state are copied separately in
-        // CloneDomElement (moved to per-bridge instance tables; this static-table struct no longer
-        // owns them).
-    }
+    // Phase 2 item 4 (de-globalization, 2026-07-17): the FormControl, Scroll, Dialog, Shadow, StyleSheet,
+    // Document and Animation slots were moved out of this process-static table into per-bridge instance
+    // tables (DomBridge._formControlRuntimeStates via FormControlStateFor, _scrollRuntimeStates via
+    // ScrollStateFor, _dialogRuntimeStates via DialogStateFor, _shadowRuntimeStates via ShadowStateFor,
+    // _styleSheetRuntimeStates via StyleSheetStateFor, _documentRuntimeStates via DocumentStateFor,
+    // _animationRuntimeStates via AnimationStateFor); every one's clone copy lives in CloneDomElement now,
+    // so the former CopyRuntimeValuesTo aggregator is gone. See the *RuntimeState classes below (still
+    // used by those instance tables). Only the inline-style trio (InlineEventHandlers / JsSetStyleProps /
+    // Style / StyleSeeded) remains in this static table — the InlineStyle hub, the final concern to move.
 }
 
 internal sealed class FormControlRuntimeState

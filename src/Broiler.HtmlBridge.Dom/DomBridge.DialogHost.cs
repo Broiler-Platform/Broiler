@@ -45,12 +45,12 @@ public sealed partial class DomBridge : IDialogHost
     }
 
     string IDialogHost.GetReturnValue(DomElement element) =>
-        GetElementRuntimeState(element).FormControl.ReturnValue.TryGet(out var rv) && rv is string s
+        FormControlStateFor(element).ReturnValue.TryGet(out var rv) && rv is string s
             ? s
             : string.Empty;
 
     void IDialogHost.SetReturnValue(DomElement element, string value) =>
-        GetElementRuntimeState(element).FormControl.ReturnValue.Set(value);
+        FormControlStateFor(element).ReturnValue.Set(value);
 
     bool IDialogHost.PopoverKeepsOverlayOnHide(DomElement element) => PopoverKeepsOverlayOnHide(element);
 }

@@ -18,4 +18,10 @@ public sealed partial class DomBridge : Dom.Features.IEventTargetHost
         => DispatchEventOnElement(element, evt);
 
     JSObject? Dom.Features.IEventTargetHost.WindowJSObject => _windowJSObject;
+
+    FormControlRuntimeState Dom.Features.IEventTargetHost.FormControlStateFor(DomElement element)
+        => FormControlStateFor(element);
+
+    void Dom.Features.IEventTargetHost.UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
+        => UncheckRadioSiblings(scope, except, radioName);
 }

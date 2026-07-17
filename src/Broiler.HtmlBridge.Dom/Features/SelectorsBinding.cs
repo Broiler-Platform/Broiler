@@ -30,10 +30,10 @@ internal static class SelectorsBinding
         return host.FindInDescendants(element, sel, true);
     }
 
-    public static JSValue Matches(DomElement element, in Arguments a)
+    public static JSValue Matches(ISelectorsHost host, DomElement element, in Arguments a)
     {
         var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
-        return DomBridge.MatchesSelector(element, sel, element) ? JSBoolean.True : JSBoolean.False;
+        return host.MatchesSelector(element, sel, element) ? JSBoolean.True : JSBoolean.False;
     }
 
     public static JSValue Closest(ISelectorsHost host, DomElement element, in Arguments a)
@@ -41,7 +41,7 @@ internal static class SelectorsBinding
         var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
         for (DomElement? current = element; current != null && !current.TagName.StartsWith('#'); current = DomBridge.ParentEl(current))
         {
-            if (DomBridge.MatchesSelector(current, sel, element))
+            if (host.MatchesSelector(current, sel, element))
                 return host.ToJSObject(current);
         }
 

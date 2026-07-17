@@ -135,7 +135,7 @@ public sealed partial class DomBridge
 
             if (element.TagName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
                 !HasAttr(element, "value") &&
-                GetElementRuntimeState(element).FormControl.Value.TryGet(out var idlValue) &&
+                FormControlStateFor(element).Value.TryGet(out var idlValue) &&
                 idlValue is string { Length: > 0 } idlString)
             {
                 SetAttr(element, "value", idlString);
@@ -643,7 +643,7 @@ public sealed partial class DomBridge
 
         if (element.TagName.Equals("input", StringComparison.OrdinalIgnoreCase) &&
             !HasAttr(element, "value") &&
-            GetElementRuntimeState(element).FormControl.Value.TryGet(out var idlValue) &&
+            FormControlStateFor(element).Value.TryGet(out var idlValue) &&
             idlValue is string { Length: > 0 } idlString)
         {
             yield return new("value", idlString);

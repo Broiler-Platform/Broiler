@@ -627,7 +627,7 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"matches",
-            new JSFunction((in a) => Dom.Features.SelectorsBinding.Matches(element, in a), "matches", 1),
+            new JSFunction((in a) => Dom.Features.SelectorsBinding.Matches(this, element, in a), "matches", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"closest",

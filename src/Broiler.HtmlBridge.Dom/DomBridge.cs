@@ -180,6 +180,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     public DomBridge()
     {
+        _selectorMatcher = new CssSelectorMatcher(new BridgeSelectorStateProvider(this));
         _traversal = new Dom.Features.TraversalBinding(this);
         _mutations = new Dom.Features.MutationObserverBinding(this);
         _eventDispatch = new Dom.Features.EventDispatchBinding(this);
