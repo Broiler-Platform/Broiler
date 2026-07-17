@@ -3069,6 +3069,37 @@ z-index emulation still drives the top layer and the corpus is byte-identical. C
 `TopLayerFragmentProjectionTests`. Follow-up once 0010 is applied and the pointer bumped: delete the
 `ApplyPopoverUAPositioning` z-index write the pass supersedes.
 
+**Track status after slice 1c — the *pixel-validatable* dialog-track (and anchor-track) increments are now
+exhausted; what remains is maintainer patch-application or corpus-gapped.** A systematic sweep after 0010
+landed:
+- **Native `::backdrop` box generation** (the largest remaining piece of `Dialogs.cs`) is scoped but is a
+  *larger* feature than the recent slices, and **has no pixel corpus**: every `::backdrop` in the local
+  corpus is `background: transparent` (the 7 `anchor-position-top-layer-*` tests) — an invisible scrim — so
+  no reftest exercises a visible backdrop. Its visual behaviour (UA dimming scrim, author `background`,
+  author geometry overlay, and the `position-try-backdrop` fallback `InsertDialogBackdrops` runs) is covered
+  only by bridge *unit* tests today. It also needs a design change 0010 does not yet carry: a natively
+  *generated* `::backdrop` box has no DOM element, so it cannot carry the `data-broiler-top-layer` attribute
+  the current projection reads — the top-layer order must move to a `CssBox`/`Fragment` field the generator
+  can set directly (DomParser projecting the attribute into that field for stamped elements, and setting it
+  on the generated backdrop as `dialog-order − 1` so it paints beneath). Correct box-tree placement:
+  generate it as a child of the dialog box with `position:fixed; inset:0` and its own top-layer order, so
+  `PaintTopLayer` lifts it out and paints it beneath the dialog. This is a multi-part Broiler.HTML/CSS
+  effort (box generation + UA `::backdrop` defaults + gating the bridge div), validatable by unit tests plus
+  the transparent-backdrop no-regression reftests — a dedicated slice, not a quick increment.
+- **Modal centering / `position:fixed`** likewise has **no corpus**: every modal in the top-layer corpus is
+  `anchor()`-positioned, none centered, and the bridge does not center them (it only applies `position:fixed`).
+- **Anchor-track render residue** stays exhausted (established earlier): the only un-handed-off case is a
+  `position-area` box that *also* uses `position-try`, for which **no WPT test exists**, so widening the MVP
+  gate has no observable payoff.
+
+**Net:** the remaining bridge deletions that actually shrink `AnchorResolver`/`Dialogs.cs`/`LayoutMetrics`
+are gated on a **maintainer applying the staged submodule patches** (0003–0010) and bumping the pointers —
+each patch's "Follow-up once applied" note names the bridge code that then deletes. The two remaining
+*capability* efforts (native `::backdrop`; the visual-viewport render cutover, blocker (b)) are each a
+dedicated feature slice with no local pixel corpus, not a bite-sized validated increment. Further local,
+CI-validatable Phase-5 progress on these tracks is limited until either a maintainer applies the patch
+backlog or a pixel corpus for the corpus-gapped features is added.
+
 ---
 
 **Finding — `position-visibility` is entangled with the scroll-container CB decision — RESOLVED 2026-07-15
