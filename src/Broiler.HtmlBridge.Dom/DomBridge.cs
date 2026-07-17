@@ -395,7 +395,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private DomDocument CreateBrowsingContextDocument()
     {
         var document = new DomDocument();
-        GetElementRuntimeState(document).Document.HasViewport.Set(false);
+        DocumentStateFor(document).HasViewport.Set(false);
         return document;
     }
 

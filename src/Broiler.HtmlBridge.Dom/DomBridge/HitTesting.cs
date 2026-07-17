@@ -1,10 +1,24 @@
+using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Runtime;
+using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
+    // Phase 2 item 4 (de-globalization, 2026-07-17): the per-document-root "has an explicit viewport
+    // meta" flag was the Document slot of the process-static ElementRuntimeState table; it is now a
+    // per-bridge instance table, owned by the session's bridge. Still an element-keyed
+    // ConditionalWeakTable, so it GCs with the document root and the cloneNode copy (see
+    // CloneDomElement) is preserved. Both access sites are on the bridge instance — no cascade.
+    // Keyed by DomNode (not DomElement): the "has viewport" flag is recorded against the document
+    // node (a DomDocument) as well as document-root elements, matching the former DomNode-keyed table.
+    private readonly ConditionalWeakTable<DomNode, DocumentRuntimeState> _documentRuntimeStates = [];
+
+    private DocumentRuntimeState DocumentStateFor(DomNode node) =>
+        _documentRuntimeStates.GetValue(node, static _ => new DocumentRuntimeState());
+
     internal static double GetCoordinateArgument(in Arguments args, int index) =>
         args.Length > index && !args[index].IsNull && !args[index].IsUndefined
             ? args[index].DoubleValue
@@ -534,7 +548,7 @@ public sealed partial class DomBridge
             return true;
 
         // A detached programmatic document (createDocument/createHTMLDocument) is viewport-less.
-        return !GetElementRuntimeState(docRoot).Document.HasViewport.TryGet(out var value) ||
+        return !DocumentStateFor(docRoot).HasViewport.TryGet(out var value) ||
                value is not bool hasViewport ||
                hasViewport;
     }

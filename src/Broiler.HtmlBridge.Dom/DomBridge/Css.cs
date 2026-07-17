@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
@@ -7,6 +8,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
+using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
 using Broiler.CSS;
 using Broiler.CSS.Dom;
@@ -19,6 +21,17 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
+    // Phase 2 item 4 (de-globalization, 2026-07-17): the per-style-element stylesheet state (fetched
+    // CSS text, the live CSSOM rule list and its parse-source / mutated flags) was the StyleSheet slot
+    // of the process-static ElementRuntimeState table; it is now a per-bridge instance table, owned by
+    // the session's bridge. Still an element-keyed ConditionalWeakTable, so it GCs with the style
+    // element and the cloneNode copy (see CloneDomElement) is preserved. All access is on the bridge
+    // instance, so this needed no static-helper cascade.
+    private readonly ConditionalWeakTable<DomElement, StyleSheetRuntimeState> _styleSheetRuntimeStates = [];
+
+    private StyleSheetRuntimeState StyleSheetStateFor(DomElement element) =>
+        _styleSheetRuntimeStates.GetValue(element, static _ => new StyleSheetRuntimeState());
+
     // P2.3: computed-style state (the GetComputedProps memo and the style-invalidation batch depth /
     // pending roots) moved to DocumentStyleContext (see _styleContext). The memo maps are concurrent
     // there for the same reason they were here — JS continuations on ThreadPool threads re-enter
@@ -323,7 +336,7 @@ public sealed partial class DomBridge
             TryGetAttribute(styleEl, "href", out var href) &&
             !string.IsNullOrEmpty(href))
         {
-            if (GetElementRuntimeState(styleEl).StyleSheet.FetchedCss.TryGet(out var cachedCss) && cachedCss is string cachedStr)
+            if (StyleSheetStateFor(styleEl).FetchedCss.TryGet(out var cachedCss) && cachedCss is string cachedStr)
             {
                 cssText.Append(cachedStr);
             }
@@ -334,7 +347,7 @@ public sealed partial class DomBridge
                     var fetchedCss = FetchExternalStylesheet(href);
                     if (!string.IsNullOrEmpty(fetchedCss))
                     {
-                        GetElementRuntimeState(styleEl).StyleSheet.FetchedCss.Set(fetchedCss);
+                        StyleSheetStateFor(styleEl).FetchedCss.Set(fetchedCss);
                         cssText.Append(fetchedCss);
                     }
                 }
@@ -360,7 +373,7 @@ public sealed partial class DomBridge
     /// </summary>
     private List<CssRule> EnsureStyleSheetRulesCurrent(DomElement styleEl)
     {
-        var state = GetElementRuntimeState(styleEl).StyleSheet;
+        var state = StyleSheetStateFor(styleEl);
         var sourceText = GetStyleElementSourceText(styleEl);
         if (state.Rules is null ||
             !string.Equals(state.RulesSourceText, sourceText, StringComparison.Ordinal))
@@ -427,7 +440,7 @@ public sealed partial class DomBridge
     private string GetStyleElementCssText(DomElement styleEl)
     {
         var rules = EnsureStyleSheetRulesCurrent(styleEl);
-        var state = GetElementRuntimeState(styleEl).StyleSheet;
+        var state = StyleSheetStateFor(styleEl);
         return state.RulesMutated
             ? string.Join("\n", rules.Select(CssSerializer.Serialize))
             : state.RulesSourceText ?? string.Empty;

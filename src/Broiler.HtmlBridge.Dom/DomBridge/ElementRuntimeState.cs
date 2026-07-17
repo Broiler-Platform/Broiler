@@ -58,9 +58,11 @@ internal sealed class ElementRuntimeState
 
     public ShadowRuntimeState Shadow { get; } = new();
 
-    public StyleSheetRuntimeState StyleSheet { get; } = new();
-
-    public DocumentRuntimeState Document { get; } = new();
+    // Phase 2 item 4 (de-globalization, 2026-07-17): the StyleSheet and Document slots were moved out
+    // of this process-static table into per-bridge instance tables (DomBridge._styleSheetRuntimeStates
+    // via StyleSheetStateFor, _documentRuntimeStates via DocumentStateFor); their clone copies live in
+    // CloneDomElement now. See StyleSheetRuntimeState / DocumentRuntimeState below (still used by those
+    // instance tables).
 
     public AnimationRuntimeState Animation { get; } = new();
 
@@ -79,11 +81,8 @@ internal sealed class ElementRuntimeState
         Shadow.Root.CopyTo(target.Shadow.Root);
         Shadow.Host.CopyTo(target.Shadow.Host);
         Shadow.Mode.CopyTo(target.Shadow.Mode);
-        StyleSheet.FetchedCss.CopyTo(target.StyleSheet.FetchedCss);
-        target.StyleSheet.Rules = StyleSheet.Rules is null ? null : [.. StyleSheet.Rules];
-        target.StyleSheet.RulesSourceText = StyleSheet.RulesSourceText;
-        target.StyleSheet.RulesMutated = StyleSheet.RulesMutated;
-        Document.HasViewport.CopyTo(target.Document.HasViewport);
+        // StyleSheet and Document state are copied separately in CloneDomElement (moved to per-bridge
+        // instance tables; this static-table struct no longer owns them).
         Animation.CurrentTimeMilliseconds.CopyTo(target.Animation.CurrentTimeMilliseconds);
     }
 }

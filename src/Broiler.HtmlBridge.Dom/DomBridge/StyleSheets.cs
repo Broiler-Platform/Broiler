@@ -88,7 +88,7 @@ public sealed partial class DomBridge
         // getComputedStyle engine, so a script insertRule/deleteRule here is observed
         // by both. CurrentRules() reparses on textContent change before returning it.
         List<CssRule> CurrentRules() => EnsureStyleSheetRulesCurrent(styleElement);
-        void MarkRulesMutated() => GetElementRuntimeState(styleElement).StyleSheet.RulesMutated = true;
+        void MarkRulesMutated() => StyleSheetStateFor(styleElement).RulesMutated = true;
 
         // Live cssRules object — single instance that always reflects current state
         var liveCssRules = new JSObject();

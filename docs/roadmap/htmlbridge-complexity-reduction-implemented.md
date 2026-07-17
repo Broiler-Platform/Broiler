@@ -19,7 +19,7 @@ own status entries for the specifics; the summary below is the quick view.
 |---|---|---|
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
-| 2 — document services & single state authority | Bulk delivered | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); process-static per-element tables being de-globalized to per-bridge instances — `PositionAreaResolutions` and the `ElementRuntimeState.Scroll` concern done (2026-07-17), remaining `ElementRuntimeState` concerns (the `InlineStyle` hub + host-threaded slots) still to do (in scope). |
+| 2 — document services & single state authority | Bulk delivered | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); process-static per-element tables being de-globalized to per-bridge instances — `PositionAreaResolutions` and the `ElementRuntimeState` `Scroll` / `StyleSheet` / `Document` concerns done (2026-07-17), remaining `ElementRuntimeState` concerns (the `InlineStyle` hub + host-threaded slots) still to do (in scope). |
 | 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, SVG, Canvas modules still to come; `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
@@ -241,9 +241,10 @@ event listeners were de-globalized off the process-static `ElementRuntimeState` 
 `ConditionalWeakTable`. Not fully met and carried forward: two simultaneous sessions are still not
 isolated (blocked at the Broiler.JS engine's shared globals — a JS-engine concern, not the bridge),
 and the process-static per-element runtime tables are being de-globalized incrementally: the
-`PositionAreaResolutions` memo and the `ElementRuntimeState.Scroll` concern are now per-bridge
-instance tables (2026-07-17 — see the item-4 note below), leaving the remaining `ElementRuntimeState`
-concerns (the `InlineStyle` hub + host-threaded slots) still to do (the sub-document
+`PositionAreaResolutions` memo and the `ElementRuntimeState` `Scroll` / `StyleSheet` / `Document`
+concerns are now per-bridge instance tables (2026-07-17 — see the item-4 note below), leaving the
+remaining `ElementRuntimeState` concerns (the `InlineStyle` hub + host-threaded slots) still to do
+(the sub-document
 caches above are now consolidated into `BrowsingContextManager` — P3.16).
 
 Two findings recorded for later phases:
@@ -294,10 +295,27 @@ Two findings recorded for later phases:
       anchor-scroll-container coverage (`WindowScrollBindingModuleTests`, `SharedScrollOverflowTests`,
       `NativeAnchorScrollContainerModeTests`, plus `PositionAreaLiveGeometryTests` /
       `DomImplementationTests`) stays green.
-    - **Remaining slots** — `StyleSheet` and `Document` are similarly instance-only (clean next
-      slices); `FormControl`, `Dialog`, `Shadow`, `Animation` and the inline-style trio
+    - **`StyleSheet` (per-style-element CSSOM state) — done (2026-07-17).** The fetched-CSS memo, the
+      live CSSOM rule list and its parse-source / mutated flags moved from the static
+      `ElementRuntimeState.StyleSheet` slot into a per-bridge instance
+      `ConditionalWeakTable<DomElement, StyleSheetRuntimeState>` (`_styleSheetRuntimeStates`, reached via
+      `StyleSheetStateFor(element)`, declared in `Css.cs`); the 5 access sites (`Css.cs`,
+      `StyleSheets.cs`) were rerouted, the slot removed from `ElementRuntimeState`, and its four-field
+      `cloneNode` copy moved into `CloneDomElement`.
+    - **`Document` (per-document-root "has viewport meta" flag) — done (2026-07-17).** Moved into a
+      per-bridge instance `ConditionalWeakTable<DomNode, DocumentRuntimeState>` (`_documentRuntimeStates`,
+      reached via `DocumentStateFor(node)`, declared in `HitTesting.cs`; keyed by `DomNode` because the
+      flag is recorded against the `DomDocument` node as well as root elements). Both access sites
+      (`DomBridge.cs` setter, `HitTesting.cs` reader) were rerouted, the slot removed, and the copy moved
+      into `CloneDomElement`. Both slices: zero static-helper cascade, behaviour-identical, and the
+      CSSOM stylesheet / hit-test / viewport / clone coverage (`StyleSheetBindingModuleTests`,
+      `SelectorsAndCssomTests`, `HitTestBindingModuleTests`, `VisualViewportEventTargetBindingModuleTests`,
+      `DomImplementationTests`) stays green.
+    - **Remaining slots** — `FormControl`, `Dialog`, `Shadow`, `Animation` and the inline-style trio
       (`Style`/`StyleSeeded`/`JsSetStyleProps`/`InlineEventHandlers`) are the ones with static/
-      host-threaded callers and are the cascade the table-wide flip must still resolve.
+      host-threaded callers (the `InlineStyle` hub is the big one) and are the cascade the table-wide
+      flip must still resolve. With `Scroll`/`StyleSheet`/`Document` gone, the static
+      `ElementRuntimeState` table now holds only these cascade-bound concerns.
 
 Goal: make hidden state dependencies explicit while preserving behavior.
 
