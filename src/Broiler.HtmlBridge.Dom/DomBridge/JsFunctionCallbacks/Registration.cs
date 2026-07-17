@@ -887,19 +887,6 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationMatchMedia069Core(in Arguments a)
-    {
-        var query = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var matches = !string.IsNullOrEmpty(query) && EvaluateMediaQuery(query, _viewportWidth, _viewportHeight);
-        var result = new JSObject();
-        result.FastAddValue((KeyString)"matches", matches ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        result.FastAddValue((KeyString)"media", new JSString(query), JSPropertyAttributes.EnumerableConfigurableValue);
-        // addListener / removeListener stubs
-        result.FastAddValue((KeyString)"addListener", UndefinedFunction("addListener", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        result.FastAddValue((KeyString)"removeListener", UndefinedFunction("removeListener", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        return result;
-    }
-
 
     private JSValue JsRegistrationSetTimeout070Core(in Arguments a) =>
         new JSNumber(_eventLoop.SetTimeout(a.Length > 0 ? a[0] as JSFunction : null));

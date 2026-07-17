@@ -799,7 +799,23 @@ callback-moved-off-bridge guards + a characterization that stubs `window.fetch` 
 delegation deterministically without network, plus the no-data → `false` contract). Regression check:
 `Broiler.HtmlBridge.Dom` builds clean; the module suites and the line-limit guard pass.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.21 named-accessor / relocated-infra /
+Status: **P3.22 completed** 2026-07-17 (same branch) — **`window.matchMedia`**, the fourth slice off the
+registration grab-bag and the first of these grab-bag slices that is *state-coupled* (so it takes a narrow host
+contract, unlike the stateless P3.19–P3.21). `MatchMediaBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+evaluates the query against the current viewport via the canonical `CssStyleEngine.MatchesMediaQuery` and returns a
+`MediaQueryList`-shaped object (`matches`/`media` + no-op legacy `addListener`/`removeListener` stubs). Its only
+bridge coupling — the **live** viewport (read per call, not at registration) — is the two-member `IMatchMediaHost`
+contract, implemented via explicit interface members in `DomBridge.MatchMediaHost.cs`. The bridge's thin
+`EvaluateMediaQuery` wrapper (its sole caller was this callback) is **deleted**, so the module talks to the CSS
+engine directly. `Registration/Window.cs` now registers `Dom.Features.MatchMediaBinding.MatchMedia(this, in a)`;
+the callback is gone from `JsFunctionCallbacks/Registration.cs` (1096 → 1083 lines). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/MatchMediaBindingModuleTests.cs`
+(co-location / host-contract / callback-and-evaluator-moved-off-bridge guards + a viewport-evaluation
+characterization — `(min-width: 100px)` matches, `(min-width: 5000px)` does not, `media` preserved, legacy stubs
+present — through the bridge). Regression check: `Broiler.HtmlBridge.Dom` builds clean; the architecture-guard (14),
+matchMedia and media-query suites pass (21).
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.22 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

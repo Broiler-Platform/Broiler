@@ -19,7 +19,7 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"localStorage", BuildLocalStorageObject(), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.matchMedia(query) — evaluates basic media queries
-        window.FastAddValue((KeyString)"matchMedia", new JSFunction(JsRegistrationMatchMedia069Core, "matchMedia", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"matchMedia", new JSFunction((in a) => Dom.Features.MatchMediaBinding.MatchMedia(this, in a), "matchMedia", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.location (read-only)
         var location = new JSObject();
