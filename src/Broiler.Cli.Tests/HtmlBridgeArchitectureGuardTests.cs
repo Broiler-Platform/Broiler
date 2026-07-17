@@ -203,14 +203,20 @@ public class HtmlBridgeArchitectureGuardTests
     private static readonly HashSet<string> OversizedFileExemptions = new(StringComparer.Ordinal)
     {
         "src/Broiler.HtmlBridge.Dom/DomBridge/LayoutMetrics.cs",
-        "src/Broiler.HtmlBridge.Dom/DomBridge/JsFunctionCallbacks/JsObjects.cs",
+        // JsFunctionCallbacks/JsObjects.cs de-listed 2026-07-17: six feature modules
+        // (P3.40–P3.45: CharacterData, node accessors, element attributes, node relationships,
+        // Element selectors, element traversal) plus the EventTarget slice (P3.46: addEventListener/
+        // removeEventListener/dispatchEvent/click/focus/blur) dropped it from 1599 to 727.
         "src/Broiler.HtmlBridge.Dom/DomBridge/JsObjects.cs",
-        "src/Broiler.HtmlBridge.Dom/DomBridge/JsFunctionCallbacks/Registration.cs",
+        // JsFunctionCallbacks/Registration.cs de-listed 2026-07-17: nine feature modules
+        // (P3.19–P3.27: console, crypto, sendBeacon, matchMedia, timers, write/writeln, node
+        // factories, element queries, live collections, node mutation) dropped it from 1184 to 684.
         "src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge/Utilities.cs",
-        "src/Broiler.HtmlBridge.Dom/DomBridge/AnimationResolver.cs",
+        // AnimationResolver.cs de-listed 2026-07-17: its CSS timing-function/easing cluster was
+        // split into the sibling partial AnimationResolver.Timing.cs, dropping it to 644 lines.
     };
 
     [Fact]

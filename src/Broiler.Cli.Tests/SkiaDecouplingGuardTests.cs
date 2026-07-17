@@ -5,6 +5,13 @@ using Broiler.HTML.Image;
 
 namespace Broiler.Cli.Tests;
 
+// Disambiguate the unqualified `Regex` type: the Broiler.JS engine now exposes a top-level
+// `Broiler.Regex` namespace which, from this `Broiler.*` namespace, otherwise shadows
+// System.Text.RegularExpressions.Regex by simple-name lookup (CS0118). The alias must sit
+// inside the Broiler.Cli.Tests namespace scope so it is resolved before the enclosing
+// `Broiler` namespace's `Regex` member. This file uses only the .NET Regex.
+using Regex = System.Text.RegularExpressions.Regex;
+
 public class SkiaDecouplingGuardTests
 {
     private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(

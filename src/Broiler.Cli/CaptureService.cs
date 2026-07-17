@@ -17,6 +17,13 @@ using Broiler.HtmlBridge.Dom;
 
 namespace Broiler.Cli;
 
+// Disambiguate the unqualified `Regex` type: the Broiler.JS engine now exposes a top-level
+// `Broiler.Regex` namespace which, from this `Broiler.*` namespace, otherwise shadows
+// System.Text.RegularExpressions.Regex by simple-name lookup (CS0118). The alias must sit
+// inside the Broiler.Cli namespace scope so it is resolved before the enclosing `Broiler`
+// namespace's `Regex` member. This file uses only the .NET Regex.
+using Regex = System.Text.RegularExpressions.Regex;
+
 /// <summary>
 /// Supported output formats for captured content.
 /// </summary>

@@ -85,16 +85,18 @@ public sealed partial class DomBridge
     private static JSObject BuildAnimationObject(DomElement element)
     {
         var animation = new JSObject();
+        // The animation-object currentTime/ready.then surface is the co-located AnimationObjectBinding
+        // feature module (Phase 3).
         animation.FastAddProperty(
             (KeyString)"currentTime",
-            new JSFunction((in _) => JsRegistrationGetCurrentTime152Core(element, in _), "get currentTime"),
-            new JSFunction((in a) => JsRegistrationSetCurrentTime153Core(element, in a), "set currentTime"),
+            new JSFunction((in _) => Dom.Features.AnimationObjectBinding.GetCurrentTime(element, in _), "get currentTime"),
+            new JSFunction((in a) => Dom.Features.AnimationObjectBinding.SetCurrentTime(element, in a), "set currentTime"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         var ready = new JSObject();
         ready.FastAddValue(
             (KeyString)"then",
-            new JSFunction((in a) => JsRegistrationThen154Core(ready, in a), "then", 1),
+            new JSFunction((in a) => Dom.Features.AnimationObjectBinding.Then(ready, in a), "then", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         ready.FastAddValue(
             (KeyString)"catch",

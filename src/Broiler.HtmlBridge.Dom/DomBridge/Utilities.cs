@@ -245,7 +245,7 @@ public sealed partial class DomBridge
     /// Returns -1 when <paramref name="first"/> precedes <paramref name="second"/>,
     /// 1 when it follows, and 0 when no ordering can be determined.
     /// </summary>
-    private static int CompareTreeOrder(DomNode first, DomNode second)
+    internal static int CompareTreeOrder(DomNode first, DomNode second)
     {
         if (ReferenceEquals(first, second))
             return 0;
@@ -447,7 +447,7 @@ public sealed partial class DomBridge
     /// Recursively unchecks all radio inputs with the given name within the scope,
     /// except for the specified element. Used for radio button mutual exclusion.
     /// </summary>
-    private static void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
+    internal static void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
     {
         foreach (var child in ChildElements(scope))
         {

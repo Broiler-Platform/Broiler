@@ -15,6 +15,14 @@ using Broiler.Media.Image;
 
 namespace Broiler.Engines.Baseline;
 
+// Disambiguate the unqualified `DateTime` and `Regex` types: the Broiler.JS engine now exposes
+// top-level `Broiler.DateTime` and `Broiler.Regex` namespaces which, from this `Broiler.*`
+// namespace, otherwise shadow System.DateTime and System.Text.RegularExpressions.Regex by
+// simple-name lookup. The aliases must sit inside the Broiler.Engines.Baseline namespace scope
+// so they are resolved before the enclosing `Broiler` namespace's members.
+using DateTime = System.DateTime;
+using Regex = System.Text.RegularExpressions.Regex;
+
 internal static partial class Program
 {
     private const string DefaultTest262Manifest = "tests/m0-baseline/conformance/test262-subset-manifest.json";

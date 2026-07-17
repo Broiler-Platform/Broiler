@@ -7,6 +7,12 @@ using System.Text.Json.Serialization;
 
 namespace Broiler.Wpt;
 
+// Disambiguate the unqualified `DateTime` type: the Broiler.JS engine now exposes a top-level
+// `Broiler.DateTime` namespace which, from this `Broiler.*` namespace, otherwise shadows
+// System.DateTime by simple-name lookup. The alias must sit inside the Broiler.Wpt namespace
+// scope so it is resolved before the enclosing `Broiler` namespace's `DateTime` member.
+using DateTime = System.DateTime;
+
 using Broiler.HTML.Image;
 
 /// <summary>

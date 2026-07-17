@@ -460,15 +460,6 @@ public sealed partial class DomBridge
         => CssStyleEngine.ExpandShorthands(computed);
 
     /// <summary>
-    /// Evaluates a media query string. Supports basic queries needed for Acid3.
-    /// Evaluates comma-separated media queries (any match = true).
-    /// Supports <c>all</c>, <c>not all</c>, <c>only all</c>, and basic conditions
-    /// like <c>(min-color: 0)</c>, <c>(min-monochrome: 0)</c>.
-    /// </summary>
-    private static bool EvaluateMediaQuery(string query, int viewportWidth = 0, int viewportHeight = 0)
-        => CssStyleEngine.MatchesMediaQuery(query, new CssEnvironment(viewportWidth, viewportHeight));
-
-    /// <summary>
     /// Parses a CSS length value (e.g. "0", "100px", "1em") to pixels.
     /// Returns -1 if the value cannot be parsed.
     /// Default font size for em conversion is 16px.

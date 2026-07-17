@@ -219,7 +219,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public IReadOnlyList<DomElement> Elements =>
         [.. _document.InclusiveDescendants().OfType<DomElement>()];
 
-    private static ElementRuntimeState GetElementRuntimeState(DomNode node) =>
+    internal static ElementRuntimeState GetElementRuntimeState(DomNode node) =>
         ElementRuntimeStates.GetValue(node, static _ => new ElementRuntimeState());
 
     /// <summary>
@@ -327,7 +327,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     };
 
     /// <summary>Writes a text/comment node's character data (see <see cref="BridgeText"/>).</summary>
-    private static void SetBridgeText(DomNode node, string value)
+    internal static void SetBridgeText(DomNode node, string value)
     {
         if (node is DomCharacterData characterData)
             characterData.Data = value;

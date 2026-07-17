@@ -349,4 +349,175 @@ internal sealed class AttributesBinding(IAttributesHost host)
         if (removed)
             _host.NotifyAttributeMutationObservers(element, attrName, previousAttrVal);
     }
+
+    // -------- Element attribute methods (element.getAttribute / setAttribute / … , registered on the
+    // element wrapper; they delegate the write and Attr-node construction into this module) --------
+
+    internal JSValue GetAttribute(DomElement element, in Arguments a)
+    {
+        if (a.Length == 0)
+            return JSNull.Value;
+        var name = a[0].ToString();
+        return DomBridge.TryGetAttribute(element, name, out var val) ? new JSString(val) : JSNull.Value;
+    }
+
+    internal JSValue SetAttribute(DomElement element, in Arguments a)
+    {
+        if (a.Length >= 2)
+            SetAttributeLikeSetAttribute(element, a[0].ToString(), a[1].ToString());
+        return JSUndefined.Value;
+    }
+
+    internal JSValue GetAttributeNode(DomElement element, JSObject? obj, in Arguments a)
+    {
+        if (a.Length == 0)
+            return JSNull.Value;
+        var name = a[0].ToString();
+        return DomBridge.TryGetAttribute(element, name, out var val) ? BuildAttrNode(name, val, element, obj) : JSNull.Value;
+    }
+
+    internal JSValue GetAttributeNodeNS(DomElement element, JSObject? obj, in Arguments a)
+    {
+        if (a.Length < 2)
+            return JSNull.Value;
+        var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+        var localName = a[1].ToString();
+        if (!DomBridge.TryGetNsAttribute(element, ns, localName, out var qName, out var val))
+            return JSNull.Value;
+        return BuildAttrNode(qName, val, element, obj);
+    }
+
+    internal JSValue HasAttribute(DomElement element, in Arguments a)
+    {
+        if (a.Length == 0)
+            return JSBoolean.False;
+        return DomBridge.HasAttr(element, a[0].ToString()) ? JSBoolean.True : JSBoolean.False;
+    }
+
+    internal JSValue RemoveAttribute(DomElement element, in Arguments a)
+    {
+        if (a.Length > 0)
+            RemoveAttributeLikeRemoveAttribute(element, a[0].ToString());
+        return JSUndefined.Value;
+    }
+
+    internal JSValue ToggleAttribute(DomElement element, in Arguments a)
+    {
+        if (a.Length == 0)
+            return JSBoolean.False;
+        var attrName = a[0].ToString();
+        var hasAttribute = DomBridge.HasAttr(element, attrName);
+        var forceSpecified = a.Length > 1 && !a[1].IsUndefined;
+        var shouldHaveAttribute = forceSpecified ? a[1].BooleanValue : !hasAttribute;
+        if (shouldHaveAttribute)
+        {
+            if (!hasAttribute)
+                SetAttributeLikeSetAttribute(element, attrName, string.Empty);
+            return JSBoolean.True;
+        }
+
+        if (hasAttribute)
+            RemoveAttributeLikeRemoveAttribute(element, attrName);
+        return JSBoolean.False;
+    }
+
+    internal JSValue SetAttributeNode(DomElement element, JSObject? obj, in Arguments a)
+    {
+        if (a.Length == 0 || a[0] is not JSObject attrObj)
+            return JSNull.Value;
+        var name = GetAttrNodeName(attrObj);
+        if (string.IsNullOrEmpty(name))
+            return JSNull.Value;
+        var old = DomBridge.TryGetAttribute(element, name, out var oldVal) ? BuildAttrNode(name, oldVal, element, obj) : JSNull.Value;
+        SetAttributeLikeSetAttribute(element, name, attrObj[(KeyString)"value"].ToString());
+        return old;
+    }
+
+    internal JSValue SetAttributeNodeNS(DomElement element, JSObject? obj, in Arguments a)
+    {
+        if (a.Length == 0 || a[0] is not JSObject attrObj)
+            return JSNull.Value;
+        var name = GetAttrNodeName(attrObj);
+        var localName = GetAttrNodeLocalName(attrObj);
+        if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(localName))
+            return JSNull.Value;
+        var ns = GetAttrNodeNamespace(attrObj);
+        JSValue old = JSNull.Value;
+        if (DomBridge.TryGetNsAttribute(element, ns, localName, out var oldQName, out var oldVal))
+            old = BuildAttrNode(oldQName, oldVal, element, obj);
+        SetAttributeLikeSetAttributeNS(element, ns, name, localName, attrObj[(KeyString)"value"].ToString());
+        return old;
+    }
+
+    internal JSValue RemoveAttributeNode(DomElement element, JSObject? obj, in Arguments a)
+    {
+        if (a.Length == 0 || a[0] is not JSObject attrObj)
+            return JSNull.Value;
+        var name = GetAttrNodeName(attrObj);
+        if (string.IsNullOrEmpty(name) || !DomBridge.TryGetAttribute(element, name, out var val))
+            return JSNull.Value;
+        var removed = BuildAttrNode(name, val, element, obj);
+        RemoveAttributeLikeRemoveAttribute(element, name);
+        return removed;
+    }
+
+    internal JSValue RemoveAttributeNodeNS(DomElement element, JSObject? obj, in Arguments a)
+    {
+        if (a.Length == 0 || a[0] is not JSObject attrObj)
+            return JSNull.Value;
+        var localName = GetAttrNodeLocalName(attrObj);
+        if (string.IsNullOrEmpty(localName))
+            return JSNull.Value;
+        var ns = GetAttrNodeNamespace(attrObj);
+        if (!DomBridge.TryGetNsAttribute(element, ns, localName, out var qName, out var val))
+            return JSNull.Value;
+        var removed = BuildAttrNode(qName, val, element, obj);
+        RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
+        return removed;
+    }
+
+    internal JSValue SetAttributeNS(DomElement element, in Arguments a)
+    {
+        if (a.Length >= 3)
+        {
+            var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+            var qName = a[1].ToString();
+            var val = a[2].ToString();
+            var localName = qName.Contains(':') ? qName[(qName.IndexOf(':') + 1)..] : qName;
+            SetAttributeLikeSetAttributeNS(element, ns, qName, localName, val);
+        }
+
+        return JSUndefined.Value;
+    }
+
+    internal JSValue GetAttributeNS(DomElement element, in Arguments a)
+    {
+        if (a.Length < 2)
+            return JSNull.Value;
+        var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+        var localName = a[1].ToString();
+        var val = element.GetAttributeNS(ns, localName);
+        return val is not null ? new JSString(val) : JSNull.Value;
+    }
+
+    internal JSValue RemoveAttributeNS(DomElement element, in Arguments a)
+    {
+        if (a.Length >= 2)
+        {
+            var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+            var localName = a[1].ToString();
+            RemoveAttributeLikeRemoveAttributeNS(element, ns, localName);
+        }
+
+        return JSUndefined.Value;
+    }
+
+    internal JSValue HasAttributeNS(DomElement element, in Arguments a)
+    {
+        if (a.Length < 2)
+            return JSBoolean.False;
+        var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+        var localName = a[1].ToString();
+        return element.GetAttributeNS(ns, localName) is not null ? JSBoolean.True : JSBoolean.False;
+    }
 }

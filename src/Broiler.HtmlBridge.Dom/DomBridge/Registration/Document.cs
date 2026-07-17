@@ -20,59 +20,47 @@ public sealed partial class DomBridge
         // standards mode so it's always the <html> element).
         document.FastAddProperty((KeyString)"scrollingElement", new JSFunction((in _) => ToJSObject(DocumentElement), "get scrollingElement"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // document.body (getter — first <body> child of documentElement)
-        document.FastAddProperty((KeyString)"body", new JSFunction(JsRegistrationGetBody002Core, "get body"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        // document structural accessors — body/head/title, co-located in the DocumentStructureBinding
+        // feature module (Phase 3).
+        document.FastAddProperty((KeyString)"body", new JSFunction((in a) => Dom.Features.DocumentStructureBinding.GetBody(this, in a), "get body"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"head", new JSFunction((in a) => Dom.Features.DocumentStructureBinding.GetHead(this, in a), "get head"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"title", new JSFunction((in a) => Dom.Features.DocumentStructureBinding.GetTitle(this, in a), "get title"), new JSFunction((in a) => Dom.Features.DocumentStructureBinding.SetTitle(this, in a), "set title"), JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // document.head (getter — first <head> child of documentElement)
-        document.FastAddProperty((KeyString)"head", new JSFunction(JsRegistrationGetHead003Core, "get head"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.title (getter / setter)
-        document.FastAddProperty((KeyString)"title", new JSFunction((in a) => new JSString(Title), "get title"), new JSFunction(JsRegistrationSetTitle005Core, "set title"), JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.getElementById(id)
-        document.FastAddValue((KeyString)"getElementById", new JSFunction(JsRegistrationGetElementById006Core, "getElementById", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.getElementsByTagName(tag)
-        document.FastAddValue((KeyString)"getElementsByTagName", new JSFunction(JsRegistrationGetElementsByTagName007Core, "getElementsByTagName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.getElementsByClassName(className)
-        document.FastAddValue((KeyString)"getElementsByClassName", new JSFunction(JsRegistrationGetElementsByClassName008Core, "getElementsByClassName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.querySelector(selector)
-        document.FastAddValue((KeyString)"querySelector", new JSFunction(JsRegistrationQuerySelector009Core, "querySelector", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.querySelectorAll(selector)
-        document.FastAddValue((KeyString)"querySelectorAll", new JSFunction(JsRegistrationQuerySelectorAll010Core, "querySelectorAll", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"elementFromPoint", new JSFunction(JsRegistrationElementFromPoint011Core, "elementFromPoint", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"elementsFromPoint", new JSFunction(JsRegistrationElementsFromPoint012Core, "elementsFromPoint", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document element-query methods — getElementById/getElementsByTagName/getElementsByClassName/
+        // querySelector/querySelectorAll, co-located in the DocumentQueryBinding feature module (Phase 3).
+        document.FastAddValue((KeyString)"getElementById", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.GetElementById(this, in a), "getElementById", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"getElementsByTagName", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.GetElementsByTagName(this, in a), "getElementsByTagName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"getElementsByClassName", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.GetElementsByClassName(this, in a), "getElementsByClassName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"querySelector", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.QuerySelector(this, in a), "querySelector", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"querySelectorAll", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.QuerySelectorAll(this, in a), "querySelectorAll", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.elementFromPoint / elementsFromPoint (hit-testing), co-located in the HitTestBinding
+        // feature module (Phase 3).
+        document.FastAddValue((KeyString)"elementFromPoint", new JSFunction((in a) => Dom.Features.HitTestBinding.ElementFromPoint(this, in a), "elementFromPoint", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"elementsFromPoint", new JSFunction((in a) => Dom.Features.HitTestBinding.ElementsFromPoint(this, in a), "elementsFromPoint", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.getAnimations() — minimal Web Animations API support used by WPT.
         document.FastAddValue((KeyString)"getAnimations", new JSFunction((in _) => BuildAnimationList(null), "getAnimations", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // document.createElement(tag)
-        document.FastAddValue((KeyString)"createElement", new JSFunction((in a) => JsRegistrationCreateElement014Core(context, in a), "createElement", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document node factories — createElement/createTextNode/createAttribute/createDocumentFragment,
+        // co-located in the DocumentFactoryBinding feature module (Phase 3).
+        document.FastAddValue((KeyString)"createElement", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateElement(this, context, in a), "createElement", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"createTextNode", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateTextNode(this, in a), "createTextNode", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"createAttribute", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateAttribute(this, context, in a), "createAttribute", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"createDocumentFragment", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateDocumentFragment(this, in a), "createDocumentFragment", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // document.createTextNode(text)
-        document.FastAddValue((KeyString)"createTextNode", new JSFunction(JsRegistrationCreateTextNode015Core, "createTextNode", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.createAttribute(name)
-        document.FastAddValue((KeyString)"createAttribute", new JSFunction((in a) => JsRegistrationCreateAttribute016Core(context, in a), "createAttribute", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.createDocumentFragment() — basic iframe/fragment support
-        document.FastAddValue((KeyString)"createDocumentFragment", new JSFunction(JsRegistrationCreateDocumentFragment017Core, "createDocumentFragment", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.createEvent(type) — DOM Events Level 3
-        document.FastAddValue((KeyString)"createEvent", new JSFunction(JsRegistrationCreateEvent033Core, "createEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.createEvent(type) — DOM Events Level 3 (Phase 3: co-located LegacyEventBinding module)
+        document.FastAddValue((KeyString)"createEvent", new JSFunction(Dom.Features.LegacyEventBinding.Create, "createEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     private void RegisterDocumentWriting(JSObject document)
     {
-        // document.write(html) — parse and insert at the current script position
-        document.FastAddValue((KeyString)"write", new JSFunction(JsRegistrationWrite036Core, "write", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.write(html) — parse and insert at the current script position (Phase 3:
+        // co-located DocumentWriteBinding feature module).
+        document.FastAddValue((KeyString)"write", new JSFunction((in a) => Dom.Features.DocumentWriteBinding.Write(this, in a), "write", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.writeln(html) — same as write, with trailing newline
         var writeFn = (JSFunction)document[(KeyString)"write"];
-        document.FastAddValue((KeyString)"writeln", new JSFunction((in a) => JsRegistrationWriteln037Core(writeFn, in a), "writeln", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"writeln", new JSFunction((in a) => Dom.Features.DocumentWriteBinding.Writeln(writeFn, in a), "writeln", 1), JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     private void RegisterDocumentNodeAndCollectionApis(JSContext context, JSObject document)
@@ -97,37 +85,31 @@ public sealed partial class DomBridge
         // document.lastChild (getter — returns last child of document, typically documentElement)
         document.FastAddProperty((KeyString)"lastChild", new JSFunction((in _) => _document.ChildNodes.Count > 0 ? ToJSObject(ChildAt(_document, ^1)) : JSNull.Value, "get lastChild"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // document.childNodes (getter — returns children of document node: [DOCTYPE, documentElement])
-        document.FastAddProperty((KeyString)"childNodes", new JSFunction(JsRegistrationGetChildNodes046Core, "get childNodes"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.removeChild(child)
-        var docNodeForMutation = _document;
-        document.FastAddValue((KeyString)"removeChild", new JSFunction((in a) => JsRegistrationRemoveChild047Core(docNodeForMutation, in a), "removeChild", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.appendChild(child)
-        document.FastAddValue((KeyString)"appendChild", new JSFunction((in a) => JsRegistrationAppendChild048Core(docNodeForMutation, in a), "appendChild", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.insertBefore(newChild, refChild)
-        document.FastAddValue((KeyString)"insertBefore", new JSFunction((in a) => JsRegistrationInsertBefore049Core(docNodeForMutation, in a), "insertBefore", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document-node mutation — childNodes/removeChild/appendChild/insertBefore, co-located in the
+        // NodeMutationBinding feature module (Phase 3).
+        document.FastAddProperty((KeyString)"childNodes", new JSFunction((in a) => Dom.Features.NodeMutationBinding.GetChildNodes(this, in a), "get childNodes"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddValue((KeyString)"removeChild", new JSFunction((in a) => Dom.Features.NodeMutationBinding.RemoveChild(this, in a), "removeChild", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"appendChild", new JSFunction((in a) => Dom.Features.NodeMutationBinding.AppendChild(this, in a), "appendChild", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"insertBefore", new JSFunction((in a) => Dom.Features.NodeMutationBinding.InsertBefore(this, in a), "insertBefore", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.forms — collection of all <form> elements with named access
-        document.FastAddProperty((KeyString)"forms", new JSFunction(JsRegistrationGetForms050Core, "get forms"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"forms", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetForms(this, in a), "get forms"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // document.createElementNS(namespace, tagName)
-        document.FastAddValue((KeyString)"createElementNS", new JSFunction((in a) => JsRegistrationCreateElementNS051Core(context, in a), "createElementNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.createElementNS(namespace, tagName)  — DocumentFactoryBinding (Phase 3)
+        document.FastAddValue((KeyString)"createElementNS", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateElementNS(this, context, in a), "createElementNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // document.createAttributeNS(namespace, qualifiedName)
-        document.FastAddValue((KeyString)"createAttributeNS", new JSFunction((in a) => JsRegistrationCreateAttributeNS052Core(context, in a), "createAttributeNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.createAttributeNS(namespace, qualifiedName)  — DocumentFactoryBinding (Phase 3)
+        document.FastAddValue((KeyString)"createAttributeNS", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateAttributeNS(this, context, in a), "createAttributeNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.images — collection of all <img> elements
-        document.FastAddProperty((KeyString)"images", new JSFunction(JsRegistrationGetImages053Core, "get images"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"images", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetImages(this, in a), "get images"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.links — collection of all <a> and <area> elements with href
         // Uses tree-order traversal so dynamically appended elements are reflected.
-        document.FastAddProperty((KeyString)"links", new JSFunction(JsRegistrationGetLinks054Core, "get links"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"links", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetLinks(this, in a), "get links"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.styleSheets — collection of stylesheet objects for main document
-        document.FastAddProperty((KeyString)"styleSheets", new JSFunction(JsRegistrationGetStyleSheets055Core, "get styleSheets"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"styleSheets", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetStyleSheets(this, in a), "get styleSheets"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.open() — for main document
         document.FastAddValue((KeyString)"open", new JSFunction((in _) => document, "open", 0), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -141,30 +123,29 @@ public sealed partial class DomBridge
         // implementation.hasFeature() — always returns true per spec
         implementation.FastAddValue((KeyString)"hasFeature", TrueFunction("hasFeature", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // implementation.createDocumentType(qualifiedName, publicId, systemId)
-        implementation.FastAddValue((KeyString)"createDocumentType", new JSFunction((in a) => JsRegistrationCreateDocumentType057Core(context, in a), "createDocumentType", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.implementation factories — createDocumentType/createDocument/createHTMLDocument,
+        // co-located in the DocumentLevelFactoryBinding feature module (Phase 3).
+        implementation.FastAddValue((KeyString)"createDocumentType", new JSFunction((in a) => Dom.Features.DocumentLevelFactoryBinding.CreateDocumentType(this, context, in a), "createDocumentType", 3), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // implementation.createDocument(namespace, qualifiedName, doctype)
-        implementation.FastAddValue((KeyString)"createDocument", new JSFunction((in a) => JsRegistrationCreateDocument058Core(context, in a), "createDocument", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        implementation.FastAddValue((KeyString)"createDocument", new JSFunction((in a) => Dom.Features.DocumentLevelFactoryBinding.CreateDocument(this, context, in a), "createDocument", 3), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // implementation.createHTMLDocument(title)
-        implementation.FastAddValue((KeyString)"createHTMLDocument", new JSFunction(JsRegistrationCreateHTMLDocument059Core, "createHTMLDocument", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        implementation.FastAddValue((KeyString)"createHTMLDocument", new JSFunction((in a) => Dom.Features.DocumentLevelFactoryBinding.CreateHTMLDocument(this, in a), "createHTMLDocument", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         document.FastAddValue((KeyString)"implementation", implementation, JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     private void RegisterDocumentEventTargetAndMetadata(JSObject document)
     {
-        // document-level addEventListener / removeEventListener / dispatchEvent
-        var docNode = _document;
-        var bridgeRef = this;
-
-        document.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => JsRegistrationAddEventListener060Core(docNode, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => JsRegistrationRemoveEventListener061Core(docNode, in a), "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"dispatchEvent", new JSFunction((in a) => JsRegistrationDispatchEvent062Core(bridgeRef, docNode, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document-level addEventListener / removeEventListener / dispatchEvent, co-located in the
+        // DocumentEventTargetBinding feature module (Phase 3).
+        document.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.AddEventListener(this, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"dispatchEvent", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.DispatchEvent(this, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.contentType — returns the MIME type of the document
-        document.FastAddProperty((KeyString)"contentType", new JSFunction(JsRegistrationGetContentType063Core, "get contentType"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"contentType", new JSFunction((in a) => Dom.Features.WindowDocumentMiscBinding.GetContentType(this, in a), "get contentType"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.URL — returns the document URL
         document.FastAddProperty((KeyString)"URL", new JSFunction((in _) => new JSString(_pageUrl), "get URL"), null, JSPropertyAttributes.EnumerableConfigurableProperty);

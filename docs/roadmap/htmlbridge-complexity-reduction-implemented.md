@@ -759,7 +759,505 @@ environmental failures → zero regressions. **This completes the Frames feature
 `BrowsingContextManager` (P3.16), the sub-document object in `SubDocumentBinding` (P3.13), the sub-window object
 in `SubWindowBinding` (P3.17), and the window-resolution behaviour in `WindowContextManager` (P3.18).
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.18 named-accessor / relocated-infra /
+Status: **P3.19 completed** 2026-07-17 (branch `claude/htmlbridge-complexity-reduction-sdrzwp`) — the **`console`
+API**, and the first slice peeled off the 1184-line `JsFunctionCallbacks/Registration.cs` grab-bag. `ConsoleBinding`
+(namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the whole feature — the `console` object builder (was the
+bridge's `BuildConsoleObject` in `Registration/Console.cs`) and its four sinks `log`/`warn`/`error`/`info` (renamed
+from the numbered `JsRegistrationLog156…Info159Core`, moved out of the shared registration grab-bag). It formats
+its arguments and routes them to `RenderLogger`, touching **no bridge instance state**, so — like `ClassListBinding`
+(P3.6) — it is a pure static class with **no host contract**; the identical per-sink arg-formatting collapsed into
+one `Format(in Arguments)` helper. The single registration site (`Registration/Window.cs`) now calls
+`Dom.Features.ConsoleBinding.Build()`; `Registration/Console.cs` is deleted and the four callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (1184 → 1144 lines — still ratcheted debt, but shrinking). Behaviour-preserving;
+no public-API change (module internal). Tests: `Broiler.Cli.Tests/ConsoleBindingModuleTests.cs` (co-location /
+callbacks-moved-off-bridge guards + a `log`/`warn`/`error`/`info` return-undefined + `typeof` characterization
+through the bridge). Regression check: the full `HtmlBridgeArchitectureGuardTests` (14) and the line-limit guard pass;
+`Broiler.HtmlBridge.Dom` builds clean; no production reference to the removed symbols remains.
+
+Status: **P3.20 completed** 2026-07-17 (same branch) — the **Web Crypto `crypto` subset**, the second
+slice off the registration grab-bag. `CryptoBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the
+`crypto` object builder (`getRandomValues` + `randomUUID`) and the `getRandomValues` callback (was the bridge's
+`JsRegistrationGetRandomValues150Core`, inline `crypto`-object construction in the bridge's
+`RegisterSecurityAndConstructorPolyfills`). Like `ConsoleBinding` it fills a caller-supplied typed array with
+`RandomNumberGenerator` bytes and mints UUIDs, touching **no bridge instance state**, so it is a pure static class
+with **no host contract**. `Registration/Polyfills.cs` now calls `Dom.Features.CryptoBinding.Build()`; the callback
+is gone from `JsFunctionCallbacks/Registration.cs`. Behaviour-preserving; no public-API change (module internal).
+Tests: `Broiler.Cli.Tests/CryptoBindingModuleTests.cs` (co-location / callback-moved-off-bridge guards + a
+`getRandomValues` fills-in-place-and-returns-same-array + `randomUUID` v4-shape characterization through the bridge).
+Regression check: `Broiler.HtmlBridge.Dom` builds clean; the Console/Crypto module suites and the line-limit guard
+pass; no production reference to the removed callback remains.
+
+Status: **P3.21 completed** 2026-07-17 (same branch) — **`navigator.sendBeacon`**, the third slice off the
+registration grab-bag. `BeaconBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns the beacon send —
+delegating a keep-alive `POST` to the window's own `fetch` and returning `false` (never throwing) when it cannot
+queue, per the Beacon spec (was the bridge's `JsRegistrationSendBeacon124Core`). It reads only the supplied
+`window` and routes errors to `RenderLogger`, touching **no bridge instance state**, so it is a pure static class
+with **no host contract**. `Registration/Window.cs` now registers `Dom.Features.BeaconBinding.Send(window, in a)`;
+the callback is gone from `JsFunctionCallbacks/Registration.cs` (1122 → 1096 lines). Behaviour-preserving; no
+public-API change (module internal). Tests: `Broiler.Cli.Tests/BeaconBindingModuleTests.cs` (co-location /
+callback-moved-off-bridge guards + a characterization that stubs `window.fetch` to observe the keep-alive-POST
+delegation deterministically without network, plus the no-data → `false` contract). Regression check:
+`Broiler.HtmlBridge.Dom` builds clean; the module suites and the line-limit guard pass.
+
+Status: **P3.22 completed** 2026-07-17 (same branch) — **`window.matchMedia`**, the fourth slice off the
+registration grab-bag and the first of these grab-bag slices that is *state-coupled* (so it takes a narrow host
+contract, unlike the stateless P3.19–P3.21). `MatchMediaBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+evaluates the query against the current viewport via the canonical `CssStyleEngine.MatchesMediaQuery` and returns a
+`MediaQueryList`-shaped object (`matches`/`media` + no-op legacy `addListener`/`removeListener` stubs). Its only
+bridge coupling — the **live** viewport (read per call, not at registration) — is the two-member `IMatchMediaHost`
+contract, implemented via explicit interface members in `DomBridge.MatchMediaHost.cs`. The bridge's thin
+`EvaluateMediaQuery` wrapper (its sole caller was this callback) is **deleted**, so the module talks to the CSS
+engine directly. `Registration/Window.cs` now registers `Dom.Features.MatchMediaBinding.MatchMedia(this, in a)`;
+the callback is gone from `JsFunctionCallbacks/Registration.cs` (1096 → 1083 lines). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/MatchMediaBindingModuleTests.cs`
+(co-location / host-contract / callback-and-evaluator-moved-off-bridge guards + a viewport-evaluation
+characterization — `(min-width: 100px)` matches, `(min-width: 5000px)` does not, `media` preserved, legacy stubs
+present — through the bridge). Regression check: `Broiler.HtmlBridge.Dom` builds clean; the architecture-guard (14),
+matchMedia and media-query suites pass (21).
+
+Status: **P3.23 completed** 2026-07-17 (same branch) — the **window timer / animation-frame scheduling API**,
+the fifth slice off the registration grab-bag. `TimerBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates all six entry points — `setTimeout`/`clearTimeout`, `setInterval`/`clearInterval`,
+`requestAnimationFrame`/`cancelAnimationFrame` (was the bridge's `JsRegistrationSetTimeout070Core`..
+`CancelAnimationFrame075Core`). Each is a thin adapter that unwraps the JS arguments and delegates to the **P2.4
+`BrowserEventLoop`** task-queue owner; since the module holds no state of its own, it takes the owner as a method
+parameter rather than through a host contract (the `Registration/Window.cs` lambdas pass `_eventLoop`). The six
+registrations collapsed to `Dom.Features.TimerBinding.<Op>(_eventLoop, in a)` calls; the callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (1083 → 1044 lines). Behaviour-preserving; no public-API change (module
+internal). Tests: `Broiler.Cli.Tests/TimerBindingModuleTests.cs` (co-location / six-callbacks-moved-off-bridge
+guards + a schedule-and-cancel characterization that drives real scheduling and cancellation end-to-end through the
+bridge's event-loop drain — `setTimeout`/`setInterval`/`requestAnimationFrame` fire, the cleared/cancelled ones do
+not, handles are numeric ids). Regression check: the TimerAndAsync, BrowserEventLoop, and architecture-guard suites
+pass (56); `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.24 completed** 2026-07-17 (same branch) — **`document.write` / `document.writeln`**, the sixth
+slice off the registration grab-bag. `DocumentWriteBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates both (was the bridge's `JsRegistrationWrite036Core`/`JsRegistrationWriteln037Core`): `write` parses its
+argument as an HTML fragment and inserts the nodes at the parser insertion point — right after the currently
+executing `<script>`, else appended to `<body>` — and `writeln` is `write` with a trailing newline. The document
+root, element list, current-script index and the HTML-fragment parser are reached through the four-member
+`IDocumentWriteHost` contract (`DomBridge.DocumentWriteHost.cs`, explicit interface members); the structural moves
+use the bridge's neutral `internal static` tree helpers (`ChildElements`/`ParentEl`/`ChildIndexOf`/`SetParent`/
+`InsertChildAt`). `Registration/Document.cs` now registers `Dom.Features.DocumentWriteBinding.Write(this, in a)` /
+`Writeln(writeFn, in a)`; the callbacks are gone from `JsFunctionCallbacks/Registration.cs` (1044 → 977 lines —
+now under 1000). Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/DocumentWriteBindingModuleTests.cs` (co-location / host-contract / callbacks-moved-off-bridge
+guards + a characterization that builds its assertion markers at runtime and appends them via `createElement`, so
+they appear only in the rendered output and prove the written/`writeln`-ed nodes were inserted and are queryable via
+`getElementById`). Regression check: the Acid3 (which exercises `document.write` heavily), write-named, and
+architecture-guard suites pass (62); `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.25 completed** 2026-07-17 (same branch) — the **`document` node-factory methods**, the seventh
+slice off the registration grab-bag. `DocumentFactoryBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the six node constructors — `createElement`, `createTextNode`, `createDocumentFragment`,
+`createElementNS`, `createAttribute`, `createAttributeNS` (was `JsRegistrationCreateElement014Core` etc.). Each
+validates its name argument, constructs the canonical node, and returns its JS wrapper. Name validation and
+ASCII-lowercasing stay as the bridge's neutral `internal static` helpers (`ValidateElementName`/
+`ValidateQualifiedName`/`AsciiToLower`) the module calls directly; the node-construction funnels
+(`CreateBridgeElement`/`…ElementNS`/`…TextNode`/`…DocumentFragment`), standalone `Attr` construction
+(`_attributes.BuildStandaloneAttrNode`) and the `ToJSObject` wrapper factory are reached through the six-member
+`IDocumentFactoryHost` contract (`DomBridge.DocumentFactoryHost.cs`, explicit interface members).
+`Registration/Document.cs` now registers `Dom.Features.DocumentFactoryBinding.<Op>(this, [context,] in a)`; the
+callbacks are gone from `JsFunctionCallbacks/Registration.cs` (977 → 917 lines). **Scoped deliberately:** the
+document-*level* factories (`createDocument`/`createHTMLDocument`/`createDocumentType`, which are
+browsing-context-coupled via `CreateBrowsingContextDocument`/`_subDocuments`) and `createEvent` (a legacy
+event-object builder) are left for later slices. Behaviour-preserving; no public-API change (module + contract
+internal). Tests: `Broiler.Cli.Tests/DocumentFactoryBindingModuleTests.cs` (co-location / host-contract /
+six-callbacks-moved-off-bridge guards + a construction characterization — element+text end-to-end into the live
+tree, a queryable `createElementNS` SVG element, fragment `nodeType` 11, and ASCII-lowercased / namespaced `Attr`
+nodes). Regression check: the namespace, attributes, factory, DOM-interface and architecture-guard suites pass (80);
+`Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.26 completed** 2026-07-17 (same branch) — the **`document` element-query methods**, the eighth
+slice off the registration grab-bag. `DocumentQueryBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the five element lookups — `getElementById`, `getElementsByTagName`, `getElementsByClassName`,
+`querySelector`, `querySelectorAll` (was `JsRegistrationGetElementById006Core` etc.). Each searches the document
+tree and returns the matching element's JS wrapper (or a JS array of wrappers). The document root, element list and
+wrapper factory are reached through the three-member `IDocumentQueryHost` contract
+(`DomBridge.DocumentQueryHost.cs`, explicit interface members); sub-tree search (`FindInSubTree`) and selector
+matching (`MatchesSelector`) stay as the bridge's neutral `internal static` helpers, called directly.
+`Registration/Document.cs` now registers `Dom.Features.DocumentQueryBinding.<Op>(this, in a)`; the callbacks are
+gone from `JsFunctionCallbacks/Registration.cs` (917 → 853 lines). **Scoped deliberately:** hit-testing
+(`elementFromPoint`/`elementsFromPoint`, layout-coupled), the structural accessors (`body`/`head`/`title`) and the
+live collections (`forms`/`images`/`links`/`styleSheets`) are separate concerns left for later slices.
+Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/DocumentQueryBindingModuleTests.cs` (co-location / host-contract / five-callbacks-moved-off-bridge
+guards + a query characterization — id lookup, tag/class counts, and `querySelector`/`All` over a `p.foo` selector —
+through the bridge). Regression check: the DocumentQuery, Selectors/CSSOM, HtmlDom and architecture-guard suites pass
+(108 of 109; the one failure, `SelectorsAndCssomTests.Lang_Matches_XmlLang_Ancestor`, is the documented pre-existing
+`:lang` selector failure — verified failing identically at the pre-change baseline); `Broiler.HtmlBridge.Dom` builds
+clean.
+
+Status: **P3.27 completed** 2026-07-17 (same branch) — the **`document` live-collection accessors**, the ninth
+slice off the registration grab-bag. `DocumentCollectionBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the four collection getters — `document.forms`, `document.images`, `document.links`,
+`document.styleSheets` (was `JsRegistrationGetForms050Core` etc.). Each scans the document for the relevant
+elements and returns a JS array of their wrappers (`forms` additionally exposes named access by the form's `name`
+attribute; `links` is `<a>`/`<area>` with `href`; `styleSheets` returns stylesheet objects). The document root,
+element list, wrapper factory, tree-order link collector (`CollectLinksInTreeOrder`) and stylesheet-object builder
+(`BuildStyleSheetObject`) are reached through the five-member `IDocumentCollectionHost` contract
+(`DomBridge.DocumentCollectionHost.cs`, explicit interface members); attribute reads use the bridge's neutral
+`internal static` `TryGetAttribute` directly. `Registration/Document.cs` now registers
+`Dom.Features.DocumentCollectionBinding.<Op>(this, in a)`; the callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (853 → 791 lines). Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/DocumentCollectionBindingModuleTests.cs` (co-location / host-contract /
+four-callbacks-moved-off-bridge guards + a collection characterization through the bridge — form count + named
+access, image count, href-only link count, stylesheet count). Regression check: the DocumentCollection, StyleSheet,
+Form, DOM-interface and architecture-guard suites pass (75); `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.28 completed** 2026-07-17 (same branch) — the **`document`-node mutation methods**, the tenth
+slice off the registration grab-bag, **which dropped it under the 750-line guard and de-listed it.**
+`NodeMutationBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates `document.childNodes` (getter),
+`document.removeChild`, `document.appendChild`, `document.insertBefore` (was `JsRegistrationGetChildNodes046Core`..
+`InsertBefore049Core`). Each resolves its argument node, performs the structural move on the document node via the
+bridge's neutral `internal static` tree helpers (`ChildIndexOf`/`SetParent`/`InsertChildAt`/`ParentEl`/
+`RemoveNthChild`/`ChildElements`), and fires the mutation-observer / node-iterator notifications. The document node,
+wrapper factory, reverse lookup (`FindDomNodeByJSObject`) and the three notifications are reached through the
+six-member `INodeMutationHost` contract (`DomBridge.NodeMutationHost.cs`, explicit interface members); the
+registration's `docNodeForMutation` local is gone (the module sources the document node from the host).
+`Registration/Document.cs` now registers `Dom.Features.NodeMutationBinding.<Op>(this, in a)`; the callbacks are gone
+from `JsFunctionCallbacks/Registration.cs` (**791 → 684 lines — under the limit**). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/NodeMutationBindingModuleTests.cs`
+(co-location / host-contract / four-callbacks-moved-off-bridge guards + a document-node mutation characterization —
+detach and re-attach the documentElement via `removeChild`/`appendChild`/`insertBefore`, `childNodes` count
+`1→0→1`, subtree survives — through the bridge). **Grab-bag de-listed:** `JsFunctionCallbacks/Registration.cs` is
+removed from the guard's `OversizedFileExemptions` (debt list eight → seven). Regression check: the binding-module,
+mutation-observer, HtmlDom and architecture-guard suites pass (179); `Broiler.HtmlBridge.Dom` builds clean.
+
+**Grab-bag decomposition summary (P3.19–P3.28).** `JsFunctionCallbacks/Registration.cs` went **1184 → 684 lines**
+as ten features were peeled into co-located modules: `ConsoleBinding` (P3.19), `CryptoBinding` (P3.20),
+`BeaconBinding` (P3.21), `MatchMediaBinding` (P3.22), `TimerBinding` (P3.23), `DocumentWriteBinding` (P3.24),
+`DocumentFactoryBinding` (P3.25), `DocumentQueryBinding` (P3.26), `DocumentCollectionBinding` (P3.27),
+`NodeMutationBinding` (P3.28) — spanning stateless (no-host) modules, `BrowserEventLoop`-parameter modules, and
+narrow-host-contract modules. What remains in the file is the residual document/window surface (structural
+accessors `body`/`head`/`title`, hit-testing `elementFromPoint`/`elementsFromPoint`, the document-level factories
+`createDocument`/`createHTMLDocument`/`createDocumentType` + `createEvent`, the document/window event-listener and
+scroll wiring, `getComputedStyle`, cookies, and the performance/scroll/scale helpers), now comfortably under the
+guard.
+
+Status: **P3.29 completed** 2026-07-17 (same branch) — the **`document` structural accessors**, continuing into
+the residual document surface after the grab-bag was de-listed (P3.28). `DocumentStructureBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates `document.body` and `document.head` (getters returning the first
+matching child of the documentElement) and `document.title` (get/set) — was the bridge's
+`JsRegistrationGetBody002Core`/`GetHead003Core`/`SetTitle005Core` plus the inline title getter. The document root,
+wrapper factory and title are reached through the three-member `IDocumentStructureHost` contract
+(`DomBridge.DocumentStructureHost.cs`, explicit interface members); child enumeration uses the bridge's neutral
+`internal static` `ChildElements` directly. `Registration/Document.cs` now registers
+`Dom.Features.DocumentStructureBinding.<Op>(this, in a)`; the callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (684 → 653 lines, staying under the guard). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/DocumentStructureBindingModuleTests.cs`
+(co-location / host-contract / three-callbacks-moved-off-bridge guards + a characterization — `body`/`head`
+tagName, `title` read of the parsed `<title>` and a round-trip set — through the bridge). Regression check: the
+DocumentStructure, HtmlDom and architecture-guard suites pass (51); `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.30 completed** 2026-07-17 (same branch) — **`document.createEvent`**, the legacy DOM Events Level 3
+factory. `LegacyEventBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) owns the ~320-line builder that returns
+a plain event object pre-populated with the union of UI/Mouse/Keyboard/Wheel/Custom event fields plus the legacy
+`init*Event` (`initEvent`/`initUIEvent`/`initMouseEvent`/`initKeyboardEvent`/`initWheelEvent`/`initCustomEvent`) and
+propagation-control methods (`stopPropagation`/`preventDefault`/`cancelBubble`/`returnValue`) — was the bridge's
+`JsRegistrationCreateEvent033Core`. It builds a self-contained JS object with closures over its own state and
+touches **no bridge instance state**, so — like `ConsoleBinding` / `CryptoBinding` — it is a pure static class with
+**no host contract** (registered by method group, `new JSFunction(Dom.Features.LegacyEventBinding.Create, …)`). This
+is the single biggest callback moved out of the grab-bag: `JsFunctionCallbacks/Registration.cs` **653 → 328 lines**.
+Behaviour-preserving; no public-API change (module internal). Tests:
+`Broiler.Cli.Tests/LegacyEventBindingModuleTests.cs` (co-location / callback-moved-off-bridge guards + a
+characterization — `createEvent('Event')`, `initEvent` sets type/bubbles/cancelable, `preventDefault` on a
+cancelable event sets `defaultPrevented`, the propagation methods are present — through the bridge). Regression
+check: the DomEvents (51, a heavy `createEvent` user), DomEventsEdgeCase and architecture-guard suites pass;
+`Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.31 completed** 2026-07-17 (same branch) — the **`document.implementation` document-level
+factories**, completing the factory surface begun in P3.25. `DocumentLevelFactoryBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates `createDocumentType`, `createDocument`, `createHTMLDocument` (was the
+bridge's `JsRegistrationCreateDocumentType057Core`..`CreateHTMLDocument059Core`). Each constructs a canonical DOM
+node/tree — a browsing-context `DomDocument` root for the two document factories — through the eight-member
+`IDocumentLevelFactoryHost` contract (`DomBridge.DocumentLevelFactoryHost.cs`, explicit interface members): the
+wrapper factory + reverse lookup, the doctype/element/namespaced-element/text funnels, `CreateBrowsingContextDocument`
+and the sub-document builder (`_subDocuments.BuildDocument`). Name validation and `SetParent` stay as the bridge's
+neutral `internal static` helpers, called directly. The `createDocument` doctype-append was simplified from an
+inline `_jsObjects.Entries` scan to the equivalent `FindDomNodeByJSObject` reverse lookup. `Registration/Document.cs`
+now registers `Dom.Features.DocumentLevelFactoryBinding.<Op>(this, [context,] in a)`; the callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (**328 → 241 lines**). Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/DocumentLevelFactoryBindingModuleTests.cs` (co-location / host-contract
+/ three-callbacks-moved-off-bridge guards + a characterization — `createHTMLDocument` title/body/`getElementById`,
+`createDocument` documentElement, `createDocumentType` name — through the bridge). Regression check: the
+SubDocumentBinding (a heavy user of these factories), Acid3-special and architecture-guard suites pass (30+);
+`Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.32 completed** 2026-07-17 (same branch) — the **`document` EventTarget methods**.
+`DocumentEventTargetBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates
+`document.addEventListener`, `document.removeEventListener`, `document.dispatchEvent` (was the bridge's
+`JsRegistrationAddEventListener060Core`/`RemoveEventListener061Core`/`DispatchEvent062Core`). Each resolves the
+document node's per-type listener store and applies the add/remove via the P3.4 `EventListenerBinding` operations,
+or runs the capture→target→bubble dispatch via the bridge's shared algorithm. The document node, listener store
+(`GetEventListeners`) and dispatch (`DispatchEventOnElement`) are reached through the three-member
+`IDocumentEventTargetHost` contract (`DomBridge.DocumentEventTargetHost.cs`, explicit interface members); the
+registration's `docNode`/`bridgeRef` locals are gone (the module sources the document node from the host).
+`Registration/Document.cs` now registers `Dom.Features.DocumentEventTargetBinding.<Op>(this, in a)`; the callbacks
+are gone from `JsFunctionCallbacks/Registration.cs` (241 → 203 lines). The **window** and **visualViewport**
+EventTarget wiring (different listener stores + dispatch paths) are left as separate concerns. Behaviour-preserving;
+no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/DocumentEventTargetBindingModuleTests.cs` (co-location / host-contract /
+three-callbacks-moved-off-bridge guards + an add→dispatch→remove→dispatch characterization — the listener fires
+once then, after removal, does not fire again — through the bridge). Regression check: the DomEvents,
+DomEventsEdgeCase, EventDispatch and architecture-guard suites pass (103); `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.33 completed** 2026-07-17 (same branch) — the **`window` EventTarget methods**, the symmetric
+counterpart to P3.32. `WindowEventTargetBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates
+`window.addEventListener`, `window.removeEventListener`, `window.dispatchEvent` (was the bridge's
+`JsRegistrationAddEventListener136Core`/`RemoveEventListener137Core`/`DispatchEvent138Core`). Each resolves the
+window's per-type listener store (from the P2.5 `EventTargetRegistry` via `WindowListenersForAdd`/
+`TryGetWindowListeners`) and applies add/remove via the P3.4 `EventListenerBinding` operations, or runs the
+window-scoped dispatch (`DispatchWindowEvent`) — reached through the three-member `IWindowEventTargetHost` contract
+(`DomBridge.WindowEventTargetHost.cs`, explicit interface members). `Registration/Window.cs` now registers
+`Dom.Features.WindowEventTargetBinding.<Op>(this, in a)`; the callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (203 → 172 lines). The **visualViewport** EventTarget wiring is left as a
+separate concern. Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/WindowEventTargetBindingModuleTests.cs` (co-location / host-contract /
+three-callbacks-moved-off-bridge guards + an add→dispatch→remove→dispatch characterization through the bridge).
+Regression check: the DomEvents, DomEventsEdgeCase and architecture-guard suites pass (98);
+`Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.34 completed** 2026-07-17 (same branch) — the **`window.visualViewport` EventTarget methods**,
+completing the EventTarget-wiring trilogy (P3.32 document, P3.33 window). `VisualViewportEventTargetBinding`
+(namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the visualViewport `addEventListener` /
+`removeEventListener` (was the bridge's `JsRegistrationAddEventListener146Core`/`RemoveEventListener147Core`). Only
+the `scroll` event is supported; a `scroll` listener is added to / removed from the visual-viewport store (owned by
+the P2.5 `EventTargetRegistry`) through the two-member `IVisualViewportEventTargetHost` contract
+(`DomBridge.VisualViewportEventTargetHost.cs`, explicit interface members); any other type is a no-op.
+`Registration/Window.cs` now registers `Dom.Features.VisualViewportEventTargetBinding.<Op>(this, in a)`; the
+callbacks are gone from `JsFunctionCallbacks/Registration.cs` (172 → 150 lines). Behaviour-preserving; no
+public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/VisualViewportEventTargetBindingModuleTests.cs` (co-location / host-contract /
+two-callbacks-moved-off-bridge guards + a callable-without-throwing characterization: `scroll` add/remove and a
+non-scroll no-op). Regression check: the EventTargetRegistry and architecture-guard suites pass (26), and the
+GoogleSearchPolyfill `VisualViewport_ScrollIntoView_*` tests — which add a `scroll` listener and assert it **fires**
+on a visual-viewport scroll — still pass, confirming the firing path end-to-end; `Broiler.HtmlBridge.Dom` builds
+clean.
+
+Status: **P3.35 completed** 2026-07-17 (same branch) — the **`window` scroll methods**. `WindowScrollBinding`
+(namespace `Broiler.HtmlBridge.Dom.Features`) co-locates `window.scroll`, `window.scrollTo`, `window.scrollBy` (was
+the bridge's `JsRegistrationScroll133Core`/`ScrollTo134Core`/`ScrollBy135Core`). Each parses the JS scroll
+arguments and applies the offset to the document (scrolling) element with the requested scroll behavior —
+`scroll`/`scrollTo` absolute (identical; `scroll` now delegates to `scrollTo`), `scrollBy` relative — all reached
+through the three-member `IWindowScrollHost` contract (`DomBridge.WindowScrollHost.cs`, explicit interface members):
+the scrolling element, `GetScrollArguments` parser and the `SetElementScrollOffsetsWithBehavior` primitive.
+`Registration/Window.cs` now registers `Dom.Features.WindowScrollBinding.<Op>(this, in a)`; the callbacks are gone
+from `JsFunctionCallbacks/Registration.cs` (150 → 126 lines). Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/WindowScrollBindingModuleTests.cs` (co-location / host-contract /
+three-callbacks-moved-off-bridge guards + a characterization — `scrollTo(0,100)`→100, `scrollBy(0,50)`→150,
+`scroll(0,25)`→25 read back via `window.scrollY` — through the bridge). Regression check: the window-scroll and
+architecture-guard suites pass (19+), including the GoogleSearchPolyfill `Window_Scroll_APIs_Update_Root_Scroll_
+Offsets_And_VisualViewport` oracle; `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.36 completed** 2026-07-17 (same branch) — the **`document` point hit-testing methods**.
+`HitTestBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates `document.elementFromPoint` (topmost
+element at a coordinate, or `null`) and `document.elementsFromPoint` (the front-to-back stack) — was the bridge's
+`JsRegistrationElementFromPoint011Core`/`ElementsFromPoint012Core`. The document root, wrapper factory and the
+point hit-test (`HitTestDocumentPoint`) are reached through the three-member `IHitTestHost` contract
+(`DomBridge.HitTestHost.cs`, explicit interface members); coordinate parsing uses the bridge's neutral
+`internal static` `GetCoordinateArgument` (the same helper `SubDocumentBinding` already calls). `Registration/
+Document.cs` now registers `Dom.Features.HitTestBinding.<Op>(this, in a)`; the callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (126 → 112 lines). Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/HitTestBindingModuleTests.cs` (co-location / host-contract /
+two-callbacks-moved-off-bridge guards + a positional characterization — a 100×100 absolute box at the origin is
+returned by `elementFromPoint(50,50)` and appears in the `elementsFromPoint(50,50)` stack — through the bridge).
+Regression check: the architecture-guard suite passes (17); `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.37 completed** 2026-07-17 (same branch) — **`window.getComputedStyle`**, the CSSOM entry point.
+`ComputedStyleBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the method that resolves an
+element's used-value style declaration (was the bridge's `JsRegistrationGetComputedStyle121Core`). It resolves the
+argument's JS wrapper to its canonical element and returns the computed-style object, reached through the two-member
+`IComputedStyleHost` contract (`DomBridge.ComputedStyleHost.cs`, explicit interface members): the JS-wrapper reverse
+lookup (`FindDomElementByJSObject`) and the object builder (`BuildComputedStyleObject`). `Registration/
+Registration.cs` (the window-globals site) now registers `Dom.Features.ComputedStyleBinding.GetComputedStyle(this,
+in a)`; the callback is gone from `JsFunctionCallbacks/Registration.cs` (112 → 101 lines). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/ComputedStyleBindingModuleTests.cs`
+(co-location / host-contract / callback-moved-off-bridge guards + a characterization — an element with inline
+`display:flex; z-index:5` resolves to those computed values via `window.getComputedStyle`, and the no-target call
+returns an empty object without throwing — through the bridge). Regression check: the SelectorsAndCssom (74 of 75;
+the one failure is the documented pre-existing `:lang` `Lang_Matches_XmlLang_Ancestor`) and architecture-guard
+suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.38 completed** 2026-07-17 (same branch) — the **Web Animations `Animation` object surface**.
+`AnimationObjectBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the animation object's
+`currentTime` get/set and its `ready`-promise `then` (built by `BuildAnimationObject`) — was the bridge's
+`JsRegistrationGetCurrentTime152Core`/`SetCurrentTime153Core`/`Then154Core`. `currentTime` reads/writes the
+element's animation timeline via the bridge's neutral `internal static` `GetElementRuntimeState` (widened
+`private`→`internal static`); `then` runs its callback synchronously and returns the `ready` object. These are
+pure static callbacks (the animation object is built in a static context), so the module has **no host contract**.
+`Registration/Animations.cs` now calls `Dom.Features.AnimationObjectBinding.{GetCurrentTime,SetCurrentTime,Then}`;
+the callbacks are gone from `JsFunctionCallbacks/Registration.cs` (101 → 75 lines). Behaviour-preserving; no
+public-API change (module internal). Tests: `Broiler.Cli.Tests/AnimationObjectBindingModuleTests.cs` (co-location /
+three-callbacks-moved-off-bridge guards + a characterization — an element with inline `animation` appears in
+`getAnimations()`, its `currentTime` round-trips a set value, and `ready.then` runs synchronously). Regression: the
+animation and architecture-guard suites pass (25).
+
+Status: **P3.39 completed** 2026-07-17 (same branch) — **the residual window/document singletons, which empties and
+DELETES the grab-bag file.** `WindowDocumentMiscBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) collects the
+last five one-off callbacks — `window.alert` (logs, headless), `performance.now`, `window.visualViewport.scale`
+setter, `document.contentType`, `document.cookie` setter (was `JsRegistrationAlert076Core`/`Now122Core`/
+`SetScale143Core`/`GetContentType063Core`/`SetCookie149Core`). These are genuinely independent one-offs (each ≤10
+lines) that don't individually warrant a module; collected here they are **not** a god-object grab-bag — no shared
+mutable state, and the two that touch the bridge (`contentType`→page URL, `scale`→`SetVisualViewportScale`) do so
+only through the two-member `IWindowDocumentMiscHost` contract (`DomBridge.WindowDocumentMiscHost.cs`), the rest
+being stateless or taking a by-ref cookie store. With these moved, `JsFunctionCallbacks/Registration.cs` held no
+callbacks and was **deleted** (was 1184 lines at session start). `Registration/Window.cs`/`Document.cs`/`Polyfills.cs`
+now register `Dom.Features.WindowDocumentMiscBinding.<Op>`. Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/WindowDocumentMiscBindingModuleTests.cs` (co-location / host-contract /
+five-callbacks-moved-off-bridge guards + a characterization exercising all five through the bridge —
+`alert`/`performance.now`/`visualViewport.scale`/`contentType`/`cookie`). Regression: the architecture-guard and
+module suites pass (20). **The `JsFunctionCallbacks/Registration.cs` grab-bag — 1184 lines of loose JS callbacks at
+the start of this program — is fully decomposed into 21 co-located feature modules (P3.19–P3.39) and no longer
+exists.**
+
+Status: **P3.40 completed** 2026-07-17 (same branch) — the **DOM `CharacterData` interface**, the first slice off
+the **1599-line `JsFunctionCallbacks/JsObjects.cs`** element/node member file (the next debt target after the
+registration grab-bag). `CharacterDataBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the
+Text/Comment shared interface — `data` get/set, `length`, `splitText` (Text), and the mutation methods
+`substringData`/`appendData`/`deleteData`/`insertData`/`replaceData` (was the bridge's `JsJsObjectsGetData045Core`..
+`ReplaceData053Core`). Read-side text access (`BridgeText`), node-type tests (`IsText`/`IsComment`) and the neutral
+tree helpers stay as the bridge's `internal static` helpers (`SetBridgeText` widened `private`→`internal static`);
+the notifying setter (`SetCharacterData`), text-node factory, wrapper factory and wrapper-cache invalidation
+(`_jsObjects.Remove`) are reached through the four-member `ICharacterDataHost` contract
+(`DomBridge.CharacterDataHost.cs`, explicit interface members). Both registration blocks in `JsObjects.cs` (the
+element-path and node-path `Populate*` methods) now call `Dom.Features.CharacterDataBinding.<Op>`; the callbacks are
+gone from `JsFunctionCallbacks/JsObjects.cs` (1599 → 1491 lines). Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/CharacterDataBindingModuleTests.cs` (co-location / host-contract /
+nine-callbacks-moved-off-bridge guards + a full-interface characterization — `data`/`length`, `append`/`insert`/
+`substring`/`delete`/`replace` chained mutations, and `splitText` splitting a text node — through the bridge).
+Regression check: the HtmlDom, namespace-core and architecture-guard suites pass (62); `Broiler.HtmlBridge.Dom`
+builds clean.
+
+Status: **P3.41 completed** 2026-07-17 (same branch) — the **shared DOM `Node` read accessors**, the second slice
+off `JsFunctionCallbacks/JsObjects.cs`. `NodeAccessorsBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the 17 accessor callbacks registered on every node wrapper (element-, node-, doctype- and
+document-path `Populate*` blocks): `isConnected`, `childNodes`, `firstChild`/`lastChild`,
+`nextSibling`/`previousSibling`, `nodeType`/`nodeName`, `localName`/`prefix`/`namespaceURI`, `nodeValue`
+(get/set), `publicId`/`systemId` (DocumentType), `ownerDocument` and `parentElement` (was the bridge's
+`JsJsObjectsGetIsConnected032Core`..`GetParentElement058Core`). Node-type tests (`IsText`/`IsComment`), tree-order
+helpers (`ChildIndexOf`, `ParentEl`), read-side text (`BridgeText`) and the owning-document derivation
+(`GetOwningDocument`) stay as the bridge's `internal static` helpers, called directly; the JS-wrapper factory
+(`ToJSObject`), the document node, the tree-root walk (`GetTreeRoot`), the notifying character-data setter
+(`SetCharacterData`) and the two document-wrapper lookups (`_jsObjects.TryGetDocument`, `_documentJSObject`) are
+reached through the six-member `INodeAccessorsHost` contract (`DomBridge.NodeAccessorsHost.cs`, explicit interface
+members). All registration sites in `JsObjects.cs` now call `Dom.Features.NodeAccessorsBinding.<Op>`; the callbacks
+are gone from `JsFunctionCallbacks/JsObjects.cs` (1491 → 1311 lines). Behaviour-preserving; no public-API change
+(module + contract internal). Tests: `Broiler.Cli.Tests/NodeAccessorsBindingModuleTests.cs` (co-location /
+host-contract / seventeen-callbacks-moved-off-bridge guards + an end-to-end characterization exercising
+`isConnected`, `childNodes.length`, `firstChild`/`lastChild`, sibling walks, `nodeType`/`nodeName`/`localName`/
+`namespaceURI`, `nodeValue` get+set on a comment, `parentElement` and `ownerDocument` through the bridge).
+Regression check: the DOM node/DomBridge/JsObjects suites pass (210); the five failures in that subset
+(viewport-zoom, anchor-size, SVG-geometry, iframe-scroll serialization and the NodeIterator pre-removal test) fail
+identically at the P3.40 baseline — pre-existing layout/rendering-environment failures, not regressions.
+`Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.42 completed** 2026-07-17 (same branch) — the **element-facing attribute methods**, the third slice
+off `JsFunctionCallbacks/JsObjects.cs`, folded into the **existing** `AttributesBinding` module (P3.12) rather than a
+new one: the module's doc comment always stated the element's own `getAttribute`/`setAttribute`/… methods "delegate
+their write and Attr-node construction here", and this closes that loop. The 15 callbacks —
+`getAttribute`/`setAttribute`/`hasAttribute`/`removeAttribute`/`toggleAttribute`, the `getAttributeNode`/
+`setAttributeNode`/`removeAttributeNode` (+`NS`) Attr-node variants and every `*AttributeNS` variant (was the
+bridge's `JsJsObjectsSetAttribute027Core`..`HasAttributeNS072Core`) — become `internal` instance methods on
+`AttributesBinding`, reusing its `_host` (`IAttributesHost`: `ApplyStyleAttribute`, `CompileInlineEventAttribute`,
+`InvalidateStyleScope`, `NotifyAttributeMutationObservers`) and its own write path — `setAttribute`/`removeAttribute`
+and their NS forms were byte-for-byte identical to the module's `SetAttributeLikeSetAttribute`/`RemoveAttribute…`
+helpers, so they now delegate to them (a net simplification). The low-level scans (`TryGetAttribute`/`SetAttr`/
+`RemoveAttr`/`HasAttr`/`TryGetNsAttribute`) stay the bridge's `internal static` helpers, called qualified. The
+element-path registration block in `JsObjects.cs` now calls `_attributes.<Op>(element[, obj], in a)`; the callbacks
+are gone from `JsFunctionCallbacks/JsObjects.cs` (1311 → 1087 lines). No new files, no new host surface;
+behaviour-preserving; no public-API change. Tests: `AttributesBindingModuleTests` extended with the
+fifteen-callbacks-moved-off-bridge guard and an end-to-end characterization (`toggleAttribute` add/remove,
+`getAttributeNode` name/value, `setAttributeNS`/`getAttributeNS`/`hasAttributeNS`/`removeAttributeNS` round-trip
+through the bridge). Regression check: the architecture-guard + attribute/namespace/toggle suites pass (126);
+`Broiler.HtmlBridge.Dom` builds clean (0 warnings).
+
+Status: **P3.43 completed** 2026-07-17 (same branch) — the **shared DOM `Node` relationship operations**, the fourth
+slice off `JsFunctionCallbacks/JsObjects.cs`. `NodeRelationshipsBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the 7 callbacks registered on every node wrapper (element-, node-, doctype- and document-path `Populate*`
+blocks): `contains`, `compareDocumentPosition`, `isSameNode`, `normalize`, `isEqualNode`, `getRootNode` and
+`cloneNode` (was the bridge's `JsJsObjectsContains073Core`..`CloneNode079Core`). The pure tree predicates
+(`IsDescendantOf`/`IsEqualNode` on the canonical `Broiler.Dom.DomNode`) are called directly; document-order
+comparison (`CompareTreeOrder`) and the shadow-root walk (`FindContainingShadowRoot`) are widened `private static`→
+`internal static` and called qualified; the JS-object→node resolver (`FindDomNodeByJSObject`), the tree-root walk
+(`GetTreeRoot`), character-data-aware `normalize()` (`NormalizeNode`), the root-node wrapper factory
+(`ToJSRootNode`), the deep/shallow clone (`CloneDomElement`) and the plain JS-wrapper factory (`ToJSObject`) are
+reached through the six-member `INodeRelationshipsHost` contract (`DomBridge.NodeRelationshipsHost.cs`, explicit
+interface members). All registration sites in `JsObjects.cs` now call `Dom.Features.NodeRelationshipsBinding.<Op>`;
+the callbacks are gone from `JsFunctionCallbacks/JsObjects.cs` (1087 → 990 lines). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/NodeRelationshipsBindingModuleTests.cs`
+(co-location / host-contract / seven-callbacks-moved-off-bridge guards + an end-to-end characterization exercising
+`contains`, `isSameNode`, `compareDocumentPosition` containment+sibling bitmasks, `getRootNode`, `cloneNode`+
+`isEqualNode` structural equality, and `normalize` text-node coalescing through the bridge). Regression check: the
+architecture-guard + contains/clone/isEqual/normalize/rootNode/compareDocument/shadow suites pass (62); the one
+failure in that subset (`Phase7_Layout_Friend_Surface…`, a CSS box-tree friend-surface guard swept in by the
+`Contains` name filter) fails identically at the P3.42 baseline — pre-existing, unrelated. `Broiler.HtmlBridge.Dom`
+builds clean (0 warnings).
+
+Status: **P3.44 completed** 2026-07-17 (same branch) — the **DOM `Element` selector API**, the fifth slice off
+`JsFunctionCallbacks/JsObjects.cs`. `SelectorsBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the 5
+element-path callbacks: `querySelector`, `querySelectorAll`, `matches`, `closest` and `getElementsByTagName` (was the
+bridge's `JsJsObjectsQuerySelector126Core`..`Closest129Core` and `GetElementsByTagName133Core`). Selector matching
+(`MatchesSelector`, already `internal static` and shared with `DocumentQueryBinding`) and the element-parent walk
+(`ParentEl`) are called directly; the descendant selector search (`FindInDescendants`) and the by-tag descendant
+collector (`CollectDescendantsByTag`) — both `private static` taking the concrete bridge for its JS-object cache —
+plus the plain JS-wrapper factory (`ToJSObject`) are reached through the three-member `ISelectorsHost` contract
+(`DomBridge.SelectorsHost.cs`, explicit interface members forwarding to the statics with `this`). The element-path
+registration in `JsObjects.cs` now calls `Dom.Features.SelectorsBinding.<Op>`; the callbacks are gone from
+`JsFunctionCallbacks/JsObjects.cs` (990 → 947 lines). Behaviour-preserving; no public-API change (module + contract
+internal). Tests: `Broiler.Cli.Tests/SelectorsBindingModuleTests.cs` (co-location / host-contract /
+five-callbacks-moved-off-bridge guards + an end-to-end characterization exercising `querySelector`/
+`querySelectorAll` scoping, compound `.x.y` selectors, `matches` true/false, `closest` ancestor walk and
+`getElementsByTagName` through the bridge). Regression check: the architecture-guard + selector suites pass (175);
+the ten failures in that subset (Skia/font rendering-parity `M5_Curated_Parity`/`HtmlRender_Curated_*` cases and the
+environmental `Lang_Matches_XmlLang_Ancestor` / `CssEscape_InSelector_DecodedToUnicode` /
+`Bridge_Selector_Surface…` selector-engine tests) fail identically at the P3.43 baseline — pre-existing
+environment/rendering failures, not regressions. `Broiler.HtmlBridge.Dom` builds clean (0 warnings).
+
+Status: **P3.45 completed** 2026-07-17 (same branch) — the **DOM element-traversal accessors**, the sixth slice off
+`JsFunctionCallbacks/JsObjects.cs`. `ElementTraversalBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the 5 element-path callbacks: `children`, `firstElementChild`, `lastElementChild`,
+`nextElementSibling` and `previousElementSibling` — the element-only siblings of the P3.41 node accessors (was the
+bridge's `JsJsObjectsGetChildren081Core`..`GetPreviousElementSibling086Core`). This is the cleanest slice yet: the
+element-child enumeration (`ChildElements`), the element-parent walk (`ParentEl`) and the text-node test (`IsText`)
+are all already `internal static` and called directly, leaving a single-member `IElementTraversalHost` contract for
+just the JS-wrapper factory (`ToJSObject`, `DomBridge.ElementTraversalHost.cs`, explicit interface member). The
+element-path registration in `JsObjects.cs` now calls `Dom.Features.ElementTraversalBinding.<Op>`; the callbacks
+are gone from `JsFunctionCallbacks/JsObjects.cs` (947 → 888 lines). Behaviour-preserving; no public-API change
+(module + contract internal). Tests: `Broiler.Cli.Tests/ElementTraversalBindingModuleTests.cs` (co-location /
+host-contract / five-callbacks-moved-off-bridge guards + an end-to-end characterization that interleaves text and
+comment nodes so element-only traversal must skip them — `children.length`, `first`/`lastElementChild`,
+`next`/`previousElementSibling` and the null ends through the bridge). Regression check: the element-traversal +
+architecture-guard suites pass (83 + 14); the one failure in that subset
+(`Range_GetBoundingClientRect_Includes_DisplayContents_Descendants`, a layout/geometry Range test swept in by the
+`Traversal` class-name filter) fails identically at the P3.44 baseline — pre-existing, unrelated.
+`Broiler.HtmlBridge.Dom` builds clean (0 warnings).
+
+Status: **P3.46 completed** 2026-07-17 (same branch) — the **DOM `EventTarget` methods**, the seventh slice off
+`JsFunctionCallbacks/JsObjects.cs`, **which drops it under the 750-line guard and de-lists it.**
+`EventTargetBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the 6 callbacks registered on every
+node/element wrapper: `addEventListener`, `removeEventListener`, `dispatchEvent` and the synthetic-event convenience
+methods `click`, `focus` and `blur` (was the bridge's `JsJsObjectsAddEventListener097Core`..`Blur103Core`). This
+wires the JS-facing methods to the already-extracted events subsystem: registration semantics stay in
+`EventListenerBinding` (P3.x) and the capture→target→bubble engine in `EventDispatchBinding`, called directly; the
+per-node listener store, the dispatch delegator and the window JS object (the synthetic focus/blur UIEvents' `view`)
+are reached through the three-member `IEventTargetHost` contract (`DomBridge.EventTargetHost.cs`, explicit interface
+members). Node-type/attribute/runtime-state helpers, the radio-group mutual-exclusion walk (`UncheckRadioSiblings`,
+widened `private static`→`internal static`) and the no-op function factory (`UndefinedFunction`) are the bridge's
+`internal static` helpers, called directly; the byte-identical `focus`/`blur` bodies are factored into one
+`DispatchSyntheticFocusEvent` helper (a small net simplification). All four registration paths in `JsObjects.cs` now
+call `Dom.Features.EventTargetBinding.<Op>`; the callbacks are gone from `JsFunctionCallbacks/JsObjects.cs`
+(888 → 727 lines, a 161-line drop). **De-listed:** the member file is removed from the guard's
+`OversizedFileExemptions` (debt list seven → six over-limit files); the ratchet's stale-exemption check now enforces
+it stays under 750. Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/EventTargetBindingModuleTests.cs` (co-location / host-contract / six-callbacks-moved-off-bridge
+guards + end-to-end characterizations: `addEventListener`→`dispatchEvent`→`removeEventListener` handler lifecycle,
+and `click` toggling a checkbox's `checked` while firing its click listener). Regression check: the
+EventListener/dispatch/click/focus/blur/submit/radio suites pass (194) with zero failures; the architecture-guard
+suite passes green (0 offenders / 0 stale exemptions) after the de-list. `Broiler.HtmlBridge.Dom` builds clean
+(0 warnings).
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
@@ -790,12 +1288,42 @@ Exit criteria:
 - No production source file exceeds 750 lines without a documented exemption.
   **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
   a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
-  module (the P3.x pattern) rather than another giant partial. The nine current
-  over-limit files (`LayoutMetrics.cs` 2332, `JsFunctionCallbacks/JsObjects.cs` 1599,
-  `JsObjects.cs` 1286, `JsFunctionCallbacks/Registration.cs` 1184, `SubDocuments.cs`
-  1152, `DomBridge.cs` 1013, `DomBridge.Serialization.cs` 951, `Utilities.cs` 894,
-  `AnimationResolver.cs` 760) are listed as documented debt to shrink — the guard
-  surfaces one to de-list once it drops under the limit, so the ratchet keeps closing.
+  module (the P3.x pattern) rather than another giant partial. The remaining six
+  over-limit files (`LayoutMetrics.cs` 2332, `JsObjects.cs` 1286, `SubDocuments.cs` 1152,
+  `DomBridge.cs` 1013, `DomBridge.Serialization.cs` 951, `Utilities.cs` 894) are listed as
+  documented debt to shrink — the guard surfaces one to de-list once it drops under the limit,
+  so the ratchet keeps closing. Three files are **de-listed** as of 2026-07-17:
+  `AnimationResolver.cs` (was 760; see ratchet maintenance below),
+  `JsFunctionCallbacks/Registration.cs` (was 1184 → 684 after the P3.19–P3.28 grab-bag
+  decomposition — nine feature modules peeled out) and
+  `JsFunctionCallbacks/JsObjects.cs` (was 1599 → 727 after the P3.40–P3.46 element/node
+  member decomposition — seven feature modules peeled out: CharacterData, node accessors,
+  element attributes, node relationships, Element selectors, element traversal, EventTarget).
+
+  **Ratchet maintenance 2026-07-17.** The guard caught its first *new* over-limit file:
+  `AnchorResolver/AnchorFunctions.cs` had grown 748 → 767 lines as the Phase 5 native
+  anchor/`@position-try` handoff work (commits through `e7db989`) added the "is this box the
+  MVP subset the engine reproduces natively?" gating predicates. Rather than exempt it (a
+  reviewed act, not the default), the cohesive native-handoff cluster
+  (`IsMvpNativeAnchorInsetBox` / `…SizeBox` / `…CombinedBox`, `IsCombinedAnchorRefNative`,
+  `NativePositionTryHandoffSupported` / `AxisSizeHandoffSupported`, and the
+  `HasInset`/`IsAutoLength`/`IsEngineSizedIntrinsic` helpers) was split into a sibling
+  `DomBridge` partial `AnchorResolver/AnchorFunctions.NativeHandoff.cs` (455 lines), leaving
+  `AnchorFunctions.cs` at 326 (the `ResolveAnchorFunctions` walk, the intervening-scroll and
+  `anchor-size()` resolution, and the small predicate helpers). Pure partial-class relocation —
+  no signature, accessibility, or logic change, so behaviour-identical by construction; the
+  exemption list is unchanged (`AnchorFunctions.cs` was never exempt). `Broiler.HtmlBridge.Dom`
+  builds clean and the guard is green (0 offenders / 0 stale exemptions). The two AnchorResolver
+  files are now both under the limit.
+
+  **De-list 2026-07-17.** The complementary ratchet action — shrinking an *exempt* file under the
+  limit and removing its exemption. `AnimationResolver.cs` (760) had its cohesive CSS
+  timing-function / easing cluster (`ApplyTimingFunction`, `SolveCubicBezier` + `BezierCoord`/
+  `BezierDerivative`, `ApplySteps`, and the two `[GeneratedRegex]` `steps()`/`cubic-bezier()`
+  patterns) split into the sibling `DomBridge` partial `AnimationResolver.Timing.cs` (127 lines),
+  dropping `AnimationResolver.cs` to 644. Pure partial-class relocation (behaviour-identical); its
+  entry was removed from `OversizedFileExemptions`, so the ratchet's stale-exemption check now
+  enforces it stays under 750. Debt list: nine → eight files.
 
 ### Phase 4 - eliminate parallel DOM state
 
