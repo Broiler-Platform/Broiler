@@ -984,7 +984,25 @@ contract internal). Tests: `Broiler.Cli.Tests/DocumentLevelFactoryBindingModuleT
 SubDocumentBinding (a heavy user of these factories), Acid3-special and architecture-guard suites pass (30+);
 `Broiler.HtmlBridge.Dom` builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.31 named-accessor / relocated-infra /
+Status: **P3.32 completed** 2026-07-17 (same branch) — the **`document` EventTarget methods**.
+`DocumentEventTargetBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates
+`document.addEventListener`, `document.removeEventListener`, `document.dispatchEvent` (was the bridge's
+`JsRegistrationAddEventListener060Core`/`RemoveEventListener061Core`/`DispatchEvent062Core`). Each resolves the
+document node's per-type listener store and applies the add/remove via the P3.4 `EventListenerBinding` operations,
+or runs the capture→target→bubble dispatch via the bridge's shared algorithm. The document node, listener store
+(`GetEventListeners`) and dispatch (`DispatchEventOnElement`) are reached through the three-member
+`IDocumentEventTargetHost` contract (`DomBridge.DocumentEventTargetHost.cs`, explicit interface members); the
+registration's `docNode`/`bridgeRef` locals are gone (the module sources the document node from the host).
+`Registration/Document.cs` now registers `Dom.Features.DocumentEventTargetBinding.<Op>(this, in a)`; the callbacks
+are gone from `JsFunctionCallbacks/Registration.cs` (241 → 203 lines). The **window** and **visualViewport**
+EventTarget wiring (different listener stores + dispatch paths) are left as separate concerns. Behaviour-preserving;
+no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/DocumentEventTargetBindingModuleTests.cs` (co-location / host-contract /
+three-callbacks-moved-off-bridge guards + an add→dispatch→remove→dispatch characterization — the listener fires
+once then, after removal, does not fire again — through the bridge). Regression check: the DomEvents,
+DomEventsEdgeCase, EventDispatch and architecture-guard suites pass (103); `Broiler.HtmlBridge.Dom` builds clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.32 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

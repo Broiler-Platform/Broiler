@@ -136,13 +136,11 @@ public sealed partial class DomBridge
 
     private void RegisterDocumentEventTargetAndMetadata(JSObject document)
     {
-        // document-level addEventListener / removeEventListener / dispatchEvent
-        var docNode = _document;
-        var bridgeRef = this;
-
-        document.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => JsRegistrationAddEventListener060Core(docNode, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => JsRegistrationRemoveEventListener061Core(docNode, in a), "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"dispatchEvent", new JSFunction((in a) => JsRegistrationDispatchEvent062Core(bridgeRef, docNode, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document-level addEventListener / removeEventListener / dispatchEvent, co-located in the
+        // DocumentEventTargetBinding feature module (Phase 3).
+        document.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.AddEventListener(this, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"dispatchEvent", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.DispatchEvent(this, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.contentType — returns the MIME type of the document
         document.FastAddProperty((KeyString)"contentType", new JSFunction(JsRegistrationGetContentType063Core, "get contentType"), null, JSPropertyAttributes.EnumerableConfigurableProperty);

@@ -38,44 +38,6 @@ public sealed partial class DomBridge
     // createTreeWalker / createNodeIterator / createComment moved to the Phase 3
     // TraversalBinding feature module (Broiler.HtmlBridge.Dom.Features).
 
-    private JSValue JsRegistrationAddEventListener060Core(DomNode? docNode, in Arguments a)
-    {
-        if (a.Length < 2)
-            return JSUndefined.Value;
-        var type = a[0].ToString();
-        if (!GetEventListeners(docNode).TryGetValue(type, out var listeners))
-        {
-            listeners = [];
-            GetEventListeners(docNode)[type] = listeners;
-        }
-
-        Dom.Features.EventListenerBinding.AddListener(listeners, a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsRegistrationRemoveEventListener061Core(DomNode? docNode, in Arguments a)
-    {
-        if (a.Length < 2)
-            return JSUndefined.Value;
-        var type = a[0].ToString();
-        Dom.Features.EventListenerBinding.RemoveListener(
-            GetEventListeners(docNode).TryGetValue(type, out var listeners) ? listeners : null,
-            a[1], a.Length > 2 ? a[2] : JSUndefined.Value);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsRegistrationDispatchEvent062Core(DomBridge? bridgeRef, DomNode? docNode, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSBoolean.True;
-        if (a[0] is not JSObject evt)
-            return JSBoolean.True;
-        return bridgeRef.DispatchEventOnElement(docNode, evt);
-    }
-
-
     private JSValue JsRegistrationGetContentType063Core(in Arguments _)
     {
         if (_pageUrl.EndsWith(".xhtml", StringComparison.OrdinalIgnoreCase) || _pageUrl.EndsWith(".xht", StringComparison.OrdinalIgnoreCase) || _pageUrl.Contains("application/xhtml+xml", StringComparison.OrdinalIgnoreCase))
