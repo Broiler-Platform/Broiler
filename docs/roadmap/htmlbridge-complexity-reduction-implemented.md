@@ -1172,7 +1172,29 @@ fifteen-callbacks-moved-off-bridge guard and an end-to-end characterization (`to
 through the bridge). Regression check: the architecture-guard + attribute/namespace/toggle suites pass (126);
 `Broiler.HtmlBridge.Dom` builds clean (0 warnings).
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.42 named-accessor / relocated-infra /
+Status: **P3.43 completed** 2026-07-17 (same branch) — the **shared DOM `Node` relationship operations**, the fourth
+slice off `JsFunctionCallbacks/JsObjects.cs`. `NodeRelationshipsBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the 7 callbacks registered on every node wrapper (element-, node-, doctype- and document-path `Populate*`
+blocks): `contains`, `compareDocumentPosition`, `isSameNode`, `normalize`, `isEqualNode`, `getRootNode` and
+`cloneNode` (was the bridge's `JsJsObjectsContains073Core`..`CloneNode079Core`). The pure tree predicates
+(`IsDescendantOf`/`IsEqualNode` on the canonical `Broiler.Dom.DomNode`) are called directly; document-order
+comparison (`CompareTreeOrder`) and the shadow-root walk (`FindContainingShadowRoot`) are widened `private static`→
+`internal static` and called qualified; the JS-object→node resolver (`FindDomNodeByJSObject`), the tree-root walk
+(`GetTreeRoot`), character-data-aware `normalize()` (`NormalizeNode`), the root-node wrapper factory
+(`ToJSRootNode`), the deep/shallow clone (`CloneDomElement`) and the plain JS-wrapper factory (`ToJSObject`) are
+reached through the six-member `INodeRelationshipsHost` contract (`DomBridge.NodeRelationshipsHost.cs`, explicit
+interface members). All registration sites in `JsObjects.cs` now call `Dom.Features.NodeRelationshipsBinding.<Op>`;
+the callbacks are gone from `JsFunctionCallbacks/JsObjects.cs` (1087 → 990 lines). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/NodeRelationshipsBindingModuleTests.cs`
+(co-location / host-contract / seven-callbacks-moved-off-bridge guards + an end-to-end characterization exercising
+`contains`, `isSameNode`, `compareDocumentPosition` containment+sibling bitmasks, `getRootNode`, `cloneNode`+
+`isEqualNode` structural equality, and `normalize` text-node coalescing through the bridge). Regression check: the
+architecture-guard + contains/clone/isEqual/normalize/rootNode/compareDocument/shadow suites pass (62); the one
+failure in that subset (`Phase7_Layout_Friend_Surface…`, a CSS box-tree friend-surface guard swept in by the
+`Contains` name filter) fails identically at the P3.42 baseline — pre-existing, unrelated. `Broiler.HtmlBridge.Dom`
+builds clean (0 warnings).
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.43 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

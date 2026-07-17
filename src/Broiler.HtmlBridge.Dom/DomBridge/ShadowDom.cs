@@ -30,7 +30,7 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private static DomElement? FindContainingShadowRoot(DomNode? node)
+    internal static DomElement? FindContainingShadowRoot(DomNode? node)
     {
         for (var current = node; current != null; current = current.ParentNode)
         {

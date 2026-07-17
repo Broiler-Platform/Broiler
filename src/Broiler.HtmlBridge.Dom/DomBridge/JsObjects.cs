@@ -387,36 +387,36 @@ public sealed partial class DomBridge
 
         // contains(otherNode) — returns true if otherNode is a descendant
         obj.FastAddValue((KeyString)"contains",
-            new JSFunction((in a) => JsJsObjectsContains073Core(element, in a), "contains", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.Contains(this, element, in a), "contains", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // compareDocumentPosition(otherNode)
         obj.FastAddValue((KeyString)"compareDocumentPosition",
-            new JSFunction((in a) => JsJsObjectsCompareDocumentPosition074Core(element, in a), "compareDocumentPosition", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.CompareDocumentPosition(this, element, in a), "compareDocumentPosition", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // isSameNode(otherNode)
         obj.FastAddValue((KeyString)"isSameNode",
-            new JSFunction((in a) => JsJsObjectsIsSameNode075Core(element, in a), "isSameNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsSameNode(this, element, in a), "isSameNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // normalize()
         obj.FastAddValue((KeyString)"normalize",
-            new JSFunction((in _) => JsJsObjectsNormalize076Core(element, in _), "normalize", 0),
+            new JSFunction((in _) => Dom.Features.NodeRelationshipsBinding.Normalize(this, element, in _), "normalize", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // isEqualNode(otherNode)
         obj.FastAddValue((KeyString)"isEqualNode",
-            new JSFunction((in a) => JsJsObjectsIsEqualNode077Core(element, in a), "isEqualNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsEqualNode(this, element, in a), "isEqualNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"getRootNode",
-            new JSFunction((in a) => JsJsObjectsGetRootNode078Core(element, in a), "getRootNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.GetRootNode(this, element, in a), "getRootNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // cloneNode(deep)
         obj.FastAddValue((KeyString)"cloneNode",
-            new JSFunction((in a) => JsJsObjectsCloneNode079Core(element, in a), "cloneNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.CloneNode(this, element, in a), "cloneNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // insertBefore(newChild, refChild)
@@ -833,31 +833,31 @@ public sealed partial class DomBridge
 
         // -- Node methods --
         obj.FastAddValue((KeyString)"cloneNode",
-            new JSFunction((in a) => JsJsObjectsCloneNode079Core(node, in a), "cloneNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.CloneNode(this, node, in a), "cloneNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"contains",
-            new JSFunction((in a) => JsJsObjectsContains073Core(node, in a), "contains", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.Contains(this, node, in a), "contains", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"compareDocumentPosition",
-            new JSFunction((in a) => JsJsObjectsCompareDocumentPosition074Core(node, in a), "compareDocumentPosition", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.CompareDocumentPosition(this, node, in a), "compareDocumentPosition", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"isSameNode",
-            new JSFunction((in a) => JsJsObjectsIsSameNode075Core(node, in a), "isSameNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsSameNode(this, node, in a), "isSameNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"isEqualNode",
-            new JSFunction((in a) => JsJsObjectsIsEqualNode077Core(node, in a), "isEqualNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsEqualNode(this, node, in a), "isEqualNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"getRootNode",
-            new JSFunction((in a) => JsJsObjectsGetRootNode078Core(node, in a), "getRootNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.GetRootNode(this, node, in a), "getRootNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"normalize",
-            new JSFunction((in a) => JsJsObjectsNormalize076Core(node, in a), "normalize", 0),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.Normalize(this, node, in a), "normalize", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- ChildNode mixin --
@@ -979,27 +979,27 @@ public sealed partial class DomBridge
 
         // -- Node methods --
         obj.FastAddValue((KeyString)"cloneNode",
-            new JSFunction((in a) => JsJsObjectsCloneNode079Core(node, in a), "cloneNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.CloneNode(this, node, in a), "cloneNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"isEqualNode",
-            new JSFunction((in a) => JsJsObjectsIsEqualNode077Core(node, in a), "isEqualNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsEqualNode(this, node, in a), "isEqualNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"isSameNode",
-            new JSFunction((in a) => JsJsObjectsIsSameNode075Core(node, in a), "isSameNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsSameNode(this, node, in a), "isSameNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"contains",
-            new JSFunction((in a) => JsJsObjectsContains073Core(node, in a), "contains", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.Contains(this, node, in a), "contains", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"compareDocumentPosition",
-            new JSFunction((in a) => JsJsObjectsCompareDocumentPosition074Core(node, in a), "compareDocumentPosition", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.CompareDocumentPosition(this, node, in a), "compareDocumentPosition", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"getRootNode",
-            new JSFunction((in a) => JsJsObjectsGetRootNode078Core(node, in a), "getRootNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.GetRootNode(this, node, in a), "getRootNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- ChildNode mixin --
@@ -1240,25 +1240,25 @@ public sealed partial class DomBridge
 
         // -- Node methods --
         obj.FastAddValue((KeyString)"cloneNode",
-            new JSFunction((in a) => JsJsObjectsCloneNode079Core(node, in a), "cloneNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.CloneNode(this, node, in a), "cloneNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         obj.FastAddValue((KeyString)"isEqualNode",
-            new JSFunction((in a) => JsJsObjectsIsEqualNode077Core(node, in a), "isEqualNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsEqualNode(this, node, in a), "isEqualNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         obj.FastAddValue((KeyString)"isSameNode",
-            new JSFunction((in a) => JsJsObjectsIsSameNode075Core(node, in a), "isSameNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsSameNode(this, node, in a), "isSameNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         obj.FastAddValue((KeyString)"contains",
-            new JSFunction((in a) => JsJsObjectsContains073Core(node, in a), "contains", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.Contains(this, node, in a), "contains", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         obj.FastAddValue((KeyString)"compareDocumentPosition",
-            new JSFunction((in a) => JsJsObjectsCompareDocumentPosition074Core(node, in a), "compareDocumentPosition", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.CompareDocumentPosition(this, node, in a), "compareDocumentPosition", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         obj.FastAddValue((KeyString)"getRootNode",
-            new JSFunction((in a) => JsJsObjectsGetRootNode078Core(node, in a), "getRootNode", 1),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.GetRootNode(this, node, in a), "getRootNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         obj.FastAddValue((KeyString)"normalize",
-            new JSFunction((in a) => JsJsObjectsNormalize076Core(node, in a), "normalize", 0),
+            new JSFunction((in a) => Dom.Features.NodeRelationshipsBinding.Normalize(this, node, in a), "normalize", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- EventTarget --
