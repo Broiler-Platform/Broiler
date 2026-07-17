@@ -797,6 +797,22 @@ Exit criteria:
   `AnimationResolver.cs` 760) are listed as documented debt to shrink — the guard
   surfaces one to de-list once it drops under the limit, so the ratchet keeps closing.
 
+  **Ratchet maintenance 2026-07-17.** The guard caught its first *new* over-limit file:
+  `AnchorResolver/AnchorFunctions.cs` had grown 748 → 767 lines as the Phase 5 native
+  anchor/`@position-try` handoff work (commits through `e7db989`) added the "is this box the
+  MVP subset the engine reproduces natively?" gating predicates. Rather than exempt it (a
+  reviewed act, not the default), the cohesive native-handoff cluster
+  (`IsMvpNativeAnchorInsetBox` / `…SizeBox` / `…CombinedBox`, `IsCombinedAnchorRefNative`,
+  `NativePositionTryHandoffSupported` / `AxisSizeHandoffSupported`, and the
+  `HasInset`/`IsAutoLength`/`IsEngineSizedIntrinsic` helpers) was split into a sibling
+  `DomBridge` partial `AnchorResolver/AnchorFunctions.NativeHandoff.cs` (455 lines), leaving
+  `AnchorFunctions.cs` at 326 (the `ResolveAnchorFunctions` walk, the intervening-scroll and
+  `anchor-size()` resolution, and the small predicate helpers). Pure partial-class relocation —
+  no signature, accessibility, or logic change, so behaviour-identical by construction; the
+  exemption list is unchanged (`AnchorFunctions.cs` was never exempt). `Broiler.HtmlBridge.Dom`
+  builds clean and the guard is green (0 offenders / 0 stale exemptions). The two AnchorResolver
+  files are now both under the limit.
+
 ### Phase 4 - eliminate parallel DOM state
 
 Status: **P4.12 completed** 2026-07-14 (branch `htmlbridge-phase4-range-stringifier`) — **work items 4/5: the
