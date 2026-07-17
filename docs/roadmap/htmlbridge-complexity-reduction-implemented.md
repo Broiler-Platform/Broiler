@@ -868,7 +868,27 @@ tree, a queryable `createElementNS` SVG element, fragment `nodeType` 11, and ASC
 nodes). Regression check: the namespace, attributes, factory, DOM-interface and architecture-guard suites pass (80);
 `Broiler.HtmlBridge.Dom` builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.25 named-accessor / relocated-infra /
+Status: **P3.26 completed** 2026-07-17 (same branch) — the **`document` element-query methods**, the eighth
+slice off the registration grab-bag. `DocumentQueryBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the five element lookups — `getElementById`, `getElementsByTagName`, `getElementsByClassName`,
+`querySelector`, `querySelectorAll` (was `JsRegistrationGetElementById006Core` etc.). Each searches the document
+tree and returns the matching element's JS wrapper (or a JS array of wrappers). The document root, element list and
+wrapper factory are reached through the three-member `IDocumentQueryHost` contract
+(`DomBridge.DocumentQueryHost.cs`, explicit interface members); sub-tree search (`FindInSubTree`) and selector
+matching (`MatchesSelector`) stay as the bridge's neutral `internal static` helpers, called directly.
+`Registration/Document.cs` now registers `Dom.Features.DocumentQueryBinding.<Op>(this, in a)`; the callbacks are
+gone from `JsFunctionCallbacks/Registration.cs` (917 → 853 lines). **Scoped deliberately:** hit-testing
+(`elementFromPoint`/`elementsFromPoint`, layout-coupled), the structural accessors (`body`/`head`/`title`) and the
+live collections (`forms`/`images`/`links`/`styleSheets`) are separate concerns left for later slices.
+Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/DocumentQueryBindingModuleTests.cs` (co-location / host-contract / five-callbacks-moved-off-bridge
+guards + a query characterization — id lookup, tag/class counts, and `querySelector`/`All` over a `p.foo` selector —
+through the bridge). Regression check: the DocumentQuery, Selectors/CSSOM, HtmlDom and architecture-guard suites pass
+(108 of 109; the one failure, `SelectorsAndCssomTests.Lang_Matches_XmlLang_Ancestor`, is the documented pre-existing
+`:lang` selector failure — verified failing identically at the pre-change baseline); `Broiler.HtmlBridge.Dom` builds
+clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.26 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

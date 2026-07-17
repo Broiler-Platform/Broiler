@@ -29,20 +29,13 @@ public sealed partial class DomBridge
         // document.title (getter / setter)
         document.FastAddProperty((KeyString)"title", new JSFunction((in a) => new JSString(Title), "get title"), new JSFunction(JsRegistrationSetTitle005Core, "set title"), JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // document.getElementById(id)
-        document.FastAddValue((KeyString)"getElementById", new JSFunction(JsRegistrationGetElementById006Core, "getElementById", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.getElementsByTagName(tag)
-        document.FastAddValue((KeyString)"getElementsByTagName", new JSFunction(JsRegistrationGetElementsByTagName007Core, "getElementsByTagName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.getElementsByClassName(className)
-        document.FastAddValue((KeyString)"getElementsByClassName", new JSFunction(JsRegistrationGetElementsByClassName008Core, "getElementsByClassName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.querySelector(selector)
-        document.FastAddValue((KeyString)"querySelector", new JSFunction(JsRegistrationQuerySelector009Core, "querySelector", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.querySelectorAll(selector)
-        document.FastAddValue((KeyString)"querySelectorAll", new JSFunction(JsRegistrationQuerySelectorAll010Core, "querySelectorAll", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document element-query methods — getElementById/getElementsByTagName/getElementsByClassName/
+        // querySelector/querySelectorAll, co-located in the DocumentQueryBinding feature module (Phase 3).
+        document.FastAddValue((KeyString)"getElementById", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.GetElementById(this, in a), "getElementById", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"getElementsByTagName", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.GetElementsByTagName(this, in a), "getElementsByTagName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"getElementsByClassName", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.GetElementsByClassName(this, in a), "getElementsByClassName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"querySelector", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.QuerySelector(this, in a), "querySelector", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"querySelectorAll", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.QuerySelectorAll(this, in a), "querySelectorAll", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"elementFromPoint", new JSFunction(JsRegistrationElementFromPoint011Core, "elementFromPoint", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"elementsFromPoint", new JSFunction(JsRegistrationElementsFromPoint012Core, "elementsFromPoint", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
