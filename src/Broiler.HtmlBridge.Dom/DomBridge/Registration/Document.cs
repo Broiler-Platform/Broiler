@@ -121,14 +121,15 @@ public sealed partial class DomBridge
         // implementation.hasFeature() — always returns true per spec
         implementation.FastAddValue((KeyString)"hasFeature", TrueFunction("hasFeature", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // implementation.createDocumentType(qualifiedName, publicId, systemId)
-        implementation.FastAddValue((KeyString)"createDocumentType", new JSFunction((in a) => JsRegistrationCreateDocumentType057Core(context, in a), "createDocumentType", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.implementation factories — createDocumentType/createDocument/createHTMLDocument,
+        // co-located in the DocumentLevelFactoryBinding feature module (Phase 3).
+        implementation.FastAddValue((KeyString)"createDocumentType", new JSFunction((in a) => Dom.Features.DocumentLevelFactoryBinding.CreateDocumentType(this, context, in a), "createDocumentType", 3), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // implementation.createDocument(namespace, qualifiedName, doctype)
-        implementation.FastAddValue((KeyString)"createDocument", new JSFunction((in a) => JsRegistrationCreateDocument058Core(context, in a), "createDocument", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        implementation.FastAddValue((KeyString)"createDocument", new JSFunction((in a) => Dom.Features.DocumentLevelFactoryBinding.CreateDocument(this, context, in a), "createDocument", 3), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // implementation.createHTMLDocument(title)
-        implementation.FastAddValue((KeyString)"createHTMLDocument", new JSFunction(JsRegistrationCreateHTMLDocument059Core, "createHTMLDocument", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        implementation.FastAddValue((KeyString)"createHTMLDocument", new JSFunction((in a) => Dom.Features.DocumentLevelFactoryBinding.CreateHTMLDocument(this, in a), "createHTMLDocument", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         document.FastAddValue((KeyString)"implementation", implementation, JSPropertyAttributes.EnumerableConfigurableValue);
     }
