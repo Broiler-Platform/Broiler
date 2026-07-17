@@ -49,17 +49,12 @@ public sealed partial class DomBridge
         // document.getAnimations() — minimal Web Animations API support used by WPT.
         document.FastAddValue((KeyString)"getAnimations", new JSFunction((in _) => BuildAnimationList(null), "getAnimations", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // document.createElement(tag)
-        document.FastAddValue((KeyString)"createElement", new JSFunction((in a) => JsRegistrationCreateElement014Core(context, in a), "createElement", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.createTextNode(text)
-        document.FastAddValue((KeyString)"createTextNode", new JSFunction(JsRegistrationCreateTextNode015Core, "createTextNode", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.createAttribute(name)
-        document.FastAddValue((KeyString)"createAttribute", new JSFunction((in a) => JsRegistrationCreateAttribute016Core(context, in a), "createAttribute", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // document.createDocumentFragment() — basic iframe/fragment support
-        document.FastAddValue((KeyString)"createDocumentFragment", new JSFunction(JsRegistrationCreateDocumentFragment017Core, "createDocumentFragment", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document node factories — createElement/createTextNode/createAttribute/createDocumentFragment,
+        // co-located in the DocumentFactoryBinding feature module (Phase 3).
+        document.FastAddValue((KeyString)"createElement", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateElement(this, context, in a), "createElement", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"createTextNode", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateTextNode(this, in a), "createTextNode", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"createAttribute", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateAttribute(this, context, in a), "createAttribute", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"createDocumentFragment", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateDocumentFragment(this, in a), "createDocumentFragment", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.createEvent(type) — DOM Events Level 3
         document.FastAddValue((KeyString)"createEvent", new JSFunction(JsRegistrationCreateEvent033Core, "createEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -114,11 +109,11 @@ public sealed partial class DomBridge
         // document.forms — collection of all <form> elements with named access
         document.FastAddProperty((KeyString)"forms", new JSFunction(JsRegistrationGetForms050Core, "get forms"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // document.createElementNS(namespace, tagName)
-        document.FastAddValue((KeyString)"createElementNS", new JSFunction((in a) => JsRegistrationCreateElementNS051Core(context, in a), "createElementNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.createElementNS(namespace, tagName)  — DocumentFactoryBinding (Phase 3)
+        document.FastAddValue((KeyString)"createElementNS", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateElementNS(this, context, in a), "createElementNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // document.createAttributeNS(namespace, qualifiedName)
-        document.FastAddValue((KeyString)"createAttributeNS", new JSFunction((in a) => JsRegistrationCreateAttributeNS052Core(context, in a), "createAttributeNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.createAttributeNS(namespace, qualifiedName)  — DocumentFactoryBinding (Phase 3)
+        document.FastAddValue((KeyString)"createAttributeNS", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateAttributeNS(this, context, in a), "createAttributeNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.images — collection of all <img> elements
         document.FastAddProperty((KeyString)"images", new JSFunction(JsRegistrationGetImages053Core, "get images"), null, JSPropertyAttributes.EnumerableConfigurableProperty);

@@ -127,43 +127,6 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationCreateElement014Core(JSContext context, in Arguments a)
-    {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'createElement': 1 argument required, but only 0 present.");
-        var tag = a[0].ToString();
-        ValidateElementName(tag, context);
-        tag = AsciiToLower(tag);
-        var el = CreateBridgeElement(tag);
-        return ToJSObject(el);
-    }
-
-
-    private JSValue JsRegistrationCreateTextNode015Core(in Arguments a)
-    {
-        var text = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var el = CreateBridgeTextNode(text);
-        return ToJSObject(el);
-    }
-
-
-    private JSValue JsRegistrationCreateAttribute016Core(JSContext context, in Arguments a)
-    {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'createAttribute': 1 argument required, but only 0 present.");
-        var name = a[0].ToString();
-        ValidateElementName(name, context);
-        return _attributes.BuildStandaloneAttrNode(AsciiToLower(name), null);
-    }
-
-
-    private JSValue JsRegistrationCreateDocumentFragment017Core(in Arguments a)
-    {
-        var fragment = CreateBridgeDocumentFragment();
-        return ToJSObject(fragment);
-    }
-
-
     private JSValue JsRegistrationCreateEvent033Core(in Arguments a)
     {
         var evt = new JSObject();
@@ -624,29 +587,6 @@ public sealed partial class DomBridge
         }
 
         return arr;
-    }
-
-
-    private JSValue JsRegistrationCreateElementNS051Core(JSContext context, in Arguments a)
-    {
-        var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
-        var localName = a.Length > 1 ? a[1].ToString() : (a.Length > 0 ? a[0].ToString() : "div");
-        ValidateQualifiedName(localName, ns, context);
-        var el = string.IsNullOrEmpty(ns)
-            ? CreateBridgeElement(localName)
-            : CreateBridgeElementNS(ns, localName);
-        return ToJSObject(el);
-    }
-
-
-    private JSValue JsRegistrationCreateAttributeNS052Core(JSContext context, in Arguments a)
-    {
-        var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
-        if (a.Length < 2)
-            throw new JSException("Failed to execute 'createAttributeNS': 2 arguments required, but fewer present.");
-        var qualifiedName = a[1].ToString();
-        ValidateQualifiedName(qualifiedName, ns, context);
-        return _attributes.BuildStandaloneAttrNode(qualifiedName, ns);
     }
 
 

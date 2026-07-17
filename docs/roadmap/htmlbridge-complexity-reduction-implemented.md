@@ -847,7 +847,28 @@ they appear only in the rendered output and prove the written/`writeln`-ed nodes
 `getElementById`). Regression check: the Acid3 (which exercises `document.write` heavily), write-named, and
 architecture-guard suites pass (62); `Broiler.HtmlBridge.Dom` builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.24 named-accessor / relocated-infra /
+Status: **P3.25 completed** 2026-07-17 (same branch) — the **`document` node-factory methods**, the seventh
+slice off the registration grab-bag. `DocumentFactoryBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the six node constructors — `createElement`, `createTextNode`, `createDocumentFragment`,
+`createElementNS`, `createAttribute`, `createAttributeNS` (was `JsRegistrationCreateElement014Core` etc.). Each
+validates its name argument, constructs the canonical node, and returns its JS wrapper. Name validation and
+ASCII-lowercasing stay as the bridge's neutral `internal static` helpers (`ValidateElementName`/
+`ValidateQualifiedName`/`AsciiToLower`) the module calls directly; the node-construction funnels
+(`CreateBridgeElement`/`…ElementNS`/`…TextNode`/`…DocumentFragment`), standalone `Attr` construction
+(`_attributes.BuildStandaloneAttrNode`) and the `ToJSObject` wrapper factory are reached through the six-member
+`IDocumentFactoryHost` contract (`DomBridge.DocumentFactoryHost.cs`, explicit interface members).
+`Registration/Document.cs` now registers `Dom.Features.DocumentFactoryBinding.<Op>(this, [context,] in a)`; the
+callbacks are gone from `JsFunctionCallbacks/Registration.cs` (977 → 917 lines). **Scoped deliberately:** the
+document-*level* factories (`createDocument`/`createHTMLDocument`/`createDocumentType`, which are
+browsing-context-coupled via `CreateBrowsingContextDocument`/`_subDocuments`) and `createEvent` (a legacy
+event-object builder) are left for later slices. Behaviour-preserving; no public-API change (module + contract
+internal). Tests: `Broiler.Cli.Tests/DocumentFactoryBindingModuleTests.cs` (co-location / host-contract /
+six-callbacks-moved-off-bridge guards + a construction characterization — element+text end-to-end into the live
+tree, a queryable `createElementNS` SVG element, fragment `nodeType` 11, and ASCII-lowercased / namespaced `Attr`
+nodes). Regression check: the namespace, attributes, factory, DOM-interface and architecture-guard suites pass (80);
+`Broiler.HtmlBridge.Dom` builds clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.25 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
