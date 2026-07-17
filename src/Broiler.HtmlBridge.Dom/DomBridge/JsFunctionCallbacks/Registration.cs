@@ -888,45 +888,6 @@ public sealed partial class DomBridge
 
 
 
-    private JSValue JsRegistrationSetTimeout070Core(in Arguments a) =>
-        new JSNumber(_eventLoop.SetTimeout(a.Length > 0 ? a[0] as JSFunction : null));
-
-
-    private JSValue JsRegistrationClearTimeout071Core(in Arguments a)
-    {
-        if (a.Length > 0)
-            _eventLoop.ClearTimeout((int)a[0].DoubleValue);
-
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsRegistrationSetInterval072Core(in Arguments a) =>
-        new JSNumber(_eventLoop.SetInterval(a.Length > 0 ? a[0] as JSFunction : null));
-
-
-    private JSValue JsRegistrationClearInterval073Core(in Arguments a)
-    {
-        if (a.Length > 0)
-            _eventLoop.ClearInterval((int)a[0].DoubleValue);
-
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsRegistrationRequestAnimationFrame074Core(in Arguments a) =>
-        new JSNumber(_eventLoop.RequestAnimationFrame(a.Length > 0 ? a[0] as JSFunction : null));
-
-
-    private JSValue JsRegistrationCancelAnimationFrame075Core(in Arguments a)
-    {
-        if (a.Length > 0)
-            _eventLoop.CancelAnimationFrame((int)a[0].DoubleValue);
-
-        return JSUndefined.Value;
-    }
-
-
     private JSValue JsRegistrationAlert076Core(in Arguments a)
     {
         var msg = a.Length > 0 ? a[0].ToString() : string.Empty;

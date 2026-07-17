@@ -34,23 +34,14 @@ public sealed partial class DomBridge
 
         window.FastAddValue((KeyString)"location", location, JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // window.setTimeout(fn, delay) — queues callback for deferred execution
-        window.FastAddValue((KeyString)"setTimeout", new JSFunction(JsRegistrationSetTimeout070Core, "setTimeout", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // window.clearTimeout(id) — removes queued callback
-        window.FastAddValue((KeyString)"clearTimeout", new JSFunction(JsRegistrationClearTimeout071Core, "clearTimeout", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // window.setInterval(fn, delay) — queues repeating callback
-        window.FastAddValue((KeyString)"setInterval", new JSFunction(JsRegistrationSetInterval072Core, "setInterval", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // window.clearInterval(id) — removes interval callback
-        window.FastAddValue((KeyString)"clearInterval", new JSFunction(JsRegistrationClearInterval073Core, "clearInterval", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // window.requestAnimationFrame(fn) — queues callback for pre-render execution
-        window.FastAddValue((KeyString)"requestAnimationFrame", new JSFunction(JsRegistrationRequestAnimationFrame074Core, "requestAnimationFrame", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // window.cancelAnimationFrame(id) — removes queued rAF callback
-        window.FastAddValue((KeyString)"cancelAnimationFrame", new JSFunction(JsRegistrationCancelAnimationFrame075Core, "cancelAnimationFrame", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        // window timers / animation frames — thin adapters over the P2.4 BrowserEventLoop, co-located
+        // in the TimerBinding feature module (Phase 3).
+        window.FastAddValue((KeyString)"setTimeout", new JSFunction((in a) => Dom.Features.TimerBinding.SetTimeout(_eventLoop, in a), "setTimeout", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"clearTimeout", new JSFunction((in a) => Dom.Features.TimerBinding.ClearTimeout(_eventLoop, in a), "clearTimeout", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"setInterval", new JSFunction((in a) => Dom.Features.TimerBinding.SetInterval(_eventLoop, in a), "setInterval", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"clearInterval", new JSFunction((in a) => Dom.Features.TimerBinding.ClearInterval(_eventLoop, in a), "clearInterval", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"requestAnimationFrame", new JSFunction((in a) => Dom.Features.TimerBinding.RequestAnimationFrame(_eventLoop, in a), "requestAnimationFrame", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"cancelAnimationFrame", new JSFunction((in a) => Dom.Features.TimerBinding.CancelAnimationFrame(_eventLoop, in a), "cancelAnimationFrame", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.alert(msg) — logs to debug output
         window.FastAddValue((KeyString)"alert", new JSFunction(JsRegistrationAlert076Core, "alert", 1), JSPropertyAttributes.EnumerableConfigurableValue);

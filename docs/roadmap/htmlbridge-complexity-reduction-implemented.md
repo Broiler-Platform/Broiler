@@ -815,7 +815,22 @@ characterization — `(min-width: 100px)` matches, `(min-width: 5000px)` does no
 present — through the bridge). Regression check: `Broiler.HtmlBridge.Dom` builds clean; the architecture-guard (14),
 matchMedia and media-query suites pass (21).
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.22 named-accessor / relocated-infra /
+Status: **P3.23 completed** 2026-07-17 (same branch) — the **window timer / animation-frame scheduling API**,
+the fifth slice off the registration grab-bag. `TimerBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates all six entry points — `setTimeout`/`clearTimeout`, `setInterval`/`clearInterval`,
+`requestAnimationFrame`/`cancelAnimationFrame` (was the bridge's `JsRegistrationSetTimeout070Core`..
+`CancelAnimationFrame075Core`). Each is a thin adapter that unwraps the JS arguments and delegates to the **P2.4
+`BrowserEventLoop`** task-queue owner; since the module holds no state of its own, it takes the owner as a method
+parameter rather than through a host contract (the `Registration/Window.cs` lambdas pass `_eventLoop`). The six
+registrations collapsed to `Dom.Features.TimerBinding.<Op>(_eventLoop, in a)` calls; the callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (1083 → 1044 lines). Behaviour-preserving; no public-API change (module
+internal). Tests: `Broiler.Cli.Tests/TimerBindingModuleTests.cs` (co-location / six-callbacks-moved-off-bridge
+guards + a schedule-and-cancel characterization that drives real scheduling and cancellation end-to-end through the
+bridge's event-loop drain — `setTimeout`/`setInterval`/`requestAnimationFrame` fire, the cleared/cancelled ones do
+not, handles are numeric ids). Regression check: the TimerAndAsync, BrowserEventLoop, and architecture-guard suites
+pass (56); `Broiler.HtmlBridge.Dom` builds clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.23 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
