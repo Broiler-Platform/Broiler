@@ -3105,12 +3105,24 @@ synthesis (and its author-geometry / position-try helpers) from `Dialogs.cs`.
   gate has no observable payoff.
 
 **Net:** the remaining bridge deletions that actually shrink `AnchorResolver`/`Dialogs.cs`/`LayoutMetrics`
-are gated on a **maintainer applying the staged submodule patches** (0003–0010) and bumping the pointers —
-each patch's "Follow-up once applied" note names the bridge code that then deletes. The two remaining
-*capability* efforts (native `::backdrop`; the visual-viewport render cutover, blocker (b)) are each a
-dedicated feature slice with no local pixel corpus, not a bite-sized validated increment. Further local,
-CI-validatable Phase-5 progress on these tracks is limited until either a maintainer applies the patch
-backlog or a pixel corpus for the corpus-gapped features is added.
+are gated on a **maintainer applying the staged submodule patches** (0003–0011) and bumping the pointers —
+each patch's "Follow-up once applied" note names the bridge code that then deletes. The one remaining
+*capability* effort is the visual-viewport render cutover (blocker (b)), a dedicated slice with no local
+pixel corpus. Further local, CI-validatable Phase-5 progress on these tracks is limited until either a
+maintainer applies the patch backlog or a pixel corpus for the corpus-gapped features is added.
+
+**Verified 2026-07-17 (two follow-ups on the above).**
+1. **The 0010 top-layer paint lifts a modal above ordinary *positioned* content, not just its own backdrop** —
+   the case the reftest corpus never exercises (its modals are `anchor()`-positioned and don't overlap
+   `z-index` content). A local render (a modal over a `z-index:5` full-viewport div, native path, 0010
+   applied) confirms the modal paints on top. So the top-layer pass is correct for the general overlap case,
+   not only the transparent-backdrop reftests.
+2. **The full staged patch backlog applies cleanly in sequence to the pinned submodules** — `Broiler.CSS`
+   `0003`; `Broiler.Graphics` `0008`; and `Broiler.HTML` `0004 → 0005 → 0006 → 0007 → 0009 → 0010 → 0011`
+   in order. So the backlog has not bit-rotted against the pins; a maintainer can apply each chain, bump the
+   three pointers, and then flip the render levers (`NativeAnchorPlacement`/`NativeTopLayer` already on in
+   WPT; `NativeBackdrop` to be turned on) and delete the bridge code the "Follow-up once applied" notes name.
+   This maintainer step is now the gating item for the remaining `Dialogs.cs`/anchor-bake deletions.
 
 ---
 
