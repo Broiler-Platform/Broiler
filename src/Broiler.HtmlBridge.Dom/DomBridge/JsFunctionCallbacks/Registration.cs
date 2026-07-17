@@ -41,17 +41,6 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationGetComputedStyle121Core(DomBridge? bridgeForStyle, in Arguments a)
-    {
-        if (a.Length == 0)
-            return new JSObject();
-        var targetObj = a[0] as JSObject;
-        var el = targetObj != null ? bridgeForStyle.FindDomElementByJSObject(targetObj) : null;
-        var pseudoElement = a.Length > 1 ? a[1]?.ToString() : null;
-        return bridgeForStyle.BuildComputedStyleObject(el, pseudoElement);
-    }
-
-
     private JSValue JsRegistrationNow122Core(long performanceTimeOrigin, in Arguments _)
     {
         var elapsed = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - performanceTimeOrigin;

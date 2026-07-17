@@ -53,9 +53,10 @@ public sealed partial class DomBridge
         var messageChannelCtor = new JSFunction((in _) => _messaging.CreateMessageChannel(), "MessageChannel", 0);
         window.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         context["MessageChannel"] = messageChannelCtor;
+        // getComputedStyle (CSSOM), co-located in the ComputedStyleBinding feature module (Phase 3).
         window.FastAddValue(
             (KeyString)"getComputedStyle",
-            new JSFunction((in a) => JsRegistrationGetComputedStyle121Core(this, in a), "getComputedStyle", 2),
+            new JSFunction((in a) => Dom.Features.ComputedStyleBinding.GetComputedStyle(this, in a), "getComputedStyle", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
         RegisterWindowGlobals(context, document, window, console, fetchFn);
         RegisterPerformanceObject(context, window);

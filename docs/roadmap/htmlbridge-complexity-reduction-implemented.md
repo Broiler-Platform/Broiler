@@ -1064,7 +1064,22 @@ two-callbacks-moved-off-bridge guards + a positional characterization — a 100�
 returned by `elementFromPoint(50,50)` and appears in the `elementsFromPoint(50,50)` stack — through the bridge).
 Regression check: the architecture-guard suite passes (17); `Broiler.HtmlBridge.Dom` builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.36 named-accessor / relocated-infra /
+Status: **P3.37 completed** 2026-07-17 (same branch) — **`window.getComputedStyle`**, the CSSOM entry point.
+`ComputedStyleBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the method that resolves an
+element's used-value style declaration (was the bridge's `JsRegistrationGetComputedStyle121Core`). It resolves the
+argument's JS wrapper to its canonical element and returns the computed-style object, reached through the two-member
+`IComputedStyleHost` contract (`DomBridge.ComputedStyleHost.cs`, explicit interface members): the JS-wrapper reverse
+lookup (`FindDomElementByJSObject`) and the object builder (`BuildComputedStyleObject`). `Registration/
+Registration.cs` (the window-globals site) now registers `Dom.Features.ComputedStyleBinding.GetComputedStyle(this,
+in a)`; the callback is gone from `JsFunctionCallbacks/Registration.cs` (112 → 101 lines). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/ComputedStyleBindingModuleTests.cs`
+(co-location / host-contract / callback-moved-off-bridge guards + a characterization — an element with inline
+`display:flex; z-index:5` resolves to those computed values via `window.getComputedStyle`, and the no-target call
+returns an empty object without throwing — through the bridge). Regression check: the SelectorsAndCssom (74 of 75;
+the one failure is the documented pre-existing `:lang` `Lang_Matches_XmlLang_Ancestor`) and architecture-guard
+suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.37 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
