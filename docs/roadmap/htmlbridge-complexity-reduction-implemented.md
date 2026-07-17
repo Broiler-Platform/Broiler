@@ -1129,7 +1129,30 @@ nine-callbacks-moved-off-bridge guards + a full-interface characterization — `
 Regression check: the HtmlDom, namespace-core and architecture-guard suites pass (62); `Broiler.HtmlBridge.Dom`
 builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.40 named-accessor / relocated-infra /
+Status: **P3.41 completed** 2026-07-17 (same branch) — the **shared DOM `Node` read accessors**, the second slice
+off `JsFunctionCallbacks/JsObjects.cs`. `NodeAccessorsBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the 17 accessor callbacks registered on every node wrapper (element-, node-, doctype- and
+document-path `Populate*` blocks): `isConnected`, `childNodes`, `firstChild`/`lastChild`,
+`nextSibling`/`previousSibling`, `nodeType`/`nodeName`, `localName`/`prefix`/`namespaceURI`, `nodeValue`
+(get/set), `publicId`/`systemId` (DocumentType), `ownerDocument` and `parentElement` (was the bridge's
+`JsJsObjectsGetIsConnected032Core`..`GetParentElement058Core`). Node-type tests (`IsText`/`IsComment`), tree-order
+helpers (`ChildIndexOf`, `ParentEl`), read-side text (`BridgeText`) and the owning-document derivation
+(`GetOwningDocument`) stay as the bridge's `internal static` helpers, called directly; the JS-wrapper factory
+(`ToJSObject`), the document node, the tree-root walk (`GetTreeRoot`), the notifying character-data setter
+(`SetCharacterData`) and the two document-wrapper lookups (`_jsObjects.TryGetDocument`, `_documentJSObject`) are
+reached through the six-member `INodeAccessorsHost` contract (`DomBridge.NodeAccessorsHost.cs`, explicit interface
+members). All registration sites in `JsObjects.cs` now call `Dom.Features.NodeAccessorsBinding.<Op>`; the callbacks
+are gone from `JsFunctionCallbacks/JsObjects.cs` (1491 → 1311 lines). Behaviour-preserving; no public-API change
+(module + contract internal). Tests: `Broiler.Cli.Tests/NodeAccessorsBindingModuleTests.cs` (co-location /
+host-contract / seventeen-callbacks-moved-off-bridge guards + an end-to-end characterization exercising
+`isConnected`, `childNodes.length`, `firstChild`/`lastChild`, sibling walks, `nodeType`/`nodeName`/`localName`/
+`namespaceURI`, `nodeValue` get+set on a comment, `parentElement` and `ownerDocument` through the bridge).
+Regression check: the DOM node/DomBridge/JsObjects suites pass (210); the five failures in that subset
+(viewport-zoom, anchor-size, SVG-geometry, iframe-scroll serialization and the NodeIterator pre-removal test) fail
+identically at the P3.40 baseline — pre-existing layout/rendering-environment failures, not regressions.
+`Broiler.HtmlBridge.Dom` builds clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.41 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
