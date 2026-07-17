@@ -216,13 +216,26 @@ The phase-by-phase delivery detail lives in the companions below.
 
 | Document | Contents |
 |---|---|
-| [Implemented delivery log](htmlbridge-complexity-reduction-implemented.md) | Phases 0–5 as delivered — project-graph repair, document services, feature-module extraction, parallel-DOM-state elimination, and used-value behaviour moved into Layout, with per-slice status, branches and regression checks. |
+| [Phase 0–5 delivery log](htmlbridge-complexity-reduction-implemented.md) | Project-graph repair, document services, feature-module extraction, parallel-DOM-state elimination, and used-value behaviour moved into Layout, with per-slice status, branches and regression checks. The bulk of each phase has landed; several phases carry explicit deferred/blocked residue (see the status table below). |
 | [Working notes](htmlbridge-complexity-reduction-notes.md) | The native dialog / backdrop feature track, its scoping analysis, and deferred/blocked findings that inform the remaining deletion work. |
 | [Remaining phases](htmlbridge-complexity-reduction-remaining.md) | Phase 6 (remove `Broiler.HtmlBridge.Rendering`), Phase 7 (isolate loading/security/browsing-context policy) and Phase 8 (simplify Core and Scripting). |
 
-High-level status: Phases 0–5 are delivered (see the delivery log). Phases 6–8
-remain. The native dialog/backdrop track and the Phase 4 item-2 deletion scoping
-are captured in the working notes.
+Per-phase status (as of 2026-07-17). "Bulk delivered" means the planned work
+items landed but one or more exit criteria remain open — the delivery log records
+the specifics per slice.
+
+| Phase | Status | Open residue |
+|---|---|---|
+| 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
+| 1 — repair the project graph | **Complete** | None — all five work items landed. |
+| 2 — document services & single state authority | Bulk delivered | Simultaneous-session isolation is blocked below the bridge (JS engine, out of scope); de-globalizing the process-static `ElementRuntimeState`/`PositionAreaResolutions` tables is deferred (in scope). |
+| 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, SVG and Canvas modules still to come; the DomBridge facade line-count target (500–800 lines) is unmet and tracked as ratcheted debt. |
+| 4 — eliminate parallel DOM state | Bulk delivered | Item 2's full inline-style dict elimination (~200 sites) is deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps are blocked by side-effect coupling. |
+| 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion is complete through step 6, but ALWAYS-pass and not-yet-native residue remains; full completion is gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame (both tracked separately). |
+| 6–8 | Not started | See [remaining phases](htmlbridge-complexity-reduction-remaining.md). |
+
+The native dialog/backdrop track and the Phase 4 item-2 deletion scoping are
+captured in the working notes.
 
 ## Priority and sequencing
 

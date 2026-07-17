@@ -1,14 +1,28 @@
 # HtmlBridge complexity-reduction — implemented delivery log
 
-Status: delivery log (completed phases)
+Status: delivery log (Phases 0–5 — bulk delivered, residue noted per phase)
 
 Baseline date: 2026-07-13
 
-This document is the **completed-work record** for the HtmlBridge
-complexity-reduction program. It captures Phases 0–5 as delivered — the project
-graph repair, document services, feature-module extraction, parallel-DOM-state
-elimination, and the move of used-value behaviour into Layout — including
-per-slice status entries, branches, tests and regression checks.
+This document is the **delivery record** for the HtmlBridge complexity-reduction
+program. It captures the work done under Phases 0–5 — the project graph repair,
+document services, feature-module extraction, parallel-DOM-state elimination, and
+the move of used-value behaviour into Layout — including per-slice status entries,
+branches, tests and regression checks.
+
+**These phases are not all fully complete.** The bulk of each phase's planned
+work has landed, but several phases carry explicit deferred, blocked, or
+still-to-come residue, and a few exit criteria remain open. Read each phase's
+own status entries for the specifics; the summary below is the quick view.
+
+| Phase | Status | Open residue |
+|---|---|---|
+| 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
+| 1 — repair the project graph | **Complete** | None — all five work items landed. |
+| 2 — document services & single state authority | Bulk delivered | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); de-globalizing process-static `ElementRuntimeState`/`PositionAreaResolutions` tables deferred (in scope). |
+| 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, SVG, Canvas modules still to come; DomBridge facade line-count target (500–800) unmet, tracked as ratcheted debt. |
+| 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
+| 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
 
 Companion documents:
 
