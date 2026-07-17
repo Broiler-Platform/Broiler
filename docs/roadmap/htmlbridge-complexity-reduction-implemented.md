@@ -19,7 +19,7 @@ own status entries for the specifics; the summary below is the quick view.
 |---|---|---|
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
-| 2 — document services & single state authority | Bulk delivered | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); process-static per-element tables being de-globalized to per-bridge instances — `PositionAreaResolutions` and the `ElementRuntimeState` `FormControl` / `Scroll` / `StyleSheet` / `Document` / `Animation` / `Shadow` / `Dialog` concerns done (2026-07-17), leaving only the `InlineStyle`-hub inline-style trio still to do (in scope). |
+| 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
 | 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, SVG, Canvas modules still to come; `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
@@ -240,11 +240,11 @@ bridge state now has explicit single owners (all internal, in `Broiler.HtmlBridg
 event listeners were de-globalized off the process-static `ElementRuntimeState` onto an instance
 `ConditionalWeakTable`. Not fully met and carried forward: two simultaneous sessions are still not
 isolated (blocked at the Broiler.JS engine's shared globals — a JS-engine concern, not the bridge),
-and the process-static per-element runtime tables are being de-globalized incrementally: the
-`PositionAreaResolutions` memo and the `ElementRuntimeState` `Scroll` / `StyleSheet` / `Document` /
-`Animation` / `Shadow` / `Dialog` / `FormControl` concerns are now per-bridge instance tables (2026-07-17 — see the
-item-4 note below), leaving only the `InlineStyle`-hub inline-style trio still to do
-(the sub-document
+and the process-static per-element runtime tables have now been **fully de-globalized** to per-bridge
+instances (2026-07-17 — see the item-4 note below): the `PositionAreaResolutions` memo and every
+`ElementRuntimeState` concern (`Scroll` / `StyleSheet` / `Document` / `Animation` / `Shadow` / `Dialog` /
+`FormControl`, and finally the `InlineStyle`-hub inline-style trio) are per-bridge instance state, so no
+process-static per-element table remains in the bridge (the sub-document
 caches above are now consolidated into `BrowsingContextManager` — P3.16).
 
 Two findings recorded for later phases:
@@ -363,12 +363,36 @@ Two findings recorded for later phases:
       `SelectorsLevel4SpecificityTests`, `Acid3CssSelectorRegressionTests`, `DocumentQueryBindingModuleTests`,
       `SubDocumentBindingModuleTests`, `FormControlClickTests`, `SelectBindingModuleTests`,
       `EventTargetBindingModuleTests`, `DialogBindingModuleTests`, `DomImplementationTests`) stays green.
-    - **Remaining slot** — only the inline-style trio
-      (`Style`/`StyleSeeded`/`JsSetStyleProps`/`InlineEventHandlers`) is left in the static
-      `ElementRuntimeState` table. It is the `InlineStyle` hub (~179 refs with 15 cross-class `Features/`
-      call sites) — the largest and last concern, entangled with Phase 4 item 2 (inline-style dict
-      elimination). With `FormControl`/`Scroll`/`StyleSheet`/`Document`/`Animation`/`Shadow`/`Dialog`
-      gone, the static table now holds only this one concern.
+    - **Inline-style trio (`Style` / `StyleSeeded` / `JsSetStyleProps` / `InlineEventHandlers`) — done
+      (2026-07-17); the process-static table is now fully eliminated.** This was the last and largest
+      concern — the `InlineStyle` hub (~179 refs, ~28 of them in static/cross-class contexts). De-globalizing
+      the *storage* is separable from Phase 4 item 2 (which eliminates the dict itself), so it was done
+      here: the backing `ConditionalWeakTable` and `GetElementRuntimeState` became **instance**, and the
+      trio accessors (`InlineStyle`, `Mark`/`Unmark`/`Clear`/`InlineStylePropsSetByJs`, `GetInlineStyleView`,
+      `GetInlineEventHandlers`) are now instance methods. The static callers were threaded:
+      - **In-bridge static helpers → instance** (single-level cascade, callers already on the instance):
+        `SerializeInlineStyleForEngine` (the computed-style engine's inline source) and
+        `AnchorFunctions.ResolveAnchorSizeFunctions`; plus the serialization adapter's `GetStyles` lambda
+        dropped its `static`.
+      - **CSSOM inline declaration → host interface.** `StyleDeclarationBinding`'s `element.style`
+        callbacks (`cssText`/`setProperty`/`getPropertyValue`/`removeProperty`/`cssFloat`/`item`/… and the
+        `CssStyleDeclaration` bracket-access `SetValue`/`GetValue`) reach the inline-style dict and the
+        "set via JS" bookkeeping through a new narrow **`IInlineStyleHost`** (`InlineStyle`,
+        `Mark`/`Unmark`/`Clear`/`InlineStylePropsSetByJs`); its sole builder call site (the instance
+        `ToJSObject`) passes the bridge. The stateless helpers it also uses (`IsAcceptableInlineValue`,
+        `ParseStyle`, `ExpandCssShorthands`, `CssPropertyNames`) stayed static.
+
+      **With this, every concern is off the process-static table: `ElementRuntimeState` and
+      `GetElementRuntimeState` are per-bridge instance state, and no process-static per-element runtime
+      table remains in the bridge.** Behaviour-identical (same element-keyed CWT/GC semantics and clone
+      copy), now owned by the session's bridge. The CSSOM / computed-style / inline-style / serialization /
+      selector / anchor / clone coverage (`StyleDeclarationBindingModuleTests`,
+      `CssStyleDeclarationValidationTests`, `InlineStyleWriteThroughTests`, `InlineStyleDropDiagnosticsTests`,
+      `SelectorsBindingModuleTests`, `SelectorsAndCssomTests`, `CssRenderingTests`,
+      `PositionAreaLiveGeometryTests`, `AnchorInsetLiveGeometryTests`, `Acid3RegressionTests`,
+      `Acid3CssSelectorRegressionTests`, `SharedLayoutGeometryTests`, `DomImplementationTests` — 308
+      relevant tests) stays green. (`ElementRuntimeState` now holds only the inline-style trio; renaming it
+      to match is optional cosmetic follow-up.)
 
 Goal: make hidden state dependencies explicit while preserving behavior.
 

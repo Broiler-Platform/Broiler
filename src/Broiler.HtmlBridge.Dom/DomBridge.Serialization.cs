@@ -588,7 +588,7 @@ public sealed partial class DomBridge
         // attribute), so it can never appear in ChildNodes and needs no serialization skip.
         GetChildren: static node => node.ChildNodes,
         GetAttributes: node => node is DomElement element ? GetSerializableAttributes(element) : [],
-        GetStyles: static node => node is DomElement element
+        GetStyles: node => node is DomElement element
             ? InlineStyle(element).OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
             : [],
         // RF-BRIDGE-1c Phase F (F3c part 2d): text nodes serialize with the same HTML escaping the

@@ -41,43 +41,43 @@ internal static partial class StyleDeclarationBinding
 
     /// <summary>Builds the writable <c>element.style</c> CSSStyleDeclaration. Was
     /// <c>DomBridge.BuildStyleObject(element, onMutation, parentRule)</c>.</summary>
-    internal static JSObject BuildInlineDeclaration(DomElement element, Action? onMutation = null, JSValue? parentRule = null,
+    internal static JSObject BuildInlineDeclaration(IInlineStyleHost host, DomElement element, Action? onMutation = null, JSValue? parentRule = null,
         Action<DomElement>? onPositionAreaInvalidate = null)
     {
-        var style = new CssStyleDeclaration(element, onMutation, onPositionAreaInvalidate);
+        var style = new CssStyleDeclaration(host, element, onMutation, onPositionAreaInvalidate);
 
         style.FastAddProperty((KeyString)"cssText",
-            new JSFunction((in a) => InlineGetCssText(element, in a), "get cssText"),
-            new JSFunction((in a) => InlineSetCssText(element, onMutation, in a), "set cssText"),
+            new JSFunction((in a) => InlineGetCssText(host, element, in a), "get cssText"),
+            new JSFunction((in a) => InlineSetCssText(host, element, onMutation, in a), "set cssText"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         style.FastAddValue((KeyString)"setProperty",
-            new JSFunction((in a) => InlineSetProperty(element, onMutation, in a), "setProperty", 2),
+            new JSFunction((in a) => InlineSetProperty(host, element, onMutation, in a), "setProperty", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue((KeyString)"getPropertyValue",
-            new JSFunction((in a) => InlineGetPropertyValue(element, in a), "getPropertyValue", 1),
+            new JSFunction((in a) => InlineGetPropertyValue(host, element, in a), "getPropertyValue", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue((KeyString)"removeProperty",
-            new JSFunction((in a) => InlineRemoveProperty(element, onMutation, in a), "removeProperty", 1),
+            new JSFunction((in a) => InlineRemoveProperty(host, element, onMutation, in a), "removeProperty", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddProperty((KeyString)"cssFloat",
-            new JSFunction((in a) => InlineGetCssFloat(element, in a), "get cssFloat"),
-            new JSFunction((in a) => InlineSetCssFloat(element, onMutation, in a), "set cssFloat"),
+            new JSFunction((in a) => InlineGetCssFloat(host, element, in a), "get cssFloat"),
+            new JSFunction((in a) => InlineSetCssFloat(host, element, onMutation, in a), "set cssFloat"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         style.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => new JSNumber(GetStylePropertyNames(element).Count), "get length"),
+            new JSFunction((in _) => new JSNumber(GetStylePropertyNames(host, element).Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         style.FastAddValue((KeyString)"item",
-            new JSFunction((in a) => InlineItem(element, in a), "item", 1),
+            new JSFunction((in a) => InlineItem(host, element, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue((KeyString)"getPropertyPriority",
-            new JSFunction((in a) => InlineGetPropertyPriority(element, in a), "getPropertyPriority", 1),
+            new JSFunction((in a) => InlineGetPropertyPriority(host, element, in a), "getPropertyPriority", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddProperty((KeyString)"parentRule",
@@ -166,7 +166,7 @@ internal static partial class StyleDeclarationBinding
 
     // -------- declaration JS object types --------
 
-    private sealed class CssStyleDeclaration(DomElement element, Action? onMutation = null,
+    private sealed class CssStyleDeclaration(IInlineStyleHost host, DomElement element, Action? onMutation = null,
         Action<DomElement>? onPositionAreaInvalidate = null) : JSObject
     {
         protected override bool SetValue(KeyString name, JSValue value, JSValue receiver, bool throwError = true)
@@ -178,13 +178,13 @@ internal static partial class StyleDeclarationBinding
                 var val = value?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(val))
                 {
-                    DomBridge.InlineStyle(element).Remove(kebab);
-                    DomBridge.UnmarkInlineStylePropSetByJs(element, kebab);
+                    host.InlineStyle(element).Remove(kebab);
+                    host.UnmarkInlineStylePropSetByJs(element, kebab);
                 }
                 else if (DomBridge.IsAcceptableInlineValue(kebab, val))
                 {
-                    DomBridge.InlineStyle(element)[kebab] = val;
-                    DomBridge.MarkInlineStylePropSetByJs(element, kebab);
+                    host.InlineStyle(element)[kebab] = val;
+                    host.MarkInlineStylePropSetByJs(element, kebab);
                 }
                 else
                 {
@@ -219,7 +219,7 @@ internal static partial class StyleDeclarationBinding
             var nameStr = key.ToString();
             if (!NonCssNames.Contains(nameStr))
             {
-                if (TryGetStylePropertyRawValue(element, nameStr, out var val))
+                if (TryGetStylePropertyRawValue(host, element, nameStr, out var val))
                     return new JSString(CssPriority.Strip(val));
             }
 
@@ -268,9 +268,9 @@ internal static partial class StyleDeclarationBinding
 
     private static List<string> GetStylePropertyNames(IReadOnlyDictionary<string, string> style) => [.. style.Keys];
 
-    private static List<string> GetStylePropertyNames(DomElement element) => GetStylePropertyNames(DomBridge.InlineStyle(element));
+    private static List<string> GetStylePropertyNames(IInlineStyleHost host, DomElement element) => GetStylePropertyNames(host.InlineStyle(element));
 
-    private static Dictionary<string, string> BuildDeclaredInlineStyleMap(DomElement element)
+    private static Dictionary<string, string> BuildDeclaredInlineStyleMap(IInlineStyleHost host, DomElement element)
     {
         var declared = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -281,18 +281,18 @@ internal static partial class StyleDeclarationBinding
                 declared[kv.Key] = kv.Value;
         }
 
-        foreach (var property in DomBridge.InlineStylePropsSetByJs(element))
+        foreach (var property in host.InlineStylePropsSetByJs(element))
         {
-            if (DomBridge.InlineStyle(element).TryGetValue(property, out var value))
+            if (host.InlineStyle(element).TryGetValue(property, out var value))
                 declared[property] = value;
         }
 
         return declared;
     }
 
-    private static bool TryGetExpandedInlineStyleRawValue(DomElement element, string property, out string value)
+    private static bool TryGetExpandedInlineStyleRawValue(IInlineStyleHost host, DomElement element, string property, out string value)
     {
-        var declared = BuildDeclaredInlineStyleMap(element);
+        var declared = BuildDeclaredInlineStyleMap(host, element);
         if (declared.Count == 0)
         {
             value = string.Empty;
@@ -333,11 +333,11 @@ internal static partial class StyleDeclarationBinding
         return false;
     }
 
-    private static bool TryGetStylePropertyRawValue(DomElement element, string property, out string value)
+    private static bool TryGetStylePropertyRawValue(IInlineStyleHost host, DomElement element, string property, out string value)
     {
-        if (TryGetStylePropertyRawValue(DomBridge.InlineStyle(element), property, out value!))
+        if (TryGetStylePropertyRawValue(host.InlineStyle(element), property, out value!))
             return true;
 
-        return TryGetExpandedInlineStyleRawValue(element, property, out value!);
+        return TryGetExpandedInlineStyleRawValue(host, element, property, out value!);
     }
 }

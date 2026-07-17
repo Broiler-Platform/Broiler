@@ -277,7 +277,7 @@ public sealed partial class DomBridge
     /// styles, replacing them with computed pixel values from the anchor element's
     /// dimensions.
     /// </summary>
-    private static void ResolveAnchorSizeFunctions(
+    private void ResolveAnchorSizeFunctions(
         DomElement element,
         Dictionary<string, string> cssProps,
         Dictionary<string, AnchorInfo> anchorRegistry)

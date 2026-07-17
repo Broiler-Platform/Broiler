@@ -70,7 +70,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // ITraversalHost contract it implements (see DomBridge.TraversalHost.cs).
     private readonly Dom.Features.TraversalBinding _traversal;
     private readonly DomDocument _document;
-    private static readonly ConditionalWeakTable<DomNode, ElementRuntimeState> ElementRuntimeStates = [];
+    private readonly ConditionalWeakTable<DomNode, ElementRuntimeState> _elementRuntimeStates = [];
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
     private JSObject? _visualViewportJSObject;
@@ -219,8 +219,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public IReadOnlyList<DomElement> Elements =>
         [.. _document.InclusiveDescendants().OfType<DomElement>()];
 
-    internal static ElementRuntimeState GetElementRuntimeState(DomNode node) =>
-        ElementRuntimeStates.GetValue(node, static _ => new ElementRuntimeState());
+    internal ElementRuntimeState GetElementRuntimeState(DomNode node) =>
+        _elementRuntimeStates.GetValue(node, static _ => new ElementRuntimeState());
 
     /// <summary>
     /// The element's authoritative in-memory inline style dictionary (CSS kebab-case),
@@ -442,7 +442,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             parent.AppendChild(child);
     }
 
-    internal static Dictionary<string, string> InlineStyle(DomElement element)
+    internal Dictionary<string, string> InlineStyle(DomElement element)
     {
         var state = GetElementRuntimeState(element);
         if (!state.StyleSeeded)
@@ -462,16 +462,16 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // (element.style.foo = …, setProperty, cssText). The Phase 3 (P3.14) StyleDeclarationBinding module
     // records/clears these through these helpers instead of touching the runtime-state object directly;
     // the bridge's own serialization/computed-style paths read GetElementRuntimeState(...).JsSetStyleProps.
-    internal static void MarkInlineStylePropSetByJs(DomElement element, string property) =>
+    internal void MarkInlineStylePropSetByJs(DomElement element, string property) =>
         GetElementRuntimeState(element).JsSetStyleProps.Add(property);
 
-    internal static void UnmarkInlineStylePropSetByJs(DomElement element, string property) =>
+    internal void UnmarkInlineStylePropSetByJs(DomElement element, string property) =>
         GetElementRuntimeState(element).JsSetStyleProps.Remove(property);
 
-    internal static void ClearInlineStylePropsSetByJs(DomElement element) =>
+    internal void ClearInlineStylePropsSetByJs(DomElement element) =>
         GetElementRuntimeState(element).JsSetStyleProps.Clear();
 
-    internal static IReadOnlyCollection<string> InlineStylePropsSetByJs(DomElement element) =>
+    internal IReadOnlyCollection<string> InlineStylePropsSetByJs(DomElement element) =>
         GetElementRuntimeState(element).JsSetStyleProps;
 
     /// <summary>Read-only diagnostic view of an element's resolved inline-style map — the same
@@ -480,7 +480,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// tooling callers that need to inspect post-resolution inline styles route through this accessor
     /// instead. Visible only to <c>InternalsVisibleTo</c> assemblies — not part of the public surface,
     /// so it does not re-open a public facade seam.</summary>
-    internal static IReadOnlyDictionary<string, string> GetInlineStyleView(DomElement element) =>
+    internal IReadOnlyDictionary<string, string> GetInlineStyleView(DomElement element) =>
         InlineStyle(element);
 
     /// <summary>Parity-test hook (DOM/CSS promotion §2.1): the bridge's own sparse
@@ -501,7 +501,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomNode element) =>
         _eventTargets.NodeListeners(element);
 
-    private static Dictionary<string, JSValue> GetInlineEventHandlers(DomNode element) =>
+    private Dictionary<string, JSValue> GetInlineEventHandlers(DomNode element) =>
         GetElementRuntimeState(element).InlineEventHandlers;
 
     internal bool TryGetStoredScrollOffset(DomElement element, bool vertical, out double offset)

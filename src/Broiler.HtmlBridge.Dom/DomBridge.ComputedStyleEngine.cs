@@ -28,7 +28,7 @@ public sealed partial class DomBridge
     /// geometry that never reach the DOM <c>style</c> attribute the engine would otherwise read.
     /// Returns <c>null</c> when there is no inline style.
     /// </summary>
-    private static string? SerializeInlineStyleForEngine(DomElement element)
+    private string? SerializeInlineStyleForEngine(DomElement element)
     {
         var inline = InlineStyle(element);
         if (inline.Count == 0)
