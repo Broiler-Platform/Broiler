@@ -145,6 +145,7 @@ internal static class FragmentTreeBuilder
             Style = style,
             CreatesStackingContext = IsStackingContext(box),
             StackLevel = GetStackLevel(box),
+            TopLayerOrder = GetTopLayerOrder(box),
             HasTransformAncestor = hasTransformAncestor,
             BackgroundImageHandle = bgImage,
             ImageHandle = imgHandle,
@@ -320,6 +321,24 @@ internal static class FragmentTreeBuilder
             return z;
 
         return 0;
+    }
+
+    // CSS Position 4 §top-layer: a box the bridge has marked as top-layer (an open modal
+    // <dialog>, an open popover, or a synthesized ::backdrop) carries a data-broiler-top-layer
+    // attribute whose value is its top-layer order (a later-added element has a higher order and
+    // paints over an earlier one). Absent/blank/unparseable → not in the top layer (null), so an
+    // ordinary box is untouched. Projecting it here lets PaintWalker paint these in a real
+    // top-layer pass instead of via the bridge's very-large-z-index emulation.
+    private const string TopLayerAttr = "data-broiler-top-layer";
+
+    private static int? GetTopLayerOrder(CssBox box)
+    {
+        var raw = box.GetAttribute(TopLayerAttr);
+        if (!string.IsNullOrEmpty(raw) &&
+            int.TryParse(raw, System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out int order))
+            return order;
+        return null;
     }
 
     /// <summary>

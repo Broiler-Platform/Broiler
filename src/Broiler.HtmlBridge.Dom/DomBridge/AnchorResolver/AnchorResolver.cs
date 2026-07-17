@@ -49,6 +49,21 @@ public sealed partial class DomBridge
     internal bool NativeVisualViewport { get; set; }
 
     /// <summary>
+    /// Phase 5 native dialog/backdrop track — top-layer paint. When on, the bridge stamps a
+    /// benign <c>data-broiler-top-layer</c> order marker on open modal dialogs, open popovers,
+    /// and synthesized <c>::backdrop</c>s (<c>Dialogs.cs</c>). The Broiler.Layout
+    /// <c>FragmentTreeBuilder</c> projects it to <see cref="Broiler.Layout.IR.Fragment.TopLayerOrder"/>,
+    /// and the renderer's native top-layer paint pass (<c>PaintWalker.PaintTopLayer</c>) paints
+    /// those boxes above every ordinary stacking context — the correct CSS Position 4 §top-layer
+    /// behaviour, replacing the bridge's approximate very-large-z-index emulation. Off by default:
+    /// the marker is inert until the renderer's native-top-layer paint patch is applied (the
+    /// pinned <c>PaintWalker</c> never reads the projected order), so stamping stays gated to the
+    /// native render path (the WPT runner enables it alongside <see cref="NativeAnchorPlacement"/>)
+    /// and the default/production serialization is unchanged.
+    /// </summary>
+    internal bool NativeTopLayer { get; set; }
+
+    /// <summary>
     /// Resolves <c>anchor()</c> function values and inserts <c>::backdrop</c>
     /// placeholder elements for modal dialogs.  Must be called after script
     /// execution and before serialization.

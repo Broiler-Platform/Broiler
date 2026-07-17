@@ -8,6 +8,22 @@ public sealed partial class DomBridge
     // Dialog UA default positioning
     // -----------------------------------------------------------------
 
+    // CSS Position 4 §top-layer: benign marker the renderer's native top-layer paint pass keys
+    // on (Broiler.Layout FragmentTreeBuilder → Fragment.TopLayerOrder → PaintWalker.PaintTopLayer).
+    // The attribute value is the element's top-layer order; a later-added element (higher order)
+    // paints over an earlier one. Stamping it lets the native pass paint modal dialogs, open
+    // popovers, and ::backdrops above every ordinary stacking context — the correct top-layer
+    // behaviour, replacing the approximate very-large-z-index emulation below. Inert until the
+    // renderer's native-top-layer paint patch lands (the pinned PaintWalker never reads the
+    // projected order), so stamping it is safe on the current baked path.
+    private const string TopLayerOrderAttr = "data-broiler-top-layer";
+
+    private void StampTopLayerOrder(DomElement el, int order) =>
+        SetAttr(el, TopLayerOrderAttr, order.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    private static int TopLayerOrderOf(DomElement el) =>
+        GetElementRuntimeState(el).Dialog.TopLayerOrder.TryGet(out var o) && o is int oi ? oi : 0;
+
     /// <summary>
     /// Applies the UA default <c>position: fixed</c> to modal dialog elements
     /// that don't already have an explicit position, matching browser behaviour
@@ -25,6 +41,11 @@ public sealed partial class DomBridge
                 continue;
             if (!(GetElementRuntimeState(el).Dialog.Modal.TryGet(out var m) && m is true))
                 continue;
+
+            // Mark the open modal dialog as a top-layer box (native paint reads this; inert on
+            // the baked path). Independent of the position-fixed default applied below.
+            if (NativeTopLayer)
+                StampTopLayerOrder(el, TopLayerOrderOf(el));
 
             // Check if position is already set (inline or CSS).
             // position:absolute dialogs keep their author position so that
@@ -79,8 +100,15 @@ public sealed partial class DomBridge
             // Elevate into the synthetic top layer, ordered by show order, so the
             // popover paints above non-top-layer content (e.g. a plain
             // position:fixed sibling) and later popovers paint over earlier ones.
-            int order = GetElementRuntimeState(el).Dialog.TopLayerOrder.TryGet(out var o) && o is int oi ? oi : 0;
+            // The very-large z-index is the approximate emulation used on the baked
+            // render path; the native top-layer paint pass keys on the marker below
+            // instead (and ignores the z-index, since a marked box is lifted out of
+            // normal stacking). Keeping both makes the marker a no-op fallback until
+            // the native-top-layer paint patch lands.
+            int order = TopLayerOrderOf(el);
             InlineStyle(el)["z-index"] = (TopLayerZIndexBase + order).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (NativeTopLayer)
+                StampTopLayerOrder(el, order);
         }
     }
     // -----------------------------------------------------------------
@@ -131,6 +159,12 @@ public sealed partial class DomBridge
             var backdrop = CreateBridgeElement("div");
             foreach (var kv in backdropStyle)
                 InlineStyle(backdrop)[kv.Key] = kv.Value;
+            // Mark the ::backdrop as top-layer with its element's order. It is inserted just
+            // before the dialog/popover below, so the native pass's document-order tiebreak
+            // paints it directly beneath its element yet above ordinary page content (inert on
+            // the baked path, where the fixed viewport-covering div stacks in DOM order).
+            if (NativeTopLayer)
+                StampTopLayerOrder(backdrop, TopLayerOrderOf(dialog));
             SetParent(backdrop, parent);
 
             int idx = ChildIndexOf(parent, dialog);

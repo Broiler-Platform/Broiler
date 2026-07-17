@@ -41,6 +41,18 @@ public sealed class Fragment
     /// <summary>Stack level (z-index or implicit order).</summary>
     public int StackLevel { get; init; }
 
+    /// <summary>
+    /// Top-layer order (CSS Position 4 §top-layer) — non-null when this fragment's box is in
+    /// the top layer (an open modal <c>&lt;dialog&gt;</c>, an open popover, or a synthesized
+    /// <c>::backdrop</c>). Top-layer fragments paint above every ordinary stacking context in a
+    /// final root-level pass ordered by this value (a later-added element paints over an earlier
+    /// one), instead of participating in normal in-tree stacking. Null for ordinary fragments.
+    /// The value is projected from the bridge's <c>data-broiler-top-layer</c> marker; it lets the
+    /// paint replace the bridge's approximate very-large-z-index top-layer emulation with a real
+    /// top-layer pass (HtmlBridge Phase 5 native dialog/backdrop track).
+    /// </summary>
+    public int? TopLayerOrder { get; init; }
+
     /// <summary>Whether this fragment or one of its ancestors establishes a transformed containing block.</summary>
     public bool HasTransformAncestor { get; init; }
 

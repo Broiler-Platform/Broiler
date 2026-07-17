@@ -3045,8 +3045,29 @@ remove the corresponding bridge bake, confirm the 7 reftests + unit tests stay g
 0001+0002 applied+pinned; bridge `display:block` bake deleted). Slice 1b (native dialog **box chrome** + the
 shorthand-vs-longhand origin-precedence cascade fix — the resolution of blocker B) is **done and end-to-end
 validated, shipped as patches 0003+0004** — landing the box-chrome bake deletion once a maintainer applies them.
-Remaining: modal centering / `position:fixed`, native `::backdrop` box-generation, and native top-layer paint
-(all Broiler.HTML). Each further slice deletes a further piece of `Dialogs.cs`.
+Slice 1c (native **top-layer paint**) is **done and end-to-end validated (patch 0010 + main-repo IR/marker)**
+— see the landing note below. Remaining: modal centering / `position:fixed` and native `::backdrop`
+box-generation (Broiler.HTML). Each further slice deletes a further piece of `Dialogs.cs`.
+
+**Landed (2026-07-17) — (a) native top-layer paint (slice 1c, patch 0010 + main-repo IR/marker).** The
+bridge emulated the top layer approximately — a very-large `z-index` (`TopLayerZIndexBase` = 2e9 + show
+order) on open popovers, and modal dialogs left as plain `position:fixed` (which paint in the
+`fixedNoZIndex` band, *beneath* in-flow content — a latent mis-stack). This slice replaces that with a real
+top-layer paint pass. Split, mostly main-repo: the layout IR gains `Fragment.TopLayerOrder` (nullable),
+projected by `FragmentTreeBuilder` from a benign `data-broiler-top-layer` order the bridge stamps on open
+modal dialogs, open popovers, and synthesized `::backdrop`s (`Dialogs.cs`, gated on the new
+`DomBridge.NativeTopLayer` flag — off in production, enabled by the WPT runner alongside
+`NativeAnchorPlacement`). Patch 0010 (`Broiler.HTML`) is the paint consumption: `PaintWalker.PaintFragment`
+skips a `TopLayerOrder != null` fragment in normal traversal, and a new `PaintWalker.PaintTopLayer` (called
+from `Paint` after the whole tree) paints them last, ordered by top-layer order (document order breaks ties,
+so a `::backdrop` inserted before its dialog paints directly beneath it), with the fixed viewport offset —
+a no-op when nothing is in the top layer. Validated: with 0010 applied + the flag on, the css-anchor-position
+corpus stays 33/6/1 and all 7 `anchor-position-top-layer-*` reftests pass at 99.9–100% (avg 98.76%, marginally
+above the 98.73% baseline) — pixel-parity with the emulation, zero regression; and on the committed/CI state
+(patch not applied) the marker is inert (the pinned `PaintWalker` never reads `TopLayerOrder`) so the retained
+z-index emulation still drives the top layer and the corpus is byte-identical. Covered by
+`TopLayerFragmentProjectionTests`. Follow-up once 0010 is applied and the pointer bumped: delete the
+`ApplyPopoverUAPositioning` z-index write the pass supersedes.
 
 ---
 

@@ -2058,7 +2058,7 @@ internal sealed partial class WptTestRunner
             // Even with no inline scripts, we still need to process anchor
             // positioning, animation snapshots, etc. via the DomBridge.
             using var context2 = new JSContext();
-            var bridge2 = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement };
+            var bridge2 = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement };
             bridge2.Attach(context2, html, url);
             // Inject browser API stubs so onload handlers etc. can reference them.
             try { context2.Eval(BrowserApiStubs); } catch { /* best-effort */ }
@@ -2071,7 +2071,7 @@ internal sealed partial class WptTestRunner
         }
 
         using var context = new JSContext();
-        var bridge = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement };
+        var bridge = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement };
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
         {
