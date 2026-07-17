@@ -18,20 +18,6 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsRegistrationElementFromPoint011Core(in Arguments a)
-    {
-        var hit = HitTestDocumentPoint(DocumentElement, GetCoordinateArgument(a, 0), GetCoordinateArgument(a, 1)).FirstOrDefault();
-        return hit != null ? ToJSObject(hit) : JSNull.Value;
-    }
-
-
-    private JSValue JsRegistrationElementsFromPoint012Core(in Arguments a)
-    {
-        var hits = HitTestDocumentPoint(DocumentElement, GetCoordinateArgument(a, 0), GetCoordinateArgument(a, 1));
-        return new JSArray([.. hits.Select(ToJSObject)]);
-    }
-
-
     // MutationObserver observe()/disconnect() callbacks moved to the Phase 3
     // MutationObserverBinding feature module (Broiler.HtmlBridge.Dom.Features).
 

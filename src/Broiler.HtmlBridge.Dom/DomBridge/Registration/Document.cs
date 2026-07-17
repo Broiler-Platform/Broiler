@@ -33,8 +33,10 @@ public sealed partial class DomBridge
         document.FastAddValue((KeyString)"getElementsByClassName", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.GetElementsByClassName(this, in a), "getElementsByClassName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"querySelector", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.QuerySelector(this, in a), "querySelector", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"querySelectorAll", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.QuerySelectorAll(this, in a), "querySelectorAll", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"elementFromPoint", new JSFunction(JsRegistrationElementFromPoint011Core, "elementFromPoint", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"elementsFromPoint", new JSFunction(JsRegistrationElementsFromPoint012Core, "elementsFromPoint", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.elementFromPoint / elementsFromPoint (hit-testing), co-located in the HitTestBinding
+        // feature module (Phase 3).
+        document.FastAddValue((KeyString)"elementFromPoint", new JSFunction((in a) => Dom.Features.HitTestBinding.ElementFromPoint(this, in a), "elementFromPoint", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"elementsFromPoint", new JSFunction((in a) => Dom.Features.HitTestBinding.ElementsFromPoint(this, in a), "elementsFromPoint", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.getAnimations() — minimal Web Animations API support used by WPT.
         document.FastAddValue((KeyString)"getAnimations", new JSFunction((in _) => BuildAnimationList(null), "getAnimations", 0), JSPropertyAttributes.EnumerableConfigurableValue);

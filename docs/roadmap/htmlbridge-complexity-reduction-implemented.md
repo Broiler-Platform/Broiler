@@ -1050,7 +1050,21 @@ three-callbacks-moved-off-bridge guards + a characterization — `scrollTo(0,100
 architecture-guard suites pass (19+), including the GoogleSearchPolyfill `Window_Scroll_APIs_Update_Root_Scroll_
 Offsets_And_VisualViewport` oracle; `Broiler.HtmlBridge.Dom` builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.35 named-accessor / relocated-infra /
+Status: **P3.36 completed** 2026-07-17 (same branch) — the **`document` point hit-testing methods**.
+`HitTestBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates `document.elementFromPoint` (topmost
+element at a coordinate, or `null`) and `document.elementsFromPoint` (the front-to-back stack) — was the bridge's
+`JsRegistrationElementFromPoint011Core`/`ElementsFromPoint012Core`. The document root, wrapper factory and the
+point hit-test (`HitTestDocumentPoint`) are reached through the three-member `IHitTestHost` contract
+(`DomBridge.HitTestHost.cs`, explicit interface members); coordinate parsing uses the bridge's neutral
+`internal static` `GetCoordinateArgument` (the same helper `SubDocumentBinding` already calls). `Registration/
+Document.cs` now registers `Dom.Features.HitTestBinding.<Op>(this, in a)`; the callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (126 → 112 lines). Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/HitTestBindingModuleTests.cs` (co-location / host-contract /
+two-callbacks-moved-off-bridge guards + a positional characterization — a 100×100 absolute box at the origin is
+returned by `elementFromPoint(50,50)` and appears in the `elementsFromPoint(50,50)` stack — through the bridge).
+Regression check: the architecture-guard suite passes (17); `Broiler.HtmlBridge.Dom` builds clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.36 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
