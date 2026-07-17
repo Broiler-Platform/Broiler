@@ -56,7 +56,7 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"alert", new JSFunction(JsRegistrationAlert076Core, "alert", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // console object (shared between window.console and global console)
-        var console = BuildConsoleObject();
+        var console = Dom.Features.ConsoleBinding.Build();
         window.FastAddValue((KeyString)"console", console, JSPropertyAttributes.EnumerableConfigurableValue);
 
         return console;

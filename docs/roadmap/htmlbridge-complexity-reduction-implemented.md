@@ -759,7 +759,22 @@ environmental failures → zero regressions. **This completes the Frames feature
 `BrowsingContextManager` (P3.16), the sub-document object in `SubDocumentBinding` (P3.13), the sub-window object
 in `SubWindowBinding` (P3.17), and the window-resolution behaviour in `WindowContextManager` (P3.18).
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.18 named-accessor / relocated-infra /
+Status: **P3.19 completed** 2026-07-17 (branch `claude/htmlbridge-complexity-reduction-sdrzwp`) — the **`console`
+API**, and the first slice peeled off the 1184-line `JsFunctionCallbacks/Registration.cs` grab-bag. `ConsoleBinding`
+(namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the whole feature — the `console` object builder (was the
+bridge's `BuildConsoleObject` in `Registration/Console.cs`) and its four sinks `log`/`warn`/`error`/`info` (renamed
+from the numbered `JsRegistrationLog156…Info159Core`, moved out of the shared registration grab-bag). It formats
+its arguments and routes them to `RenderLogger`, touching **no bridge instance state**, so — like `ClassListBinding`
+(P3.6) — it is a pure static class with **no host contract**; the identical per-sink arg-formatting collapsed into
+one `Format(in Arguments)` helper. The single registration site (`Registration/Window.cs`) now calls
+`Dom.Features.ConsoleBinding.Build()`; `Registration/Console.cs` is deleted and the four callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (1184 → 1144 lines — still ratcheted debt, but shrinking). Behaviour-preserving;
+no public-API change (module internal). Tests: `Broiler.Cli.Tests/ConsoleBindingModuleTests.cs` (co-location /
+callbacks-moved-off-bridge guards + a `log`/`warn`/`error`/`info` return-undefined + `typeof` characterization
+through the bridge). Regression check: the full `HtmlBridgeArchitectureGuardTests` (14) and the line-limit guard pass;
+`Broiler.HtmlBridge.Dom` builds clean; no production reference to the removed symbols remains.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.19 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

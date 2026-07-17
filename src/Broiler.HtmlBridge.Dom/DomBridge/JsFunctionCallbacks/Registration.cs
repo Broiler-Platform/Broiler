@@ -1141,44 +1141,4 @@ public sealed partial class DomBridge
         return ready;
     }
 
-
-    private static JSValue JsRegistrationLog156Core(in Arguments a)
-    {
-        var parts = new List<string>();
-        for (var i = 0; i < a.Length; i++)
-            parts.Add(a[i]?.ToString() ?? "undefined");
-        RenderLogger.LogDebug(LogCategory.JavaScript, "console.log", string.Join(" ", parts));
-        return JSUndefined.Value;
-    }
-
-
-    private static JSValue JsRegistrationWarn157Core(in Arguments a)
-    {
-        var parts = new List<string>();
-        for (var i = 0; i < a.Length; i++)
-            parts.Add(a[i]?.ToString() ?? "undefined");
-        RenderLogger.Log(LogCategory.JavaScript, LogLevel.Warning, "console.warn", string.Join(" ", parts));
-        return JSUndefined.Value;
-    }
-
-
-    private static JSValue JsRegistrationError158Core(in Arguments a)
-    {
-        var parts = new List<string>();
-        for (var i = 0; i < a.Length; i++)
-            parts.Add(a[i]?.ToString() ?? "undefined");
-        RenderLogger.Log(LogCategory.JavaScript, LogLevel.Error, "console.error", string.Join(" ", parts));
-        return JSUndefined.Value;
-    }
-
-
-    private static JSValue JsRegistrationInfo159Core(in Arguments a)
-    {
-        var parts = new List<string>();
-        for (var i = 0; i < a.Length; i++)
-            parts.Add(a[i]?.ToString() ?? "undefined");
-        RenderLogger.LogDebug(LogCategory.JavaScript, "console.info", string.Join(" ", parts));
-        return JSUndefined.Value;
-    }
-
 }
