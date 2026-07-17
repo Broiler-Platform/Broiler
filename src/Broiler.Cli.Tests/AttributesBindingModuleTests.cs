@@ -13,6 +13,13 @@ namespace Broiler.Cli.Tests;
 /// style, inline event handlers, style invalidation, mutation records) through the narrow
 /// <see cref="IAttributesHost"/> contract. The characterizations exercise the extracted feature
 /// end-to-end through the bridge with no layout dependency.
+///
+/// P3.42 folds the element-facing attribute methods themselves — <c>getAttribute</c>/
+/// <c>setAttribute</c>/<c>hasAttribute</c>/<c>removeAttribute</c>/<c>toggleAttribute</c>, the
+/// <c>*AttributeNode</c> variants and every <c>*NS</c> variant — into the same module (they were the
+/// bridge's <c>JsJsObjectsSetAttribute027Core</c>..<c>HasAttributeNS072Core</c> callbacks), as the
+/// module's doc comment always intended ("the element's own getAttribute/setAttribute/… methods …
+/// delegate their write and Attr-node construction here").
 /// </summary>
 public sealed class AttributesBindingModuleTests
 {
@@ -132,5 +139,55 @@ public sealed class AttributesBindingModuleTests
         // value) as the mutation record's oldValue — behaviour preserved by the extraction.
         var seen = context.Eval("window._seen");
         Assert.Equal("data-k=;data-k=v1;", seen.ToString());
+    }
+
+    [Fact]
+    public void Element_Attribute_Callbacks_Moved_Off_The_Bridge()
+    {
+        var bridge = typeof(DomBridge);
+        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+        foreach (var name in new[]
+                 {
+                     "JsJsObjectsSetAttribute027Core", "JsJsObjectsGetAttribute028Core",
+                     "JsJsObjectsGetAttributeNode029Core", "JsJsObjectsGetAttributeNodeNS030Core",
+                     "JsJsObjectsHasAttribute060Core", "JsJsObjectsRemoveAttribute063Core",
+                     "JsJsObjectsToggleAttribute064Core", "JsJsObjectsSetAttributeNode065Core",
+                     "JsJsObjectsSetAttributeNodeNS066Core", "JsJsObjectsRemoveAttributeNode067Core",
+                     "JsJsObjectsRemoveAttributeNodeNS068Core", "JsJsObjectsSetAttributeNS069Core",
+                     "JsJsObjectsGetAttributeNS070Core", "JsJsObjectsRemoveAttributeNS071Core",
+                     "JsJsObjectsHasAttributeNS072Core",
+                 })
+        {
+            Assert.Null(bridge.GetMethod(name, all));
+        }
+    }
+
+    [Fact]
+    public void Element_Attribute_Methods_Flow_Through_The_Module()
+    {
+        const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "https://example.com/index.html");
+
+        var result = context.Eval("""
+            (() => {
+                var d = document.getElementById('d');
+                var t1 = d.toggleAttribute('hidden');   // add -> true
+                var t2 = d.toggleAttribute('hidden');   // remove -> false
+                d.setAttribute('data-a', '7');
+                var node = d.getAttributeNode('data-a');
+                d.setAttributeNS('urn:x', 'x:foo', 'bar');
+                var ns1 = d.getAttributeNS('urn:x', 'foo');
+                var has = d.hasAttributeNS('urn:x', 'foo');
+                d.removeAttributeNS('urn:x', 'foo');
+                var has2 = d.hasAttributeNS('urn:x', 'foo');
+                return t1 + '|' + t2 + '|' + node.name + '=' + node.value + '|' +
+                       ns1 + '|' + has + '|' + has2;
+            })()
+            """);
+
+        Assert.Equal("true|false|data-a=7|bar|true|false", result.ToString());
     }
 }

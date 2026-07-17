@@ -183,20 +183,20 @@ public sealed partial class DomBridge
         // setAttribute(name, value)
         var bridgeForSet = this;
         obj.FastAddValue((KeyString)"setAttribute",
-            new JSFunction((in a) => JsJsObjectsSetAttribute027Core(bridgeForSet, element, in a), "setAttribute", 2),
+            new JSFunction((in a) => _attributes.SetAttribute(element, in a), "setAttribute", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getAttribute(name)
         obj.FastAddValue((KeyString)"getAttribute",
-            new JSFunction((in a) => JsJsObjectsGetAttribute028Core(element, in a), "getAttribute", 1),
+            new JSFunction((in a) => _attributes.GetAttribute(element, in a), "getAttribute", 1),
              JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"getAttributeNode",
-            new JSFunction((in a) => JsJsObjectsGetAttributeNode029Core(element, obj, in a), "getAttributeNode", 1),
+            new JSFunction((in a) => _attributes.GetAttributeNode(element, obj, in a), "getAttributeNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"getAttributeNodeNS",
-            new JSFunction((in a) => JsJsObjectsGetAttributeNodeNS030Core(element, obj, in a), "getAttributeNodeNS", 2),
+            new JSFunction((in a) => _attributes.GetAttributeNodeNS(element, obj, in a), "getAttributeNodeNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- DOM tree navigation --
@@ -326,7 +326,7 @@ public sealed partial class DomBridge
 
         // hasAttribute(name)
         obj.FastAddValue((KeyString)"hasAttribute",
-            new JSFunction((in a) => JsJsObjectsHasAttribute060Core(element, in a), "hasAttribute", 1),
+            new JSFunction((in a) => _attributes.HasAttribute(element, in a), "hasAttribute", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // hasAttributes()
@@ -341,48 +341,48 @@ public sealed partial class DomBridge
 
         // removeAttribute(name)
         obj.FastAddValue((KeyString)"removeAttribute",
-            new JSFunction((in a) => JsJsObjectsRemoveAttribute063Core(bridgeForSet, element, in a), "removeAttribute", 1),
+            new JSFunction((in a) => _attributes.RemoveAttribute(element, in a), "removeAttribute", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // toggleAttribute(name, force)
         obj.FastAddValue((KeyString)"toggleAttribute",
-            new JSFunction((in a) => JsJsObjectsToggleAttribute064Core(element, in a), "toggleAttribute", 2),
+            new JSFunction((in a) => _attributes.ToggleAttribute(element, in a), "toggleAttribute", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"setAttributeNode",
-            new JSFunction((in a) => JsJsObjectsSetAttributeNode065Core(element, obj, in a), "setAttributeNode", 1),
+            new JSFunction((in a) => _attributes.SetAttributeNode(element, obj, in a), "setAttributeNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"setAttributeNodeNS",
-            new JSFunction((in a) => JsJsObjectsSetAttributeNodeNS066Core(element, obj, in a), "setAttributeNodeNS", 1),
+            new JSFunction((in a) => _attributes.SetAttributeNodeNS(element, obj, in a), "setAttributeNodeNS", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"removeAttributeNode",
-            new JSFunction((in a) => JsJsObjectsRemoveAttributeNode067Core(element, obj, in a), "removeAttributeNode", 1),
+            new JSFunction((in a) => _attributes.RemoveAttributeNode(element, obj, in a), "removeAttributeNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"removeAttributeNodeNS",
-            new JSFunction((in a) => JsJsObjectsRemoveAttributeNodeNS068Core(element, obj, in a), "removeAttributeNodeNS", 1),
+            new JSFunction((in a) => _attributes.RemoveAttributeNodeNS(element, obj, in a), "removeAttributeNodeNS", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // setAttributeNS(namespace, qualifiedName, value)
         obj.FastAddValue((KeyString)"setAttributeNS",
-            new JSFunction((in a) => JsJsObjectsSetAttributeNS069Core(bridgeForSet, element, in a), "setAttributeNS", 3),
+            new JSFunction((in a) => _attributes.SetAttributeNS(element, in a), "setAttributeNS", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getAttributeNS(namespace, localName)
         obj.FastAddValue((KeyString)"getAttributeNS",
-            new JSFunction((in a) => JsJsObjectsGetAttributeNS070Core(element, in a), "getAttributeNS", 2),
+            new JSFunction((in a) => _attributes.GetAttributeNS(element, in a), "getAttributeNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // removeAttributeNS(namespace, localName)
         obj.FastAddValue((KeyString)"removeAttributeNS",
-            new JSFunction((in a) => JsJsObjectsRemoveAttributeNS071Core(bridgeForSet, element, in a), "removeAttributeNS", 2),
+            new JSFunction((in a) => _attributes.RemoveAttributeNS(element, in a), "removeAttributeNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // hasAttributeNS(namespace, localName)
         obj.FastAddValue((KeyString)"hasAttributeNS",
-            new JSFunction((in a) => JsJsObjectsHasAttributeNS072Core(element, in a), "hasAttributeNS", 2),
+            new JSFunction((in a) => _attributes.HasAttributeNS(element, in a), "hasAttributeNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // contains(otherNode) — returns true if otherNode is a descendant

@@ -1152,7 +1152,27 @@ Regression check: the DOM node/DomBridge/JsObjects suites pass (210); the five f
 identically at the P3.40 baseline — pre-existing layout/rendering-environment failures, not regressions.
 `Broiler.HtmlBridge.Dom` builds clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.41 named-accessor / relocated-infra /
+Status: **P3.42 completed** 2026-07-17 (same branch) — the **element-facing attribute methods**, the third slice
+off `JsFunctionCallbacks/JsObjects.cs`, folded into the **existing** `AttributesBinding` module (P3.12) rather than a
+new one: the module's doc comment always stated the element's own `getAttribute`/`setAttribute`/… methods "delegate
+their write and Attr-node construction here", and this closes that loop. The 15 callbacks —
+`getAttribute`/`setAttribute`/`hasAttribute`/`removeAttribute`/`toggleAttribute`, the `getAttributeNode`/
+`setAttributeNode`/`removeAttributeNode` (+`NS`) Attr-node variants and every `*AttributeNS` variant (was the
+bridge's `JsJsObjectsSetAttribute027Core`..`HasAttributeNS072Core`) — become `internal` instance methods on
+`AttributesBinding`, reusing its `_host` (`IAttributesHost`: `ApplyStyleAttribute`, `CompileInlineEventAttribute`,
+`InvalidateStyleScope`, `NotifyAttributeMutationObservers`) and its own write path — `setAttribute`/`removeAttribute`
+and their NS forms were byte-for-byte identical to the module's `SetAttributeLikeSetAttribute`/`RemoveAttribute…`
+helpers, so they now delegate to them (a net simplification). The low-level scans (`TryGetAttribute`/`SetAttr`/
+`RemoveAttr`/`HasAttr`/`TryGetNsAttribute`) stay the bridge's `internal static` helpers, called qualified. The
+element-path registration block in `JsObjects.cs` now calls `_attributes.<Op>(element[, obj], in a)`; the callbacks
+are gone from `JsFunctionCallbacks/JsObjects.cs` (1311 → 1087 lines). No new files, no new host surface;
+behaviour-preserving; no public-API change. Tests: `AttributesBindingModuleTests` extended with the
+fifteen-callbacks-moved-off-bridge guard and an end-to-end characterization (`toggleAttribute` add/remove,
+`getAttributeNode` name/value, `setAttributeNS`/`getAttributeNS`/`hasAttributeNS`/`removeAttributeNS` round-trip
+through the bridge). Regression check: the architecture-guard + attribute/namespace/toggle suites pass (126);
+`Broiler.HtmlBridge.Dom` builds clean (0 warnings).
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.42 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
