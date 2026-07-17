@@ -291,11 +291,8 @@ public sealed partial class DomBridge
 
     private void RegisterSecurityAndConstructorPolyfills(JSContext context, JSObject window)
     {
-        // TODO-G18: window.crypto.getRandomValues() — cryptographically secure
-        var cryptoObj = new JSObject();
-        cryptoObj.FastAddValue((KeyString)"getRandomValues", new JSFunction(JsRegistrationGetRandomValues150Core, "getRandomValues", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        cryptoObj.FastAddValue((KeyString)"randomUUID", new JSFunction((in _) => new JSString(Guid.NewGuid().ToString()), "randomUUID", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
+        // window.crypto — the getRandomValues/randomUUID subset (Phase 3: co-located CryptoBinding module)
+        var cryptoObj = Dom.Features.CryptoBinding.Build();
         window.FastAddValue((KeyString)"crypto", cryptoObj, JSPropertyAttributes.EnumerableConfigurableValue);
         context["crypto"] = cryptoObj;
 

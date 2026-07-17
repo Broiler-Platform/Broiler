@@ -1093,28 +1093,6 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationGetRandomValues150Core(in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSUndefined.Value;
-        var arr = a[0];
-        if (arr is JSObject arrObj)
-        {
-            var lengthProp = arrObj[(KeyString)"length"];
-            if (lengthProp != null && !lengthProp.IsUndefined && !lengthProp.IsNull)
-            {
-                var len = (int)lengthProp.DoubleValue;
-                var buffer = new byte[len];
-                System.Security.Cryptography.RandomNumberGenerator.Fill(buffer);
-                for (var i = 0; i < len; i++)
-                    arrObj[(KeyString)i.ToString()] = new JSNumber(buffer[i]);
-            }
-        }
-
-        return arr;
-    }
-
-
     private static JSValue JsRegistrationGetCurrentTime152Core(DomElement element, in Arguments _)
     {
         if (GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.TryGet(out var value) && value is double currentTimeMs)

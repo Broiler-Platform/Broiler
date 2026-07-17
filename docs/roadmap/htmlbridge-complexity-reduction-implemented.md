@@ -774,7 +774,20 @@ callbacks-moved-off-bridge guards + a `log`/`warn`/`error`/`info` return-undefin
 through the bridge). Regression check: the full `HtmlBridgeArchitectureGuardTests` (14) and the line-limit guard pass;
 `Broiler.HtmlBridge.Dom` builds clean; no production reference to the removed symbols remains.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.19 named-accessor / relocated-infra /
+Status: **P3.20 completed** 2026-07-17 (same branch) — the **Web Crypto `crypto` subset**, the second
+slice off the registration grab-bag. `CryptoBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the
+`crypto` object builder (`getRandomValues` + `randomUUID`) and the `getRandomValues` callback (was the bridge's
+`JsRegistrationGetRandomValues150Core`, inline `crypto`-object construction in the bridge's
+`RegisterSecurityAndConstructorPolyfills`). Like `ConsoleBinding` it fills a caller-supplied typed array with
+`RandomNumberGenerator` bytes and mints UUIDs, touching **no bridge instance state**, so it is a pure static class
+with **no host contract**. `Registration/Polyfills.cs` now calls `Dom.Features.CryptoBinding.Build()`; the callback
+is gone from `JsFunctionCallbacks/Registration.cs`. Behaviour-preserving; no public-API change (module internal).
+Tests: `Broiler.Cli.Tests/CryptoBindingModuleTests.cs` (co-location / callback-moved-off-bridge guards + a
+`getRandomValues` fills-in-place-and-returns-same-array + `randomUUID` v4-shape characterization through the bridge).
+Regression check: `Broiler.HtmlBridge.Dom` builds clean; the Console/Crypto module suites and the line-limit guard
+pass; no production reference to the removed callback remains.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.20 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
