@@ -501,68 +501,6 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsRegistrationGetForms050Core(in Arguments _)
-    {
-        var results = new List<JSValue>();
-        foreach (var el in Elements)
-        {
-            if (string.Equals(el.TagName, "form", StringComparison.OrdinalIgnoreCase))
-                results.Add(ToJSObject(el));
-        }
-
-        var arr = new JSArray(results);
-        // Add named access: forms with a 'name' attribute can be
-        // accessed as properties of the collection.
-        foreach (var el in Elements)
-        {
-            if (string.Equals(el.TagName, "form", StringComparison.OrdinalIgnoreCase))
-            {
-                if (TryGetAttribute(el, "name", out var formName) && !string.IsNullOrEmpty(formName))
-                    arr.FastAddValue((KeyString)formName, ToJSObject(el), JSPropertyAttributes.EnumerableConfigurableValue);
-            }
-        }
-
-        return arr;
-    }
-
-
-    private JSValue JsRegistrationGetImages053Core(in Arguments _)
-    {
-        var results = new List<JSValue>();
-        foreach (var el in Elements)
-        {
-            if (string.Equals(el.TagName, "img", StringComparison.OrdinalIgnoreCase))
-                results.Add(ToJSObject(el));
-        }
-
-        return new JSArray(results);
-    }
-
-
-    private JSValue JsRegistrationGetLinks054Core(in Arguments _)
-    {
-        var results = new List<JSValue>();
-        CollectLinksInTreeOrder(DocumentElement, results);
-        return new JSArray(results);
-    }
-
-
-    private JSValue JsRegistrationGetStyleSheets055Core(in Arguments _)
-    {
-        var styleEls = new List<DomElement>();
-        foreach (var el in Elements)
-        {
-            if (string.Equals(el.TagName, "style", StringComparison.OrdinalIgnoreCase))
-                styleEls.Add(el);
-        }
-
-        var arr = new JSArray();
-        foreach (var styleEl in styleEls)
-            arr.Add(BuildStyleSheetObject(styleEl));
-        return arr;
-    }
-
-
     private JSValue JsRegistrationCreateDocumentType057Core(JSContext context, in Arguments a)
     {
         if (a.Length < 3)

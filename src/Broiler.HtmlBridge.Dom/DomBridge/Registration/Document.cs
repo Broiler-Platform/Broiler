@@ -100,7 +100,7 @@ public sealed partial class DomBridge
         document.FastAddValue((KeyString)"insertBefore", new JSFunction((in a) => JsRegistrationInsertBefore049Core(docNodeForMutation, in a), "insertBefore", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.forms — collection of all <form> elements with named access
-        document.FastAddProperty((KeyString)"forms", new JSFunction(JsRegistrationGetForms050Core, "get forms"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"forms", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetForms(this, in a), "get forms"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.createElementNS(namespace, tagName)  — DocumentFactoryBinding (Phase 3)
         document.FastAddValue((KeyString)"createElementNS", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateElementNS(this, context, in a), "createElementNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -109,14 +109,14 @@ public sealed partial class DomBridge
         document.FastAddValue((KeyString)"createAttributeNS", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateAttributeNS(this, context, in a), "createAttributeNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.images — collection of all <img> elements
-        document.FastAddProperty((KeyString)"images", new JSFunction(JsRegistrationGetImages053Core, "get images"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"images", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetImages(this, in a), "get images"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.links — collection of all <a> and <area> elements with href
         // Uses tree-order traversal so dynamically appended elements are reflected.
-        document.FastAddProperty((KeyString)"links", new JSFunction(JsRegistrationGetLinks054Core, "get links"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"links", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetLinks(this, in a), "get links"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.styleSheets — collection of stylesheet objects for main document
-        document.FastAddProperty((KeyString)"styleSheets", new JSFunction(JsRegistrationGetStyleSheets055Core, "get styleSheets"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"styleSheets", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetStyleSheets(this, in a), "get styleSheets"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.open() — for main document
         document.FastAddValue((KeyString)"open", new JSFunction((in _) => document, "open", 0), JSPropertyAttributes.EnumerableConfigurableValue);

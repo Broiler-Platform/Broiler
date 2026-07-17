@@ -888,7 +888,24 @@ through the bridge). Regression check: the DocumentQuery, Selectors/CSSOM, HtmlD
 `:lang` selector failure — verified failing identically at the pre-change baseline); `Broiler.HtmlBridge.Dom` builds
 clean.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.26 named-accessor / relocated-infra /
+Status: **P3.27 completed** 2026-07-17 (same branch) — the **`document` live-collection accessors**, the ninth
+slice off the registration grab-bag. `DocumentCollectionBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the four collection getters — `document.forms`, `document.images`, `document.links`,
+`document.styleSheets` (was `JsRegistrationGetForms050Core` etc.). Each scans the document for the relevant
+elements and returns a JS array of their wrappers (`forms` additionally exposes named access by the form's `name`
+attribute; `links` is `<a>`/`<area>` with `href`; `styleSheets` returns stylesheet objects). The document root,
+element list, wrapper factory, tree-order link collector (`CollectLinksInTreeOrder`) and stylesheet-object builder
+(`BuildStyleSheetObject`) are reached through the five-member `IDocumentCollectionHost` contract
+(`DomBridge.DocumentCollectionHost.cs`, explicit interface members); attribute reads use the bridge's neutral
+`internal static` `TryGetAttribute` directly. `Registration/Document.cs` now registers
+`Dom.Features.DocumentCollectionBinding.<Op>(this, in a)`; the callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (853 → 791 lines). Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/DocumentCollectionBindingModuleTests.cs` (co-location / host-contract /
+four-callbacks-moved-off-bridge guards + a collection characterization through the bridge — form count + named
+access, image count, href-only link count, stylesheet count). Regression check: the DocumentCollection, StyleSheet,
+Form, DOM-interface and architecture-guard suites pass (75); `Broiler.HtmlBridge.Dom` builds clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.27 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
