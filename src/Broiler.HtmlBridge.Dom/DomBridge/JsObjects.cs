@@ -268,20 +268,20 @@ public sealed partial class DomBridge
 
         // data (read/write) — for text nodes and comment nodes (alias for nodeValue/textContent)
         obj.FastAddProperty((KeyString)"data",
-            new JSFunction((in a) => JsJsObjectsGetData045Core(element, in a), "get data"),
-            new JSFunction((in a) => JsJsObjectsSetData046Core(bridge, element, in a), "set data"),
+            new JSFunction((in a) => Dom.Features.CharacterDataBinding.GetData(element, in a), "get data"),
+            new JSFunction((in a) => Dom.Features.CharacterDataBinding.SetData(this, element, in a), "set data"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // length (read-only) — character count for text/comment nodes, child count for elements
         obj.FastAddProperty((KeyString)"length",
-            new JSFunction((in a) => JsJsObjectsGetLength047Core(element, in a), "get length"),
+            new JSFunction((in a) => Dom.Features.CharacterDataBinding.GetLength(element, in a), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // splitText(offset) — splits a text node at the given character offset
         if (IsText(element))
         {
             obj.FastAddValue((KeyString)"splitText",
-                new JSFunction((in a) => JsJsObjectsSplitText048Core(element, in a), "splitText", 1),
+                new JSFunction((in a) => Dom.Features.CharacterDataBinding.SplitText(this, element, in a), "splitText", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
@@ -289,23 +289,23 @@ public sealed partial class DomBridge
         if (IsText(element) || IsComment(element))
         {
             obj.FastAddValue((KeyString)"substringData",
-                new JSFunction((in a) => JsJsObjectsSubstringData049Core(element, in a), "substringData", 2),
+                new JSFunction((in a) => Dom.Features.CharacterDataBinding.SubstringData(element, in a), "substringData", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             obj.FastAddValue((KeyString)"appendData",
-                new JSFunction((in a) => JsJsObjectsAppendData050Core(bridge, element, in a), "appendData", 1),
+                new JSFunction((in a) => Dom.Features.CharacterDataBinding.AppendData(this, element, in a), "appendData", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             obj.FastAddValue((KeyString)"deleteData",
-                new JSFunction((in a) => JsJsObjectsDeleteData051Core(bridge, element, in a), "deleteData", 2),
+                new JSFunction((in a) => Dom.Features.CharacterDataBinding.DeleteData(this, element, in a), "deleteData", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             obj.FastAddValue((KeyString)"insertData",
-                new JSFunction((in a) => JsJsObjectsInsertData052Core(bridge, element, in a), "insertData", 2),
+                new JSFunction((in a) => Dom.Features.CharacterDataBinding.InsertData(this, element, in a), "insertData", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             obj.FastAddValue((KeyString)"replaceData",
-                new JSFunction((in a) => JsJsObjectsReplaceData053Core(bridge, element, in a), "replaceData", 3),
+                new JSFunction((in a) => Dom.Features.CharacterDataBinding.ReplaceData(this, element, in a), "replaceData", 3),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
@@ -754,40 +754,40 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"data",
-            new JSFunction((in a) => JsJsObjectsGetData045Core(node, in a), "get data"),
-            new JSFunction((in a) => JsJsObjectsSetData046Core(bridge, node, in a), "set data"),
+            new JSFunction((in a) => Dom.Features.CharacterDataBinding.GetData(node, in a), "get data"),
+            new JSFunction((in a) => Dom.Features.CharacterDataBinding.SetData(this, node, in a), "set data"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"length",
-            new JSFunction((in a) => JsJsObjectsGetLength047Core(node, in a), "get length"),
+            new JSFunction((in a) => Dom.Features.CharacterDataBinding.GetLength(node, in a), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // splitText is Text-only (not on Comment).
         if (IsText(node))
         {
             obj.FastAddValue((KeyString)"splitText",
-                new JSFunction((in a) => JsJsObjectsSplitText048Core(node, in a), "splitText", 1),
+                new JSFunction((in a) => Dom.Features.CharacterDataBinding.SplitText(this, node, in a), "splitText", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         obj.FastAddValue((KeyString)"substringData",
-            new JSFunction((in a) => JsJsObjectsSubstringData049Core(node, in a), "substringData", 2),
+            new JSFunction((in a) => Dom.Features.CharacterDataBinding.SubstringData(node, in a), "substringData", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"appendData",
-            new JSFunction((in a) => JsJsObjectsAppendData050Core(bridge, node, in a), "appendData", 1),
+            new JSFunction((in a) => Dom.Features.CharacterDataBinding.AppendData(this, node, in a), "appendData", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"deleteData",
-            new JSFunction((in a) => JsJsObjectsDeleteData051Core(bridge, node, in a), "deleteData", 2),
+            new JSFunction((in a) => Dom.Features.CharacterDataBinding.DeleteData(this, node, in a), "deleteData", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"insertData",
-            new JSFunction((in a) => JsJsObjectsInsertData052Core(bridge, node, in a), "insertData", 2),
+            new JSFunction((in a) => Dom.Features.CharacterDataBinding.InsertData(this, node, in a), "insertData", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"replaceData",
-            new JSFunction((in a) => JsJsObjectsReplaceData053Core(bridge, node, in a), "replaceData", 3),
+            new JSFunction((in a) => Dom.Features.CharacterDataBinding.ReplaceData(this, node, in a), "replaceData", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- Tree navigation --

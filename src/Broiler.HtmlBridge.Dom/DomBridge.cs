@@ -327,7 +327,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     };
 
     /// <summary>Writes a text/comment node's character data (see <see cref="BridgeText"/>).</summary>
-    private static void SetBridgeText(DomNode node, string value)
+    internal static void SetBridgeText(DomNode node, string value)
     {
         if (node is DomCharacterData characterData)
             characterData.Data = value;
