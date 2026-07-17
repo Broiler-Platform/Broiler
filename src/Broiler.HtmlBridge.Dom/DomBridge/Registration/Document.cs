@@ -20,14 +20,11 @@ public sealed partial class DomBridge
         // standards mode so it's always the <html> element).
         document.FastAddProperty((KeyString)"scrollingElement", new JSFunction((in _) => ToJSObject(DocumentElement), "get scrollingElement"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // document.body (getter — first <body> child of documentElement)
-        document.FastAddProperty((KeyString)"body", new JSFunction(JsRegistrationGetBody002Core, "get body"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.head (getter — first <head> child of documentElement)
-        document.FastAddProperty((KeyString)"head", new JSFunction(JsRegistrationGetHead003Core, "get head"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.title (getter / setter)
-        document.FastAddProperty((KeyString)"title", new JSFunction((in a) => new JSString(Title), "get title"), new JSFunction(JsRegistrationSetTitle005Core, "set title"), JSPropertyAttributes.EnumerableConfigurableProperty);
+        // document structural accessors — body/head/title, co-located in the DocumentStructureBinding
+        // feature module (Phase 3).
+        document.FastAddProperty((KeyString)"body", new JSFunction((in a) => Dom.Features.DocumentStructureBinding.GetBody(this, in a), "get body"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"head", new JSFunction((in a) => Dom.Features.DocumentStructureBinding.GetHead(this, in a), "get head"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"title", new JSFunction((in a) => Dom.Features.DocumentStructureBinding.GetTitle(this, in a), "get title"), new JSFunction((in a) => Dom.Features.DocumentStructureBinding.SetTitle(this, in a), "set title"), JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document element-query methods — getElementById/getElementsByTagName/getElementsByClassName/
         // querySelector/querySelectorAll, co-located in the DocumentQueryBinding feature module (Phase 3).

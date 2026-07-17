@@ -935,7 +935,22 @@ accessors `body`/`head`/`title`, hit-testing `elementFromPoint`/`elementsFromPoi
 scroll wiring, `getComputedStyle`, cookies, and the performance/scroll/scale helpers), now comfortably under the
 guard.
 
-Still to come — each entangled with layout or rendering; the P3.7–P3.28 named-accessor / relocated-infra /
+Status: **P3.29 completed** 2026-07-17 (same branch) — the **`document` structural accessors**, continuing into
+the residual document surface after the grab-bag was de-listed (P3.28). `DocumentStructureBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates `document.body` and `document.head` (getters returning the first
+matching child of the documentElement) and `document.title` (get/set) — was the bridge's
+`JsRegistrationGetBody002Core`/`GetHead003Core`/`SetTitle005Core` plus the inline title getter. The document root,
+wrapper factory and title are reached through the three-member `IDocumentStructureHost` contract
+(`DomBridge.DocumentStructureHost.cs`, explicit interface members); child enumeration uses the bridge's neutral
+`internal static` `ChildElements` directly. `Registration/Document.cs` now registers
+`Dom.Features.DocumentStructureBinding.<Op>(this, in a)`; the callbacks are gone from
+`JsFunctionCallbacks/Registration.cs` (684 → 653 lines, staying under the guard). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/DocumentStructureBindingModuleTests.cs`
+(co-location / host-contract / three-callbacks-moved-off-bridge guards + a characterization — `body`/`head`
+tagName, `title` read of the parsed `<title>` and a round-trip set — through the bridge). Regression check: the
+DocumentStructure, HtmlDom and architecture-guard suites pass (51); `Broiler.HtmlBridge.Dom` builds clean.
+
+Still to come — each entangled with layout or rendering; the P3.7–P3.29 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is

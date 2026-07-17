@@ -18,37 +18,6 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsRegistrationGetBody002Core(in Arguments a)
-    {
-        foreach (var child in ChildElements(DocumentElement))
-        {
-            if (string.Equals(child.TagName, "body", StringComparison.OrdinalIgnoreCase))
-                return ToJSObject(child);
-        }
-
-        return JSNull.Value;
-    }
-
-
-    private JSValue JsRegistrationGetHead003Core(in Arguments a)
-    {
-        foreach (var child in ChildElements(DocumentElement))
-        {
-            if (string.Equals(child.TagName, "head", StringComparison.OrdinalIgnoreCase))
-                return ToJSObject(child);
-        }
-
-        return JSNull.Value;
-    }
-
-
-    private JSValue JsRegistrationSetTitle005Core(in Arguments a)
-    {
-        Title = a.Length > 0 ? a[0].ToString() : string.Empty;
-        return JSUndefined.Value;
-    }
-
-
     private JSValue JsRegistrationElementFromPoint011Core(in Arguments a)
     {
         var hit = HitTestDocumentPoint(DocumentElement, GetCoordinateArgument(a, 0), GetCoordinateArgument(a, 1)).FirstOrDefault();
