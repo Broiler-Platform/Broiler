@@ -210,7 +210,8 @@ public class HtmlBridgeArchitectureGuardTests
         "src/Broiler.HtmlBridge.Dom/DomBridge.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.cs",
         "src/Broiler.HtmlBridge.Dom/DomBridge/Utilities.cs",
-        "src/Broiler.HtmlBridge.Dom/DomBridge/AnimationResolver.cs",
+        // AnimationResolver.cs de-listed 2026-07-17: its CSS timing-function/easing cluster was
+        // split into the sibling partial AnimationResolver.Timing.cs, dropping it to 644 lines.
     };
 
     [Fact]

@@ -805,12 +805,13 @@ Exit criteria:
 - No production source file exceeds 750 lines without a documented exemption.
   **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
   a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
-  module (the P3.x pattern) rather than another giant partial. The nine current
+  module (the P3.x pattern) rather than another giant partial. The remaining eight
   over-limit files (`LayoutMetrics.cs` 2332, `JsFunctionCallbacks/JsObjects.cs` 1599,
-  `JsObjects.cs` 1286, `JsFunctionCallbacks/Registration.cs` 1184, `SubDocuments.cs`
-  1152, `DomBridge.cs` 1013, `DomBridge.Serialization.cs` 951, `Utilities.cs` 894,
-  `AnimationResolver.cs` 760) are listed as documented debt to shrink — the guard
-  surfaces one to de-list once it drops under the limit, so the ratchet keeps closing.
+  `JsObjects.cs` 1286, `JsFunctionCallbacks/Registration.cs` 1144 — was 1184 before P3.19,
+  `SubDocuments.cs` 1152, `DomBridge.cs` 1013, `DomBridge.Serialization.cs` 951,
+  `Utilities.cs` 894) are listed as documented debt to shrink — the guard surfaces one to
+  de-list once it drops under the limit, so the ratchet keeps closing. `AnimationResolver.cs`
+  (was 760) is **de-listed** as of 2026-07-17 (see ratchet maintenance below).
 
   **Ratchet maintenance 2026-07-17.** The guard caught its first *new* over-limit file:
   `AnchorResolver/AnchorFunctions.cs` had grown 748 → 767 lines as the Phase 5 native
@@ -827,6 +828,15 @@ Exit criteria:
   exemption list is unchanged (`AnchorFunctions.cs` was never exempt). `Broiler.HtmlBridge.Dom`
   builds clean and the guard is green (0 offenders / 0 stale exemptions). The two AnchorResolver
   files are now both under the limit.
+
+  **De-list 2026-07-17.** The complementary ratchet action — shrinking an *exempt* file under the
+  limit and removing its exemption. `AnimationResolver.cs` (760) had its cohesive CSS
+  timing-function / easing cluster (`ApplyTimingFunction`, `SolveCubicBezier` + `BezierCoord`/
+  `BezierDerivative`, `ApplySteps`, and the two `[GeneratedRegex]` `steps()`/`cubic-bezier()`
+  patterns) split into the sibling `DomBridge` partial `AnimationResolver.Timing.cs` (127 lines),
+  dropping `AnimationResolver.cs` to 644. Pure partial-class relocation (behaviour-identical); its
+  entry was removed from `OversizedFileExemptions`, so the ratchet's stale-exemption check now
+  enforces it stays under 750. Debt list: nine → eight files.
 
 ### Phase 4 - eliminate parallel DOM state
 
