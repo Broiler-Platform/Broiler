@@ -207,7 +207,10 @@ public class HtmlBridgeArchitectureGuardTests
         // (P3.40–P3.45: CharacterData, node accessors, element attributes, node relationships,
         // Element selectors, element traversal) plus the EventTarget slice (P3.46: addEventListener/
         // removeEventListener/dispatchEvent/click/focus/blur) dropped it from 1599 to 727.
-        "src/Broiler.HtmlBridge.Dom/DomBridge/JsObjects.cs",
+        // DomBridge/JsObjects.cs de-listed 2026-07-17: the three non-element node JS-wrapper
+        // populators (PopulateCharacterDataJSObject, PopulateDocumentTypeJSObject,
+        // PopulateDocumentFragmentJSObject) were split into DomBridge/JsObjects.NonElementNodes.cs,
+        // leaving the element-wrapper ToJSObject dispatcher behind and dropping it from 1286 to 708.
         // JsFunctionCallbacks/Registration.cs de-listed 2026-07-17: nine feature modules
         // (P3.19–P3.27: console, crypto, sendBeacon, matchMedia, timers, write/writeln, node
         // factories, element queries, live collections, node mutation) dropped it from 1184 to 684.

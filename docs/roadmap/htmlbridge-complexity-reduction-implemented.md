@@ -1288,9 +1288,9 @@ Exit criteria:
 - No production source file exceeds 750 lines without a documented exemption.
   **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
   a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
-  module (the P3.x pattern) rather than another giant partial. The remaining two
-  over-limit files (`LayoutMetrics.cs` 2343, `JsObjects.cs` 1286)
-  are listed as
+  module (the P3.x pattern) rather than another giant partial. The one remaining
+  over-limit file (`LayoutMetrics.cs` 2343)
+  is listed as
   documented debt to shrink — the guard surfaces one to de-list once it drops under the limit,
   so the ratchet keeps closing. Three files are **de-listed** as of 2026-07-17:
   `AnimationResolver.cs` (was 760; see ratchet maintenance below),
@@ -1396,6 +1396,23 @@ Exit criteria:
   `HtmlDomInterfacesTests`, `DomEdgeCasePhase4Tests`, `IsEqualNodePromotionTests`,
   `SvgDomAndCrossDocTests`, `Acid3RegressionTests`, 204 tests with the guard) stays green. Debt list:
   five → four files.
+
+  **De-list 2026-07-17.** A sixth exempt-file shrink — `DomBridge/JsObjects.cs` (1286), dominated
+  by the ~690-line element-wrapper `ToJSObject` plus three non-element node populators. The three
+  populators — the minimal JS-wrapper builders for canonical character-data nodes
+  (`PopulateCharacterDataJSObject`, for `DomText`/`DomComment`), `DocumentType`
+  (`PopulateDocumentTypeJSObject`) and `DocumentFragment` (`PopulateDocumentFragmentJSObject`) —
+  were split into the sibling partial `DomBridge/JsObjects.NonElementNodes.cs` (600 lines), leaving
+  `ToJSObject` (the element wrapper and its node-kind dispatch) behind. Pure partial-class
+  relocation — no signature, accessibility, or logic change, so behaviour-identical by construction;
+  `JsObjects.cs` drops 1286 → 708 and its `OversizedFileExemptions` entry is removed.
+  `Broiler.HtmlBridge.Dom` builds clean and the guard is green (14/14, 0 offenders / 0 stale
+  exemptions); the node-wrapper coverage (`CharacterDataBindingModuleTests`,
+  `DocumentFragmentSentinelMigrationTests`, `NodeAccessorsBindingModuleTests`,
+  `DoctypeSentinelMigrationTests`, `DomImplementationTests`, `HtmlDomInterfacesTests`, 98 tests with
+  the guard) stays green. With this de-list the live `OversizedFileExemptions` set holds a single
+  entry — `LayoutMetrics.cs` (2343) is now the only HtmlBridge production file still over the
+  750-line limit.
 
 ### Phase 4 - eliminate parallel DOM state
 
