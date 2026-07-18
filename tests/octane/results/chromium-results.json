@@ -4,23 +4,23 @@
   "octaneVersion": "9",
   "perSuiteTimeoutSec": 180,
   "benchmarks": {
-    "Richards": 47661,
-    "DeltaBlue": 136983,
-    "Crypto": 54816,
-    "RayTrace": 152660,
-    "EarleyBoyer": 107010,
-    "RegExp": 12936,
-    "Splay": 64989,
-    "SplayLatency": 103730,
-    "NavierStokes": 51443,
-    "PdfJS": 93507,
-    "Mandreel": 62584,
-    "MandreelLatency": 101739,
-    "Gameboy": 146337,
-    "CodeLoad": 38151,
-    "Box2D": 148019,
-    "zlib": 115594,
-    "Typescript": 148262
+    "Richards": 37978,
+    "DeltaBlue": 101696,
+    "Crypto": 42165,
+    "RayTrace": 115808,
+    "EarleyBoyer": 84735,
+    "RegExp": 10082,
+    "Splay": 48349,
+    "SplayLatency": 71998,
+    "NavierStokes": 38584,
+    "PdfJS": 58374,
+    "Mandreel": 46755,
+    "MandreelLatency": 68290,
+    "Gameboy": 101309,
+    "CodeLoad": 28359,
+    "Box2D": 105834,
+    "zlib": 91178,
+    "Typescript": 93823
   },
   "suiteStatus": {
     "Richards": {
@@ -69,6 +69,6 @@
       "status": "ok"
     }
   },
-  "geomean": 79915,
-  "generatedAt": "2026-06-27T16:34:30.991Z"
+  "geomean": 58335,
+  "generatedAt": "2026-07-18T18:36:35.964Z"
 }

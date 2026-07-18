@@ -1,32 +1,32 @@
 # Octane 2.0 benchmark — Chromium vs Broiler
 
-- Generated: `2026-06-27T16:34:30.991Z`
+- Generated: `2026-07-18T18:36:35.964Z`
 - Octane version: `9`
-- Chromium: `Chromium 149.0.7827.55` — **overall score 79915**
-- Broiler: `Broiler.JS (BroilerJS --script-host)` — **overall score 197**
+- Chromium: `Chromium 149.0.7827.55` — **overall score 58335**
+- Broiler: `Broiler.JS (BroilerJS --script-host)` — **overall score 209**
 
 Higher is better. "Broiler / Chromium" is the ratio of scores on suites both engines completed.
 
 | Benchmark | Chromium | Broiler | Broiler / Chromium |
 |---|--:|--:|--:|
-| Box2D | 148019 | _error_ | — |
-| CodeLoad | 38151 | _error_ | — |
-| Crypto | 54816 | _crash_ | — |
-| DeltaBlue | 136983 | 69.3 | 0.001 |
-| EarleyBoyer | 107010 | 161 | 0.002 |
-| Gameboy | 146337 | 712 | 0.005 |
-| Mandreel | 62584 | _timeout_ | — |
-| MandreelLatency | 101739 | — | — |
-| NavierStokes | 51443 | 276 | 0.005 |
-| PdfJS | 93507 | _error_ | — |
-| RayTrace | 152660 | 201 | 0.001 |
-| RegExp | 12936 | 78 | 0.006 |
-| Richards | 47661 | 45.8 | 0.001 |
-| Splay | 64989 | 257 | 0.004 |
-| SplayLatency | 103730 | 1100 | 0.011 |
-| Typescript | 148262 | _error_ | — |
-| zlib | 115594 | _error_ | — |
-| **Overall (geomean)** | **79915** | **197** | 0.002 |
+| Box2D | 105834 | _error_ | — |
+| CodeLoad | 28359 | _error_ | — |
+| Crypto | 42165 | _crash_ | — |
+| DeltaBlue | 101696 | 78.5 | 0.001 |
+| EarleyBoyer | 84735 | 184 | 0.002 |
+| Gameboy | 101309 | 737 | 0.007 |
+| Mandreel | 46755 | _timeout_ | — |
+| MandreelLatency | 68290 | — | — |
+| NavierStokes | 38584 | 301 | 0.008 |
+| PdfJS | 58374 | _error_ | — |
+| RayTrace | 115808 | 208 | 0.002 |
+| RegExp | 10082 | 78.4 | 0.008 |
+| Richards | 37978 | 55.9 | 0.001 |
+| Splay | 48349 | 207 | 0.004 |
+| SplayLatency | 71998 | 1265 | 0.018 |
+| Typescript | 93823 | _error_ | — |
+| zlib | 91178 | _error_ | — |
+| **Overall (geomean)** | **58335** | **209** | 0.004 |
 
 ## Broiler failures
 

@@ -1,21 +1,21 @@
 {
-  "generatedAt": "2026-06-27T16:34:30.991Z",
+  "generatedAt": "2026-07-18T18:36:35.964Z",
   "octaneVersion": "9",
   "engines": {
     "chromium": {
       "label": "Chromium 149.0.7827.55",
-      "geomean": 79915
+      "geomean": 58335
     },
     "broiler": {
       "label": "Broiler.JS (BroilerJS --script-host)",
-      "geomean": 197
+      "geomean": 209
     }
   },
   "benchmarks": [
     {
       "name": "Box2D",
       "chromium": {
-        "score": 148019,
+        "score": 105834,
         "status": "ok"
       },
       "broiler": {
@@ -28,7 +28,7 @@
     {
       "name": "CodeLoad",
       "chromium": {
-        "score": 38151,
+        "score": 28359,
         "status": "ok"
       },
       "broiler": {
@@ -41,7 +41,7 @@
     {
       "name": "Crypto",
       "chromium": {
-        "score": 54816,
+        "score": 42165,
         "status": "ok"
       },
       "broiler": {
@@ -54,11 +54,11 @@
     {
       "name": "DeltaBlue",
       "chromium": {
-        "score": 136983,
+        "score": 101696,
         "status": "ok"
       },
       "broiler": {
-        "score": 69.3,
+        "score": 78.5,
         "status": "ok"
       },
       "broilerVsChromium": 0.001
@@ -66,11 +66,11 @@
     {
       "name": "EarleyBoyer",
       "chromium": {
-        "score": 107010,
+        "score": 84735,
         "status": "ok"
       },
       "broiler": {
-        "score": 161,
+        "score": 184,
         "status": "ok"
       },
       "broilerVsChromium": 0.002
@@ -78,19 +78,19 @@
     {
       "name": "Gameboy",
       "chromium": {
-        "score": 146337,
+        "score": 101309,
         "status": "ok"
       },
       "broiler": {
-        "score": 712,
+        "score": 737,
         "status": "ok"
       },
-      "broilerVsChromium": 0.005
+      "broilerVsChromium": 0.007
     },
     {
       "name": "Mandreel",
       "chromium": {
-        "score": 62584,
+        "score": 46755,
         "status": "ok"
       },
       "broiler": {
@@ -102,7 +102,7 @@
     {
       "name": "MandreelLatency",
       "chromium": {
-        "score": 101739,
+        "score": 68290,
         "status": "ok"
       },
       "broiler": {
@@ -114,19 +114,19 @@
     {
       "name": "NavierStokes",
       "chromium": {
-        "score": 51443,
+        "score": 38584,
         "status": "ok"
       },
       "broiler": {
-        "score": 276,
+        "score": 301,
         "status": "ok"
       },
-      "broilerVsChromium": 0.005
+      "broilerVsChromium": 0.008
     },
     {
       "name": "PdfJS",
       "chromium": {
-        "score": 93507,
+        "score": 58374,
         "status": "ok"
       },
       "broiler": {
@@ -139,35 +139,35 @@
     {
       "name": "RayTrace",
       "chromium": {
-        "score": 152660,
+        "score": 115808,
         "status": "ok"
       },
       "broiler": {
-        "score": 201,
+        "score": 208,
         "status": "ok"
       },
-      "broilerVsChromium": 0.001
+      "broilerVsChromium": 0.002
     },
     {
       "name": "RegExp",
       "chromium": {
-        "score": 12936,
+        "score": 10082,
         "status": "ok"
       },
       "broiler": {
-        "score": 78,
+        "score": 78.4,
         "status": "ok"
       },
-      "broilerVsChromium": 0.006
+      "broilerVsChromium": 0.008
     },
     {
       "name": "Richards",
       "chromium": {
-        "score": 47661,
+        "score": 37978,
         "status": "ok"
       },
       "broiler": {
-        "score": 45.8,
+        "score": 55.9,
         "status": "ok"
       },
       "broilerVsChromium": 0.001
@@ -175,11 +175,11 @@
     {
       "name": "Splay",
       "chromium": {
-        "score": 64989,
+        "score": 48349,
         "status": "ok"
       },
       "broiler": {
-        "score": 257,
+        "score": 207,
         "status": "ok"
       },
       "broilerVsChromium": 0.004
@@ -187,19 +187,19 @@
     {
       "name": "SplayLatency",
       "chromium": {
-        "score": 103730,
+        "score": 71998,
         "status": "ok"
       },
       "broiler": {
-        "score": 1100,
+        "score": 1265,
         "status": "ok"
       },
-      "broilerVsChromium": 0.011
+      "broilerVsChromium": 0.018
     },
     {
       "name": "Typescript",
       "chromium": {
-        "score": 148262,
+        "score": 93823,
         "status": "ok"
       },
       "broiler": {
@@ -212,7 +212,7 @@
     {
       "name": "zlib",
       "chromium": {
-        "score": 115594,
+        "score": 91178,
         "status": "ok"
       },
       "broiler": {

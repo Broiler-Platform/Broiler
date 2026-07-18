@@ -4,15 +4,15 @@
   "octaneVersion": "9",
   "perSuiteTimeoutSec": 180,
   "benchmarks": {
-    "Richards": 45.8,
-    "DeltaBlue": 69.3,
-    "RayTrace": 201,
-    "EarleyBoyer": 161,
-    "RegExp": 78,
-    "Splay": 257,
-    "SplayLatency": 1100,
-    "NavierStokes": 276,
-    "Gameboy": 712
+    "Richards": 55.9,
+    "DeltaBlue": 78.5,
+    "RayTrace": 208,
+    "EarleyBoyer": 184,
+    "RegExp": 78.4,
+    "Splay": 207,
+    "SplayLatency": 1265,
+    "NavierStokes": 301,
+    "Gameboy": 737
   },
   "suiteStatus": {
     "Richards": {
@@ -67,6 +67,6 @@
       "error": "Cannot get property getScopedTypeNameEx of null"
     }
   },
-  "geomean": 197,
-  "generatedAt": "2026-06-27T16:34:30.991Z"
+  "geomean": 209,
+  "generatedAt": "2026-07-18T18:36:35.964Z"
 }
