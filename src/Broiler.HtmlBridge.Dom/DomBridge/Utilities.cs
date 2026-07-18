@@ -187,7 +187,7 @@ public sealed partial class DomBridge
     /// Returns <c>true</c> if the target URL is cross-origin relative to the page URL.
     /// Relative URLs and file:// URLs are treated as same-origin.
     /// </summary>
-    private static bool IsCrossOrigin(string targetUrl, string pageUrl)
+    internal static bool IsCrossOrigin(string targetUrl, string pageUrl)
     {
         targetUrl = NormalizeWptPlaceholderUrl(targetUrl);
         if (string.IsNullOrWhiteSpace(targetUrl)) return false;

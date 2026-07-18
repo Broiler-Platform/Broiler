@@ -1,13 +1,7 @@
-using Broiler.JavaScript.BuiltIns.Null;
-using System.Text;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
-using Broiler.JavaScript.BuiltIns.Array;
-using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.Dom;
-using System.Globalization;
 
 namespace Broiler.HtmlBridge;
 
@@ -16,34 +10,10 @@ public sealed partial class DomBridge
 
     // form.length and form.action moved to the Phase 3 FormBinding feature module
     // (Broiler.HtmlBridge.Dom.Features).
-
-    private JSValue JsElementInterfacesSetData051Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        SetAttr(element, "data", a.Length > 0 ? a[0].ToString() : string.Empty);
-        // Invalidate cached sub-document when data changes
-        bridge.InvalidateCachedSubDocument(element);
-        return JSUndefined.Value;
-    }
-
-    private JSValue JsElementInterfacesGetContentDocument054Core(DomBridge? bridge, DomElement element, in Arguments _)
-    {
-        var dataUrl = TryGetAttribute(element, "data", out var d) ? d : string.Empty;
-        if (IsCrossOrigin(dataUrl, bridge._pageUrl))
-            return JSNull.Value;
-        // Check if the resource actually loaded successfully
-        if (bridge.IsObjectLoadFailed(element))
-            return JSNull.Value;
-        return bridge.GetOrCreateSubDocument(element);
-    }
-
-
-    private JSValue JsElementInterfacesGetSVGDocument055Core(DomBridge? bridge, DomElement element, in Arguments _)
-    {
-        var dataUrl = TryGetAttribute(element, "data", out var d) ? d : string.Empty;
-        if (IsCrossOrigin(dataUrl, bridge._pageUrl))
-            return JSNull.Value;
-        return bridge.GetOrCreateSubDocument(element);
-    }
+    //
+    // The <object>-element sub-document accessors (data setter, contentDocument, getSVGDocument) moved to
+    // the ObjectElementBinding feature module (Phase 3 P3.52). Only the <img> computed-dimension getter
+    // below remains here — a computed-style read, a candidate for a future computed-style consolidation.
 
     private JSValue JsElementInterfacesCallback062Core(DomBridge? bridge, string? dimName, DomElement element, in Arguments _)
     {

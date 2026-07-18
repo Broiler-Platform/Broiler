@@ -48,9 +48,12 @@ public sealed partial class DomBridge
         // HTMLObjectElement — data property with URI resolution + contentDocument + getSVGDocument + type
         if (tag == "object")
         {
+            // data get (reflected URL) + type get/set are in ElementReflectionBinding (P3.49); the data
+            // setter, contentDocument getter and getSVGDocument() are sub-document-coupled and live in the
+            // ObjectElementBinding feature module (Phase 3 P3.52).
             obj.FastAddProperty((KeyString)"data",
                 new JSFunction((in _) => Dom.Features.ElementReflectionBinding.GetData(this, element, in _), "get data"),
-                new JSFunction((in a) => JsElementInterfacesSetData051Core(bridge, element, in a), "set data"),
+                new JSFunction((in a) => Dom.Features.ObjectElementBinding.SetData(this, element, in a), "set data"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // type property (MIME type of the resource)
@@ -63,12 +66,12 @@ public sealed partial class DomBridge
             // Returns null when the resource fails to load (HTTP 404, file not found, etc.)
             // which signals that the fallback content (child nodes) should be visible.
             obj.FastAddProperty((KeyString)"contentDocument",
-                new JSFunction((in _) => JsElementInterfacesGetContentDocument054Core(bridge, element, in _), "get contentDocument"),
+                new JSFunction((in _) => Dom.Features.ObjectElementBinding.GetContentDocument(this, element, in _), "get contentDocument"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // getSVGDocument() for <object> element
             obj.FastAddValue((KeyString)"getSVGDocument",
-                new JSFunction((in _) => JsElementInterfacesGetSVGDocument055Core(bridge, element, in _), "getSVGDocument", 0),
+                new JSFunction((in _) => Dom.Features.ObjectElementBinding.GetSvgDocument(this, element, in _), "getSVGDocument", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
