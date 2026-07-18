@@ -20,7 +20,7 @@ own status entries for the specifics; the summary below is the quick view.
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
-| 3 — feature modules | Bulk delivered | Residual `JsObjects.cs` callbacks — the `element.style` cssText setter (deferred Phase-4-item-2-entangled) — and Canvas (Phase-6-entangled) still to come (SVG done — P3.50; Element/geometry done — P3.51; `<object>` sub-document accessors done — P3.52; tree mutation done — P3.58; on* reflectors done — P3.59; form-control IDL done — P3.60; `form.submit()` done — P3.61); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
+| 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds only two callbacks, both explicitly deferred/gated: the `element.style` cssText setter (Phase-4-item-2-entangled) and Canvas `getContext` (Phase-6-entangled) (SVG done — P3.50; Element/geometry done — P3.51; `<object>` sub-document accessors done — P3.52; tree mutation done — P3.58; on* reflectors done — P3.59; form-control IDL done — P3.60; `form.submit()` done — P3.61; shadow-DOM binding done — P3.62); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
 
@@ -1716,6 +1716,26 @@ no-op). Regression check: the form-submit / Form / EventTarget / EventDispatch /
 architecture-guard suites pass (one pre-existing environment-sensitive `SelectListBox…WritingMode` render check
 fails identically on `origin/main`, unrelated to this change); `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.62 completed** 2026-07-18 (same branch) — the **shadow-DOM JS-binding members** (the
+`element.shadowRoot` getter and `element.attachShadow()` method), extracted off the mixed `JsObjects.cs`
+element-member callbacks. `ShadowDomBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) exposes an attached
+root only when its mode is `open`, and `attachShadow` rejects a second attachment (`NotSupportedError`),
+normalizes the requested mode to `open`/`closed`, and creates + links the root. The per-element shadow linkage
+(host/root/mode) stays the bridge's `ElementRuntimeState.Shadow` slot, reached only through the named primitives
+of the five-member `IShadowDomHost` contract (`DomBridge.ShadowDomHost.cs`) — the module never touches the
+runtime-state object (the P3.7 pattern); the whole create-parent-and-record step is a single `AttachShadowRoot`
+host primitive, so the `#shadow-root` element construction and the four state writes stay on the bridge. The two
+registrations in `DomBridge/JsObjects.cs` now call `Dom.Features.ShadowDomBinding.GetShadowRoot` / `AttachShadow`,
+and the two callbacks (`JsJsObjectsGetShadowRoot019Core`/`AttachShadow087Core`) are gone from
+`JsFunctionCallbacks/JsObjects.cs` (119 → 86 lines). **This leaves only two callbacks in that file — the
+`element.style` cssText setter (deferred, Phase-4-item-2-entangled) and the Canvas `getContext` (Phase-6-gated) —
+both explicitly deferred/gated rather than merely not-yet-extracted.** Behaviour-preserving; no public-API change
+(module + contract internal). Tests: `Broiler.Cli.Tests/ShadowDomBindingModuleTests.cs` (feature-module /
+host-contract / two-callbacks-moved-off-bridge guards + end-to-end characterizations: open attachment exposes an
+identity-stable root and a second attach throws; closed attachment returns the root but the getter hides it).
+Regression check: the shadow-DOM / GoogleSearchPolyfill / Acid3 / public-API-snapshot / architecture-guard suites
+pass; `Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: the residue of the mixed `JsObjects.cs` element-member callbacks (the
@@ -1728,7 +1748,10 @@ the DomBridge 500-800-line facade target.
 are done** (P3.54); **insertAdjacent\* is done** (P3.56); **the element-content members are done** (P3.57);
 **tree mutation is done** (P3.58 — `insertBefore`/`appendChild`/`append`/`prepend`/`removeChild`/`replaceChild`);
 **the on\* event-handler reflectors are done** (P3.59); **the form-control IDL reflectors are done** (P3.60 —
-`value`/`checked`/`type`/`name`/`disabled`/`hidden`/`tabIndex`/`required`); **`form.submit()` is done** (P3.61).
+`value`/`checked`/`type`/`name`/`disabled`/`hidden`/`tabIndex`/`required`); **`form.submit()` is done** (P3.61);
+**the shadow-DOM `shadowRoot`/`attachShadow` binding is done** (P3.62). The mixed `JsObjects.cs` element-member
+callbacks file now holds only the two explicitly deferred/gated callbacks (the `element.style` cssText setter and
+Canvas `getContext`).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

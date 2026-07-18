@@ -93,8 +93,10 @@ public sealed partial class DomBridge
         // DomBridge.ElementContentHost.cs). Split around shadowRoot to preserve property order.
         Dom.Features.ElementContentBinding.InstallHtmlSerialization(this, obj, element);
 
+        // shadowRoot (read-only) — Phase 3 P3.62: co-located ShadowDomBinding feature module, reached
+        // through IShadowDomHost (DomBridge.ShadowDomHost.cs).
         obj.FastAddProperty((KeyString)"shadowRoot",
-            new JSFunction((in _) => JsJsObjectsGetShadowRoot019Core(element, in _), "get shadowRoot"),
+            new JSFunction((in _) => Dom.Features.ShadowDomBinding.GetShadowRoot(this, element, in _), "get shadowRoot"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // textContent (read/write) + innerText / outerText (read) — Phase 3 P3.57: ElementContentBinding.
@@ -403,8 +405,9 @@ public sealed partial class DomBridge
 
         // -- DOM manipulation methods --
 
+        // attachShadow(init) — Phase 3 P3.62: co-located ShadowDomBinding feature module.
         obj.FastAddValue((KeyString)"attachShadow",
-            new JSFunction((in a) => JsJsObjectsAttachShadow087Core(element, in a), "attachShadow", 1),
+            new JSFunction((in a) => Dom.Features.ShadowDomBinding.AttachShadow(this, element, in a), "attachShadow", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // appendChild(child)

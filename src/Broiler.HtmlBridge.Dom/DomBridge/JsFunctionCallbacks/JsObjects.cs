@@ -20,15 +20,7 @@ public sealed partial class DomBridge
     // innerHTML / outerHTML / textContent get+set moved to the ElementContentBinding feature module
     // (Phase 3 P3.57).
 
-    private JSValue JsJsObjectsGetShadowRoot019Core(DomElement element, in Arguments _)
-    {
-        var shadowRoot = GetShadowRoot(element);
-        if (shadowRoot == null)
-            return JSNull.Value;
-        var mode = ShadowStateFor(element).Mode.TryGet(out var rawMode) ? rawMode as string : null;
-        return string.Equals(mode, "open", StringComparison.OrdinalIgnoreCase) ? ToJSObject(shadowRoot) : JSNull.Value;
-    }
-
+    // element.shadowRoot getter moved to the ShadowDomBinding feature module (Phase 3 P3.62).
 
     private JSValue JsJsObjectsSetStyle025Core(DomBridge? bridge, DomElement element, in Arguments a)
     {
@@ -54,32 +46,7 @@ public sealed partial class DomBridge
 
     // insertBefore(newChild, refChild) moved to the TreeMutationBinding feature module (Phase 3 P3.58).
 
-    private JSValue JsJsObjectsAttachShadow087Core(DomElement element, in Arguments a)
-    {
-        if (GetShadowRoot(element) != null)
-            ThrowDOMException(_jsContext!, "Shadow root already attached.", "NotSupportedError");
-        var mode = "open";
-        if (a.Length > 0 && a[0] is JSObject options)
-        {
-            var modeValue = options[(KeyString)"mode"];
-            if (modeValue != null && !modeValue.IsUndefined && !modeValue.IsNull)
-            {
-                mode = modeValue.ToString();
-            }
-        }
-
-        mode = string.Equals(mode, "closed", StringComparison.OrdinalIgnoreCase) ? "closed" : "open";
-        var shadowRoot = CreateBridgeElement("#shadow-root");
-        // SetParent links the shadow root to its host, so GetOwningDocument derives the shadow root's
-        // owning document from the host's tree position — no OwnerDocRoot inheritance needed (P4.4c).
-        SetParent(shadowRoot, element);
-        ShadowStateFor(shadowRoot).Host.Set(element);
-        ShadowStateFor(shadowRoot).Mode.Set(mode);
-        ShadowStateFor(element).Root.Set(shadowRoot);
-        ShadowStateFor(element).Mode.Set(mode);
-        return ToJSObject(shadowRoot);
-    }
-
+    // attachShadow(init) moved to the ShadowDomBinding feature module (Phase 3 P3.62).
 
     // appendChild / append / prepend / removeChild / replaceChild moved to the TreeMutationBinding
     // feature module (Phase 3 P3.58).
