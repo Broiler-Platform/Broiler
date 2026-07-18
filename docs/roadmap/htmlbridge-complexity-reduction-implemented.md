@@ -20,7 +20,7 @@ own status entries for the specifics; the summary below is the quick view.
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
-| 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, Canvas modules still to come (SVG done — P3.50); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
+| 3 — feature modules | Bulk delivered | Window/Document, sub-document `<object>`, Canvas modules still to come (SVG done — P3.50; Element/geometry done — P3.51); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
 
@@ -1487,11 +1487,37 @@ no-host-contract / ten-callbacks-moved-off-bridge guards + end-to-end characteri
 engine). Regression check: the SVG / element-interface / Acid3 / HtmlDomInterface / clone / architecture-guard
 suites pass; `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.51 completed** 2026-07-18 (same branch) — the **element box-model / scrolling interface**, the
+`Element/geometry` family named "still to come" below and the one Phase 3 slice that genuinely reads the live
+layout. `ElementGeometryBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the box metrics
+(`clientTop`/`clientLeft`/`clientWidth`/`clientHeight`, `offsetWidth`/`offsetHeight`,
+`scrollWidth`/`scrollHeight`, `offsetTop`/`offsetLeft`, `offsetParent`, `getBoundingClientRect`/
+`getClientRects`) and the imperative scrolling API (`scrollTop`/`scrollLeft` get/set,
+`scroll`/`scrollTo`/`scrollBy`, `scrollIntoView`, `scrollParent`). Because every value reads the bridge's
+layout cache, this is the first module to use the **wide-explicit-host** template in earnest: the ~20-member
+`IElementGeometryHost` contract (`DomBridge.ElementGeometryHost.cs`, forwarding to the existing private
+`LayoutMetrics.*` methods) names the exact geometry surface the callbacks depend on, so they no longer reach
+into arbitrary bridge internals — the coupling is the same but now declared rather than ambient. The
+byte-identical `scroll`/`scrollTo` callbacks (`Scroll082`≡`ScrollTo083`) are deduplicated into one `Scroll`,
+and the repeated DOMRect construction factored into one `BuildRect`. The ~90-line box-model block in
+`DomBridge/ElementInterfaces.cs` becomes one `Dom.Features.ElementGeometryBinding.Install(this, obj, element)`
+call, and the fourteen callbacks (`GetScrollTop072`..`ScrollParent085`) are gone from
+`JsFunctionCallbacks/ElementInterfaces.cs` (184 → 70 lines — now only the sub-document
+`SetData051`/`GetContentDocument054`/`GetSVGDocument055` and computed-style-dimension `Callback062` remain).
+Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/ElementGeometryBindingModuleTests.cs` (feature-module / wide-host-contract /
+fourteen-callbacks-moved-off-bridge guards + real-layout characterizations through `bridge.Attach` + `ctx.Eval`:
+`offsetWidth`/`offsetHeight`, the full `getBoundingClientRect` DOMRect, a `scrollTop` round-trip on an overflow
+container, and `getClientRects` returning an array). Regression check: the geometry / scroll / overflow / anchor
+/ position-try / sticky / element-interface / HtmlDomInterface / architecture-guard suites show the same
+pre-existing environmental failures as baseline — zero regressions; `Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
-any residual coupling: Element/geometry, Window/Document, Canvas (better done with Phase 6, which dissolves
+any residual coupling: Window/Document, the sub-document `<object>` accessors (`data`/`contentDocument`/
+`getSVGDocument`, computed-style dimensions), Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
-done** (P3.13/P3.16/P3.17/P3.18); **SVG is done** (P3.50).
+done** (P3.13/P3.16/P3.17/P3.18); **SVG is done** (P3.50); **Element/geometry is done** (P3.51).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

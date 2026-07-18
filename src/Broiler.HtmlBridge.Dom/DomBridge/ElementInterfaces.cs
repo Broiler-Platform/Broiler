@@ -114,98 +114,12 @@ public sealed partial class DomBridge
             }
         }
 
-        // -- TODO-G4 / TODO-G19: Box model properties for all elements --
-        // clientWidth/clientHeight, offsetWidth/offsetHeight, scrollWidth/scrollHeight,
-        // scrollTop/scrollLeft, and getBoundingClientRect()
-        {
-            var isViewportElement = IsViewportElementForMetrics(element);
-            var bridgeForOffset = this;
-            var elForOffset = element;
-
-            obj.FastAddProperty((KeyString)"clientTop",
-                new JSFunction((in _) => new JSNumber(bridgeForOffset.GetClientTopForDomElement(elForOffset)), "get clientTop"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"clientLeft",
-                new JSFunction((in _) => new JSNumber(bridgeForOffset.GetClientLeftForDomElement(elForOffset)), "get clientLeft"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"clientWidth",
-                new JSFunction((in _) => new JSNumber(bridgeForOffset.GetClientWidthForDomElement(elForOffset, isViewportElement)), "get clientWidth"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"clientHeight",
-                new JSFunction((in _) => new JSNumber(bridgeForOffset.GetClientHeightForDomElement(elForOffset, isViewportElement)), "get clientHeight"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"offsetWidth",
-                new JSFunction((in _) => new JSNumber(bridgeForOffset.GetOffsetWidthForDomElement(elForOffset, isViewportElement)), "get offsetWidth"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"offsetHeight",
-                new JSFunction((in _) => new JSNumber(bridgeForOffset.GetOffsetHeightForDomElement(elForOffset, isViewportElement)), "get offsetHeight"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"scrollWidth",
-                new JSFunction((in _) => new JSNumber(bridgeForOffset.GetScrollWidthForDomElement(elForOffset, isViewportElement)), "get scrollWidth"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"scrollHeight",
-                new JSFunction((in _) => new JSNumber(bridgeForOffset.GetScrollHeightForDomElement(elForOffset, isViewportElement)), "get scrollHeight"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"scrollTop",
-                new JSFunction((in _) => JsElementInterfacesGetScrollTop072Core(bridgeForOffset, element, in _), "get scrollTop"),
-                new JSFunction((in a) => JsElementInterfacesSetScrollTop073Core(bridgeForOffset, element, in a), "set scrollTop"),
-                JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"scrollLeft",
-                new JSFunction((in _) => JsElementInterfacesGetScrollLeft074Core(bridgeForOffset, element, in _), "get scrollLeft"),
-                new JSFunction((in a) => JsElementInterfacesSetScrollLeft075Core(bridgeForOffset, element, in a), "set scrollLeft"),
-                JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"offsetTop",
-                new JSFunction((in _) => new JSNumber(bridgeForOffset.GetOffsetTopForDomElement(elForOffset)), "get offsetTop"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"offsetLeft",
-                new JSFunction((in _) => new JSNumber(bridgeForOffset.GetOffsetLeftForDomElement(elForOffset)), "get offsetLeft"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"offsetParent",
-                new JSFunction((in _) => JsElementInterfacesGetOffsetParent078Core(bridgeForOffset, elForOffset, in _), "get offsetParent"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // getBoundingClientRect() — returns DOMRect-like object
-            obj.FastAddValue((KeyString)"getBoundingClientRect",
-                new JSFunction((in _) => JsElementInterfacesGetBoundingClientRect079Core(bridgeForOffset, elForOffset, isViewportElement, in _), "getBoundingClientRect", 0),
-                JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // getClientRects() — returns array with one DOMRect for root elements
-            obj.FastAddValue((KeyString)"getClientRects",
-                new JSFunction((in a2) => JsElementInterfacesGetClientRects080Core(bridgeForOffset, elForOffset, isViewportElement, in a2), "getClientRects", 0),
-                JSPropertyAttributes.EnumerableConfigurableValue);
-
-            obj.FastAddValue((KeyString)"scrollIntoView",
-                new JSFunction((in a) => JsElementInterfacesScrollIntoView081Core(bridgeForOffset, elForOffset, in a), "scrollIntoView", 1),
-                JSPropertyAttributes.EnumerableConfigurableValue);
-
-            obj.FastAddValue((KeyString)"scroll",
-                new JSFunction((in a) => JsElementInterfacesScroll082Core(bridgeForOffset, element, in a), "scroll", 2),
-                JSPropertyAttributes.EnumerableConfigurableValue);
-
-            obj.FastAddValue((KeyString)"scrollTo",
-                new JSFunction((in a) => JsElementInterfacesScrollTo083Core(bridgeForOffset, element, in a), "scrollTo", 2),
-                JSPropertyAttributes.EnumerableConfigurableValue);
-
-            obj.FastAddValue((KeyString)"scrollBy",
-                new JSFunction((in a) => JsElementInterfacesScrollBy084Core(bridgeForOffset, element, in a), "scrollBy", 2),
-                JSPropertyAttributes.EnumerableConfigurableValue);
-
-            obj.FastAddValue((KeyString)"scrollParent",
-                new JSFunction((in _) => JsElementInterfacesScrollParent085Core(bridgeForOffset, elForOffset, in _), "scrollParent", 0),
-                JSPropertyAttributes.EnumerableConfigurableValue);
-        }
+        // Box-model metrics (client*/offset*/scroll* dimensions, offsetParent, getBoundingClientRect/
+        // getClientRects) and the imperative scrolling API (scrollTop/scrollLeft, scroll/scrollTo/scrollBy,
+        // scrollIntoView, scrollParent) — Phase 3 P3.51: extracted into the co-located ElementGeometryBinding
+        // feature module. These read the live layout, so the module reaches the bridge through the wide
+        // IElementGeometryHost contract (DomBridge.ElementGeometryHost.cs).
+        Dom.Features.ElementGeometryBinding.Install(this, obj, element);
 
         // SVG DOM interfaces — SVGAnimatedLength/Rect stubs, SVGTextContentElement text metrics, the
         // SVGSVGElement animation timeline and the SMIL animation-element no-ops (Phase 3 P3.50:
