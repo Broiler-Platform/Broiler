@@ -194,17 +194,29 @@ synthesis (and its author-geometry / position-try helpers) from `Dialogs.cs`.
   position-area / abspos / dialog / Acid3 / guard / public-API Cli suites, and the **css-anchor-position WPT
   corpus (33/6, identical to baseline)** all pass.
 
-  **Still remaining — the *block*-axis (height) shrink-to-fit.** A content-*height* out-of-flow box is not
-  yet centred: `ResolveUsedBlockHeight` leaves an intrinsic-keyword height as-is expecting child layout to
-  have folded the content height into `ActualBottom`, but for a fixed/abspos box the box reports only its
-  chrome height at every mid-layout centring phase (verified: a fixed modal with an 80px-tall block child
-  still reads a 34px chrome height at `PositionAbsoluteBox` time; the content height folds in later). So a
-  post-sizing block-axis centring pass reads a stale height and mis-centres — it was implemented and then
-  **reverted** for that reason. Fixing it needs the engine to shrink-wrap an out-of-flow box's
-  intrinsic/`auto` used *height* to its content before the centring phase (or to run the block-axis centring
-  in the root post-pass, after all descendant heights finalise). The bridge therefore centres a modal
-  vertically only for an **explicit** length/percentage height; a content-height modal keeps its natural
-  block position (near the top) rather than being mis-centred.
+  **Landed (2026-07-18) — block-axis shrink-to-fit: content-*height* modals now centre vertically too.**
+  A content-*height* out-of-flow box's used height is not final until layout completes — a fixed/abspos
+  box reports only its chrome height at every *mid-layout* centring phase (verified: a fixed modal with an
+  80px block child reads a 34px chrome height at `PositionAbsoluteBox` time; the content height folds in
+  after its own layout pass returns). So block-axis centring is done as a **root post-pass**,
+  `CssBox.CenterOutOfFlowBlockAxis` (`CssBox.AutoMarginBlockCentering.cs`), run at the document root after
+  the single-pass layout (and after scroll/sticky/anchor), where `Bounds.Height` is final. It walks the
+  tree top-down and, for each absolute/fixed box with both block-axis insets, both block-axis margins auto
+  and a content/intrinsic-keyword height, re-positions it by the §10.6.4 auto-margin offset. To stop the
+  in-line `ResolveOverconstrainedAutoMargins` from mis-centring such a box against the chrome-only
+  pre-layout size, `IsDefiniteBorderBoxHeight` now returns **false** for an intrinsic-keyword height,
+  deferring it to the post-pass (explicit length/percentage heights still centre in-line as before). It is
+  gated with the other native-placement post-passes (`NativeAnchorPlacement.Enabled`, on in the bridge
+  geometry / WPT paths, inert by default). The bridge's `ApplyModalCenteringDefaults` now gives a modal
+  with no author height the UA `height: fit-content` default (symmetric with width), so a fully
+  content-sized modal shrink-wraps and centres on **both** axes. Tests: `NativeModalCenteringTests`
+  (content-size shrink-wrap + centre on both axes; explicit-width/content-height centre on both). **Zero
+  regression:** 213 engine layout tests, the anchor / position-area / abspos / dialog / backdrop / popover /
+  Acid3 / guard / public-API Cli suites, and the css-anchor-position WPT corpus (33/6, identical to
+  baseline) all pass (the standing zoom / visual-viewport / anchor-size / iframe-scroll serialization
+  environmental fails are unchanged). This closes the modal-centring track: a native modal `<dialog>`
+  (definite or content-sized) now centres in the viewport via the engine's §10.3.7/§10.6.4 auto-margin
+  resolution — no bridge position bake.
 - **Anchor-track render residue** stays exhausted (established earlier): the only un-handed-off case is a
   `position-area` box that *also* uses `position-try`, for which **no WPT test exists**, so widening the MVP
   gate has no observable payoff.

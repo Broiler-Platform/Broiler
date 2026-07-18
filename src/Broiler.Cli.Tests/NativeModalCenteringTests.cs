@@ -49,15 +49,17 @@ public sealed class NativeModalCenteringTests
     }
 
     [Fact]
-    public void ContentSized_Modal_ShrinkWraps_And_Centers_Horizontally()
+    public void ContentSized_Modal_ShrinkWraps_And_Centers_On_Both_Axes()
     {
-        // No explicit width → the UA `width: fit-content` default shrink-wraps the modal to its content
-        // width (not stretched to the viewport), and the auto margins centre it horizontally.
-        var (left, _, width, height) = ShowModalRect("", "short");
+        // No explicit size → the UA `width/height: fit-content` default shrink-wraps the modal to its
+        // content (not stretched to the viewport), and the auto margins centre it on both axes — the
+        // block axis via the engine's root post-pass, which sees the final content height.
+        var (left, top, width, height) = ShowModalRect("", "short");
 
         Assert.True(width < ViewportWidth, $"content-sized modal width {width} should shrink-wrap, not fill the viewport");
-        Assert.True(height < ViewportHeight, $"content-sized modal height {height} should not fill the viewport");
+        Assert.True(height < ViewportHeight, $"content-sized modal height {height} should shrink-wrap, not fill the viewport");
         Assert.Equal((ViewportWidth - width) / 2, left, 1);
+        Assert.Equal((ViewportHeight - height) / 2, top, 1);
     }
 
     [Fact]
@@ -83,14 +85,15 @@ public sealed class NativeModalCenteringTests
     }
 
     [Fact]
-    public void ContentHeight_Modal_Is_Not_Vertically_MisCentered()
+    public void ExplicitWidth_ContentHeight_Centers_On_Both_Axes()
     {
-        // With an explicit width but content height, the modal centres horizontally and keeps its
-        // natural block position (near the viewport top) — it is NOT mis-centred using a stale height.
-        // (Full content-height vertical centring awaits the engine shrink-wrap of out-of-flow heights.)
-        var (left, top, width, _) = ShowModalRect("dialog { width: 300px; }", "one line");
+        // Explicit width centres horizontally; the unspecified height gets the UA fit-content default,
+        // shrink-wraps to content, and the block-axis post-pass centres it vertically too.
+        var (left, top, width, height) = ShowModalRect("dialog { width: 300px; }", "one line");
 
+        Assert.True(width >= 300, $"explicit 300px width plus chrome, got {width}");
+        Assert.True(height < ViewportHeight, "content height should shrink-wrap, not fill the viewport");
         Assert.Equal((ViewportWidth - width) / 2, left, 1);
-        Assert.True(top < ViewportHeight / 4, $"content-height modal top {top} should stay near the viewport top");
+        Assert.Equal((ViewportHeight - height) / 2, top, 1);
     }
 }

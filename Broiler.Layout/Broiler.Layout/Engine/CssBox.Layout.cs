@@ -1572,8 +1572,15 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     // The used border-box block size for §10.6.4 centring: Size.Height once resolved, else derived
     // from an explicit non-percentage height (mirrors the bottom-anchored fixed/abspos fallback).
     // False when the height is auto/percentage and not yet resolved — vertical centring is skipped.
+    // Also false for an intrinsic-keyword (fit-content/min-/max-content) height: its content height is
+    // not known until layout completes (the pre-layout Size.Height holds only the box chrome), so
+    // block-axis centring for such a box is deferred to the CenterOutOfFlowBlockAxis root post-pass,
+    // which sees the final height. Centring it here against the chrome-only size would mis-centre it.
     private bool IsDefiniteBorderBoxHeight(out double boxHeight)
     {
+        boxHeight = 0;
+        if (IsIntrinsicSizingHeightKeyword(Height))
+            return false;
         boxHeight = Size.Height;
         if (boxHeight > 0)
             return true;
