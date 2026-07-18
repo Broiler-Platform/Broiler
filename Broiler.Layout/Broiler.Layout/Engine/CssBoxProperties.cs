@@ -664,6 +664,47 @@ internal abstract partial class CssBoxProperties
     public string Clear { get; set; } = "none";
     public string Position { get; set; } = "static";
 
+    // CSS Viewport `zoom`: the cascaded per-element zoom factor, surfaced on the box for the native zoom
+    // model (HtmlBridge complexity-reduction roadmap Phase 5, the CSS-`zoom`/visual-viewport endgame).
+    // Populated by CssUtils.SetPropertyValue from the declared cascade; consumed only when
+    // NativeZoom.Enabled (via EffectiveZoom), so it is inert by default and the HtmlBridge serialization
+    // bake continues to carry zoom as it does today. Initial value `normal` (== factor 1).
+    public string Zoom { get; set; } = "normal";
+
+    /// <summary>
+    /// This box's specified <c>zoom</c> as a positive factor: a number (<c>zoom: 2</c>), a percentage
+    /// (<c>zoom: 150%</c> → 1.5), or 1.0 for the initial/<c>normal</c>/<c>inherit</c>/unparseable value.
+    /// Not itself inherited — each element has its own zoom; the multiplicative compounding across
+    /// ancestors is expressed by <see cref="EffectiveZoom"/>.
+    /// </summary>
+    internal double OwnZoom
+    {
+        get
+        {
+            var z = Zoom?.Trim();
+            if (string.IsNullOrEmpty(z)
+                || z.Equals("normal", System.StringComparison.OrdinalIgnoreCase)
+                || z.Equals("inherit", System.StringComparison.OrdinalIgnoreCase))
+                return 1.0;
+            if (z.EndsWith('%')
+                && double.TryParse(z[..^1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var pct)
+                && pct > 0)
+                return pct / 100.0;
+            if (double.TryParse(z, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var num) && num > 0)
+                return num;
+            return 1.0;
+        }
+    }
+
+    /// <summary>
+    /// The compounded (effective) zoom applied to this box's used values: the product of this box's own
+    /// <see cref="OwnZoom"/> and every ancestor's, per CSS <c>zoom</c> (the factor compounds down the
+    /// tree). Always <c>1.0</c> unless <see cref="NativeZoom.Enabled"/>, so the engine is zoom-neutral by
+    /// default and this foundation is inert until the used-value increments consume it.
+    /// </summary>
+    public double EffectiveZoom =>
+        !NativeZoom.Enabled ? 1.0 : (GetParent()?.EffectiveZoom ?? 1.0) * OwnZoom;
+
     // CSS Anchor Positioning: the cascaded values are surfaced on the box so the
     // layout engine's anchor-placement post-pass can read them (HtmlBridge
     // complexity-reduction roadmap Phase 5 item 3, P5.8b). They are populated by

@@ -63,6 +63,7 @@ internal static partial class CssUtils
             "padding-right" => cssBox.PaddingRight,
             "padding-top" => cssBox.PaddingTop,
             "page-break-inside" => cssBox.PageBreakInside,
+            "zoom" => cssBox.Zoom,
             "left" => cssBox.Left,
             "top" => cssBox.Top,
             "width" => cssBox.Width,
@@ -490,6 +491,9 @@ internal static partial class CssUtils
                 break;
             case "page-break-inside":
                 cssBox.PageBreakInside = value;
+                break;
+            case "zoom":
+                cssBox.Zoom = value;
                 break;
             case "left":
                 cssBox.Left = value;

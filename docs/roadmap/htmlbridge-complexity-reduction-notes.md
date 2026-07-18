@@ -800,6 +800,33 @@ Still remaining (the non-mechanical cutover): thread the bridge's `_visualViewpo
 entry (`HtmlContainerInt.ViewportZoom`) and stop the serialization `zoom` bake for pinch-zoom, retiring
 `ApplyVisualViewportSerializationState` — the one step that needs pixel validation with no reftest corpus.
 
+**Landed (2026-07-18) — (b2) general engine `zoom`: the `EffectiveZoom` foundation (increment 1,
+main-repo, flag-gated).** The engine was entirely zoom-blind — a tree-wide search found no `zoom` property
+and no reads; all `zoom` handling was the bridge serialization bake (`ApplyZoomSerializationStyles`,
+Chrome's "pre-multiply lengths at style time" model done at the DOM level). This increment gives the engine
+the property + the compounding factor it needs before any used-value scaling can consume it:
+`CssBoxProperties.Zoom` (a per-box string, wired into the `CssUtils` get/set property dispatch so the
+cascade populates it like any longhand), `OwnZoom` (parses a number / percentage / `normal`), and
+`EffectiveZoom` (this box's `OwnZoom` × every ancestor's — the multiplicative compounding CSS `zoom`
+implies). All gated by the new thread-static `NativeZoom.Enabled` flag (mirrors `NativeAnchorPlacement`):
+**`EffectiveZoom` is `1.0` everywhere while off, so the engine is zoom-neutral by default** and the bridge
+bake continues to carry zoom unchanged. Tests: `Broiler.Layout.Tests/EffectiveZoomTests.cs` (compounding
+down the tree when enabled; `1.0` everywhere when disabled; number / percentage / `normal` / non-positive
+parsing). Zero regression: 213 engine layout tests, and the Acid3 / guard / public-API / shared-geometry /
+position-area-live-geometry / modal-centering Cli suites all pass — the foundation is inert.
+
+**Remaining zoom increments** (each builds on `EffectiveZoom`, in order): (2) apply the factor to the used
+**font size** — separating the *computed* font size (unzoomed, inherited and the `em`/`%` base) from the
+*used* font size (computed × `EffectiveZoom`), so `em` and inheritance compound correctly; (3) apply it to
+absolute (`px`/`pt`/…) **length** used values — cleanly a `Broiler.CSS.CssLengthParser.ParseLength` zoom
+parameter (a submodule change → **patch workflow**), threaded from each box's `EffectiveZoom`, with `%`
+compounding through the already-zoomed containing block and `em` through the zoomed font size; (4) the SVG
+attribute / `::before`·`::after` pseudo / column edge cases the bake also covers; (5) the render/paint path
+(reuses the patch-0008/0009 `BCanvas.Scale` viewport-zoom plumbing, but per-subtree rather than a uniform
+root scale); (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles`. The `%`-vs-`px`-vs-`em`
+and *own*-vs-*effective* factor distinctions (increments 2–3) are the intricate, correctness-sensitive core
+— which is why this is "the large piece" and is being landed incrementally behind the flag.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 
