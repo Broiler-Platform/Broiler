@@ -90,45 +90,7 @@ public sealed partial class DomBridge
     // Form-control IDL reflectors (value/checked/type/name/disabled/hidden/tabIndex/required) moved to
     // the FormControlBinding feature module (Phase 3 P3.60).
 
-    private JSValue JsJsObjectsSubmit125Core(DomElement element, JSObject? obj, in Arguments a)
-    {
-        if (string.Equals(element.TagName, "form", StringComparison.OrdinalIgnoreCase))
-        {
-            // Fire submit event
-            var submitEvt = new JSObject();
-            submitEvt.FastAddValue((KeyString)"type", new JSString("submit"), JSPropertyAttributes.EnumerableConfigurableValue);
-            submitEvt.FastAddValue((KeyString)"target", obj, JSPropertyAttributes.EnumerableConfigurableValue);
-            submitEvt.FastAddValue((KeyString)"bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-            submitEvt.FastAddValue((KeyString)"cancelable", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-            var prevented = false;
-            submitEvt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-            JSValue JsJsObjectsPreventDefault124(in Arguments _)
-            {
-                prevented = true;
-                submitEvt[(KeyString)"defaultPrevented"] = JSBoolean.True;
-                return JSUndefined.Value;
-            }
-
-            submitEvt.FastAddValue((KeyString)"preventDefault", new JSFunction(JsJsObjectsPreventDefault124, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            submitEvt.FastAddValue((KeyString)"stopPropagation", UndefinedFunction("stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            if (GetEventListeners(element).TryGetValue("submit", out var submitListeners))
-            {
-                foreach (var registration in submitListeners.ToList())
-                {
-                    InvokeEventListener(registration.Listener, submitEvt, "DomBridge.submit");
-                }
-            }
-
-            // If preventDefault was called, do not proceed with default action
-            if (prevented)
-            {
-                RenderLogger.LogDebug(LogCategory.JavaScript, "DomBridge.submit", "Default action prevented");
-            }
-        }
-
-        return JSUndefined.Value;
-    }
-
+    // form.submit() moved to the FormSubmitBinding feature module (Phase 3 P3.61).
 
     // insertAdjacentElement / insertAdjacentText / insertAdjacentHTML (and their
     // NormalizeInsertAdjacentPosition / GetInsertAdjacentTarget helpers) moved to the

@@ -509,9 +509,10 @@ public sealed partial class DomBridge
             new JSFunction((in a) => _forms.IsElementValid(element) ? JSBoolean.True : JSBoolean.False, "reportValidity", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // submit() — for form elements
+        // submit() — for form elements (Phase 3 P3.61: co-located FormSubmitBinding feature module,
+        // reached through IFormSubmitHost; DomBridge.FormSubmitHost.cs).
         obj.FastAddValue((KeyString)"submit",
-            new JSFunction((in a) => JsJsObjectsSubmit125Core(element, obj, in a), "submit", 0),
+            new JSFunction((in a) => Dom.Features.FormSubmitBinding.Submit(this, element, obj, in a), "submit", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // querySelector on elements

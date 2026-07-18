@@ -20,7 +20,7 @@ own status entries for the specifics; the summary below is the quick view.
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
-| 3 — feature modules | Bulk delivered | Residual `JsObjects.cs` element-member callbacks (`form.submit()`, the `element.style` cssText setter) and Canvas (Phase-6-entangled) still to come (SVG done — P3.50; Element/geometry done — P3.51; `<object>` sub-document accessors done — P3.52; tree mutation done — P3.58; on* reflectors done — P3.59; form-control IDL done — P3.60); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
+| 3 — feature modules | Bulk delivered | Residual `JsObjects.cs` callbacks — the `element.style` cssText setter (deferred Phase-4-item-2-entangled) — and Canvas (Phase-6-entangled) still to come (SVG done — P3.50; Element/geometry done — P3.51; `<object>` sub-document accessors done — P3.52; tree mutation done — P3.58; on* reflectors done — P3.59; form-control IDL done — P3.60; `form.submit()` done — P3.61); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
 
@@ -1698,18 +1698,37 @@ the checked IDL state plus radio-group mutual exclusion, and `<select>` value re
 / HtmlDomInterface / DomImplementation / public-API-snapshot / architecture-guard suites pass (158 tests across
 the two runs); `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.61 completed** 2026-07-18 (same branch) — the **`form.submit()` action**, extracted off the mixed
+`JsObjects.cs` element-member callbacks. `FormSubmitBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) fires
+the synthetic cancelable `submit` event on a `<form>` and invokes the form's registered `submit` listeners,
+honouring `preventDefault()` (this engine does not navigate on submit, so the prevention is logged). It is kept
+distinct from `FormBinding` (P3.9, whose deliberately narrow `IFormHost` couples only through `ToJSObject`) so
+the event-dispatch concern does not dilute that module. Only the listener-store read needs the bridge — reached
+through the one-member `IFormSubmitHost` contract (`DomBridge.FormSubmitHost.cs`); the no-op function factory
+(`UndefinedFunction`), the listener invoker (`InvokeEventListener`) and the render logger are the bridge's
+`internal static` helpers, called directly. The `submit` registration in `DomBridge/JsObjects.cs` now calls
+`Dom.Features.FormSubmitBinding.Submit`, and the callback (`JsJsObjectsSubmit125Core`, with its nested
+`preventDefault` closure) is gone from `JsFunctionCallbacks/JsObjects.cs` (157 → 119 lines). Behaviour-preserving;
+no public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/FormSubmitBindingModuleTests.cs`
+(feature-module / host-contract / callback-moved guards + end-to-end characterizations: the `submit` listener
+fires, sees a cancelable event and `preventDefault()` sets `defaultPrevented`; `submit()` on a non-form is a
+no-op). Regression check: the form-submit / Form / EventTarget / EventDispatch / Acid3 / public-API-snapshot /
+architecture-guard suites pass (one pre-existing environment-sensitive `SelectListBox…WritingMode` render check
+fails identically on `origin/main`, unrelated to this change); `Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
-any residual coupling: the residue of the mixed `JsObjects.cs` element-member callbacks (`form.submit()`
-and the `element.style` cssText setter), Canvas (better done with Phase 6, which
-dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
+any residual coupling: the residue of the mixed `JsObjects.cs` element-member callbacks (the
+`element.style` cssText setter, entangled with the deferred Phase-4 item-2 inline-style dict machinery),
+Canvas (better done with Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and
+the DomBridge 500-800-line facade target.
 **Frames is done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is done** (P3.50);
 **Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done** (P3.52); **the mixed
 `ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global attribute reflectors
 are done** (P3.54); **insertAdjacent\* is done** (P3.56); **the element-content members are done** (P3.57);
 **tree mutation is done** (P3.58 — `insertBefore`/`appendChild`/`append`/`prepend`/`removeChild`/`replaceChild`);
 **the on\* event-handler reflectors are done** (P3.59); **the form-control IDL reflectors are done** (P3.60 —
-`value`/`checked`/`type`/`name`/`disabled`/`hidden`/`tabIndex`/`required`).
+`value`/`checked`/`type`/`name`/`disabled`/`hidden`/`tabIndex`/`required`); **`form.submit()` is done** (P3.61).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
