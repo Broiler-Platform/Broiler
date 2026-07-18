@@ -1552,13 +1552,35 @@ neutral `internal static` `ParseCssLengthToPixels` (widened `private`→`interna
 engine). Regression check: the computed-style / sparse-computed-style / element-interface / element-reflection
 / object-element / HtmlDomInterface / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.54 completed** 2026-07-18 (same branch) — the **HTMLElement global content-attribute reflectors**,
+the first cohesive slice off the big mixed `JsFunctionCallbacks/JsObjects.cs` element-member callbacks file.
+`GlobalAttributeBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates `id`, `className` (↔ `class`),
+`title`, `lang`, `accessKey` (↔ `accesskey`), `dir`, and the enumerated `draggable` (registration **and**
+callbacks together, per work-item 2). The selector-affecting three (`id`/`className`/`dir`) invalidate the style
+scope on write through the one-member `IGlobalAttributeHost` contract (`DomBridge.GlobalAttributeHost.cs`); the
+plain reflectors (`title`/`lang`/`accessKey`/`draggable`) use the bridge's neutral `internal static`
+`SetAttr`/`TryGetAttribute` helpers directly, and the canonical `id`/`class` mirrors stay on
+`DomElement.Id`/`ClassName`. The three inline `title`/`lang`/`accessKey` get/set pairs collapse into shared
+`ReflectedGet`/`ReflectedSet` helpers — a small net simplification. The ~40-line registration block in
+`DomBridge/JsObjects.cs` becomes one `Dom.Features.GlobalAttributeBinding.Install(this, obj, element)` call, and
+the nine callbacks (`SetId002`..`SetDraggable014`) are gone from `JsFunctionCallbacks/JsObjects.cs` (654 → 582
+lines). Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/GlobalAttributeBindingModuleTests.cs` (feature-module / host-contract /
+nine-callbacks-moved-off-bridge guards + end-to-end characterizations: all seven reflectors round-tripping
+through the JS engine, the `draggable` default-false / empty-`className` reads, and — the reason the host
+contract exists — assigning `id` re-running the `#target` cascade via style-scope invalidation). Regression
+check: the HtmlDomInterface / element-attribute / classList / selectors-CSSOM / Acid3 / public-API-snapshot /
+node-accessor / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
-any residual coupling: Window/Document, Canvas (better done with Phase 6, which dissolves
-`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
-done** (P3.13/P3.16/P3.17/P3.18); **SVG is done** (P3.50); **Element/geometry is done** (P3.51); **the `<object>`
-sub-document accessors are done** (P3.52); **the mixed `ElementInterfaces.cs` callbacks file is fully retired**
-(P3.53).
+any residual coupling: the rest of the mixed `JsObjects.cs` element-member callbacks (innerHTML/outerHTML/
+textContent setters, tree mutation, form-control IDL, `<iframe>` accessors, insertAdjacent*), Canvas (better done
+with Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge
+500-800-line facade target. **Frames is done** (P3.13/P3.16/P3.17/P3.18); **SVG is done** (P3.50);
+**Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done** (P3.52); **the mixed
+`ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global attribute reflectors
+are done** (P3.54).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

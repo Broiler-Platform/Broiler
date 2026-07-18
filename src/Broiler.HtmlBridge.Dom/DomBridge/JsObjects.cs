@@ -82,46 +82,11 @@ public sealed partial class DomBridge
                     : element.TagName),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddProperty((KeyString)"id",
-            new JSFunction((in a) => element.Id != null ? new JSString(element.Id) : JSNull.Value, "get id"),
-            new JSFunction((in a) => JsJsObjectsSetId002Core(bridge, element, in a), "set id"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // className (read/write) — reflects the 'class' content attribute
-        obj.FastAddProperty((KeyString)"className",
-            new JSFunction((in a) => JsJsObjectsGetClassName003Core(element, in a), "get className"),
-            new JSFunction((in a) => JsJsObjectsSetClassName004Core(bridge, element, in a), "set className"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // title (read/write) — synced with attributes["title"]
-        obj.FastAddProperty((KeyString)"title",
-            new JSFunction((in a) => TryGetAttribute(element, "title", out var t) ? new JSString(t) : new JSString(string.Empty), "get title"),
-            new JSFunction((in a) => JsJsObjectsSetTitle006Core(element, in a), "set title"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // lang (read/write) — synced with attributes["lang"]
-        obj.FastAddProperty((KeyString)"lang",
-            new JSFunction((in a) => TryGetAttribute(element, "lang", out var lang) ? new JSString(lang) : new JSString(string.Empty), "get lang"),
-            new JSFunction((in a) => JsJsObjectsSetLang008Core(element, in a), "set lang"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // accessKey (read/write) — synced with attributes["accesskey"]
-        obj.FastAddProperty((KeyString)"accessKey",
-            new JSFunction((in a) => TryGetAttribute(element, "accesskey", out var accessKey) ? new JSString(accessKey) : new JSString(string.Empty), "get accessKey"),
-            new JSFunction((in a) => JsJsObjectsSetAccessKey010Core(element, in a), "set accessKey"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // dir (read/write) — synced with attributes["dir"]
-        obj.FastAddProperty((KeyString)"dir",
-            new JSFunction((in a) => TryGetAttribute(element, "dir", out var dir) ? new JSString(dir) : new JSString(string.Empty), "get dir"),
-            new JSFunction((in a) => JsJsObjectsSetDir012Core(bridge, element, in a), "set dir"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // draggable (read/write) — reflected enumerated attribute
-        obj.FastAddProperty((KeyString)"draggable",
-            new JSFunction((in _) => JsJsObjectsGetDraggable013Core(element, in _), "get draggable"),
-            new JSFunction((in a) => JsJsObjectsSetDraggable014Core(element, in a), "set draggable"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        // HTMLElement global content-attribute reflectors (id, className, title, lang, accessKey, dir,
+        // draggable) — Phase 3 P3.54: extracted into the co-located GlobalAttributeBinding feature module.
+        // The selector-affecting three (id/className/dir) invalidate the style scope on write through the
+        // one-member IGlobalAttributeHost contract (DomBridge.GlobalAttributeHost.cs).
+        Dom.Features.GlobalAttributeBinding.Install(this, obj, element);
 
         // innerHTML (read/write)
         obj.FastAddProperty((KeyString)"innerHTML",

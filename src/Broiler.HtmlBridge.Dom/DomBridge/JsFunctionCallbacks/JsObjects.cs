@@ -14,80 +14,8 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
 
-    private JSValue JsJsObjectsSetId002Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        var val = a.Length > 0 ? a[0].ToString() : string.Empty;
-        element.Id = val;
-        SetAttr(element, "id", val);
-        bridge.InvalidateStyleScope(element);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsGetClassName003Core(DomElement element, in Arguments a)
-    {
-        // Prefer Attributes['class'] (synced by setAttribute and className setter).
-        // Fall back to element.ClassName for elements created with a class in the constructor
-        // but not yet synced to Attributes (e.g. parsed HTML elements).
-        if (TryGetAttribute(element, "class", out var cls))
-            return new JSString(cls);
-        return element.ClassName != null ? new JSString(element.ClassName) : new JSString(string.Empty);
-    }
-
-
-    private JSValue JsJsObjectsSetClassName004Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        var val = a.Length > 0 ? a[0].ToString() : string.Empty;
-        element.ClassName = val;
-        SetAttr(element, "class", val);
-        bridge.InvalidateStyleScope(element);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsSetTitle006Core(DomElement element, in Arguments a)
-    {
-        SetAttr(element, "title", a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsSetLang008Core(DomElement element, in Arguments a)
-    {
-        SetAttr(element, "lang", a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsSetAccessKey010Core(DomElement element, in Arguments a)
-    {
-        SetAttr(element, "accesskey", a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsSetDir012Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        SetAttr(element, "dir", a.Length > 0 ? a[0].ToString() : string.Empty);
-        bridge.InvalidateStyleScope(element);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsGetDraggable013Core(DomElement element, in Arguments _)
-    {
-        if (TryGetAttribute(element, "draggable", out var draggable))
-            return string.Equals(draggable, "true", StringComparison.OrdinalIgnoreCase) ? JSBoolean.True : JSBoolean.False;
-        return JSBoolean.False;
-    }
-
-
-    private JSValue JsJsObjectsSetDraggable014Core(DomElement element, in Arguments a)
-    {
-        SetAttr(element, "draggable", a.Length > 0 && a[0].BooleanValue ? "true" : "false");
-        return JSUndefined.Value;
-    }
-
+    // HTMLElement global content-attribute reflectors (id, className, title, lang, accessKey, dir,
+    // draggable) moved to the GlobalAttributeBinding feature module (Phase 3 P3.54).
 
     private JSValue JsJsObjectsSetInnerHTML016Core(DomBridge? bridge, DomElement element, in Arguments a)
     {
