@@ -1572,12 +1572,34 @@ contract exists — assigning `id` re-running the `#target` cascade via style-sc
 check: the HtmlDomInterface / element-attribute / classList / selectors-CSSOM / Acid3 / public-API-snapshot /
 node-accessor / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.55 completed** 2026-07-18 (same branch) — the **`<iframe>`-element browsing-context accessors**,
+the second cohesive slice off the mixed `JsObjects.cs` element-member callbacks and the sibling of the P3.52
+`<object>` extraction. `IframeElementBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates
+`contentDocument` / `contentWindow` / `getSVGDocument()` (each the same-origin sub-document or sub-window, or
+`null` across origins — `getSVGDocument()` now shares the one `GetContentDocument` helper the `contentDocument`
+getter uses, since they were identical), the `src` / `srcdoc` read/write pair (whose setters reload the frame:
+invalidate the cached sub-document, clear the fired-onload latch, then fire `onload`), and the read-only
+`sandbox` reflection (registration **and** callbacks together, per work-item 2). The frames machinery is reached
+through the six-member `IIframeElementHost` contract (`DomBridge.IframeElementHost.cs`: the same-origin gate, the
+sub-document / sub-window factories, and the reload hooks that live on the `BrowsingContextManager` /
+`SubWindowBinding` owners); the content-attribute reads/writes use the neutral `internal static`
+`SetAttr`/`TryGetAttribute` helpers directly. The byte-identical `src`/`srcdoc` setters (`SetSrc139`≡`SetSrcdoc141`)
+collapse into one `SetFrameAttribute`. The ~30-line `<iframe>` block in `DomBridge/JsObjects.cs` becomes one
+`Dom.Features.IframeElementBinding.Install(this, obj, element)` call, and the five callbacks
+(`GetContentDocument135`..`SetSrcdoc141`) are gone from `JsFunctionCallbacks/JsObjects.cs` (582 → 538 lines).
+Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/IframeElementBindingModuleTests.cs` (feature-module / host-contract /
+five-callbacks-moved-off-bridge guards + end-to-end characterizations: same-origin `contentDocument` (nodeType 9)
+/ `contentWindow` / `getSVGDocument()` ≡ `contentDocument`, and the `src`/`srcdoc` content-attribute round-trip).
+Regression check: the iframe / sub-document / sub-window / SVG-cross-doc / WebMessaging / object-element /
+HtmlDomInterface / public-API-snapshot / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: the rest of the mixed `JsObjects.cs` element-member callbacks (innerHTML/outerHTML/
-textContent setters, tree mutation, form-control IDL, `<iframe>` accessors, insertAdjacent*), Canvas (better done
-with Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge
-500-800-line facade target. **Frames is done** (P3.13/P3.16/P3.17/P3.18); **SVG is done** (P3.50);
+textContent setters, tree mutation, form-control IDL, insertAdjacent*), Canvas (better done with Phase 6, which
+dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
+**Frames is done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is done** (P3.50);
 **Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done** (P3.52); **the mixed
 `ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global attribute reflectors
 are done** (P3.54).

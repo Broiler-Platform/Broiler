@@ -532,51 +532,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsGetContentDocument135Core(DomElement element, in Arguments _)
-    {
-        // Cross-origin iframes return null for contentDocument (same-origin policy)
-        if (IsCurrentIframeCrossOrigin(element))
-            return JSNull.Value;
-        // Non-HTML resources get a minimal empty sub-document (no parsed fallback content)
-        return GetOrCreateSubDocument(element);
-    }
-
-
-    private JSValue JsJsObjectsGetContentWindow136Core(DomElement element, in Arguments _)
-    {
-        if (IsCurrentIframeCrossOrigin(element))
-            return JSNull.Value;
-        return _subWindows.GetOrCreate(element);
-    }
-
-
-    private JSValue JsJsObjectsGetSVGDocument137Core(DomElement element, in Arguments _)
-    {
-        if (IsCurrentIframeCrossOrigin(element))
-            return JSNull.Value;
-        return GetOrCreateSubDocument(element);
-    }
-
-
-    private JSValue JsJsObjectsSetSrc139Core(DomBridge? bridgeForSrc, DomElement element, in Arguments a)
-    {
-        SetAttr(element, "src", a.Length > 0 ? a[0].ToString() : string.Empty);
-        // Invalidate cached sub-document when src changes
-        InvalidateCachedSubDocument(element);
-        _browsingContexts.ClearOnloadFired(element);
-        // Fire onload for the new resource
-        bridgeForSrc.FireSubDocumentOnload(element);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsSetSrcdoc141Core(DomBridge? bridgeForSrc, DomElement element, in Arguments a)
-    {
-        SetAttr(element, "srcdoc", a.Length > 0 ? a[0].ToString() : string.Empty);
-        InvalidateCachedSubDocument(element);
-        _browsingContexts.ClearOnloadFired(element);
-        bridgeForSrc.FireSubDocumentOnload(element);
-        return JSUndefined.Value;
-    }
+    // <iframe> browsing-context accessors (contentDocument/contentWindow/getSVGDocument, src/srcdoc
+    // setters) moved to the IframeElementBinding feature module (Phase 3 P3.55).
 
 }

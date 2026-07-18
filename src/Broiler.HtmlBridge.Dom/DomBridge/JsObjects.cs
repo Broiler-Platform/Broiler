@@ -621,39 +621,11 @@ public sealed partial class DomBridge
             new JSFunction((in a) => JsJsObjectsGetContext134Core(element, in a), "getContext", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // contentWindow / contentDocument — for <iframe> elements with full sub-document DOM
-        if (string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase))
-        {
-            obj.FastAddProperty((KeyString)"contentDocument",
-                new JSFunction((in _) => JsJsObjectsGetContentDocument135Core(element, in _), "get contentDocument"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"contentWindow",
-                new JSFunction((in _) => JsJsObjectsGetContentWindow136Core(element, in _), "get contentWindow"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // getSVGDocument() — returns contentDocument (same as contentDocument for same-origin)
-            obj.FastAddValue((KeyString)"getSVGDocument",
-                new JSFunction((in _) => JsJsObjectsGetSVGDocument137Core(element, in _), "getSVGDocument", 0),
-                JSPropertyAttributes.EnumerableConfigurableValue);
-
-            // src property (read/write) — for iframe elements
-            var bridgeForSrc = this;
-            obj.FastAddProperty((KeyString)"src",
-                new JSFunction((in _) => TryGetAttribute(element, "src", out var s) ? new JSString(s) : new JSString(string.Empty), "get src"),
-                new JSFunction((in a) => JsJsObjectsSetSrc139Core(bridgeForSrc, element, in a), "set src"),
-                 JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            obj.FastAddProperty((KeyString)"srcdoc",
-                new JSFunction((in _) => TryGetAttribute(element, "srcdoc", out var s) ? new JSString(s) : new JSString(string.Empty), "get srcdoc"),
-                new JSFunction((in a) => JsJsObjectsSetSrcdoc141Core(bridgeForSrc, element, in a), "set srcdoc"),
-                JSPropertyAttributes.EnumerableConfigurableProperty);
-
-            // sandbox attribute access
-            obj.FastAddProperty((KeyString)"sandbox",
-                new JSFunction((in _) => TryGetAttribute(element, "sandbox", out var sandbox) ? new JSString(sandbox) : new JSString(string.Empty), "get sandbox"),
-                null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        }
+        // <iframe> browsing-context accessors (contentDocument/contentWindow/getSVGDocument, src/srcdoc
+        // read/write, sandbox reflection) — Phase 3 P3.55: extracted into the co-located IframeElementBinding
+        // feature module, sibling of the P3.52 <object> ObjectElementBinding. Reaches the frames machinery
+        // through the IIframeElementHost contract (DomBridge.IframeElementHost.cs).
+        Dom.Features.IframeElementBinding.Install(this, obj, element);
 
         AddElementSpecificMembers(obj, element);
 
