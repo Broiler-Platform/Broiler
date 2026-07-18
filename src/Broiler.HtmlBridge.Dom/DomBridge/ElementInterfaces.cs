@@ -11,7 +11,6 @@ public sealed partial class DomBridge
 {
     private void AddElementSpecificMembers(JSObject obj, Broiler.Dom.DomElement element)
     {
-        var bridge = this;
         // -- Phase 5: HTML DOM Interfaces --
 
         var tag = element.TagName.ToLowerInvariant();
@@ -104,14 +103,16 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
-        // HTMLImageElement — height/width return computed CSS value or HTML attribute
+        // HTMLImageElement — height/width return computed CSS value or HTML attribute (Phase 3 P3.53:
+        // the used-dimension getter moved to the ComputedStyleBinding feature module alongside
+        // getComputedStyle; the reflected-dimension setter is in ElementReflectionBinding, P3.49).
         if (tag == "img")
         {
             foreach (var dim in new[] { "height", "width" })
             {
                 var dimName = dim;
                 obj.FastAddProperty((KeyString)dimName,
-                    new JSFunction((in _) => JsElementInterfacesCallback062Core(bridge, dimName, element, in _), "get " + dimName),
+                    new JSFunction((in _) => Dom.Features.ComputedStyleBinding.GetUsedDimension(this, dimName, element, in _), "get " + dimName),
                     new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedDimension(dimName, element, in a), "set " + dimName),
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }

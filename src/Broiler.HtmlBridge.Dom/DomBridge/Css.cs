@@ -477,7 +477,7 @@ public sealed partial class DomBridge
     /// Returns -1 if the value cannot be parsed.
     /// Default font size for em conversion is 16px.
     /// </summary>
-    private static double ParseCssLengthToPixels(string value, int viewportWidth = 0, int viewportHeight = 0)
+    internal static double ParseCssLengthToPixels(string value, int viewportWidth = 0, int viewportHeight = 0)
     {
         if (string.IsNullOrWhiteSpace(value)) return double.NaN;
 

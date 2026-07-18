@@ -1534,12 +1534,31 @@ three-callbacks-moved-off-bridge guards + end-to-end characterizations: same-ori
 `null` gate). Regression check: the sub-document / SVG-cross-doc / object / element-interface / element-reflection
 / HtmlDomInterface / public-API-snapshot / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.53 completed** 2026-07-18 (same branch) — the **`<img>` used-dimension getter**, the last
+callback in the mixed `JsFunctionCallbacks/ElementInterfaces.cs`, which **retires that file entirely**. The
+`<img>.width`/`<img>.height` IDL getters report the element's used (rendered) dimension by reading it out of
+the computed-style object (content-attribute fallback, then `0`), so rather than a new module they fold into
+the existing `ComputedStyleBinding` (P3.37) as `GetUsedDimension`, reusing its `IComputedStyleHost`
+`BuildComputedStyleObject` seam — the module's charter widens slightly from "the `getComputedStyle` entry
+point" to "the computed-style reads." The CSS-length parse and content-attribute fallback use the bridge's
+neutral `internal static` `ParseCssLengthToPixels` (widened `private`→`internal`) / `TryGetAttribute`. The
+`<img>` registration in `DomBridge/ElementInterfaces.cs` now calls
+`Dom.Features.ComputedStyleBinding.GetUsedDimension(this, dimName, element, …)` (paired with the P3.49
+`ElementReflectionBinding.SetReflectedDimension` setter); with the last callback gone, the whole
+`JsFunctionCallbacks/ElementInterfaces.cs` file (and the now-unused `bridge` local in
+`AddElementSpecificMembers`) is **deleted**. Behaviour-preserving; no public-API change. Tests: extended
+`Broiler.Cli.Tests/ComputedStyleBindingModuleTests.cs` (both callbacks-off-the-bridge guard + an end-to-end
+`<img>.width`/`height` characterization: content-attribute fallback resolving to a number through the JS
+engine). Regression check: the computed-style / sparse-computed-style / element-interface / element-reflection
+/ object-element / HtmlDomInterface / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
-any residual coupling: Window/Document, the residual `<img>` computed-dimension getter (`Callback062`), Canvas
-(better done with Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the
-DomBridge 500-800-line facade target. **Frames is done** (P3.13/P3.16/P3.17/P3.18); **SVG is done** (P3.50);
-**Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done** (P3.52).
+any residual coupling: Window/Document, Canvas (better done with Phase 6, which dissolves
+`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
+done** (P3.13/P3.16/P3.17/P3.18); **SVG is done** (P3.50); **Element/geometry is done** (P3.51); **the `<object>`
+sub-document accessors are done** (P3.52); **the mixed `ElementInterfaces.cs` callbacks file is fully retired**
+(P3.53).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
