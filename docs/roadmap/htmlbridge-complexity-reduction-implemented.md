@@ -20,7 +20,7 @@ own status entries for the specifics; the summary below is the quick view.
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
-| 3 — feature modules | Bulk delivered | Window/Document, Canvas modules still to come (SVG done — P3.50; Element/geometry done — P3.51; `<object>` sub-document accessors done — P3.52); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
+| 3 — feature modules | Bulk delivered | Remaining `JsObjects.cs` element-member callbacks (form-control IDL, on* event-handler reflectors, the `element.style` cssText setter) and Canvas (Phase-6-entangled) still to come (SVG done — P3.50; Element/geometry done — P3.51; `<object>` sub-document accessors done — P3.52; tree mutation done — P3.58); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
 
@@ -1633,15 +1633,41 @@ collapsing children to one text node). Regression check: the element-content / H
 / Acid3 / shadow-DOM / public-API-snapshot / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds
 clean.
 
+Status: **P3.58 completed** 2026-07-18 (branch `claude/htmlbridge-complexity-phases-r2w0r9`) — the **DOM `Node`
+child-mutation methods**, the "tree mutation" slice named first in the still-to-come list, extracted off the
+mixed `JsObjects.cs` element-member callbacks. `TreeMutationBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates `insertBefore` / `appendChild` / `append` / `prepend` /
+`removeChild` / `replaceChild` — pure canonical tree mutation that resolves the child wrapper(s), enforces
+the `HierarchyRequestError` circular-reference guard, and positions or detaches nodes. The neutral tree
+helpers (`ParentEl`, `ChildAt`, `ChildIndexOf`, `RemoveNthChild`, `RemoveChildFrom`, `SetParent`,
+`ThrowDOMException`) stay the bridge's `internal static` helpers, called directly (matching the P3.47
+`ChildNodeBinding` sibling); the side-effecting insertion (`InsertNodeAt`), the JS-object→node resolver
+(`FindDomNodeByJSObject`), the `append`/`prepend` argument builder (`BuildChildNodeArgumentNodes`),
+style-scope invalidation, the JS context the DOM-exception thrower needs, and the node-iterator /
+mutation-observer notifications (`NotifyNodeIteratorPreRemoval` / `NotifyChildAdded` / `NotifyChildRemoved`)
+are reached through the eight-member `ITreeMutationHost` contract (`DomBridge.TreeMutationHost.cs`). The six
+inline registrations in `DomBridge/JsObjects.cs` become `Dom.Features.TreeMutationBinding.*` calls in place
+(behaviour-preserving property order; the interleaved `attachShadow` and ElementTraversal getters keep their
+positions), and the six callbacks are gone from `JsFunctionCallbacks/JsObjects.cs` (462 → 320 lines), along
+with the now-dead `bridgeForInsert` / `bridgeForAppend` capture locals. Behaviour-preserving; no public-API
+change (module + contract internal). Tests: `Broiler.Cli.Tests/TreeMutationBindingModuleTests.cs`
+(feature-module / host-contract / six-callbacks-moved-off-bridge guards + end-to-end characterizations:
+`appendChild`/`append`/`insertBefore`/`prepend` ordering, `removeChild`/`replaceChild` mutation and return
+values, and the `appendChild` circular-insertion `HierarchyRequestError`). Regression check: the
+TreeMutation / ChildNode / ElementContent / HtmlDomInterface / DomImplementation / Acid3 / DOM-edge-case /
+inner-HTML-parallel-state / public-API-snapshot / architecture-guard suites pass (151 tests across the two
+runs); `Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
-any residual coupling: the rest of the mixed `JsObjects.cs` element-member callbacks (tree mutation, form-control
-IDL, on* event-handler reflectors), Canvas (better done with Phase 6, which dissolves
-`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
-done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is done** (P3.50);
+any residual coupling: the rest of the mixed `JsObjects.cs` element-member callbacks (form-control
+IDL, on* event-handler reflectors, the `element.style` cssText setter), Canvas (better done with Phase 6, which
+dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
+**Frames is done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is done** (P3.50);
 **Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done** (P3.52); **the mixed
 `ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global attribute reflectors
-are done** (P3.54); **insertAdjacent\* is done** (P3.56); **the element-content members are done** (P3.57).
+are done** (P3.54); **insertAdjacent\* is done** (P3.56); **the element-content members are done** (P3.57);
+**tree mutation is done** (P3.58 — `insertBefore`/`appendChild`/`append`/`prepend`/`removeChild`/`replaceChild`).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

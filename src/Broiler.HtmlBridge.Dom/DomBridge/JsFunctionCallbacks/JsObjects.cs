@@ -52,38 +52,7 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsInsertBefore080Core(DomBridge? bridgeForInsert, DomElement element, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSUndefined.Value;
-        if (a[0] is not JSObject newChildObj)
-            return JSUndefined.Value;
-        var newEl = FindDomNodeByJSObject(newChildObj);
-        if (newEl == null)
-            return a[0];
-        // Prevent circular references (HierarchyRequestError per DOM spec)
-        if (ReferenceEquals(newEl, element) || element.IsDescendantOf(newEl))
-            ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
-        if (a.Length < 2 || a[1].IsNull || a[1].IsUndefined)
-        {
-            bridgeForInsert.InsertNodeAt(element, newEl, element.ChildNodes.Count);
-            return a[0];
-        }
-
-        if (a[1] is not JSObject refChildObj)
-            return a[0];
-        var refEl = FindDomNodeByJSObject(refChildObj);
-        if (refEl == null)
-            return a[0];
-        if (ReferenceEquals(newEl, refEl))
-            return a[0];
-        var idx = ChildIndexOf(element, refEl);
-        if (idx < 0)
-            throw new JSException("NotFoundError: The node before which the new node is to be inserted is not a child of this node.");
-        bridgeForInsert.InsertNodeAt(element, newEl, idx);
-        return a[0];
-    }
-
+    // insertBefore(newChild, refChild) moved to the TreeMutationBinding feature module (Phase 3 P3.58).
 
     private JSValue JsJsObjectsAttachShadow087Core(DomElement element, in Arguments a)
     {
@@ -112,119 +81,8 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsAppendChild088Core(DomBridge? bridgeForAppend, DomElement element, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSUndefined.Value;
-        if (a[0] is not JSObject childObj)
-            return JSUndefined.Value;
-        // Find the Broiler.Dom.DomElement for this child JSObject
-        var childEl = FindDomNodeByJSObject(childObj);
-        if (childEl == null)
-            return a[0];
-        // Prevent circular references (HierarchyRequestError per DOM spec)
-        if (ReferenceEquals(childEl, element) || element.IsDescendantOf(childEl))
-            ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
-        bridgeForAppend.InsertNodeAt(element, childEl, element.ChildNodes.Count);
-        return a[0];
-    }
-
-
-    private JSValue JsJsObjectsAppend089Core(DomElement element, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSUndefined.Value;
-        var nodes = BuildChildNodeArgumentNodes(a);
-        var insertIndex = element.ChildNodes.Count;
-        foreach (var node in nodes)
-            InsertNodeAt(element, node, insertIndex++);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsPrepend090Core(DomElement element, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSUndefined.Value;
-        var nodes = BuildChildNodeArgumentNodes(a);
-        var insertIndex = 0;
-        foreach (var node in nodes)
-            InsertNodeAt(element, node, insertIndex++);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsRemoveChild091Core(DomBridge? bridgeForAppend, DomElement element, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSUndefined.Value;
-        if (a[0] is not JSObject childObj)
-            return JSUndefined.Value;
-        var childEl = FindDomNodeByJSObject(childObj);
-        if (childEl == null)
-            return a[0];
-        var idx = ChildIndexOf(element, childEl);
-        if (idx < 0)
-            return a[0];
-        NotifyNodeIteratorPreRemoval(childEl);
-        RemoveNthChild(element, idx);
-        SetParent(childEl, null);
-        bridgeForAppend.InvalidateStyleScope(element);
-        NotifyChildRemoved(element, childEl, idx);
-        return a[0];
-    }
-
-
-    private JSValue JsJsObjectsReplaceChild092Core(DomBridge? bridgeForAppend, DomElement element, in Arguments a)
-    {
-        if (a.Length < 2)
-            return JSUndefined.Value;
-        if (a[0] is not JSObject newChildObj || a[1] is not JSObject oldChildObj)
-            return JSUndefined.Value;
-        var newEl = FindDomNodeByJSObject(newChildObj);
-        var oldEl = FindDomNodeByJSObject(oldChildObj);
-        if (newEl == null || oldEl == null)
-            return a[1];
-        // Prevent circular references (HierarchyRequestError per DOM spec)
-        if (ReferenceEquals(newEl, element) || element.IsDescendantOf(newEl))
-            ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
-        var idx = ChildIndexOf(element, oldEl);
-        if (idx < 0)
-            return a[1];
-        var previousSibling = idx > 0 ? ChildAt(element, idx - 1) : null;
-        var nextSibling = idx + 1 < element.ChildNodes.Count ? ChildAt(element, idx + 1) : null;
-        // If newChild is already in this parent, remove it first and re-find idx
-        if (ReferenceEquals(ParentEl(newEl), element))
-        {
-            RemoveChildFrom(element, newEl);
-            idx = ChildIndexOf(element, oldEl);
-            if (idx < 0)
-                return a[1];
-        }
-        else
-        {
-            if (ParentEl(newEl) != null)
-            {
-                var oldParent = ParentEl(newEl);
-                var oldIndex = ChildIndexOf(oldParent, newEl);
-                if (oldIndex >= 0)
-                {
-                    NotifyNodeIteratorPreRemoval(newEl);
-                    RemoveNthChild(oldParent, oldIndex);
-                    NotifyChildRemoved(oldParent, newEl, oldIndex);
-                }
-            }
-        }
-
-        SetParent(oldEl, null);
-        SetParent(newEl, element);
-        element.ReplaceChild(newEl, element.ChildNodes[idx]);
-        bridgeForAppend.InvalidateStyleScope(element);
-        NotifyChildRemoved(element, oldEl, idx, previousSibling, nextSibling);
-        NotifyChildAdded(element, newEl, idx);
-        return a[1]; // returns the old child
-    }
-
+    // appendChild / append / prepend / removeChild / replaceChild moved to the TreeMutationBinding
+    // feature module (Phase 3 P3.58).
 
     private JSValue JsJsObjectsCallback104Core(DomElement element, global::System.String? eventName, in Arguments _)
     {

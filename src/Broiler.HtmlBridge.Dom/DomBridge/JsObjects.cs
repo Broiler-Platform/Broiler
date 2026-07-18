@@ -367,9 +367,8 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // insertBefore(newChild, refChild)
-        var bridgeForInsert = this;
         obj.FastAddValue((KeyString)"insertBefore",
-            new JSFunction((in a) => JsJsObjectsInsertBefore080Core(bridgeForInsert, element, in a), "insertBefore", 2),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.InsertBefore(this, element, in a), "insertBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // children (read-only) — element children only (no text nodes)
@@ -409,27 +408,26 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // appendChild(child)
-        var bridgeForAppend = this;
         obj.FastAddValue((KeyString)"appendChild",
-            new JSFunction((in a) => JsJsObjectsAppendChild088Core(bridgeForAppend, element, in a), "appendChild", 1),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.AppendChild(this, element, in a), "appendChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"append",
-            new JSFunction((in a) => JsJsObjectsAppend089Core(element, in a), "append", 0),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.Append(this, element, in a), "append", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"prepend",
-            new JSFunction((in a) => JsJsObjectsPrepend090Core(element, in a), "prepend", 0),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.Prepend(this, element, in a), "prepend", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // removeChild(child)
         obj.FastAddValue((KeyString)"removeChild",
-            new JSFunction((in a) => JsJsObjectsRemoveChild091Core(bridgeForAppend, element, in a), "removeChild", 1),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.RemoveChild(this, element, in a), "removeChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // replaceChild(newChild, oldChild)
         obj.FastAddValue((KeyString)"replaceChild",
-            new JSFunction((in a) => JsJsObjectsReplaceChild092Core(bridgeForAppend, element, in a), "replaceChild", 2),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.ReplaceChild(this, element, in a), "replaceChild", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // remove() — ChildNode.remove() per DOM Living Standard
