@@ -88,35 +88,17 @@ public sealed partial class DomBridge
         // one-member IGlobalAttributeHost contract (DomBridge.GlobalAttributeHost.cs).
         Dom.Features.GlobalAttributeBinding.Install(this, obj, element);
 
-        // innerHTML (read/write)
-        obj.FastAddProperty((KeyString)"innerHTML",
-            new JSFunction((in a) => new JSString(SerializeChildrenToHtml(element)), "get innerHTML"),
-            new JSFunction((in a) => JsJsObjectsSetInnerHTML016Core(bridge, element, in a), "set innerHTML"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // outerHTML (read/write)
-        obj.FastAddProperty((KeyString)"outerHTML",
-            new JSFunction((in _) => new JSString(SerializeElementToHtml(element)), "get outerHTML"),
-            new JSFunction((in a) => JsJsObjectsSetOuterHTML018Core(bridge, element, in a), "set outerHTML"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        // innerHTML / outerHTML (read/write) — Phase 3 P3.57: extracted into the co-located
+        // ElementContentBinding feature module (reached through IElementContentHost;
+        // DomBridge.ElementContentHost.cs). Split around shadowRoot to preserve property order.
+        Dom.Features.ElementContentBinding.InstallHtmlSerialization(this, obj, element);
 
         obj.FastAddProperty((KeyString)"shadowRoot",
             new JSFunction((in _) => JsJsObjectsGetShadowRoot019Core(element, in _), "get shadowRoot"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // textContent (read/write)
-        obj.FastAddProperty((KeyString)"textContent",
-            new JSFunction((in _) => GetNodeTextValue(element), "get textContent"),
-            new JSFunction((in a) => JsJsObjectsSetTextContent021Core(bridge, element, in a), "set textContent"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        obj.FastAddProperty((KeyString)"innerText",
-            new JSFunction((in _) => GetNodeTextValue(element), "get innerText"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        obj.FastAddProperty((KeyString)"outerText",
-            new JSFunction((in _) => GetNodeTextValue(element), "get outerText"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        // textContent (read/write) + innerText / outerText (read) — Phase 3 P3.57: ElementContentBinding.
+        Dom.Features.ElementContentBinding.InstallTextContent(this, obj, element);
 
         // style object — CSS property access and manipulation.
         // In browsers, `element.style` is a read-only property: assigning a

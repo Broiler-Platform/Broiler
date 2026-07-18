@@ -1614,15 +1614,34 @@ element placement at all four positions, text/HTML insertion, and the invalid-po
 Regression check: the insertAdjacent / HtmlDomInterface / HtmlFragment / DOM-mutation / traversal / Acid3 /
 public-API-snapshot / iframe / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.57 completed** 2026-07-18 (same branch) — the **element-content IDL members**, a further slice
+off the mixed `JsObjects.cs` element-member callbacks. `ElementContentBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates the HTML-serialization pair `innerHTML` / `outerHTML` (read
+serializes the element/children, write reparses a fragment) and the text-content trio `textContent` /
+`innerText` / `outerText` (read returns the node's text value, only `textContent` is writable). Everything
+routes through the bridge's shared parser/serializer and canonical tree mutation, reached through the
+six-member `IElementContentHost` contract (`DomBridge.ElementContentHost.cs`). Split into two install entry
+points (`InstallHtmlSerialization` / `InstallTextContent`) so the unrelated `shadowRoot` accessor keeps its
+original position between them — behaviour-preserving property order. The inline registration in
+`DomBridge/JsObjects.cs` becomes two `Dom.Features.ElementContentBinding.Install*` calls, and the three
+callbacks (`SetInnerHTML016`/`SetOuterHTML018`/`SetTextContent021`) are gone from
+`JsFunctionCallbacks/JsObjects.cs` (482 → 462 lines). Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/ElementContentBindingModuleTests.cs` (feature-module /
+host-contract / three-callbacks-moved-off-bridge guards + end-to-end characterizations: `innerHTML`
+read/reparse, `outerHTML` element replacement, and `textContent`/`innerText` read + `textContent` write
+collapsing children to one text node). Regression check: the element-content / HtmlDomInterface / serialization
+/ Acid3 / shadow-DOM / public-API-snapshot / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds
+clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
-any residual coupling: the rest of the mixed `JsObjects.cs` element-member callbacks (innerHTML/outerHTML/
-textContent setters, tree mutation, form-control IDL, on* event-handler reflectors), Canvas (better done with
-Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line
-facade target. **Frames is done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is
-done** (P3.50); **Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done**
-(P3.52); **the mixed `ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global
-attribute reflectors are done** (P3.54); **insertAdjacent\* is done** (P3.56).
+any residual coupling: the rest of the mixed `JsObjects.cs` element-member callbacks (tree mutation, form-control
+IDL, on* event-handler reflectors), Canvas (better done with Phase 6, which dissolves
+`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
+done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is done** (P3.50);
+**Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done** (P3.52); **the mixed
+`ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global attribute reflectors
+are done** (P3.54); **insertAdjacent\* is done** (P3.56); **the element-content members are done** (P3.57).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

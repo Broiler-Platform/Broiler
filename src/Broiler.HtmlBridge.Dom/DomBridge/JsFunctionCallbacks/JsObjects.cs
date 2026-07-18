@@ -17,19 +17,8 @@ public sealed partial class DomBridge
     // HTMLElement global content-attribute reflectors (id, className, title, lang, accessKey, dir,
     // draggable) moved to the GlobalAttributeBinding feature module (Phase 3 P3.54).
 
-    private JSValue JsJsObjectsSetInnerHTML016Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        bridge.SetElementInnerHtml(element, a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsSetOuterHTML018Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        bridge.SetElementOuterHtml(element, a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
+    // innerHTML / outerHTML / textContent get+set moved to the ElementContentBinding feature module
+    // (Phase 3 P3.57).
 
     private JSValue JsJsObjectsGetShadowRoot019Core(DomElement element, in Arguments _)
     {
@@ -38,15 +27,6 @@ public sealed partial class DomBridge
             return JSNull.Value;
         var mode = ShadowStateFor(element).Mode.TryGet(out var rawMode) ? rawMode as string : null;
         return string.Equals(mode, "open", StringComparison.OrdinalIgnoreCase) ? ToJSObject(shadowRoot) : JSNull.Value;
-    }
-
-
-    private JSValue JsJsObjectsSetTextContent021Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        var text = a.Length > 0 ? a[0].ToString() : string.Empty;
-        // Setting textContent replaces all children with a single text node per DOM spec.
-        bridge.SetElementTextContent(element, text);
-        return JSUndefined.Value;
     }
 
 
