@@ -1594,15 +1594,35 @@ five-callbacks-moved-off-bridge guards + end-to-end characterizations: same-orig
 Regression check: the iframe / sub-document / sub-window / SVG-cross-doc / WebMessaging / object-element /
 HtmlDomInterface / public-API-snapshot / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.56 completed** 2026-07-18 (same branch) — the **DOM `insertAdjacent*` methods**, a further
+cohesive slice off the mixed `JsObjects.cs` element-member callbacks. `InsertAdjacentBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates `insertAdjacentElement` / `insertAdjacentText` /
+`insertAdjacentHTML` — each resolving the `beforebegin`/`afterbegin`/`beforeend`/`afterend` position to a
+(parent, index) target and inserting an element, a text node, or the parsed fragment there. The
+position-normalisation and target-resolution helpers (`NormalizeInsertAdjacentPosition` /
+`GetInsertAdjacentTarget`, previously in `HtmlFragmentMutation.cs`) moved into the module with the methods
+since they had no other consumer; they raise the spec `SyntaxError` / `NoModificationAllowedError` via
+`DomBridge.ThrowDOMException` and navigate with the neutral `internal static` `ParentEl`/`ChildIndexOf`, while
+the JS context, reverse lookup, insertion primitive, text-node factory, fragment parser and computed-style
+reset come through the six-member `IInsertAdjacentHost` contract (`DomBridge.InsertAdjacentHost.cs`). The three
+registration sites in `DomBridge/JsObjects.cs` become one `Dom.Features.InsertAdjacentBinding.Install(this, obj,
+element)` call, and the three callbacks (`InsertAdjacentElement130`..`InsertAdjacentHTML132`) plus the two
+helpers are gone from the bridge (`JsFunctionCallbacks/JsObjects.cs` 538 → 482 lines). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/InsertAdjacentBindingModuleTests.cs`
+(feature-module / host-contract / callbacks-and-helpers-moved-off-bridge guards + end-to-end characterizations:
+element placement at all four positions, text/HTML insertion, and the invalid-position `SyntaxError`).
+Regression check: the insertAdjacent / HtmlDomInterface / HtmlFragment / DOM-mutation / traversal / Acid3 /
+public-API-snapshot / iframe / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: the rest of the mixed `JsObjects.cs` element-member callbacks (innerHTML/outerHTML/
-textContent setters, tree mutation, form-control IDL, insertAdjacent*), Canvas (better done with Phase 6, which
-dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target.
-**Frames is done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is done** (P3.50);
-**Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done** (P3.52); **the mixed
-`ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global attribute reflectors
-are done** (P3.54).
+textContent setters, tree mutation, form-control IDL, on* event-handler reflectors), Canvas (better done with
+Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line
+facade target. **Frames is done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is
+done** (P3.50); **Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done**
+(P3.52); **the mixed `ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global
+attribute reflectors are done** (P3.54); **insertAdjacent\* is done** (P3.56).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

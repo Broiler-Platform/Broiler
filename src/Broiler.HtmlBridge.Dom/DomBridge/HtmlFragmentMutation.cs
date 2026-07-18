@@ -88,37 +88,8 @@ public sealed partial class DomBridge
     // canonical algorithm drops the bridge copy's element-level BridgeText comparison, which was a
     // no-op on the canonical tree (an element's NodeValue is null) — so it is behaviour-equivalent.
 
-    private string NormalizeInsertAdjacentPosition(JSValue? value)
-    {
-        var position = value?.ToString().Trim().ToLowerInvariant() ?? string.Empty;
-        if (position is "beforebegin" or "afterbegin" or "beforeend" or "afterend")
-            return position;
-
-        ThrowDOMException(_jsContext!, $"'{position}' is not a valid insertion position.", "SyntaxError");
-        return string.Empty;
-    }
-
-    private (DomElement Parent, int Index) GetInsertAdjacentTarget(DomElement element, string position)
-    {
-        switch (position)
-        {
-            case "beforebegin":
-                if (ParentEl(element) == null)
-                    ThrowDOMException(_jsContext!, "Cannot insert adjacent content without a parent node.", "NoModificationAllowedError");
-                return (ParentEl(element)!, ChildIndexOf(ParentEl(element)!, element));
-            case "afterbegin":
-                return (element, 0);
-            case "beforeend":
-                return (element, element.ChildNodes.Count);
-            case "afterend":
-                if (ParentEl(element) == null)
-                    ThrowDOMException(_jsContext!, "Cannot insert adjacent content without a parent node.", "NoModificationAllowedError");
-                return (ParentEl(element)!, ChildIndexOf(ParentEl(element)!, element) + 1);
-            default:
-                ThrowDOMException(_jsContext!, $"'{position}' is not a valid insertion position.", "SyntaxError");
-                return (element, element.ChildNodes.Count);
-        }
-    }
+    // NormalizeInsertAdjacentPosition / GetInsertAdjacentTarget moved to the InsertAdjacentBinding feature
+    // module (Phase 3 P3.56) with their only consumers, the insertAdjacent* methods.
 
     // Phase 4 item 1: parent widened DomElement -> DomNode so a canonical DomDocumentFragment can be
     // an insertion parent (fragment.appendChild/append/...). The style-scope invalidation and

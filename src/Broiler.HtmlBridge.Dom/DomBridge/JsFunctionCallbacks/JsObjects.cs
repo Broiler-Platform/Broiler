@@ -455,65 +455,9 @@ public sealed partial class DomBridge
     }
 
 
-    private JSValue JsJsObjectsInsertAdjacentElement130Core(DomElement element, in Arguments a)
-    {
-        if (a.Length < 2)
-            return JSNull.Value;
-        var position = NormalizeInsertAdjacentPosition(a[0]);
-        if (a[1] is not JSObject adjacentObject)
-            return JSNull.Value;
-        var adjacentElement = FindDomElementByJSObject(adjacentObject);
-        if (adjacentElement == null)
-            return JSNull.Value;
-        var (parent, index) = GetInsertAdjacentTarget(element, position);
-        InsertNodeAt(parent, adjacentElement, index);
-        return a[1];
-    }
-
-
-    private JSValue JsJsObjectsInsertAdjacentText131Core(DomElement element, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSUndefined.Value;
-        var position = NormalizeInsertAdjacentPosition(a[0]);
-        var text = a.Length > 1 ? a[1].ToString() : string.Empty;
-        var (parent, index) = GetInsertAdjacentTarget(element, position);
-        var textNode = CreateBridgeTextNode(text);
-        InsertNodeAt(parent, textNode, index);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsJsObjectsInsertAdjacentHTML132Core(DomElement element, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSUndefined.Value;
-        var position = NormalizeInsertAdjacentPosition(a[0]);
-        var html = a.Length > 1 ? a[1].ToString() : string.Empty;
-        if (string.IsNullOrEmpty(html))
-            return JSUndefined.Value;
-        DomElement parsingContext;
-        switch (position)
-        {
-            case "beforebegin":
-            case "afterend":
-                if (ParentEl(element) == null)
-                    ThrowDOMException(_jsContext!, "Cannot insert adjacent HTML without a parent node.", "NoModificationAllowedError");
-                parsingContext = ParentEl(element)!;
-                break;
-            default:
-                parsingContext = element;
-                break;
-        }
-
-        var (parent, index) = GetInsertAdjacentTarget(element, position);
-        var nodes = BuildAdjacentHtmlNodes(parsingContext, html);
-        foreach (var node in nodes)
-            InsertNodeAt(parent, node, index++);
-        ResetComputedStyleEngines();
-        return JSUndefined.Value;
-    }
-
+    // insertAdjacentElement / insertAdjacentText / insertAdjacentHTML (and their
+    // NormalizeInsertAdjacentPosition / GetInsertAdjacentTarget helpers) moved to the
+    // InsertAdjacentBinding feature module (Phase 3 P3.56).
 
     private JSValue JsJsObjectsGetContext134Core(DomElement element, in Arguments a)
     {

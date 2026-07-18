@@ -599,17 +599,10 @@ public sealed partial class DomBridge
             new JSFunction((in a) => Dom.Features.SelectorsBinding.Closest(this, element, in a), "closest", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue((KeyString)"insertAdjacentElement",
-            new JSFunction((in a) => JsJsObjectsInsertAdjacentElement130Core(element, in a), "insertAdjacentElement", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"insertAdjacentText",
-            new JSFunction((in a) => JsJsObjectsInsertAdjacentText131Core(element, in a), "insertAdjacentText", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"insertAdjacentHTML",
-            new JSFunction((in a) => JsJsObjectsInsertAdjacentHTML132Core(element, in a), "insertAdjacentHTML", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        // insertAdjacentElement / insertAdjacentText / insertAdjacentHTML — Phase 3 P3.56: extracted into
+        // the co-located InsertAdjacentBinding feature module (reached through IInsertAdjacentHost;
+        // DomBridge.InsertAdjacentHost.cs).
+        Dom.Features.InsertAdjacentBinding.Install(this, obj, element);
 
         // getElementsByTagName on elements — searches descendants in tree order
         obj.FastAddValue((KeyString)"getElementsByTagName",
