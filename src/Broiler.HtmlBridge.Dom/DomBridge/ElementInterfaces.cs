@@ -35,28 +35,28 @@ public sealed partial class DomBridge
         if (tag == "label")
         {
             obj.FastAddProperty((KeyString)"htmlFor", new JSFunction((in _) => TryGetAttribute(element, "for", out var f) ? new JSString(f) : new JSString(string.Empty), "get htmlFor"),
-                new JSFunction((in a) => JsElementInterfacesSetHtmlFor047Core(element, in a), "set htmlFor"), JSPropertyAttributes.EnumerableConfigurableProperty);
+                new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetHtmlFor(element, in a), "set htmlFor"), JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         // HTMLMetaElement — httpEquiv property (maps to 'http-equiv' content attribute)
         if (tag == "meta")
         {
             obj.FastAddProperty((KeyString)"httpEquiv", new JSFunction((in _) => TryGetAttribute(element, "http-equiv", out var he) ? new JSString(he) : new JSString(string.Empty), "get httpEquiv"),
-                new JSFunction((in a) => JsElementInterfacesSetHttpEquiv049Core(element, in a), "set httpEquiv"), JSPropertyAttributes.EnumerableConfigurableProperty);
+                new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetHttpEquiv(element, in a), "set httpEquiv"), JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         // HTMLObjectElement — data property with URI resolution + contentDocument + getSVGDocument + type
         if (tag == "object")
         {
             obj.FastAddProperty((KeyString)"data",
-                new JSFunction((in _) => JsElementInterfacesGetData050Core(bridge, element, in _), "get data"),
+                new JSFunction((in _) => Dom.Features.ElementReflectionBinding.GetData(this, element, in _), "get data"),
                 new JSFunction((in a) => JsElementInterfacesSetData051Core(bridge, element, in a), "set data"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // type property (MIME type of the resource)
             obj.FastAddProperty((KeyString)"type",
                 new JSFunction((in _) => TryGetAttribute(element, "type", out var t) ? new JSString(t) : new JSString(string.Empty), "get type"),
-                new JSFunction((in a) => JsElementInterfacesSetType053Core(element, in a), "set type"),
+                new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetType(element, in a), "set type"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // contentDocument for <object> element (with same-origin check)
@@ -76,8 +76,8 @@ public sealed partial class DomBridge
         if (tag == "a")
         {
             obj.FastAddProperty((KeyString)"href",
-                new JSFunction((in _) => JsElementInterfacesGetHref056Core(bridge, element, in _), "get href"),
-                new JSFunction((in a) => JsElementInterfacesSetHref057Core(element, in a), "set href"),
+                new JSFunction((in _) => Dom.Features.ElementReflectionBinding.GetHref(this, element, in _), "get href"),
+                new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetHref(element, in a), "set href"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
@@ -90,14 +90,14 @@ public sealed partial class DomBridge
                 var captured = attrName; // capture for closure
                 obj.FastAddProperty((KeyString)captured,
                     new JSFunction((in _) => TryGetAttribute(element, captured, out var v) ? new JSString(v) : new JSString(string.Empty), "get " + captured),
-                    new JSFunction((in a) => JsElementInterfacesCallback059Core(captured, element, in a), "set " + captured),
+                    new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedAttribute(captured, element, in a), "set " + captured),
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
 
             // href — with URI resolution like <a>
             obj.FastAddProperty((KeyString)"href",
-                new JSFunction((in _) => JsElementInterfacesGetHref060Core(bridge, element, in _), "get href"),
-                new JSFunction((in a) => JsElementInterfacesSetHref061Core(element, in a), "set href"),
+                new JSFunction((in _) => Dom.Features.ElementReflectionBinding.GetHref(this, element, in _), "get href"),
+                new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetHref(element, in a), "set href"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
@@ -109,7 +109,7 @@ public sealed partial class DomBridge
                 var dimName = dim;
                 obj.FastAddProperty((KeyString)dimName,
                     new JSFunction((in _) => JsElementInterfacesCallback062Core(bridge, dimName, element, in _), "get " + dimName),
-                    new JSFunction((in a) => JsElementInterfacesCallback063Core(dimName, element, in a), "set " + dimName),
+                    new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedDimension(dimName, element, in a), "set " + dimName),
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
         }

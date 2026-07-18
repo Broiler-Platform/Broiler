@@ -17,31 +17,6 @@ public sealed partial class DomBridge
     // form.length and form.action moved to the Phase 3 FormBinding feature module
     // (Broiler.HtmlBridge.Dom.Features).
 
-    private JSValue JsElementInterfacesSetHtmlFor047Core(DomElement element, in Arguments a)
-    {
-        SetAttr(element, "for", a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsElementInterfacesSetHttpEquiv049Core(DomElement element, in Arguments a)
-    {
-        SetAttr(element, "http-equiv", a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsElementInterfacesGetData050Core(DomBridge? bridge, DomElement element, in Arguments _)
-    {
-        if (!TryGetAttribute(element, "data", out var d))
-            return new JSString(string.Empty);
-        // Resolve relative URI against base URL
-        if (Uri.TryCreate(bridge._pageUrl, UriKind.Absolute, out var baseUri) && Uri.TryCreate(baseUri, d, out var resolved))
-            return new JSString(resolved.AbsoluteUri);
-        return new JSString(d);
-    }
-
-
     private JSValue JsElementInterfacesSetData051Core(DomBridge? bridge, DomElement element, in Arguments a)
     {
         SetAttr(element, "data", a.Length > 0 ? a[0].ToString() : string.Empty);
@@ -49,14 +24,6 @@ public sealed partial class DomBridge
         bridge.InvalidateCachedSubDocument(element);
         return JSUndefined.Value;
     }
-
-
-    private JSValue JsElementInterfacesSetType053Core(DomElement element, in Arguments a)
-    {
-        SetAttr(element, "type", a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
 
     private JSValue JsElementInterfacesGetContentDocument054Core(DomBridge? bridge, DomElement element, in Arguments _)
     {
@@ -77,48 +44,6 @@ public sealed partial class DomBridge
             return JSNull.Value;
         return bridge.GetOrCreateSubDocument(element);
     }
-
-
-    private JSValue JsElementInterfacesGetHref056Core(DomBridge? bridge, DomElement element, in Arguments _)
-    {
-        if (!TryGetAttribute(element, "href", out var h))
-            return new JSString(string.Empty);
-        if (Uri.TryCreate(bridge._pageUrl, UriKind.Absolute, out var baseUri) && Uri.TryCreate(baseUri, h, out var resolved))
-            return new JSString(resolved.AbsoluteUri);
-        return new JSString(h);
-    }
-
-
-    private JSValue JsElementInterfacesSetHref057Core(DomElement element, in Arguments a)
-    {
-        SetAttr(element, "href", a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsElementInterfacesCallback059Core(string? captured, DomElement element, in Arguments a)
-    {
-        SetAttr(element, captured, a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
-
-    private JSValue JsElementInterfacesGetHref060Core(DomBridge? bridge, DomElement element, in Arguments _)
-    {
-        if (!TryGetAttribute(element, "href", out var h))
-            return new JSString(string.Empty);
-        if (Uri.TryCreate(bridge._pageUrl, UriKind.Absolute, out var baseUri) && Uri.TryCreate(baseUri, h, out var resolved))
-            return new JSString(resolved.AbsoluteUri);
-        return new JSString(h);
-    }
-
-
-    private JSValue JsElementInterfacesSetHref061Core(DomElement element, in Arguments a)
-    {
-        SetAttr(element, "href", a.Length > 0 ? a[0].ToString() : string.Empty);
-        return JSUndefined.Value;
-    }
-
 
     private JSValue JsElementInterfacesCallback062Core(DomBridge? bridge, string? dimName, DomElement element, in Arguments _)
     {
@@ -141,14 +66,6 @@ public sealed partial class DomBridge
             return new JSNumber(attrNum);
         return new JSNumber(0);
     }
-
-
-    private JSValue JsElementInterfacesCallback063Core(string? dimName, DomElement element, in Arguments a)
-    {
-        SetAttr(element, dimName, a.Length > 0 ? a[0].ToString() : "0");
-        return JSUndefined.Value;
-    }
-
 
     private JSValue JsElementInterfacesGetScrollTop072Core(DomBridge? bridgeForOffset, DomElement element, in Arguments _)
     {

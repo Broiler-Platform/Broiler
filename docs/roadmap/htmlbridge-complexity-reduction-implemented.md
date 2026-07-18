@@ -1437,6 +1437,29 @@ builder-and-four-callbacks-moved-off-bridge guards + a direct round-trip charact
 invoked on the built object). Regression check: the guard / window-scroll / clone / Acid3 suites pass (65);
 `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.49 completed** 2026-07-17 (same branch) — the **reflected content-attribute IDL accessors**, a
+cohesive URL/reflection slice cherry-picked off the mixed `ElementInterfaces.cs` (whose remaining callbacks
+are the layout-entangled `Element/geometry` and SVG-text-metric families and the sub-document `data`/
+`contentDocument` accessors). `ElementReflectionBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the plain string reflectors (`label.htmlFor` ↔ `for`, `meta.httpEquiv` ↔ `http-equiv`, `.type`,
+and the generic named-string / numeric-dimension setters) and the URL-typed getters (`<object>.data` and
+`<a>/<area>/<base>/<link>.href`), which resolve their relative content attribute against the live page URL.
+The content-attribute reads/writes use the bridge's neutral `internal static` `TryGetAttribute`/`SetAttr`
+helpers directly; only the page URL — read at call time so navigation stays reflected — comes through the
+one-member `IElementReflectionHost` contract (`DomBridge.ElementReflectionHost.cs`). The byte-identical
+`href` get/set callback pairs (`GetHref056`≡`060`, `SetHref057`≡`061`) are deduplicated into one
+`GetHref`/`SetHref`, and the shared page-URL resolution factored into one `ResolveReflectedUrl` — a small
+net simplification. All ten registration sites in `ElementInterfaces.cs` now call
+`Dom.Features.ElementReflectionBinding.<Op>`; the ten callbacks are gone from
+`JsFunctionCallbacks/ElementInterfaces.cs` (413 → 330 lines), leaving only the sub-document
+(`SetData051`/`GetContentDocument054`/`GetSVGDocument055`) and computed-style-dimension (`Callback062`)
+callbacks. Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/ElementReflectionBindingModuleTests.cs` (feature-module / host-contract /
+ten-callbacks-moved-off-bridge guards + an end-to-end `<a>.href` characterization: relative-URL resolution
+against the page base, IDL set, and raw content-attribute read through the bridge). Regression check: the
+element-interface / anchor / Acid3 / HtmlDomInterface / clone / architecture-guard suites pass (127);
+`Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
 any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
