@@ -154,6 +154,29 @@ synthesis (and its author-geometry / position-try helpers) from `Dialogs.cs`.
   overwriting the specified value) and running after used size is known — then a one-line DomParser UA rule
   (`inset:0; margin:auto` on a top-layer `<dialog>` with auto insets) centres modals. Deferred as its own
   engine increment.
+
+  **Landed (2026-07-17/18) — the engine work item AND the bridge wiring for definite-size modals.** The
+  "deferred engine increment" above was implemented as `CssBox.ResolveOverconstrainedAutoMargins`
+  (commit `e45bd33`, `Broiler.Layout`, main-repo): CSS2.1 §10.3.7/§10.6.4 auto-margin centring for
+  absolutely-positioned and fixed boxes, resolving *both* snags — snag (1) via the latched
+  `IsSpecifiedMargin{Left,Right,Top,Bottom}Auto` flags (which survive the getter's lossy `auto→"0"`
+  rewrite) plus `InvalidateActualMargins()`, and snag (2) via `IsDefiniteBorderBoxHeight` (uses the
+  resolved `Size.Height`, or derives it from an explicit non-percentage height). Covered by
+  `Broiler.Layout.Tests/AutoMarginCenteringTests.cs` (7 tests, incl. the margin-already-read-as-auto case
+  and the negative-excess clamp). **Bridge wiring (2026-07-18, main-repo):** `ApplyDialogUAPositioning`
+  now applies the UA `dialog:modal { inset:0; margin:auto }` default via `ApplyModalCenteringDefaults`,
+  **per axis and only where the modal has a definite specified size** (`IsDefiniteSizeValue` — not
+  auto/`fit-content`/`min-content`/`max-content`; a `<percentage>` counts), so the engine centres a
+  definite-size modal in the viewport. A content-sized (auto/intrinsic) axis is deliberately left
+  untouched — with both insets it would *stretch* to fill the viewport, because the engine still does not
+  shrink-wrap a both-inset abspos/fixed box (`ResolveBlockUsedWidth` line ~185 fills the IMCB for
+  `width:auto`/intrinsic with both insets); that shrink-to-fit sizing is the remaining engine increment
+  for content-sized modal centring. Any author inset/margin declaration suppresses the UA default
+  entirely. Covered by `Broiler.Cli.Tests/NativeModalCenteringTests.cs` (definite-size centred;
+  content-sized not stretched; author-positioned untouched; definite-width/auto-height centres only
+  horizontally). Zero regressions — the dialog/backdrop/popover/anchor/Acid3/architecture-guard/public-API
+  suites pass (the standing zoom / visual-viewport / anchor-size / iframe-scroll serialization
+  environmental fails are identical with the change stashed).
 - **Anchor-track render residue** stays exhausted (established earlier): the only un-handed-off case is a
   `position-area` box that *also* uses `position-try`, for which **no WPT test exists**, so widening the MVP
   gate has no observable payoff.

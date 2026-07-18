@@ -78,7 +78,75 @@ public sealed partial class DomBridge
             // Set position:fixed as UA default for modal dialogs that have
             // no explicit position, matching Chromium's top-layer behaviour.
             InlineStyle(el)["position"] = "fixed";
+
+            // HTML UA `dialog:modal { inset:0; margin:auto }` centring. With the box
+            // fixed-positioned, both insets 0 and auto margins, the layout engine's
+            // §10.3.7 / §10.6.4 auto-margin resolution centres a definite-size box in the
+            // viewport (Broiler.Layout CssBox.ResolveOverconstrainedAutoMargins).
+            ApplyModalCenteringDefaults(el);
         }
+    }
+
+    // The HTML UA `dialog:modal` inset/margin properties (checked both as their shorthands and
+    // as longhands): any author declaration on these means the page positions the modal itself,
+    // so the UA centring default must not fight it.
+    private static readonly string[] ModalPositioningProps =
+    [
+        "inset", "inset-block", "inset-inline", "left", "right", "top", "bottom",
+        "margin", "margin-block", "margin-inline",
+        "margin-left", "margin-right", "margin-top", "margin-bottom",
+    ];
+
+    /// <summary>
+    /// Applies the HTML user-agent <c>dialog:modal { inset:0; margin:auto }</c> centring default to a
+    /// modal <c>&lt;dialog&gt;</c> the bridge just gave the UA <c>position:fixed</c>. The engine centres a
+    /// box only when it has a definite used size on the axis (both opposing insets + auto margins +
+    /// definite size, per CSS2.1 §10.3.7/§10.6.4); a content-sized (auto/intrinsic) axis with both insets
+    /// would instead stretch to fill the viewport, so the inset/margin default is applied <em>per axis</em>
+    /// only where the modal has a definite specified size. A content-sized axis keeps its natural size and
+    /// static position (uncentred) until the engine can shrink-wrap a both-inset box. The default is
+    /// suppressed entirely when the author declares any inset/margin — the page owns the positioning then.
+    /// </summary>
+    private void ApplyModalCenteringDefaults(DomElement el)
+    {
+        var specified = BuildSpecifiedStyleMap(el);
+
+        foreach (var prop in ModalPositioningProps)
+            if (specified.ContainsKey(prop))
+                return;
+
+        bool widthDefinite = IsDefiniteSizeValue(specified.GetValueOrDefault("width"));
+        bool heightDefinite = IsDefiniteSizeValue(specified.GetValueOrDefault("height"));
+        if (!widthDefinite && !heightDefinite)
+            return;
+
+        if (widthDefinite)
+        {
+            InlineStyle(el)["left"] = "0";
+            InlineStyle(el)["right"] = "0";
+            InlineStyle(el)["margin-left"] = "auto";
+            InlineStyle(el)["margin-right"] = "auto";
+        }
+
+        if (heightDefinite)
+        {
+            InlineStyle(el)["top"] = "0";
+            InlineStyle(el)["bottom"] = "0";
+            InlineStyle(el)["margin-top"] = "auto";
+            InlineStyle(el)["margin-bottom"] = "auto";
+        }
+    }
+
+    // A used size is definite (so the engine can centre against it) when it is neither auto nor an
+    // intrinsic-sizing keyword; a <percentage> is definite (it resolves against the containing block).
+    private static bool IsDefiniteSizeValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+        value = value.Trim().ToLowerInvariant();
+        return value != "auto"
+            && value != "fit-content" && value != "min-content" && value != "max-content"
+            && !value.StartsWith("fit-content(", StringComparison.Ordinal);
     }
 
     /// <summary>
