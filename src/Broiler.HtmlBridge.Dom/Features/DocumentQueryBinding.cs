@@ -60,7 +60,7 @@ internal static class DocumentQueryBinding
         var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
         foreach (var el in host.Elements)
         {
-            if (DomBridge.MatchesSelector(el, selector))
+            if (host.MatchesSelector(el, selector))
                 return host.ToJSObject(el);
         }
 
@@ -73,7 +73,7 @@ internal static class DocumentQueryBinding
         var results = new List<JSValue>();
         foreach (var el in host.Elements)
         {
-            if (DomBridge.MatchesSelector(el, selector))
+            if (host.MatchesSelector(el, selector))
                 results.Add(host.ToJSObject(el));
         }
 

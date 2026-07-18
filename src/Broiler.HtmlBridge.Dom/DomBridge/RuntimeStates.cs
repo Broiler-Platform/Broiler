@@ -7,10 +7,17 @@ namespace Broiler.HtmlBridge.Dom.Runtime;
 internal readonly record struct EventListenerRegistration(JSValue Listener, bool Capture, bool Once = false, bool Passive = false);
 
 /// <summary>
-/// JavaScript and browser-runtime state associated with a legacy DOM node.
-/// The node model deliberately does not own this state.
+/// Per-element inline-style runtime state — the authoritative in-memory inline style, whether it has
+/// been seeded from the <c>style=</c> attribute, the set of properties written through the JS
+/// <c>element.style</c> path, and the inline <c>on*</c> event handlers. Reached through the bridge's
+/// per-instance <c>InlineStyleStateFor</c> accessor.
+///
+/// Formerly <c>ElementRuntimeState</c>, the catch-all node-runtime-state composite; every other concern
+/// (form control, scroll, dialog, shadow, stylesheet, document, animation — the classes below) has since
+/// been split into its own per-bridge instance table (Phase 2 items 3/4), leaving only the inline-style
+/// concern here. The node model deliberately does not own this state.
 /// </summary>
-internal sealed class ElementRuntimeState
+internal sealed class InlineStyleRuntimeState
 {
     // P2.5: addEventListener listeners moved off this (process-global) table into the instance-scoped
     // EventTargetRegistry; only inline on* handlers remain node-runtime state here.
@@ -47,42 +54,16 @@ internal sealed class ElementRuntimeState
     /// </summary>
     public bool StyleSeeded { get; set; }
 
-    public FormControlRuntimeState FormControl { get; } = new();
-
-    public ScrollRuntimeState Scroll { get; } = new();
-
-    public DialogRuntimeState Dialog { get; } = new();
-
-    public ShadowRuntimeState Shadow { get; } = new();
-
-    public StyleSheetRuntimeState StyleSheet { get; } = new();
-
-    public DocumentRuntimeState Document { get; } = new();
-
-    public AnimationRuntimeState Animation { get; } = new();
-
-    public void CopyRuntimeValuesTo(ElementRuntimeState target)
-    {
-        FormControl.Value.CopyTo(target.FormControl.Value);
-        FormControl.Checked.CopyTo(target.FormControl.Checked);
-        FormControl.DefaultSelected.CopyTo(target.FormControl.DefaultSelected);
-        FormControl.SelectedIndex.CopyTo(target.FormControl.SelectedIndex);
-        FormControl.ReturnValue.CopyTo(target.FormControl.ReturnValue);
-        Scroll.Left.CopyTo(target.Scroll.Left);
-        Scroll.Top.CopyTo(target.Scroll.Top);
-        Dialog.Modal.CopyTo(target.Dialog.Modal);
-        Dialog.TopLayerOrder.CopyTo(target.Dialog.TopLayerOrder);
-        Dialog.PopoverOpen.CopyTo(target.Dialog.PopoverOpen);
-        Shadow.Root.CopyTo(target.Shadow.Root);
-        Shadow.Host.CopyTo(target.Shadow.Host);
-        Shadow.Mode.CopyTo(target.Shadow.Mode);
-        StyleSheet.FetchedCss.CopyTo(target.StyleSheet.FetchedCss);
-        target.StyleSheet.Rules = StyleSheet.Rules is null ? null : [.. StyleSheet.Rules];
-        target.StyleSheet.RulesSourceText = StyleSheet.RulesSourceText;
-        target.StyleSheet.RulesMutated = StyleSheet.RulesMutated;
-        Document.HasViewport.CopyTo(target.Document.HasViewport);
-        Animation.CurrentTimeMilliseconds.CopyTo(target.Animation.CurrentTimeMilliseconds);
-    }
+    // Phase 2 items 3/4 (de-globalization, 2026-07-17): the former ElementRuntimeState composite's other
+    // concerns — FormControl, Scroll, Dialog, Shadow, StyleSheet, Document and Animation — were each split
+    // into their own per-bridge instance table (DomBridge._formControlRuntimeStates via FormControlStateFor,
+    // _scrollRuntimeStates via ScrollStateFor, _dialogRuntimeStates via DialogStateFor, _shadowRuntimeStates
+    // via ShadowStateFor, _styleSheetRuntimeStates via StyleSheetStateFor, _documentRuntimeStates via
+    // DocumentStateFor, _animationRuntimeStates via AnimationStateFor); every one's clone copy lives in
+    // CloneDomElement now, so the former CopyRuntimeValuesTo aggregator is gone. The inline-style concern
+    // that remained was itself de-globalized to a per-bridge table (DomBridge._inlineStyleStates via
+    // InlineStyleStateFor) and this composite renamed to InlineStyleRuntimeState — no process-static
+    // per-element runtime table remains. See the *RuntimeState classes below (still used by those tables).
 }
 
 internal sealed class FormControlRuntimeState

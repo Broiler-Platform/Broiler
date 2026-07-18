@@ -59,7 +59,7 @@ public sealed partial class DomBridge
         // anchor) baked, so the engine only ever places a modal target against an accessible
         // registered anchor.
         var position = merged.GetValueOrDefault("position");
-        bool isModalDialog = GetElementRuntimeState(element).Dialog.Modal.TryGet(out var modal) && modal is true;
+        bool isModalDialog = DialogStateFor(element).Modal.TryGet(out var modal) && modal is true;
         if (position == "fixed" && !isModalDialog)
             return false;
 
@@ -258,7 +258,7 @@ public sealed partial class DomBridge
         var area = merged.GetValueOrDefault("position-area");
         if (!string.IsNullOrWhiteSpace(area) && area != "none")
             return false;
-        if (GetElementRuntimeState(element).Dialog.Modal.TryGet(out var modal) && modal is true)
+        if (DialogStateFor(element).Modal.TryGet(out var modal) && modal is true)
             return false;
         // The engine sizes already-laid-out (already-zoomed) box geometry; a CSS zoom scale
         // would double-count, so keep zoomed boxes baked.
@@ -345,7 +345,7 @@ public sealed partial class DomBridge
         // engine MVP does not apply — both pure gates exclude them for the same reason).
         if (merged.GetValueOrDefault("position") != "absolute")
             return false;
-        if (GetElementRuntimeState(element).Dialog.Modal.TryGet(out var modal) && modal is true)
+        if (DialogStateFor(element).Modal.TryGet(out var modal) && modal is true)
             return false;
         // A CSS zoom scale would double-count (the engine sizes already-zoomed geometry).
         if (Math.Abs(GetUsedZoomForElement(element) - 1.0) > 0.0001)

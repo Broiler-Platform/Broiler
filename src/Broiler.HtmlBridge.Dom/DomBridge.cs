@@ -4,7 +4,6 @@ using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.String;
 using System.Net;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
@@ -71,7 +70,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // ITraversalHost contract it implements (see DomBridge.TraversalHost.cs).
     private readonly Dom.Features.TraversalBinding _traversal;
     private readonly DomDocument _document;
-    private static readonly ConditionalWeakTable<DomNode, ElementRuntimeState> ElementRuntimeStates = [];
+    // Per-element inline-style runtime state (the last concern de-globalized off the former process-static
+    // ElementRuntimeState table, 2026-07-17); reached via InlineStyleStateFor.
+    private readonly ConditionalWeakTable<DomNode, InlineStyleRuntimeState> _inlineStyleStates = [];
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
     private JSObject? _visualViewportJSObject;
@@ -181,6 +182,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     public DomBridge()
     {
+        _selectorMatcher = new CssSelectorMatcher(new BridgeSelectorStateProvider(this));
         _traversal = new Dom.Features.TraversalBinding(this);
         _mutations = new Dom.Features.MutationObserverBinding(this);
         _eventDispatch = new Dom.Features.EventDispatchBinding(this);
@@ -219,8 +221,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public IReadOnlyList<DomElement> Elements =>
         [.. _document.InclusiveDescendants().OfType<DomElement>()];
 
-    internal static ElementRuntimeState GetElementRuntimeState(DomNode node) =>
-        ElementRuntimeStates.GetValue(node, static _ => new ElementRuntimeState());
+    internal InlineStyleRuntimeState InlineStyleStateFor(DomNode node) =>
+        _inlineStyleStates.GetValue(node, static _ => new InlineStyleRuntimeState());
 
     /// <summary>
     /// The element's authoritative in-memory inline style dictionary (CSS kebab-case),
@@ -396,7 +398,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private DomDocument CreateBrowsingContextDocument()
     {
         var document = new DomDocument();
-        GetElementRuntimeState(document).Document.HasViewport.Set(false);
+        DocumentStateFor(document).HasViewport.Set(false);
         return document;
     }
 
@@ -442,9 +444,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             parent.AppendChild(child);
     }
 
-    internal static Dictionary<string, string> InlineStyle(DomElement element)
+    internal Dictionary<string, string> InlineStyle(DomElement element)
     {
-        var state = GetElementRuntimeState(element);
+        var state = InlineStyleStateFor(element);
         if (!state.StyleSeeded)
         {
             state.StyleSeeded = true;
@@ -461,18 +463,18 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // Named bookkeeping seams for the set of inline-style properties explicitly set via JS
     // (element.style.foo = …, setProperty, cssText). The Phase 3 (P3.14) StyleDeclarationBinding module
     // records/clears these through these helpers instead of touching the runtime-state object directly;
-    // the bridge's own serialization/computed-style paths read GetElementRuntimeState(...).JsSetStyleProps.
-    internal static void MarkInlineStylePropSetByJs(DomElement element, string property) =>
-        GetElementRuntimeState(element).JsSetStyleProps.Add(property);
+    // the bridge's own serialization/computed-style paths read InlineStyleStateFor(...).JsSetStyleProps.
+    internal void MarkInlineStylePropSetByJs(DomElement element, string property) =>
+        InlineStyleStateFor(element).JsSetStyleProps.Add(property);
 
-    internal static void UnmarkInlineStylePropSetByJs(DomElement element, string property) =>
-        GetElementRuntimeState(element).JsSetStyleProps.Remove(property);
+    internal void UnmarkInlineStylePropSetByJs(DomElement element, string property) =>
+        InlineStyleStateFor(element).JsSetStyleProps.Remove(property);
 
-    internal static void ClearInlineStylePropsSetByJs(DomElement element) =>
-        GetElementRuntimeState(element).JsSetStyleProps.Clear();
+    internal void ClearInlineStylePropsSetByJs(DomElement element) =>
+        InlineStyleStateFor(element).JsSetStyleProps.Clear();
 
-    internal static IReadOnlyCollection<string> InlineStylePropsSetByJs(DomElement element) =>
-        GetElementRuntimeState(element).JsSetStyleProps;
+    internal IReadOnlyCollection<string> InlineStylePropsSetByJs(DomElement element) =>
+        InlineStyleStateFor(element).JsSetStyleProps;
 
     /// <summary>Read-only diagnostic view of an element's resolved inline-style map — the same
     /// dictionary the anchor resolver reads and writes (display:none, resolved left/top/width/height,
@@ -480,7 +482,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// tooling callers that need to inspect post-resolution inline styles route through this accessor
     /// instead. Visible only to <c>InternalsVisibleTo</c> assemblies — not part of the public surface,
     /// so it does not re-open a public facade seam.</summary>
-    internal static IReadOnlyDictionary<string, string> GetInlineStyleView(DomElement element) =>
+    internal IReadOnlyDictionary<string, string> GetInlineStyleView(DomElement element) =>
         InlineStyle(element);
 
     /// <summary>Parity-test hook (DOM/CSS promotion §2.1): the bridge's own sparse
@@ -501,14 +503,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomNode element) =>
         _eventTargets.NodeListeners(element);
 
-    private static Dictionary<string, JSValue> GetInlineEventHandlers(DomNode element) =>
-        GetElementRuntimeState(element).InlineEventHandlers;
+    private Dictionary<string, JSValue> GetInlineEventHandlers(DomNode element) =>
+        InlineStyleStateFor(element).InlineEventHandlers;
 
     internal bool TryGetStoredScrollOffset(DomElement element, bool vertical, out double offset)
     {
         var slot = vertical
-            ? GetElementRuntimeState(element).Scroll.Top
-            : GetElementRuntimeState(element).Scroll.Left;
+            ? ScrollStateFor(element).Top
+            : ScrollStateFor(element).Left;
         if (slot.TryGet(out var value) && value is double storedOffset)
         {
             offset = storedOffset;
@@ -680,334 +682,4 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         return _eventLoop.DrainStep(TaskCheckpointCallback);
     }
 
-    /// <summary>
-    /// Fires the <c>load</c> event on the <c>&lt;body&gt;</c> element, which
-    /// triggers the inline <c>onload</c> attribute handler as well as any
-    /// <c>addEventListener('load', …)</c> listeners registered on the body.
-    /// In browsers, the body's <c>onload</c> fires after all synchronous
-    /// scripts have executed. This is critical for test harnesses like Acid3,
-    /// which use <c>&lt;body onload="update()"&gt;</c> to bootstrap the
-    /// test runner.
-    /// </summary>
-    public void FireWindowLoadEvent()
-    {
-        ThrowIfDisposed();
-        if (_jsContext == null) return;
-
-        _jsContext["frames"] = BuildWindowFramesArray();
-
-        var htmlEl = Elements.FirstOrDefault(e =>
-            string.Equals(e.TagName, "html", StringComparison.OrdinalIgnoreCase));
-        if (htmlEl != null)
-            FireDescendantOnloads(htmlEl);
-
-        // 1. Fire window.onload if it was set by script.
-        //    In browsers, setting `window.onload = fn` registers a handler
-        //    that fires when the page finishes loading.  This is distinct
-        //    from the <body onload="…"> inline attribute handler.
-        try
-        {
-            _jsContext.Eval(@"
-(function() {
-  // A page may register the load handler either as `window.onload = fn`
-  // or as a bare `onload = fn` assignment. In a browser `window` IS the
-  // global object so both are the same property; in this engine the global
-  // object and `window` are distinct, so a bare `onload = fn` lands on the
-  // global (globalThis.onload) and never on window.onload. Check both, with
-  // window.onload winning when present.
-  var h = null;
-  if (typeof window.onload === 'function') h = window.onload;
-  else if (typeof onload === 'function') h = onload;
-  if (h) {
-    try { h(); } catch(e) {}
-  }
-})();");
-        }
-        catch (Exception ex)
-        {
-            RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
-                $"Error firing window.onload: {ex.Message}", ex);
-        }
-
-        try
-        {
-            DispatchWindowEvent("load");
-        }
-        catch (Exception ex)
-        {
-            RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
-                $"Error firing window load listeners: {ex.Message}", ex);
-        }
-
-        // 2. Fire <body onload="…"> attribute handler and any load event
-        //    listeners registered on the body element.
-        // Find the <body> element by traversing the document tree.
-        // The body is a child of <html> (documentElement), which is a
-        // child of the document node.
-        DomElement? body = null;
-        if (htmlEl != null)
-        {
-            body = ChildElements(htmlEl).FirstOrDefault(c =>
-                string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
-        }
-        if (body == null) return;
-
-        // Ensure the body's JS object is created so inline event attributes are compiled
-        ToJSObject(body);
-
-        // Dispatch a 'load' event on the body element. This covers inline
-        // attributes, property-assigned handlers (document.body.onload = fn),
-        // and addEventListener registrations using the same event path.
-        try
-        {
-            if (_jsContext.Eval("(function() { var e = document.createEvent('Event'); e.initEvent('load', false, false); return e; })()") is JSObject evt)
-                DispatchEventOnElement(body, evt);
-        }
-        catch (Exception ex)
-        {
-            RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
-                $"Error firing window load event: {ex.Message}", ex);
-        }
-    }
-
-    private JSBoolean DispatchWindowEvent(string eventType, bool bubbles = false)
-    {
-        var evt = new JSObject();
-        evt.FastAddValue((KeyString)"type", new JSString(eventType), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"bubbles", bubbles ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        return DispatchWindowEvent(evt);
-    }
-
-    private JSBoolean DispatchWindowEvent(JSObject evt)
-    {
-        if (_jsContext == null || _windowJSObject == null)
-            return JSBoolean.True;
-
-        var eventType = evt[(KeyString)"type"]?.ToString() ?? "unknown";
-        evt.FastAddValue((KeyString)"target", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt[(KeyString)"srcElement"] = _windowJSObject;
-        evt.FastAddValue((KeyString)"currentTarget", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"eventPhase", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
-
-        var immediateStopped = false;
-        var prevented = evt[(KeyString)"defaultPrevented"] is JSValue defaultPreventedValue &&
-                        defaultPreventedValue.BooleanValue;
-        var currentListenerPassive = false;
-        var legacyCancelBubble = false;
-        evt[(KeyString)"defaultPrevented"] = prevented ? JSBoolean.True : JSBoolean.False;
-        evt.FastAddValue((KeyString)"stopPropagation",
-            new JSFunction((in _) => JsCallbackStopPropagation001Core(ref legacyCancelBubble, in _), "stopPropagation", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"stopImmediatePropagation",
-            new JSFunction((in _) => JsCallbackStopImmediatePropagation002Core(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"preventDefault",
-            new JSFunction((in _) => JsCallbackPreventDefault003Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddProperty(
-            (KeyString)"cancelBubble",
-            new JSFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
-            new JSFunction((in setArgs) => JsCallbackSetCancelBubble005Core(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-        evt.FastAddProperty(
-            (KeyString)"returnValue",
-            new JSFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
-            new JSFunction((in setArgs) => JsCallbackSetReturnValue007Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-        evt.FastAddValue((KeyString)"composedPath",
-            new JSFunction((in _) => new JSArray(_windowJSObject), "composedPath", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        if (_eventTargets.TryGetWindowListeners(eventType, out var listeners))
-        {
-            foreach (var registration in listeners.ToList())
-            {
-                if (immediateStopped)
-                    break;
-
-                currentListenerPassive = registration.Passive;
-                InvokeEventListener(registration.Listener, evt, "DomBridge.window.dispatchEvent");
-                currentListenerPassive = false;
-
-                if (registration.Once)
-                    listeners.Remove(registration);
-            }
-        }
-
-        evt[(KeyString)"currentTarget"] = JSNull.Value;
-        evt[(KeyString)"eventPhase"] = new JSNumber(0);
-        return prevented ? JSBoolean.False : JSBoolean.True;
-    }
-
-    private JSArray BuildWindowFramesArray()
-    {
-        var frames = new List<JSValue>();
-        CollectWindowFrames(DocumentElement, frames);
-        return new JSArray([.. frames]);
-    }
-
-    private void CollectWindowFrames(DomElement element, List<JSValue> frames)
-    {
-        foreach (var child in ChildElements(element))
-        {
-            if (IsText(child))
-                continue;
-
-            if (string.Equals(child.TagName, "iframe", StringComparison.OrdinalIgnoreCase))
-            {
-                var src = TryGetAttribute(child, "src", out var srcValue) ? srcValue : string.Empty;
-                if (!IsCrossOrigin(src, _pageUrl))
-                    frames.Add(_subWindows.GetOrCreate(child));
-            }
-
-            // Sub-documents are severed (P4.4b) — never in-tree children — so the walk always
-            // descends normal element children.
-            CollectWindowFrames(child, frames);
-        }
-    }
-
-    // ------------------------------------------------------------------
-    //  HTML parsing helpers
-    // ------------------------------------------------------------------
-
-    private static readonly System.Text.RegularExpressions.Regex DocTypePattern = DocTypePatternRegex();
-
-    private void ParseHtml(string html)
-    {
-        // P2.2: one call clears both wrapper maps. Re-parse now also releases stale sub-document
-        // wrappers (keyed by detached roots that no lookup can reach again) — observably
-        // equivalent to before, but it stops them lingering until disposal.
-        _jsObjects.Clear();
-        ClearComputedPropsCache();
-        // Clear the document first so the doctype/<html> re-append below satisfies canonical
-        // DomDocument ordering (doctype must precede the document element).
-        ClearChildren(_document);
-        _serializationTransformsApplied = false;
-        // A re-parse is a new document generation: drop the prior document's timers, listeners,
-        // observers and message ports so re-attaching leaves no state from the previous document
-        // (HtmlBridge complexity-reduction roadmap Phase 2, P2.1).
-        ClearRuntimeSessionState();
-        // A re-parsed document is a new generation: release the prior document's headless
-        // layout view (and its renderer container) so geometry is document-scoped.
-        DisposeLayoutView();
-
-        // Parse DOCTYPE from the HTML and add it as the document's first child (before <html>,
-        // which is (re)appended below — canonical DomDocument requires doctype-before-element).
-        var doctype = ParseDocType(html);
-        if (doctype != null)
-            _document.AppendChild(doctype);
-
-        // Publish the document's quirks mode for the render that follows on this
-        // thread. Layout (which on the HTML-string path holds no back-reference to
-        // the document) reads it while sizing the root/body boxes for the
-        // quirks-mode fill-viewport behaviour. Every WPT render runs through this
-        // parse before laying out, so the flag is set for the render that matters.
-        Layout.DocumentModeContext.CurrentQuirksMode =
-            Layout.DocumentModeContext.IsQuirksHtml(html);
-
-        // Use WHATWG-aligned tokeniser & tree builder (shared HtmlDocumentParser).
-        var (docElement, allElements, title) = BuildDocumentTree(html);
-        Title = title;
-        ClearChildren(DocumentElement);
-        // RF-BRIDGE-1c Phase F (F3c part 2d): reparent ALL children (raw ChildNodes) so any
-        // text/comment nodes directly under the parsed <html> survive — no-op on the old
-        // homogeneous tree where every child was an element.
-        foreach (var child in docElement.ChildNodes.ToArray())
-        {
-            SetParent(child, DocumentElement);
-            DocumentElement.AppendChild(child);
-        }
-
-        // Copy attributes from the parsed <html> element to DocumentElement
-        // so that attributes like lang="en", dir="rtl", etc. are preserved
-        // during serialization.
-        if (!string.IsNullOrEmpty(docElement.Id))
-            DocumentElement.Id = docElement.Id;
-        if (!string.IsNullOrEmpty(docElement.ClassName))
-            DocumentElement.ClassName = docElement.ClassName;
-        foreach (var attribute in docElement.Attributes.Values)
-            SetAttr(DocumentElement, attribute.QualifiedName, attribute.Value);
-        foreach (var kv in InlineStyle(docElement))
-            InlineStyle(DocumentElement)[kv.Key] = kv.Value;
-
-
-        // Connect DocumentElement to the canonical document (after the doctype) so that
-        // document.firstChild works and structural pseudo-classes correctly detect the document
-        // root boundary.
-        if (!_document.ChildNodes.Contains(DocumentElement))
-            _document.AppendChild(DocumentElement);
-
-
-        // Stylesheet discovery is document-scoped and lazy through the shared
-        // CssStyleEngine. A rebuilt document must not retain the prior engines.
-        ResetComputedStyleEngines();
-    }
-
-    /// <summary>
-    /// Parses a CSS inline style string (e.g. <c>"color: red; font-size: 12px"</c>)
-    /// into a property→value dictionary. Implements CSS error recovery: when the
-    /// same property is declared multiple times, invalid values are discarded so
-    /// the last <em>valid</em> value wins (per CSS 2.1 §4.2 / CSS Syntax §5).
-    /// </summary>
-    /// <param name="reportDrops">
-    /// When <c>true</c>, declarations rejected by
-    /// <see cref="CSS.Dom.CssDeclarationValidator.IsAcceptableDeclarationValue"/>
-    /// are surfaced through
-    /// <see cref="CSS.Dom.CssEngineDiagnostics.DeclarationRejected"/>
-    /// (diagnostic #1b). The bridge rewrites the serialized <c>style</c> attribute
-    /// from the survivors of this filter (see <c>PrepareCanonicalDocumentForRendering</c>),
-    /// so a dropped inline declaration vanishes before the renderer's own style engine
-    /// can report it — this is the only place such drops are observable. Set it only at
-    /// inline-style <em>ingestion</em> sites that write <c>InlineStyle(element)</c> (so the drop
-    /// reaches the rendered output); leave it off for query/bookkeeping re-parses and for
-    /// stylesheet-rule / descriptor parsing (cascade drops the style engine already reports).
-    /// </param>
-    internal static Dictionary<string, string> ParseStyle(string styleValue, bool reportDrops = false)
-    {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var declarations = new CSS.CssParser().ParseDeclarations(styleValue);
-        foreach (var declaration in declarations.Declarations)
-        {
-            var prop = declaration.Name;
-            // Validate the importance-stripped value against the shared CSS.Dom
-            // declaration table (the same closed-keyword error-recovery the cascade
-            // uses), then re-attach the "!important" suffix the bridge-owned
-            // declaration map carries as part of the string value.
-            var rawValue = declaration.Value.Text;
-
-            if (CssDeclarationValidator.IsAcceptableDeclarationValue(prop, rawValue))
-            {
-                var val = declaration.Important ? rawValue + " !important" : rawValue;
-                result[prop] = val;
-                // Map vendor-prefixed property to unprefixed equivalent (TODO-G9)
-                var unprefixed = CssPropertyNames.StripVendorPrefix(prop);
-                if (unprefixed != prop && !result.ContainsKey(unprefixed))
-                    result[unprefixed] = val;
-            }
-            else if (reportDrops)
-            {
-                // Report the raw value (without any synthetic " !important" suffix) so
-                // inline drops aggregate identically to the engine's stylesheet drops.
-                CssEngineDiagnostics.DeclarationRejected?.Invoke(prop, rawValue);
-            }
-        }
-        return result;
-    }
-
-    /// <summary>
-    /// Whether <paramref name="value"/> is an acceptable declared value for
-    /// <paramref name="property"/> per the shared <see cref="CSS.Dom.CssDeclarationValidator"/> —
-    /// the same closed-keyword error-recovery the inline-style <em>attribute</em> path
-    /// (<see cref="ParseStyle"/>) applies. A live <c>CSSStyleDeclaration</c> per-property setter
-    /// (<c>el.style.color = …</c>, <c>setProperty(…)</c>, <c>cssFloat = …</c>) must <em>reject</em>
-    /// an invalid value rather than store it, matching the attribute path (where
-    /// <c>el.style = "color: bogus"</c> already drops the declaration) and CSSOM error handling.
-    /// The value may carry a trailing <c>!important</c>, which is stripped before validation;
-    /// unknown and custom (<c>--*</c>) properties are always accepted (the validator's default).
-    /// </summary>
-    internal static bool IsAcceptableInlineValue(string property, string value) =>
-        CssDeclarationValidator.IsAcceptableDeclarationValue(property, CssPriority.Strip(value));
-
-    [GeneratedRegex(@"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial System.Text.RegularExpressions.Regex DocTypePatternRegex();
 }

@@ -19,8 +19,8 @@ own status entries for the specifics; the summary below is the quick view.
 |---|---|---|
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
-| 2 — document services & single state authority | Bulk delivered | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); de-globalizing process-static `ElementRuntimeState`/`PositionAreaResolutions` tables deferred (in scope). |
-| 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, SVG, Canvas modules still to come; DomBridge facade line-count target (500–800) unmet, tracked as ratcheted debt. |
+| 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
+| 3 — feature modules | Bulk delivered | Window/Document, Canvas modules still to come (SVG done — P3.50; Element/geometry done — P3.51; `<object>` sub-document accessors done — P3.52); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
 
@@ -240,8 +240,12 @@ bridge state now has explicit single owners (all internal, in `Broiler.HtmlBridg
 event listeners were de-globalized off the process-static `ElementRuntimeState` onto an instance
 `ConditionalWeakTable`. Not fully met and carried forward: two simultaneous sessions are still not
 isolated (blocked at the Broiler.JS engine's shared globals — a JS-engine concern, not the bridge),
-and the remaining process-static `ElementRuntimeState`/`PositionAreaResolutions` tables are still to be
-de-globalized (the sub-document caches above are now consolidated into `BrowsingContextManager` — P3.16).
+and the process-static per-element runtime tables have now been **fully de-globalized** to per-bridge
+instances (2026-07-17 — see the item-4 note below): the `PositionAreaResolutions` memo and every
+`ElementRuntimeState` concern (`Scroll` / `StyleSheet` / `Document` / `Animation` / `Shadow` / `Dialog` /
+`FormControl`, and finally the `InlineStyle`-hub inline-style trio) are per-bridge instance state, so no
+process-static per-element table remains in the bridge (the sub-document
+caches above are now consolidated into `BrowsingContextManager` — P3.16).
 
 Two findings recorded for later phases:
 
@@ -252,9 +256,146 @@ Two findings recorded for later phases:
   guarantees *sequential* re-attach isolation. Full simultaneous isolation needs JS-engine work
   (out of this roadmap's scope).
 - **De-globalizing the process-static per-element runtime tables** (`ElementRuntimeStates`,
-  `PositionAreaResolutions`) is deferred: it is a 155-call-site / 24-file cascade through the
-  project's ~284 static helpers, and the tables are weak + node-keyed (they GC with the session's
-  nodes, so they do not leak or cross sessions today). Its own later PR under item 4.
+  `PositionAreaResolutions`) is being done incrementally. Both tables are weak + node-keyed (they GC
+  with the session's nodes, so they do not leak or cross sessions today), so this is a correctness/
+  ownership cleanup rather than a leak fix.
+  - **`PositionAreaResolutions` — done (2026-07-17).** The position-area memo (a
+    `ConditionalWeakTable<DomElement, …>` with four accessors, all in
+    `AnchorResolver/PositionAreaQueries.cs`) was made a **per-bridge instance** field
+    (`_positionAreaResolutions`) and its four accessors instance methods. Every caller was already in
+    an instance context except one: the static `StyleDeclarationBinding.CssStyleDeclaration.SetValue`
+    (inline `el.style.position-area = …` mutation) called the former static
+    `DomBridge.ClearPositionAreaResolution`. Rather than open the static-helper cascade, a narrow
+    `Action<DomElement>? onPositionAreaInvalidate` callback was threaded through
+    `BuildInlineDeclaration` → `CssStyleDeclaration`; the sole builder call site (the instance
+    `ToJSObject` in `JsObjects.cs`) passes `bridge.ClearPositionAreaResolution`. Behaviour-identical
+    (same CWT/GC semantics, same invalidation and clone-copy paths); `Broiler.HtmlBridge.Dom` builds
+    clean and the position-area / position-try / CSSOM style-declaration coverage
+    (`PositionAreaLiveGeometryTests`, `PositionTryLiveGeometryTests`, `NativePositionTryBridgeModeTests`,
+    `NativePositionTryPipelineTests`, `CssStyleDeclarationValidationTests`,
+    `StyleDeclarationBindingModuleTests`, `SelectorsAndCssomTests`, `DomImplementationTests`) stays
+    green.
+  - **`ElementRuntimeStates` — de-globalizing by concern; `Scroll` done (2026-07-17).** The whole
+    table cannot be flipped to instance in one step: its `internal static GetElementRuntimeState(node)`
+    accessor has 86 call sites, and ~16 of them are in **static** helpers — including the heavily-used
+    `InlineStyle` hub (~179 refs) and the cross-class feature bindings that reach runtime state through
+    narrow host interfaces (`EventTargetBinding.Click`, `AnimationObjectBinding`). Making those instance
+    ripples through the project's ~284 static helpers and the host-interface seams (the doc's
+    155-call-site / 24-file cascade), so the whole-table flip stays deferred. Instead the composite is
+    being de-globalized **one concern at a time**, starting with the concerns whose every access is
+    already on the bridge instance:
+    - **`Scroll` (JS-visible element scroll offset) — done.** Moved out of the static
+      `ElementRuntimeState.Scroll` slot into a per-bridge instance `ConditionalWeakTable<DomElement,
+      ScrollRuntimeState>` (`_scrollRuntimeStates`, reached via the instance `ScrollStateFor(element)`);
+      the 18 access sites (all in instance methods across `LayoutMetrics.Scrolling.cs`, the anchor
+      resolver, and `HitTesting`/`DomBridge`) were rerouted, the slot was removed from
+      `ElementRuntimeState`, and the `cloneNode` copy moved from `CopyRuntimeValuesTo` into
+      `CloneDomElement`. Zero static-helper cascade (no static caller touches `Scroll`). Behaviour-
+      identical (same element-keyed CWT/GC semantics and clone copy); the scroll / scrollIntoView /
+      anchor-scroll-container coverage (`WindowScrollBindingModuleTests`, `SharedScrollOverflowTests`,
+      `NativeAnchorScrollContainerModeTests`, plus `PositionAreaLiveGeometryTests` /
+      `DomImplementationTests`) stays green.
+    - **`StyleSheet` (per-style-element CSSOM state) — done (2026-07-17).** The fetched-CSS memo, the
+      live CSSOM rule list and its parse-source / mutated flags moved from the static
+      `ElementRuntimeState.StyleSheet` slot into a per-bridge instance
+      `ConditionalWeakTable<DomElement, StyleSheetRuntimeState>` (`_styleSheetRuntimeStates`, reached via
+      `StyleSheetStateFor(element)`, declared in `Css.cs`); the 5 access sites (`Css.cs`,
+      `StyleSheets.cs`) were rerouted, the slot removed from `ElementRuntimeState`, and its four-field
+      `cloneNode` copy moved into `CloneDomElement`.
+    - **`Document` (per-document-root "has viewport meta" flag) — done (2026-07-17).** Moved into a
+      per-bridge instance `ConditionalWeakTable<DomNode, DocumentRuntimeState>` (`_documentRuntimeStates`,
+      reached via `DocumentStateFor(node)`, declared in `HitTesting.cs`; keyed by `DomNode` because the
+      flag is recorded against the `DomDocument` node as well as root elements). Both access sites
+      (`DomBridge.cs` setter, `HitTesting.cs` reader) were rerouted, the slot removed, and the copy moved
+      into `CloneDomElement`. Both slices: zero static-helper cascade, behaviour-identical, and the
+      CSSOM stylesheet / hit-test / viewport / clone coverage (`StyleSheetBindingModuleTests`,
+      `SelectorsAndCssomTests`, `HitTestBindingModuleTests`, `VisualViewportEventTargetBindingModuleTests`,
+      `DomImplementationTests`) stays green.
+    - **`Shadow` (per-element shadow-DOM linkage: host→root, root→host, root mode) and `Dialog`
+      (per-element dialog/popover top-layer state: modal flag, top-layer order, popover-open flag) —
+      done (2026-07-17).** Moved into per-bridge instance
+      `ConditionalWeakTable<DomElement, ShadowRuntimeState>` (`_shadowRuntimeStates` via
+      `ShadowStateFor`, in `ShadowDom.cs`) and `ConditionalWeakTable<DomElement, DialogRuntimeState>`
+      (`_dialogRuntimeStates` via `DialogStateFor`, in `AnchorResolver/Dialogs.cs`); the ~26 access
+      sites were rerouted, the slots removed from `ElementRuntimeState`, and their `cloneNode` copies
+      moved into `CloneDomElement`. These concerns *did* have static callers — the in-file static
+      helpers `GetShadowRoot` / `GetShadowHost` (`ShadowDom.cs`) and `TopLayerOrderOf` /
+      `IsAnchorAccessible` / `FindModalDialogs` / `FindOpenPopovers` (`Dialogs.cs`) — but the cascade
+      was exactly one level: every caller of those six helpers was already on the bridge instance, so
+      making the helpers instance closed it with no cross-class host threading. Behaviour-identical;
+      the dialog / anchor-accessibility / native-anchor-pipeline / clone coverage
+      (`DialogBindingModuleTests`, the `NativeAnchor*` pipeline/bridge-mode suites,
+      `AnchorInsetLiveGeometryTests`, `DomImplementationTests`) stays green.
+    - **`Animation` (per-element Web Animations `currentTime` timeline) — done (2026-07-17).** Moved
+      into a per-bridge instance `ConditionalWeakTable<DomElement, AnimationRuntimeState>`
+      (`_animationRuntimeStates`, reached via `AnimationStateFor(element)`, declared in
+      `Registration/Animations.cs`). The 3 in-bridge sites (`Animations.cs`, `AnimationResolver.cs`) were
+      rerouted directly. The one static caller — the `AnimationObjectBinding.GetCurrentTime` /
+      `SetCurrentTime` feature callbacks (a static class) — was handled *without* re-coupling it to the
+      bridge: `BuildAnimationObject` (its builder) became an instance method and now resolves the
+      element's `AnimationRuntimeState` once (stable CWT identity) and hands it to the callbacks, whose
+      signatures changed from `(DomElement element, …)` to `(AnimationRuntimeState state, …)`. The slot
+      was removed from `ElementRuntimeState` and its `cloneNode` copy moved into `CloneDomElement`.
+      Behaviour-identical; the Web Animations coverage (`AnimationObjectBindingModuleTests`,
+      `CssRenderingTests`, `DomImplementationTests`) stays green.
+    - **`FormControl` (checkbox/radio checkedness, option value/defaultSelected, select selectedIndex,
+      dialog returnValue) — done (2026-07-17).** This was the first genuinely host-threaded cascade.
+      The state moved into a per-bridge instance `ConditionalWeakTable<DomElement, FormControlRuntimeState>`
+      (`_formControlRuntimeStates` via `FormControlStateFor`, in `DomBridge.SelectHost.cs`); the many
+      in-bridge sites (`SelectHost`, `JsObjects`, `Serialization`, `DialogHost`, `Utilities`) were
+      rerouted directly. Three static seams needed threading:
+      - **`:checked` selector matching.** `Checked` is read by the `BridgeSelectorStateProvider` behind
+        the selector matcher, which was a **process-static shared** `CssSelectorMatcher` used by the
+        static `MatchesSelector`. Both are now **per-bridge**: `_selectorMatcher` is a bridge field
+        (built in the constructor with the bridge-carrying provider), `MatchesSelector` is an instance
+        method, and the computed-style engine's provider (built in a now-non-static engine-scope lambda)
+        likewise reads the per-bridge table. `MatchesSelector`'s cross-class callers were threaded
+        through their existing host interfaces — `MatchesSelector` was added to `ISelectorsHost`,
+        `IDocumentQueryHost` and `ISubDocumentHost` (the `FindInDescendants`/`SearchDescendants`
+        utilities already carried the bridge, so they needed only `bridge.MatchesSelector`).
+      - **`click` checkbox/radio toggle + radio mutual-exclusion.** `EventTargetBinding.Click` (a static
+        feature callback on `IEventTargetHost`) had `FormControlStateFor` and `UncheckRadioSiblings`
+        added to that host interface; `UncheckRadioSiblings` became an instance method.
+      With every concern moved, the `ElementRuntimeState.CopyRuntimeValuesTo` aggregator was deleted and
+      each concern's `cloneNode` copy now lives inline in `CloneDomElement`. Behaviour-identical; the
+      selector / CSSOM / `:checked` / form-control-click / select / querySelector / dialog / clone
+      coverage (`SelectorsBindingModuleTests`, `SelectorsAndCssomTests`, `SelectorScopeTests`,
+      `SelectorsLevel4SpecificityTests`, `Acid3CssSelectorRegressionTests`, `DocumentQueryBindingModuleTests`,
+      `SubDocumentBindingModuleTests`, `FormControlClickTests`, `SelectBindingModuleTests`,
+      `EventTargetBindingModuleTests`, `DialogBindingModuleTests`, `DomImplementationTests`) stays green.
+    - **Inline-style trio (`Style` / `StyleSeeded` / `JsSetStyleProps` / `InlineEventHandlers`) — done
+      (2026-07-17); the process-static table is now fully eliminated.** This was the last and largest
+      concern — the `InlineStyle` hub (~179 refs, ~28 of them in static/cross-class contexts). De-globalizing
+      the *storage* is separable from Phase 4 item 2 (which eliminates the dict itself), so it was done
+      here: the backing `ConditionalWeakTable` and `GetElementRuntimeState` became **instance**, and the
+      trio accessors (`InlineStyle`, `Mark`/`Unmark`/`Clear`/`InlineStylePropsSetByJs`, `GetInlineStyleView`,
+      `GetInlineEventHandlers`) are now instance methods. The static callers were threaded:
+      - **In-bridge static helpers → instance** (single-level cascade, callers already on the instance):
+        `SerializeInlineStyleForEngine` (the computed-style engine's inline source) and
+        `AnchorFunctions.ResolveAnchorSizeFunctions`; plus the serialization adapter's `GetStyles` lambda
+        dropped its `static`.
+      - **CSSOM inline declaration → host interface.** `StyleDeclarationBinding`'s `element.style`
+        callbacks (`cssText`/`setProperty`/`getPropertyValue`/`removeProperty`/`cssFloat`/`item`/… and the
+        `CssStyleDeclaration` bracket-access `SetValue`/`GetValue`) reach the inline-style dict and the
+        "set via JS" bookkeeping through a new narrow **`IInlineStyleHost`** (`InlineStyle`,
+        `Mark`/`Unmark`/`Clear`/`InlineStylePropsSetByJs`); its sole builder call site (the instance
+        `ToJSObject`) passes the bridge. The stateless helpers it also uses (`IsAcceptableInlineValue`,
+        `ParseStyle`, `ExpandCssShorthands`, `CssPropertyNames`) stayed static.
+
+      **With this, every concern is off the process-static table: `ElementRuntimeState` and
+      `GetElementRuntimeState` are per-bridge instance state, and no process-static per-element runtime
+      table remains in the bridge.** Behaviour-identical (same element-keyed CWT/GC semantics and clone
+      copy), now owned by the session's bridge. The CSSOM / computed-style / inline-style / serialization /
+      selector / anchor / clone coverage (`StyleDeclarationBindingModuleTests`,
+      `CssStyleDeclarationValidationTests`, `InlineStyleWriteThroughTests`, `InlineStyleDropDiagnosticsTests`,
+      `SelectorsBindingModuleTests`, `SelectorsAndCssomTests`, `CssRenderingTests`,
+      `PositionAreaLiveGeometryTests`, `AnchorInsetLiveGeometryTests`, `Acid3RegressionTests`,
+      `Acid3CssSelectorRegressionTests`, `SharedLayoutGeometryTests`, `DomImplementationTests` — 308
+      relevant tests) stays green. Follow-up rename (2026-07-17): with only the inline-style concern left,
+      the misnamed `ElementRuntimeState` class → `InlineStyleRuntimeState`, `GetElementRuntimeState` →
+      `InlineStyleStateFor`, and `_elementRuntimeStates` → `_inlineStyleStates`; the now-grab-bag state file
+      `DomBridge/ElementRuntimeState.cs` → `DomBridge/RuntimeStates.cs` (it holds the per-concern
+      `*RuntimeState` DTOs, `EventListenerRegistration` and `RuntimeValue`). Pure rename, build-verified.
 
 Goal: make hidden state dependencies explicit while preserving behavior.
 
@@ -1257,11 +1398,250 @@ EventListener/dispatch/click/focus/blur/submit/radio suites pass (194) with zero
 suite passes green (0 offenders / 0 stale exemptions) after the de-list. `Broiler.HtmlBridge.Dom` builds clean
 (0 warnings).
 
+Status: **P3.47 completed** 2026-07-17 (same branch) — the **DOM `ChildNode` mixin**, a further slice off the
+node-wrapper registration in `JsObjects.cs`. `ChildNodeBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the four `ChildNode` methods registered on every node wrapper — `remove()`, `before()`, `after()` and
+`replaceWith()` (was the bridge's `JsJsObjectsRemove093Core`..`ReplaceWith096Core`). Pure DOM tree mutation: the
+neutral static tree helpers it uses (`ParentEl`, `ChildIndexOf`, `RemoveNthChild`, `SetParent`) stay the bridge's
+`internal static` helpers, called directly; the child-node argument builder (`BuildChildNodeArgumentNodes`), the
+side-effecting insertion primitive (`InsertNodeAt`), style-scope invalidation (`InvalidateStyleScope`) and the
+node-iterator / mutation-observer notifications (`NotifyNodeIteratorPreRemoval`, `NotifyChildRemoved`) are reached
+through the five-member `IChildNodeHost` contract (`DomBridge.ChildNodeHost.cs`, explicit interface members).
+Distinct from the document-level `NodeMutationBinding` (appendChild/removeChild/insertBefore on the document node,
+via `INodeMutationHost`): the mixin positions argument nodes relative to an arbitrary context node. All three
+registration paths (the element path in `JsObjects.cs` and the two node paths in `JsObjects.NonElementNodes.cs`) now
+call `Dom.Features.ChildNodeBinding.<Op>(this, …)`; the callbacks are gone from `JsFunctionCallbacks/JsObjects.cs`
+(727 → 654 lines). Behaviour-preserving (the parent is hoisted once up front exactly as the originals did to survive
+detachment); no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/ChildNodeBindingModuleTests.cs` (co-location / host-contract / four-callbacks-moved-off-bridge
+guards + an end-to-end characterization driving `before`/`after`/`remove` (incl. a detached-node no-op) /
+`replaceWith` through the bridge). Regression check: the ChildNode / NodeMutation / HtmlDomInterface / clone /
+DOM-edge-case / architecture-guard suites pass (105); `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.48 completed** 2026-07-17 (same branch) — the **Web Storage `localStorage` object**, a
+self-contained slice off the window registration. `WebStorageBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates the whole `localStorage` stub — its `getItem` / `setItem` /
+`removeItem` / `clear` over an in-memory `Dictionary<string,string>` (with the value mirrored onto the
+storage JSObject so bracket-notation `localStorage["key"]` falls through to property lookup) plus the
+`BuildLocalStorage` factory (was the bridge's `BuildLocalStorageObject`). Because the store is a plain
+dictionary and the callbacks touch **no bridge state**, this is — like `ClassListBinding` /
+`StyleDeclarationBinding` — an **internal static class with no host contract** (the cleanest kind of
+slice). The window registration (`Registration/Window.cs`) now calls
+`Dom.Features.WebStorageBinding.BuildLocalStorage()`; the factory and the four callbacks
+(`JsUtilitiesGetItem029Core`..`Clear032Core`) are gone from `DomBridge/Utilities.cs` and
+`JsFunctionCallbacks/Utilities.cs` (the latter now holds only the Canvas 2D callbacks — better moved with
+Phase 6). Behaviour-preserving; no public-API change (module internal). Tests:
+`Broiler.Cli.Tests/WebStorageBindingModuleTests.cs` (feature-module / no-host-contract /
+builder-and-four-callbacks-moved-off-bridge guards + a direct round-trip characterization:
+`setItem`/`getItem`, the bracket-notation mirror, a missing key, key-scoped `removeItem` and `clear`
+invoked on the built object). Regression check: the guard / window-scroll / clone / Acid3 suites pass (65);
+`Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.49 completed** 2026-07-17 (same branch) — the **reflected content-attribute IDL accessors**, a
+cohesive URL/reflection slice cherry-picked off the mixed `ElementInterfaces.cs` (whose remaining callbacks
+are the layout-entangled `Element/geometry` and SVG-text-metric families and the sub-document `data`/
+`contentDocument` accessors). `ElementReflectionBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the plain string reflectors (`label.htmlFor` ↔ `for`, `meta.httpEquiv` ↔ `http-equiv`, `.type`,
+and the generic named-string / numeric-dimension setters) and the URL-typed getters (`<object>.data` and
+`<a>/<area>/<base>/<link>.href`), which resolve their relative content attribute against the live page URL.
+The content-attribute reads/writes use the bridge's neutral `internal static` `TryGetAttribute`/`SetAttr`
+helpers directly; only the page URL — read at call time so navigation stays reflected — comes through the
+one-member `IElementReflectionHost` contract (`DomBridge.ElementReflectionHost.cs`). The byte-identical
+`href` get/set callback pairs (`GetHref056`≡`060`, `SetHref057`≡`061`) are deduplicated into one
+`GetHref`/`SetHref`, and the shared page-URL resolution factored into one `ResolveReflectedUrl` — a small
+net simplification. All ten registration sites in `ElementInterfaces.cs` now call
+`Dom.Features.ElementReflectionBinding.<Op>`; the ten callbacks are gone from
+`JsFunctionCallbacks/ElementInterfaces.cs` (413 → 330 lines), leaving only the sub-document
+(`SetData051`/`GetContentDocument054`/`GetSVGDocument055`) and computed-style-dimension (`Callback062`)
+callbacks. Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/ElementReflectionBindingModuleTests.cs` (feature-module / host-contract /
+ten-callbacks-moved-off-bridge guards + an end-to-end `<a>.href` characterization: relative-URL resolution
+against the page base, IDL set, and raw content-attribute read through the bridge). Regression check: the
+element-interface / anchor / Acid3 / HtmlDomInterface / clone / architecture-guard suites pass (127);
+`Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.50 completed** 2026-07-18 (branch `claude/htmlbridge-complexity-reduction-f3anpg`) — the **SVG DOM
+element interfaces**, the SVG family named "still to come" below. Unlike the layout-entangled element-geometry
+residue (`getBoundingClientRect`/`offsetParent`/scroll), every SVG accessor here is an attribute/font-size
+*estimation stub* — none reads layout geometry — so the whole cohesive block (registration **and** callbacks,
+per work-item 2) lifts out as `SvgElementBinding` (namespace `Broiler.HtmlBridge.Dom.Features`), a pure
+`internal static` class with **no host contract** (like `ClassListBinding` P3.6 and `WebStorageBinding` P3.48).
+It owns the `SVGAnimatedLength` stubs for the dimensional presentation attributes
+(`width`/`height`/`x`/`y`/`cx`/`cy`/`r`/`rx`/`ry`), the `SVGSVGElement.viewBox` `SVGAnimatedRect`, the
+`SVGTextContentElement` text-metric methods (`getNumberOfChars`/`getComputedTextLength`/`getSubStringLength`/
+`getStartPositionOfChar`/`getEndPositionOfChar`/`getRotationOfChar`), the `SVGSVGElement` animation timeline
+(`getCurrentTime`/`setCurrentTime`), and the SMIL animation-element no-ops
+(`beginElement`/`endElement`/`getStartTime`). It reads content attributes / text through the bridge's neutral
+`internal static` `TryGetAttribute`/`CollectTextContent`, and builds the no-op SMIL functions with the bridge's
+`internal static` `UndefinedFunction`/`ZeroFunction` factories (`ZeroFunction` widened `private`→`internal`);
+the private `CreateSvgLengthValue` helper moved into the module since its only consumer (the animated-length
+stub) came with it, and the repeated font-size parse collapsed into one `ReadFontSize`. The ~90-line SVG block
+in `DomBridge/ElementInterfaces.cs` becomes one `Dom.Features.SvgElementBinding.Install(obj, element, tag)`
+call, and the ten callbacks (`Callback086`..`SetCurrentTime095`) are gone from
+`JsFunctionCallbacks/ElementInterfaces.cs` (330 → 184 lines), leaving only the sub-document
+(`SetData051`/`GetContentDocument054`/`GetSVGDocument055`), computed-style-dimension (`Callback062`) and
+layout-entangled element-geometry/scroll callbacks. Behaviour-preserving; no public-API change (module
+internal, no contract). Tests: `Broiler.Cli.Tests/SvgElementBindingModuleTests.cs` (feature-module /
+no-host-contract / ten-callbacks-moved-off-bridge guards + end-to-end characterizations: `rect.width.baseVal`,
+`svg.viewBox` parse, the text-metric font-size estimates, and the `currentTime` round-trip through the JS
+engine). Regression check: the SVG / element-interface / Acid3 / HtmlDomInterface / clone / architecture-guard
+suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.51 completed** 2026-07-18 (same branch) — the **element box-model / scrolling interface**, the
+`Element/geometry` family named "still to come" below and the one Phase 3 slice that genuinely reads the live
+layout. `ElementGeometryBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates the box metrics
+(`clientTop`/`clientLeft`/`clientWidth`/`clientHeight`, `offsetWidth`/`offsetHeight`,
+`scrollWidth`/`scrollHeight`, `offsetTop`/`offsetLeft`, `offsetParent`, `getBoundingClientRect`/
+`getClientRects`) and the imperative scrolling API (`scrollTop`/`scrollLeft` get/set,
+`scroll`/`scrollTo`/`scrollBy`, `scrollIntoView`, `scrollParent`). Because every value reads the bridge's
+layout cache, this is the first module to use the **wide-explicit-host** template in earnest: the ~20-member
+`IElementGeometryHost` contract (`DomBridge.ElementGeometryHost.cs`, forwarding to the existing private
+`LayoutMetrics.*` methods) names the exact geometry surface the callbacks depend on, so they no longer reach
+into arbitrary bridge internals — the coupling is the same but now declared rather than ambient. The
+byte-identical `scroll`/`scrollTo` callbacks (`Scroll082`≡`ScrollTo083`) are deduplicated into one `Scroll`,
+and the repeated DOMRect construction factored into one `BuildRect`. The ~90-line box-model block in
+`DomBridge/ElementInterfaces.cs` becomes one `Dom.Features.ElementGeometryBinding.Install(this, obj, element)`
+call, and the fourteen callbacks (`GetScrollTop072`..`ScrollParent085`) are gone from
+`JsFunctionCallbacks/ElementInterfaces.cs` (184 → 70 lines — now only the sub-document
+`SetData051`/`GetContentDocument054`/`GetSVGDocument055` and computed-style-dimension `Callback062` remain).
+Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/ElementGeometryBindingModuleTests.cs` (feature-module / wide-host-contract /
+fourteen-callbacks-moved-off-bridge guards + real-layout characterizations through `bridge.Attach` + `ctx.Eval`:
+`offsetWidth`/`offsetHeight`, the full `getBoundingClientRect` DOMRect, a `scrollTop` round-trip on an overflow
+container, and `getClientRects` returning an array). Regression check: the geometry / scroll / overflow / anchor
+/ position-try / sticky / element-interface / HtmlDomInterface / architecture-guard suites show the same
+pre-existing environmental failures as baseline — zero regressions; `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.52 completed** 2026-07-18 (same branch) — the **`<object>`-element sub-document IDL accessors**,
+the sub-document slice of the mixed `ElementInterfaces.cs` callbacks. `ObjectElementBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates the `data` content-attribute **setter** (which invalidates the
+cached sub-document so a new `data` URL reloads), the `contentDocument` getter (same-origin sub-document, or
+`null` when cross-origin / load-failed so the element's fallback content shows), and `getSVGDocument()`. The
+plain reflected `data` getter and the `type` get/set stay in `ElementReflectionBinding` (P3.49) — this module
+owns only the parts coupled to the sub-document / browsing-context machinery, reached through the narrow
+four-member `IObjectElementHost` contract (`DomBridge.ObjectElementHost.cs`: the live page URL plus the
+cached-sub-document invalidation / load-failure / factory hooks). The content-attribute write and the
+same-origin test use the bridge's neutral `internal static` `SetAttr`/`TryGetAttribute`/`IsCrossOrigin`
+helpers directly (`IsCrossOrigin` widened `private`→`internal`). The three registration sites in
+`DomBridge/ElementInterfaces.cs` now call `Dom.Features.ObjectElementBinding.<Op>(this, element, …)`; the
+three callbacks are gone from `JsFunctionCallbacks/ElementInterfaces.cs` (70 → 39 lines), which now holds only
+the `<img>` computed-dimension getter (`Callback062`) — a computed-style read left for a future computed-style
+consolidation (`ComputedStyleBinding` already owns `BuildComputedStyleObject` via `IComputedStyleHost`).
+Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/ObjectElementBindingModuleTests.cs` (feature-module / host-contract /
+three-callbacks-moved-off-bridge guards + end-to-end characterizations: same-origin `contentDocument` ≡
+`getSVGDocument()`, the `data` setter writing the content attribute, and the cross-origin `contentDocument` ===
+`null` gate). Regression check: the sub-document / SVG-cross-doc / object / element-interface / element-reflection
+/ HtmlDomInterface / public-API-snapshot / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.53 completed** 2026-07-18 (same branch) — the **`<img>` used-dimension getter**, the last
+callback in the mixed `JsFunctionCallbacks/ElementInterfaces.cs`, which **retires that file entirely**. The
+`<img>.width`/`<img>.height` IDL getters report the element's used (rendered) dimension by reading it out of
+the computed-style object (content-attribute fallback, then `0`), so rather than a new module they fold into
+the existing `ComputedStyleBinding` (P3.37) as `GetUsedDimension`, reusing its `IComputedStyleHost`
+`BuildComputedStyleObject` seam — the module's charter widens slightly from "the `getComputedStyle` entry
+point" to "the computed-style reads." The CSS-length parse and content-attribute fallback use the bridge's
+neutral `internal static` `ParseCssLengthToPixels` (widened `private`→`internal`) / `TryGetAttribute`. The
+`<img>` registration in `DomBridge/ElementInterfaces.cs` now calls
+`Dom.Features.ComputedStyleBinding.GetUsedDimension(this, dimName, element, …)` (paired with the P3.49
+`ElementReflectionBinding.SetReflectedDimension` setter); with the last callback gone, the whole
+`JsFunctionCallbacks/ElementInterfaces.cs` file (and the now-unused `bridge` local in
+`AddElementSpecificMembers`) is **deleted**. Behaviour-preserving; no public-API change. Tests: extended
+`Broiler.Cli.Tests/ComputedStyleBindingModuleTests.cs` (both callbacks-off-the-bridge guard + an end-to-end
+`<img>.width`/`height` characterization: content-attribute fallback resolving to a number through the JS
+engine). Regression check: the computed-style / sparse-computed-style / element-interface / element-reflection
+/ object-element / HtmlDomInterface / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.54 completed** 2026-07-18 (same branch) — the **HTMLElement global content-attribute reflectors**,
+the first cohesive slice off the big mixed `JsFunctionCallbacks/JsObjects.cs` element-member callbacks file.
+`GlobalAttributeBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates `id`, `className` (↔ `class`),
+`title`, `lang`, `accessKey` (↔ `accesskey`), `dir`, and the enumerated `draggable` (registration **and**
+callbacks together, per work-item 2). The selector-affecting three (`id`/`className`/`dir`) invalidate the style
+scope on write through the one-member `IGlobalAttributeHost` contract (`DomBridge.GlobalAttributeHost.cs`); the
+plain reflectors (`title`/`lang`/`accessKey`/`draggable`) use the bridge's neutral `internal static`
+`SetAttr`/`TryGetAttribute` helpers directly, and the canonical `id`/`class` mirrors stay on
+`DomElement.Id`/`ClassName`. The three inline `title`/`lang`/`accessKey` get/set pairs collapse into shared
+`ReflectedGet`/`ReflectedSet` helpers — a small net simplification. The ~40-line registration block in
+`DomBridge/JsObjects.cs` becomes one `Dom.Features.GlobalAttributeBinding.Install(this, obj, element)` call, and
+the nine callbacks (`SetId002`..`SetDraggable014`) are gone from `JsFunctionCallbacks/JsObjects.cs` (654 → 582
+lines). Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/GlobalAttributeBindingModuleTests.cs` (feature-module / host-contract /
+nine-callbacks-moved-off-bridge guards + end-to-end characterizations: all seven reflectors round-tripping
+through the JS engine, the `draggable` default-false / empty-`className` reads, and — the reason the host
+contract exists — assigning `id` re-running the `#target` cascade via style-scope invalidation). Regression
+check: the HtmlDomInterface / element-attribute / classList / selectors-CSSOM / Acid3 / public-API-snapshot /
+node-accessor / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.55 completed** 2026-07-18 (same branch) — the **`<iframe>`-element browsing-context accessors**,
+the second cohesive slice off the mixed `JsObjects.cs` element-member callbacks and the sibling of the P3.52
+`<object>` extraction. `IframeElementBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) co-locates
+`contentDocument` / `contentWindow` / `getSVGDocument()` (each the same-origin sub-document or sub-window, or
+`null` across origins — `getSVGDocument()` now shares the one `GetContentDocument` helper the `contentDocument`
+getter uses, since they were identical), the `src` / `srcdoc` read/write pair (whose setters reload the frame:
+invalidate the cached sub-document, clear the fired-onload latch, then fire `onload`), and the read-only
+`sandbox` reflection (registration **and** callbacks together, per work-item 2). The frames machinery is reached
+through the six-member `IIframeElementHost` contract (`DomBridge.IframeElementHost.cs`: the same-origin gate, the
+sub-document / sub-window factories, and the reload hooks that live on the `BrowsingContextManager` /
+`SubWindowBinding` owners); the content-attribute reads/writes use the neutral `internal static`
+`SetAttr`/`TryGetAttribute` helpers directly. The byte-identical `src`/`srcdoc` setters (`SetSrc139`≡`SetSrcdoc141`)
+collapse into one `SetFrameAttribute`. The ~30-line `<iframe>` block in `DomBridge/JsObjects.cs` becomes one
+`Dom.Features.IframeElementBinding.Install(this, obj, element)` call, and the five callbacks
+(`GetContentDocument135`..`SetSrcdoc141`) are gone from `JsFunctionCallbacks/JsObjects.cs` (582 → 538 lines).
+Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/IframeElementBindingModuleTests.cs` (feature-module / host-contract /
+five-callbacks-moved-off-bridge guards + end-to-end characterizations: same-origin `contentDocument` (nodeType 9)
+/ `contentWindow` / `getSVGDocument()` ≡ `contentDocument`, and the `src`/`srcdoc` content-attribute round-trip).
+Regression check: the iframe / sub-document / sub-window / SVG-cross-doc / WebMessaging / object-element /
+HtmlDomInterface / public-API-snapshot / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.56 completed** 2026-07-18 (same branch) — the **DOM `insertAdjacent*` methods**, a further
+cohesive slice off the mixed `JsObjects.cs` element-member callbacks. `InsertAdjacentBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates `insertAdjacentElement` / `insertAdjacentText` /
+`insertAdjacentHTML` — each resolving the `beforebegin`/`afterbegin`/`beforeend`/`afterend` position to a
+(parent, index) target and inserting an element, a text node, or the parsed fragment there. The
+position-normalisation and target-resolution helpers (`NormalizeInsertAdjacentPosition` /
+`GetInsertAdjacentTarget`, previously in `HtmlFragmentMutation.cs`) moved into the module with the methods
+since they had no other consumer; they raise the spec `SyntaxError` / `NoModificationAllowedError` via
+`DomBridge.ThrowDOMException` and navigate with the neutral `internal static` `ParentEl`/`ChildIndexOf`, while
+the JS context, reverse lookup, insertion primitive, text-node factory, fragment parser and computed-style
+reset come through the six-member `IInsertAdjacentHost` contract (`DomBridge.InsertAdjacentHost.cs`). The three
+registration sites in `DomBridge/JsObjects.cs` become one `Dom.Features.InsertAdjacentBinding.Install(this, obj,
+element)` call, and the three callbacks (`InsertAdjacentElement130`..`InsertAdjacentHTML132`) plus the two
+helpers are gone from the bridge (`JsFunctionCallbacks/JsObjects.cs` 538 → 482 lines). Behaviour-preserving; no
+public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/InsertAdjacentBindingModuleTests.cs`
+(feature-module / host-contract / callbacks-and-helpers-moved-off-bridge guards + end-to-end characterizations:
+element placement at all four positions, text/HTML insertion, and the invalid-position `SyntaxError`).
+Regression check: the insertAdjacent / HtmlDomInterface / HtmlFragment / DOM-mutation / traversal / Acid3 /
+public-API-snapshot / iframe / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.57 completed** 2026-07-18 (same branch) — the **element-content IDL members**, a further slice
+off the mixed `JsObjects.cs` element-member callbacks. `ElementContentBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates the HTML-serialization pair `innerHTML` / `outerHTML` (read
+serializes the element/children, write reparses a fragment) and the text-content trio `textContent` /
+`innerText` / `outerText` (read returns the node's text value, only `textContent` is writable). Everything
+routes through the bridge's shared parser/serializer and canonical tree mutation, reached through the
+six-member `IElementContentHost` contract (`DomBridge.ElementContentHost.cs`). Split into two install entry
+points (`InstallHtmlSerialization` / `InstallTextContent`) so the unrelated `shadowRoot` accessor keeps its
+original position between them — behaviour-preserving property order. The inline registration in
+`DomBridge/JsObjects.cs` becomes two `Dom.Features.ElementContentBinding.Install*` calls, and the three
+callbacks (`SetInnerHTML016`/`SetOuterHTML018`/`SetTextContent021`) are gone from
+`JsFunctionCallbacks/JsObjects.cs` (482 → 462 lines). Behaviour-preserving; no public-API change (module +
+contract internal). Tests: `Broiler.Cli.Tests/ElementContentBindingModuleTests.cs` (feature-module /
+host-contract / three-callbacks-moved-off-bridge guards + end-to-end characterizations: `innerHTML`
+read/reparse, `outerHTML` element replacement, and `textContent`/`innerText` read + `textContent` write
+collapsing children to one text node). Regression check: the element-content / HtmlDomInterface / serialization
+/ Acid3 / shadow-DOM / public-API-snapshot / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds
+clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
-any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
+any residual coupling: the rest of the mixed `JsObjects.cs` element-member callbacks (tree mutation, form-control
+IDL, on* event-handler reflectors), Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
-done** (P3.13/P3.16/P3.17/P3.18).
+done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is done** (P3.50);
+**Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done** (P3.52); **the mixed
+`ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global attribute reflectors
+are done** (P3.54); **insertAdjacent\* is done** (P3.56); **the element-content members are done** (P3.57).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
@@ -1288,11 +1668,15 @@ Exit criteria:
 - No production source file exceeds 750 lines without a documented exemption.
   **Enforced 2026-07-16** by `HtmlBridgeArchitectureGuardTests.No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`:
   a new/grown HtmlBridge source file over 750 lines fails the guard, forcing a feature
-  module (the P3.x pattern) rather than another giant partial. The remaining six
-  over-limit files (`LayoutMetrics.cs` 2332, `JsObjects.cs` 1286, `SubDocuments.cs` 1152,
-  `DomBridge.cs` 1013, `DomBridge.Serialization.cs` 951, `Utilities.cs` 894) are listed as
-  documented debt to shrink — the guard surfaces one to de-list once it drops under the limit,
-  so the ratchet keeps closing. Three files are **de-listed** as of 2026-07-17:
+  module (the P3.x pattern) rather than another giant partial. **The debt list is now empty as of
+  2026-07-17** — every HtmlBridge production file is under the 750-line limit, so the guard runs as a
+  pure ratchet (`OversizedFileExemptions` holds no entries; any new/grown over-limit file fails).
+  The guard surfaced each debt file to de-list once it dropped under the limit,
+  so the ratchet kept closing. Three files were **de-listed** early on 2026-07-17:
+  `AnimationResolver.cs` (was 760; see ratchet maintenance below),
+  `JsFunctionCallbacks/Registration.cs` (was 1184 → 684 after the P3.19–P3.28 grab-bag
+  decomposition — nine feature modules peeled out) and
+  `JsFunctionCallbacks/JsObjects.cs` (was 1599 → 727 after the P3.40–P3.46 element/node
   `AnimationResolver.cs` (was 760; see ratchet maintenance below),
   `JsFunctionCallbacks/Registration.cs` (was 1184 → 684 after the P3.19–P3.28 grab-bag
   decomposition — nine feature modules peeled out) and
@@ -1324,6 +1708,125 @@ Exit criteria:
   dropping `AnimationResolver.cs` to 644. Pure partial-class relocation (behaviour-identical); its
   entry was removed from `OversizedFileExemptions`, so the ratchet's stale-exemption check now
   enforces it stays under 750. Debt list: nine → eight files.
+
+  **De-list 2026-07-17.** A second exempt-file shrink under the same ratchet action.
+  `DomBridge/Utilities.cs` (894) — the grab-bag of internal helpers — had its cohesive DOM
+  name-validation cluster together with the JS-side constructor globals it validates against
+  (`ThrowDOMException`, `ValidateElementName` / `ValidateQualifiedName`, `RegisterDOMException`,
+  `RegisterNodeConstructor`, `RegisterSVGLength`, and the two `[GeneratedRegex]`
+  `ValidXmlNamePattern` / `ValidXmlQualifiedNamePattern` patterns with their backing fields) split
+  into the sibling `DomBridge` partial `DomBridge/Utilities.NameValidation.cs` (286 lines), dropping
+  `Utilities.cs` to 626. Pure partial-class relocation — no signature, accessibility, or logic
+  change, so behaviour-identical by construction; its entry was removed from
+  `OversizedFileExemptions`, so the stale-exemption check now enforces it stays under 750.
+  `Broiler.HtmlBridge.Dom` builds clean and the guard is green (14/14, 0 offenders / 0 stale
+  exemptions); the `NamespaceAndDomCoreTests` / `DomImplementationTests` name-validation coverage
+  (27 tests) stays green. Debt list: eight → seven files.
+
+  **De-list 2026-07-17.** A third exempt-file shrink under the same ratchet action.
+  `DomBridge.Serialization.cs` (951) had its cohesive SVG zoom-serialization attribute-scaling
+  cluster split into the sibling `DomBridge` partial `DomBridge.Serialization.SvgZoom.cs`
+  (300 lines): `ApplyZoomSerializationSvgAttributes` and the presentation/geometry scalers
+  (`ApplySvgPresentationAttribute`, `ScaleSvgLengthAttribute` / `…PointListAttribute` /
+  `…PathDataAttribute`, `ScaleSvgNumericMatch`, `TryScaleSvgLengthToken`), the SVG font-relative
+  unit resolution (`TryResolveSvgFontRelativeUnitPixels`, `ResolveOriginalNearest/RootSpecifiedFontSizePx`,
+  `TryGetSpecifiedFontSizePx`, `GetSvgFontRelativeUnitRatio`, `ResolveSvgLengthZoomFactor`,
+  `GetNearestExplicitFontSizeOwnerZoom`, `GetRootFontSizeOwnerZoom`), the four SVG unit sets, and
+  the three `[GeneratedRegex]` point/path/font-shorthand patterns. Only `ApplyZoomSerializationStyles`'s
+  entry call into the block stays in `Serialization.cs`; the now-unused
+  `using System.Text.RegularExpressions` was dropped from it. Pure partial-class relocation —
+  no signature, accessibility, or logic change, so behaviour-identical by construction;
+  `Serialization.cs` drops 951 → 668 and its `OversizedFileExemptions` entry is removed.
+  `Broiler.HtmlBridge.Dom` builds clean and the guard is green (14/14, 0 offenders / 0 stale
+  exemptions); the SVG-serialization / zoom coverage (`SvgDomAndCrossDocTests`,
+  `SvgDomDynamicContentTests`, `SharedGeometryZoomSizeTests`, `Acid3SvgAndParsingRegressionTests`,
+  81 tests) stays green. Debt list: seven → six files.
+
+  **De-list 2026-07-17.** A fourth exempt-file shrink — and the first to touch the primary facade
+  `DomBridge.cs` (1013) itself, moving it toward the exit-criterion 500–800-line facade target. Two
+  cohesive behaviour clusters (neither composition/compat facade material) were split into sibling
+  partials: the window `load` lifecycle and window-target event dispatch (`FireWindowLoadEvent`,
+  the two `DispatchWindowEvent` overloads, `BuildWindowFramesArray` / `CollectWindowFrames`) into
+  `DomBridge.WindowLoad.cs` (209 lines), and initial HTML/doctype ingestion plus inline-style
+  parsing (`ParseHtml`, `ParseStyle`, `IsAcceptableInlineValue`, the `DocTypePattern` field and its
+  `[GeneratedRegex]`) into `DomBridge.HtmlParsing.cs` (159 lines). The now-unused
+  `using System.Text.RegularExpressions` was dropped from the facade. Pure partial-class relocation —
+  no signature, accessibility, or logic change, so behaviour-identical by construction; `DomBridge.cs`
+  drops 1013 → 682 (now inside the 500–800 facade band) and its `OversizedFileExemptions` entry is
+  removed. `Broiler.HtmlBridge.Dom` builds clean and the guard is green (14/14, 0 offenders / 0 stale
+  exemptions); the load-event / parsing / inline-style coverage (`Acid3RegressionTests`,
+  `Acid3SvgAndParsingRegressionTests`, `Acid3HtmlElementRegressionTests`, `DoctypeSentinelMigrationTests`,
+  `InlineStyleDropDiagnosticsTests`, `InlineStyleWriteThroughTests`, 90 tests with the guard) stays
+  green. Debt list: six → five files.
+
+  **De-list 2026-07-17.** A fifth exempt-file shrink. `SubDocuments.cs` (1152) mixed two concerns
+  beyond its name; both were split into sibling partials. The generic HTML-fragment DOM-mutation
+  helpers — per-node cache teardown (`RemoveElementsRecursive`), `normalize()` text coalescing,
+  indexed child removal/insertion, and the `innerHTML` / `outerHTML` / `insertAdjacentHTML` /
+  child-node-argument fragment builders (`SetElementInnerHtml` / `SetElementOuterHtml`,
+  `BuildAdjacentHtmlNodes`, `BuildChildNodeArgumentNodes`, `InsertNodeAt`, `GetInsertAdjacentTarget`,
+  `TryBuildInnerHtmlFragmentContainer`, `IsVoidHtmlElementTag`) — went into
+  `DomBridge/HtmlFragmentMutation.cs` (329 lines). The XML/XHTML sub-document construction and
+  sub-document script execution (`BuildSubDocumentFromXml`, `BuildDomElementFromXElement`,
+  `ExecuteSubDocumentScripts`, `CollectScriptContent`, `GetTextContentRecursive`) went into
+  `DomBridge/SubDocuments.XmlAndScripts.cs` (163 lines); a dead orphan doc-comment at the file tail
+  was dropped, and the now-unused `System.Text` / `System.Xml.Linq` usings were removed from the
+  original. Pure partial-class relocation — no signature, accessibility, or logic change, so
+  behaviour-identical by construction; `SubDocuments.cs` drops 1152 → 694 and its
+  `OversizedFileExemptions` entry is removed. `Broiler.HtmlBridge.Dom` builds clean and the guard is
+  green (14/14, 0 offenders / 0 stale exemptions); the fragment-mutation / sub-document coverage
+  (`InnerHtmlParallelStateRemovalTests`, `SubDocumentBindingModuleTests`,
+  `SubDocumentSeverMigrationTests`, `DocumentFragmentSentinelMigrationTests`, `DomImplementationTests`,
+  `HtmlDomInterfacesTests`, `DomEdgeCasePhase4Tests`, `IsEqualNodePromotionTests`,
+  `SvgDomAndCrossDocTests`, `Acid3RegressionTests`, 204 tests with the guard) stays green. Debt list:
+  five → four files.
+
+  **De-list 2026-07-17.** A sixth exempt-file shrink — `DomBridge/JsObjects.cs` (1286), dominated
+  by the ~690-line element-wrapper `ToJSObject` plus three non-element node populators. The three
+  populators — the minimal JS-wrapper builders for canonical character-data nodes
+  (`PopulateCharacterDataJSObject`, for `DomText`/`DomComment`), `DocumentType`
+  (`PopulateDocumentTypeJSObject`) and `DocumentFragment` (`PopulateDocumentFragmentJSObject`) —
+  were split into the sibling partial `DomBridge/JsObjects.NonElementNodes.cs` (600 lines), leaving
+  `ToJSObject` (the element wrapper and its node-kind dispatch) behind. Pure partial-class
+  relocation — no signature, accessibility, or logic change, so behaviour-identical by construction;
+  `JsObjects.cs` drops 1286 → 708 and its `OversizedFileExemptions` entry is removed.
+  `Broiler.HtmlBridge.Dom` builds clean and the guard is green (14/14, 0 offenders / 0 stale
+  exemptions); the node-wrapper coverage (`CharacterDataBindingModuleTests`,
+  `DocumentFragmentSentinelMigrationTests`, `NodeAccessorsBindingModuleTests`,
+  `DoctypeSentinelMigrationTests`, `DomImplementationTests`, `HtmlDomInterfacesTests`, 98 tests with
+  the guard) stays green. With this de-list the live `OversizedFileExemptions` set holds a single
+  entry — `LayoutMetrics.cs` (2343) is now the only HtmlBridge production file still over the
+  750-line limit.
+
+  **De-list 2026-07-17 — ratchet fully closed.** The last and largest debt file,
+  `DomBridge/LayoutMetrics.cs` (2343, ~3× the limit), was decomposed into four cohesive sibling
+  partials, leaving the core box-metric accessors (`clientWidth`/`offsetWidth`/`scrollWidth`/…,
+  offset/scroll-parent resolution, bounding-client-rect, and the shared-geometry read-pass cache)
+  behind:
+  - `LayoutMetrics.SvgAndZoom.cs` (380 lines) — SVG geometry/text-metric resolution, element
+    zoom / transform-scale resolution, and the border-box size helpers (plus the two
+    `[GeneratedRegex]` transform-scale / text-path patterns).
+  - `LayoutMetrics.Scrolling.cs` (583 lines) — the scrolling surface: `scrollIntoView`
+    option/argument parsing, element scroll-offset get/set with behaviour, scroll-event dispatch,
+    visual-viewport scroll/scale, and programmatic-scrollability / overflow analysis.
+  - `LayoutMetrics.ScrollGeometry.cs` (400 lines) — scroll-container / fixed-position ancestor
+    resolution, rendered-descendant enumeration, and the `scrollIntoView` physical-offset /
+    scroll-coordinate / scroll-inset geometry conversions.
+  - `LayoutMetrics.CssLength.cs` (393 lines) — CSS `<length>` / `calc()`-style math evaluation
+    against a viewport / containing-block basis, and the font-size / line-height reference
+    resolution it depends on.
+
+  Extracted verbatim (line-range moves) — pure partial-class relocation, no signature,
+  accessibility, or logic change, so behaviour-identical by construction; `LayoutMetrics.cs` drops
+  2343 → 676 and its `OversizedFileExemptions` entry is removed. **This empties the debt list: every
+  HtmlBridge production file is now under 750 lines, and the guard runs as a pure ratchet
+  (0 offenders / 0 exemptions).** `Broiler.HtmlBridge.Dom` builds clean and the guard is green
+  (14/14); the geometry / scroll / SVG / viewport coverage (`LayoutGeometryCacheEquivalenceTests`,
+  `LayoutGeometryCompletenessTests`, `SharedLayoutGeometryTests`, `SharedGeometryZoomSizeTests`,
+  `SharedScrollOverflowTests`, `SvgDomAndCrossDocTests`, `SvgDomDynamicContentTests`,
+  `VisualViewportEventTargetBindingModuleTests`, `WindowScrollBindingModuleTests`,
+  `PositionAreaLiveGeometryTests`, `AnchorInsetLiveGeometryTests`, `AbsPosInlineCbGeometryTests`,
+  133 tests with the guard) stays green.
 
 ### Phase 4 - eliminate parallel DOM state
 

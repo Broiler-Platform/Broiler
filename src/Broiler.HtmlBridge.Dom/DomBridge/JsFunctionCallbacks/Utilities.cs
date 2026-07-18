@@ -24,51 +24,6 @@ public sealed partial class DomBridge
     // classList / DOMTokenList callbacks (contains/add/remove/toggle/replace) moved to the Phase 3
     // ClassListBinding feature module (Broiler.HtmlBridge.Dom.Features).
 
-    private static JSValue JsUtilitiesGetItem029Core(Dictionary<string, string>? store, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSNull.Value;
-        var key = a[0].ToString();
-        return store.TryGetValue(key, out var val) ? new JSString(val) : JSNull.Value;
-    }
-
-
-    private static JSValue JsUtilitiesSetItem030Core(JSObject? storage, Dictionary<string, string>? store, in Arguments a)
-    {
-        if (a.Length >= 2)
-        {
-            var key = a[0].ToString();
-            var val = a[1].ToString();
-            store[key] = val;
-            storage[(KeyString)key] = new JSString(val);
-        }
-
-        return JSUndefined.Value;
-    }
-
-
-    private static JSValue JsUtilitiesRemoveItem031Core(JSObject? storage, Dictionary<string, string>? store, in Arguments a)
-    {
-        if (a.Length > 0)
-        {
-            var key = a[0].ToString();
-            store.Remove(key);
-            storage.Delete((KeyString)key);
-        }
-
-        return JSUndefined.Value;
-    }
-
-
-    private static JSValue JsUtilitiesClear032Core(JSObject? storage, Dictionary<string, string>? store, in Arguments a)
-    {
-        foreach (var key in store.Keys.ToList())
-            storage.Delete((KeyString)key);
-        store.Clear();
-        return JSUndefined.Value;
-    }
-
-
     private static JSValue JsUtilitiesSetFillStyle034Core(CanvasRenderingContext2D? context2d, in Arguments a)
     {
         if (a.Length > 0)

@@ -1,13 +1,26 @@
+using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
+    // Phase 2 item 4 (de-globalization, 2026-07-17): the per-element Web Animations timeline
+    // (currentTime) was the Animation slot of the process-static ElementRuntimeState table; it is now
+    // a per-bridge instance table, owned by the session's bridge. Still an element-keyed
+    // ConditionalWeakTable, so it GCs with the element and the cloneNode copy (see CloneDomElement) is
+    // preserved. The one static caller (the AnimationObjectBinding currentTime get/set feature
+    // callbacks) is threaded the resolved AnimationRuntimeState by the now-instance BuildAnimationObject.
+    private readonly ConditionalWeakTable<DomElement, AnimationRuntimeState> _animationRuntimeStates = [];
+
+    private AnimationRuntimeState AnimationStateFor(DomElement element) =>
+        _animationRuntimeStates.GetValue(element, static _ => new AnimationRuntimeState());
+
     private JSArray BuildAnimationList(DomElement? target)
     {
         var animations = new List<JSValue>();
@@ -56,7 +69,7 @@ public sealed partial class DomBridge
         string? animationShorthand,
         string? animationDelay)
     {
-        if (GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.IsSet)
+        if (AnimationStateFor(element).CurrentTimeMilliseconds.IsSet)
             return;
 
         double delaySec = 0;
@@ -79,18 +92,20 @@ public sealed partial class DomBridge
         }
 
         var currentTimeMs = delaySec > 0 ? (delaySec * 1000.0) + 1.0 : Math.Abs(delaySec) * 1000.0;
-        GetElementRuntimeState(element).Animation.CurrentTimeMilliseconds.Set(currentTimeMs);
+        AnimationStateFor(element).CurrentTimeMilliseconds.Set(currentTimeMs);
     }
 
-    private static JSObject BuildAnimationObject(DomElement element)
+    private JSObject BuildAnimationObject(DomElement element)
     {
         var animation = new JSObject();
         // The animation-object currentTime/ready.then surface is the co-located AnimationObjectBinding
-        // feature module (Phase 3).
+        // feature module (Phase 3). currentTime reads/writes the element's per-bridge animation timeline;
+        // resolve it once here (stable CWT identity for this element/bridge) and hand it to the callbacks.
+        var animationState = AnimationStateFor(element);
         animation.FastAddProperty(
             (KeyString)"currentTime",
-            new JSFunction((in _) => Dom.Features.AnimationObjectBinding.GetCurrentTime(element, in _), "get currentTime"),
-            new JSFunction((in a) => Dom.Features.AnimationObjectBinding.SetCurrentTime(element, in a), "set currentTime"),
+            new JSFunction((in _) => Dom.Features.AnimationObjectBinding.GetCurrentTime(animationState, in _), "get currentTime"),
+            new JSFunction((in a) => Dom.Features.AnimationObjectBinding.SetCurrentTime(animationState, in a), "set currentTime"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         var ready = new JSObject();

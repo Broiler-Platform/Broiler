@@ -14,4 +14,7 @@ internal interface IDocumentQueryHost
     JSObject ToJSObject(DomNode node);
     DomElement DocumentElement { get; }
     IReadOnlyList<DomElement> Elements { get; }
+    // Selector matching moved onto the host (Phase 2 item 4 de-globalization): it reads the per-bridge
+    // `:checked` state, so it is now a bridge-instance method rather than a static helper.
+    bool MatchesSelector(DomElement element, string selector, DomElement? scope = null);
 }

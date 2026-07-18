@@ -17,4 +17,7 @@ public sealed partial class DomBridge : Dom.Features.ISelectorsHost
         => CollectDescendantsByTag(element, tagName, results, this);
 
     JSObject Dom.Features.ISelectorsHost.ToJSObject(DomNode node) => ToJSObject(node);
+
+    bool Dom.Features.ISelectorsHost.MatchesSelector(DomElement element, string selector, DomElement? scope)
+        => MatchesSelector(element, selector, scope);
 }

@@ -1,5 +1,7 @@
+using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Runtime;
 using Broiler.HtmlBridge.Dom.Features;
+using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;
@@ -14,6 +16,19 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge : ISelectHost
 {
+    // Phase 2 item 4 (de-globalization, 2026-07-17): the per-element form-control runtime state
+    // (checkbox/radio checkedness, option value/defaultSelected, select selectedIndex, dialog
+    // returnValue) was the FormControl slot of the process-static ElementRuntimeState table; it is now
+    // a per-bridge instance table, owned by the session's bridge. Still element-keyed, so it GCs with
+    // the element and the cloneNode copy (see CloneDomElement) is preserved. Reached from the bridge's
+    // own instance methods directly, and from the feature bindings that need it (EventTargetBinding's
+    // click checkbox/radio toggle, and the `:checked` selector state provider) through their host
+    // interfaces — the concern's static callers were threaded, not left on a process-static table.
+    private readonly ConditionalWeakTable<DomElement, FormControlRuntimeState> _formControlRuntimeStates = [];
+
+    private FormControlRuntimeState FormControlStateFor(DomElement element) =>
+        _formControlRuntimeStates.GetValue(element, static _ => new FormControlRuntimeState());
+
     JSObject ISelectHost.ToJSObject(DomNode node) => ToJSObject(node);
 
     DomElement? ISelectHost.FindDomElementByJSObject(JSObject? jsObj) =>
@@ -21,7 +36,7 @@ public sealed partial class DomBridge : ISelectHost
 
     bool ISelectHost.TryGetSelectedIndex(DomElement select, out int index)
     {
-        if (GetElementRuntimeState(select).FormControl.SelectedIndex.TryGet(out var value) && value is int i)
+        if (FormControlStateFor(select).SelectedIndex.TryGet(out var value) && value is int i)
         {
             index = i;
             return true;
@@ -32,11 +47,11 @@ public sealed partial class DomBridge : ISelectHost
     }
 
     void ISelectHost.SetSelectedIndex(DomElement select, int index) =>
-        GetElementRuntimeState(select).FormControl.SelectedIndex.Set(index);
+        FormControlStateFor(select).SelectedIndex.Set(index);
 
     bool ISelectHost.TryGetOptionValue(DomElement option, out string value)
     {
-        if (GetElementRuntimeState(option).FormControl.Value.TryGet(out var stored) && stored is string s)
+        if (FormControlStateFor(option).Value.TryGet(out var stored) && stored is string s)
         {
             value = s;
             return true;
@@ -47,8 +62,8 @@ public sealed partial class DomBridge : ISelectHost
     }
 
     bool ISelectHost.GetOptionDefaultSelected(DomElement option) =>
-        GetElementRuntimeState(option).FormControl.DefaultSelected.TryGet(out var ds) && ds is true;
+        FormControlStateFor(option).DefaultSelected.TryGet(out var ds) && ds is true;
 
     void ISelectHost.SetOptionDefaultSelected(DomElement option, bool value) =>
-        GetElementRuntimeState(option).FormControl.DefaultSelected.Set(value);
+        FormControlStateFor(option).DefaultSelected.Set(value);
 }

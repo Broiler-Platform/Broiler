@@ -23,9 +23,9 @@ public sealed partial class DomBridge
         {
             double scrollTop = 0;
             double scrollLeft = 0;
-            if (GetElementRuntimeState(el).Scroll.Top.TryGet(out var st) && st is double stv)
+            if (ScrollStateFor(el).Top.TryGet(out var st) && st is double stv)
                 scrollTop = stv;
-            if (GetElementRuntimeState(el).Scroll.Left.TryGet(out var sl) && sl is double slv)
+            if (ScrollStateFor(el).Left.TryGet(out var sl) && sl is double slv)
                 scrollLeft = slv;
 
             var scrollScale = GetScrollSimulationScaleFactor();

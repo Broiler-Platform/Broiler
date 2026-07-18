@@ -14,4 +14,7 @@ public sealed partial class DomBridge : Dom.Features.IDocumentQueryHost
     DomElement Dom.Features.IDocumentQueryHost.DocumentElement => DocumentElement;
 
     IReadOnlyList<DomElement> Dom.Features.IDocumentQueryHost.Elements => Elements;
+
+    bool Dom.Features.IDocumentQueryHost.MatchesSelector(DomElement element, string selector, DomElement? scope)
+        => MatchesSelector(element, selector, scope);
 }

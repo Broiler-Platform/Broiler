@@ -71,14 +71,14 @@ public sealed partial class DomBridge
             // position is used instead of its document position.
             bool targetIsFixed =
                 (cssProps.GetValueOrDefault("position") ?? InlineStyle(element).GetValueOrDefault("position")) == "fixed" ||
-                (GetElementRuntimeState(element).Dialog.Modal.TryGet(out var tModal) && tModal is true);
+                (DialogStateFor(element).Modal.TryGet(out var tModal) && tModal is true);
             double scrollAdjY = 0, scrollAdjX = 0;
             if (targetIsFixed)
             {
                 var docEl = DocumentElement;
-                if (GetElementRuntimeState(docEl).Scroll.Top.TryGet(out var stv) && stv is double scrollTop)
+                if (ScrollStateFor(docEl).Top.TryGet(out var stv) && stv is double scrollTop)
                     scrollAdjY = scrollTop;
-                if (GetElementRuntimeState(docEl).Scroll.Left.TryGet(out var slv) && slv is double scrollLeft)
+                if (ScrollStateFor(docEl).Left.TryGet(out var slv) && slv is double scrollLeft)
                     scrollAdjX = scrollLeft;
             }
 
@@ -222,9 +222,9 @@ public sealed partial class DomBridge
             // this scroller's scroll, so its edges don't move by that offset.
             if (!stickyToNextScroller)
             {
-                if (GetElementRuntimeState(el).Scroll.Left.TryGet(out var sl) && sl is double slv)
+                if (ScrollStateFor(el).Left.TryGet(out var sl) && sl is double slv)
                     offX += slv * scale;
-                if (GetElementRuntimeState(el).Scroll.Top.TryGet(out var st) && st is double stv)
+                if (ScrollStateFor(el).Top.TryGet(out var st) && st is double stv)
                     offY += stv * scale;
             }
 
@@ -277,7 +277,7 @@ public sealed partial class DomBridge
     /// styles, replacing them with computed pixel values from the anchor element's
     /// dimensions.
     /// </summary>
-    private static void ResolveAnchorSizeFunctions(
+    private void ResolveAnchorSizeFunctions(
         DomElement element,
         Dictionary<string, string> cssProps,
         Dictionary<string, AnchorInfo> anchorRegistry)

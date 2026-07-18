@@ -17,23 +17,23 @@ internal static partial class StyleDeclarationBinding
 {
     // -------- element.style (writable, inline-style store) --------
 
-    private static JSValue InlineGetCssText(DomElement element, in Arguments a)
+    private static JSValue InlineGetCssText(IInlineStyleHost host, DomElement element, in Arguments a)
     {
-        var parts = DomBridge.InlineStyle(element).Select(kv => $"{kv.Key}: {kv.Value}");
+        var parts = host.InlineStyle(element).Select(kv => $"{kv.Key}: {kv.Value}");
         var text = string.Join("; ", parts);
         return new JSString(text.Length > 0 ? text + ";" : text);
     }
 
-    private static JSValue InlineSetCssText(DomElement element, Action? onMutation, in Arguments a)
+    private static JSValue InlineSetCssText(IInlineStyleHost host, DomElement element, Action? onMutation, in Arguments a)
     {
-        DomBridge.InlineStyle(element).Clear();
-        DomBridge.ClearInlineStylePropsSetByJs(element);
+        host.InlineStyle(element).Clear();
+        host.ClearInlineStylePropsSetByJs(element);
         if (a.Length > 0)
         {
             foreach (var kv in DomBridge.ParseStyle(a[0].ToString(), reportDrops: true))
             {
-                DomBridge.InlineStyle(element)[kv.Key] = kv.Value;
-                DomBridge.MarkInlineStylePropSetByJs(element, kv.Key);
+                host.InlineStyle(element)[kv.Key] = kv.Value;
+                host.MarkInlineStylePropSetByJs(element, kv.Key);
             }
         }
 
@@ -41,7 +41,7 @@ internal static partial class StyleDeclarationBinding
         return JSUndefined.Value;
     }
 
-    private static JSValue InlineSetProperty(DomElement element, Action? onMutation, in Arguments a)
+    private static JSValue InlineSetProperty(IInlineStyleHost host, DomElement element, Action? onMutation, in Arguments a)
     {
         if (a.Length >= 2)
         {
@@ -49,13 +49,13 @@ internal static partial class StyleDeclarationBinding
             var value = CssPriority.Apply(a[1].ToString(), a.Length >= 3 ? a[2].ToString() : string.Empty);
             if (string.IsNullOrEmpty(value))
             {
-                DomBridge.InlineStyle(element).Remove(prop);
-                DomBridge.UnmarkInlineStylePropSetByJs(element, prop);
+                host.InlineStyle(element).Remove(prop);
+                host.UnmarkInlineStylePropSetByJs(element, prop);
             }
             else if (DomBridge.IsAcceptableInlineValue(prop, value))
             {
-                DomBridge.InlineStyle(element)[prop] = value;
-                DomBridge.MarkInlineStylePropSetByJs(element, prop);
+                host.InlineStyle(element)[prop] = value;
+                host.MarkInlineStylePropSetByJs(element, prop);
             }
             // setProperty with an invalid value is a no-op per CSSOM (the value is not set).
 
@@ -65,12 +65,12 @@ internal static partial class StyleDeclarationBinding
         return JSUndefined.Value;
     }
 
-    private static JSValue InlineGetPropertyValue(DomElement element, in Arguments a)
+    private static JSValue InlineGetPropertyValue(IInlineStyleHost host, DomElement element, in Arguments a)
     {
         if (a.Length > 0)
         {
             var prop = a[0].ToString();
-            if (TryGetStylePropertyRawValue(element, prop, out var val))
+            if (TryGetStylePropertyRawValue(host, element, prop, out var val))
                 return new JSString(CssPriority.Strip(val));
             // Try camelCase version of kebab-case input
             var camel = CssPropertyNames.ToDomPropertyName(prop);
@@ -86,14 +86,14 @@ internal static partial class StyleDeclarationBinding
         return new JSString(string.Empty);
     }
 
-    private static JSValue InlineRemoveProperty(DomElement element, Action? onMutation, in Arguments a)
+    private static JSValue InlineRemoveProperty(IInlineStyleHost host, DomElement element, Action? onMutation, in Arguments a)
     {
         if (a.Length > 0)
         {
             var prop = a[0].ToString();
-            var removed = DomBridge.InlineStyle(element).TryGetValue(prop, out var val) ? val : string.Empty;
-            DomBridge.InlineStyle(element).Remove(prop);
-            DomBridge.UnmarkInlineStylePropSetByJs(element, prop);
+            var removed = host.InlineStyle(element).TryGetValue(prop, out var val) ? val : string.Empty;
+            host.InlineStyle(element).Remove(prop);
+            host.UnmarkInlineStylePropSetByJs(element, prop);
             onMutation?.Invoke();
             return new JSString(removed);
         }
@@ -101,30 +101,30 @@ internal static partial class StyleDeclarationBinding
         return new JSString(string.Empty);
     }
 
-    private static JSValue InlineGetCssFloat(DomElement element, in Arguments a)
+    private static JSValue InlineGetCssFloat(IInlineStyleHost host, DomElement element, in Arguments a)
     {
-        if (DomBridge.InlineStyle(element).TryGetValue("float", out var val))
+        if (host.InlineStyle(element).TryGetValue("float", out var val))
             return new JSString(val);
         return new JSString(string.Empty);
     }
 
-    private static JSValue InlineSetCssFloat(DomElement element, Action? onMutation, in Arguments a)
+    private static JSValue InlineSetCssFloat(IInlineStyleHost host, DomElement element, Action? onMutation, in Arguments a)
     {
         if (a.Length > 0)
         {
             var val = a[0].ToString();
             if (string.IsNullOrEmpty(val) || DomBridge.IsAcceptableInlineValue("float", val))
-                DomBridge.InlineStyle(element)["float"] = val;
+                host.InlineStyle(element)["float"] = val;
         }
         onMutation?.Invoke();
         return JSUndefined.Value;
     }
 
-    private static JSValue InlineItem(DomElement element, in Arguments a)
+    private static JSValue InlineItem(IInlineStyleHost host, DomElement element, in Arguments a)
     {
         if (a.Length > 0 && int.TryParse(a[0].ToString(), out var index))
         {
-            var propertyNames = GetStylePropertyNames(element);
+            var propertyNames = GetStylePropertyNames(host, element);
             if (index >= 0 && index < propertyNames.Count)
                 return new JSString(propertyNames[index]);
         }
@@ -132,9 +132,9 @@ internal static partial class StyleDeclarationBinding
         return new JSString(string.Empty);
     }
 
-    private static JSValue InlineGetPropertyPriority(DomElement element, in Arguments a)
+    private static JSValue InlineGetPropertyPriority(IInlineStyleHost host, DomElement element, in Arguments a)
     {
-        if (a.Length > 0 && TryGetStylePropertyRawValue(element, a[0].ToString(), out var value))
+        if (a.Length > 0 && TryGetStylePropertyRawValue(host, element, a[0].ToString(), out var value))
             return new JSString(CssPriority.Parse(value));
         return new JSString(string.Empty);
     }

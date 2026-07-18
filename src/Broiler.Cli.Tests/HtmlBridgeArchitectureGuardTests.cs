@@ -199,22 +199,51 @@ public class HtmlBridgeArchitectureGuardTests
     // limit or adding an exemption is a deliberate, reviewed act, not the default.
     private const int MaxProductionFileLines = 750;
 
-    // Documented Phase-3 debt: files that still exceed the limit (line counts as of 2026-07-16).
+    // Documented Phase-3 debt: files that still exceed the limit. This set is now EMPTY — as of
+    // 2026-07-17 every HtmlBridge production file is under the 750-line limit, so the guard runs as a
+    // pure ratchet (any new/grown over-limit file fails). The de-list history below records how each
+    // former debt file was decomposed into feature-module / sibling partials; keep it for provenance.
     private static readonly HashSet<string> OversizedFileExemptions = new(StringComparer.Ordinal)
     {
-        "src/Broiler.HtmlBridge.Dom/DomBridge/LayoutMetrics.cs",
+        // LayoutMetrics.cs de-listed 2026-07-17: the last and largest debt file (2343 lines) was split
+        // into four cohesive sibling partials — SVG geometry/text + element zoom/transform
+        // (LayoutMetrics.SvgAndZoom.cs), the scrollIntoView / scroll-offset / visual-viewport /
+        // scrollability surface (LayoutMetrics.Scrolling.cs), scroll-container / fixed-position /
+        // scroll-offset geometry (LayoutMetrics.ScrollGeometry.cs), and CSS length/math + font/line-height
+        // resolution (LayoutMetrics.CssLength.cs) — leaving the core box-metric accessors and the
+        // shared-geometry cache behind and dropping it from 2343 to 676 lines. Exemption set now empty.
         // JsFunctionCallbacks/JsObjects.cs de-listed 2026-07-17: six feature modules
         // (P3.40–P3.45: CharacterData, node accessors, element attributes, node relationships,
         // Element selectors, element traversal) plus the EventTarget slice (P3.46: addEventListener/
         // removeEventListener/dispatchEvent/click/focus/blur) dropped it from 1599 to 727.
-        "src/Broiler.HtmlBridge.Dom/DomBridge/JsObjects.cs",
+        // DomBridge/JsObjects.cs de-listed 2026-07-17: the three non-element node JS-wrapper
+        // populators (PopulateCharacterDataJSObject, PopulateDocumentTypeJSObject,
+        // PopulateDocumentFragmentJSObject) were split into DomBridge/JsObjects.NonElementNodes.cs,
+        // leaving the element-wrapper ToJSObject dispatcher behind and dropping it from 1286 to 708.
         // JsFunctionCallbacks/Registration.cs de-listed 2026-07-17: nine feature modules
         // (P3.19–P3.27: console, crypto, sendBeacon, matchMedia, timers, write/writeln, node
         // factories, element queries, live collections, node mutation) dropped it from 1184 to 684.
-        "src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs",
-        "src/Broiler.HtmlBridge.Dom/DomBridge.cs",
-        "src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.cs",
-        "src/Broiler.HtmlBridge.Dom/DomBridge/Utilities.cs",
+        // SubDocuments.cs de-listed 2026-07-17: two cohesive clusters were split out — the generic
+        // HTML-fragment DOM-mutation helpers (RemoveElementsRecursive, NormalizeNode, RemoveChildAt,
+        // insertAdjacent/innerHTML/outerHTML builders) into DomBridge/HtmlFragmentMutation.cs, and
+        // XML/XHTML sub-document construction plus sub-document script execution
+        // (BuildSubDocumentFromXml, BuildDomElementFromXElement, ExecuteSubDocumentScripts) into
+        // DomBridge/SubDocuments.XmlAndScripts.cs — dropping it from 1152 to 694 lines.
+        // DomBridge.cs de-listed 2026-07-17: two cohesive behaviour clusters were split out of the
+        // facade into sibling partials — the window-load lifecycle / window-event dispatch
+        // (FireWindowLoadEvent, DispatchWindowEvent, BuildWindowFramesArray/CollectWindowFrames) into
+        // DomBridge.WindowLoad.cs, and initial HTML/doctype/inline-style parsing (ParseHtml,
+        // ParseStyle, IsAcceptableInlineValue, DocTypePattern) into DomBridge.HtmlParsing.cs —
+        // dropping the facade from 1013 to 682 lines (within the 500-800 facade target).
+        // DomBridge.Serialization.cs de-listed 2026-07-17: its cohesive SVG zoom-serialization
+        // attribute-scaling cluster (ApplyZoomSerializationSvgAttributes and the ScaleSvg* / SVG
+        // font-relative-unit resolution helpers, the SVG unit sets, and the three [GeneratedRegex]
+        // point/path/font-shorthand patterns) was split into the sibling partial
+        // DomBridge.Serialization.SvgZoom.cs, dropping it from 951 to 668 lines.
+        // Utilities.cs de-listed 2026-07-17: its cohesive DOM name-validation / DOMException /
+        // JS-constructor-globals cluster (ThrowDOMException, ValidateElementName/QualifiedName,
+        // RegisterDOMException/Node/SVGLength, and the two XML-name regex patterns) was split into
+        // the sibling partial Utilities.NameValidation.cs, dropping it from 894 to 626 lines.
         // AnimationResolver.cs de-listed 2026-07-17: its CSS timing-function/easing cluster was
         // split into the sibling partial AnimationResolver.Timing.cs, dropping it to 644 lines.
     };

@@ -68,6 +68,9 @@ internal interface ISubDocumentHost
     JSObject BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn);
     void CollectByTagName(DomNode root, string tag, List<JSValue> results);
     void CollectMatching(DomNode root, Func<DomElement, bool> predicate, List<JSValue> results);
+    // Selector matching moved onto the host (Phase 2 item 4 de-globalization): it reads the per-bridge
+    // `:checked` state, so it is now a bridge-instance method rather than a static helper.
+    bool MatchesSelector(DomElement element, string selector, DomElement? scope = null);
 
     // -------- mutation seams (append/remove on the sub-document) --------
     List<DomNode> BuildChildNodeArgumentNodes(in Arguments arguments);

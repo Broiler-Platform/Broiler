@@ -26,31 +26,31 @@ public sealed partial class DomBridge : IDialogHost
     void IDialogHost.InvalidateStyleScope(DomElement element) => InvalidateStyleScope(element);
 
     void IDialogHost.AssignNextTopLayerOrder(DomElement element) =>
-        GetElementRuntimeState(element).Dialog.TopLayerOrder.Set(++_topLayerCounter);
+        DialogStateFor(element).TopLayerOrder.Set(++_topLayerCounter);
 
     void IDialogHost.SetDialogModal(DomElement element, bool modal)
     {
         if (modal)
-            GetElementRuntimeState(element).Dialog.Modal.Set(true);
+            DialogStateFor(element).Modal.Set(true);
         else
-            GetElementRuntimeState(element).Dialog.Modal.Remove();
+            DialogStateFor(element).Modal.Remove();
     }
 
     void IDialogHost.SetPopoverOpen(DomElement element, bool open)
     {
         if (open)
-            GetElementRuntimeState(element).Dialog.PopoverOpen.Set(true);
+            DialogStateFor(element).PopoverOpen.Set(true);
         else
-            GetElementRuntimeState(element).Dialog.PopoverOpen.Remove();
+            DialogStateFor(element).PopoverOpen.Remove();
     }
 
     string IDialogHost.GetReturnValue(DomElement element) =>
-        GetElementRuntimeState(element).FormControl.ReturnValue.TryGet(out var rv) && rv is string s
+        FormControlStateFor(element).ReturnValue.TryGet(out var rv) && rv is string s
             ? s
             : string.Empty;
 
     void IDialogHost.SetReturnValue(DomElement element, string value) =>
-        GetElementRuntimeState(element).FormControl.ReturnValue.Set(value);
+        FormControlStateFor(element).ReturnValue.Set(value);
 
     bool IDialogHost.PopoverKeepsOverlayOnHide(DomElement element) => PopoverKeepsOverlayOnHide(element);
 }

@@ -19,4 +19,9 @@ internal interface IEventTargetHost
     Dictionary<string, List<EventListenerRegistration>> GetEventListeners(DomNode element);
     JSValue DispatchEventOnElement(DomNode element, JSObject evt);
     JSObject? WindowJSObject { get; }
+    // Form-control state moved onto the host (Phase 2 item 4 de-globalization): the click checkbox/radio
+    // toggle reads and writes the per-bridge FormControl runtime state (checkedness) and drives the
+    // radio-group mutual-exclusion walk, all now bridge-instance rather than process-static.
+    FormControlRuntimeState FormControlStateFor(DomElement element);
+    void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName);
 }

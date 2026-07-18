@@ -28,7 +28,7 @@ public sealed partial class DomBridge
     /// geometry that never reach the DOM <c>style</c> attribute the engine would otherwise read.
     /// Returns <c>null</c> when there is no inline style.
     /// </summary>
-    private static string? SerializeInlineStyleForEngine(DomElement element)
+    private string? SerializeInlineStyleForEngine(DomElement element)
     {
         var inline = InlineStyle(element);
         if (inline.Count == 0)
@@ -58,9 +58,11 @@ public sealed partial class DomBridge
     private CssStyleEngine GetSyncedScopedEngine(DomElement element)
     {
         var docRoot = GetDocumentRootFor(element);
-        var scope = _styleContext.GetOrCreateEngineScope(docRoot, static () =>
+        var scope = _styleContext.GetOrCreateEngineScope(docRoot, () =>
         {
-            var engine = new CssStyleEngine(new BridgeSelectorStateProvider());
+            // Non-static so the `:checked` state provider can read this bridge's per-instance
+            // FormControl table (Phase 2 item 4 de-globalization).
+            var engine = new CssStyleEngine(new BridgeSelectorStateProvider(this));
             // Feed the bridge's live ElementRuntimeState inline map as the cascade's inline
             // source (see SerializeInlineStyleForEngine) so the engine sees JS-set and
             // anchor-resolver-written inline that never reaches the DOM style attribute.
