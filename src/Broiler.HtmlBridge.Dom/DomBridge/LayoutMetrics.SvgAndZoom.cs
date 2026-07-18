@@ -353,25 +353,8 @@ public sealed partial class DomBridge
     }
 
 
-    private static JSObject CreateSvgLengthValue(double numericValue)
-    {
-        var svgLength = new JSObject();
-        svgLength.FastAddValue((KeyString)"value", new JSNumber(numericValue), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"valueInSpecifiedUnits", new JSNumber(numericValue), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"unitType", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_UNKNOWN", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_NUMBER", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PERCENTAGE", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_EMS", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_EXS", new JSNumber(4), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PX", new JSNumber(5), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_CM", new JSNumber(6), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_MM", new JSNumber(7), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_IN", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PT", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PC", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
-        return svgLength;
-    }
+    // CreateSvgLengthValue moved to the SvgElementBinding feature module (Phase 3 P3.50) — its only
+    // consumer (the SVGAnimatedLength stub) moved there too.
 
     [GeneratedRegex(@"scale\(\s*(?<value>[-+]?[0-9]*\.?[0-9]+)\s*\)", RegexOptions.IgnoreCase, "de-DE")]
     private static partial System.Text.RegularExpressions.Regex GetTransformScaleRegex();

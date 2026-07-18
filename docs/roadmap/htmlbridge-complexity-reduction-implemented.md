@@ -20,7 +20,7 @@ own status entries for the specifics; the summary below is the quick view.
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
-| 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, SVG, Canvas modules still to come; `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
+| 3 — feature modules | Bulk delivered | Element/geometry, Window/Document, Canvas modules still to come (SVG done — P3.50); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
 
@@ -1460,11 +1460,38 @@ against the page base, IDL set, and raw content-attribute read through the bridg
 element-interface / anchor / Acid3 / HtmlDomInterface / clone / architecture-guard suites pass (127);
 `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.50 completed** 2026-07-18 (branch `claude/htmlbridge-complexity-reduction-f3anpg`) — the **SVG DOM
+element interfaces**, the SVG family named "still to come" below. Unlike the layout-entangled element-geometry
+residue (`getBoundingClientRect`/`offsetParent`/scroll), every SVG accessor here is an attribute/font-size
+*estimation stub* — none reads layout geometry — so the whole cohesive block (registration **and** callbacks,
+per work-item 2) lifts out as `SvgElementBinding` (namespace `Broiler.HtmlBridge.Dom.Features`), a pure
+`internal static` class with **no host contract** (like `ClassListBinding` P3.6 and `WebStorageBinding` P3.48).
+It owns the `SVGAnimatedLength` stubs for the dimensional presentation attributes
+(`width`/`height`/`x`/`y`/`cx`/`cy`/`r`/`rx`/`ry`), the `SVGSVGElement.viewBox` `SVGAnimatedRect`, the
+`SVGTextContentElement` text-metric methods (`getNumberOfChars`/`getComputedTextLength`/`getSubStringLength`/
+`getStartPositionOfChar`/`getEndPositionOfChar`/`getRotationOfChar`), the `SVGSVGElement` animation timeline
+(`getCurrentTime`/`setCurrentTime`), and the SMIL animation-element no-ops
+(`beginElement`/`endElement`/`getStartTime`). It reads content attributes / text through the bridge's neutral
+`internal static` `TryGetAttribute`/`CollectTextContent`, and builds the no-op SMIL functions with the bridge's
+`internal static` `UndefinedFunction`/`ZeroFunction` factories (`ZeroFunction` widened `private`→`internal`);
+the private `CreateSvgLengthValue` helper moved into the module since its only consumer (the animated-length
+stub) came with it, and the repeated font-size parse collapsed into one `ReadFontSize`. The ~90-line SVG block
+in `DomBridge/ElementInterfaces.cs` becomes one `Dom.Features.SvgElementBinding.Install(obj, element, tag)`
+call, and the ten callbacks (`Callback086`..`SetCurrentTime095`) are gone from
+`JsFunctionCallbacks/ElementInterfaces.cs` (330 → 184 lines), leaving only the sub-document
+(`SetData051`/`GetContentDocument054`/`GetSVGDocument055`), computed-style-dimension (`Callback062`) and
+layout-entangled element-geometry/scroll callbacks. Behaviour-preserving; no public-API change (module
+internal, no contract). Tests: `Broiler.Cli.Tests/SvgElementBindingModuleTests.cs` (feature-module /
+no-host-contract / ten-callbacks-moved-off-bridge guards + end-to-end characterizations: `rect.width.baseVal`,
+`svg.viewBox` parse, the text-metric font-size estimates, and the `currentTime` round-trip through the JS
+engine). Regression check: the SVG / element-interface / Acid3 / HtmlDomInterface / clone / architecture-guard
+suites pass; `Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
-any residual coupling: Element/geometry, Window/Document, SVG, Canvas (better done with Phase 6, which dissolves
+any residual coupling: Element/geometry, Window/Document, Canvas (better done with Phase 6, which dissolves
 `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
-done** (P3.13/P3.16/P3.17/P3.18).
+done** (P3.13/P3.16/P3.17/P3.18); **SVG is done** (P3.50).
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
