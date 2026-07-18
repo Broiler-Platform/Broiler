@@ -98,14 +98,25 @@ public sealed partial class DomBridge
     ];
 
     /// <summary>
-    /// Applies the HTML user-agent <c>dialog:modal { inset:0; margin:auto }</c> centring default to a
-    /// modal <c>&lt;dialog&gt;</c> the bridge just gave the UA <c>position:fixed</c>. The engine centres a
-    /// box only when it has a definite used size on the axis (both opposing insets + auto margins +
-    /// definite size, per CSS2.1 §10.3.7/§10.6.4); a content-sized (auto/intrinsic) axis with both insets
-    /// would instead stretch to fill the viewport, so the inset/margin default is applied <em>per axis</em>
-    /// only where the modal has a definite specified size. A content-sized axis keeps its natural size and
-    /// static position (uncentred) until the engine can shrink-wrap a both-inset box. The default is
-    /// suppressed entirely when the author declares any inset/margin — the page owns the positioning then.
+    /// Applies the HTML user-agent <c>dialog:modal { inset:0; width:fit-content; margin:auto }</c>
+    /// centring default to a modal <c>&lt;dialog&gt;</c> the bridge just gave the UA <c>position:fixed</c>.
+    /// The layout engine centres a box on an axis when it has a resolvable used size there and both
+    /// opposing insets + auto margins (CSS2.1 §10.3.7/§10.6.4).
+    /// <para>
+    /// <b>Inline axis:</b> the engine shrink-wraps an intrinsic-keyword width, so a modal with no author
+    /// width gets the UA <c>fit-content</c> default and centres horizontally at its content width; an
+    /// explicit or intrinsic author width centres as-is; an explicit author <c>auto</c> is left alone
+    /// (with both insets it fills the viewport — no free space).
+    /// </para>
+    /// <para>
+    /// <b>Block axis:</b> centred only when the author gives an explicit length/percentage height. A
+    /// content (auto/intrinsic) block size on an out-of-flow box is not yet shrink-wrapped by the engine's
+    /// used-height pass — the box would report only its chrome height at centring time — so a content-height
+    /// modal keeps its natural block position rather than being mis-centred. That is the remaining engine
+    /// increment for full content-sized modal centring.
+    /// </para>
+    /// The default is suppressed entirely when the author declares any inset/margin — the page owns the
+    /// positioning then.
     /// </summary>
     private void ApplyModalCenteringDefaults(DomElement el)
     {
@@ -115,12 +126,7 @@ public sealed partial class DomBridge
             if (specified.ContainsKey(prop))
                 return;
 
-        bool widthDefinite = IsDefiniteSizeValue(specified.GetValueOrDefault("width"));
-        bool heightDefinite = IsDefiniteSizeValue(specified.GetValueOrDefault("height"));
-        if (!widthDefinite && !heightDefinite)
-            return;
-
-        if (widthDefinite)
+        if (ResolveModalInlineAxisCentres(el, specified))
         {
             InlineStyle(el)["left"] = "0";
             InlineStyle(el)["right"] = "0";
@@ -128,7 +134,8 @@ public sealed partial class DomBridge
             InlineStyle(el)["margin-right"] = "auto";
         }
 
-        if (heightDefinite)
+        // Block axis: only an explicit definite height centres reliably (see remarks).
+        if (IsExplicitLengthOrPercentage(specified.GetValueOrDefault("height")))
         {
             InlineStyle(el)["top"] = "0";
             InlineStyle(el)["bottom"] = "0";
@@ -137,9 +144,24 @@ public sealed partial class DomBridge
         }
     }
 
-    // A used size is definite (so the engine can centre against it) when it is neither auto nor an
-    // intrinsic-sizing keyword; a <percentage> is definite (it resolves against the containing block).
-    private static bool IsDefiniteSizeValue(string? value)
+    // Decides whether the modal's inline (width) axis can be centred, applying the UA <c>fit-content</c>
+    // default when the author gave no width so the box shrink-wraps to content. Returns false only when
+    // the author explicitly set <c>width:auto</c> — with both insets that fills the containing block,
+    // leaving no free space for the auto margins to distribute.
+    private bool ResolveModalInlineAxisCentres(DomElement el, Dictionary<string, string> specified)
+    {
+        if (!specified.TryGetValue("width", out var value) || string.IsNullOrWhiteSpace(value))
+        {
+            InlineStyle(el)["width"] = "fit-content"; // UA dialog:modal shrink-to-fit default
+            return true;
+        }
+
+        return !string.Equals(value.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // True for an explicit length or percentage — a used size the engine resolves before positioning, so
+    // the auto margins can centre against it. Excludes auto and the intrinsic-sizing keywords.
+    private static bool IsExplicitLengthOrPercentage(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
             return false;

@@ -177,6 +177,34 @@ synthesis (and its author-geometry / position-try helpers) from `Dialogs.cs`.
   horizontally). Zero regressions — the dialog/backdrop/popover/anchor/Acid3/architecture-guard/public-API
   suites pass (the standing zoom / visual-viewport / anchor-size / iframe-scroll serialization
   environmental fails are identical with the change stashed).
+
+  **Landed (2026-07-18) — horizontal shrink-to-fit: content-*width* modals now shrink-wrap and centre.**
+  The engine increment named above ("shrink-to-fit sizing … remaining") is delivered for the inline axis
+  (`Broiler.Layout`, main-repo): `ResolveBlockUsedWidth` now resolves an **intrinsic-keyword width**
+  (`fit-content`/`min-content`/`max-content`) for an absolutely-positioned / fixed box too (previously the
+  `Position != Absolute && != Fixed` gate left such a box to the both-inset *fill* branch, so `inset:0;
+  width:fit-content` stretched to the IMCB instead of shrink-wrapping); for a both-inset box `fit-content`
+  clamps to the inset-modified containing block. `IsDefiniteBorderBoxWidth` now treats the resolved
+  intrinsic width as definite, so the existing `ResolveOverconstrainedAutoMargins` centres it. The bridge's
+  `ApplyModalCenteringDefaults` gives a modal with no author width the UA `width: fit-content` default, so a
+  content-sized modal shrink-wraps and centres **horizontally**. Tests:
+  `Broiler.Layout.Tests/AutoMarginCenteringTests.IntrinsicWidth_ShrinkWrapped_IsCentred` and the
+  `NativeModalCenteringTests` set (content-width shrink-wrap + horizontal centre; explicit-both-axes centre;
+  content-height stays vertically natural). **Zero regression:** 213 engine layout tests, the anchor /
+  position-area / abspos / dialog / Acid3 / guard / public-API Cli suites, and the **css-anchor-position WPT
+  corpus (33/6, identical to baseline)** all pass.
+
+  **Still remaining — the *block*-axis (height) shrink-to-fit.** A content-*height* out-of-flow box is not
+  yet centred: `ResolveUsedBlockHeight` leaves an intrinsic-keyword height as-is expecting child layout to
+  have folded the content height into `ActualBottom`, but for a fixed/abspos box the box reports only its
+  chrome height at every mid-layout centring phase (verified: a fixed modal with an 80px-tall block child
+  still reads a 34px chrome height at `PositionAbsoluteBox` time; the content height folds in later). So a
+  post-sizing block-axis centring pass reads a stale height and mis-centres — it was implemented and then
+  **reverted** for that reason. Fixing it needs the engine to shrink-wrap an out-of-flow box's
+  intrinsic/`auto` used *height* to its content before the centring phase (or to run the block-axis centring
+  in the root post-pass, after all descendant heights finalise). The bridge therefore centres a modal
+  vertically only for an **explicit** length/percentage height; a content-height modal keeps its natural
+  block position (near the top) rather than being mis-centred.
 - **Anchor-track render residue** stays exhausted (established earlier): the only un-handed-off case is a
   `position-area` box that *also* uses `position-try`, for which **no WPT test exists**, so widening the MVP
   gate has no observable payoff.

@@ -49,14 +49,15 @@ public sealed class NativeModalCenteringTests
     }
 
     [Fact]
-    public void ContentSized_Modal_Is_Not_Stretched_To_The_Viewport()
+    public void ContentSized_Modal_ShrinkWraps_And_Centers_Horizontally()
     {
-        // No explicit size → the UA centring inset default is suppressed on the auto axes, so the modal
-        // keeps its natural (content) size rather than stretching to fill the viewport.
-        var (_, _, width, height) = ShowModalRect("", "short");
+        // No explicit width → the UA `width: fit-content` default shrink-wraps the modal to its content
+        // width (not stretched to the viewport), and the auto margins centre it horizontally.
+        var (left, _, width, height) = ShowModalRect("", "short");
 
-        Assert.True(width < ViewportWidth, $"content-sized modal width {width} should not fill the viewport");
+        Assert.True(width < ViewportWidth, $"content-sized modal width {width} should shrink-wrap, not fill the viewport");
         Assert.True(height < ViewportHeight, $"content-sized modal height {height} should not fill the viewport");
+        Assert.Equal((ViewportWidth - width) / 2, left, 1);
     }
 
     [Fact]
@@ -70,13 +71,26 @@ public sealed class NativeModalCenteringTests
     }
 
     [Fact]
-    public void Definite_Width_Auto_Height_Centers_Only_Horizontally()
+    public void ExplicitWidth_And_ExplicitHeight_Center_On_Both_Axes()
     {
+        // Both axes definite → centred on both.
+        var (left, top, width, height) = ShowModalRect("dialog { width: 300px; height: 120px; }", "one line");
+
+        Assert.True(width >= 300, $"explicit 300px width plus chrome, got {width}"); // border box adds padding/border
+        Assert.True(height >= 120, $"explicit 120px height plus chrome, got {height}");
+        Assert.Equal((ViewportWidth - width) / 2, left, 1);
+        Assert.Equal((ViewportHeight - height) / 2, top, 1);
+    }
+
+    [Fact]
+    public void ContentHeight_Modal_Is_Not_Vertically_MisCentered()
+    {
+        // With an explicit width but content height, the modal centres horizontally and keeps its
+        // natural block position (near the viewport top) — it is NOT mis-centred using a stale height.
+        // (Full content-height vertical centring awaits the engine shrink-wrap of out-of-flow heights.)
         var (left, top, width, _) = ShowModalRect("dialog { width: 300px; }", "one line");
 
-        // Horizontal axis has a definite size → centred.
         Assert.Equal((ViewportWidth - width) / 2, left, 1);
-        // Vertical axis is content-sized → keeps its static top (near the top of the viewport), not centred.
-        Assert.True(top < ViewportHeight / 4, $"auto-height modal top {top} should stay near the viewport top");
+        Assert.True(top < ViewportHeight / 4, $"content-height modal top {top} should stay near the viewport top");
     }
 }

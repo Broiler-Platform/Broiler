@@ -150,11 +150,27 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     - ContainingBlock.ActualBorderLeftWidth - ContainingBlock.ActualBorderRightWidth;
         }
 
-        if (IsIntrinsicWidthKeyword(Width) && Float == CssConstants.None && Position != CssConstants.Absolute && Position != CssConstants.Fixed)
+        if (IsIntrinsicWidthKeyword(Width) && Float == CssConstants.None)
         {
             // CSS Sizing 3 §5: width resolves to an intrinsic size
-            // (min-content / max-content / fit-content).
-            width = ResolveIntrinsicWidth(g, Width, width);
+            // (min-content / max-content / fit-content). This also applies to an
+            // out-of-flow (absolutely/fixed positioned) box: an intrinsic-keyword width
+            // shrink-wraps to content rather than filling the inset-modified containing
+            // block, so a `dialog:modal { inset:0; width:fit-content; margin:auto }` box
+            // sizes to its content and the auto margins then centre it (§10.3.7). For such a
+            // box with both opposing insets, fit-content clamps to the space between the
+            // insets (the inset-modified containing block), not the full containing block.
+            double availableForIntrinsic = width;
+            if ((Position == CssConstants.Absolute || Position == CssConstants.Fixed)
+                && Left != null && Left != CssConstants.Auto
+                && Right != null && Right != CssConstants.Auto)
+            {
+                double insetLeft = CssLengthParser.ParseLength(Left, width, GetEmHeight());
+                double insetRight = CssLengthParser.ParseLength(Right, width, GetEmHeight());
+                availableForIntrinsic = Math.Max(0, width - insetLeft - insetRight);
+            }
+
+            width = ResolveIntrinsicWidth(g, Width, availableForIntrinsic);
         }
         else if (Width != CssConstants.Auto && !string.IsNullOrEmpty(Width) && !IsIntrinsicWidthKeyword(Width))
         {
@@ -1545,10 +1561,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             InvalidateActualMargins();
     }
 
-    // The used border-box inline size is known (Size.Width has been resolved by positioning time)
-    // when width is an explicit, non-intrinsic value — the case §10.3.7 centring needs.
+    // The used border-box inline size is known (Size.Width has been resolved by positioning time) —
+    // the case §10.3.7 centring needs — for an explicit length/percentage width AND for an
+    // intrinsic-keyword (min-/max-/fit-content) width, which ResolveBlockUsedWidth now shrink-wraps
+    // into Size.Width before positioning. Only `width:auto` is excluded: with both insets it fills the
+    // inset-modified containing block (auto margins resolve to 0), so there is no free space to centre.
     private bool IsDefiniteBorderBoxWidth() =>
-        Width != CssConstants.Auto && !string.IsNullOrEmpty(Width) && !IsIntrinsicWidthKeyword(Width);
+        Width != CssConstants.Auto && !string.IsNullOrEmpty(Width);
 
     // The used border-box block size for §10.6.4 centring: Size.Height once resolved, else derived
     // from an explicit non-percentage height (mirrors the bottom-anchored fixed/abspos fallback).

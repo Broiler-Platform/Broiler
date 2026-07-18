@@ -101,6 +101,24 @@ public sealed class AutoMarginCenteringTests
     }
 
     [Fact]
+    public void IntrinsicWidth_ShrinkWrapped_IsCentred()
+    {
+        // A `width: fit-content` box shrink-wraps (ResolveBlockUsedWidth resolves Size.Width before
+        // positioning); the auto margins then centre that resolved size, just like an explicit width.
+        var root = Box(null, new SizeF(1000, 1000), "static");
+        var b = Box(root, new SizeF(100, 100), "fixed");
+        b.Width = "fit-content";              // intrinsic keyword, size already resolved to 100 above
+        b.Height = "100px";
+        b.Left = "0"; b.Right = "0"; b.Top = "0"; b.Bottom = "0";
+        b.MarginLeft = "auto"; b.MarginRight = "auto";
+        b.MarginTop = "auto"; b.MarginBottom = "auto";
+        b.ResolveOverconstrainedAutoMargins(300, 300);
+        // excess = 300 - 0 - 0 - 100 = 200 → each margin 100.
+        Assert.Equal(100, b.ActualMarginLeft, 3);
+        Assert.Equal(100, b.ActualMarginRight, 3);
+    }
+
+    [Fact]
     public void ExcessNegative_MarginsZero()
     {
         var root = Box(null, new SizeF(1000, 1000), "static");
