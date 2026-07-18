@@ -109,14 +109,22 @@ public sealed partial class DomBridge
         // removeProperty, cssFloat — all route through this onMutation), write the dict through to the
         // canonical style= attribute so element.style and getAttribute("style") observe one state,
         // then invalidate computed style.
-        var styleObj = Dom.Features.StyleDeclarationBinding.BuildInlineDeclaration(bridge, element, () =>
+        // Phase 4 item 2: every element.style mutation writes the inline-style dict through to the
+        // canonical style= attribute (so element.style and getAttribute("style") observe one state) and
+        // then invalidates computed style. Shared by the declaration object's per-property/cssText
+        // mutations and the `element.style = "..."` assignment setter (Phase 3 P3.63:
+        // StyleDeclarationBinding.SetInlineStyleCssText).
+        void OnStyleMutation()
         {
             bridge.SyncStyleAttributeFromInlineStyle(element);
             bridge.InvalidateStyleScope(element);
-        }, onPositionAreaInvalidate: bridge.ClearPositionAreaResolution);
+        }
+
+        var styleObj = Dom.Features.StyleDeclarationBinding.BuildInlineDeclaration(bridge, element, OnStyleMutation,
+            onPositionAreaInvalidate: bridge.ClearPositionAreaResolution);
         obj.FastAddProperty((KeyString)"style",
             new JSFunction((in a) => styleObj, "get style"),
-            new JSFunction((in a) => JsJsObjectsSetStyle025Core(bridge, element, in a), "set style"),
+            new JSFunction((in a) => Dom.Features.StyleDeclarationBinding.SetInlineStyleCssText(bridge, element, OnStyleMutation, in a), "set style"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // classList — class list manipulation (Phase 3 P3.6: co-located ClassListBinding module)

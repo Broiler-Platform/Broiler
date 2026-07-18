@@ -22,27 +22,7 @@ public sealed partial class DomBridge
 
     // element.shadowRoot getter moved to the ShadowDomBinding feature module (Phase 3 P3.62).
 
-    private JSValue JsJsObjectsSetStyle025Core(DomBridge? bridge, DomElement element, in Arguments a)
-    {
-        if (a.Length > 0 && a[0] is JSString s)
-        {
-            // Setting element.style = "prop: val; ..." parses as cssText
-            InlineStyle(element).Clear();
-            InlineStyleStateFor(element).JsSetStyleProps.Clear();
-            foreach (var kv in ParseStyle(s.ToString(), reportDrops: true))
-            {
-                InlineStyle(element)[kv.Key] = kv.Value;
-                InlineStyleStateFor(element).JsSetStyleProps.Add(kv.Key);
-            }
-
-            // Phase 4 item 2: write-through so getAttribute("style") observes the assignment.
-            bridge.SyncStyleAttributeFromInlineStyle(element);
-            bridge.InvalidateStyleScope(element);
-        }
-
-        return JSUndefined.Value;
-    }
-
+    // element.style = "..." cssText assignment setter moved to StyleDeclarationBinding (Phase 3 P3.63).
 
     // insertBefore(newChild, refChild) moved to the TreeMutationBinding feature module (Phase 3 P3.58).
 

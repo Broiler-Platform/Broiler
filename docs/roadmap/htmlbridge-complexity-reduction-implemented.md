@@ -20,7 +20,7 @@ own status entries for the specifics; the summary below is the quick view.
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
-| 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds only two callbacks, both explicitly deferred/gated: the `element.style` cssText setter (Phase-4-item-2-entangled) and Canvas `getContext` (Phase-6-entangled) (SVG done — P3.50; Element/geometry done — P3.51; `<object>` sub-document accessors done — P3.52; tree mutation done — P3.58; on* reflectors done — P3.59; form-control IDL done — P3.60; `form.submit()` done — P3.61; shadow-DOM binding done — P3.62); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
+| 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
 
@@ -1736,12 +1736,34 @@ identity-stable root and a second attach throws; closed attachment returns the r
 Regression check: the shadow-DOM / GoogleSearchPolyfill / Acid3 / public-API-snapshot / architecture-guard suites
 pass; `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.63 completed** 2026-07-18 (same branch) — the **`element.style = "..."` cssText assignment
+setter**, the last non-Canvas callback in the mixed `JsObjects.cs` element-member file, moved into the CSSOM
+owner `StyleDeclarationBinding` (P3.14) rather than a new module: `element.style` is effectively read-only, so
+assigning a string is spec-equivalent to setting `style.cssText`, and the setter already lived one method away
+(`InlineSetCssText`). The new `StyleDeclarationBinding.SetInlineStyleCssText` reuses the module's existing
+`IInlineStyleHost` seam (the inline-style dict + "set via JS" bookkeeping — no *new* coupling) and the shared
+`onMutation` write-through; it preserves verbatim the original setter's quirk that only a **string** RHS acts
+(a non-string assignment is a no-op, unlike `style.cssText =` which stringifies), so the dict clear stays inside
+the string guard. In `DomBridge/JsObjects.cs` the previously-inline `onMutation` lambda became a shared local
+function `OnStyleMutation` passed to both `BuildInlineDeclaration` and the setter, and the setter now calls
+`Dom.Features.StyleDeclarationBinding.SetInlineStyleCssText`. The callback (`JsJsObjectsSetStyle025Core`) is gone
+from `JsFunctionCallbacks/JsObjects.cs` (86 → 66 lines). **The mixed element-member callbacks file now holds a
+single callback — the Canvas `getContext` (Phase-6-gated) — so every callback that could be extracted as a
+behaviour-preserving refactor has been.** Behaviour-preserving; no public-API change (method added to an existing
+internal module). Tests: added to `Broiler.Cli.Tests/StyleDeclarationBindingModuleTests.cs` (callback-moved /
+method-present guard + end-to-end: a string assignment parses cssText and writes through to `getAttribute("style")`
+and a reassignment clears prior props; a non-string assignment is a no-op). Regression check: the
+StyleDeclaration / InlineStyle-write-through / InlineStyle-drop-diagnostics / CssStyleDeclaration-validation /
+Selectors-CSSOM / ComputedStyle / Acid3 / public-API-snapshot / architecture-guard suites pass (one pre-existing
+`Lang_Matches_XmlLang_Ancestor` selector check fails identically on `origin/main`, unrelated to this change);
+`Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
-any residual coupling: the residue of the mixed `JsObjects.cs` element-member callbacks (the
-`element.style` cssText setter, entangled with the deferred Phase-4 item-2 inline-style dict machinery),
-Canvas (better done with Phase 6, which dissolves `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and
-the DomBridge 500-800-line facade target.
+any residual coupling: the last callback in the mixed `JsObjects.cs` element-member file is Canvas
+`getContext` (better done with Phase 6, which dissolves
+`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`); the DomBridge 500-800-line facade target is already met
+(682 lines).
 **Frames is done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is done** (P3.50);
 **Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done** (P3.52); **the mixed
 `ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global attribute reflectors
@@ -1749,9 +1771,10 @@ are done** (P3.54); **insertAdjacent\* is done** (P3.56); **the element-content 
 **tree mutation is done** (P3.58 — `insertBefore`/`appendChild`/`append`/`prepend`/`removeChild`/`replaceChild`);
 **the on\* event-handler reflectors are done** (P3.59); **the form-control IDL reflectors are done** (P3.60 —
 `value`/`checked`/`type`/`name`/`disabled`/`hidden`/`tabIndex`/`required`); **`form.submit()` is done** (P3.61);
-**the shadow-DOM `shadowRoot`/`attachShadow` binding is done** (P3.62). The mixed `JsObjects.cs` element-member
-callbacks file now holds only the two explicitly deferred/gated callbacks (the `element.style` cssText setter and
-Canvas `getContext`).
+**the shadow-DOM `shadowRoot`/`attachShadow` binding is done** (P3.62); **the `element.style` cssText assignment
+setter is done** (P3.63 — into `StyleDeclarationBinding`). The mixed `JsObjects.cs` element-member callbacks file
+now holds a single callback — Canvas `getContext` (Phase-6-gated) — so every behaviour-preservingly-extractable
+callback has been peeled out.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
