@@ -84,23 +84,8 @@ public sealed partial class DomBridge
     // appendChild / append / prepend / removeChild / replaceChild moved to the TreeMutationBinding
     // feature module (Phase 3 P3.58).
 
-    private JSValue JsJsObjectsCallback104Core(DomElement element, global::System.String? eventName, in Arguments _)
-    {
-        if (GetInlineEventHandlers(element).TryGetValue(eventName, out var handler))
-            return handler;
-        return JSNull.Value;
-    }
-
-
-    private JSValue JsJsObjectsCallback105Core(DomElement element, global::System.String? eventName, in Arguments a)
-    {
-        if (a.Length > 0 && a[0] is JSFunction fn)
-            GetInlineEventHandlers(element)[eventName] = fn;
-        else
-            GetInlineEventHandlers(element).Remove(eventName);
-        return JSUndefined.Value;
-    }
-
+    // get/set on<event> inline event-handler reflectors moved to the EventHandlerReflectorBinding
+    // feature module (Phase 3 P3.59).
 
     private JSValue JsJsObjectsGetValue106Core(DomElement element, in Arguments a)
     {

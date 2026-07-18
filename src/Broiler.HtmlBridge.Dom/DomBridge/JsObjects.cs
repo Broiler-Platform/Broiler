@@ -484,8 +484,8 @@ public sealed partial class DomBridge
         foreach (var eventName in InlineEventNames)
         {
             obj.FastAddProperty((KeyString)$"on{eventName}",
-                new JSFunction((in _) => JsJsObjectsCallback104Core(element, eventName, in _), $"get on{eventName}"),
-                new JSFunction((in a) => JsJsObjectsCallback105Core(element, eventName, in a), $"set on{eventName}"),
+                new JSFunction((in _) => Dom.Features.EventHandlerReflectorBinding.GetOn(this, element, eventName, in _), $"get on{eventName}"),
+                new JSFunction((in a) => Dom.Features.EventHandlerReflectorBinding.SetOn(this, element, eventName, in a), $"set on{eventName}"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
