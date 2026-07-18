@@ -64,6 +64,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // (checkValidity/reportValidity) live in FormBinding, reached through the narrow IFormHost
     // contract (see DomBridge.FormHost.cs).
     private readonly Dom.Features.FormBinding _forms;
+    // Phase 3 (P3.60): the form-control IDL reflectors (value/checked/type/name/disabled/hidden/
+    // tabIndex/required) live in FormControlBinding, reached through the narrow IFormControlHost
+    // contract (see DomBridge.FormControlHost.cs).
+    private readonly Dom.Features.FormControlBinding _formControl;
     // Phase 3 (first feature-module slice): TreeWalker/NodeIterator/Range construction, every Range
     // callback and the traversal-scoped active-range / active-node-iterator registries live in the
     // co-located TraversalBinding module. The bridge holds the module through the narrow
@@ -190,6 +194,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _dialogs = new Dom.Features.DialogBinding(this);
         _select = new Dom.Features.SelectBinding(this);
         _forms = new Dom.Features.FormBinding(this);
+        _formControl = new Dom.Features.FormControlBinding(this);
         _messaging = new Dom.Features.MessagingBinding(this, _eventTargets);
         _fetch = new Dom.Features.FetchBinding(this, _resources);
         _attributes = new Dom.Features.AttributesBinding(this);

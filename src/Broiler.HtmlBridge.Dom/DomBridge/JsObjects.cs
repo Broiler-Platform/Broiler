@@ -494,57 +494,10 @@ public sealed partial class DomBridge
 
         // -- Form element support --
 
-        // value (read/write) — for input, textarea, select elements
-        // The IDL 'value' property is NOT reflected as a content attribute for inputs.
-        obj.FastAddProperty((KeyString)"value",
-            new JSFunction((in a) => JsJsObjectsGetValue106Core(element, in a), "get value"),
-            new JSFunction((in a) => JsJsObjectsSetValue107Core(element, in a), "set value"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // checked (read/write) — for checkbox and radio inputs
-        // Uses the typed checked-state slot as the "dirty" IDL state that tracks
-        // programmatic changes. setAttribute("checked") only sets the content
-        // attribute and does NOT affect this IDL state.
-        obj.FastAddProperty((KeyString)"checked",
-            new JSFunction((in a) => JsJsObjectsGetChecked108Core(element, in a), "get checked"),
-            new JSFunction((in a) => JsJsObjectsSetChecked109Core(element, in a), "set checked"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // type (read/write) — for input/button elements; getter returns lowercase
-        obj.FastAddProperty((KeyString)"type",
-            new JSFunction((in a) => JsJsObjectsGetType110Core(element, in a), "get type"),
-            new JSFunction((in a) => JsJsObjectsSetType111Core(element, in a), "set type"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // name (read/write) — for form elements; syncs with content attribute
-        obj.FastAddProperty((KeyString)"name",
-            new JSFunction((in a) => JsJsObjectsGetName112Core(element, in a), "get name"),
-            new JSFunction((in a) => JsJsObjectsSetName113Core(element, in a), "set name"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // disabled (read/write) — for form controls
-        obj.FastAddProperty((KeyString)"disabled",
-            new JSFunction((in a) => HasAttr(element, "disabled") ? JSBoolean.True : JSBoolean.False, "get disabled"),
-            new JSFunction((in a) => JsJsObjectsSetDisabled115Core(bridge, element, in a), "set disabled"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // hidden (read/write) — global reflected boolean attribute
-        obj.FastAddProperty((KeyString)"hidden",
-            new JSFunction((in a) => HasAttr(element, "hidden") ? JSBoolean.True : JSBoolean.False, "get hidden"),
-            new JSFunction((in a) => JsJsObjectsSetHidden117Core(bridge, element, in a), "set hidden"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // tabIndex (read/write) — global reflected numeric attribute
-        obj.FastAddProperty((KeyString)"tabIndex",
-            new JSFunction((in _) => JsJsObjectsGetTabIndex118Core(element, in _), "get tabIndex"),
-            new JSFunction((in a) => JsJsObjectsSetTabIndex119Core(element, in a), "set tabIndex"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // required (read/write) — form validation
-        obj.FastAddProperty((KeyString)"required",
-            new JSFunction((in a) => HasAttr(element, "required") ? JSBoolean.True : JSBoolean.False, "get required"),
-            new JSFunction((in a) => JsJsObjectsSetRequired121Core(bridge, element, in a), "set required"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        // Form-control IDL reflectors (value/checked/type/name/disabled/hidden/tabIndex/required) —
+        // Phase 3 P3.60: extracted into the co-located FormControlBinding feature module, reached
+        // through the IFormControlHost contract (DomBridge.FormControlHost.cs).
+        _formControl.Install(obj, element);
 
         // checkValidity() — form validation (Phase 3 P3.9: FormBinding owns the validity check)
         obj.FastAddValue((KeyString)"checkValidity",
