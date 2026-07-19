@@ -1722,7 +1722,11 @@ internal abstract partial class CssBoxProperties
             ? Math.Max(0, Size.Width)
             : 0;
 
-        return CssLengthParser.ParseLength(radius, basis, GetEmHeight());
+        // Paint-only used length (increment 5): border-radius scales with the box's zoom — absolute
+        // radii × EffectiveZoom, a `%` radius resolves against the box's own (already zoom-scaled) border
+        // box so it carries the full factor already (percentAgainstContainingBlock: false). The paint
+        // walker derives the Y radius proportionally from this X value, so it scales with no further work.
+        return ApplyZoomToLength(radius, CssLengthParser.ParseLength(radius, basis, GetEmHeight()), percentAgainstContainingBlock: false);
     }
 
     public double ActualCornerNw

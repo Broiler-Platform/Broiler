@@ -105,6 +105,52 @@ public sealed class ZoomLengthTests
     }
 
     [Fact]
+    public void ComputedStyleIr_Carries_EffectiveZoom_For_PaintOnly_Lengths()
+    {
+        // The paint layer resolves a few paint-only lengths (e.g. text-shadow offsets) from raw strings
+        // rather than the zoomed box geometry, so the ComputedStyle IR carries EffectiveZoom as the hook
+        // it scales them by. 1.0 while off; the compounded factor when a zoomed box is built.
+        var zoomed = Box(Root(), "2");
+        Assert.Equal(1.0, Broiler.Layout.IR.ComputedStyleBuilder.FromBox(zoomed).EffectiveZoom, 6); // flag off
+        WithNativeZoom(() =>
+            Assert.Equal(2.0, Broiler.Layout.IR.ComputedStyleBuilder.FromBox(zoomed).EffectiveZoom, 6));
+    }
+
+    [Fact]
+    public void BorderRadius_Absolute_Scales_By_EffectiveZoom()
+    {
+        // Paint-only used length (increment 5): an absolute corner radius scales with the box's zoom.
+        var box = Box(Root(), "2");
+        box.CornerNwRadius = "8px";
+        box.CornerSeRadius = "4px";
+
+        WithNativeZoom(() =>
+        {
+            Assert.Equal(16, box.ActualCornerNw, 3);
+            Assert.Equal(8, box.ActualCornerSe, 3);
+        });
+    }
+
+    [Fact]
+    public void BorderRadius_Percent_ResolvesAgainstZoomedBox_NotReScaled()
+    {
+        // A `%` radius resolves against the box's own (already zoom-scaled) border box, so it carries the
+        // full factor and is not re-scaled: 25% of the 200px box width = 50, unchanged by the zoom flag.
+        var box = Box(Root(), "2");
+        box.CornerNwRadius = "25%"; // box Size.Width is 200
+
+        WithNativeZoom(() => Assert.Equal(50, box.ActualCornerNw, 3));
+    }
+
+    [Fact]
+    public void BorderRadius_Disabled_Unscaled()
+    {
+        var box = Box(Root(), "2");
+        box.CornerNwRadius = "8px";
+        Assert.Equal(8, box.ActualCornerNw, 3);
+    }
+
+    [Fact]
     public void Outline_Disabled_Unscaled()
     {
         var box = Box(Root(), "2");

@@ -192,6 +192,16 @@ public sealed class ComputedStyle
 
     public string TextShadow { get; init; } = "none";
 
+    // --- Zoom ---
+
+    /// <summary>
+    /// The box's compounded CSS <c>zoom</c> factor (<see cref="Engine.CssBoxProperties.EffectiveZoom"/>);
+    /// <c>1.0</c> when the native-zoom engine is off. The layout read model already emits fully zoomed
+    /// geometry, so this is the hook the paint layer uses to scale the few <em>paint-only</em> used lengths
+    /// it resolves from raw strings itself (e.g. <c>text-shadow</c> offsets) rather than from the box tree.
+    /// </summary>
+    public double EffectiveZoom { get; init; } = 1.0;
+
     // --- Positioning ---
 
     public string Left { get; init; } = "auto";

@@ -936,17 +936,39 @@ keyword × `EffectiveZoom`, `em` riding the zoomed font, mirroring the border wi
 this is fully isolated. Gated by `NativeZoom` → flag-off byte-identical. Tests: `ZoomLengthTests` (outline
 width + offset ×zoom, `thick` keyword ×zoom, disabled = unscaled). Zero regression: 242 engine layout tests.
 
-**Remaining within increment 5** (the render-layer bulk, in the `Broiler.HTML`/`Broiler.Graphics` submodules —
-patch workflow + pixel validation, no reftest corpus): the paint-only lengths resolved *at paint* rather than
-in the layout read model — **`border-radius`**, **box-shadow** offset/blur/spread, **text-decoration**
-thickness / underline-offset, **`column-rule-width`** — plus **SVG** presentation/geometry attribute painting
-and **`::before`/`::after`** pseudo boxes (materialised upstream). Each scales by the owning box's
-`EffectiveZoom` the same way (absolute × zoom, `em`/font-relative via the zoomed font), but the change lives
-in the submodule paint code, so it is a patch not a main-repo edit. The one main-repo remnant deliberately
-left is **`letter-spacing`/`word-spacing`**: they *do* feed text layout (`MeasureWordSpacing` /
-`CssUtils.WhiteSpace`) and are entangled with the whitespace-advance measurement (a two-site add through
-`ParseLength(..., fontAdjust)`), so scaling them safely needs a focused text-measurement pass rather than a
-one-line getter wrap — a bounded follow-up.
+**Landed (2026-07-19) — increment 5, second slice: paint-residue scaling (main-repo `border-radius` + the
+paint-layer zoom hook + the `text-shadow` submodule patch).** Investigating the "submodule paint residue"
+turned up a mis-classification: **`border-radius` is resolved in the main repo**, not the submodule.
+`ParseCornerRadius` (`CssBoxProperties`) feeds `ActualCornerNw/Ne/Se/Sw`, and the submodule paint walker only
+*derives the Y radius proportionally from that X value* (`GetEffectiveCornerRadiusY = cornerX × H/W`), so
+scaling the one main-repo resolver covers both axes. `ParseCornerRadius` now applies
+`ApplyZoomToLength(radius, …, percentAgainstContainingBlock: false)` — absolute radii × `EffectiveZoom`, a
+`%` radius resolves against the box's own already-zoomed border box so it is not re-scaled, and the Y
+derivation scales for free. Pinned by `ZoomLengthTests` (absolute ×zoom, `%` not re-scaled, disabled =
+unscaled).
+
+For the genuinely submodule-resolved paint lengths, a reusable hook: **`ComputedStyle.EffectiveZoom`** (new
+IR field, populated from `CssBox.EffectiveZoom` in `ComputedStyleBuilder.FromBox`; `1.0` while the flag is
+off). It is the general lever the paint layer scales by for any paint-only length it resolves from a raw
+string rather than from the zoomed box geometry. First consumer: **`text-shadow`** offsets, whose
+`shadowX`/`shadowY` are parsed in `PaintWalker.Text.cs` from the raw string — shipped as
+**`patches/0002-broiler-html-text-shadow-zoom-scaling.patch`** (`Broiler.HTML` push → 403, pointer pinned).
+Note the dependency direction is the reverse of patch 0001: here the *submodule* reads a *parent* field, so
+the `ComputedStyle.EffectiveZoom` hook is **kept** in the parent (the pinned unpatched submodule simply does
+not read it; the parent compiles either way) rather than reverted. The hook is pinned by `ZoomLengthTests`
+(`ComputedStyleIr_Carries_EffectiveZoom_For_PaintOnly_Lengths`); the submodule scaling built clean against
+the patched tree before revert. Gated by `NativeZoom` → flag-off byte-identical. Zero regression: 246 engine
+layout tests. See `patches/README.md`.
+
+**Remaining within increment 5** (still carried by the bake): **SVG** presentation/geometry attribute
+painting and **`::before`/`::after`** pseudo boxes — both materialised in the submodule render layer, and SVG
+in particular has its own coordinate system / `viewBox` semantics, so it wants a dedicated pass (and pixel
+validation, no reftest corpus). Box-shadow is a non-issue for now: it is carried in the IR but has **no paint
+consumer** (element box-shadow is unimplemented); text-decoration underline rides the zoomed font metrics.
+The one main-repo remnant deliberately left is **`letter-spacing`/`word-spacing`**: they *do* feed text
+layout (`MeasureWordSpacing` / `CssUtils.WhiteSpace`) and are entangled with the whitespace-advance
+measurement (a two-site add through `ParseLength(..., fontAdjust)`), so scaling them safely needs a focused
+text-measurement pass rather than a one-line getter wrap — a bounded follow-up.
 
 **Remaining zoom increments**: (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles` — once the
 submodule paint residue above is patched in, so the flag-on engine matches the bake before the bake is
