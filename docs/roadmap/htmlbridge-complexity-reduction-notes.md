@@ -898,12 +898,34 @@ existing `%`-inset test. Zero regression: 236 engine layout tests + the position
 Cli subset. This closes the last documented increment-3 length gap; only `calc()` (shipped as the
 `Broiler.CSS` patch, wiring deferred until the pointer bump) remains outside the flag-off engine.
 
-**Remaining zoom increments**: (4) the SVG
-attribute / `::before`·`::after` pseudo / column edge cases the bake also covers; (5) the render/paint path
-(reuses the patch-0008/0009 `BCanvas.Scale` viewport-zoom plumbing, but per-subtree rather than a uniform
-root scale); (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles`. The `%`-vs-`px`-vs-`em`
-and *own*-vs-*effective* factor distinctions (increments 2–3) are the intricate, correctness-sensitive core
-— which is why this is "the large piece" and is being landed incrementally behind the flag.
+**Landed (2026-07-19) — increment 4, first slice: multi-column length scaling (main-repo).** The multicol
+`column-width`, `column-gap` and fragmentation `height`/`max-height` used lengths were still resolved via
+direct `CssLengthParser.ParseLength` and so unzoomed. All five callsites now route through `ParseUsedLength`:
+`ResolveColumnGap` (explicit gap ×`EffectiveZoom`, own-size basis; the `normal` default already rides the
+zoomed `GetEmHeight`), the two `column-width` auto-count resolutions in `CssBox.Layout.cs` (own-size basis),
+and the multicol balancing `height`/`max-height` in `CssBox.MultiColumn.cs` (CB basis). So a zoomed multicol
+container now sizes its columns and gaps at the effective factor, consistent with the padding/border it
+already subtracts zoomed. Gated by `NativeZoom` → flag-off byte-identical. `ResolveColumnGap` is now
+`internal` so `ZoomMultiColumnTests` can pin it directly (explicit gap ×zoom, nested zoom ×3, disabled =
+unscaled); the width/height callsites reuse the `ParseUsedLength` helper already pinned by `ZoomInsetTests`.
+Zero regression: 239 engine layout tests (the one failing Cli grid-auto-columns assertion is a pre-existing
+bare-container measurement difference, identical on clean HEAD).
+
+**Remaining within increment 4** (still carried by the bake, off the flag-off engine's main-repo layout
+surface): **`::before`/`::after` pseudo** and **SVG presentation/geometry attributes**. Both live in the
+render/serialization layers rather than the `Broiler.Layout` box-length surface the earlier increments cover
+— pseudo boxes and SVG attribute scaling are materialised upstream (renderer / bridge bake), so they fold in
+with the increment-5 render/paint pass rather than as a `ParseUsedLength` call-site sweep. The
+`ZoomScaledSerializationProperties` bake list also still owns a few paint-only lengths not consulted by box
+geometry (`border-radius`, `outline-width`/`outline-offset`, `column-rule-width`, `letter-spacing`/
+`word-spacing`), which likewise belong to the paint increment.
+
+**Remaining zoom increments**: (5) the render/paint path (reuses the patch-0008/0009 `BCanvas.Scale`
+viewport-zoom plumbing, but per-subtree rather than a uniform root scale), which also absorbs the pseudo /
+SVG / paint-only-length remainder above; (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles`.
+The `%`-vs-`px`-vs-`em` and *own*-vs-*effective* factor distinctions (increments 2–3) are the intricate,
+correctness-sensitive core — which is why this is "the large piece" and is being landed incrementally behind
+the flag.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.

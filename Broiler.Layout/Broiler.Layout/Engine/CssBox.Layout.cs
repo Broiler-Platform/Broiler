@@ -1168,7 +1168,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 {
                     // Auto column-count from column-width: compute the
                     // number of columns so we can pre-constrain width.
-                    double cwVal = CssLengthParser.ParseLength(ColumnWidth, Size.Width, GetEmHeight());
+                    double cwVal = ParseUsedLength(ColumnWidth, Size.Width, percentAgainstContainingBlock: false);
                     double gap = ResolveColumnGap();
                     double available = Size.Width - ActualPaddingLeft - ActualPaddingRight
                         - ActualBorderLeftWidth - ActualBorderRightWidth;
@@ -1237,7 +1237,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (!hasExplicitCount && hasColumnWidth)
             {
                 // Auto column-count from column-width: CSS Multi-column §3.4
-                double cw = CssLengthParser.ParseLength(ColumnWidth, Size.Width, GetEmHeight());
+                double cw = ParseUsedLength(ColumnWidth, Size.Width, percentAgainstContainingBlock: false);
                 double gap = GetEmHeight();
                 double available = Size.Width - ActualPaddingLeft - ActualPaddingRight
                     - ActualBorderLeftWidth - ActualBorderRightWidth;
