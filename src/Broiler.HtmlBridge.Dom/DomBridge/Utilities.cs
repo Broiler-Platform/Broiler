@@ -250,41 +250,23 @@ public sealed partial class DomBridge
         if (ReferenceEquals(first, second))
             return 0;
 
-        var firstAncestors = new List<DomNode>();
-        for (DomNode? current = first; current != null; current = current.ParentNode)
-            firstAncestors.Add(current);
-        firstAncestors.Reverse();
-
-        var secondAncestors = new List<DomNode>();
-        for (DomNode? current = second; current != null; current = current.ParentNode)
-            secondAncestors.Add(current);
-        secondAncestors.Reverse();
-
-        var divergenceIndex = 0;
-        var sharedLength = Math.Min(firstAncestors.Count, secondAncestors.Count);
-        while (divergenceIndex < sharedLength &&
-               ReferenceEquals(firstAncestors[divergenceIndex], secondAncestors[divergenceIndex]))
-        {
-            divergenceIndex++;
-        }
-
-        if (divergenceIndex == 0 ||
-            divergenceIndex >= firstAncestors.Count ||
-            divergenceIndex >= secondAncestors.Count)
-        {
-            return 0;
-        }
-
-        var commonAncestor = firstAncestors[divergenceIndex - 1];
-        var firstChild = firstAncestors[divergenceIndex];
-        var secondChild = secondAncestors[divergenceIndex];
-        var firstIndex = ChildIndexOf(commonAncestor, firstChild);
-        var secondIndex = ChildIndexOf(commonAncestor, secondChild);
-
-        if (firstIndex == secondIndex)
+        // Phase 4 item 4/5: the tree order of two nodes is the order of the boundary points immediately
+        // before each of them, which canonical Broiler.Dom.DomRange.CompareBoundaryPoints computes — the
+        // same canonical order primitive IsPositionAfter (P4.17) now delegates to, replacing the
+        // hand-rolled ancestor-chain divergence. This helper's only caller (compareDocumentPosition)
+        // already resolves the same-node, disconnected, and ancestor/descendant cases before reaching
+        // here, so both nodes are same-tree, non-containing, and parented; the guards below preserve the
+        // old "return 0 when no ordering can be determined" contract (and avoid CompareBoundaryPoints's
+        // cross-tree WrongDocument throw) for any other caller.
+        var firstParent = first.ParentNode;
+        var secondParent = second.ParentNode;
+        if (firstParent is null || secondParent is null ||
+            !ReferenceEquals(first.GetRootNode(), second.GetRootNode()))
             return 0;
 
-        return firstIndex < secondIndex ? -1 : 1;
+        return Math.Sign(DomRange.CompareBoundaryPoints(
+            firstParent, ChildIndexOf(firstParent, first),
+            secondParent, ChildIndexOf(secondParent, second)));
     }
 
     /// <summary>

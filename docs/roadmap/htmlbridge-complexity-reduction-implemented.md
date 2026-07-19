@@ -1970,6 +1970,28 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.19 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
+4/5: reuse canonical `CompareBoundaryPoints` for `CompareTreeOrder` (the last document-order duplicate).**
+`DomBridge.CompareTreeOrder` (`Utilities.cs`, the tree-order step of `compareDocumentPosition`) reimplemented
+document order via a hand-rolled ancestor-chain divergence — the same order the P4.17 `IsPositionAfter` reuse
+routes through canonical `DomRange.CompareBoundaryPoints`. The tree order of two nodes is the order of the
+boundary points immediately before each, so it now delegates: `Math.Sign(CompareBoundaryPoints(firstParent,
+index(first), secondParent, index(second)))`. Its only caller (`CompareDocumentPosition`) already resolves the
+same-node / disconnected / ancestor-descendant cases before reaching it, so both nodes are same-tree,
+non-containing and parented; the retained `null`-parent / different-root guards preserve the old "0 when no
+ordering can be determined" contract and dodge `CompareBoundaryPoints`'s cross-tree `WrongDocument` throw for
+any other caller. In-repo (canonical method already public); no public-API change; −18 net lines. Verified
+regression-free: the `NodeRelationshipsBindingModule` + `HtmlDomInterfaces` (compareDocumentPosition) suites
+pass 53/53 and Acid3 (`DomEventsEdgeCase`) passes; the only failure in the range/traversal batch is the
+standing headless `Range_GetBoundingClientRect` geometry test (confirmed pre-existing).
+
+**Reuse thread status.** With P4.19 the clean canonical neutral-algorithm reuses are exhausted: `IsDescendantOf`
+(P4.8), `IsEqualNode`/`CommonAncestorWith` (P4.9/P4.10), `InclusiveDescendants` (P4.12), `GetRootNode` (P4.16),
+`CompareBoundaryPoints` (P4.17 + P4.19) and `Descendants` (P4.18) are all delegated; the one remaining public-
+visibility promotion (`IndexOfReference`) is the pending `patches/0002`. What is left in item 4/5 is the
+genuinely blocked pair — `Normalize` (needs the `DomDocument.Mutated`-subscription architecture) and
+`CloneDomElement` (three canonical-`CloneNode` divergences) — recorded under P4.15.
+
 Status: **P4.18 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
 4/5, descendant-collection cluster: reuse canonical `DomNode.Descendants()` for the hand-rolled depth-first
 element walks.** Four bridge helpers reimplemented a depth-first descendant-element recursion that canonical
