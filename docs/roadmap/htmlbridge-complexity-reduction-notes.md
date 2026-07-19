@@ -862,14 +862,29 @@ string, so the stored value is now pre-divided by `EffectiveZoom` (a no-op while
 ×`EffectiveZoom`, `%` inset ×`OwnZoom` against the CB, disabled = unscaled, observed through the auto-margin
 centring split). Zero regression: 234 engine layout tests + the Cli suites.
 
-**Deliberately deferred within increment 3** (documented gaps, inert while the flag is off): **`calc()`**
-(mixed units) is left to resolve against zoomed bases without per-unit scaling — `ApplyZoomToLength` skips
-any token containing `(`; the clean general form is the `Broiler.CSS.ParseLength` zoom-parameter patch
-(submodule → patch workflow), now a smaller optional refinement rather than a prerequisite. The
+**Landed (2026-07-19) — increment-3 `calc()` follow-up: per-term scaling (submodule patch, deferred wiring).**
+A `calc()`/`min()`/`max()` mixes units the call-site post-multiply cannot handle (absolute vs `%`, both
+against font-/viewport-relative terms that must stay put), so the scaling must happen *inside* the evaluator
+— and the hardcoded absolute unit→pixel factors in `Broiler.CSS.CssLengthParser` are the only lever, which
+is unreachable from the main repo. Added `CssLengthParser.SetElementZoom(absoluteZoom, percentZoom)` —
+thread-static factors (mirroring the existing viewport-factor pattern) applied during evaluation: absolute
+units + `rem`/`rlh` ×`absoluteZoom`, `%` ×`percentZoom`, `em`/`ex`/`ch`/`ic`/`lh` and viewport units
+untouched. Both default to `1.0` (neutral), so the parser is byte-identical for any caller that does not opt
+in. The `Broiler.CSS` remote is outside the session's push scope (push → 403), so per the submodule
+workflow this ships as **`patches/0001-broiler-css-calc-zoom-length-scaling.patch`** (with its own
+`CssLengthZoomTests`, 217 CSS tests pass) and the pointer is **not** bumped. The parent wiring
+(`ParseLengthWithLineHeight`/`ParseInsetLength` setting the hook for `(`-containing lengths while
+`NativeZoom` is on) is validated locally against the patched submodule — a `calc(20px + 10%)` inset under
+`zoom:2` centred exactly — then **reverted** for the pinned-pointer build, because it references
+`SetElementZoom` which the pinned SHA lacks (committing it would break the CI clone-by-pointer build). The
+feature is `NativeZoom`-gated (off), so nothing on CI needs it now; the wiring lands with the pointer bump.
+See `patches/README.md`.
+
+**Still deferred within increment 3** (documented gap, inert while the flag is off): the
 **direct-`ParseLength` *height* callsites** (abspos/special block-size resolution against `cbHeight` in
 `CssBox.Layout.cs`) are still unwrapped, so a zoomed abspos box scales its insets and inline size but an
 explicit abspos `height` resolved on those paths is not yet zoomed — a bounded next follow-up mirroring the
-inset helper.
+`ParseInsetLength` helper.
 
 **Remaining zoom increments**: (4) the SVG
 attribute / `::before`·`::after` pseudo / column edge cases the bake also covers; (5) the render/paint path

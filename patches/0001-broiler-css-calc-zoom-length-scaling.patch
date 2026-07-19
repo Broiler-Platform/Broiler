@@ -1,0 +1,217 @@
+From 2985f1a62df57bb7bf68214a319fda723d8070f6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 19 Jul 2026 09:27:02 +0000
+Subject: [PATCH] CssLengthParser: element-zoom hook for per-term calc()
+ scaling
+
+Adds SetElementZoom(absoluteZoom, percentZoom) thread-static factors (mirroring
+the existing viewport-factor pattern) applied during length evaluation so a
+calc()/min()/max() whose sub-terms mix units scales each term correctly:
+
+- absolute units (px/mm/cm/in/pt/pc/q) and root-relative rem/rlh by absoluteZoom;
+- percentages by percentZoom (the caller passes its own zoom when the % basis is
+  the ancestor-zoomed containing block, else 1.0);
+- em/ex/ch/ic/lh untouched (they already ride the caller's zoomed emFactor/
+  lineHeightFactor - scaling here would double-count);
+- viewport units untouched (element zoom does not scale the viewport).
+
+The hardcoded absolute unit->pixel factors are the only lever that cannot be
+reached from outside the parser, which is why the scaling lives here rather than
+as a post-multiply at the call site. Both factors default to the neutral 1.0, so
+a caller that never opts in is byte-identical to the pre-zoom parser.
+
+Tests: CssLengthZoomTests pins per-term scaling (absolute/rem by absoluteZoom, %
+by percentZoom, em/viewport untouched, disabled = unscaled). Full suite 217 pass.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Ert9d7aRuuFxoLMRzYN2G3
+---
+ Broiler.CSS.Tests/CssLengthZoomTests.cs | 76 +++++++++++++++++++++++++
+ Broiler.CSS/CssLengthParser.cs          | 67 ++++++++++++++++++++--
+ 2 files changed, 139 insertions(+), 4 deletions(-)
+ create mode 100644 Broiler.CSS.Tests/CssLengthZoomTests.cs
+
+diff --git a/Broiler.CSS.Tests/CssLengthZoomTests.cs b/Broiler.CSS.Tests/CssLengthZoomTests.cs
+new file mode 100644
+index 0000000..046344c
+--- /dev/null
++++ b/Broiler.CSS.Tests/CssLengthZoomTests.cs
+@@ -0,0 +1,76 @@
++using Broiler.CSS;
++
++namespace Broiler.CSS.Tests;
++
++/// <summary>
++/// Pins the element <c>zoom</c> hook on <see cref="CssLengthParser"/>
++/// (<see cref="CssLengthParser.SetElementZoom"/>): a <c>calc()</c> whose sub-terms mix absolute,
++/// percentage and font-/viewport-relative units scales each term by the right factor — absolute
++/// units (and <c>rem</c>/<c>rlh</c>) by the absolute-zoom factor, percentages by the percent-zoom
++/// factor, while <c>em</c>-family units (which already ride the caller's zoomed <c>emFactor</c>) and
++/// viewport units are left untouched. The factors default to the neutral <c>1.0</c>, so a caller that
++/// never opts in sees the pre-zoom parser. Consumed by the engine's native CSS <c>zoom</c> model for
++/// the <c>calc()</c> path (the non-<c>calc()</c> path scales the resolved value at the call site; the
++/// hardcoded absolute unit→pixel factors are the only lever that cannot be reached from outside the
++/// parser, which is why this lives here).
++/// </summary>
++public sealed class CssLengthZoomTests
++{
++    private static double Parse(string expr, double basis, double em, double absoluteZoom, double percentZoom)
++    {
++        CssLengthParser.SetElementZoom(absoluteZoom, percentZoom);
++        try { return CssLengthParser.ParseLength(expr, basis, em); }
++        finally { CssLengthParser.SetElementZoom(1.0, 1.0); }
++    }
++
++    [Fact]
++    public void Default_Factors_Leave_Calc_Unscaled()
++    {
++        // No opt-in (1.0, 1.0): byte-identical to the pre-zoom parser.
++        Assert.Equal(30, Parse("calc(10px + 20px)", 0, 16, 1.0, 1.0), 6);
++    }
++
++    [Fact]
++    public void Calc_AbsoluteTerms_Scale_By_AbsoluteZoom()
++    {
++        // (10 + 20)px × 2 = 60.
++        Assert.Equal(60, Parse("calc(10px + 20px)", 0, 16, 2.0, 1.0), 6);
++    }
++
++    [Fact]
++    public void Calc_Rem_Scales_By_AbsoluteZoom()
++    {
++        // rem is root-relative (16px default) and counts as absolute for element zoom: 2rem = 32 × 2 = 64.
++        Assert.Equal(64, Parse("calc(2rem)", 0, 16, 2.0, 1.0), 6);
++    }
++
++    [Fact]
++    public void Calc_Percent_Scales_By_PercentZoom_And_Absolute_By_AbsoluteZoom()
++    {
++        // 50% of 200 = 100 × pctZoom 3 = 300; 10px × absZoom 2 = 20; total 320.
++        Assert.Equal(320, Parse("calc(50% + 10px)", 200, 16, 2.0, 3.0), 6);
++    }
++
++    [Fact]
++    public void Calc_Em_Rides_The_Zoomed_Font_And_Is_Not_ReScaled()
++    {
++        // em uses the caller's emFactor (already zoomed by the engine); the absolute-zoom factor must
++        // NOT touch it, or it would double-count: 2em = 2 × 16 = 32, unchanged despite absZoom 2.
++        Assert.Equal(32, Parse("calc(2em)", 0, 16, 2.0, 1.0), 6);
++    }
++
++    [Fact]
++    public void Calc_Viewport_Units_Are_Unaffected_By_ElementZoom()
++    {
++        CssLengthParser.SetViewportSize(1000, 1000); // 1vw = 10px
++        // Element zoom does not scale the viewport: 10vw = 100, unchanged despite absZoom 2.
++        Assert.Equal(100, Parse("calc(10vw)", 0, 16, 2.0, 1.0), 6);
++    }
++
++    [Fact]
++    public void Bare_Absolute_Length_Also_Honours_AbsoluteZoom()
++    {
++        // A non-calc length routes through the same evaluator, so the hook is uniform: 25px × 2 = 50.
++        Assert.Equal(50, Parse("25px", 0, 16, 2.0, 1.0), 6);
++    }
++}
+diff --git a/Broiler.CSS/CssLengthParser.cs b/Broiler.CSS/CssLengthParser.cs
+index a904038..b863c6f 100644
+--- a/Broiler.CSS/CssLengthParser.cs
++++ b/Broiler.CSS/CssLengthParser.cs
+@@ -35,6 +35,33 @@ public static class CssLengthParser
+     [ThreadStatic]
+     private static double _vmaxFactor;
+ 
++    /// <summary>
++    /// Element <c>zoom</c> factor applied to <em>absolute</em> used lengths
++    /// (<c>px</c>/<c>mm</c>/<c>cm</c>/<c>in</c>/<c>pt</c>/<c>pc</c>/<c>q</c>/<c>rem</c>/<c>rlh</c>)
++    /// during evaluation — including the sub-terms of a <c>calc()</c>/<c>min()</c>/<c>max()</c>
++    /// expression, which is why the scaling lives here rather than as a post-multiply at the call
++    /// site. Font-relative units (<c>em</c>/<c>ex</c>/<c>ch</c>/<c>ic</c>/<c>lh</c>) are deliberately
++    /// excluded: they already ride the caller's zoomed <c>emFactor</c>/<c>lineHeightFactor</c>.
++    /// Viewport units are excluded too (element zoom does not scale the viewport). <c>0</c> (the
++    /// thread-static default) is treated as the neutral <c>1.0</c>, so a caller that never opts in
++    /// is byte-identical to the pre-zoom parser.
++    /// </summary>
++    [ThreadStatic]
++    private static double _absoluteZoom;
++
++    /// <summary>
++    /// Element <c>zoom</c> factor applied to <em>percentage</em> terms. Percentages resolve against
++    /// their (already resolved) <c>hundredPercent</c> basis; when that basis is the ancestor-zoomed
++    /// containing block the caller passes its own zoom here to reach the effective factor, and when
++    /// the basis is the box's own already-scaled size it passes <c>1.0</c>. <c>0</c> is treated as
++    /// the neutral <c>1.0</c>.
++    /// </summary>
++    [ThreadStatic]
++    private static double _percentZoom;
++
++    private static double AbsoluteZoom => _absoluteZoom > 0 ? _absoluteZoom : 1.0;
++    private static double PercentZoom => _percentZoom > 0 ? _percentZoom : 1.0;
++
+     /// <summary>
+     /// Sets the viewport dimensions used by <see cref="ParseLength"/> to
+     /// resolve CSS viewport-relative units.
+@@ -47,6 +74,35 @@ public static class CssLengthParser
+         _vmaxFactor = Math.Max(width, height) * 0.01;
+     }
+ 
++    /// <summary>
++    /// Sets the element <c>zoom</c> factors used while resolving lengths, so a <c>calc()</c> whose
++    /// sub-terms mix absolute, percentage and font-/viewport-relative units scales each term
++    /// correctly (the hardcoded absolute unit→pixel factors are the only lever that cannot be reached
++    /// from outside the parser). Callers set the factors around a parse and reset them to
++    /// <c>1.0, 1.0</c> afterwards. Both default to the neutral <c>1.0</c>, so the parser is unchanged
++    /// unless a caller opts in. See <see cref="_absoluteZoom"/>/<see cref="_percentZoom"/> for the
++    /// unit split.
++    /// </summary>
++    public static void SetElementZoom(double absoluteZoom, double percentZoom)
++    {
++        _absoluteZoom = absoluteZoom;
++        _percentZoom = percentZoom;
++    }
++
++    /// <summary>
++    /// Whether <paramref name="unit"/> is an absolute used-length unit that element <c>zoom</c>
++    /// scales. Mirrors the engine's non-<c>calc()</c> zoom classification: absolute physical units
++    /// plus root-relative <c>rem</c>/<c>rlh</c>; excludes <c>em</c>/<c>ex</c>/<c>ch</c>/<c>ic</c>/<c>lh</c>
++    /// (ride the zoomed font metrics) and the viewport units (unaffected by element zoom).
++    /// </summary>
++    private static bool IsElementZoomAbsoluteUnit(string unit) => unit switch
++    {
++        CssConstants.Px or CssConstants.Mm or CssConstants.Cm or CssConstants.In or
++        CssConstants.Pt or CssConstants.Pc or CssConstants.Q or
++        CssConstants.Rem or CssConstants.Rlh => true,
++        _ => false,
++    };
++
+     public static bool IsValidLength(string value)
+     {
+         var defaultRootLineHeight = CssMetrics.DefaultFontSizePx * CssMetrics.NormalLineHeightFactor;
+@@ -412,7 +468,7 @@ public static class CssLengthParser
+ 
+         if (value.EndsWith('%'))
+         {
+-            evaluation = new LengthEvaluation(ParseNumber(value, hundredPercent), IsUnitless: false);
++            evaluation = new LengthEvaluation(ParseNumber(value, hundredPercent) * PercentZoom, IsUnitless: false);
+             return true;
+         }
+ 
+@@ -444,9 +500,12 @@ public static class CssLengthParser
+         if (double.IsNaN(factor))
+             return false;
+ 
+-        evaluation = new LengthEvaluation(unit == CssConstants.Pt && returnPoints
+-                ? ParseNumber(number, hundredPercent) 
+-                : factor * parsedNumber, IsUnitless: false);
++        double pixels = unit == CssConstants.Pt && returnPoints
++            ? ParseNumber(number, hundredPercent)
++            : factor * parsedNumber;
++        if (IsElementZoomAbsoluteUnit(unit))
++            pixels *= AbsoluteZoom;
++        evaluation = new LengthEvaluation(pixels, IsUnitless: false);
+         return true;
+     }
+ 
+-- 
+2.43.0
+
