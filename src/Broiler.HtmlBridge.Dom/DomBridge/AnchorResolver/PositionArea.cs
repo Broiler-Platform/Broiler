@@ -24,7 +24,7 @@ public sealed partial class DomBridge
         if (!IsText(element))
         {
             var cssProps = CollectMatchedRuleProperties(element);
-            foreach (var kv in InlineStyle(element))
+            foreach (var kv in BakedInlineStyle(element))
                 cssProps[kv.Key] = kv.Value;
 
             string? positionArea = cssProps.GetValueOrDefault("position-area");
@@ -81,11 +81,11 @@ public sealed partial class DomBridge
                     if (!cssProps.TryGetValue("position", out var origPos) ||
                         !origPos.Equals("fixed", StringComparison.OrdinalIgnoreCase))
                     {
-                        InlineStyle(element)["position"] = "absolute";
+                        BakedInlineStyle(element)["position"] = "absolute";
                     }
                     else
                     {
-                        InlineStyle(element)["position"] = "fixed";
+                        BakedInlineStyle(element)["position"] = "fixed";
                     }
 
                     double cellW = rect.Value.Width;
@@ -235,7 +235,7 @@ public sealed partial class DomBridge
                                 var blockProps = GetComputedProps(blockAncestor);
                                 string? blockPos = blockProps.GetValueOrDefault("position");
                                 if (blockPos == null || blockPos == "static")
-                                    InlineStyle(blockAncestor)["position"] = "relative";
+                                    BakedInlineStyle(blockAncestor)["position"] = "relative";
                             }
 
                             // Defer the move to avoid collection modification
@@ -314,17 +314,17 @@ public sealed partial class DomBridge
 
                         // Set resolved pixel values for margins and padding
                         // to override the percentage values from CSS.
-                        InlineStyle(element)["margin-top"] = $"{marginTop2.ToString(CultureInfo.InvariantCulture)}px";
-                        InlineStyle(element)["margin-right"] = $"{marginRight2.ToString(CultureInfo.InvariantCulture)}px";
-                        InlineStyle(element)["margin-bottom"] = $"{marginBottom2.ToString(CultureInfo.InvariantCulture)}px";
-                        InlineStyle(element)["margin-left"] = $"{marginLeft2.ToString(CultureInfo.InvariantCulture)}px";
-                        InlineStyle(element)["padding-top"] = $"{padTop.ToString(CultureInfo.InvariantCulture)}px";
-                        InlineStyle(element)["padding-right"] = $"{padRight.ToString(CultureInfo.InvariantCulture)}px";
-                        InlineStyle(element)["padding-bottom"] = $"{padBottom.ToString(CultureInfo.InvariantCulture)}px";
-                        InlineStyle(element)["padding-left"] = $"{padLeft.ToString(CultureInfo.InvariantCulture)}px";
-                        InlineStyle(element).Remove("margin");
-                        InlineStyle(element).Remove("padding");
-                        InlineStyle(element).Remove("inset");
+                        BakedInlineStyle(element)["margin-top"] = $"{marginTop2.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element)["margin-right"] = $"{marginRight2.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element)["margin-bottom"] = $"{marginBottom2.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element)["margin-left"] = $"{marginLeft2.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element)["padding-top"] = $"{padTop.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element)["padding-right"] = $"{padRight.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element)["padding-bottom"] = $"{padBottom.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element)["padding-left"] = $"{padLeft.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element).Remove("margin");
+                        BakedInlineStyle(element).Remove("padding");
+                        BakedInlineStyle(element).Remove("inset");
 
                         resolvedW = contentW;
                         resolvedH = contentH;
@@ -362,16 +362,16 @@ public sealed partial class DomBridge
                         // (which maps medium→2px instead of the spec's 3px).
                         // Always set the value (even 0px) to ensure the
                         // renderer doesn't fall back to its keyword defaults.
-                        InlineStyle(element)["border-top-width"] = $"{bdrT.ToString(CultureInfo.InvariantCulture)}px";
-                        InlineStyle(element)["border-right-width"] = $"{bdrR.ToString(CultureInfo.InvariantCulture)}px";
-                        InlineStyle(element)["border-bottom-width"] = $"{bdrB.ToString(CultureInfo.InvariantCulture)}px";
-                        InlineStyle(element)["border-left-width"] = $"{bdrL.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element)["border-top-width"] = $"{bdrT.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element)["border-right-width"] = $"{bdrR.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element)["border-bottom-width"] = $"{bdrB.ToString(CultureInfo.InvariantCulture)}px";
+                        BakedInlineStyle(element)["border-left-width"] = $"{bdrL.ToString(CultureInfo.InvariantCulture)}px";
                     }
 
-                    InlineStyle(element)["left"] = $"{finalLeft.ToString(CultureInfo.InvariantCulture)}px";
-                    InlineStyle(element)["top"] = $"{finalTop.ToString(CultureInfo.InvariantCulture)}px";
-                    InlineStyle(element)["width"] = $"{resolvedW.ToString(CultureInfo.InvariantCulture)}px";
-                    InlineStyle(element)["height"] = $"{resolvedH.ToString(CultureInfo.InvariantCulture)}px";
+                    BakedInlineStyle(element)["left"] = $"{finalLeft.ToString(CultureInfo.InvariantCulture)}px";
+                    BakedInlineStyle(element)["top"] = $"{finalTop.ToString(CultureInfo.InvariantCulture)}px";
+                    BakedInlineStyle(element)["width"] = $"{resolvedW.ToString(CultureInfo.InvariantCulture)}px";
+                    BakedInlineStyle(element)["height"] = $"{resolvedH.ToString(CultureInfo.InvariantCulture)}px";
 
                     // Record the scroll container for deferred position:relative.
                     if (scrollContainer != null)
@@ -386,7 +386,7 @@ public sealed partial class DomBridge
                     // placement post-pass from repositioning an already-placed box. Stamped
                     // unconditionally as of Phase 4 item-2 step 5 (harmless on the retired baked
                     // path, where the engine post-pass does not run).
-                    InlineStyle(element)["position-area"] = "none";
+                    BakedInlineStyle(element)["position-area"] = "none";
                 }
             }
         }
@@ -494,7 +494,7 @@ public sealed partial class DomBridge
             return false;
 
         var cssProps = CollectMatchedRuleProperties(element);
-        foreach (var kv in InlineStyle(element))
+        foreach (var kv in BakedInlineStyle(element))
             cssProps[kv.Key] = kv.Value;
 
         string? positionArea = cssProps.GetValueOrDefault("position-area");

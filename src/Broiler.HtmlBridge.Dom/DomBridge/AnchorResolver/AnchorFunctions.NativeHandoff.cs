@@ -30,7 +30,7 @@ public sealed partial class DomBridge
         // Merge inline styles over matched-rule props (inline wins), matching what the
         // engine cascade projects onto the box.
         var merged = new Dictionary<string, string>(cssProps, StringComparer.OrdinalIgnoreCase);
-        foreach (var kv in InlineStyle(element))
+        foreach (var kv in BakedInlineStyle(element))
             merged[kv.Key] = kv.Value;
 
         // Whether the box has no in-flow content — the engine's opposing-inset sizing and the
@@ -246,7 +246,7 @@ public sealed partial class DomBridge
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
         var merged = new Dictionary<string, string>(cssProps, StringComparer.OrdinalIgnoreCase);
-        foreach (var kv in InlineStyle(element))
+        foreach (var kv in BakedInlineStyle(element))
             merged[kv.Key] = kv.Value;
 
         // Absolutely positioned only (fixed gets a scroll adjustment the engine MVP omits).
@@ -338,7 +338,7 @@ public sealed partial class DomBridge
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
         var merged = new Dictionary<string, string>(cssProps, StringComparer.OrdinalIgnoreCase);
-        foreach (var kv in InlineStyle(element))
+        foreach (var kv in BakedInlineStyle(element))
             merged[kv.Key] = kv.Value;
 
         // Absolutely positioned only (fixed/modal targets get a document-scroll adjustment the

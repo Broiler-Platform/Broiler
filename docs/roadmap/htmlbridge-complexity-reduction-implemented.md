@@ -28,7 +28,7 @@ quick view.
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
 | 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. |
-| 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
+| 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~170 sites) in progress — the anchor-resolver cluster (98 sites) is now behind the `BakedInlineStyle`/`BakedStyleMap` seam (P4.14), so the baked-vs-script store split is a single-point change; the store split itself + non-cluster sites remain. Item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling (clone runtime-state copy consolidated behind one authority, P4.13). |
 | 5 — used-value behaviour into Layout | Bulk delivered; **in-scope terminal** | Anchor-track deletion complete through step 6. Feature (b) visual-viewport/zoom: read (CSSOM) **and** render (pixel) sides now validated on the engine used-value model (2026-07-19) — deleting the zoom bake is now only a *deployment* gate (enable `NativeZoom` at the external `CaptureService` renderer), plus the submodule-push-gated pinch render cutover (`patches/0001`). Feature (a) dialog/backdrop: native modal centering + modal box-chrome bake deletion landed; native `::backdrop` box + top-layer paint stay submodule-patch-gated. See the [2026-07-19 reconciliation](#reconciliation-2026-07-19--features-a-and-b-driven-to-their-in-scope-terminal-state). |
 
 Companion documents:
@@ -1969,6 +1969,32 @@ Exit criteria:
   133 tests with the guard) stays green.
 
 ### Phase 4 - eliminate parallel DOM state
+
+Status: **P4.14 in progress** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item 2,
+inline-style single authority, increment 1: seam the anchor-resolver cluster off the raw dict.** The remaining
+item-2 work (fully eliminate the parallel inline-style `Style` dict) is a ~170-site rewrite, ~98 of them in the
+anchor-resolver cluster where the dict is used as **baked-geometry scratch** — the resolver reads an element's
+effective inline style and writes resolved position/insets/margins/borders/size, and those direct writes
+deliberately do **not** write-through to `getAttribute("style")` (unlike the `element.style` JS path, P4.7), so
+they don't leak mid-resolution. That dual-purpose use is exactly why the dict is a parallel store and why a
+blind route-to-attribute rewrite is wrong. This increment introduces the migration **seam** rather than
+swapping the store: a new `BakedInlineStyle(element)` accessor returns a `BakedStyleMap` value-wrapper
+(`AnchorResolver/BakedStyle.cs`) mirroring the exact dict surface the cluster uses (indexer get/set, `Remove`,
+`ContainsKey`, `TryGetValue`, `GetValueOrDefault`, `Keys`, enumeration), and all **98** raw `InlineStyle(...)`
+sites across the nine `AnchorResolver/` files (`PositionArea` 25, `Dialogs` 17, `PositionTry` 17, `AnchorFunctions`
+12, `InlineContainingBlocks` 9, `AnchorResolver` 8, `StickyPositioning` 5, `AnchorFunctions.NativeHandoff` 3,
+`Visibility` 1) now go through it. Today the wrapper forwards to the same per-element dict, so behaviour is
+**byte-identical**; the next increment can back the baked writes with a store distinct from the script-observable
+inline style (reads → merged script ∪ baked view, writes → baked overlay merged only at serialization) by
+changing **only** `BakedStyle.cs`, not the 98 call sites. Behaviour-preserving; no public-API change. The
+compiler enforced surface-completeness (it caught a `.Keys` use the initial inventory missed). Validation:
+`Broiler.HtmlBridge.Dom` builds clean; the NativeAnchor* / PositionArea / PositionTry / NativeSticky /
+AnchorInset / DialogBindingModule Cli suites pass (53) and the InlineStyleWriteThrough / InnerHtmlParallelState
+suites pass — the one intermittent `PositionTryLiveGeometryTests.FixedSizeOverflowingBase_SelectsFallback_LiveOffsets`
+was confirmed a **pre-existing parallel-run flake** (fails 1-in-3 at baseline with this change stashed; passes 3/3
+in isolation). **Not yet done:** the store split itself (increment 2), the remaining non-cluster item-2 sites
+(serialization/`StyleDeclarationBinding`/animation), and the item-5 `Normalize`/`CloneDomElement` swaps — all
+unchanged.
 
 Status: **P4.13 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item 5,
 `CloneDomElement` de-risk: consolidate the bridge runtime-state clone-copy behind a single authority.**

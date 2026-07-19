@@ -31,7 +31,7 @@ public sealed partial class DomBridge
                 hasAnchorSizeRef = true;
         }
         // Also check inline styles for anchor-size()
-        foreach (var kv in InlineStyle(element))
+        foreach (var kv in BakedInlineStyle(element))
         {
             if (kv.Value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
                 hasAnchorSizeRef = true;
@@ -63,14 +63,14 @@ public sealed partial class DomBridge
 
             // Get the implicit anchor name from position-anchor.
             string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor") ??
-                                     InlineStyle(element).GetValueOrDefault("position-anchor");
+                                     BakedInlineStyle(element).GetValueOrDefault("position-anchor");
 
             // When the target element is fixed-positioned (e.g. top-layer dialog)
             // and the anchor is NOT fixed-positioned, anchor positions must be
             // adjusted by the document scroll offset so the anchor's viewport
             // position is used instead of its document position.
             bool targetIsFixed =
-                (cssProps.GetValueOrDefault("position") ?? InlineStyle(element).GetValueOrDefault("position")) == "fixed" ||
+                (cssProps.GetValueOrDefault("position") ?? BakedInlineStyle(element).GetValueOrDefault("position")) == "fixed" ||
                 (DialogStateFor(element).Modal.TryGet(out var tModal) && tModal is true);
             double scrollAdjY = 0, scrollAdjX = 0;
             if (targetIsFixed)
@@ -137,7 +137,7 @@ public sealed partial class DomBridge
                 });
 
                 if (resolved != kv.Value)
-                    InlineStyle(element)[kv.Key] = resolved;
+                    BakedInlineStyle(element)[kv.Key] = resolved;
             }
 
             // Apply non-anchor CSS properties (e.g. position, margin).
@@ -145,15 +145,15 @@ public sealed partial class DomBridge
             {
                 if (!kv.Value.Contains("anchor(", StringComparison.OrdinalIgnoreCase) &&
                     !kv.Value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase) &&
-                    !InlineStyle(element).ContainsKey(kv.Key) &&
+                    !BakedInlineStyle(element).ContainsKey(kv.Key) &&
                     IsLayoutProperty(kv.Key))
                 {
-                    InlineStyle(element)[kv.Key] = kv.Value;
+                    BakedInlineStyle(element)[kv.Key] = kv.Value;
                 }
             }
 
             // Remove 'inset' shorthand.
-            InlineStyle(element).Remove("inset");
+            BakedInlineStyle(element).Remove("inset");
         }
 
         // Resolve anchor-size() function calls in both CSS and inline styles.
@@ -284,7 +284,7 @@ public sealed partial class DomBridge
     {
         // Get implicit anchor name from position-anchor.
         string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor") ??
-                                 InlineStyle(element).GetValueOrDefault("position-anchor");
+                                 BakedInlineStyle(element).GetValueOrDefault("position-anchor");
 
         string ResolveValue(string value)
         {
@@ -308,17 +308,17 @@ public sealed partial class DomBridge
         {
             if (kv.Value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
             {
-                InlineStyle(element)[kv.Key] = ResolveValue(kv.Value);
+                BakedInlineStyle(element)[kv.Key] = ResolveValue(kv.Value);
             }
         }
 
         // Resolve in existing inline styles.
-        var inlineKeys = new List<string>(InlineStyle(element).Keys);
+        var inlineKeys = new List<string>(BakedInlineStyle(element).Keys);
         foreach (var key in inlineKeys)
         {
-            if (InlineStyle(element)[key].Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+            if (BakedInlineStyle(element)[key].Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
             {
-                InlineStyle(element)[key] = ResolveValue(InlineStyle(element)[key]);
+                BakedInlineStyle(element)[key] = ResolveValue(BakedInlineStyle(element)[key]);
             }
         }
     }

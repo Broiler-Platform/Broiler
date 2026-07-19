@@ -61,7 +61,7 @@ public sealed partial class DomBridge
         {
             // Collect all CSS + inline properties to find position-try-fallbacks.
             var cssProps = CollectMatchedRuleProperties(element);
-            foreach (var kv in InlineStyle(element))
+            foreach (var kv in BakedInlineStyle(element))
                 cssProps[kv.Key] = kv.Value;
 
             string? fallbacks = cssProps.GetValueOrDefault("position-try-fallbacks") ??
@@ -85,8 +85,8 @@ public sealed partial class DomBridge
                 else
                 {
                     TryApplyFallback(element, cssProps, anchorRegistry, positionTryRules, fallbacks!);
-                    InlineStyle(element)["position-try-fallbacks"] = "none";
-                    InlineStyle(element)["position-try"] = "normal";
+                    BakedInlineStyle(element)["position-try-fallbacks"] = "none";
+                    BakedInlineStyle(element)["position-try"] = "normal";
                 }
             }
         }
@@ -108,15 +108,15 @@ public sealed partial class DomBridge
         // Check if the base style overflows the IMCB. The base insets are already baked
         // to inline px here; the live read path (ResolvePositionTryForElement) resolves them
         // fresh and calls the same ComputeFallbackPlacement core.
-        double baseLeft = TryParsePx(InlineStyle(element).GetValueOrDefault("left")) ?? 0;
-        double baseTop = TryParsePx(InlineStyle(element).GetValueOrDefault("top")) ?? 0;
-        double baseRight = TryParsePx(InlineStyle(element).GetValueOrDefault("right")) ??
+        double baseLeft = TryParsePx(BakedInlineStyle(element).GetValueOrDefault("left")) ?? 0;
+        double baseTop = TryParsePx(BakedInlineStyle(element).GetValueOrDefault("top")) ?? 0;
+        double baseRight = TryParsePx(BakedInlineStyle(element).GetValueOrDefault("right")) ??
                            TryParsePx(baseProps.GetValueOrDefault("right")) ?? 0;
-        double baseBottom = TryParsePx(InlineStyle(element).GetValueOrDefault("bottom")) ??
+        double baseBottom = TryParsePx(BakedInlineStyle(element).GetValueOrDefault("bottom")) ??
                             TryParsePx(baseProps.GetValueOrDefault("bottom")) ?? 0;
-        double baseWidth = TryParsePx(InlineStyle(element).GetValueOrDefault("width")) ??
+        double baseWidth = TryParsePx(BakedInlineStyle(element).GetValueOrDefault("width")) ??
                            TryParsePx(baseProps.GetValueOrDefault("width")) ?? 0;
-        double baseHeight = TryParsePx(InlineStyle(element).GetValueOrDefault("height")) ??
+        double baseHeight = TryParsePx(BakedInlineStyle(element).GetValueOrDefault("height")) ??
                             TryParsePx(baseProps.GetValueOrDefault("height")) ?? 0;
 
         // Estimate content width for min-content/max-content.
@@ -132,13 +132,13 @@ public sealed partial class DomBridge
         if (ComputeFallbackPlacement(baseProps, anchorRegistry, positionTryRules, fallbackList,
                 baseLeft, baseTop, baseRight, baseBottom, baseWidth, baseHeight, cbWidth, cbHeight) is { } placed)
         {
-            InlineStyle(element)["left"] = $"{placed.left.ToString(CultureInfo.InvariantCulture)}px";
-            InlineStyle(element)["top"] = $"{placed.top.ToString(CultureInfo.InvariantCulture)}px";
-            InlineStyle(element)["width"] = $"{placed.width.ToString(CultureInfo.InvariantCulture)}px";
-            InlineStyle(element)["height"] = $"{placed.height.ToString(CultureInfo.InvariantCulture)}px";
-            InlineStyle(element).Remove("right");
-            InlineStyle(element).Remove("bottom");
-            InlineStyle(element).Remove("inset");
+            BakedInlineStyle(element)["left"] = $"{placed.left.ToString(CultureInfo.InvariantCulture)}px";
+            BakedInlineStyle(element)["top"] = $"{placed.top.ToString(CultureInfo.InvariantCulture)}px";
+            BakedInlineStyle(element)["width"] = $"{placed.width.ToString(CultureInfo.InvariantCulture)}px";
+            BakedInlineStyle(element)["height"] = $"{placed.height.ToString(CultureInfo.InvariantCulture)}px";
+            BakedInlineStyle(element).Remove("right");
+            BakedInlineStyle(element).Remove("bottom");
+            BakedInlineStyle(element).Remove("inset");
         }
     }
 
@@ -291,7 +291,7 @@ public sealed partial class DomBridge
         {
             if (IsText(child)) continue;
             var childProps = CollectMatchedRuleProperties(child);
-            foreach (var kv in InlineStyle(child))
+            foreach (var kv in BakedInlineStyle(child))
                 childProps[kv.Key] = kv.Value;
 
             double childWidth = TryParsePx(childProps.GetValueOrDefault("width")) ?? 0;
