@@ -1970,6 +1970,33 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.13 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item 5,
+`CloneDomElement` de-risk: consolidate the bridge runtime-state clone-copy behind a single authority.**
+`CloneDomElement` (`Utilities.cs`) copied every per-bridge per-element runtime-state table onto the
+`cloneNode` copy as a **scattered ~25-line inline block of hand-written `.CopyTo` calls** — the exact
+"parallel state kept in sync by hand" hazard Phase 4 targets: because the copy list lived in a *different
+file* from the state-table definitions, adding a field or a whole new runtime-state table (as the Phase 2
+items 3/4 de-globalization repeatedly did) could silently drop it from clones with nothing to catch the
+omission. This slice gives **each runtime-state composite its own `CopyTo(target)`** co-located with its
+fields (`FormControl`/`Scroll`/`Dialog`/`Shadow`/`StyleSheet`/`Document`/`Animation` in `RuntimeStates.cs`)
+and replaces the inline block with a single `DomBridge.CopyBridgeRuntimeStateTo(source, clone)` aggregator
+(inline-style dict + the seven table `CopyTo`s + the position-area memo `CopyPositionAreaResolution`).
+**Behaviour-preserving** — the same copies, relocated; the shadow root/host reference-copy and the
+stylesheet rule-list deep-copy semantics are retained verbatim. This is also the concrete decomposition the
+still-blocked item-5 `CloneDomElement`→canonical-`CloneNode` swap needs: a future swap becomes "canonical
+clones the tree/attributes; `CopyBridgeRuntimeStateTo` copies the parallel bridge state," instead of the
+canonical clone having to reproduce the scattered list. No public-API change (all members `private`/
+`internal`). Tests: new `HtmlDomInterfacesTests.Input_Value_And_Checked_Survive_CloneNode` (script-set value
++ checked survive onto an independent clone) alongside the existing `Radio_Checked_State_Survives_CloneNode`;
+the clone / node-relationship / namespace / sentinel-migration / owner-doc-root suites pass (102 → 103 with
+the new test). Also fixed a **stale reflection guard** surfaced in-area:
+`OwnerDocRootRemovalTests.ElementRuntimeState_Has_No_OwnerDocRoot_Field` looked up the pre-2026-07-17
+composite name `ElementRuntimeState` (renamed `InlineStyleRuntimeState` by the de-globalization), so its
+`Assert.NotNull` had been failing at baseline and the guard no longer guarded anything — repointed to the
+current type name. This does **not** close item 5 (the `Normalize` / `CloneDomElement` canonical swaps stay
+blocked by the side-effect / runtime-state coupling, and item 2's full inline-style dict elimination is
+unchanged) — it removes the silent-drop hazard in the clone path and stages the eventual swap.
+
 Status: **P4.12 completed** 2026-07-14 (branch `htmlbridge-phase4-range-stringifier`) — **work items 4/5: the
 Range stringifier is promoted to a spec-correct canonical `Broiler.Dom.DomRange.ToString()`, and the bridge's
 `GetDocumentOrderNodes` document-order flatten is deleted in favour of canonical `DomNode.InclusiveDescendants`.**

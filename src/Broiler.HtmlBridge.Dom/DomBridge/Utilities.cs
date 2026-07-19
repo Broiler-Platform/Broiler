@@ -353,50 +353,15 @@ public sealed partial class DomBridge
             else
                 clone.SetAttributeNS(attribute.NamespaceUri, attribute.QualifiedName, attribute.Value);
         }
-        // RF-BRIDGE-1c Phase B: inline style lives in ElementRuntimeState now. Copy the
-        // source's live style dict (which may hold JS mutations not yet synced to the
-        // `style=` attribute), replacing the clone's lazily-seeded attribute values.
-        var cloneStyle = InlineStyle(clone);
-        cloneStyle.Clear();
-        foreach (var kv in InlineStyle(element))
-            cloneStyle[kv.Key] = kv.Value;
         // RF-BRIDGE-1c Phase F (F3c part 2d): element text lives in child DomText nodes, cloned by
         // the deep-clone loop below — no element-store TextContent scalar to copy.
         // (The namespace was carried at construction via CreateBridgeElementNS above.)
-        // Copy browser-runtime values (e.g., checked state for inputs). Form-control, scroll offsets,
-        // dialog/popover top-layer state, shadow-DOM linkage, stylesheet state, the document viewport
-        // flag and the animation timeline all moved out of ElementRuntimeState into per-bridge instance
-        // tables (Phase 2 item 4 de-globalization), so copy each here to preserve cloneNode semantics.
-        var sourceForm = FormControlStateFor(element);
-        var cloneForm = FormControlStateFor(clone);
-        sourceForm.Value.CopyTo(cloneForm.Value);
-        sourceForm.Checked.CopyTo(cloneForm.Checked);
-        sourceForm.DefaultSelected.CopyTo(cloneForm.DefaultSelected);
-        sourceForm.SelectedIndex.CopyTo(cloneForm.SelectedIndex);
-        sourceForm.ReturnValue.CopyTo(cloneForm.ReturnValue);
-        ScrollStateFor(element).Left.CopyTo(ScrollStateFor(clone).Left);
-        ScrollStateFor(element).Top.CopyTo(ScrollStateFor(clone).Top);
-        var sourceDialog = DialogStateFor(element);
-        var cloneDialog = DialogStateFor(clone);
-        sourceDialog.Modal.CopyTo(cloneDialog.Modal);
-        sourceDialog.TopLayerOrder.CopyTo(cloneDialog.TopLayerOrder);
-        sourceDialog.PopoverOpen.CopyTo(cloneDialog.PopoverOpen);
-        var sourceShadow = ShadowStateFor(element);
-        var cloneShadow = ShadowStateFor(clone);
-        sourceShadow.Root.CopyTo(cloneShadow.Root);
-        sourceShadow.Host.CopyTo(cloneShadow.Host);
-        sourceShadow.Mode.CopyTo(cloneShadow.Mode);
-        var sourceSheet = StyleSheetStateFor(element);
-        var cloneSheet = StyleSheetStateFor(clone);
-        sourceSheet.FetchedCss.CopyTo(cloneSheet.FetchedCss);
-        cloneSheet.Rules = sourceSheet.Rules is null ? null : [.. sourceSheet.Rules];
-        cloneSheet.RulesSourceText = sourceSheet.RulesSourceText;
-        cloneSheet.RulesMutated = sourceSheet.RulesMutated;
-        DocumentStateFor(element).HasViewport.CopyTo(DocumentStateFor(clone).HasViewport);
-        AnimationStateFor(element).CurrentTimeMilliseconds.CopyTo(AnimationStateFor(clone).CurrentTimeMilliseconds);
-        // Carry the memoized position-area resolution too (was ElementRuntimeState.Layout,
-        // now the bridge-level PositionAreaResolutions cache — see PositionAreaQueries.cs).
-        CopyPositionAreaResolution(element, clone);
+        // Copy all bridge per-element runtime state (inline style, form control, scroll, dialog/
+        // popover, shadow, stylesheet, document viewport, animation, position-area memo) through the
+        // single CopyBridgeRuntimeStateTo authority. Must run after the attributes are copied above:
+        // the inline-style copy first lazily seeds the clone from its `style=` attribute, then
+        // overwrites it with the source's live dict.
+        CopyBridgeRuntimeStateTo(element, clone);
 
         if (deep)
         {
@@ -411,6 +376,43 @@ public sealed partial class DomBridge
             }
         }
         return clone;
+    }
+
+    /// <summary>
+    /// Phase 4 item 5 (CloneDomElement de-risk): the single authority that copies every bridge
+    /// per-element runtime-state table from a source element onto its <c>cloneNode</c> copy.
+    /// Canonical <c>DomNode.CloneNode</c> clones the tree and attributes but knows nothing about
+    /// the bridge's parallel per-element state (inline style, form control, scroll, dialog/popover
+    /// top layer, shadow linkage, stylesheet CSSOM, document viewport flag, animation timeline and
+    /// the position-area memo), so the bridge carries it here. Consolidating it out of the scattered
+    /// inline block in <see cref="CloneDomElement"/> means each state table owns its own
+    /// <c>CopyTo</c> (in <c>RuntimeStates.cs</c>, next to its fields) — a new field/table can no
+    /// longer be silently dropped from clones — and isolates the exact bridge-state copy the
+    /// eventual canonical-<c>CloneNode</c> swap (item 5) will call alongside the canonical clone.
+    /// </summary>
+    private void CopyBridgeRuntimeStateTo(DomElement source, DomElement clone)
+    {
+        // Inline style (RF-BRIDGE-1c Phase B): copy the source's live style dict — which may hold
+        // JS `element.style` mutations not yet synced to the `style=` attribute — over the clone's
+        // lazily-seeded attribute values. `InlineStyle(clone)` seeds from the (already-copied)
+        // `style=` attribute before the Clear, so the copy is authoritative.
+        var cloneStyle = InlineStyle(clone);
+        cloneStyle.Clear();
+        foreach (var kv in InlineStyle(source))
+            cloneStyle[kv.Key] = kv.Value;
+
+        // Per-bridge instance tables (Phase 2 items 3/4 de-globalization) — each owns its CopyTo.
+        FormControlStateFor(source).CopyTo(FormControlStateFor(clone));
+        ScrollStateFor(source).CopyTo(ScrollStateFor(clone));
+        DialogStateFor(source).CopyTo(DialogStateFor(clone));
+        ShadowStateFor(source).CopyTo(ShadowStateFor(clone));
+        StyleSheetStateFor(source).CopyTo(StyleSheetStateFor(clone));
+        DocumentStateFor(source).CopyTo(DocumentStateFor(clone));
+        AnimationStateFor(source).CopyTo(AnimationStateFor(clone));
+
+        // Memoized position-area resolution (was ElementRuntimeState.Layout, now the bridge-level
+        // PositionAreaResolutions cache — see PositionAreaQueries.cs).
+        CopyPositionAreaResolution(source, clone);
     }
 
     /// <summary>
