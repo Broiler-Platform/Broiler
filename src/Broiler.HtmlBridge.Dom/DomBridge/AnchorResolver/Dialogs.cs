@@ -23,19 +23,20 @@ public sealed partial class DomBridge
     // -----------------------------------------------------------------
 
     // CSS Position 4 §top-layer: benign marker the renderer's native top-layer paint pass keys
-    // on (Broiler.Layout FragmentTreeBuilder → Fragment.TopLayerOrder → PaintWalker.PaintTopLayer).
-    // The attribute value is the element's top-layer order; a later-added element (higher order)
-    // paints over an earlier one. Stamping it lets the native pass paint modal dialogs, open
-    // popovers, and ::backdrops above every ordinary stacking context — the correct top-layer
-    // behaviour, replacing the approximate very-large-z-index emulation below. Inert until the
-    // renderer's native-top-layer paint patch lands (the pinned PaintWalker never reads the
-    // projected order), so stamping it is safe on the current baked path.
+    // on (Broiler.Layout FragmentTreeBuilder → Fragment.TopLayerOrder → PaintWalker.PaintTopLayer,
+    // patch 0010 — applied and pinned). The attribute value is the element's top-layer order; a
+    // later-added element (higher order) paints over an earlier one. Stamping it lets the native
+    // pass paint modal dialogs, open popovers, and ::backdrops above every ordinary stacking
+    // context — the correct top-layer behaviour, superseding the approximate very-large-z-index
+    // emulation (now written only on the retired NativeTopLayer-off rollback path).
     private const string TopLayerOrderAttr = "data-broiler-top-layer";
 
     // Native ::backdrop marker: the resolved backdrop background (UA modal/popover scrim default
-    // folded with any author `background`) the renderer materialises into a native ::backdrop
-    // box. Only stamped in NativeTopLayer mode; on the baked path the bridge inserts a styled
-    // <div> instead. Inert until the native-::backdrop renderer patch lands.
+    // folded with any author `background`) the renderer materialises into a native ::backdrop box
+    // (Broiler.HTML DomParser, patch 0011 — applied and pinned). Stamped in NativeBackdrop mode;
+    // the baked path inserts a styled <div> instead. The <div> path is still retained (not yet
+    // deletable) because it carries author `::backdrop` position-try-fallbacks, which the native
+    // path does not yet reproduce (see InsertDialogBackdrops).
     private const string BackdropBgAttr = "data-broiler-backdrop";
 
     private void StampTopLayerOrder(DomElement el, int order) =>
@@ -186,18 +187,17 @@ public sealed partial class DomBridge
                     InlineStyle(el)["left"] = "0";
             }
 
-            // Elevate into the synthetic top layer, ordered by show order, so the
-            // popover paints above non-top-layer content (e.g. a plain
-            // position:fixed sibling) and later popovers paint over earlier ones.
-            // The very-large z-index is the approximate emulation used on the baked
-            // render path; the native top-layer paint pass keys on the marker below
-            // instead (and ignores the z-index, since a marked box is lifted out of
-            // normal stacking). Keeping both makes the marker a no-op fallback until
-            // the native-top-layer paint patch lands.
+            // Elevate into the top layer, ordered by show order, so the popover paints above
+            // non-top-layer content (e.g. a plain position:fixed sibling) and later popovers paint over
+            // earlier ones. Native path: the renderer's top-layer paint pass (patch 0010, pinned) keys on
+            // the `data-broiler-top-layer` marker and lifts the box out of normal stacking. The very-large
+            // z-index is the older approximate emulation, now needed only on the retired baked
+            // (NativeTopLayer-off) rollback path — so the two are mutually exclusive rather than both.
             int order = TopLayerOrderOf(el);
-            InlineStyle(el)["z-index"] = (TopLayerZIndexBase + order).ToString(System.Globalization.CultureInfo.InvariantCulture);
             if (NativeTopLayer)
                 StampTopLayerOrder(el, order);
+            else
+                InlineStyle(el)["z-index"] = (TopLayerZIndexBase + order).ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
     }
     // -----------------------------------------------------------------
@@ -280,37 +280,13 @@ public sealed partial class DomBridge
                 }
             }
 
-            // The white-box UA defaults below (display:block, border, padding,
-            // white background) are the modal <dialog> appearance. Popovers do
-            // not share them — their box styling comes entirely from author CSS —
-            // so skip this block for popovers (their ::backdrop was still emitted
-            // above).
-            if (isPopover)
-                continue;
-
-            // Ensure the dialog has UA default styles.
-            // Check both inline styles and CSS rules before applying defaults.
-            // NB: `display: block` is no longer baked here — the native UA rule
-            // `dialog { display: block }` (Broiler.HTML CssDefaults, patches
-            // 0001+0002, now applied and pinned) supplies it through the real
-            // cascade, so the bridge pre-bake is redundant.
-            var dialogProps = GetComputedProps(dialog);
-            if (!InlineStyle(dialog).ContainsKey("border") &&
-                !dialogProps.ContainsKey("border") &&
-                !dialogProps.ContainsKey("border-width"))
-            {
-                InlineStyle(dialog)["border-width"] = "1px";
-                InlineStyle(dialog)["border-style"] = "solid";
-                InlineStyle(dialog)["border-color"] = "black";
-            }
-            if (!InlineStyle(dialog).ContainsKey("padding") &&
-                !dialogProps.ContainsKey("padding"))
-                InlineStyle(dialog)["padding"] = "1em";
-            if (!InlineStyle(dialog).ContainsKey("background") &&
-                !InlineStyle(dialog).ContainsKey("background-color") &&
-                !dialogProps.ContainsKey("background") &&
-                !dialogProps.ContainsKey("background-color"))
-                InlineStyle(dialog)["background-color"] = "white";
+            // The modal <dialog> box chrome (display:block, border:1px solid black, padding:1em,
+            // white background) is no longer baked here — the native UA rule
+            // `dialog { display: block; border: 1px solid black; padding: 1em; background-color: white }`
+            // (Broiler.HTML CssDefaults, patches 0001+0002 + the box-chrome patch 0004, all applied and
+            // pinned) supplies it through the real cascade, with the shorthand-vs-longhand origin fix so an
+            // author reset still wins. Popovers never had UA box chrome (author CSS only). So nothing
+            // dialog-specific remains in this loop past the backdrop handling above.
         }
     }
     /// <summary>

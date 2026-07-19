@@ -241,6 +241,32 @@ maintainer applies the patch backlog or a pixel corpus for the corpus-gapped fea
    WPT; `NativeBackdrop` to be turned on) and delete the bridge code the "Follow-up once applied" notes name.
    This maintainer step is now the gating item for the remaining `Dialogs.cs`/anchor-bake deletions.
 
+**Landed (2026-07-19) — the maintainer patch backlog is APPLIED, and two `Dialogs.cs` follow-ups are
+executed.** The "Update submodules" commits applied and pinned the staged patches (0004–0011 among them),
+so the native dialog UA chrome, top-layer paint, and native `::backdrop` box generation are all live at the
+pinned SHAs. The `Broiler.Wpt.Tests` project (which had a pre-existing `GetInlineStyleView` static-call
+build break from the Phase-2 de-globalization) was fixed first, so the **7 `anchor-position-top-layer`
+reftests + `NativeModalDialog` tests build and pass (8/8)** here — the deterministic pixel validation the
+dialog track needs. Two follow-ups then landed against that validation:
+- **Box-chrome bake deleted** (`InsertDialogBackdrops`). Patch 0004's UA rule
+  `dialog { display:block; border:1px solid black; padding:1em; background-color:white }` (pinned, with the
+  shorthand-vs-longhand origin fix) supplies the modal chrome through the real cascade, so the bridge
+  border/padding/background pre-bake is redundant. Removed (+ the now-empty `isPopover` box-chrome guard).
+- **Popover top-layer de-doubled.** The `data-broiler-top-layer` marker (patch 0010 native paint) and the
+  very-large z-index emulation were both written; they are now mutually exclusive — marker when
+  `NativeTopLayer`, z-index only on the retired rollback path. (Modal dialogs never had the z-index — only
+  the marker — so `ApplyDialogUAPositioning` was already clean.)
+  Both validated: 8/8 reftests + 4/4 Cli popover/backdrop unit tests, zero regressions.
+
+- **Still blocked — the backdrop `<div>` synthesis cannot be deleted yet.** The `else`-branch `<div>` path
+  carries **author `::backdrop` position-try-fallbacks** (covered by
+  `DomBridge_Backdrop_Honors_Author_Geometry_And_PositionTry_Fallback`: `left:9999px` → `--pt` → `left:300px`),
+  which the native `::backdrop` path (patch 0011) does **not** reproduce (it overlays author `::backdrop`
+  *geometry* from the cascade but not the fallback re-placement). So flipping `NativeBackdrop` on / deleting
+  the `<div>` would regress that test-covered feature; the `<div>` stays until the native `::backdrop` gains
+  position-try support (a further `Broiler.HTML` patch). The stale "inert until the patch lands" marker
+  comments were corrected to reflect that 0010/0011 are now applied.
+
 ---
 
 **Finding — `position-visibility` is entangled with the scroll-container CB decision — RESOLVED 2026-07-15
