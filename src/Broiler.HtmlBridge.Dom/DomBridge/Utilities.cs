@@ -509,11 +509,15 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectDescendantsByTag(DomElement root, string tagName, List<JSValue> results, DomBridge bridge)
     {
-        foreach (var child in ChildElements(root))
+        // Phase 4 item 4/5: reuse canonical Descendants() (public, document-order, level-snapshotted —
+        // the bridge's own WPT #1143 defensive idiom promoted to canonical, operating on the real child
+        // list so it also avoids the LegacyChildList projection overflow) instead of a hand-rolled
+        // depth-first ChildElements recursion. Same element set + pre-order; mutation-safe where the old
+        // live ChildElements iteration was not.
+        foreach (var element in root.Descendants().OfType<DomElement>())
         {
-            if (tagName == "*" || string.Equals(child.TagName, tagName, StringComparison.OrdinalIgnoreCase))
-                results.Add(bridge.ToJSObject(child));
-            CollectDescendantsByTag(child, tagName, results, bridge);
+            if (tagName == "*" || string.Equals(element.TagName, tagName, StringComparison.OrdinalIgnoreCase))
+                results.Add(bridge.ToJSObject(element));
         }
     }
 

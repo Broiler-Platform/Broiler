@@ -1970,6 +1970,28 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.18 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
+4/5, descendant-collection cluster: reuse canonical `DomNode.Descendants()` for the hand-rolled depth-first
+element walks.** Four bridge helpers reimplemented a depth-first descendant-element recursion that canonical
+`Descendants()` (already **public**) provides — and which canonical documents as the bridge's own WPT #1143
+concurrent-mutation defensive idiom promoted to canonical (it snapshots each level via `_children.ToArray()`
+on the **real** child list, so it is document-order, mutation-safe, and free of the `LegacyChildList`
+projection overflow the per-level `SnapshotChildren` retry guarded). All four now iterate
+`root.Descendants().OfType<DomElement>()`: `CollectDescendantsByTag` (`Utilities.cs`, `getElementsByTagName`),
+`CollectStyleElements` (`StyleSheets.cs`, `document.styleSheets`), `CollectStyleElementsInTree` (`Css.cs`, the
+computed-style cascade's `<style>`/external-stylesheet collection) and `CollectWindowFrames` (`WindowLoad.cs`,
+`window.frames`). Byte-identical set + pre-order (`ChildElements` is exactly `ChildNodes.OfType<DomElement>()`
+with no `#`-filtering, shadow roots are not in-tree children, and severed sub-documents are not descendants —
+so the element set and order match); the three that iterated the **live** `ChildElements`
+(`CollectDescendantsByTag`/`CollectStyleElements`/`CollectWindowFrames`) additionally **gain** the canonical
+level-snapshot mutation-safety they lacked, and `CollectStyleElementsInTree` swaps its per-level
+`SnapshotChildren` for canonical's equivalent (which, on the real list, cannot hit the projection overflow the
+retry existed for). `SnapshotChildren` itself stays — it is the widely-used single-level primitive (anchor
+resolver, dialogs, animation, sub-documents). No submodule change (canonical method already public). No
+public-API change; −4 net lines. Verified regression-free: the `StyleSheetBindingModule` /
+`ComputedStyleBindingModule` / `HtmlDom` (getElementsByTagName) / `IframeElementBindingModule` (frames) /
+`CssImportantCascade` suites pass (51/51).
+
 Status: **P4.17 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
 4/5, document-position & child-index canonical-reuse cluster (submodule-gated half via the patch workflow).**
 Two neutral-algorithm reuses:

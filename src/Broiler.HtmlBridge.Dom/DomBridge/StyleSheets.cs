@@ -36,16 +36,15 @@ public sealed partial class DomBridge
         return arr;
     }
 
-    /// <summary>Collects all style elements in the sub-tree.</summary>
+    /// <summary>Collects all style elements in the sub-tree. Phase 4 item 4/5: reuses canonical
+    /// <see cref="DomNode.Descendants"/> (document-order, level-snapshotted against concurrent mutation)
+    /// instead of a hand-rolled depth-first recursion over the live child list.</summary>
     private static void CollectStyleElements(DomNode root, List<DomElement> results)
     {
-        foreach (var child in ChildElements(root))
+        foreach (var element in root.Descendants().OfType<DomElement>())
         {
-            if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
-                results.Add(child);
-            else if (IsExternalStylesheet(child))
-                results.Add(child);
-            CollectStyleElements(child, results);
+            if (string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase) || IsExternalStylesheet(element))
+                results.Add(element);
         }
     }
 
