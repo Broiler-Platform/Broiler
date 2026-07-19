@@ -1013,17 +1013,19 @@ box-shadow.
 outline, border-radius, text-shadow (patch 0002), SVG attributes (patch 0003), pseudo-elements (inherited,
 verified), and word-spacing.
 
-**Remaining zoom increments**: (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles` — once the
-three submodule paint patches (`patches/0001`–`0003`) are applied and their pointers bumped, so the flag-on
-engine matches the bake before the bake is removed. The `%`-vs-`px`-vs-`em` and *own*-vs-*effective* factor
-distinctions (increments 2–3) are the intricate, correctness-sensitive core — which is why this is "the large
-piece" and is being landed incrementally behind the flag.
-
-**Remaining zoom increments**: (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles` — once the
-three submodule paint patches (`patches/0001`–`0003`) are applied and their pointers bumped, so the flag-on
-engine matches the bake before the bake is removed. The `%`-vs-`px`-vs-`em` and *own*-vs-*effective* factor
-distinctions (increments 2–3) are the intricate, correctness-sensitive core — which is why this is "the large
-piece" and is being landed incrementally behind the flag.
+**Increment 6 — the cutover (runbook authored, not executed).** Flip `NativeZoom` on and delete
+`ApplyZoomSerializationStyles`. This is the one *irreversible* step, so it is written up as an executable
+runbook rather than performed here: **`docs/roadmap/zoom-native-cutover.md`**. The bake and the engine are
+mutually exclusive (running both double-counts; neither drops zoom), so enabling the flag and deleting the
+bake are one atomic change, gated on four preconditions: **P1** the three submodule paint patches
+(`patches/0001`–`0003`) applied + `Broiler.CSS`/`Broiler.HTML` pointers bumped + the reverted calc parent
+wiring re-added (blocked — the submodule remotes 403 from this session, an environment/maintainer action);
+**P2** `NativeZoom.Enabled` (thread-static) set on the *layout* thread; **P3** the CSSOM metric divide-out
+(`LayoutMetrics.UnzoomSharedExtent` / `GetUsedZoomForElement`) stays green on the engine path — favourable,
+since it reads zoom from *computed* props and so is source-agnostic; **P4** an A/B bake-vs-engine equivalence
+harness (there is no reftest corpus). The `%`-vs-`px`-vs-`em` and *own*-vs-*effective* factor distinctions
+(increments 2–3) are the intricate, correctness-sensitive core — which is why this is "the large piece" and
+is being landed incrementally behind the flag. The runbook's readiness checklist tracks P1–P4.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
