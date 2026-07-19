@@ -815,10 +815,22 @@ down the tree when enabled; `1.0` everywhere when disabled; number / percentage 
 parsing). Zero regression: 213 engine layout tests, and the Acid3 / guard / public-API / shared-geometry /
 position-area-live-geometry / modal-centering Cli suites all pass — the foundation is inert.
 
-**Remaining zoom increments** (each builds on `EffectiveZoom`, in order): (2) apply the factor to the used
-**font size** — separating the *computed* font size (unzoomed, inherited and the `em`/`%` base) from the
-*used* font size (computed × `EffectiveZoom`), so `em` and inheritance compound correctly; (3) apply it to
-absolute (`px`/`pt`/…) **length** used values — cleanly a `Broiler.CSS.CssLengthParser.ParseLength` zoom
+**Landed (2026-07-18) — (b2) increment 2: used font-size scaling (main-repo).** `ActualFont.Size` (the
+used font size — what renders and what `GetEmHeight` feeds to other lengths' `em`) is now the *computed*
+size × `EffectiveZoom` when the box is zoomed. A new `ComputedFontSizePoints` holds the CSS computed size
+(unzoomed, per spec `zoom` scales only used values), and the font-size `%`/`em`/`larger`/`smaller`
+resolution + inheritance resolve against the *parent's* `ComputedFontSizePoints` — so a nested zoom
+compounds the ancestor factor exactly once (through `EffectiveZoom`), not through the font-size chain. Both
+the used-size path and the parent-basis swap are guarded on `EffectiveZoom != 1`, so with `NativeZoom` off
+the original `ActualFont.Size`-based resolution is byte-identical. No `Broiler.CSS` change needed — the
+computed size is built from the unzoomed parent basis and multiplied uniformly, so px/em/% all scale
+correctly without touching the length parser. Tests: `Broiler.Layout.Tests/ZoomFontSizeTests.cs` (absolute
+scales ×zoom / ×nested-zoom; `2em` under `zoom:2` is exactly 2× the un-zoomed `2em` — ancestor zoom applied
+once; disabled = unscaled; via a size-echoing font environment). Zero regression: 227 engine layout tests
+and the Acid3 / guard / public-API / computed-style / shared-geometry Cli suites.
+
+**Remaining zoom increments** (each builds on `EffectiveZoom`, in order): (3) apply the factor to absolute
+(`px`/`pt`/…) **length** used values — cleanly a `Broiler.CSS.CssLengthParser.ParseLength` zoom
 parameter (a submodule change → **patch workflow**), threaded from each box's `EffectiveZoom`, with `%`
 compounding through the already-zoomed containing block and `em` through the zoomed font size; (4) the SVG
 attribute / `::before`·`::after` pseudo / column edge cases the bake also covers; (5) the render/paint path

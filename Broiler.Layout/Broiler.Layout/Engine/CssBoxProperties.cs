@@ -705,6 +705,40 @@ internal abstract partial class CssBoxProperties
     public double EffectiveZoom =>
         !NativeZoom.Enabled ? 1.0 : (GetParent()?.EffectiveZoom ?? 1.0) * OwnZoom;
 
+    /// <summary>
+    /// The CSS <em>computed</em> font size in points — unaffected by <c>zoom</c> (which scales only used
+    /// values, CSS Viewport). Font-size <c>%</c>/<c>em</c>/<c>larger</c>/<c>smaller</c> and inheritance
+    /// resolve against this, so the ancestor zoom is applied exactly once (via
+    /// <see cref="EffectiveZoom"/>) to the <em>used</em> size (<see cref="ActualFont"/>.Size) rather than
+    /// compounding through the font-size chain. Only consulted on the native-zoom path (parent
+    /// EffectiveZoom ≠ 1); off it, the existing <c>ActualFont.Size</c>-based resolution is unchanged.
+    /// </summary>
+    internal double ComputedFontSizePoints
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(FontSize))
+                return CssConstants.FontSize;
+
+            double parentSize = GetParent() != null ? GetParent().ComputedFontSizePoints : CssConstants.FontSize;
+            var fsize = FontSize switch
+            {
+                CssConstants.Medium => CssConstants.FontSize,
+                CssConstants.XXSmall => CssConstants.FontSize - 4,
+                CssConstants.XSmall => CssConstants.FontSize - 3,
+                CssConstants.Small => CssConstants.FontSize - 2,
+                CssConstants.Large => CssConstants.FontSize + 2,
+                CssConstants.XLarge => CssConstants.FontSize + 3,
+                CssConstants.XXLarge => CssConstants.FontSize + 4,
+                CssConstants.Smaller => parentSize - 2,
+                CssConstants.Larger => parentSize + 2,
+                _ => CssLengthParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
+            };
+
+            return fsize <= 0 ? 0.001 : fsize;
+        }
+    }
+
     // CSS Anchor Positioning: the cascaded values are surfaced on the box so the
     // layout engine's anchor-placement post-pass can read them (HtmlBridge
     // complexity-reduction roadmap Phase 5 item 3, P5.8b). They are populated by
@@ -1046,7 +1080,11 @@ internal abstract partial class CssBoxProperties
                 && GetParent() != null
                 && double.TryParse(trimmedValue[..^1], NumberStyles.Float, CultureInfo.InvariantCulture, out _))
             {
-                double resolvedPoints = CssLengthParser.ParseNumber(trimmedValue, GetParent().ActualFont.Size);
+                // Percentage font-size resolves against the parent's COMPUTED (unzoomed) font size on the
+                // native-zoom path, so `zoom` applies once (via EffectiveZoom on the used size) rather than
+                // compounding through the font-size chain; off it, the existing used-size basis is kept.
+                double parentBasis = GetParent().EffectiveZoom != 1.0 ? GetParent().ComputedFontSizePoints : GetParent().ActualFont.Size;
+                double resolvedPoints = CssLengthParser.ParseNumber(trimmedValue, parentBasis);
                 _fontSize = resolvedPoints.ToString("0.0###", CultureInfo.InvariantCulture) + "pt";
                 InvalidateFontDependentValues();
                 
@@ -1072,7 +1110,10 @@ internal abstract partial class CssBoxProperties
                 }
                 else if (len.Unit == CssUnit.Em && GetParent() != null)
                 {
-                    computedValue = len.ConvertEmToPoints(GetParent().ActualFont.Size).ToString();
+                    // em font-size resolves against the parent's COMPUTED (unzoomed) size on the
+                    // native-zoom path (see the percentage branch above).
+                    double parentBasis = GetParent().EffectiveZoom != 1.0 ? GetParent().ComputedFontSizePoints : GetParent().ActualFont.Size;
+                    computedValue = len.ConvertEmToPoints(parentBasis).ToString();
                 }
                 else
                 {
@@ -1821,24 +1862,35 @@ internal abstract partial class CssBoxProperties
             if (IsBoldWeight(FontWeight, GetParent()))
                 st |= LayoutFontStyle.Bold;
 
-            double parentSize = CssConstants.FontSize;
-
-            if (GetParent() != null)
-                parentSize = GetParent().ActualFont.Size;
-
-            var fsize = FontSize switch
+            double fsize;
+            if (EffectiveZoom != 1.0)
             {
-                CssConstants.Medium => CssConstants.FontSize,
-                CssConstants.XXSmall => CssConstants.FontSize - 4,
-                CssConstants.XSmall => CssConstants.FontSize - 3,
-                CssConstants.Small => CssConstants.FontSize - 2,
-                CssConstants.Large => CssConstants.FontSize + 2,
-                CssConstants.XLarge => CssConstants.FontSize + 3,
-                CssConstants.XXLarge => CssConstants.FontSize + 4,
-                CssConstants.Smaller => parentSize - 2,
-                CssConstants.Larger => parentSize + 2,
-                _ => CssLengthParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
-            };
+                // Native CSS `zoom`: the used font size is the computed (unzoomed) size scaled by the
+                // effective zoom. `em`/`%`/inheritance resolve against the computed size (unaffected by
+                // zoom), so they compound the ancestor zoom exactly once, through EffectiveZoom.
+                fsize = ComputedFontSizePoints * EffectiveZoom;
+            }
+            else
+            {
+                double parentSize = CssConstants.FontSize;
+
+                if (GetParent() != null)
+                    parentSize = GetParent().ActualFont.Size;
+
+                fsize = FontSize switch
+                {
+                    CssConstants.Medium => CssConstants.FontSize,
+                    CssConstants.XXSmall => CssConstants.FontSize - 4,
+                    CssConstants.XSmall => CssConstants.FontSize - 3,
+                    CssConstants.Small => CssConstants.FontSize - 2,
+                    CssConstants.Large => CssConstants.FontSize + 2,
+                    CssConstants.XLarge => CssConstants.FontSize + 3,
+                    CssConstants.XXLarge => CssConstants.FontSize + 4,
+                    CssConstants.Smaller => parentSize - 2,
+                    CssConstants.Larger => parentSize + 2,
+                    _ => CssLengthParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
+                };
+            }
 
             // CSS 2.1 §15.4: font-size: 0 results in a zero-size em box.
             // Use a tiny positive value so the font object remains valid
