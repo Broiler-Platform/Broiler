@@ -610,6 +610,36 @@ fallback path until 0005 is applied (the *render* path already uses native place
 unaffected). No test is committed for this (it cannot pass at the pinned SHA); the finding is recorded
 here to inform the resolver-retirement / patch-landing sequence.
 
+**Landed (2026-07-19) — the bridge live anchor-geometry resolvers are RETIRED (LayoutSnapshot-endgame
+"delete fallback geometry approximations after parity is proven").** Now that patch 0005 is applied and
+pinned — `HeadlessLayoutView` unconditionally enables the engine's `NativeAnchorPlacement` post-pass (and
+threads `PositionTryRules`) around the shared-geometry layout — the shared snapshot the bridge reads for
+live CSSOM queries carries engine-resolved position-area / `anchor()`-inset / `anchor-size()` /
+position-try geometry directly. So the four bridge live resolvers
+(`ResolvePositionAreaForElement` / `ResolveAnchorInsetForElement` / `ResolveAnchorSizeForElement` /
+`ResolvePositionTryForElement`), which existed only to patch the resolved rect back onto the *pre-0005*
+(static) snapshot on read, are now pure redundancy. **Empirically proven before deletion:** with all four
+short-circuited to `null`, the full `*LiveGeometryTests` suite (16 tests — one class per mechanism) still
+passes **from the snapshot alone**, and the broader anchor / CSSOM / hit-testing Cli sweep showed only the
+standing environmental fails. Deleted: the four resolver methods (the whole read-path file
+`AnchorInsetQueries.cs`, plus `ResolvePositionAreaForElement` from `PositionAreaQueries.cs` and
+`ResolvePositionTryForElement` from `PositionTry.cs`), their read-path call sites in the four `offset*`
+getters, the anchor-resolution branch of `ComputeUnzoomedLayoutRect` (it collapses to the plain snapshot
+path), and the now-orphaned per-pass memo (`GetAnchorRegistryForPass` / `GetPositionTryRulesForPass` +
+`_passAnchorRegistry` / `_passPositionTryRules`) — ~300 lines net. **Kept** (still used by the render bake
+/ clone, verified by reference): `TryGetPositionAreaResolution` / `SetPositionAreaResolution` /
+`CopyPositionAreaResolution`, `ComputeFallbackPlacement`, `ParsePositionTryRules`, `EstimateMinContentWidth`,
+`BuildAnchorRegistry`, and the `AnchorGeometry` helpers. No public-API change (all deleted members were
+`internal`). Validation: `Broiler.HtmlBridge.Dom` builds clean (0 errors, no unused-member warnings);
+`LiveGeometry` + `PositionArea` + `PositionTry` + `SharedGeometryZoomSize` = **38/38 green**; the guard /
+architecture / public-API / anchor / hit-testing sweep adds **zero** regressions (the 5 fails there —
+three GoogleSearchPolyfill SVG hit-testing, `DomBridge_AnchorSize_…`, and the
+`DomBridge_Runtime_State_Uses_Typed_Groups` boundary guard — all fail identically on clean HEAD, verified
+by stash). This makes the shared snapshot the **single** live-geometry source for anchor-positioned boxes,
+advancing the Phase-5 LayoutSnapshot-endgame exit criterion ("LayoutMetrics is a small binding/facade, not
+a layout engine"). The sticky/scroll live-read values noted above ride the same snapshot, so they too are
+now native (no bridge resolver ever existed for them).
+
 **Design (2026-07-16) — visual-viewport / CSS `zoom` endgame (step-6 blocker (b)).** Scoping of the
 last non-dialog step-6 residual, `ApplyVisualViewportSerializationState`, grounded in a full map of the
 machinery. Supersedes the terse "not a slice; folded into the LayoutSnapshot endgame" note above.
