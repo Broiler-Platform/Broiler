@@ -843,15 +843,33 @@ margin, width, height, text-indent, border-spacing**) and the four border-width 
 `2em` scales once through the zoomed font; disabled = unscaled). Zero regression: 231 engine layout tests +
 the Acid3 / guard / public-API / geometry / modal-centering Cli suites.
 
-**Deliberately deferred within increment 3** (documented gaps, all inert while the flag is off): **`%`
-lengths** are not re-scaled here — they resolve against their basis, whose zoom depends on the caller (the
-box's own already-`EffectiveZoom`-scaled size for `padding`/`margin`, the ancestor-zoomed containing block
-for `width`), so a uniform post-scale would double-count some paths; **`calc()`** (mixed units) is left to
-resolve against zoomed bases without per-unit scaling; and the **direct-`ParseLength` inset callsites**
-(top/left/… positioning in `CssBox.Layout.cs`) are not yet wrapped, so a zoomed *positioned* box scales its
-size/padding/border but not its inset offset. Each is a bounded follow-up; the clean general form (`%` and
-`calc()` per-unit) is the `Broiler.CSS.ParseLength` zoom-parameter patch, now a smaller optional refinement
-rather than a prerequisite.
+**Landed (2026-07-19) — increment-3 follow-ups: basis-dependent `%` + inset scaling (main-repo).** The two
+tractable increment-3 gaps are now closed by teaching `ApplyZoomToLength` the *basis* of a percentage.
+`ApplyZoomToLength(length, resolved, percentAgainstContainingBlock)` now scales a `%` length by the box's
+own `OwnZoom` when the basis is the ancestor-zoomed containing block (`width`/`height`/insets) and leaves it
+unscaled when the basis is the box's own already-`EffectiveZoom`-scaled size (`padding`/`margin`) — the
+distinction that would otherwise double-count. `ParseLengthWithLineHeight` gained a matching
+`percentAgainstContainingBlock` flag, threaded `true` from the CB-basis width resolution
+(`ResolveBlockUsedWidth`, `CssBox.Layout.cs:181`). A new `ParseInsetLength(value, basis, …)` helper wraps the
+~32 direct `CssLengthParser.ParseLength(Left/Top/Right/Bottom, …)` callsites in `CssBox.Layout.cs` so a
+zoomed *positioned* box now scales its inset offsets too (absolute ×`EffectiveZoom`, `%` ×`OwnZoom` against
+the CB; the four relative-positioning offsets resolve against `Size` and pass
+`percentAgainstContainingBlock: false`). One latent-bug fix fell out: `ResolveOverconstrainedAutoMargins`
+computes a *used* centring margin, but `ActualMargin*` re-applies `EffectiveZoom` to the stored margin
+string, so the stored value is now pre-divided by `EffectiveZoom` (a no-op while the flag is off, since
+`EffectiveZoom` is then `1.0`) to avoid double-counting the zoom on the centred margin. All still gated by
+`NativeZoom` → flag-off byte-identical. Tests: `Broiler.Layout.Tests/ZoomInsetTests.cs` (absolute inset
+×`EffectiveZoom`, `%` inset ×`OwnZoom` against the CB, disabled = unscaled, observed through the auto-margin
+centring split). Zero regression: 234 engine layout tests + the Cli suites.
+
+**Deliberately deferred within increment 3** (documented gaps, inert while the flag is off): **`calc()`**
+(mixed units) is left to resolve against zoomed bases without per-unit scaling — `ApplyZoomToLength` skips
+any token containing `(`; the clean general form is the `Broiler.CSS.ParseLength` zoom-parameter patch
+(submodule → patch workflow), now a smaller optional refinement rather than a prerequisite. The
+**direct-`ParseLength` *height* callsites** (abspos/special block-size resolution against `cbHeight` in
+`CssBox.Layout.cs`) are still unwrapped, so a zoomed abspos box scales its insets and inline size but an
+explicit abspos `height` resolved on those paths is not yet zoomed — a bounded next follow-up mirroring the
+inset helper.
 
 **Remaining zoom increments**: (4) the SVG
 attribute / `::before`·`::after` pseudo / column edge cases the bake also covers; (5) the render/paint path

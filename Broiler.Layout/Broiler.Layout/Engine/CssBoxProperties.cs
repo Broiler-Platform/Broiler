@@ -2008,23 +2008,29 @@ internal abstract partial class CssBoxProperties
     /// re-scaled here — full <c>%</c>/<c>calc()</c> zoom is a follow-up. No-op unless
     /// <see cref="NativeZoom"/> is enabled and this box is zoomed, so it is inert by default.
     /// </summary>
-    private double ApplyZoomToLength(string length, double resolved)
+    /// <param name="percentAgainstContainingBlock">
+    /// Whether a <c>%</c> length was resolved against the containing block (ancestor-zoomed) rather than
+    /// this box's own already-<see cref="EffectiveZoom"/>-scaled size. When the basis is the box's own
+    /// size (padding/margin/…), the percentage already carries the full effective zoom, so it is not
+    /// re-scaled; when it is the containing block (width/height/insets), the percentage carries only the
+    /// ancestor zoom and needs the box's own <see cref="OwnZoom"/> to reach the effective factor.
+    /// </param>
+    private double ApplyZoomToLength(string length, double resolved, bool percentAgainstContainingBlock = false)
     {
         if (!NativeZoom.Enabled)
             return resolved;
-        double eff = EffectiveZoom;
-        if (eff == 1.0)
+        if (EffectiveZoom == 1.0 && OwnZoom == 1.0)
             return resolved;
 
         var t = length?.Trim();
         if (string.IsNullOrEmpty(t) || t == "0" || t.Equals("auto", StringComparison.OrdinalIgnoreCase))
             return resolved;
         if (t.Contains('('))
-            return resolved; // calc()/math — resolved against zoomed bases; per-unit zoom is a follow-up
+            return resolved; // calc()/math — handled by CssLengthParser (increment 3 calc patch)
 
         var lower = t.ToLowerInvariant();
         if (lower.EndsWith('%'))
-            return resolved; // percentage — carries its (zoomed) basis' factor
+            return percentAgainstContainingBlock ? resolved * OwnZoom : resolved;
         if ((lower.EndsWith("em") && !lower.EndsWith("rem"))
             || lower.EndsWith("ex") || lower.EndsWith("ch") || lower.EndsWith("ic")
             || (lower.EndsWith("lh") && !lower.EndsWith("rlh")))
@@ -2032,16 +2038,38 @@ internal abstract partial class CssBoxProperties
         if (lower.EndsWith("vw") || lower.EndsWith("vh") || lower.EndsWith("vmin") || lower.EndsWith("vmax"))
             return resolved; // viewport-relative — unaffected by element zoom
 
-        return resolved * eff; // absolute / rem / keyword / unitless
+        return resolved * EffectiveZoom; // absolute / rem / keyword / unitless
     }
 
-    protected double ParseLengthWithLineHeight(string length, double hundredPercent)
+    /// <summary>
+    /// Resolves an inset (<c>top</c>/<c>right</c>/<c>bottom</c>/<c>left</c>) length against its basis and
+    /// applies native <c>zoom</c> the same way <see cref="ApplyZoomToLength"/> does: absolute insets scale
+    /// by <see cref="EffectiveZoom"/>, <c>em</c>/<c>ch</c> ride the already-zoomed font, viewport units are
+    /// untouched, and percentages scale by this box's own zoom when the basis is the (ancestor-zoomed)
+    /// containing block. Inert unless <see cref="NativeZoom"/> is enabled and the box is zoomed — flag-off
+    /// it is byte-identical to a bare <see cref="Broiler.CSS.CssLengthParser.ParseLength(string,double,double)"/>.
+    /// </summary>
+    /// <param name="percentAgainstContainingBlock">
+    /// <c>true</c> (the default) when <paramref name="basis"/> is the containing block's size — the usual
+    /// inset case; <c>false</c> when it is the box's own already effective-zoom-scaled size (e.g. a
+    /// relative-positioning offset resolved against <c>Size</c>).
+    /// </param>
+    private protected double ParseInsetLength(string value, double basis, bool percentAgainstContainingBlock = true)
+        => ApplyZoomToLength(value, CssLengthParser.ParseLength(value, basis, GetEmHeight()), percentAgainstContainingBlock);
+
+    /// <param name="percentAgainstContainingBlock">
+    /// Set when <paramref name="hundredPercent"/> is the containing block's (ancestor-zoomed) size —
+    /// e.g. resolving <c>width</c>/<c>height</c>/insets — so a <c>%</c> length picks up this box's own
+    /// zoom to reach the effective factor. Leave <c>false</c> when the basis is the box's own already
+    /// effective-zoom-scaled size (padding/margin), where the percentage already carries the full factor.
+    /// </param>
+    protected double ParseLengthWithLineHeight(string length, double hundredPercent, bool percentAgainstContainingBlock = false)
     {
         if (!string.IsNullOrWhiteSpace(length) &&
             length.EndsWith("rem", StringComparison.OrdinalIgnoreCase) &&
             double.TryParse(length[..^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var rem))
         {
-            return ApplyZoomToLength(length, rem * GetRootEmHeight());
+            return ApplyZoomToLength(length, rem * GetRootEmHeight(), percentAgainstContainingBlock);
         }
 
         // CSS Values 3 §5.1.1: 1ch is the advance measure of the "0" glyph in the
@@ -2056,7 +2084,7 @@ internal abstract partial class CssBoxProperties
         {
             double chWidth = GetChWidth();
             if (!double.IsNaN(chWidth) && chWidth > 0)
-                return ApplyZoomToLength(length, chCount * chWidth);
+                return ApplyZoomToLength(length, chCount * chWidth, percentAgainstContainingBlock);
         }
 
         return ApplyZoomToLength(length, CssLengthParser.ParseLength(
@@ -2067,7 +2095,7 @@ internal abstract partial class CssBoxProperties
             false,
             false,
             ActualLineHeight,
-            GetRootLineHeight()));
+            GetRootLineHeight()), percentAgainstContainingBlock);
     }
 
     private double ParseLineHeightLength(string length, double hundredPercent)
