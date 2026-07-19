@@ -1970,6 +1970,33 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.17 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
+4/5, document-position & child-index canonical-reuse cluster (submodule-gated half via the patch workflow).**
+Two neutral-algorithm reuses:
+
+- **`IsPositionAfter` → canonical `DomRange.CompareBoundaryPoints` (landed in-repo).** The bridge's
+  boundary-point "is A after B" comparison (`JsFunctionCallbacks/Common.cs`, behind `compareBoundaryPoints` /
+  `compareDocumentPosition`) reimplemented the DOM boundary-comparison algorithm that canonical
+  `DomRange.CompareBoundaryPoints` (already **public**) provides. Verified branch-for-branch equivalent for
+  **same-tree** points (same-container `offset` compare, either-descendant child-index compare, and
+  common-ancestor ordering all agree, so `IsPositionAfter ≡ CompareBoundaryPoints(...) > 0`), so the same-tree
+  path now delegates. The bridge's **deliberate cross-tree leniency** (its `compareBoundaryPoints` returns an
+  order via the document root rather than throwing `WrongDocument` as canonical does) is preserved verbatim by
+  guarding on `GetRootNode()` equality first. Deletes ~25 lines of duplicated descendant-walk / order logic.
+  No submodule change needed (canonical method already public). Verified regression-free — the
+  `DomTraversalAndRange` / `NodeRelationshipsBindingModule` (compareDocumentPosition) / `NamespaceAndDomCore`
+  suites pass, the one failure (`Range_GetBoundingClientRect_Includes_DisplayContents_Descendants`) is the
+  standing headless-geometry environmental failure, confirmed identical at baseline.
+- **`ChildIndexOf` → canonical `IndexOfReference` (submodule patch `0002`).** `IndexOfReference` (the
+  byte-identical reference-equality child-index scan `DomRange` uses) is on an `internal`
+  `DomNodeCollectionExtensions`; making it public is a one-line visibility change. The `Broiler.DOM` push
+  **returned 403** (out of session scope — contrary to the P4.12-era note that the `MaiRat/` redirect was
+  in-scope; the scope has since tightened), so per `CLAUDE.md` it ships as
+  `patches/0002-dom-make-domnodecollectionextensions-public.patch` with a `patches/README.md` entry, the
+  submodule pointer left **unbumped**, and `ChildIndexOf` keeping its manual loop as the active CI fallback.
+  The follow-up (delegate + delete the loop) lands once a maintainer applies the patch and bumps the pointer.
+  No main-repo behaviour change for this half.
+
 Status: **P4.16 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
 4/5, next tractable cluster: reuse canonical `DomNode.GetRootNode()` for the bridge's absolute-root walks.**
 The neutral-tree-algorithm reuse cluster (the P4.8–4.12 pattern), scoped to the reuses whose canonical method

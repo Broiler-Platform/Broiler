@@ -55,39 +55,16 @@ public sealed partial class DomBridge
 
     private bool IsPositionAfter(DomNode docRoot, DomNode containerA, int offsetA, DomNode containerB, int offsetB)
     {
-        if (ReferenceEquals(containerA, containerB))
-            return offsetA > offsetB;
+        // Phase 4 item 4/5: for boundary points in the SAME tree this is exactly canonical
+        // Broiler.Dom.DomRange.CompareBoundaryPoints(...) > 0 (verified branch-for-branch: same-container,
+        // either-descendant, and common-ancestor ordering all agree), so delegate to it instead of
+        // re-implementing the walk. The bridge deliberately keeps a LENIENT cross-tree path — canonical
+        // throws WrongDocument, but the bridge's compareBoundaryPoints returns an order rather than
+        // throwing — so the cross-tree branch (different roots) is preserved verbatim below.
+        if (ReferenceEquals(containerA.GetRootNode(), containerB.GetRootNode()))
+            return DomRange.CompareBoundaryPoints(containerA, offsetA, containerB, offsetB) > 0;
 
-        if (containerB.IsDescendantOf(containerA))
-        {
-            DomNode node = containerB;
-            while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerA))
-                node = node.ParentNode;
-            if (node.ParentNode != null)
-            {
-                var childIdx = ChildIndexOf(containerA, node);
-                return offsetA > childIdx;
-            }
-
-            return false;
-        }
-
-        if (containerA.IsDescendantOf(containerB))
-        {
-            DomNode node = containerA;
-            while (node.ParentNode != null && !ReferenceEquals(node.ParentNode, containerB))
-                node = node.ParentNode;
-            if (node.ParentNode != null)
-            {
-                var childIdx = ChildIndexOf(containerB, node);
-                return childIdx >= offsetB;
-            }
-
-            return true;
-        }
-
-        var commonRoot = containerA.CommonAncestorWith(containerB) ?? docRoot;
-        var allNodes = commonRoot.InclusiveDescendants().ToList();
+        var allNodes = docRoot.InclusiveDescendants().ToList();
         var idxA = allNodes.IndexOf(containerA);
         var idxB = allNodes.IndexOf(containerB);
         if (idxA < 0 || idxB < 0)
