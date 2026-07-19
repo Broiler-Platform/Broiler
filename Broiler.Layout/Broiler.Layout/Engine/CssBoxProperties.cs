@@ -288,7 +288,9 @@ internal abstract partial class CssBoxProperties
                     || OutlineStyle.Equals("hidden", StringComparison.OrdinalIgnoreCase))
                     _actualOutlineWidth = 0;
                 else
-                    _actualOutlineWidth = CssLengthParser.GetActualBorderWidth(OutlineWidth, GetEmHeight());
+                    // Paint-only used length: scale by zoom exactly like the border widths (absolute /
+                    // thin·medium·thick keyword × EffectiveZoom, em rides the already-zoomed font).
+                    _actualOutlineWidth = ApplyZoomToLength(OutlineWidth, CssLengthParser.GetActualBorderWidth(OutlineWidth, GetEmHeight()));
             }
 
             return _actualOutlineWidth;
@@ -303,7 +305,8 @@ internal abstract partial class CssBoxProperties
             if (double.IsNaN(_actualOutlineOffset))
                 _actualOutlineOffset = string.IsNullOrEmpty(OutlineOffset)
                     ? 0
-                    : CssLengthParser.ParseLength(OutlineOffset, 0, GetEmHeight());
+                    // Paint-only used length (may be negative); absolute × EffectiveZoom, em rides the font.
+                    : ApplyZoomToLength(OutlineOffset, CssLengthParser.ParseLength(OutlineOffset, 0, GetEmHeight()));
 
             return _actualOutlineOffset;
         }

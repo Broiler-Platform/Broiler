@@ -78,6 +78,45 @@ public sealed class ZoomLengthTests
     }
 
     [Fact]
+    public void OutlineWidth_And_Offset_Scale_By_EffectiveZoom()
+    {
+        // Paint-only lengths (increment 5): outline does not affect layout, but its used width/offset
+        // still scale by the element's zoom so the painted outline tracks the zoomed box.
+        var box = Box(Root(), "2");
+        box.OutlineStyle = "solid";
+        box.OutlineWidth = "3px";
+        box.OutlineOffset = "5px";
+
+        WithNativeZoom(() =>
+        {
+            Assert.Equal(6, box.ActualOutlineWidth, 3);
+            Assert.Equal(10, box.ActualOutlineOffset, 3);
+        });
+    }
+
+    [Fact]
+    public void OutlineWidth_Keyword_Scales_By_EffectiveZoom()
+    {
+        var box = Box(Root(), "2");
+        box.OutlineStyle = "solid";
+        box.OutlineWidth = "thick"; // medium/thick keyword resolves to px, then scales like an absolute width
+
+        WithNativeZoom(() => Assert.Equal(10, box.ActualOutlineWidth, 3)); // thick = 5px × 2
+    }
+
+    [Fact]
+    public void Outline_Disabled_Unscaled()
+    {
+        var box = Box(Root(), "2");
+        box.OutlineStyle = "solid";
+        box.OutlineWidth = "3px";
+        box.OutlineOffset = "5px";
+
+        Assert.Equal(3, box.ActualOutlineWidth, 3);
+        Assert.Equal(5, box.ActualOutlineOffset, 3);
+    }
+
+    [Fact]
     public void Disabled_LeavesLengths_Unscaled()
     {
         var box = Box(Root(), "2");

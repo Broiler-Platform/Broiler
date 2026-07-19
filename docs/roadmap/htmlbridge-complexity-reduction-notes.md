@@ -920,12 +920,39 @@ with the increment-5 render/paint pass rather than as a `ParseUsedLength` call-s
 geometry (`border-radius`, `outline-width`/`outline-offset`, `column-rule-width`, `letter-spacing`/
 `word-spacing`), which likewise belong to the paint increment.
 
-**Remaining zoom increments**: (5) the render/paint path (reuses the patch-0008/0009 `BCanvas.Scale`
-viewport-zoom plumbing, but per-subtree rather than a uniform root scale), which also absorbs the pseudo /
-SVG / paint-only-length remainder above; (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles`.
-The `%`-vs-`px`-vs-`em` and *own*-vs-*effective* factor distinctions (increments 2–3) are the intricate,
-correctness-sensitive core — which is why this is "the large piece" and is being landed incrementally behind
-the flag.
+**Landed (2026-07-19) — increment 5, first slice: outline paint-length scaling + the paint-model correction
+(main-repo).** Design correction first, because it reshapes increments 5–6: the roadmap sketch had increment
+5 *reuse the patch-0008/0009 `BCanvas.Scale` plumbing per zoomed subtree*. That is the **visual-viewport**
+(pinch) model — a canvas transform that leaves used values untouched — and it is **incompatible** with the
+used-value model increments 1–4 committed to. Layout already emits fully zoomed geometry (positions, box
+sizes, font size, borders, padding, insets, columns), so paint renders a zoomed subtree correctly *without*
+any canvas scale; adding a per-subtree `BCanvas.Scale` on top would **double-count** the zoom. So increment 5
+is not a canvas-scale pass — it is scaling the handful of **paint-only used lengths that do not flow from box
+geometry**, each at its own resolution site, exactly as increments 2–4 did for geometry lengths. This slice
+takes the two such lengths the `Broiler.Layout` read model resolves: **`outline-width`** (`ActualOutlineWidth`
+— now `ApplyZoomToLength(OutlineWidth, GetActualBorderWidth(...))`, so absolute / `thin`·`medium`·`thick`
+keyword × `EffectiveZoom`, `em` riding the zoomed font, mirroring the border widths) and **`outline-offset`**
+(`ActualOutlineOffset`, absolute × `EffectiveZoom`, negatives preserved). Outline never affects layout, so
+this is fully isolated. Gated by `NativeZoom` → flag-off byte-identical. Tests: `ZoomLengthTests` (outline
+width + offset ×zoom, `thick` keyword ×zoom, disabled = unscaled). Zero regression: 242 engine layout tests.
+
+**Remaining within increment 5** (the render-layer bulk, in the `Broiler.HTML`/`Broiler.Graphics` submodules —
+patch workflow + pixel validation, no reftest corpus): the paint-only lengths resolved *at paint* rather than
+in the layout read model — **`border-radius`**, **box-shadow** offset/blur/spread, **text-decoration**
+thickness / underline-offset, **`column-rule-width`** — plus **SVG** presentation/geometry attribute painting
+and **`::before`/`::after`** pseudo boxes (materialised upstream). Each scales by the owning box's
+`EffectiveZoom` the same way (absolute × zoom, `em`/font-relative via the zoomed font), but the change lives
+in the submodule paint code, so it is a patch not a main-repo edit. The one main-repo remnant deliberately
+left is **`letter-spacing`/`word-spacing`**: they *do* feed text layout (`MeasureWordSpacing` /
+`CssUtils.WhiteSpace`) and are entangled with the whitespace-advance measurement (a two-site add through
+`ParseLength(..., fontAdjust)`), so scaling them safely needs a focused text-measurement pass rather than a
+one-line getter wrap — a bounded follow-up.
+
+**Remaining zoom increments**: (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles` — once the
+submodule paint residue above is patched in, so the flag-on engine matches the bake before the bake is
+removed. The `%`-vs-`px`-vs-`em` and *own*-vs-*effective* factor distinctions (increments 2–3) are the
+intricate, correctness-sensitive core — which is why this is "the large piece" and is being landed
+incrementally behind the flag.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
