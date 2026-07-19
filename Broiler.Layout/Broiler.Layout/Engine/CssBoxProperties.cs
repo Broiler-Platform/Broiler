@@ -1399,7 +1399,7 @@ internal abstract partial class CssBoxProperties
 
             if (double.IsNaN(_actualBorderTopWidth))
             {
-                _actualBorderTopWidth = CssLengthParser.GetActualBorderWidth(BorderTopWidth, GetEmHeight());
+                _actualBorderTopWidth = ApplyZoomToLength(BorderTopWidth, CssLengthParser.GetActualBorderWidth(BorderTopWidth, GetEmHeight()));
 
                 if (string.IsNullOrEmpty(BorderTopStyle) || BorderTopStyle == CssConstants.None)
                     _actualBorderTopWidth = 0f;
@@ -1418,7 +1418,7 @@ internal abstract partial class CssBoxProperties
 
             if (double.IsNaN(_actualBorderLeftWidth))
             {
-                _actualBorderLeftWidth = CssLengthParser.GetActualBorderWidth(BorderLeftWidth, GetEmHeight());
+                _actualBorderLeftWidth = ApplyZoomToLength(BorderLeftWidth, CssLengthParser.GetActualBorderWidth(BorderLeftWidth, GetEmHeight()));
 
                 if (string.IsNullOrEmpty(BorderLeftStyle) || BorderLeftStyle == CssConstants.None)
                     _actualBorderLeftWidth = 0f;
@@ -1437,7 +1437,7 @@ internal abstract partial class CssBoxProperties
 
             if (double.IsNaN(_actualBorderBottomWidth))
             {
-                _actualBorderBottomWidth = CssLengthParser.GetActualBorderWidth(BorderBottomWidth, GetEmHeight());
+                _actualBorderBottomWidth = ApplyZoomToLength(BorderBottomWidth, CssLengthParser.GetActualBorderWidth(BorderBottomWidth, GetEmHeight()));
 
                 if (string.IsNullOrEmpty(BorderBottomStyle) || BorderBottomStyle == CssConstants.None)
                     _actualBorderBottomWidth = 0f;
@@ -1456,7 +1456,7 @@ internal abstract partial class CssBoxProperties
 
             if (double.IsNaN(_actualBorderRightWidth))
             {
-                _actualBorderRightWidth = CssLengthParser.GetActualBorderWidth(BorderRightWidth, GetEmHeight());
+                _actualBorderRightWidth = ApplyZoomToLength(BorderRightWidth, CssLengthParser.GetActualBorderWidth(BorderRightWidth, GetEmHeight()));
 
                 if (string.IsNullOrEmpty(BorderRightStyle) || BorderRightStyle == CssConstants.None)
                     _actualBorderRightWidth = 0f;
@@ -1997,13 +1997,51 @@ internal abstract partial class CssBoxProperties
     /// </summary>
     protected virtual double GetChWidth() => double.NaN;
 
+    /// <summary>
+    /// Native CSS <c>zoom</c>: scales a resolved absolute length by <see cref="EffectiveZoom"/> (CSS
+    /// Viewport — <c>zoom</c> multiplies used values). Applied per unit: absolute lengths
+    /// (<c>px</c>/<c>pt</c>/<c>cm</c>/<c>mm</c>/<c>in</c>/<c>pc</c>/<c>q</c>), root-relative <c>rem</c>/
+    /// <c>rlh</c>, keyword widths and unitless values scale by the full effective zoom; font-relative
+    /// units (<c>em</c>/<c>ex</c>/<c>ch</c>/<c>ic</c>/non-root <c>lh</c>) are already scaled through the
+    /// zoomed font metrics (<see cref="ActualFont"/>) and are left unchanged; viewport units are
+    /// unaffected. Percentages and <c>calc()</c> resolve against their (already-zoomed) basis and are not
+    /// re-scaled here — full <c>%</c>/<c>calc()</c> zoom is a follow-up. No-op unless
+    /// <see cref="NativeZoom"/> is enabled and this box is zoomed, so it is inert by default.
+    /// </summary>
+    private double ApplyZoomToLength(string length, double resolved)
+    {
+        if (!NativeZoom.Enabled)
+            return resolved;
+        double eff = EffectiveZoom;
+        if (eff == 1.0)
+            return resolved;
+
+        var t = length?.Trim();
+        if (string.IsNullOrEmpty(t) || t == "0" || t.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            return resolved;
+        if (t.Contains('('))
+            return resolved; // calc()/math — resolved against zoomed bases; per-unit zoom is a follow-up
+
+        var lower = t.ToLowerInvariant();
+        if (lower.EndsWith('%'))
+            return resolved; // percentage — carries its (zoomed) basis' factor
+        if ((lower.EndsWith("em") && !lower.EndsWith("rem"))
+            || lower.EndsWith("ex") || lower.EndsWith("ch") || lower.EndsWith("ic")
+            || (lower.EndsWith("lh") && !lower.EndsWith("rlh")))
+            return resolved; // font-relative — already scaled via the zoomed font metrics
+        if (lower.EndsWith("vw") || lower.EndsWith("vh") || lower.EndsWith("vmin") || lower.EndsWith("vmax"))
+            return resolved; // viewport-relative — unaffected by element zoom
+
+        return resolved * eff; // absolute / rem / keyword / unitless
+    }
+
     protected double ParseLengthWithLineHeight(string length, double hundredPercent)
     {
         if (!string.IsNullOrWhiteSpace(length) &&
             length.EndsWith("rem", StringComparison.OrdinalIgnoreCase) &&
             double.TryParse(length[..^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var rem))
         {
-            return rem * GetRootEmHeight();
+            return ApplyZoomToLength(length, rem * GetRootEmHeight());
         }
 
         // CSS Values 3 §5.1.1: 1ch is the advance measure of the "0" glyph in the
@@ -2018,10 +2056,10 @@ internal abstract partial class CssBoxProperties
         {
             double chWidth = GetChWidth();
             if (!double.IsNaN(chWidth) && chWidth > 0)
-                return chCount * chWidth;
+                return ApplyZoomToLength(length, chCount * chWidth);
         }
 
-        return CssLengthParser.ParseLength(
+        return ApplyZoomToLength(length, CssLengthParser.ParseLength(
             length,
             hundredPercent,
             GetEmHeight(),
@@ -2029,7 +2067,7 @@ internal abstract partial class CssBoxProperties
             false,
             false,
             ActualLineHeight,
-            GetRootLineHeight());
+            GetRootLineHeight()));
     }
 
     private double ParseLineHeightLength(string length, double hundredPercent)

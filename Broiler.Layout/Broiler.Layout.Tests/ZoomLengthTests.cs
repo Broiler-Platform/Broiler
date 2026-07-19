@@ -1,0 +1,122 @@
+using System;
+using System.Drawing;
+using Broiler.Layout.Engine;
+using Xunit;
+
+namespace Broiler.Layout.Tests;
+
+/// <summary>
+/// Pins the native CSS <c>zoom</c> length increment: absolute (<c>px</c>/…) and <c>rem</c> used lengths
+/// scale by <see cref="CssBoxProperties.EffectiveZoom"/> (padding, margin, border width, box size);
+/// font-relative (<c>em</c>) lengths scale through the zoomed font metrics (once, not twice); percentages
+/// resolve against their zoomed basis and are not re-scaled here. Gated by <see cref="NativeZoom"/>.
+/// </summary>
+public sealed class ZoomLengthTests
+{
+    private static readonly Uri BaseUrl = new("file:///zoom-len.html");
+
+    private static CssBox Root()
+    {
+        var root = new CssBox(null, null, BaseUrl) { Location = new PointF(0, 0), Size = new SizeF(400, 400) };
+        root.LayoutEnvironment = new EchoFontEnvironment();
+        root.FontSize = "16px";
+        return root;
+    }
+
+    private static CssBox Box(CssBox parent, string zoom = "normal")
+    {
+        var b = new CssBox(parent, null, BaseUrl) { Location = new PointF(0, 0), Size = new SizeF(200, 200), Zoom = zoom };
+        b.FontSize = "16px";
+        return b;
+    }
+
+    private static void WithNativeZoom(Action body)
+    {
+        var prev = NativeZoom.Enabled;
+        NativeZoom.Enabled = true;
+        try { body(); }
+        finally { NativeZoom.Enabled = prev; }
+    }
+
+    [Fact]
+    public void AbsolutePadding_Margin_Border_Scale_By_EffectiveZoom()
+    {
+        var box = Box(Root(), "2");
+        box.PaddingLeft = "10px";
+        box.MarginTop = "8px";
+        box.BorderLeftWidth = "3px";
+        box.BorderLeftStyle = "solid";
+
+        WithNativeZoom(() =>
+        {
+            Assert.Equal(20, box.ActualPaddingLeft, 3);
+            Assert.Equal(16, box.ActualMarginTop, 3);
+            Assert.Equal(6, box.ActualBorderLeftWidth, 3);
+        });
+    }
+
+    [Fact]
+    public void NestedZoom_Compounds_On_Lengths()
+    {
+        var outer = Box(Root(), "2");
+        var inner = Box(outer, "1.5"); // effectiveZoom 3
+        inner.PaddingLeft = "10px";
+
+        WithNativeZoom(() => Assert.Equal(30, inner.ActualPaddingLeft, 3));
+    }
+
+    [Fact]
+    public void EmLength_Scales_Once_Through_The_Zoomed_Font()
+    {
+        var plain = Box(Root());
+        plain.PaddingLeft = "2em";                 // 2 × 16px font
+        var zoomed = Box(Root(), "2");
+        zoomed.PaddingLeft = "2em";                // 2 × (16px × 2) font — scaled once, via the font
+
+        WithNativeZoom(() =>
+            Assert.Equal(2.0, zoomed.ActualPaddingLeft / plain.ActualPaddingLeft, 3));
+    }
+
+    [Fact]
+    public void Disabled_LeavesLengths_Unscaled()
+    {
+        var box = Box(Root(), "2");
+        box.PaddingLeft = "10px";
+        box.BorderLeftWidth = "3px";
+        box.BorderLeftStyle = "solid";
+
+        Assert.Equal(10, box.ActualPaddingLeft, 3);
+        Assert.Equal(3, box.ActualBorderLeftWidth, 3);
+    }
+
+    private sealed class EchoFontEnvironment : ILayoutEnvironment
+    {
+        public Broiler.Graphics.ILayoutFont GetFont(string family, double size, LayoutFontStyle style, string? fontFeatures = null) => new EchoFont(size);
+        public SizeF MeasureText(Broiler.Graphics.ILayoutFont font, string text) => SizeF.Empty;
+        public void MeasureText(Broiler.Graphics.ILayoutFont font, string text, double maxWidth, out int charFit, out double charFitWidth) { charFit = 0; charFitWidth = 0; }
+        public double GetWhitespaceWidth(Broiler.Graphics.ILayoutFont font) => 0;
+        public Broiler.Layout.ImageIntrinsics GetImageIntrinsics(object imageHandle) => default;
+        public Broiler.Graphics.BColor ParseColor(string value) => default;
+        public void RequestRefresh(bool relayout) { }
+        public SizeF ViewportSize => new(1000, 1000);
+        public PointF RootLocation => PointF.Empty;
+        public SizeF ActualSize { get; set; }
+        public bool AvoidGeometryAntialias => false;
+        public SizeF PageSize => new(1000, 1000);
+        public int MarginTop => 0;
+        public void ReportLayoutError(string message, Exception? exception = null) { }
+        public bool AvoidAsyncImagesLoading => true;
+        public bool AvoidImagesLateLoading => true;
+        public Broiler.Layout.ILayoutImageLoader CreateImageLoader(Action<object?, RectangleF, bool> onComplete) => null!;
+        public string FormatListMarker(int number, string style) => string.Empty;
+    }
+
+    private sealed class EchoFont(double size) : Broiler.Graphics.ILayoutFont
+    {
+        public double Size { get; } = size;
+        public double Height => size;
+        public double UnderlineOffset => 0;
+        public double LeftPadding => 0;
+        public string? FontFeatures => null;
+    }
+}

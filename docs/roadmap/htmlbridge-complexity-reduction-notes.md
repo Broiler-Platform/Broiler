@@ -829,10 +829,31 @@ scales ×zoom / ×nested-zoom; `2em` under `zoom:2` is exactly 2× the un-zoomed
 once; disabled = unscaled; via a size-echoing font environment). Zero regression: 227 engine layout tests
 and the Acid3 / guard / public-API / computed-style / shared-geometry Cli suites.
 
-**Remaining zoom increments** (each builds on `EffectiveZoom`, in order): (3) apply the factor to absolute
-(`px`/`pt`/…) **length** used values — cleanly a `Broiler.CSS.CssLengthParser.ParseLength` zoom
-parameter (a submodule change → **patch workflow**), threaded from each box's `EffectiveZoom`, with `%`
-compounding through the already-zoomed containing block and `em` through the zoomed font size; (4) the SVG
+**Landed (2026-07-18) — (b2) increment 3: absolute-length scaling (main-repo, no submodule patch needed).**
+A closer look at `CssLengthParser` showed the clean split does **not** require the `Broiler.CSS` patch after
+all: font-relative units already carry zoom (their `emFactor` is the zoomed `GetEmHeight` from increment 2),
+so only *absolute* used values need scaling — a per-unit **post-scale of the resolved value** in the box's
+own `ParseLengthWithLineHeight`, all main-repo. New `ApplyZoomToLength(length, resolved)` scales the resolved
+value by `EffectiveZoom` for absolute units (`px`/`pt`/`cm`/`mm`/`in`/`pc`/`q`), `rem`/`rlh`, keyword widths
+and unitless values; leaves `em`/`ex`/`ch`/`ic`/non-root `lh` unchanged (already scaled through the zoomed
+font); and leaves viewport units untouched. Wired into `ParseLengthWithLineHeight` (covers **padding,
+margin, width, height, text-indent, border-spacing**) and the four border-width getters. No-op unless
+`NativeZoom` is on and the box is zoomed, so flag-off is byte-identical. Tests:
+`Broiler.Layout.Tests/ZoomLengthTests.cs` (padding/margin/border scale ×zoom; nested zoom compounds ×3;
+`2em` scales once through the zoomed font; disabled = unscaled). Zero regression: 231 engine layout tests +
+the Acid3 / guard / public-API / geometry / modal-centering Cli suites.
+
+**Deliberately deferred within increment 3** (documented gaps, all inert while the flag is off): **`%`
+lengths** are not re-scaled here — they resolve against their basis, whose zoom depends on the caller (the
+box's own already-`EffectiveZoom`-scaled size for `padding`/`margin`, the ancestor-zoomed containing block
+for `width`), so a uniform post-scale would double-count some paths; **`calc()`** (mixed units) is left to
+resolve against zoomed bases without per-unit scaling; and the **direct-`ParseLength` inset callsites**
+(top/left/… positioning in `CssBox.Layout.cs`) are not yet wrapped, so a zoomed *positioned* box scales its
+size/padding/border but not its inset offset. Each is a bounded follow-up; the clean general form (`%` and
+`calc()` per-unit) is the `Broiler.CSS.ParseLength` zoom-parameter patch, now a smaller optional refinement
+rather than a prerequisite.
+
+**Remaining zoom increments**: (4) the SVG
 attribute / `::before`·`::after` pseudo / column edge cases the bake also covers; (5) the render/paint path
 (reuses the patch-0008/0009 `BCanvas.Scale` viewport-zoom plumbing, but per-subtree rather than a uniform
 root scale); (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles`. The `%`-vs-`px`-vs-`em`
