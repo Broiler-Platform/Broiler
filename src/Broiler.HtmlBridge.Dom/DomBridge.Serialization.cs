@@ -34,7 +34,8 @@ public sealed partial class DomBridge
     /// </summary>
     public string SerializeToHtml()
     {
-        ApplyZoomSerializationStyles(DocumentElement, 1.0);
+        if (ZoomBakeActive)
+            ApplyZoomSerializationStyles(DocumentElement, 1.0);
         ApplySerializationTransforms();
         return HtmlSerializer.Serialize(
             DocumentElement,
@@ -59,11 +60,23 @@ public sealed partial class DomBridge
         // it is idempotent once baked (the `zoom` property is stripped), so repeat calls on
         // the render path are no-ops. Must run before the guarded pseudo/progress transforms,
         // which depend on the baked sizes.
-        ApplyZoomSerializationStyles(DocumentElement, 1.0);
+        if (ZoomBakeActive)
+            ApplyZoomSerializationStyles(DocumentElement, 1.0);
         ApplySerializationTransforms();
         ReflectRenderState(DocumentElement);
         return _document;
     }
+
+    /// <summary>
+    /// Whether the element-<c>zoom</c> serialization bake (<see cref="ApplyZoomSerializationStyles"/>)
+    /// runs. The bake and the engine used-value model (<c>Broiler.Layout.Engine.NativeZoom</c>,
+    /// increments 1–5) are mutually exclusive: running both double-counts <c>zoom</c>, running neither
+    /// drops it. The engine flag is <c>[ThreadStatic]</c> and set on the layout thread; the bake mutates
+    /// the DOM thread-independently. So the bake is skipped exactly when the engine model is enabled on
+    /// this thread — the increment-6 cutover switch. Default (flag off) the bake runs, byte-identical to
+    /// before this gate.
+    /// </summary>
+    private static bool ZoomBakeActive => !Broiler.Layout.Engine.NativeZoom.Enabled;
 
     /// <summary>
     /// RF-BRIDGE-1b render-doc/live-doc separation: restores the live document's zoom-baked

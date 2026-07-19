@@ -144,8 +144,27 @@ reftest corpus exists.
   engine path).* Note `Zoomed_Client_Stays_Unzoomed_After_A_Snapshot_Build` specifically exercises
   the `_zoomSerializationRevertLog` behaviour being deleted; re-verify (it should still hold — with
   no bake there is no destructive live-doc mutation to revert).
-- [ ] **P4** A/B equivalence harness written and green across the corpus above. **Engine-coverage
-  audit done 2026-07-19** (the input to P4): every property in the bake's
+- [ ] **P4** A/B equivalence harness **written and RUN 2026-07-19 — it found a flip-blocking divergence.**
+  `Broiler.Cli.Tests/ZoomBakeVsEngineEquivalenceTests` renders a zoom corpus through both paths (Path A =
+  `NativeZoom` off / bake; Path B = `NativeZoom` on / engine, the bake now skipped via the new
+  `DomBridge.ZoomBakeActive` gate) and compares CSSOM box geometry (`offset*`/`client*`/`getBoundingClientRect`).
+  **Result: the two models AGREE for absolute lengths, nested zoom, abspos insets, margins/border,
+  absolute-length `line-height`, and the no-zoom control (6 cases equivalent), but DIVERGE for relative
+  units and `calc()` — `%`, `em`, `rem`, and `calc(px + %)`** (e.g. `width:50%` of a 200px CB under
+  `zoom:2` → bake `offsetWidth` 50 vs engine 100; `2rem` → 16 vs 32; `3em`@10px → 60 vs 30;
+  `calc(50px + 10%)` → 45 vs 90). These are exactly the "`%`-vs-`px`-vs-`em` / own-vs-effective factor"
+  distinctions this runbook calls the correctness-sensitive core. The divergences are pinned as documented
+  `*_Diverges_BlocksFlip` catalogue tests (both observed values asserted, so any future reconciliation is
+  regression-visible). **The flip is therefore NOT behaviour-preserving and must not be executed until the
+  two models are reconciled for relative units** — decide the correct model against a Chrome reference (there
+  is no reftest corpus here), then align the engine or the bake so A ≈ B across the whole corpus. (The
+  engine's `offsetWidth = 100` for `50%`-of-200 looks the more spec-correct, but "looks correct" is not a
+  reference — this needs a real oracle before flipping.) The **bake-gating itself has landed** (`ZoomBakeActive`
+  → the bake is skipped exactly when `NativeZoom` is enabled on the layout thread; default-off it is
+  byte-identical, verified against the standing zoom Cli suite), so the cutover switch is in place and
+  reversible; only the model reconciliation + P2 scoping remain.
+
+  **Engine-coverage audit done 2026-07-19** (the earlier input to P4): every property in the bake's
   `ZoomScaledSerializationProperties` list was cross-checked against the engine used-value model —
   all are now covered behind the flag **except two that are safe to drop**:
   `scroll-padding-*`/`scroll-margin-*` (absent from `Broiler.Layout` layout; the only consumer,
@@ -157,12 +176,15 @@ reftest corpus exists.
   (`ApplyZoomToLineHeight`: absolute-length line-height × `EffectiveZoom`, unitless/`%`/font-relative
   left to the zoomed font basis; flag-gated). Pinned by
   `ZoomLineHeightAndCalcTests.AbsoluteLineHeight_*` / `UnitlessLineHeight_IsNotReScaled_ByZoomHelper`.
-  So the used-value model now reproduces the bake for every rendered property; the remaining P4 work
-  is to build the harness and run the equivalence across the corpus before the atomic flip.
+  The used-value model reproduces the bake for every *absolute*-length rendered property — but the A/B
+  harness (above) then showed it does **not** for `%`/`em`/`rem`/`calc`, which is the open P4 blocker.
 
 **Status 2026-07-19:** P1 is complete (patches + pointers landed; calc parent wiring re-added). The
-engine-coverage audit (the P4 input) is done and closed its one real gap (line-height). The
-remaining gate is **P2** (scope `NativeZoom.Enabled` at every layout consumer of bridge output) and
-the **P4** A/B harness; the flip itself stays unexecuted until both are green, because it is a
-production-render change with no reftest corpus (per this runbook's original P4 warning). When P2 and
-P4 are checked, execute "The flip" above as a single commit.
+bake-gating (`ZoomBakeActive`) has landed (default-off byte-identical), so the cutover switch is in
+place. The P4 A/B harness is **written and run — and it surfaced a hard blocker**: the bake and engine
+`zoom` models diverge for **relative units and `calc()`** (`%`/`em`/`rem`), so the flip is not
+behaviour-preserving and stays **unexecuted**. Remaining before the flip: **(R)** reconcile the two
+models for relative units against a Chrome reference (align engine or bake so the `*_Diverges_BlocksFlip`
+catalogue collapses to equivalence), then **(P2)** scope `NativeZoom.Enabled` at every layout consumer of
+bridge output. Only when the full corpus is A ≈ B **and** P2 is done should "The flip" above be executed
+as a single commit.

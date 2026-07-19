@@ -1092,6 +1092,27 @@ consumer of bridge output (geometry snapshot, WPT render, product capture), not 
 A/B harness. The atomic flip stays unexecuted until both are green (production-render change, no reftest
 corpus). See `docs/roadmap/zoom-native-cutover.md` for the updated checklist.
 
+**Landed (2026-07-19) — increment-6 P4: the A/B equivalence harness is built and RUN, and it found a
+flip-blocking divergence.** Two pieces landed. (1) The **bake-gating**: `SerializeToHtml` /
+`GetRenderDocument` now skip `ApplyZoomSerializationStyles` when `DomBridge.ZoomBakeActive`
+(`= !NativeZoom.Enabled`) — the increment-6 cutover switch, so the bake runs exactly when the engine model
+is *off* and vice-versa. Default (flag off) it is byte-identical (verified: the standing zoom Cli suite is
+unchanged, 22 pass / 5 env fails). (2) The **A/B harness**,
+`Broiler.Cli.Tests/ZoomBakeVsEngineEquivalenceTests`, renders a zoom corpus through both paths (Path A =
+bake, Path B = engine with the bake gated off) and compares CSSOM box geometry
+(`offset*`/`client*`/`getBoundingClientRect`). **Finding:** the two models are equivalent for **absolute
+lengths, nested zoom, abspos insets, margins/border, absolute-length `line-height`, and no-zoom** (6 cases),
+but **DIVERGE for `%`, `em`, `rem`, and `calc(px + %)`** under zoom — e.g. `width:50%` of a 200px CB under
+`zoom:2` reports `offsetWidth` 50 (bake) vs 100 (engine); `2rem` → 16 vs 32; `3em`@10px → 60 vs 30;
+`calc(50px + 10%)` → 45 vs 90. These are the "`%`-vs-`px`-vs-`em` / own-vs-effective factor" distinctions
+the roadmap calls the correctness-sensitive core, and Path A is the *unchanged current default*, so the
+divergence is a real bake-vs-engine model difference, not a gating artefact. The four divergences are pinned
+as `*_Diverges_BlocksFlip` catalogue tests (both observed values asserted → regression-visible). **Net: the
+zoom flip is NOT behaviour-preserving for relative units and must not be executed** until the two models are
+reconciled against a Chrome reference (align engine or bake so the catalogue collapses to equivalence), on
+top of the still-open P2 (scope the flag at every layout consumer). The bake-gating + harness land safely
+(default-off byte-identical) and de-risk the flip by making the blocker precise and testable.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 
