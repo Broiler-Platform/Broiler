@@ -1970,6 +1970,24 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
+Status: **P4.16 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
+4/5, next tractable cluster: reuse canonical `DomNode.GetRootNode()` for the bridge's absolute-root walks.**
+The neutral-tree-algorithm reuse cluster (the P4.8–4.12 pattern), scoped to the reuses whose canonical method
+is already **public** (no submodule push). Canonical `GetRootNode()` (`Broiler.Dom/DomNode.cs:243`) is the
+identical `while (ParentNode is not null)` climb the bridge open-coded in two places, so both now delegate:
+`GetOwningDocument` (`Utilities.cs`, 21 callers — `ownerDocument`, hit-test viewport, base-URL frame recovery)
+becomes `node.GetRootNode() as DomDocument ?? node.OwnerDocument`, and `GetTreeRoot` (`ShadowDom.cs`, behind the
+`INodeRelationshipsHost`/`INodeAccessorsHost` `getRootNode()` + `compareDocumentPosition` bindings) becomes
+`node.GetRootNode()`. Byte-identical (same walk); no public-API change; −4 net lines of duplicated traversal.
+The third candidate, `ChildIndexOf` → canonical `IndexOfReference`, is **not** in-repo: `IndexOfReference` lives
+on the `internal` `DomNodeCollectionExtensions`, so promoting it needs the extension made public — a submodule
+push (403 → patch, the P4.9/P4.10 shape) — so the loop stays, with a note at the call site. The `ParentEl`-based
+topmost-*element* walks (`Css.GetDocumentRootFor`, `AnimationResolver`) stay too: they climb element parents and
+stop at shadow roots, which is not `GetRootNode`'s document/fragment semantics. Validation: builds clean; the
+`OwnerDocRootRemoval` (ownerDocument across main / detached / sub-document / iframe-content regimes + the iframe
+hit-test viewport guard), `SubdocRootGuardRemoval`, `NodeRelationshipsBindingModule` (`getRootNode`,
+`compareDocumentPosition`) suites pass (20/20).
+
 Status: **P4.15 — item 5 (`Normalize` / `CloneDomElement` canonical swaps) investigated; both remain blocked,
 with the precise blockers and unblock paths now established** 2026-07-19 (branch
 `claude/htmlbridge-complexity-reduction-4ho9hr`). A deep, code-grounded run at the two remaining item-5 swaps.

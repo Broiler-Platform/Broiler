@@ -265,7 +265,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         element.ChildNodes[index.GetOffset(element.ChildNodes.Count)];
 
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
-    /// (old <c>Children.IndexOf</c>, reference equality).</summary>
+    /// (old <c>Children.IndexOf</c>, reference equality). Phase 4 item 4/5: canonical
+    /// <c>Broiler.Dom.DomNodeCollectionExtensions.IndexOfReference</c> is the byte-identical scan, but it
+    /// is <c>internal</c> to the submodule — promoting this delegation is gated on making it public
+    /// (a submodule push, per the P4.9/P4.10 pattern), so the loop stays for now.</summary>
     internal static int ChildIndexOf(DomNode element, DomNode child)
     {
         for (var i = 0; i < element.ChildNodes.Count; i++)

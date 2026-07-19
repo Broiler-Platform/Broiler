@@ -54,16 +54,11 @@ public sealed partial class DomBridge
         return null;
     }
 
-    private DomNode GetTreeRoot(DomNode node)
-    {
-        DomNode current = node;
-        // Walk to the absolute root. For a connected node this is the canonical DomDocument
-        // (Phase 4: the document root is the DomDocument, not a #document wrapper element); a
-        // detached subtree roots to its topmost node (returned as a DomNode).
-        while (current.ParentNode is { } parent)
-            current = parent;
-        return current;
-    }
+    // Walk to the absolute root. For a connected node this is the canonical DomDocument (Phase 4: the
+    // document root is the DomDocument, not a #document wrapper element); a detached subtree roots to its
+    // topmost node. Phase 4 item 4/5: this is exactly canonical DomNode.GetRootNode(), so delegate to it
+    // rather than re-implement the `while ParentNode` climb.
+    private DomNode GetTreeRoot(DomNode node) => node.GetRootNode();
 
     private JSValue ToJSRootNode(DomNode root)
     {

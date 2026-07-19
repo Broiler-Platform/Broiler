@@ -295,13 +295,11 @@ public sealed partial class DomBridge
     /// set at construction/adoption (a sub-document's <c>createElement</c> node was adopted into its
     /// content document; every other node was minted from the main <c>_document</c>).
     /// </summary>
-    internal static DomDocument GetOwningDocument(DomNode node)
-    {
-        DomNode root = node;
-        while (root.ParentNode is { } parent)
-            root = parent;
-        return root as DomDocument ?? node.OwnerDocument;
-    }
+    internal static DomDocument GetOwningDocument(DomNode node) =>
+        // Phase 4 item 4/5: the absolute-root walk is canonical DomNode.GetRootNode() (the identical
+        // `while ParentNode` climb); a connected node roots to its DomDocument, a detached one falls
+        // back to the canonical owner-document set at construction/adoption.
+        node.GetRootNode() as DomDocument ?? node.OwnerDocument;
 
     /// <summary>
     /// Clones a <see cref="DomElement"/>. When <paramref name="deep"/> is true,
