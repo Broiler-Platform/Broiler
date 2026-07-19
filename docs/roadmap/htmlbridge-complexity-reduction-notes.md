@@ -1175,8 +1175,21 @@ the full Cli `~Zoom` suite keeps only its 3 standing font-metric + 2 render-bake
 `ZoomBakeVsEngineEquivalenceTests` was reworked from `*_Diverges_BlocksFlip` (documenting the bug) to
 `*_ReadIsEngineUsedValue` (pinning the fixed value) + `*_ReadIsStable` (the read is now independent of the
 render-only flag). This banks the read-side correctness of the LayoutSnapshot endgame; only the render-side
-flip (delete the bake) remains, still gated on P2 render-consumer scoping + render validation (no zoom
-reftest corpus).
+flip (delete the bake) remains.
+
+**Landed (2026-07-19) — the render-side A/B validation is done (engine render proven correct, incl. relative
+units).** The "no zoom reftest corpus" claim was wrong: there are 16 `Wpt_CssViewport_Zoom*_MatchesReference`
+pixel reftests (all green). A new `WptTestRunner.NativeZoom` lever (default off → byte-identical; mirrors
+`NativeAnchorPlacement`) enables the engine used-value model around the WPT serialize+render
+(`RenderHtmlFileBitmap`), so the bake is skipped and the engine renders. New
+`Wpt_CssViewport_Zoom{Basic,Percentage,Em}_EngineRender_MatchesReference` tests render the zoom cases through
+the **engine** and assert they match the same hand-authored references the baked path matches — **absolute
+plus the `%`/`em` cases the bake mis-handled** — and all pass; the existing 16 reftests are unchanged
+(lever default-off). So the cutover's correctness is now validated end-to-end on **both** the read (CSSOM)
+and render (pixel) sides. What remains for deleting the bake is purely a **deployment** gate: enabling
+`NativeZoom` at every consumer that lays out bridge serialized output — WPT (done, via the lever) and the
+product capture path (`CaptureService` hands HTML to an external renderer this container can't scope), an
+environment concern rather than a correctness or patch one.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.

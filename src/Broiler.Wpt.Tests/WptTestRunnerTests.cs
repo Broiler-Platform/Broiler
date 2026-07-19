@@ -1297,6 +1297,63 @@ input {
             $"zoom basic should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
+    // ---- Render-side A/B validation for the increment-6 zoom cutover ------------------------------
+    // These render the zoom TEST html through the ENGINE used-value model (WptTestRunner.NativeZoom on,
+    // so the serialize bake is skipped and the engine scales used values) and assert it matches the same
+    // hand-authored REFERENCE the baked path matches. Passing proves the engine render reproduces the
+    // correct pixels for the corpus — the render-side half of the cutover's A/B gate — INCLUDING the
+    // relative units (%, em) the old serialization bake mis-handled on the read path.
+    private WptTestResult RunZoomEngineMatch(string testHtml, string referenceHtml, string namePrefix)
+    {
+        var prev = WptTestRunner.NativeZoom;
+        WptTestRunner.NativeZoom = true;
+        try { return RunTempMatchTest(testHtml, referenceHtml, namePrefix); }
+        finally { WptTestRunner.NativeZoom = prev; }
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomBasic_EngineRender_MatchesReference()
+    {
+        // Absolute lengths: zoom:2 on a 40px box renders 80px.
+        var testHtml = @"<!DOCTYPE html><html><head><style>
+    html, body { margin: 0; padding: 0; }
+    div { width: 40px; height: 40px; background: green; }
+    #zoomed { zoom: 2; }
+</style></head><body><div></div><div id=""zoomed""></div></body></html>";
+        var referenceHtml = @"<!DOCTYPE html><html><head><style>
+    html, body { margin: 0; padding: 0; }
+    #first { width: 40px; height: 40px; background: green; }
+    #second { width: 80px; height: 80px; background: green; }
+</style></head><body><div id=""first""></div><div id=""second""></div></body></html>";
+        var result = RunZoomEngineMatch(testHtml, referenceHtml, "zoom-engine-basic");
+        Assert.True(result.Passed, $"engine render (absolute zoom) should match reference. Match={result.MatchPercent:F1}% {result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomPercentage_EngineRender_MatchesReference()
+    {
+        // Percentage under zoom: zoom:2; width:50% of a 200px CB → 100px content → renders 200px wide.
+        // (The old serialization bake mis-scaled this on the CSSOM read path; the engine renders it right.)
+        var testHtml = @"<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0}</style></head>
+<body><div style=""width:200px""><div style=""zoom:2;width:50%;height:20px;background:blue""></div></div></body></html>";
+        var referenceHtml = @"<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0}</style></head>
+<body><div style=""width:200px;height:40px;background:blue""></div></body></html>";
+        var result = RunZoomEngineMatch(testHtml, referenceHtml, "zoom-engine-percent");
+        Assert.True(result.Passed, $"engine render (percentage zoom) should match reference. Match={result.MatchPercent:F1}% {result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomEm_EngineRender_MatchesReference()
+    {
+        // em under zoom: zoom:2; width:3em/height:2em at font-size:10px → 30x20 content → renders 60x40.
+        var testHtml = @"<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0}</style></head>
+<body><div style=""font-size:10px""><div style=""zoom:2;width:3em;height:2em;font-size:10px;background:blue""></div></div></body></html>";
+        var referenceHtml = @"<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0}</style></head>
+<body><div style=""width:60px;height:40px;background:blue""></div></body></html>";
+        var result = RunZoomEngineMatch(testHtml, referenceHtml, "zoom-engine-em");
+        Assert.True(result.Passed, $"engine render (em zoom) should match reference. Match={result.MatchPercent:F1}% {result.Message}");
+    }
+
     [Fact]
     public void Wpt_CssViewport_ZoomInherited_MatchesReference()
     {

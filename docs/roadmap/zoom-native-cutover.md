@@ -194,7 +194,19 @@ pinned by `SharedGeometryZoomSizeTests`) already decides it.
   (only the 3 standing font-metric + 2 render-bake env-fails remain), and `ZoomBakeVsEngineEquivalenceTests`
   now pins the correct engine read values (`*_ReadIsEngineUsedValue`) instead of documenting the divergence.
   The render/serialize path still bakes (called directly, not via the snapshot), so this is read-side only.
-- **Remaining — the render-side flip** (delete the bake). Still needs **(P2)** `NativeZoom` scoped at the
-  render/serialize consumers (capture / WPT) and **render validation** — and note the render bake is likely
-  *also* buggy for relative-unit *pixels*, so the engine render would change (fix) those, with no zoom reftest
-  corpus to confirm the magnitude. That is the remaining gated piece; the read-side correctness win is banked.
+- **DONE — the render-side A/B validation (the P4 render gate).** There *is* a zoom pixel-reftest corpus
+  after all (16 `Wpt_CssViewport_Zoom*_MatchesReference`, all green). A new `WptTestRunner.NativeZoom` lever
+  (default off → byte-identical; mirrors `NativeAnchorPlacement`) enables the engine used-value model around
+  the WPT serialize+render (`RenderHtmlFileBitmap`), so the bake is skipped and the engine renders. The new
+  `Wpt_CssViewport_Zoom{Basic,Percentage,Em}_EngineRender_MatchesReference` tests render the zoom cases
+  through the engine and assert they match the same hand-authored references the baked path matches —
+  **absolute AND the relative units (`%`, `em`) the bake mishandled.** All pass; the existing 16 reftests are
+  unchanged (lever default-off). So the engine render is proven correct for the corpus: the cutover's
+  correctness is now validated end-to-end on **both** the read (CSSOM) and render (pixel) sides.
+- **Remaining — the render-side flip** (delete the bake): now only a **deployment** gate, not a correctness
+  one. `NativeZoom` must be enabled at every consumer that lays out bridge serialized output — WPT render
+  (done, via the lever) and, critically, the **product capture path** (`CaptureService` bakes via
+  `SerializeToHtml`, then hands the HTML to an *external* renderer this container can't scope or validate).
+  Until that consumer is covered — an environment/deployment concern, not a patch or a correctness question —
+  the bake stays as the carry-through for any renderer that doesn't enable `NativeZoom`. Correctness is banked
+  on both sides; only the multi-consumer deployment scoping of the flag remains.
