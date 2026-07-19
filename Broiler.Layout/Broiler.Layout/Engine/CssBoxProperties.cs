@@ -2024,7 +2024,7 @@ internal abstract partial class CssBoxProperties
     /// re-scaled; when it is the containing block (width/height/insets), the percentage carries only the
     /// ancestor zoom and needs the box's own <see cref="OwnZoom"/> to reach the effective factor.
     /// </param>
-    private double ApplyZoomToLength(string length, double resolved, bool percentAgainstContainingBlock = false)
+    internal double ApplyZoomToLength(string length, double resolved, bool percentAgainstContainingBlock = false)
     {
         if (!NativeZoom.Enabled)
             return resolved;
@@ -2282,7 +2282,7 @@ internal abstract partial class CssBoxProperties
             BorderLeftColor = BorderTopColor = BorderRightColor = BorderBottomColor = color;
     }
 
-    protected void MeasureWordSpacing(ILayoutEnvironment g)
+    protected internal void MeasureWordSpacing(ILayoutEnvironment g)
     {
         if (!double.IsNaN(ActualWordSpacing))
             return;
@@ -2293,7 +2293,9 @@ internal abstract partial class CssBoxProperties
             return;
 
         string len = RegexParserUtils.Search(RegexParserUtils.CssLengthRegex(), WordSpacing);
-        ActualWordSpacing += CssLengthParser.ParseLength(len, 1, GetEmHeight());
+        // word-spacing is a used length: scale it by the box's zoom (absolute × EffectiveZoom; an em term
+        // already rides the zoomed font via GetEmHeight). Inert while NativeZoom is off — byte-identical.
+        ActualWordSpacing += ApplyZoomToLength(len, CssLengthParser.ParseLength(len, 1, GetEmHeight()));
     }
 
     protected void InheritStyle(CssBox p, bool everything)

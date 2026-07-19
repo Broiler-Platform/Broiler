@@ -992,10 +992,32 @@ the pseudo materialiser does and asserts: zoom inherited **exactly once** (not d
 tests. This closes increment 5's paint residue: outline, border-radius, text-shadow (patch 0002), SVG
 attributes (patch 0003), and pseudo are all handled behind the flag.
 
-**Remaining follow-up (bounded, main-repo)**: **`letter-spacing`/`word-spacing`** — they *do* feed text
-layout (`MeasureWordSpacing` / `CssUtils.WhiteSpace`) and are entangled with the whitespace-advance
-measurement (a two-site add through `ParseLength(..., fontAdjust)`), so scaling them safely needs a focused
-text-measurement pass rather than a one-line getter wrap.
+**Landed (2026-07-19) — increment 5 follow-up: `word-spacing` (main-repo).** `word-spacing` feeds the
+per-word-gap advance (`ActualWordSpacing`, used across line layout / intrinsic sizing), and it is built at
+**two** sites — the base `CssUtils.WhiteSpace` (whitespace-glyph width + a `word-spacing` term) and the
+`MeasureWordSpacing` add — where `WhiteSpace` is only ever called from `MeasureWordSpacing`. Rather than
+disturb that pre-existing two-term measurement, both `word-spacing` `ParseLength` results now route through
+`ApplyZoomToLength`, so the whole advance scales by `EffectiveZoom` (absolute × zoom; an `em` term rides the
+already-zoomed `GetEmHeight`), while the whitespace-glyph part scales through the zoomed font on its own. To
+reach the helper from the static `CssUtils.WhiteSpace`, `ApplyZoomToLength` was widened `private` → `internal`;
+`MeasureWordSpacing` was widened `protected` → `protected internal` so `ActualWordSpacing` is directly
+testable. Inert while `NativeZoom` is off → byte-identical (verified: the text-measurement Cli subset fails
+the identical 7 pre-existing Skia/font/network environmental tests with and without this change). Pinned by
+`ZoomWordSpacingTests` (absolute advance ×`EffectiveZoom`; `em` rides the zoomed font once; disabled =
+unscaled). Zero regression: 256 engine layout tests. **`letter-spacing` is a non-issue** — a tree-wide search
+finds it nowhere in `Broiler.Layout`/`Broiler.HTML`; the engine does not lay it out or paint it at all (it
+lives only in the bake's serialization list), so there is nothing to scale, like the unimplemented element
+box-shadow.
+
+**Increment 5 is complete** — every paint-and-text residue the bake covers is now handled behind the flag:
+outline, border-radius, text-shadow (patch 0002), SVG attributes (patch 0003), pseudo-elements (inherited,
+verified), and word-spacing.
+
+**Remaining zoom increments**: (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles` — once the
+three submodule paint patches (`patches/0001`–`0003`) are applied and their pointers bumped, so the flag-on
+engine matches the bake before the bake is removed. The `%`-vs-`px`-vs-`em` and *own*-vs-*effective* factor
+distinctions (increments 2–3) are the intricate, correctness-sensitive core — which is why this is "the large
+piece" and is being landed incrementally behind the flag.
 
 **Remaining zoom increments**: (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles` — once the
 three submodule paint patches (`patches/0001`–`0003`) are applied and their pointers bumped, so the flag-on
