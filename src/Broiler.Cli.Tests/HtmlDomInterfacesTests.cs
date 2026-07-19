@@ -62,6 +62,37 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,radio", result);
     }
 
+    [Fact]
+    public void Input_Value_And_Checked_Survive_CloneNode()
+    {
+        // Exercises the consolidated cloneNode bridge-runtime-state copy
+        // (DomBridge.CopyBridgeRuntimeStateTo -> FormControlRuntimeState.CopyTo): the source's
+        // script-set value (not reflected to the value= attribute) and checked state must both
+        // survive onto the clone, and the clone must be independent of later source mutations.
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input id=""t"" type=""text"" />
+<input id=""c"" type=""checkbox"" />
+<div id=""result""></div>
+<script>
+var r = [];
+var t = document.getElementById('t');
+var c = document.getElementById('c');
+t.value = 'hello';
+c.checked = true;
+var tClone = t.cloneNode(false);
+var cClone = c.cloneNode(false);
+t.value = 'changed';           // must not leak into the already-taken clone
+r.push(tClone.value);          // hello
+r.push(cClone.checked);        // true
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("hello,true", result);
+    }
+
     // ────────────────────── 7.2: className whitespace preservation ──────────────────────
 
     [Fact]

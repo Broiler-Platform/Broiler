@@ -190,21 +190,18 @@ public sealed partial class DomBridge
 
     private void CollectWindowFrames(DomElement element, List<JSValue> frames)
     {
-        foreach (var child in ChildElements(element))
+        // Phase 4 item 4/5: reuse canonical Descendants() (public, document-order, level-snapshotted)
+        // instead of a hand-rolled depth-first ChildElements recursion. Sub-documents are severed
+        // (P4.4b) — never in-tree children — so the walk never crosses a frame boundary, and a nested
+        // iframe's content (its own sub-document) is not a descendant here, matching the old walk.
+        foreach (var child in element.Descendants().OfType<DomElement>())
         {
-            if (IsText(child))
-                continue;
-
             if (string.Equals(child.TagName, "iframe", StringComparison.OrdinalIgnoreCase))
             {
                 var src = TryGetAttribute(child, "src", out var srcValue) ? srcValue : string.Empty;
                 if (!IsCrossOrigin(src, _pageUrl))
                     frames.Add(_subWindows.GetOrCreate(child));
             }
-
-            // Sub-documents are severed (P4.4b) — never in-tree children — so the walk always
-            // descends normal element children.
-            CollectWindowFrames(child, frames);
         }
     }
 }

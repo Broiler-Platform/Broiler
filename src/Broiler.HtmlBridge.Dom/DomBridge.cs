@@ -265,7 +265,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         element.ChildNodes[index.GetOffset(element.ChildNodes.Count)];
 
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
-    /// (old <c>Children.IndexOf</c>, reference equality).</summary>
+    /// (old <c>Children.IndexOf</c>, reference equality). Phase 4 item 4/5: canonical
+    /// <c>Broiler.Dom.DomNodeCollectionExtensions.IndexOfReference</c> is the byte-identical scan, but the
+    /// extension class is <c>internal</c> at the pinned submodule SHA; making it public ships as
+    /// <c>patches/0002-dom-make-domnodecollectionextensions-public.patch</c> (Broiler.DOM push 403'd). Once
+    /// applied + pointer-bumped, the follow-up is <c>=> element.ChildNodes.IndexOfReference(child)</c>; the
+    /// loop is the active fallback until then.</summary>
     internal static int ChildIndexOf(DomNode element, DomNode child)
     {
         for (var i = 0; i < element.ChildNodes.Count; i++)

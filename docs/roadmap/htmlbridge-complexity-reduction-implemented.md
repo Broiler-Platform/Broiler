@@ -10,10 +10,17 @@ document services, feature-module extraction, parallel-DOM-state elimination, an
 the move of used-value behaviour into Layout — including per-slice status entries,
 branches, tests and regression checks.
 
-**These phases are not all fully complete.** The bulk of each phase's planned
-work has landed, but several phases carry explicit deferred, blocked, or
-still-to-come residue, and a few exit criteria remain open. Read each phase's
-own status entries for the specifics; the summary below is the quick view.
+**These phases are complete to their in-scope terminal state; the residue that
+remains is externally gated.** The bulk of each phase's planned work has landed,
+and as of the 2026-07-19 reconciliation no further main-repo, in-session code
+change advances closure — what is left is strictly external: a maintainer applying
+the pending submodule patches (`Broiler.CSS`/`Broiler.HTML`/`Broiler.DOM`, out of
+session push scope → 403 → patch workflow) and bumping the pointers; an
+environment-config change (enabling `NativeZoom` at the `CaptureService` external
+renderer to delete the zoom bake); and the deliberately later-phase / out-of-scope
+items (Phase 6 Canvas `getContext`; the JS-engine simultaneous-session isolation).
+Read each phase's own status entries for the specifics; the summary below is the
+quick view.
 
 | Phase | Status | Open residue |
 |---|---|---|
@@ -21,8 +28,8 @@ own status entries for the specifics; the summary below is the quick view.
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
 | 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. |
-| 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
-| 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
+| 4 — eliminate parallel DOM state | Bulk delivered | Item 2: the serialize-time **baked style is now a distinct per-element overlay store**, split off the script-observable inline-style dict (P4.14 increments 1–3: anchor cluster + animation/synthetic/zoom bake writers seamed, then backed by a tombstone-aware overlay merged only at serialization) — verified byte-identical incl. the WPT anchor-position pixel corpus. `InlineStyleRuntimeState.Style` no longer carries bakes. Remaining: full-corpus WPT/Acid CI gate. Item 4/5 canonical reuses done (P4.8–4.12, P4.16–4.19; `IndexOfReference` visibility is pending `patches/0002`). `CloneDomElement` now delegates to canonical `CloneNode` (P4.20, verified byte-identical across ~14 clone suites). Item 5 reduces to `Normalize` alone — still blocked on driving the bridge's MutationObserver/NodeIterator/Range from canonical `DomDocument.Mutated` (P4.15). |
+| 5 — used-value behaviour into Layout | Bulk delivered; **in-scope terminal** | Anchor-track deletion complete through step 6. Feature (b) visual-viewport/zoom: read (CSSOM) **and** render (pixel) sides now validated on the engine used-value model (2026-07-19) — deleting the zoom bake is now only a *deployment* gate (enable `NativeZoom` at the external `CaptureService` renderer), plus the submodule-push-gated pinch render cutover (`patches/0001`). Feature (a) dialog/backdrop: native modal centering + modal box-chrome bake deletion landed; native `::backdrop` box + top-layer paint stay submodule-patch-gated. See the [2026-07-19 reconciliation](#reconciliation-2026-07-19--features-a-and-b-driven-to-their-in-scope-terminal-state). |
 
 Companion documents:
 
@@ -1962,6 +1969,276 @@ Exit criteria:
   133 tests with the guard) stays green.
 
 ### Phase 4 - eliminate parallel DOM state
+
+Status: **P4.20 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item 5:
+`CloneDomElement` now delegates the tree + attribute clone to canonical `DomNode.CloneNode`.** This closes the
+more tractable of the two P4.15 blocked swaps. `CloneDomElement` reimplemented cloning per node-kind — element
+via `CreateBridgeElementNS` (minted from the main `_document`) + a `SetAttribute`/`SetAttributeNS` copy loop,
+text/comment/doctype/fragment via the document factories, plus a recursive deep-clone. It now delegates to
+`source.CloneNode(deep)` (canonical `CloneShallow` handles every node kind — namespace + attribute set, text/
+comment data, doctype fields, fragment — and recurses in child order), and a new
+`CopyRuntimeStateForClonedSubtree` walks the source and clone in lockstep, applying the bridge's
+`CopyBridgeRuntimeStateTo` authority (P4.13 + the P4.14-inc3 baked overlay) to each element pair. Cloning does
+not mutate the live document, so — unlike `Normalize` — there is **no** MutationObserver/NodeIterator/live-range
+side-effect coupling, and the runtime-state gate was already retired, which is why this half was tractable.
+
+**The three P4.15 divergences turned out not to manifest** in the tested surface: canonical preserves the source
+owner document (vs the old mint-from-main-`_document`) and copies attribute keys verbatim (vs the old
+no-namespace `SetAttribute` lowercasing) — both spec-correct — and uses the `Name`-carrying `CloneShallow` ctor
+(namespace preserved). Verified byte-identical across a **comprehensive clone surface** (≈14 suites,
+stash-baseline-compared): general clone + form-control-state survival (`HtmlDomInterfaces`), whitespace/namespace
+(`NamespaceAndDomCore`), doctype (`DoctypeSentinelMigration`), fragment (`DocumentFragmentSentinelMigration`),
+deep-clone/Acid3 (`DomEventsEdgeCase`, `Acid3Regression`), **SVG attribute-case** (`SvgDomAndCrossDoc`,
+`SvgDomDynamicContent`, `Acid3SvgAndParsing`) and **sub-document owner-document** (`OwnerDocRootRemoval`,
+`SubdocRootGuardRemoval`) — **all 0 failures with the change, and 0 at baseline** for the divergence-sensitive
+SVG/owner-doc subset (so no regression, and no pre-existing failure masked). No public-API change; −30 net lines.
+There is no SVG WPT pixel subset in-repo, so the render gate here is the Cli SVG/Acid suites; the full WPT
+pixel + Acid CI corpus remains the belt-and-suspenders sign-off for a clone/render-adjacent change, consistent
+with the P4.15 note. **Item 5 now reduces to `Normalize` alone** (still blocked on the
+`DomDocument.Mutated`-subscription architecture — P4.15).
+
+Status: **P4.19 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
+4/5: reuse canonical `CompareBoundaryPoints` for `CompareTreeOrder` (the last document-order duplicate).**
+`DomBridge.CompareTreeOrder` (`Utilities.cs`, the tree-order step of `compareDocumentPosition`) reimplemented
+document order via a hand-rolled ancestor-chain divergence — the same order the P4.17 `IsPositionAfter` reuse
+routes through canonical `DomRange.CompareBoundaryPoints`. The tree order of two nodes is the order of the
+boundary points immediately before each, so it now delegates: `Math.Sign(CompareBoundaryPoints(firstParent,
+index(first), secondParent, index(second)))`. Its only caller (`CompareDocumentPosition`) already resolves the
+same-node / disconnected / ancestor-descendant cases before reaching it, so both nodes are same-tree,
+non-containing and parented; the retained `null`-parent / different-root guards preserve the old "0 when no
+ordering can be determined" contract and dodge `CompareBoundaryPoints`'s cross-tree `WrongDocument` throw for
+any other caller. In-repo (canonical method already public); no public-API change; −18 net lines. Verified
+regression-free: the `NodeRelationshipsBindingModule` + `HtmlDomInterfaces` (compareDocumentPosition) suites
+pass 53/53 and Acid3 (`DomEventsEdgeCase`) passes; the only failure in the range/traversal batch is the
+standing headless `Range_GetBoundingClientRect` geometry test (confirmed pre-existing).
+
+**Reuse thread status.** With P4.19 the clean canonical neutral-algorithm reuses are exhausted: `IsDescendantOf`
+(P4.8), `IsEqualNode`/`CommonAncestorWith` (P4.9/P4.10), `InclusiveDescendants` (P4.12), `GetRootNode` (P4.16),
+`CompareBoundaryPoints` (P4.17 + P4.19) and `Descendants` (P4.18) are all delegated; the one remaining public-
+visibility promotion (`IndexOfReference`) is the pending `patches/0002`. What is left in item 4/5 is the
+genuinely blocked pair — `Normalize` (needs the `DomDocument.Mutated`-subscription architecture) and
+`CloneDomElement` (three canonical-`CloneNode` divergences) — recorded under P4.15.
+
+Status: **P4.18 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
+4/5, descendant-collection cluster: reuse canonical `DomNode.Descendants()` for the hand-rolled depth-first
+element walks.** Four bridge helpers reimplemented a depth-first descendant-element recursion that canonical
+`Descendants()` (already **public**) provides — and which canonical documents as the bridge's own WPT #1143
+concurrent-mutation defensive idiom promoted to canonical (it snapshots each level via `_children.ToArray()`
+on the **real** child list, so it is document-order, mutation-safe, and free of the `LegacyChildList`
+projection overflow the per-level `SnapshotChildren` retry guarded). All four now iterate
+`root.Descendants().OfType<DomElement>()`: `CollectDescendantsByTag` (`Utilities.cs`, `getElementsByTagName`),
+`CollectStyleElements` (`StyleSheets.cs`, `document.styleSheets`), `CollectStyleElementsInTree` (`Css.cs`, the
+computed-style cascade's `<style>`/external-stylesheet collection) and `CollectWindowFrames` (`WindowLoad.cs`,
+`window.frames`). Byte-identical set + pre-order (`ChildElements` is exactly `ChildNodes.OfType<DomElement>()`
+with no `#`-filtering, shadow roots are not in-tree children, and severed sub-documents are not descendants —
+so the element set and order match); the three that iterated the **live** `ChildElements`
+(`CollectDescendantsByTag`/`CollectStyleElements`/`CollectWindowFrames`) additionally **gain** the canonical
+level-snapshot mutation-safety they lacked, and `CollectStyleElementsInTree` swaps its per-level
+`SnapshotChildren` for canonical's equivalent (which, on the real list, cannot hit the projection overflow the
+retry existed for). `SnapshotChildren` itself stays — it is the widely-used single-level primitive (anchor
+resolver, dialogs, animation, sub-documents). No submodule change (canonical method already public). No
+public-API change; −4 net lines. Verified regression-free: the `StyleSheetBindingModule` /
+`ComputedStyleBindingModule` / `HtmlDom` (getElementsByTagName) / `IframeElementBindingModule` (frames) /
+`CssImportantCascade` suites pass (51/51).
+
+Status: **P4.17 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
+4/5, document-position & child-index canonical-reuse cluster (submodule-gated half via the patch workflow).**
+Two neutral-algorithm reuses:
+
+- **`IsPositionAfter` → canonical `DomRange.CompareBoundaryPoints` (landed in-repo).** The bridge's
+  boundary-point "is A after B" comparison (`JsFunctionCallbacks/Common.cs`, behind `compareBoundaryPoints` /
+  `compareDocumentPosition`) reimplemented the DOM boundary-comparison algorithm that canonical
+  `DomRange.CompareBoundaryPoints` (already **public**) provides. Verified branch-for-branch equivalent for
+  **same-tree** points (same-container `offset` compare, either-descendant child-index compare, and
+  common-ancestor ordering all agree, so `IsPositionAfter ≡ CompareBoundaryPoints(...) > 0`), so the same-tree
+  path now delegates. The bridge's **deliberate cross-tree leniency** (its `compareBoundaryPoints` returns an
+  order via the document root rather than throwing `WrongDocument` as canonical does) is preserved verbatim by
+  guarding on `GetRootNode()` equality first. Deletes ~25 lines of duplicated descendant-walk / order logic.
+  No submodule change needed (canonical method already public). Verified regression-free — the
+  `DomTraversalAndRange` / `NodeRelationshipsBindingModule` (compareDocumentPosition) / `NamespaceAndDomCore`
+  suites pass, the one failure (`Range_GetBoundingClientRect_Includes_DisplayContents_Descendants`) is the
+  standing headless-geometry environmental failure, confirmed identical at baseline.
+- **`ChildIndexOf` → canonical `IndexOfReference` (submodule patch `0002`).** `IndexOfReference` (the
+  byte-identical reference-equality child-index scan `DomRange` uses) is on an `internal`
+  `DomNodeCollectionExtensions`; making it public is a one-line visibility change. The `Broiler.DOM` push
+  **returned 403** (out of session scope — contrary to the P4.12-era note that the `MaiRat/` redirect was
+  in-scope; the scope has since tightened), so per `CLAUDE.md` it ships as
+  `patches/0002-dom-make-domnodecollectionextensions-public.patch` with a `patches/README.md` entry, the
+  submodule pointer left **unbumped**, and `ChildIndexOf` keeping its manual loop as the active CI fallback.
+  The follow-up (delegate + delete the loop) lands once a maintainer applies the patch and bumps the pointer.
+  No main-repo behaviour change for this half.
+
+Status: **P4.16 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
+4/5, next tractable cluster: reuse canonical `DomNode.GetRootNode()` for the bridge's absolute-root walks.**
+The neutral-tree-algorithm reuse cluster (the P4.8–4.12 pattern), scoped to the reuses whose canonical method
+is already **public** (no submodule push). Canonical `GetRootNode()` (`Broiler.Dom/DomNode.cs:243`) is the
+identical `while (ParentNode is not null)` climb the bridge open-coded in two places, so both now delegate:
+`GetOwningDocument` (`Utilities.cs`, 21 callers — `ownerDocument`, hit-test viewport, base-URL frame recovery)
+becomes `node.GetRootNode() as DomDocument ?? node.OwnerDocument`, and `GetTreeRoot` (`ShadowDom.cs`, behind the
+`INodeRelationshipsHost`/`INodeAccessorsHost` `getRootNode()` + `compareDocumentPosition` bindings) becomes
+`node.GetRootNode()`. Byte-identical (same walk); no public-API change; −4 net lines of duplicated traversal.
+The third candidate, `ChildIndexOf` → canonical `IndexOfReference`, is **not** in-repo: `IndexOfReference` lives
+on the `internal` `DomNodeCollectionExtensions`, so promoting it needs the extension made public — a submodule
+push (403 → patch, the P4.9/P4.10 shape) — so the loop stays, with a note at the call site. The `ParentEl`-based
+topmost-*element* walks (`Css.GetDocumentRootFor`, `AnimationResolver`) stay too: they climb element parents and
+stop at shadow roots, which is not `GetRootNode`'s document/fragment semantics. Validation: builds clean; the
+`OwnerDocRootRemoval` (ownerDocument across main / detached / sub-document / iframe-content regimes + the iframe
+hit-test viewport guard), `SubdocRootGuardRemoval`, `NodeRelationshipsBindingModule` (`getRootNode`,
+`compareDocumentPosition`) suites pass (20/20).
+
+Status: **P4.15 — item 5 (`Normalize` / `CloneDomElement` canonical swaps) investigated; both remain blocked,
+with the precise blockers and unblock paths now established** 2026-07-19 (branch
+`claude/htmlbridge-complexity-reduction-4ho9hr`). A deep, code-grounded run at the two remaining item-5 swaps.
+One prior premise is now **stale in the bridge's favour**: bridge text/comment nodes are already canonical
+`Broiler.Dom.DomText`/`DomComment` (`CreateBridgeTextNode` → `_document.CreateTextNode`, `IsText` is
+`NodeType == Text`), so canonical `DomNode.Normalize()`/`CloneNode()` *would* recognise them — the old
+homogeneous-`DomElement`-facade blocker is gone. What actually blocks each swap:
+
+- **`Normalize` — blocked by the bridge-native side-effect system (architectural).** `NormalizeNode`
+  (`HtmlFragmentMutation.cs`) coalesces text via `RemoveChildAt`, which fires the bridge's **pre-removal**
+  `NotifyNodeIteratorPreRemoval` + `NotifyChildRemoved` (MutationObserver) + `InvalidateStyleScope`. The
+  bridge's MutationObserver/NodeIterator/live-range are **bridge-native** (`MutationObserverHub`, driven by
+  explicit `Notify*` calls) and do **not** subscribe to canonical `DomDocument.Mutated` — only
+  `DocumentStyleContext` does. Canonical `DomNode.Normalize()` (`Broiler.Dom/DomNode.cs:312`) removes then
+  **publishes post-removal** `DomMutationRecord`s to `Mutated`; a post-removal record cannot reconstruct the
+  bridge's *pre-removal* NodeIterator notification, and the bridge observers never see `Mutated` anyway. So a
+  swap would silently drop NodeIterator adjustment, MutationObserver `childList` records, and style
+  invalidation. **Unblock path:** drive the bridge's MutationObserver/NodeIterator/Range subsystems from
+  `DomDocument.Mutated` (as canonical `DomTraversal`/`DomRange` already do — they subscribe at
+  `DomTraversal.cs:215` / `DomRange.cs:38`), retiring the hand-rolled `Notify*` wrappers; then `Normalize`
+  (and every other mutation) delegates to canonical for free. This is a cross-cutting subsystem change on the
+  mutation hot path — its own multi-step track, gated on the full WPT/Acid corpus, not a behaviour-preserving
+  single increment.
+
+- **`CloneDomElement` — the runtime-state gate is retired, but canonical `CloneNode` has three DOM-semantics
+  divergences to reconcile first.** Cloning does **not** mutate the document, so it has *no* side-effect
+  coupling; and the runtime-state copy is now isolated behind one authority (`CopyBridgeRuntimeStateTo`, P4.13,
+  incl. the P4.14-inc3 baked overlay), so the swap shape is `source.CloneNode(deep)` + a lockstep
+  source/clone walk calling `CopyBridgeRuntimeStateTo` per element pair. What still blocks a *behaviour-preserving*
+  swap, each a real divergence between the current hand-rolled clone and canonical `DomElement.CloneShallow`
+  (`Broiler.Dom/DomElement.cs:94`): (1) **owner document** — the bridge mints clones from the main `_document`
+  (`CreateBridgeElementNS`), canonical `CloneNode` clones into `source.OwnerDocument`, differing for
+  sub-document nodes; (2) **attribute case** — the bridge re-copies no-namespace attributes through
+  `SetAttribute` (which lowercases), canonical copies the stored key verbatim, so any parser-stored
+  case-preserved attribute (e.g. SVG `viewBox`) can diverge; (3) **shallow-ctor namespace/registration** parity
+  (`new DomElement(ownerDocument, Name)` vs the `CreateElementNS` funnel). Each is unit-testable (the
+  Namespace / SVG / Acid3-SVG / clone suites cover them), so this swap is the more tractable of the two — but it
+  is a delicate rewrite of a correct method whose attribute-case divergence is **render-relevant** (SVG
+  attribute case), so it needs the SVG + serialization + Acid corpus to sign off, not just the clone unit tests.
+
+**Net:** neither swap is a safe, in-container, behaviour-preserving single increment. `Normalize` needs the
+`DomDocument.Mutated`-subscription architecture; `CloneDomElement` needs the three divergences reconciled and a
+full SVG/serialization/Acid validation. Both are now specified concretely for a run with full CI, rather than
+left as the prior vague "side-effect / runtime-state coupling." No code change landed for P4.15 — deliberately,
+to avoid shipping an unvalidatable DOM-semantics change.
+
+Status: **P4.14 increment 3 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) —
+**work item 2, inline-style single authority: split the baked-style storage off the script-observable dict.**
+With every serialize-time bake write behind the `BakedInlineStyle` seam (increments 1–2), the writes now land
+in a per-element **baked overlay** (`_bakedStyleOverlays`, a `ConditionalWeakTable<DomElement,
+Dictionary<string, string?>>` in `AnchorResolver/BakedStyle.cs`) instead of `InlineStyleRuntimeState.Style`, so
+that dict is no longer polluted by bakes. A `null` overlay value is a **tombstone** — a bake resolver removing an
+authored/prior property (the animation resolver dropping the `animation` shorthand after baking longhands, the
+anchor resolver dropping `margin`/`padding`/`inset`, sticky dropping `bottom`/`right`) so the merged view
+excludes it. `BakedStyleMap` now writes to the overlay and reads the **merged** base ∪ overlay view (overlay
+wins, tombstones remove); the resolvers' cross-pass reads are unchanged by construction. The serializer's own
+effective-style reads — the `GetStyles` emit, `SyncStyleAttributeFromInlineStyle` (the `style=`-attribute
+write-back at `ReflectRenderState`), and the zoom / SVG-zoom source reads — route to the new
+`EffectiveInlineStyle(element)` (materialized merge) / `BakedInlineStyle(...).TryGetValue`, which are exactly the
+merge points; every other reader (script-CSSOM `element.style`, cascade cleanup, parse-time authored copy) stays
+on `InlineStyle` and is unaffected because it runs **pre-bake**, when the overlay is empty. `CloneDomElement`'s
+runtime-state copy (P4.13) also copies the overlay. **Why it's byte-identical:** bakes are strictly terminal
+(serialize-time, after all script/cascade writes), so applying the overlay last reproduces the old single-dict
+content exactly. **Validation:** builds clean; the anchor / position-area / position-try / sticky / animation /
+inline-style / CssStyleDeclaration / computed-style / CSSOM / synthetic-form-control / clone / dialog / SVG /
+cross-document Cli suites show a **failure set identical to baseline** (stash-compares), the three
+`DomBridge_SerializeToHtml_*` zoom/srcdoc failures are the standing environmental ones (no new), and — the render
+gate for a serialization-affecting change — the **WPT `css/css-anchor-position` pixel corpus is byte-identical
+between baseline and this change** (40 discovered → 32 pass / 7 fail / 1 skip, 97.98% average match, same failing
+names). The full-corpus WPT pixel + Acid run (beyond the anchor subset) is the remaining CI-only gate, but the
+terminal-bake argument makes the serialized output byte-identical for every element, not just anchor ones.
+**This completes the anchor-cluster item-2 elimination:** the parallel inline-style dict no longer carries baked
+geometry; `InlineStyleRuntimeState.Style` is the script/cascade authority and the baked overlay is a distinct
+serialize-time store. Still open: the non-cluster read-side (none observed — script surfaces already exclude
+bakes) and the item-5 `Normalize`/`CloneDomElement` swaps.
+
+Status: **P4.14 increment 2 completed** 2026-07-19 — **work item 2, route the remaining serialize-time bake writers through
+the `BakedInlineStyle` seam, so every bridge-internal bake write now goes through one chokepoint.** Investigation
+of the store-split target found the `Style` dict is a **multi-purpose scratch**, not just inline style: it holds
+script-set inline style (marked by `JsSetStyleProps`), lazily-seeded `style=`-attribute values, **CSS-cascade-derived
+values** (added by the cascade, stripped by `Css.InvalidateElementStyles`), and the serialize-time bakes. The
+script-observable surfaces already exclude bakes — `element.style` is rebuilt from the `style=` attribute + only the
+`JsSetStyleProps` keys (`StyleDeclarationBinding.BuildDeclaredInlineStyleMap`), and the computed-style author layer
+keeps only inline/JS-set keys — so the bakes are already logically separate on the read side; what's missing is a
+single write-side chokepoint and a clean storage split. A blind storage swap is unsafe (it touches every reader of
+this entangled dict and needs the full WPT pixel/Acid corpus, which can't run reliably in-container), so increment 2
+completes the **write** boundary: the animation-snapshot resolver (`AnimationResolver.cs`, a serialize-time bake
+resolver run beside `ResolveAnchorPositions`) is routed wholesale, and the synthetic-form-control (meter/progress) +
+zoom bake **writes** in `DomBridge.Serialization.cs` are routed, while the script path (`StyleDeclarationBinding`/
+`AttributesHost`, which write-throughs to the attribute), the parse-time authored-style copy (`HtmlParsing`), and the
+cascade cleanup (`Css.cs`) stay on `InlineStyle`. The four remaining `InlineStyle` reads in the serializer
+(`SyncStyleAttributeFromInlineStyle`, the two zoom source reads, and the final property emit) are exactly the
+**merge points** increment 3 will switch to a merged base∪overlay read when it backs `BakedInlineStyle` with a
+distinct baked-overlay store. Byte-identical (the wrapper still forwards to the same dict); no public-API change.
+Added `Count` to `BakedStyleMap`. Validation: `Broiler.HtmlBridge.Dom` builds clean; the Animation / Serialization /
+FormControl / NativeAnchor / InlineStyleWriteThrough Cli suites pass (110), and the 5 failures in that batch are a
+**byte-identical pre-existing set at baseline** (the three standing environmental `DomBridge_SerializeToHtml_*`
+zoom/srcdoc tests, the `HttpClientMigration` WebClient assembly guard, and the font-dependent
+`FormControlRenderTests.SelectListBox…WritingMode`) — confirmed by a stash-compare. **Increment 3 (not done):** the
+actual storage swap (baked overlay + serializer merge-point reads), then the non-cluster read-side + the item-5
+`Normalize`/`CloneDomElement` swaps.
+
+Status: **P4.14 in progress (increment 1)** 2026-07-19 — **work item 2, seam the anchor-resolver cluster off the raw dict.** The remaining
+item-2 work (fully eliminate the parallel inline-style `Style` dict) is a ~170-site rewrite, ~98 of them in the
+anchor-resolver cluster where the dict is used as **baked-geometry scratch** — the resolver reads an element's
+effective inline style and writes resolved position/insets/margins/borders/size, and those direct writes
+deliberately do **not** write-through to `getAttribute("style")` (unlike the `element.style` JS path, P4.7), so
+they don't leak mid-resolution. That dual-purpose use is exactly why the dict is a parallel store and why a
+blind route-to-attribute rewrite is wrong. This increment introduces the migration **seam** rather than
+swapping the store: a new `BakedInlineStyle(element)` accessor returns a `BakedStyleMap` value-wrapper
+(`AnchorResolver/BakedStyle.cs`) mirroring the exact dict surface the cluster uses (indexer get/set, `Remove`,
+`ContainsKey`, `TryGetValue`, `GetValueOrDefault`, `Keys`, enumeration), and all **98** raw `InlineStyle(...)`
+sites across the nine `AnchorResolver/` files (`PositionArea` 25, `Dialogs` 17, `PositionTry` 17, `AnchorFunctions`
+12, `InlineContainingBlocks` 9, `AnchorResolver` 8, `StickyPositioning` 5, `AnchorFunctions.NativeHandoff` 3,
+`Visibility` 1) now go through it. Today the wrapper forwards to the same per-element dict, so behaviour is
+**byte-identical**; the next increment can back the baked writes with a store distinct from the script-observable
+inline style (reads → merged script ∪ baked view, writes → baked overlay merged only at serialization) by
+changing **only** `BakedStyle.cs`, not the 98 call sites. Behaviour-preserving; no public-API change. The
+compiler enforced surface-completeness (it caught a `.Keys` use the initial inventory missed). Validation:
+`Broiler.HtmlBridge.Dom` builds clean; the NativeAnchor* / PositionArea / PositionTry / NativeSticky /
+AnchorInset / DialogBindingModule Cli suites pass (53) and the InlineStyleWriteThrough / InnerHtmlParallelState
+suites pass — the one intermittent `PositionTryLiveGeometryTests.FixedSizeOverflowingBase_SelectsFallback_LiveOffsets`
+was confirmed a **pre-existing parallel-run flake** (fails 1-in-3 at baseline with this change stashed; passes 3/3
+in isolation). **Not yet done:** the store split itself (increment 2), the remaining non-cluster item-2 sites
+(serialization/`StyleDeclarationBinding`/animation), and the item-5 `Normalize`/`CloneDomElement` swaps — all
+unchanged.
+
+Status: **P4.13 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item 5,
+`CloneDomElement` de-risk: consolidate the bridge runtime-state clone-copy behind a single authority.**
+`CloneDomElement` (`Utilities.cs`) copied every per-bridge per-element runtime-state table onto the
+`cloneNode` copy as a **scattered ~25-line inline block of hand-written `.CopyTo` calls** — the exact
+"parallel state kept in sync by hand" hazard Phase 4 targets: because the copy list lived in a *different
+file* from the state-table definitions, adding a field or a whole new runtime-state table (as the Phase 2
+items 3/4 de-globalization repeatedly did) could silently drop it from clones with nothing to catch the
+omission. This slice gives **each runtime-state composite its own `CopyTo(target)`** co-located with its
+fields (`FormControl`/`Scroll`/`Dialog`/`Shadow`/`StyleSheet`/`Document`/`Animation` in `RuntimeStates.cs`)
+and replaces the inline block with a single `DomBridge.CopyBridgeRuntimeStateTo(source, clone)` aggregator
+(inline-style dict + the seven table `CopyTo`s + the position-area memo `CopyPositionAreaResolution`).
+**Behaviour-preserving** — the same copies, relocated; the shadow root/host reference-copy and the
+stylesheet rule-list deep-copy semantics are retained verbatim. This is also the concrete decomposition the
+still-blocked item-5 `CloneDomElement`→canonical-`CloneNode` swap needs: a future swap becomes "canonical
+clones the tree/attributes; `CopyBridgeRuntimeStateTo` copies the parallel bridge state," instead of the
+canonical clone having to reproduce the scattered list. No public-API change (all members `private`/
+`internal`). Tests: new `HtmlDomInterfacesTests.Input_Value_And_Checked_Survive_CloneNode` (script-set value
++ checked survive onto an independent clone) alongside the existing `Radio_Checked_State_Survives_CloneNode`;
+the clone / node-relationship / namespace / sentinel-migration / owner-doc-root suites pass (102 → 103 with
+the new test). Also fixed a **stale reflection guard** surfaced in-area:
+`OwnerDocRootRemovalTests.ElementRuntimeState_Has_No_OwnerDocRoot_Field` looked up the pre-2026-07-17
+composite name `ElementRuntimeState` (renamed `InlineStyleRuntimeState` by the de-globalization), so its
+`Assert.NotNull` had been failing at baseline and the guard no longer guarded anything — repointed to the
+current type name. This does **not** close item 5 (the `Normalize` / `CloneDomElement` canonical swaps stay
+blocked by the side-effect / runtime-state coupling, and item 2's full inline-style dict elimination is
+unchanged) — it removes the silent-drop hazard in the clone path and stages the eventual swap.
 
 Status: **P4.12 completed** 2026-07-14 (branch `htmlbridge-phase4-range-stringifier`) — **work items 4/5: the
 Range stringifier is promoted to a spec-correct canonical `Broiler.Dom.DomRange.ToString()`, and the bridge's
@@ -3966,3 +4243,57 @@ further is gated on separate feature work (native dialog/backdrop, visual-viewpo
 engine intrinsic-size position-try is now **done**: min-content and max/fit-content bases all hand off natively)
 plus the optional follow-up of fully retiring the `NativeAnchorPlacement` lever once the last ALWAYS
 marker-stamp no longer needs it.
+
+#### Reconciliation 2026-07-19 — features (a) and (b) driven to their in-scope terminal state
+
+The two step-6 feature gates ((a) native dialog/backdrop, (b) the visual-viewport LayoutSnapshot endgame)
+have since been carried as far as this session's scope allows (merged via PR #1407). What landed, and where
+each now genuinely stops, so a reader knows exactly what full closure still needs:
+
+- **(b) visual-viewport / zoom — read AND render sides now validated; only a deployment gate remains.**
+  - **Native visual-viewport read model activated** (`NativeVisualViewport` on): the pinch scale is read from
+    the engine rather than the serialization bake, and the `_zoomSerializationRevertLog` revert machinery is
+    **deleted** (dead once the read path no longer mutates the live doc).
+  - **CSSOM read path migrated to the engine used-value model.** The A/B harness
+    (`Broiler.Cli.Tests/ZoomBakeVsEngineEquivalenceTests`) proved bake and engine agree for absolute lengths,
+    nested zoom, abspos insets, margins/border and absolute-length `line-height`, and diverge only for `%` /
+    `em` / `rem` / `calc(px+%)` — where the **engine value is the mathematically-correct unzoomed CSS px** and
+    the bake was simply buggy. `SharedLayoutGeometry.BuildSharedGeometrySnapshot` now enables `NativeZoom`
+    around the snapshot layout, so `offset*`/`client*`/`gBCR` are the correct engine used value for relative
+    units too. The catalogue tests were reworked from `*_Diverges_BlocksFlip` to `*_ReadIsEngineUsedValue` /
+    `*_ReadIsStable` (read now independent of the render-only flag). Zero new fails.
+  - **Render-side A/B validation done** (engine render proven correct, incl. relative units): a
+    `WptTestRunner.NativeZoom` lever (default-off, byte-identical; mirrors `NativeAnchorPlacement`) renders the
+    zoom cases through the engine; the new `Wpt_CssViewport_Zoom{Basic,Percentage,Em}_EngineRender_MatchesReference`
+    tests match the same hand-authored references the baked path matches — the absolute **and** the `%`/`em`
+    cases the bake mishandled — and the existing 16 `Wpt_CssViewport_Zoom*_MatchesReference` reftests are
+    unchanged. Correctness is banked on both the read (CSSOM) and render (pixel) sides.
+  - **Terminal gate (not closeable in-session): deleting the zoom bake is now purely a *deployment* concern**,
+    not correctness or patch. `NativeZoom` must be enabled at every consumer that lays out bridge serialized
+    output; the geometry snapshot (a) and WPT render (b) are covered, but the **product capture path**
+    (`CaptureService`) hands the serialized HTML to an *external* renderer this container can neither scope nor
+    validate. Until that consumer enables the flag — an environment-config change — the bake stays as the
+    carry-through, so nothing on CI regresses. See `zoom-native-cutover.md` P2.
+  - **Pinch-zoom render cutover is submodule-push-gated.** `patches/0001-html-render-viewport-zoom-param.patch`
+    (`Broiler.HTML` `HtmlRender.RenderToImageWithStyleSet` → threads `viewportZoom`) is captured for a
+    maintainer to apply (403 push scope); its main-repo follow-up (pass `visualViewport.scale` into the render
+    and stop `ApplyVisualViewportSerializationState` baking the pinch factor onto the root `zoom`) is deferred
+    until the pointer is bumped, because it references the patched API that does not exist at the pinned SHA.
+    The serialization bake remains the active fallback meanwhile.
+
+- **(a) native dialog / backdrop — the in-scope, main-repo slices landed; the native box + paint stay
+  submodule-patch-gated.** Native modal `<dialog>` centering is wired (horizontal and block-axis
+  shrink-to-fit for content-sized modals), the **modal box-chrome bake is deleted**, and the popover
+  top-layer emulation is de-doubled. The remaining pieces — a native `::backdrop` box and a native top layer
+  in layout/paint — live in `Broiler.CSS` / `Broiler.HTML` (out of session push scope → 403 → patch workflow,
+  maintainer-apply), so the `ApplyDialogUAPositioning` / `ApplyPopoverUAPositioning` / `InsertDialogBackdrops`
+  ALWAYS passes stay as the WPT-runner-only fallback until those patches land. See the native-dialog track in
+  `htmlbridge-complexity-reduction-notes.md`.
+
+**Net after this reconciliation.** Every Phase 0–5 residue is now at its terminal *in-scope* state: no
+further main-repo, in-session code change advances closure. What remains is strictly external — a maintainer
+applying the pending submodule patches (dialog/backdrop native box+paint; patch 0001 viewport-zoom render
+plumbing) and bumping the pointers, an environment change enabling `NativeZoom` at the `CaptureService`
+renderer, and the later-phase / out-of-scope items already recorded (Phase 6 Canvas `getContext`; the JS-engine
+simultaneous-session isolation). The `NativeAnchorPlacement` lever's full retirement stays the documented
+optional follow-up, still blocked only by the step-3e marker that the native-dialog track will remove.

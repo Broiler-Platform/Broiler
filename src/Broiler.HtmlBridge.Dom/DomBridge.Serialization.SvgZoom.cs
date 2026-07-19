@@ -68,7 +68,7 @@ public sealed partial class DomBridge
             return;
 
         string? value = null;
-        if (preferInlineStyle && InlineStyle(element).TryGetValue(propertyName, out var inlineValue) && !string.IsNullOrWhiteSpace(inlineValue))
+        if (preferInlineStyle && BakedInlineStyle(element).TryGetValue(propertyName, out var inlineValue) && !string.IsNullOrWhiteSpace(inlineValue))
             value = inlineValue;
         else if (props.TryGetValue(propertyName, out var propValue) && !string.IsNullOrWhiteSpace(propValue))
             value = propValue;

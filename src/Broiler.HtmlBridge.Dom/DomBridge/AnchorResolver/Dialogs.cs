@@ -78,7 +78,7 @@ public sealed partial class DomBridge
 
             // Set position:fixed as UA default for modal dialogs that have
             // no explicit position, matching Chromium's top-layer behaviour.
-            InlineStyle(el)["position"] = "fixed";
+            BakedInlineStyle(el)["position"] = "fixed";
 
             // HTML UA `dialog:modal { inset:0; margin:auto }` centring. With the box
             // fixed-positioned, both insets 0 and auto margins, the layout engine's
@@ -121,18 +121,18 @@ public sealed partial class DomBridge
 
         if (ResolveModalAxisCentres(el, specified, "width"))
         {
-            InlineStyle(el)["left"] = "0";
-            InlineStyle(el)["right"] = "0";
-            InlineStyle(el)["margin-left"] = "auto";
-            InlineStyle(el)["margin-right"] = "auto";
+            BakedInlineStyle(el)["left"] = "0";
+            BakedInlineStyle(el)["right"] = "0";
+            BakedInlineStyle(el)["margin-left"] = "auto";
+            BakedInlineStyle(el)["margin-right"] = "auto";
         }
 
         if (ResolveModalAxisCentres(el, specified, "height"))
         {
-            InlineStyle(el)["top"] = "0";
-            InlineStyle(el)["bottom"] = "0";
-            InlineStyle(el)["margin-top"] = "auto";
-            InlineStyle(el)["margin-bottom"] = "auto";
+            BakedInlineStyle(el)["top"] = "0";
+            BakedInlineStyle(el)["bottom"] = "0";
+            BakedInlineStyle(el)["margin-top"] = "auto";
+            BakedInlineStyle(el)["margin-bottom"] = "auto";
         }
     }
 
@@ -144,7 +144,7 @@ public sealed partial class DomBridge
     {
         if (!specified.TryGetValue(sizeProperty, out var value) || string.IsNullOrWhiteSpace(value))
         {
-            InlineStyle(el)[sizeProperty] = "fit-content"; // UA dialog:modal shrink-to-fit default
+            BakedInlineStyle(el)[sizeProperty] = "fit-content"; // UA dialog:modal shrink-to-fit default
             return true;
         }
 
@@ -180,11 +180,11 @@ public sealed partial class DomBridge
 
             if (!alreadyPositioned)
             {
-                InlineStyle(el)["position"] = "fixed";
-                if (!InlineStyle(el).ContainsKey("top") && !props.ContainsKey("top"))
-                    InlineStyle(el)["top"] = "0";
-                if (!InlineStyle(el).ContainsKey("left") && !props.ContainsKey("left"))
-                    InlineStyle(el)["left"] = "0";
+                BakedInlineStyle(el)["position"] = "fixed";
+                if (!BakedInlineStyle(el).ContainsKey("top") && !props.ContainsKey("top"))
+                    BakedInlineStyle(el)["top"] = "0";
+                if (!BakedInlineStyle(el).ContainsKey("left") && !props.ContainsKey("left"))
+                    BakedInlineStyle(el)["left"] = "0";
             }
 
             // Elevate into the top layer, ordered by show order, so the popover paints above
@@ -197,7 +197,7 @@ public sealed partial class DomBridge
             if (NativeTopLayer)
                 StampTopLayerOrder(el, order);
             else
-                InlineStyle(el)["z-index"] = (TopLayerZIndexBase + order).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                BakedInlineStyle(el)["z-index"] = (TopLayerZIndexBase + order).ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
     }
     // -----------------------------------------------------------------
@@ -262,7 +262,7 @@ public sealed partial class DomBridge
 
                 var backdrop = CreateBridgeElement("div");
                 foreach (var kv in backdropStyle)
-                    InlineStyle(backdrop)[kv.Key] = kv.Value;
+                    BakedInlineStyle(backdrop)[kv.Key] = kv.Value;
                 SetParent(backdrop, parent);
 
                 int idx = ChildIndexOf(parent, dialog);

@@ -25,7 +25,7 @@ public sealed partial class DomBridge
         {
             if (IsText(el)) continue;
             // Check inline styles first.
-            if (InlineStyle(el).TryGetValue("anchor-name", out var n) &&
+            if (BakedInlineStyle(el).TryGetValue("anchor-name", out var n) &&
                 string.Equals(n.Trim(), anchorName, StringComparison.Ordinal))
                 return el;
         }

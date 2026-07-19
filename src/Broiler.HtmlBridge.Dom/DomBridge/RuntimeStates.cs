@@ -59,13 +59,20 @@ internal sealed class InlineStyleRuntimeState
     // into their own per-bridge instance table (DomBridge._formControlRuntimeStates via FormControlStateFor,
     // _scrollRuntimeStates via ScrollStateFor, _dialogRuntimeStates via DialogStateFor, _shadowRuntimeStates
     // via ShadowStateFor, _styleSheetRuntimeStates via StyleSheetStateFor, _documentRuntimeStates via
-    // DocumentStateFor, _animationRuntimeStates via AnimationStateFor); every one's clone copy lives in
-    // CloneDomElement now, so the former CopyRuntimeValuesTo aggregator is gone. The inline-style concern
-    // that remained was itself de-globalized to a per-bridge table (DomBridge._inlineStyleStates via
+    // DocumentStateFor, _animationRuntimeStates via AnimationStateFor). The inline-style concern that
+    // remained was itself de-globalized to a per-bridge table (DomBridge._inlineStyleStates via
     // InlineStyleStateFor) and this composite renamed to InlineStyleRuntimeState — no process-static
     // per-element runtime table remains. See the *RuntimeState classes below (still used by those tables).
+    // Phase 4 item 5 (2026-07-19): each table's cloneNode copy is now a per-class CopyTo, aggregated by
+    // DomBridge.CopyBridgeRuntimeStateTo (a single authority, replacing the scattered per-field CopyTo list
+    // the earlier de-globalization had inlined into CloneDomElement).
 }
 
+// Phase 4 item 5 (CloneDomElement de-risk, 2026-07-19): each runtime-state composite owns a
+// CopyTo(target) that clones its own fields, co-located with the field declarations. cloneNode's
+// bridge-state copy (DomBridge.CopyBridgeRuntimeStateTo) is the single caller: keeping the copy
+// semantics next to the fields means adding a field can no longer silently drop from the clone
+// (the old scattered CopyTo list in CloneDomElement had to be hand-updated in a different file).
 internal sealed class FormControlRuntimeState
 {
     public RuntimeValue<string> Value { get; } = new();
@@ -73,12 +80,27 @@ internal sealed class FormControlRuntimeState
     public RuntimeValue<bool> DefaultSelected { get; } = new();
     public RuntimeValue<int> SelectedIndex { get; } = new();
     public RuntimeValue<string> ReturnValue { get; } = new();
+
+    public void CopyTo(FormControlRuntimeState target)
+    {
+        Value.CopyTo(target.Value);
+        Checked.CopyTo(target.Checked);
+        DefaultSelected.CopyTo(target.DefaultSelected);
+        SelectedIndex.CopyTo(target.SelectedIndex);
+        ReturnValue.CopyTo(target.ReturnValue);
+    }
 }
 
 internal sealed class ScrollRuntimeState
 {
     public RuntimeValue<double> Left { get; } = new();
     public RuntimeValue<double> Top { get; } = new();
+
+    public void CopyTo(ScrollRuntimeState target)
+    {
+        Left.CopyTo(target.Left);
+        Top.CopyTo(target.Top);
+    }
 }
 
 internal sealed class DialogRuntimeState
@@ -91,6 +113,13 @@ internal sealed class DialogRuntimeState
     // the element in the top layer as it animates out, in which case it stays
     // set so its ::backdrop still renders for the snapshot.
     public RuntimeValue<bool> PopoverOpen { get; } = new();
+
+    public void CopyTo(DialogRuntimeState target)
+    {
+        Modal.CopyTo(target.Modal);
+        TopLayerOrder.CopyTo(target.TopLayerOrder);
+        PopoverOpen.CopyTo(target.PopoverOpen);
+    }
 }
 
 internal sealed class ShadowRuntimeState
@@ -98,6 +127,15 @@ internal sealed class ShadowRuntimeState
     public RuntimeValue<DomElement> Root { get; } = new();
     public RuntimeValue<DomElement> Host { get; } = new();
     public RuntimeValue<string> Mode { get; } = new();
+
+    // Copies the shadow root/host references verbatim — the clone points at the SAME shadow
+    // root/host as the source (the pre-existing cloneNode behaviour, preserved).
+    public void CopyTo(ShadowRuntimeState target)
+    {
+        Root.CopyTo(target.Root);
+        Host.CopyTo(target.Host);
+        Mode.CopyTo(target.Mode);
+    }
 }
 
 internal sealed class StyleSheetRuntimeState
@@ -128,16 +166,30 @@ internal sealed class StyleSheetRuntimeState
     /// text is serialized from the model so the mutation is observed downstream.
     /// </summary>
     public bool RulesMutated { get; set; }
+
+    // The rule list is deep-copied (a fresh List) so the clone's insertRule/deleteRule do not
+    // mutate the source sheet; the source text / mutated flag are copied verbatim.
+    public void CopyTo(StyleSheetRuntimeState target)
+    {
+        FetchedCss.CopyTo(target.FetchedCss);
+        target.Rules = Rules is null ? null : [.. Rules];
+        target.RulesSourceText = RulesSourceText;
+        target.RulesMutated = RulesMutated;
+    }
 }
 
 internal sealed class DocumentRuntimeState
 {
     public RuntimeValue<bool> HasViewport { get; } = new();
+
+    public void CopyTo(DocumentRuntimeState target) => HasViewport.CopyTo(target.HasViewport);
 }
 
 internal sealed class AnimationRuntimeState
 {
     public RuntimeValue<double> CurrentTimeMilliseconds { get; } = new();
+
+    public void CopyTo(AnimationRuntimeState target) => CurrentTimeMilliseconds.CopyTo(target.CurrentTimeMilliseconds);
 }
 
 internal sealed class RuntimeValue<T>

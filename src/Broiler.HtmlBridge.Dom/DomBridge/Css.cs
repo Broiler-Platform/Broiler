@@ -151,24 +151,20 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Recursively collects all <c>&lt;style&gt;</c> elements from a document tree.
-    /// Sub-documents keep their own style scope, but since P4.4b severed the
-    /// <c>#subdoc-root</c> element they are no longer in-tree children, so this walk
-    /// never crosses a sub-document boundary.
+    /// Collects all <c>&lt;style&gt;</c> (and external-stylesheet <c>&lt;link&gt;</c>) elements from a
+    /// document tree. Sub-documents keep their own style scope, but since P4.4b severed the
+    /// <c>#subdoc-root</c> element they are no longer in-tree children, so this walk never crosses a
+    /// sub-document boundary. Phase 4 item 4/5: reuses canonical <see cref="DomNode.Descendants"/>
+    /// (document-order, level-snapshotted against the concurrent-mutation race the per-level
+    /// <see cref="SnapshotChildren"/> walk guarded — Descendants snapshots the real child list, so the
+    /// LegacyChildList projection overflow cannot occur here) instead of the hand-rolled recursion.
     /// </summary>
     private static void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
     {
-        foreach (var child in SnapshotChildren(root))
+        foreach (var element in root.Descendants().OfType<DomElement>())
         {
-            if (!IsText(child))
-            {
-                if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
-                    styleElements.Add(child);
-                else if (IsExternalStylesheet(child))
-                    styleElements.Add(child);
-
-                CollectStyleElementsInTree(child, styleElements);
-            }
+            if (string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase) || IsExternalStylesheet(element))
+                styleElements.Add(element);
         }
     }
 

@@ -250,41 +250,23 @@ public sealed partial class DomBridge
         if (ReferenceEquals(first, second))
             return 0;
 
-        var firstAncestors = new List<DomNode>();
-        for (DomNode? current = first; current != null; current = current.ParentNode)
-            firstAncestors.Add(current);
-        firstAncestors.Reverse();
-
-        var secondAncestors = new List<DomNode>();
-        for (DomNode? current = second; current != null; current = current.ParentNode)
-            secondAncestors.Add(current);
-        secondAncestors.Reverse();
-
-        var divergenceIndex = 0;
-        var sharedLength = Math.Min(firstAncestors.Count, secondAncestors.Count);
-        while (divergenceIndex < sharedLength &&
-               ReferenceEquals(firstAncestors[divergenceIndex], secondAncestors[divergenceIndex]))
-        {
-            divergenceIndex++;
-        }
-
-        if (divergenceIndex == 0 ||
-            divergenceIndex >= firstAncestors.Count ||
-            divergenceIndex >= secondAncestors.Count)
-        {
-            return 0;
-        }
-
-        var commonAncestor = firstAncestors[divergenceIndex - 1];
-        var firstChild = firstAncestors[divergenceIndex];
-        var secondChild = secondAncestors[divergenceIndex];
-        var firstIndex = ChildIndexOf(commonAncestor, firstChild);
-        var secondIndex = ChildIndexOf(commonAncestor, secondChild);
-
-        if (firstIndex == secondIndex)
+        // Phase 4 item 4/5: the tree order of two nodes is the order of the boundary points immediately
+        // before each of them, which canonical Broiler.Dom.DomRange.CompareBoundaryPoints computes — the
+        // same canonical order primitive IsPositionAfter (P4.17) now delegates to, replacing the
+        // hand-rolled ancestor-chain divergence. This helper's only caller (compareDocumentPosition)
+        // already resolves the same-node, disconnected, and ancestor/descendant cases before reaching
+        // here, so both nodes are same-tree, non-containing, and parented; the guards below preserve the
+        // old "return 0 when no ordering can be determined" contract (and avoid CompareBoundaryPoints's
+        // cross-tree WrongDocument throw) for any other caller.
+        var firstParent = first.ParentNode;
+        var secondParent = second.ParentNode;
+        if (firstParent is null || secondParent is null ||
+            !ReferenceEquals(first.GetRootNode(), second.GetRootNode()))
             return 0;
 
-        return firstIndex < secondIndex ? -1 : 1;
+        return Math.Sign(DomRange.CompareBoundaryPoints(
+            firstParent, ChildIndexOf(firstParent, first),
+            secondParent, ChildIndexOf(secondParent, second)));
     }
 
     /// <summary>
@@ -295,13 +277,11 @@ public sealed partial class DomBridge
     /// set at construction/adoption (a sub-document's <c>createElement</c> node was adopted into its
     /// content document; every other node was minted from the main <c>_document</c>).
     /// </summary>
-    internal static DomDocument GetOwningDocument(DomNode node)
-    {
-        DomNode root = node;
-        while (root.ParentNode is { } parent)
-            root = parent;
-        return root as DomDocument ?? node.OwnerDocument;
-    }
+    internal static DomDocument GetOwningDocument(DomNode node) =>
+        // Phase 4 item 4/5: the absolute-root walk is canonical DomNode.GetRootNode() (the identical
+        // `while ParentNode` climb); a connected node roots to its DomDocument, a detached one falls
+        // back to the canonical owner-document set at construction/adoption.
+        node.GetRootNode() as DomDocument ?? node.OwnerDocument;
 
     /// <summary>
     /// Clones a <see cref="DomElement"/>. When <paramref name="deep"/> is true,
@@ -309,108 +289,84 @@ public sealed partial class DomBridge
     /// </summary>
     private DomNode CloneDomElement(DomNode source, bool deep)
     {
-        // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes clone via the document
-        // factories (DomText/DomComment ctors are internal). Dead on today's homogeneous facade
-        // tree — facade text/comment nodes are Broiler.Dom.DomElement and take the element path below; live
-        // once text/comment construction flips to canonical DomText/DomComment.
-        if (source is DomCharacterData sourceCharData)
-        {
-            return IsComment(source)
-                ? _document.CreateComment(sourceCharData.Data)
-                : _document.CreateTextNode(sourceCharData.Data);
-        }
+        // Phase 4 item 5: delegate the tree + attribute clone to canonical DomNode.CloneNode (spec §4.4)
+        // instead of the bridge's hand-rolled per-node-kind rebuild. Canonical CloneShallow handles every
+        // node kind — element (namespace + attribute set verbatim), text/comment (data), doctype
+        // (name/publicId/systemId) and fragment — and, when deep, recurses the child list in order. This
+        // replaces the former CreateBridgeElementNS-from-main-`_document` construction + SetAttribute
+        // attribute copy; canonical preserves the source's owner document and attribute keys verbatim,
+        // which is spec-correct (the old path minted every clone from the main document and lowercased
+        // no-namespace attribute names). Cloning does not mutate the live document, so there is no
+        // MutationObserver/NodeIterator/live-range side-effect coupling here (unlike Normalize).
+        var clone = source.CloneNode(deep);
 
-        // Phase 4 item 1: a canonical DomDocumentType clones its immutable name/publicId/systemId.
-        if (source is DomDocumentType sourceDocType)
-            return _document.CreateDocumentType(sourceDocType.Name, sourceDocType.PublicId, sourceDocType.SystemId);
+        // Canonical CloneNode knows nothing about the bridge's parallel per-element runtime state (inline
+        // style + baked overlay, form control, scroll, dialog/popover, shadow, stylesheet, document
+        // viewport, animation, position-area memo), so copy it onto every element in the cloned subtree
+        // through the single CopyBridgeRuntimeStateTo authority (P4.13 / P4.14-inc3).
+        CopyRuntimeStateForClonedSubtree(source, clone, deep);
+        return clone;
+    }
 
-        // Phase 4 item 1: a canonical DomDocumentFragment clones to an empty fragment; a deep clone
-        // copies its children (a shallow clone is empty, per DOM).
-        if (source is DomDocumentFragment sourceFragment)
-        {
-            var fragmentClone = CreateBridgeDocumentFragment();
-            if (deep)
-                foreach (var child in sourceFragment.ChildNodes.ToArray())
-                    fragmentClone.AppendChild(CloneDomElement(child, true));
-            return fragmentClone;
-        }
+    /// <summary>
+    /// Walks a source subtree and its canonical <c>CloneNode</c> copy in lockstep, copying the bridge's
+    /// per-element runtime state (via <see cref="CopyBridgeRuntimeStateTo"/>) from each source element to
+    /// its clone. Canonical <c>CloneNode(deep)</c> reproduces the child list in order, so index <c>i</c>
+    /// of the source's children pairs with index <c>i</c> of the clone's.
+    /// </summary>
+    private void CopyRuntimeStateForClonedSubtree(DomNode source, DomNode clone, bool deep)
+    {
+        if (source is DomElement sourceElement && clone is DomElement cloneElement)
+            CopyBridgeRuntimeStateTo(sourceElement, cloneElement);
 
-        var element = (DomElement)source;
-        // Preserve the source element's exact namespace (folds the old post-construction
-        // `clone.NamespaceURI = element.NamespaceURI` — see below); SVG/foreign clones keep
-        // their namespace rather than defaulting to HTML.
-        var clone = CreateBridgeElementNS(element.NamespaceUri, element.TagName, element.Id, element.ClassName);
-        // RF-BRIDGE-1c Phase C2: copy attributes straight from the canonical namespace-keyed
-        // set so namespaced attributes (namespace, prefix, local name) survive the clone —
-        // that fidelity used to depend on the separate NsAttrMap shadow. No-namespace
-        // attributes go through SetAttribute (which lowercases, matching the prior snapshot
-        // path); a prefixed qualified name can only exist with a namespace, so it never
-        // reaches the SetAttribute branch (which would throw on the ':').
-        foreach (var attribute in element.Attributes.Values)
-        {
-            if (attribute.NamespaceUri is null)
-                clone.SetAttribute(attribute.QualifiedName, attribute.Value);
-            else
-                clone.SetAttributeNS(attribute.NamespaceUri, attribute.QualifiedName, attribute.Value);
-        }
-        // RF-BRIDGE-1c Phase B: inline style lives in ElementRuntimeState now. Copy the
-        // source's live style dict (which may hold JS mutations not yet synced to the
-        // `style=` attribute), replacing the clone's lazily-seeded attribute values.
+        if (!deep)
+            return;
+
+        var sourceChildren = source.ChildNodes;
+        var cloneChildren = clone.ChildNodes;
+        for (var i = 0; i < sourceChildren.Count && i < cloneChildren.Count; i++)
+            CopyRuntimeStateForClonedSubtree(sourceChildren[i], cloneChildren[i], true);
+    }
+
+    /// <summary>
+    /// Phase 4 item 5 (CloneDomElement de-risk): the single authority that copies every bridge
+    /// per-element runtime-state table from a source element onto its <c>cloneNode</c> copy.
+    /// Canonical <c>DomNode.CloneNode</c> clones the tree and attributes but knows nothing about
+    /// the bridge's parallel per-element state (inline style, form control, scroll, dialog/popover
+    /// top layer, shadow linkage, stylesheet CSSOM, document viewport flag, animation timeline and
+    /// the position-area memo), so the bridge carries it here. Consolidating it out of the scattered
+    /// inline block in <see cref="CloneDomElement"/> means each state table owns its own
+    /// <c>CopyTo</c> (in <c>RuntimeStates.cs</c>, next to its fields) — a new field/table can no
+    /// longer be silently dropped from clones — and isolates the exact bridge-state copy the
+    /// eventual canonical-<c>CloneNode</c> swap (item 5) will call alongside the canonical clone.
+    /// </summary>
+    private void CopyBridgeRuntimeStateTo(DomElement source, DomElement clone)
+    {
+        // Inline style (RF-BRIDGE-1c Phase B): copy the source's live style dict — which may hold
+        // JS `element.style` mutations not yet synced to the `style=` attribute — over the clone's
+        // lazily-seeded attribute values. `InlineStyle(clone)` seeds from the (already-copied)
+        // `style=` attribute before the Clear, so the copy is authoritative.
         var cloneStyle = InlineStyle(clone);
         cloneStyle.Clear();
-        foreach (var kv in InlineStyle(element))
+        foreach (var kv in InlineStyle(source))
             cloneStyle[kv.Key] = kv.Value;
-        // RF-BRIDGE-1c Phase F (F3c part 2d): element text lives in child DomText nodes, cloned by
-        // the deep-clone loop below — no element-store TextContent scalar to copy.
-        // (The namespace was carried at construction via CreateBridgeElementNS above.)
-        // Copy browser-runtime values (e.g., checked state for inputs). Form-control, scroll offsets,
-        // dialog/popover top-layer state, shadow-DOM linkage, stylesheet state, the document viewport
-        // flag and the animation timeline all moved out of ElementRuntimeState into per-bridge instance
-        // tables (Phase 2 item 4 de-globalization), so copy each here to preserve cloneNode semantics.
-        var sourceForm = FormControlStateFor(element);
-        var cloneForm = FormControlStateFor(clone);
-        sourceForm.Value.CopyTo(cloneForm.Value);
-        sourceForm.Checked.CopyTo(cloneForm.Checked);
-        sourceForm.DefaultSelected.CopyTo(cloneForm.DefaultSelected);
-        sourceForm.SelectedIndex.CopyTo(cloneForm.SelectedIndex);
-        sourceForm.ReturnValue.CopyTo(cloneForm.ReturnValue);
-        ScrollStateFor(element).Left.CopyTo(ScrollStateFor(clone).Left);
-        ScrollStateFor(element).Top.CopyTo(ScrollStateFor(clone).Top);
-        var sourceDialog = DialogStateFor(element);
-        var cloneDialog = DialogStateFor(clone);
-        sourceDialog.Modal.CopyTo(cloneDialog.Modal);
-        sourceDialog.TopLayerOrder.CopyTo(cloneDialog.TopLayerOrder);
-        sourceDialog.PopoverOpen.CopyTo(cloneDialog.PopoverOpen);
-        var sourceShadow = ShadowStateFor(element);
-        var cloneShadow = ShadowStateFor(clone);
-        sourceShadow.Root.CopyTo(cloneShadow.Root);
-        sourceShadow.Host.CopyTo(cloneShadow.Host);
-        sourceShadow.Mode.CopyTo(cloneShadow.Mode);
-        var sourceSheet = StyleSheetStateFor(element);
-        var cloneSheet = StyleSheetStateFor(clone);
-        sourceSheet.FetchedCss.CopyTo(cloneSheet.FetchedCss);
-        cloneSheet.Rules = sourceSheet.Rules is null ? null : [.. sourceSheet.Rules];
-        cloneSheet.RulesSourceText = sourceSheet.RulesSourceText;
-        cloneSheet.RulesMutated = sourceSheet.RulesMutated;
-        DocumentStateFor(element).HasViewport.CopyTo(DocumentStateFor(clone).HasViewport);
-        AnimationStateFor(element).CurrentTimeMilliseconds.CopyTo(AnimationStateFor(clone).CurrentTimeMilliseconds);
-        // Carry the memoized position-area resolution too (was ElementRuntimeState.Layout,
-        // now the bridge-level PositionAreaResolutions cache — see PositionAreaQueries.cs).
-        CopyPositionAreaResolution(element, clone);
 
-        if (deep)
-        {
-            // RF-BRIDGE-1c Phase F (F3c): iterate raw ChildNodes (not ChildElements) so text/
-            // comment children clone too once they flip to canonical DomText/DomComment. On the
-            // homogeneous facade tree every child is already an element, so this is a no-op widen.
-            foreach (var child in element.ChildNodes)
-            {
-                var childClone = CloneDomElement(child, true);
-                SetParent(childClone, clone);
-                clone.AppendChild(childClone);
-            }
-        }
-        return clone;
+        // Per-bridge instance tables (Phase 2 items 3/4 de-globalization) — each owns its CopyTo.
+        FormControlStateFor(source).CopyTo(FormControlStateFor(clone));
+        ScrollStateFor(source).CopyTo(ScrollStateFor(clone));
+        DialogStateFor(source).CopyTo(DialogStateFor(clone));
+        ShadowStateFor(source).CopyTo(ShadowStateFor(clone));
+        StyleSheetStateFor(source).CopyTo(StyleSheetStateFor(clone));
+        DocumentStateFor(source).CopyTo(DocumentStateFor(clone));
+        AnimationStateFor(source).CopyTo(AnimationStateFor(clone));
+
+        // Memoized position-area resolution (was ElementRuntimeState.Layout, now the bridge-level
+        // PositionAreaResolutions cache — see PositionAreaQueries.cs).
+        CopyPositionAreaResolution(source, clone);
+
+        // Baked-style overlay (Phase 4 item 2 increment 3): serialize-time bakes now live off the
+        // inline-style dict, so copy the overlay too. A no-op unless the source was cloned after baking.
+        CopyBakedStyleOverlay(source, clone);
     }
 
     /// <summary>
@@ -505,11 +461,15 @@ public sealed partial class DomBridge
     /// </summary>
     private static void CollectDescendantsByTag(DomElement root, string tagName, List<JSValue> results, DomBridge bridge)
     {
-        foreach (var child in ChildElements(root))
+        // Phase 4 item 4/5: reuse canonical Descendants() (public, document-order, level-snapshotted —
+        // the bridge's own WPT #1143 defensive idiom promoted to canonical, operating on the real child
+        // list so it also avoids the LegacyChildList projection overflow) instead of a hand-rolled
+        // depth-first ChildElements recursion. Same element set + pre-order; mutation-safe where the old
+        // live ChildElements iteration was not.
+        foreach (var element in root.Descendants().OfType<DomElement>())
         {
-            if (tagName == "*" || string.Equals(child.TagName, tagName, StringComparison.OrdinalIgnoreCase))
-                results.Add(bridge.ToJSObject(child));
-            CollectDescendantsByTag(child, tagName, results, bridge);
+            if (tagName == "*" || string.Equals(element.TagName, tagName, StringComparison.OrdinalIgnoreCase))
+                results.Add(bridge.ToJSObject(element));
         }
     }
 

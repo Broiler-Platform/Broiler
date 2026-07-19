@@ -25,7 +25,11 @@ public sealed class OwnerDocRootRemovalTests
     [Fact]
     public void ElementRuntimeState_Has_No_OwnerDocRoot_Field()
     {
-        var ers = typeof(DomBridge).Assembly.GetType("Broiler.HtmlBridge.Dom.Runtime.ElementRuntimeState");
+        // The node-runtime-state composite (formerly ElementRuntimeState) was renamed
+        // InlineStyleRuntimeState by the Phase 2 items 3/4 de-globalization (2026-07-17), once every
+        // non-inline-style concern had been split into its own per-bridge table. Look it up under the
+        // current name; the OwnerDocRoot parallel-state field (P4.4c) must not exist on it.
+        var ers = typeof(DomBridge).Assembly.GetType("Broiler.HtmlBridge.Dom.Runtime.InlineStyleRuntimeState");
         Assert.NotNull(ers);
         Assert.Null(ers!.GetProperty("OwnerDocRoot", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
         Assert.Null(ers.GetField("OwnerDocRoot", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));

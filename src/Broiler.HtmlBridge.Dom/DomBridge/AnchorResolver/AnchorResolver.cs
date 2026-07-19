@@ -174,7 +174,7 @@ public sealed partial class DomBridge
                  scPos == "fixed" || scPos == "sticky");
             if (!alreadyPositioned)
             {
-                InlineStyle(sc)["position"] = "relative";
+                BakedInlineStyle(sc)["position"] = "relative";
                 // Native mode: mark this scroller so the engine's position-visibility pass knows
                 // its position:relative is anchor-induced (not authored) and must still count as an
                 // intervening clip container — reproducing the bridge's pre-position:relative CB
@@ -262,12 +262,12 @@ public sealed partial class DomBridge
 
         // The replaced root paints only the image; neither the root nor the
         // (box-less) body background reaches the canvas.
-        InlineStyle(html)["background"] = "none";
-        InlineStyle(html)["background-color"] = "transparent";
-        InlineStyle(body)["margin"] = "0";
-        InlineStyle(body)["padding"] = "0";
-        InlineStyle(body)["background"] = "none";
-        InlineStyle(body)["background-color"] = "transparent";
+        BakedInlineStyle(html)["background"] = "none";
+        BakedInlineStyle(html)["background-color"] = "transparent";
+        BakedInlineStyle(body)["margin"] = "0";
+        BakedInlineStyle(body)["padding"] = "0";
+        BakedInlineStyle(body)["background"] = "none";
+        BakedInlineStyle(body)["background-color"] = "transparent";
 
         ClearChildren(body);
 
@@ -302,7 +302,7 @@ public sealed partial class DomBridge
             return;
 
         var combinedZoom = GetUsedZoomForElement(DocumentElement) * scale;
-        InlineStyle(DocumentElement)["zoom"] = combinedZoom.ToString("0.###", CultureInfo.InvariantCulture);
+        BakedInlineStyle(DocumentElement)["zoom"] = combinedZoom.ToString("0.###", CultureInfo.InvariantCulture);
         ScrollStateFor(DocumentElement).Left.Set(GetVisualViewportPageOffset(vertical: false));
         ScrollStateFor(DocumentElement).Top.Set(GetVisualViewportPageOffset(vertical: true));
     }

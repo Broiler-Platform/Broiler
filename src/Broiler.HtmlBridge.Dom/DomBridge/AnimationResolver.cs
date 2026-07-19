@@ -117,11 +117,11 @@ public sealed partial class DomBridge
         string? animValue = null, delayValue = null, nameValue = null;
         bool hasAnimation = false, hasDelay = false, hasName = false;
 
-        if (InlineStyle(element).Count > 0)
+        if (BakedInlineStyle(element).Count > 0)
         {
-            hasAnimation = InlineStyle(element).TryGetValue("animation", out animValue);
-            hasDelay = InlineStyle(element).TryGetValue("animation-delay", out delayValue);
-            hasName = InlineStyle(element).TryGetValue("animation-name", out nameValue);
+            hasAnimation = BakedInlineStyle(element).TryGetValue("animation", out animValue);
+            hasDelay = BakedInlineStyle(element).TryGetValue("animation-delay", out delayValue);
+            hasName = BakedInlineStyle(element).TryGetValue("animation-name", out nameValue);
         }
 
         // Also check stylesheet rules that may apply to this element.
@@ -311,7 +311,7 @@ public sealed partial class DomBridge
                     if (fillMode is "backwards" or "both")
                     {
                         foreach (var kv in keyframes[0].Properties)
-                            InlineStyle(element)[kv.Key] = kv.Value;
+                            BakedInlineStyle(element)[kv.Key] = kv.Value;
                     }
                     return;
                 }
@@ -344,13 +344,13 @@ public sealed partial class DomBridge
 
         // Apply resolved values as inline styles and remove animation properties.
         foreach (var kv in resolvedProps)
-            InlineStyle(element)[kv.Key] = kv.Value;
+            BakedInlineStyle(element)[kv.Key] = kv.Value;
 
-        InlineStyle(element).Remove("animation");
-        InlineStyle(element).Remove("animation-delay");
-        InlineStyle(element).Remove("animation-name");
-        InlineStyle(element).Remove("animation-duration");
-        InlineStyle(element).Remove("animation-timing-function");
+        BakedInlineStyle(element).Remove("animation");
+        BakedInlineStyle(element).Remove("animation-delay");
+        BakedInlineStyle(element).Remove("animation-name");
+        BakedInlineStyle(element).Remove("animation-duration");
+        BakedInlineStyle(element).Remove("animation-timing-function");
     }
 
     private Dictionary<string, string> ResolveKeyframeProperties(DomElement element,
