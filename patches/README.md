@@ -68,3 +68,31 @@ still compiles against the pinned submodule.
   (`Broiler.HTML.Orchestration` builds clean) before being reverted for the
   pinned-pointer build. Its rendered effect needs pixel validation (no reftest
   corpus), so it lands behind the `NativeZoom` flag with the rest of the engine.
+
+## 0003-broiler-html-svg-attr-zoom-scaling.patch
+
+- **Target submodule:** `Broiler.HTML` (`Broiler-Platform/Broiler.HTML`)
+- **Pinned SHA (apply onto):** `3319ede468eb78340aa2995bd0528d8c87cf9fd6`
+- **What it does:** in `PaintWalker.Decorations.cs`, `EmitSvgContent` passes the
+  box's effective CSS `zoom` (`fragment.Style.EffectiveZoom`) into
+  `SvgRenderer.RenderSvgContent`. A view-boxed SVG scales on its own (its transform
+  derives from the already-zoomed content box `bounds`), but a **view-box-less**
+  SVG maps its raw user-unit geometry 1:1 to CSS pixels, so under the native-zoom
+  engine it would stay unscaled without this.
+- **Parent side (kept in the main repo — same reverse dependency as patch 0002):**
+  `SvgRenderer.RenderSvgContent` (main-repo `Broiler.Layout`) gained an
+  `effectiveZoom` parameter (default `1.0`) that **seeds** the SVG user-unit scale;
+  the view-box branch overrides the seed (from the zoomed `bounds`) so it never
+  compounds. This is committed to the parent now: the pinned unpatched submodule
+  calls the 2-arg overload → default `1.0` → byte-identical, and the parent
+  compiles either way. All the SVG geometry (`rect`/`circle`/`ellipse`/`line`/
+  `polygon`/`polyline`/`text`, plus stroke widths) already flows through the
+  seeded `sx`/`sy`, so the one seed covers every shape.
+- **Why the caller side can't be a main-repo change:** the only caller of
+  `RenderSvgContent` is the submodule paint walker (`EmitSvgContent`), which owns
+  the `fragment` and its `Style.EffectiveZoom`.
+- **Verification:** the main-repo scaling is pinned directly by
+  `Broiler.Layout.Tests/ZoomSvgRenderTests` (no-viewBox raw geometry ×zoom; a
+  viewBox does **not** compound zoom; default `1.0` byte-identical) — the
+  submodule patch is only the one-line value pass-through, which built clean
+  against the patched tree (`Broiler.HTML.Orchestration`) before revert.

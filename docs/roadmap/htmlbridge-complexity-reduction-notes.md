@@ -960,15 +960,31 @@ not read it; the parent compiles either way) rather than reverted. The hook is p
 the patched tree before revert. Gated by `NativeZoom` → flag-off byte-identical. Zero regression: 246 engine
 layout tests. See `patches/README.md`.
 
-**Remaining within increment 5** (still carried by the bake): **SVG** presentation/geometry attribute
-painting and **`::before`/`::after`** pseudo boxes — both materialised in the submodule render layer, and SVG
-in particular has its own coordinate system / `viewBox` semantics, so it wants a dedicated pass (and pixel
-validation, no reftest corpus). Box-shadow is a non-issue for now: it is carried in the IR but has **no paint
-consumer** (element box-shadow is unimplemented); text-decoration underline rides the zoomed font metrics.
-The one main-repo remnant deliberately left is **`letter-spacing`/`word-spacing`**: they *do* feed text
-layout (`MeasureWordSpacing` / `CssUtils.WhiteSpace`) and are entangled with the whitespace-advance
-measurement (a two-site add through `ParseLength(..., fontAdjust)`), so scaling them safely needs a focused
-text-measurement pass rather than a one-line getter wrap — a bounded follow-up.
+**Landed (2026-07-19) — increment 5, third slice: SVG attribute scaling (main-repo seed + submodule patch).**
+As with border-radius, the SVG geometry work turned out to be **mostly main-repo**: `SvgRenderer` (in
+`Broiler.Layout`) parses the inline SVG, reads the geometry attributes (`x`/`y`/`width`/`height`/`points`/
+radii/`stroke-width`/`font-size`), and maps them to CSS pixels through a single `sx`/`sy`/`tx`/`ty` transform
+that every shape flows through. The insight is the two cases split cleanly: a **view-boxed** SVG already
+scales, because `sx = bounds.Width / viewBoxWidth` and `bounds` is the content box the layout emits *zoomed*;
+a **view-box-less** SVG maps raw user units 1:1 to CSS px and so needs the factor. `RenderSvgContent` gained
+an `effectiveZoom` parameter (default `1.0`) that **seeds** `sx`/`sy` — the view-box branch overrides the
+seed (from the zoomed bounds) so it never compounds, and the one seed covers every shape. The only caller is
+the submodule paint walker (`EmitSvgContent`), so passing `fragment.Style.EffectiveZoom` in ships as
+**`patches/0003-broiler-html-svg-attr-zoom-scaling.patch`** (same reverse-dependency shape as patch 0002 —
+the submodule passes a parent value, so the parent parameter is kept, default `1.0` for the pinned unpatched
+submodule). Pinned directly by `Broiler.Layout.Tests/ZoomSvgRenderTests` (no-viewBox raw geometry ×zoom; a
+viewBox does not compound; default `1.0` byte-identical). Gated by `NativeZoom` → flag-off byte-identical.
+Zero regression: 249 engine layout tests.
+
+**Remaining within increment 5**: only **`::before`/`::after`** pseudo boxes — materialised upstream (the
+renderer / bridge), the one paint-residue item not reachable from the `Broiler.Layout` read model or a
+single submodule call site. Non-issues confirmed: box-shadow is carried in the IR but has **no paint
+consumer** (element box-shadow unimplemented); text-decoration underline rides the zoomed font metrics; SVG
+`text` `font-size` scales through the same seeded `sx`/`sy`. The one main-repo remnant deliberately left is
+**`letter-spacing`/`word-spacing`**: they *do* feed text layout (`MeasureWordSpacing` / `CssUtils.WhiteSpace`)
+and are entangled with the whitespace-advance measurement (a two-site add through `ParseLength(..., fontAdjust)`),
+so scaling them safely needs a focused text-measurement pass rather than a one-line getter wrap — a bounded
+follow-up.
 
 **Remaining zoom increments**: (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles` — once the
 submodule paint residue above is patched in, so the flag-on engine matches the bake before the bake is

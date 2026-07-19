@@ -16,24 +16,34 @@ internal static partial class SvgRenderer
     /// Parses SVG XML content and returns display items positioned within
     /// the given <paramref name="bounds"/> rectangle.
     /// </summary>
-    public static List<DisplayItem> RenderSvgContent(string svgXml, RectangleF bounds)
+    /// <param name="effectiveZoom">
+    /// The owning element's compounded CSS <c>zoom</c> (<c>1.0</c> when the native-zoom engine is off).
+    /// It seeds the SVG user-unit → CSS-pixel scale, so a <em>view-box-less</em> SVG's raw geometry
+    /// (which maps 1:1 to CSS px) scales with the box. A view-boxed SVG is unaffected: its scale is
+    /// derived from <paramref name="bounds"/>, which the layout already emits zoomed, so the view-box
+    /// branch overrides the seed rather than compounding it.
+    /// </param>
+    public static List<DisplayItem> RenderSvgContent(string svgXml, RectangleF bounds, double effectiveZoom = 1.0)
     {
         var items = new List<DisplayItem>();
         if (string.IsNullOrEmpty(svgXml))
             return items;
 
-        ParseElements(svgXml, bounds, items);
+        ParseElements(svgXml, bounds, items, effectiveZoom);
         return items;
     }
 
-    private static void ParseElements(string svgXml, RectangleF bounds, List<DisplayItem> items)
+    private static void ParseElements(string svgXml, RectangleF bounds, List<DisplayItem> items, double effectiveZoom)
     {
         // Parse the viewBox from the root <svg> element to compute the
         // coordinate transform.  When a viewBox is present, SVG coordinates
         // are in viewBox space and must be scaled/translated to CSS bounds.
         // Default preserveAspectRatio is "xMidYMid meet" — scale uniformly
         // to fit, then centre in the viewport.
-        float sx = 1f, sy = 1f, tx = 0f, ty = 0f;
+        // Seed the user-unit scale with the element's zoom: with no viewBox the raw SVG coordinates map
+        // 1:1 to CSS pixels, so they must scale by zoom like any other used length. A viewBox overrides
+        // this below with a scale derived from the (already-zoomed) bounds, so it is not compounded.
+        float sx = (float)effectiveZoom, sy = (float)effectiveZoom, tx = 0f, ty = 0f;
         var pathStartsById = new Dictionary<string, PointF>(StringComparer.OrdinalIgnoreCase);
         var svgMatch = ParseRegex().Match(svgXml);
         if (svgMatch.Success)
