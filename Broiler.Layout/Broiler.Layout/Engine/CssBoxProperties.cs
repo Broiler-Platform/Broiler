@@ -514,7 +514,9 @@ internal abstract partial class CssBoxProperties
         if (!double.IsNaN(cache))
             return cache;
 
-        double resolved = ParseLengthWithLineHeight(value, basis);
+        // min-/max-width resolve against the containing block width (CSS2.1 §10.4), so a percentage
+        // carries only the ancestor zoom and needs this box's own zoom to reach the effective factor.
+        double resolved = ParseLengthWithLineHeight(value, basis, percentAgainstContainingBlock: true);
 
         // Only an absolute length (no percentage term) is independent of the
         // basis; cache it. Percentage / expression-with-% values differ per
@@ -2042,19 +2044,21 @@ internal abstract partial class CssBoxProperties
     }
 
     /// <summary>
-    /// Resolves an inset (<c>top</c>/<c>right</c>/<c>bottom</c>/<c>left</c>) length against its basis and
-    /// applies native <c>zoom</c> the same way <see cref="ApplyZoomToLength"/> does: absolute insets scale
-    /// by <see cref="EffectiveZoom"/>, <c>em</c>/<c>ch</c> ride the already-zoomed font, viewport units are
-    /// untouched, and percentages scale by this box's own zoom when the basis is the (ancestor-zoomed)
-    /// containing block. Inert unless <see cref="NativeZoom"/> is enabled and the box is zoomed — flag-off
-    /// it is byte-identical to a bare <see cref="Broiler.CSS.CssLengthParser.ParseLength(string,double,double)"/>.
+    /// Resolves a used length (an inset, or an abspos/percentage block size / min-/max-size) against its
+    /// basis via the direct <see cref="Broiler.CSS.CssLengthParser.ParseLength(string,double,double)"/> —
+    /// i.e. without the line-height context of <see cref="ParseLengthWithLineHeight(string,double,bool)"/> —
+    /// and applies native <c>zoom</c> the same way <see cref="ApplyZoomToLength"/> does: absolute lengths
+    /// scale by <see cref="EffectiveZoom"/>, <c>em</c>/<c>ch</c> ride the already-zoomed font, viewport units
+    /// are untouched, and percentages scale by this box's own zoom when the basis is the (ancestor-zoomed)
+    /// containing block. Inert unless <see cref="NativeZoom"/> is enabled and the box is zoomed — flag-off it
+    /// is byte-identical to a bare <c>ParseLength</c>.
     /// </summary>
     /// <param name="percentAgainstContainingBlock">
     /// <c>true</c> (the default) when <paramref name="basis"/> is the containing block's size — the usual
-    /// inset case; <c>false</c> when it is the box's own already effective-zoom-scaled size (e.g. a
-    /// relative-positioning offset resolved against <c>Size</c>).
+    /// case for insets and percentage/abspos block sizes; <c>false</c> when it is the box's own already
+    /// effective-zoom-scaled size (e.g. a relative-positioning offset resolved against <c>Size</c>).
     /// </param>
-    private protected double ParseInsetLength(string value, double basis, bool percentAgainstContainingBlock = true)
+    private protected double ParseUsedLength(string value, double basis, bool percentAgainstContainingBlock = true)
         => ApplyZoomToLength(value, CssLengthParser.ParseLength(value, basis, GetEmHeight()), percentAgainstContainingBlock);
 
     /// <param name="percentAgainstContainingBlock">

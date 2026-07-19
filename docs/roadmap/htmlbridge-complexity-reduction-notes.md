@@ -880,11 +880,23 @@ workflow this ships as **`patches/0001-broiler-css-calc-zoom-length-scaling.patc
 feature is `NativeZoom`-gated (off), so nothing on CI needs it now; the wiring lands with the pointer bump.
 See `patches/README.md`.
 
-**Still deferred within increment 3** (documented gap, inert while the flag is off): the
-**direct-`ParseLength` *height* callsites** (abspos/special block-size resolution against `cbHeight` in
-`CssBox.Layout.cs`) are still unwrapped, so a zoomed abspos box scales its insets and inline size but an
-explicit abspos `height` resolved on those paths is not yet zoomed — a bounded next follow-up mirroring the
-`ParseInsetLength` helper.
+**Landed (2026-07-19) — increment-3 abspos block-size follow-up: the last direct-`ParseLength` gap (main-repo).**
+The `ParseInsetLength` helper is generalised to **`ParseUsedLength(value, basis, percentAgainstContainingBlock
+= true)`** (same body — direct `ParseLength` + `ApplyZoomToLength`, no line-height context) and now also wraps
+the seven direct-`ParseLength` **block-size** callsites in `CssBox.Layout.cs`: the abspos/percentage `height`
+resolutions against `cbHeight` (`PreResolveDefiniteHeightForDescendants`, `ApplyExplicitHeight`,
+`ApplyFloatExplicitHeight`), the `min-height`/`max-height` §10.7 clamps against `cbHeight`, and the two
+absolute-`height` fallbacks against basis `0` (the bottom-anchored fixed placement and
+`IsDefiniteBorderBoxHeight`). So a zoomed abspos box now scales its explicit/percentage block size too
+(absolute ×`EffectiveZoom`, `%` ×`OwnZoom` against the CB), consistent with the border/padding that
+`ResolveSpecifiedHeightToBorderBox` already adds zoomed. The same CB-basis `%` fix is applied to
+`min-width`/`max-width` (`ResolveCachedConstraintLength` now passes `percentAgainstContainingBlock: true`,
+matching the §10.4 containing-block basis). All gated by `NativeZoom` → flag-off byte-identical. Tests:
+`ZoomInsetTests` gains the absolute-height fallback (×`EffectiveZoom`, disabled = unscaled) observed through
+the §10.6.4 block-axis centring split; the `%` block-size behaviour is covered by the shared helper's
+existing `%`-inset test. Zero regression: 236 engine layout tests + the positioned/geometry/modal-centring
+Cli subset. This closes the last documented increment-3 length gap; only `calc()` (shipped as the
+`Broiler.CSS` patch, wiring deferred until the pointer bump) remains outside the flag-off engine.
 
 **Remaining zoom increments**: (4) the SVG
 attribute / `::before`·`::after` pseudo / column edge cases the bake also covers; (5) the render/paint path

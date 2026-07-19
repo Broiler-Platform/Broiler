@@ -74,6 +74,38 @@ public sealed class ZoomInsetTests
     }
 
     [Fact]
+    public void AbsoluteHeightFallback_ScalesBy_EffectiveZoom()
+    {
+        // With Size.Height still 0, §10.6.4 block-axis centring derives the box height from the explicit
+        // CSS `height` (the ParseUsedLength(Height, 0) fallback in IsDefiniteBorderBoxHeight); under zoom
+        // that absolute height scales by EffectiveZoom, leaving less free space and a smaller margin.
+        var root = Box(null, new SizeF(1000, 1000), "static");
+        var b = Box(root, new SizeF(100, 0), "fixed", "2");
+        b.Height = "100px";
+        b.Top = "0"; b.Bottom = "0";
+        b.MarginTop = "auto"; b.MarginBottom = "auto";
+        WithNativeZoom(() =>
+        {
+            b.ResolveOverconstrainedAutoMargins(300, 300);
+            // height 100px × 2 = 200; margin = (300 - 200) / 2 = 50.
+            Assert.Equal(50, b.ActualMarginTop, 3);
+        });
+    }
+
+    [Fact]
+    public void AbsoluteHeightFallback_Disabled_IsUnscaled()
+    {
+        var root = Box(null, new SizeF(1000, 1000), "static");
+        var b = Box(root, new SizeF(100, 0), "fixed", "2");
+        b.Height = "100px";
+        b.Top = "0"; b.Bottom = "0";
+        b.MarginTop = "auto"; b.MarginBottom = "auto";
+        // Flag off: height stays 100; margin = (300 - 100) / 2 = 100.
+        b.ResolveOverconstrainedAutoMargins(300, 300);
+        Assert.Equal(100, b.ActualMarginTop, 3);
+    }
+
+    [Fact]
     public void Disabled_LeavesInsets_Unscaled()
     {
         var b = InsetBox("40px", "2");
