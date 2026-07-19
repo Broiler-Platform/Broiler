@@ -1027,6 +1027,41 @@ harness (there is no reftest corpus). The `%`-vs-`px`-vs-`em` and *own*-vs-*effe
 (increments 2–3) are the intricate, correctness-sensitive core — which is why this is "the large piece" and
 is being landed incrementally behind the flag. The runbook's readiness checklist tracks P1–P4.
 
+**Landed (2026-07-19) — increment-6 precondition P1 complete + the P4 engine-coverage audit closed its one
+gap.** The maintainer's "Update submodules" commit applied the three CSS-`zoom` paint patches
+(`0001` calc / `0002` text-shadow / `0003` SVG) and bumped the `Broiler.CSS` + `Broiler.HTML` pointers, so
+`CssLengthParser.SetElementZoom` and the `EffectiveZoom`-scaled paint now live at the pinned SHAs — clearing
+the environment/maintainer half of **P1** (previously the 403 blocker). The parent half is now re-added:
+`CssBoxProperties.ParseUsedLength` / `ParseLengthWithLineHeight` wrap the `(`-containing (calc) `ParseLength`
+in a `CssLengthParser.SetElementZoom(EffectiveZoom, percentAgainstContainingBlock ? OwnZoom : 1.0)` … `finally
+SetElementZoom(1.0, 1.0)` scope (guarded by `NeedsCalcZoomScope`), so a `calc()`/`min()`/`max()` used length
+now scales its absolute terms by `EffectiveZoom` and its `%` terms by `OwnZoom` on the engine path — the parent
+side of patch 0001, previously reverted because the pinned `Broiler.CSS` lacked `SetElementZoom`.
+**P1 is complete.**
+
+Doing the **P4 engine-coverage audit** (the input to the equivalence harness) — cross-checking every property
+in the bake's `ZoomScaledSerializationProperties` list against the engine used-value model — surfaced and closed
+the one genuine render-parity gap and cleared two false ones:
+- **Gap closed — explicit absolute-length `line-height`.** `ParseLineHeightLength` used a bare `ParseLength`,
+  so a `line-height: 20px` under `zoom: 2` was *not* scaled by the engine while the bake scaled it to `40px`.
+  New `ApplyZoomToLineHeight` scales an absolute-length line-height by `EffectiveZoom` (matching the bake),
+  and deliberately leaves a unitless / `%` / font-relative (`em`/`rem`) line-height alone — those already ride
+  the zoomed font basis, so re-scaling would double-count. Flag-gated.
+- **Safe to drop (no fix needed) — `scroll-padding-*` / `scroll-margin-*`.** Absent from `Broiler.Layout`
+  layout entirely; the only consumer, `LayoutMetrics.ResolveScrollIntoViewInset`, reads them from *computed*
+  props and applies `GetUsedZoomForElement` itself (source-agnostic), so dropping the serialization bake has
+  no render or CSSOM effect.
+- **Safe to drop (no fix needed) — `letter-spacing`.** The engine never lays it out (documented increment-5
+  non-issue), so its bake scaling has no rendered effect.
+
+So the used-value model now reproduces the bake for every rendered property behind the flag. All 49
+`Broiler.Layout.Tests` zoom tests pass (incl. the new `ZoomLineHeightAndCalcTests`), and the flag-off
+`Broiler.Cli.Tests ~Zoom` set is byte-identical to baseline (22 pass / the 5 standing font/visual-viewport
+environmental fails). **Remaining before the flip: P2** — scope `NativeZoom.Enabled` at *every* layout
+consumer of bridge output (geometry snapshot, WPT render, product capture), not just one seam — and the **P4**
+A/B harness. The atomic flip stays unexecuted until both are green (production-render change, no reftest
+corpus). See `docs/roadmap/zoom-native-cutover.md` for the updated checklist.
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 

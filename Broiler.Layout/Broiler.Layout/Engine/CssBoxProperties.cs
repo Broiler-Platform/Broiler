@@ -2066,7 +2066,30 @@ internal abstract partial class CssBoxProperties
     /// effective-zoom-scaled size (e.g. a relative-positioning offset resolved against <c>Size</c>).
     /// </param>
     private protected double ParseUsedLength(string value, double basis, bool percentAgainstContainingBlock = true)
-        => ApplyZoomToLength(value, CssLengthParser.ParseLength(value, basis, GetEmHeight()), percentAgainstContainingBlock);
+    {
+        if (NeedsCalcZoomScope(value))
+        {
+            CssLengthParser.SetElementZoom(EffectiveZoom, percentAgainstContainingBlock ? OwnZoom : 1.0);
+            try { return ApplyZoomToLength(value, CssLengthParser.ParseLength(value, basis, GetEmHeight()), percentAgainstContainingBlock); }
+            finally { CssLengthParser.SetElementZoom(1.0, 1.0); }
+        }
+        return ApplyZoomToLength(value, CssLengthParser.ParseLength(value, basis, GetEmHeight()), percentAgainstContainingBlock);
+    }
+
+    /// <summary>
+    /// True when a length must be parsed under the CSS length parser's element-<c>zoom</c> scope
+    /// (<see cref="Broiler.CSS.CssLengthParser.SetElementZoom"/>): a <c>calc()</c>/<c>min()</c>/<c>max()</c>
+    /// mixes units that the post-hoc <see cref="ApplyZoomToLength"/> cannot scale (absolute vs <c>%</c> vs
+    /// font-/viewport-relative), so the per-unit factors are set on the parser for the parse instead
+    /// (increment-3 calc wiring, the parent side of the <c>Broiler.CSS</c> calc patch). No-op unless native
+    /// <c>zoom</c> is on, the box is zoomed, and the length actually contains a <c>(</c> — so flag-off it is
+    /// byte-identical.
+    /// </summary>
+    private bool NeedsCalcZoomScope(string? length)
+        => NativeZoom.Enabled
+           && (EffectiveZoom != 1.0 || OwnZoom != 1.0)
+           && !string.IsNullOrEmpty(length)
+           && length.Contains('(');
 
     /// <param name="percentAgainstContainingBlock">
     /// Set when <paramref name="hundredPercent"/> is the containing block's (ancestor-zoomed) size —
@@ -2098,6 +2121,18 @@ internal abstract partial class CssBoxProperties
                 return ApplyZoomToLength(length, chCount * chWidth, percentAgainstContainingBlock);
         }
 
+        if (NeedsCalcZoomScope(length))
+        {
+            CssLengthParser.SetElementZoom(EffectiveZoom, percentAgainstContainingBlock ? OwnZoom : 1.0);
+            try
+            {
+                return ApplyZoomToLength(length, CssLengthParser.ParseLength(
+                    length, hundredPercent, GetEmHeight(), null, false, false,
+                    ActualLineHeight, GetRootLineHeight()), percentAgainstContainingBlock);
+            }
+            finally { CssLengthParser.SetElementZoom(1.0, 1.0); }
+        }
+
         return ApplyZoomToLength(length, CssLengthParser.ParseLength(
             length,
             hundredPercent,
@@ -2112,7 +2147,7 @@ internal abstract partial class CssBoxProperties
     private double ParseLineHeightLength(string length, double hundredPercent)
     {
         var parentLineHeight = GetParent()?.ActualLineHeight ?? GetNormalLineHeight();
-        return CssLengthParser.ParseLength(
+        double resolved = CssLengthParser.ParseLength(
             length,
             hundredPercent,
             GetEmHeight(),
@@ -2121,6 +2156,33 @@ internal abstract partial class CssBoxProperties
             false,
             parentLineHeight,
             GetRootLineHeight());
+        return ApplyZoomToLineHeight(length, resolved);
+    }
+
+    /// <summary>
+    /// Native <c>zoom</c> for an explicit <c>line-height</c> used value (increment-2 companion). Only an
+    /// <em>absolute</em>-length line-height (<c>px</c>/<c>pt</c>/<c>cm</c>/<c>mm</c>/<c>in</c>/<c>pc</c>/<c>q</c>)
+    /// scales by <see cref="EffectiveZoom"/> — matching the serialization bake, which multiplied
+    /// <c>line-height</c> by the used zoom. A unitless number, a <c>%</c>, or a font-relative
+    /// (<c>em</c>/<c>ex</c>/<c>ch</c>/<c>rem</c>) line-height already rides the zoomed font (its basis is the
+    /// already-<see cref="EffectiveZoom"/>-scaled font size or root font size), so re-scaling it would
+    /// double-count. Inert unless <see cref="NativeZoom"/> is enabled and the box is zoomed — flag-off it is
+    /// byte-identical.
+    /// </summary>
+    private double ApplyZoomToLineHeight(string length, double resolved)
+    {
+        if (!NativeZoom.Enabled || EffectiveZoom == 1.0)
+            return resolved;
+        var t = length?.Trim();
+        if (string.IsNullOrEmpty(t) || t == "0" || t.Equals("normal", StringComparison.OrdinalIgnoreCase))
+            return resolved;
+        if (t.Contains('('))
+            return resolved; // calc()/math — mixed units ride their own bases; not scaled here
+        var lower = t.ToLowerInvariant();
+        if (lower.EndsWith("px") || lower.EndsWith("pt") || lower.EndsWith("cm") || lower.EndsWith("mm")
+            || lower.EndsWith("in") || lower.EndsWith("pc") || lower.EndsWith('q'))
+            return resolved * EffectiveZoom; // absolute physical length — scales like every other used length
+        return resolved; // unitless / % / em / rem / viewport — already carried by the zoomed font basis
     }
 
     private double GetRootLineHeight()

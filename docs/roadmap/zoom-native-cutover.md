@@ -120,12 +120,49 @@ reftest corpus exists.
 
 ## Readiness checklist (current status — 2026-07-19)
 
-- [ ] **P1** patches 0001–0003 applied + `Broiler.CSS` / `Broiler.HTML` pointers bumped +
-  calc parent wiring re-added. *(Blocked: the submodule remotes 403 from this session's scope;
-  applying the patches and bumping the pointers is an environment/maintainer action.)*
-- [ ] **P2** `NativeZoom.Enabled` thread-locality confirmed at the render/geometry layout entry.
+- [x] **P1** patches 0001–0003 applied + `Broiler.CSS` / `Broiler.HTML` pointers bumped
+  (**done by the maintainer 2026-07-19** — the "Update submodules" commit applied the three
+  CSS-`zoom` paint patches and bumped both pointers; `CssLengthParser.SetElementZoom` and the
+  `EffectiveZoom`-scaled text-shadow / SVG paint now live at the pinned SHAs) **+ calc parent
+  wiring re-added** (`CssBoxProperties.ParseUsedLength` / `ParseLengthWithLineHeight` now wrap the
+  `(`-containing `ParseLength` in a `SetElementZoom(EffectiveZoom, percentAgainstContainingBlock ?
+  OwnZoom : 1.0)` scope via the `NeedsCalcZoomScope` guard — flag-gated, byte-identical off).
+  Pinned by `Broiler.Layout.Tests/ZoomLineHeightAndCalcTests.CalcAbsoluteInset_*`.
+- [ ] **P2** `NativeZoom.Enabled` thread-locality confirmed **and scoped at every layout consumer
+  of bridge output**. This is the main remaining engineering step and is wider than one site: the
+  bridge does not run layout itself, and both `SerializeToHtml`/`GetRenderDocument` hand a document
+  (or serialized string) to a *separate* `HtmlContainer` that lays it out on the calling thread.
+  The flag must be scoped (save/restore) around **(a)** the geometry-snapshot layout
+  (`SharedLayoutGeometry.BuildSharedGeometrySnapshot` around `GetRenderDocument` + `GetGeometry`, the
+  same seam that already scopes `NativeVisualViewport`'s `VisualViewportScale`), **(b)** the WPT
+  reference render (`WptTestRunner.RenderWithNativeAnchor`, beside `NativeAnchorPlacement.Enabled`),
+  and **(c)** the product capture render (`CaptureService`'s container layout of the serialized
+  output). Miss any consumer and that path silently drops `zoom` once the bake is gone — so P2 must
+  enumerate every layout of bridge output, not just the WPT path.
 - [ ] **P3** CSSOM `SharedGeometryZoomSize` suite green on the engine path *(expected to hold —
-  the divide-out reads computed zoom, which is source-agnostic — but unverified).*
-- [ ] **P4** A/B equivalence harness written and green across the corpus above.
+  the divide-out reads computed zoom, which is source-agnostic — but unverified end-to-end on the
+  engine path).* Note `Zoomed_Client_Stays_Unzoomed_After_A_Snapshot_Build` specifically exercises
+  the `_zoomSerializationRevertLog` behaviour being deleted; re-verify (it should still hold — with
+  no bake there is no destructive live-doc mutation to revert).
+- [ ] **P4** A/B equivalence harness written and green across the corpus above. **Engine-coverage
+  audit done 2026-07-19** (the input to P4): every property in the bake's
+  `ZoomScaledSerializationProperties` list was cross-checked against the engine used-value model —
+  all are now covered behind the flag **except two that are safe to drop**:
+  `scroll-padding-*`/`scroll-margin-*` (absent from `Broiler.Layout` layout; the only consumer,
+  `LayoutMetrics.ResolveScrollIntoViewInset`, reads them from *computed* props and applies
+  `GetUsedZoomForElement` itself — source-agnostic, so no render or CSSOM effect) and
+  `letter-spacing` (the engine never lays it out — documented non-issue in increment 5). The one
+  genuine render-parity gap the audit found — an **explicit absolute-length `line-height`** was not
+  scaled by the engine (bare `ParseLength` in `ParseLineHeightLength`) — **is now closed**
+  (`ApplyZoomToLineHeight`: absolute-length line-height × `EffectiveZoom`, unitless/`%`/font-relative
+  left to the zoomed font basis; flag-gated). Pinned by
+  `ZoomLineHeightAndCalcTests.AbsoluteLineHeight_*` / `UnitlessLineHeight_IsNotReScaled_ByZoomHelper`.
+  So the used-value model now reproduces the bake for every rendered property; the remaining P4 work
+  is to build the harness and run the equivalence across the corpus before the atomic flip.
 
-When all four are checked, execute "The flip" above as a single commit.
+**Status 2026-07-19:** P1 is complete (patches + pointers landed; calc parent wiring re-added). The
+engine-coverage audit (the P4 input) is done and closed its one real gap (line-height). The
+remaining gate is **P2** (scope `NativeZoom.Enabled` at every layout consumer of bridge output) and
+the **P4** A/B harness; the flip itself stays unexecuted until both are green, because it is a
+production-render change with no reftest corpus (per this runbook's original P4 warning). When P2 and
+P4 are checked, execute "The flip" above as a single commit.
