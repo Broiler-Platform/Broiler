@@ -109,31 +109,6 @@ public sealed partial class DomBridge
     internal static IEnumerable<string> AttributeNames(DomElement element) =>
         element.Attributes.Values.Select(static attribute => attribute.QualifiedName);
 
-    /// <summary>Legacy enumeration/snapshot of the string-keyed attribute map (qualified
-    /// name → value, case-insensitive, last-wins on collision — matching the old
-    /// <c>LegacyAttributeDictionary.Snapshot</c>).</summary>
-    private static Dictionary<string, string> AttributeSnapshot(DomElement element)
-    {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var attribute in element.Attributes.Values)
-            result[attribute.QualifiedName] = attribute.Value;
-        return result;
-    }
-
-    /// <summary>Restores the element's attribute set to <paramref name="saved"/> — the
-    /// attribute-map equivalent of <c>RestoreStringMap</c> (remove extras, then set saved).</summary>
-    private static void RestoreAttributes(DomElement element, Dictionary<string, string> saved)
-    {
-        foreach (var name in AttributeNames(element).ToList())
-        {
-            if (!saved.ContainsKey(name))
-                RemoveAttr(element, name);
-        }
-
-        foreach (var kv in saved)
-            SetAttr(element, kv.Key, kv.Value);
-    }
-
     private void CollectByTagName(DomNode root, string tag, List<JSValue> results)
     {
         foreach (var child in ChildElements(root))
