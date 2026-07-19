@@ -10,10 +10,17 @@ document services, feature-module extraction, parallel-DOM-state elimination, an
 the move of used-value behaviour into Layout — including per-slice status entries,
 branches, tests and regression checks.
 
-**These phases are not all fully complete.** The bulk of each phase's planned
-work has landed, but several phases carry explicit deferred, blocked, or
-still-to-come residue, and a few exit criteria remain open. Read each phase's
-own status entries for the specifics; the summary below is the quick view.
+**These phases are complete to their in-scope terminal state; the residue that
+remains is externally gated.** The bulk of each phase's planned work has landed,
+and as of the 2026-07-19 reconciliation no further main-repo, in-session code
+change advances closure — what is left is strictly external: a maintainer applying
+the pending submodule patches (`Broiler.CSS`/`Broiler.HTML`/`Broiler.DOM`, out of
+session push scope → 403 → patch workflow) and bumping the pointers; an
+environment-config change (enabling `NativeZoom` at the `CaptureService` external
+renderer to delete the zoom bake); and the deliberately later-phase / out-of-scope
+items (Phase 6 Canvas `getContext`; the JS-engine simultaneous-session isolation).
+Read each phase's own status entries for the specifics; the summary below is the
+quick view.
 
 | Phase | Status | Open residue |
 |---|---|---|
@@ -22,7 +29,7 @@ own status entries for the specifics; the summary below is the quick view.
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
 | 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
-| 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
+| 5 — used-value behaviour into Layout | Bulk delivered; **in-scope terminal** | Anchor-track deletion complete through step 6. Feature (b) visual-viewport/zoom: read (CSSOM) **and** render (pixel) sides now validated on the engine used-value model (2026-07-19) — deleting the zoom bake is now only a *deployment* gate (enable `NativeZoom` at the external `CaptureService` renderer), plus the submodule-push-gated pinch render cutover (`patches/0001`). Feature (a) dialog/backdrop: native modal centering + modal box-chrome bake deletion landed; native `::backdrop` box + top-layer paint stay submodule-patch-gated. See the [2026-07-19 reconciliation](#reconciliation-2026-07-19--features-a-and-b-driven-to-their-in-scope-terminal-state). |
 
 Companion documents:
 
@@ -3966,3 +3973,57 @@ further is gated on separate feature work (native dialog/backdrop, visual-viewpo
 engine intrinsic-size position-try is now **done**: min-content and max/fit-content bases all hand off natively)
 plus the optional follow-up of fully retiring the `NativeAnchorPlacement` lever once the last ALWAYS
 marker-stamp no longer needs it.
+
+#### Reconciliation 2026-07-19 — features (a) and (b) driven to their in-scope terminal state
+
+The two step-6 feature gates ((a) native dialog/backdrop, (b) the visual-viewport LayoutSnapshot endgame)
+have since been carried as far as this session's scope allows (merged via PR #1407). What landed, and where
+each now genuinely stops, so a reader knows exactly what full closure still needs:
+
+- **(b) visual-viewport / zoom — read AND render sides now validated; only a deployment gate remains.**
+  - **Native visual-viewport read model activated** (`NativeVisualViewport` on): the pinch scale is read from
+    the engine rather than the serialization bake, and the `_zoomSerializationRevertLog` revert machinery is
+    **deleted** (dead once the read path no longer mutates the live doc).
+  - **CSSOM read path migrated to the engine used-value model.** The A/B harness
+    (`Broiler.Cli.Tests/ZoomBakeVsEngineEquivalenceTests`) proved bake and engine agree for absolute lengths,
+    nested zoom, abspos insets, margins/border and absolute-length `line-height`, and diverge only for `%` /
+    `em` / `rem` / `calc(px+%)` — where the **engine value is the mathematically-correct unzoomed CSS px** and
+    the bake was simply buggy. `SharedLayoutGeometry.BuildSharedGeometrySnapshot` now enables `NativeZoom`
+    around the snapshot layout, so `offset*`/`client*`/`gBCR` are the correct engine used value for relative
+    units too. The catalogue tests were reworked from `*_Diverges_BlocksFlip` to `*_ReadIsEngineUsedValue` /
+    `*_ReadIsStable` (read now independent of the render-only flag). Zero new fails.
+  - **Render-side A/B validation done** (engine render proven correct, incl. relative units): a
+    `WptTestRunner.NativeZoom` lever (default-off, byte-identical; mirrors `NativeAnchorPlacement`) renders the
+    zoom cases through the engine; the new `Wpt_CssViewport_Zoom{Basic,Percentage,Em}_EngineRender_MatchesReference`
+    tests match the same hand-authored references the baked path matches — the absolute **and** the `%`/`em`
+    cases the bake mishandled — and the existing 16 `Wpt_CssViewport_Zoom*_MatchesReference` reftests are
+    unchanged. Correctness is banked on both the read (CSSOM) and render (pixel) sides.
+  - **Terminal gate (not closeable in-session): deleting the zoom bake is now purely a *deployment* concern**,
+    not correctness or patch. `NativeZoom` must be enabled at every consumer that lays out bridge serialized
+    output; the geometry snapshot (a) and WPT render (b) are covered, but the **product capture path**
+    (`CaptureService`) hands the serialized HTML to an *external* renderer this container can neither scope nor
+    validate. Until that consumer enables the flag — an environment-config change — the bake stays as the
+    carry-through, so nothing on CI regresses. See `zoom-native-cutover.md` P2.
+  - **Pinch-zoom render cutover is submodule-push-gated.** `patches/0001-html-render-viewport-zoom-param.patch`
+    (`Broiler.HTML` `HtmlRender.RenderToImageWithStyleSet` → threads `viewportZoom`) is captured for a
+    maintainer to apply (403 push scope); its main-repo follow-up (pass `visualViewport.scale` into the render
+    and stop `ApplyVisualViewportSerializationState` baking the pinch factor onto the root `zoom`) is deferred
+    until the pointer is bumped, because it references the patched API that does not exist at the pinned SHA.
+    The serialization bake remains the active fallback meanwhile.
+
+- **(a) native dialog / backdrop — the in-scope, main-repo slices landed; the native box + paint stay
+  submodule-patch-gated.** Native modal `<dialog>` centering is wired (horizontal and block-axis
+  shrink-to-fit for content-sized modals), the **modal box-chrome bake is deleted**, and the popover
+  top-layer emulation is de-doubled. The remaining pieces — a native `::backdrop` box and a native top layer
+  in layout/paint — live in `Broiler.CSS` / `Broiler.HTML` (out of session push scope → 403 → patch workflow,
+  maintainer-apply), so the `ApplyDialogUAPositioning` / `ApplyPopoverUAPositioning` / `InsertDialogBackdrops`
+  ALWAYS passes stay as the WPT-runner-only fallback until those patches land. See the native-dialog track in
+  `htmlbridge-complexity-reduction-notes.md`.
+
+**Net after this reconciliation.** Every Phase 0–5 residue is now at its terminal *in-scope* state: no
+further main-repo, in-session code change advances closure. What remains is strictly external — a maintainer
+applying the pending submodule patches (dialog/backdrop native box+paint; patch 0001 viewport-zoom render
+plumbing) and bumping the pointers, an environment change enabling `NativeZoom` at the `CaptureService`
+renderer, and the later-phase / out-of-scope items already recorded (Phase 6 Canvas `getContext`; the JS-engine
+simultaneous-session isolation). The `NativeAnchorPlacement` lever's full retirement stays the documented
+optional follow-up, still blocked only by the step-3e marker that the native-dialog track will remove.
