@@ -93,8 +93,10 @@ public sealed partial class DomBridge
         // DomBridge.ElementContentHost.cs). Split around shadowRoot to preserve property order.
         Dom.Features.ElementContentBinding.InstallHtmlSerialization(this, obj, element);
 
+        // shadowRoot (read-only) — Phase 3 P3.62: co-located ShadowDomBinding feature module, reached
+        // through IShadowDomHost (DomBridge.ShadowDomHost.cs).
         obj.FastAddProperty((KeyString)"shadowRoot",
-            new JSFunction((in _) => JsJsObjectsGetShadowRoot019Core(element, in _), "get shadowRoot"),
+            new JSFunction((in _) => Dom.Features.ShadowDomBinding.GetShadowRoot(this, element, in _), "get shadowRoot"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // textContent (read/write) + innerText / outerText (read) — Phase 3 P3.57: ElementContentBinding.
@@ -107,14 +109,22 @@ public sealed partial class DomBridge
         // removeProperty, cssFloat — all route through this onMutation), write the dict through to the
         // canonical style= attribute so element.style and getAttribute("style") observe one state,
         // then invalidate computed style.
-        var styleObj = Dom.Features.StyleDeclarationBinding.BuildInlineDeclaration(bridge, element, () =>
+        // Phase 4 item 2: every element.style mutation writes the inline-style dict through to the
+        // canonical style= attribute (so element.style and getAttribute("style") observe one state) and
+        // then invalidates computed style. Shared by the declaration object's per-property/cssText
+        // mutations and the `element.style = "..."` assignment setter (Phase 3 P3.63:
+        // StyleDeclarationBinding.SetInlineStyleCssText).
+        void OnStyleMutation()
         {
             bridge.SyncStyleAttributeFromInlineStyle(element);
             bridge.InvalidateStyleScope(element);
-        }, onPositionAreaInvalidate: bridge.ClearPositionAreaResolution);
+        }
+
+        var styleObj = Dom.Features.StyleDeclarationBinding.BuildInlineDeclaration(bridge, element, OnStyleMutation,
+            onPositionAreaInvalidate: bridge.ClearPositionAreaResolution);
         obj.FastAddProperty((KeyString)"style",
             new JSFunction((in a) => styleObj, "get style"),
-            new JSFunction((in a) => JsJsObjectsSetStyle025Core(bridge, element, in a), "set style"),
+            new JSFunction((in a) => Dom.Features.StyleDeclarationBinding.SetInlineStyleCssText(bridge, element, OnStyleMutation, in a), "set style"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // classList — class list manipulation (Phase 3 P3.6: co-located ClassListBinding module)
@@ -367,9 +377,8 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // insertBefore(newChild, refChild)
-        var bridgeForInsert = this;
         obj.FastAddValue((KeyString)"insertBefore",
-            new JSFunction((in a) => JsJsObjectsInsertBefore080Core(bridgeForInsert, element, in a), "insertBefore", 2),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.InsertBefore(this, element, in a), "insertBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // children (read-only) — element children only (no text nodes)
@@ -404,32 +413,32 @@ public sealed partial class DomBridge
 
         // -- DOM manipulation methods --
 
+        // attachShadow(init) — Phase 3 P3.62: co-located ShadowDomBinding feature module.
         obj.FastAddValue((KeyString)"attachShadow",
-            new JSFunction((in a) => JsJsObjectsAttachShadow087Core(element, in a), "attachShadow", 1),
+            new JSFunction((in a) => Dom.Features.ShadowDomBinding.AttachShadow(this, element, in a), "attachShadow", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // appendChild(child)
-        var bridgeForAppend = this;
         obj.FastAddValue((KeyString)"appendChild",
-            new JSFunction((in a) => JsJsObjectsAppendChild088Core(bridgeForAppend, element, in a), "appendChild", 1),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.AppendChild(this, element, in a), "appendChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"append",
-            new JSFunction((in a) => JsJsObjectsAppend089Core(element, in a), "append", 0),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.Append(this, element, in a), "append", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"prepend",
-            new JSFunction((in a) => JsJsObjectsPrepend090Core(element, in a), "prepend", 0),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.Prepend(this, element, in a), "prepend", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // removeChild(child)
         obj.FastAddValue((KeyString)"removeChild",
-            new JSFunction((in a) => JsJsObjectsRemoveChild091Core(bridgeForAppend, element, in a), "removeChild", 1),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.RemoveChild(this, element, in a), "removeChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // replaceChild(newChild, oldChild)
         obj.FastAddValue((KeyString)"replaceChild",
-            new JSFunction((in a) => JsJsObjectsReplaceChild092Core(bridgeForAppend, element, in a), "replaceChild", 2),
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.ReplaceChild(this, element, in a), "replaceChild", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // remove() — ChildNode.remove() per DOM Living Standard
@@ -486,8 +495,8 @@ public sealed partial class DomBridge
         foreach (var eventName in InlineEventNames)
         {
             obj.FastAddProperty((KeyString)$"on{eventName}",
-                new JSFunction((in _) => JsJsObjectsCallback104Core(element, eventName, in _), $"get on{eventName}"),
-                new JSFunction((in a) => JsJsObjectsCallback105Core(element, eventName, in a), $"set on{eventName}"),
+                new JSFunction((in _) => Dom.Features.EventHandlerReflectorBinding.GetOn(this, element, eventName, in _), $"get on{eventName}"),
+                new JSFunction((in a) => Dom.Features.EventHandlerReflectorBinding.SetOn(this, element, eventName, in a), $"set on{eventName}"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
@@ -496,57 +505,10 @@ public sealed partial class DomBridge
 
         // -- Form element support --
 
-        // value (read/write) — for input, textarea, select elements
-        // The IDL 'value' property is NOT reflected as a content attribute for inputs.
-        obj.FastAddProperty((KeyString)"value",
-            new JSFunction((in a) => JsJsObjectsGetValue106Core(element, in a), "get value"),
-            new JSFunction((in a) => JsJsObjectsSetValue107Core(element, in a), "set value"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // checked (read/write) — for checkbox and radio inputs
-        // Uses the typed checked-state slot as the "dirty" IDL state that tracks
-        // programmatic changes. setAttribute("checked") only sets the content
-        // attribute and does NOT affect this IDL state.
-        obj.FastAddProperty((KeyString)"checked",
-            new JSFunction((in a) => JsJsObjectsGetChecked108Core(element, in a), "get checked"),
-            new JSFunction((in a) => JsJsObjectsSetChecked109Core(element, in a), "set checked"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // type (read/write) — for input/button elements; getter returns lowercase
-        obj.FastAddProperty((KeyString)"type",
-            new JSFunction((in a) => JsJsObjectsGetType110Core(element, in a), "get type"),
-            new JSFunction((in a) => JsJsObjectsSetType111Core(element, in a), "set type"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // name (read/write) — for form elements; syncs with content attribute
-        obj.FastAddProperty((KeyString)"name",
-            new JSFunction((in a) => JsJsObjectsGetName112Core(element, in a), "get name"),
-            new JSFunction((in a) => JsJsObjectsSetName113Core(element, in a), "set name"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // disabled (read/write) — for form controls
-        obj.FastAddProperty((KeyString)"disabled",
-            new JSFunction((in a) => HasAttr(element, "disabled") ? JSBoolean.True : JSBoolean.False, "get disabled"),
-            new JSFunction((in a) => JsJsObjectsSetDisabled115Core(bridge, element, in a), "set disabled"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // hidden (read/write) — global reflected boolean attribute
-        obj.FastAddProperty((KeyString)"hidden",
-            new JSFunction((in a) => HasAttr(element, "hidden") ? JSBoolean.True : JSBoolean.False, "get hidden"),
-            new JSFunction((in a) => JsJsObjectsSetHidden117Core(bridge, element, in a), "set hidden"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // tabIndex (read/write) — global reflected numeric attribute
-        obj.FastAddProperty((KeyString)"tabIndex",
-            new JSFunction((in _) => JsJsObjectsGetTabIndex118Core(element, in _), "get tabIndex"),
-            new JSFunction((in a) => JsJsObjectsSetTabIndex119Core(element, in a), "set tabIndex"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // required (read/write) — form validation
-        obj.FastAddProperty((KeyString)"required",
-            new JSFunction((in a) => HasAttr(element, "required") ? JSBoolean.True : JSBoolean.False, "get required"),
-            new JSFunction((in a) => JsJsObjectsSetRequired121Core(bridge, element, in a), "set required"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        // Form-control IDL reflectors (value/checked/type/name/disabled/hidden/tabIndex/required) —
+        // Phase 3 P3.60: extracted into the co-located FormControlBinding feature module, reached
+        // through the IFormControlHost contract (DomBridge.FormControlHost.cs).
+        _formControl.Install(obj, element);
 
         // checkValidity() — form validation (Phase 3 P3.9: FormBinding owns the validity check)
         obj.FastAddValue((KeyString)"checkValidity",
@@ -558,9 +520,10 @@ public sealed partial class DomBridge
             new JSFunction((in a) => _forms.IsElementValid(element) ? JSBoolean.True : JSBoolean.False, "reportValidity", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // submit() — for form elements
+        // submit() — for form elements (Phase 3 P3.61: co-located FormSubmitBinding feature module,
+        // reached through IFormSubmitHost; DomBridge.FormSubmitHost.cs).
         obj.FastAddValue((KeyString)"submit",
-            new JSFunction((in a) => JsJsObjectsSubmit125Core(element, obj, in a), "submit", 0),
+            new JSFunction((in a) => Dom.Features.FormSubmitBinding.Submit(this, element, obj, in a), "submit", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // querySelector on elements

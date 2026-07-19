@@ -1,0 +1,42 @@
+From 893653b9496c85cf8b5810d840d843d1702fbb4b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 19 Jul 2026 10:41:01 +0000
+Subject: [PATCH] PaintWalker: pass the box's effective CSS zoom into SVG
+ rendering
+
+EmitSvgContent renders inline SVG content into the (already-zoomed) box content
+box via SvgRenderer.RenderSvgContent. A view-boxed SVG scales correctly on its
+own (its transform derives from the zoomed bounds), but a view-box-less SVG maps
+its raw user-unit geometry 1:1 to CSS pixels, so under the native CSS zoom engine
+it was left unscaled. Pass fragment.Style.EffectiveZoom so RenderSvgContent seeds
+the user-unit scale with it. 1.0 (the default) while the native-zoom engine is
+off, so this is inert.
+
+Depends on the RenderSvgContent effectiveZoom parameter and the
+ComputedStyle.EffectiveZoom field (both in the parent repo).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Ert9d7aRuuFxoLMRzYN2G3
+---
+ .../Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
+index 099fd93..f83980c 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
+@@ -156,7 +156,10 @@ internal static partial class PaintWalker
+                 bounds.Height - (float)(border.Top + border.Bottom + padding.Top + padding.Bottom));
+ 
+             if (r.Width > 0 && r.Height > 0)
+-                items.AddRange(SvgRenderer.RenderSvgContent(fragment.SvgContent, r));
++                // Pass the box's effective CSS zoom so a view-box-less SVG's raw user-unit geometry scales
++                // with the box (a view-boxed SVG is unaffected — its scale derives from the zoomed bounds).
++                // 1.0 while the native-zoom engine is off, so this is inert by default.
++                items.AddRange(SvgRenderer.RenderSvgContent(fragment.SvgContent, r, fragment.Style.EffectiveZoom));
+         }
+     }
+ 
+-- 
+2.43.0
+

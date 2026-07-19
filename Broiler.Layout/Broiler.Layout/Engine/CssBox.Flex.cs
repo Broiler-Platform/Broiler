@@ -11,12 +11,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// CSS Multi-column §6.2: resolves <c>column-gap</c>.  The initial value
     /// 'normal' is ≈ 1em; an explicit length (including 0) overrides it.
     /// </summary>
-    private double ResolveColumnGap()
+    internal double ResolveColumnGap()
     {
         if (!string.IsNullOrEmpty(ColumnGap) && ColumnGap != "normal")
-            return CssLengthParser.ParseLength(ColumnGap, Size.Width, GetEmHeight());
+            // column-gap resolves against the multicol container's own (already zoom-scaled) content
+            // width, so a percentage carries the full effective factor; an absolute gap scales by zoom.
+            return ParseUsedLength(ColumnGap, Size.Width, percentAgainstContainingBlock: false);
 
-        return GetEmHeight();
+        return GetEmHeight(); // 'normal' ≈ 1em, already zoomed via GetEmHeight (increment 2)
     }
 
     private sealed class FlexItemLayout

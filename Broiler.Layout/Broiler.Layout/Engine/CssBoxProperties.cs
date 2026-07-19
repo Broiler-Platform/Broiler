@@ -288,7 +288,9 @@ internal abstract partial class CssBoxProperties
                     || OutlineStyle.Equals("hidden", StringComparison.OrdinalIgnoreCase))
                     _actualOutlineWidth = 0;
                 else
-                    _actualOutlineWidth = CssLengthParser.GetActualBorderWidth(OutlineWidth, GetEmHeight());
+                    // Paint-only used length: scale by zoom exactly like the border widths (absolute /
+                    // thin·medium·thick keyword × EffectiveZoom, em rides the already-zoomed font).
+                    _actualOutlineWidth = ApplyZoomToLength(OutlineWidth, CssLengthParser.GetActualBorderWidth(OutlineWidth, GetEmHeight()));
             }
 
             return _actualOutlineWidth;
@@ -303,7 +305,8 @@ internal abstract partial class CssBoxProperties
             if (double.IsNaN(_actualOutlineOffset))
                 _actualOutlineOffset = string.IsNullOrEmpty(OutlineOffset)
                     ? 0
-                    : CssLengthParser.ParseLength(OutlineOffset, 0, GetEmHeight());
+                    // Paint-only used length (may be negative); absolute × EffectiveZoom, em rides the font.
+                    : ApplyZoomToLength(OutlineOffset, CssLengthParser.ParseLength(OutlineOffset, 0, GetEmHeight()));
 
             return _actualOutlineOffset;
         }
@@ -514,7 +517,9 @@ internal abstract partial class CssBoxProperties
         if (!double.IsNaN(cache))
             return cache;
 
-        double resolved = ParseLengthWithLineHeight(value, basis);
+        // min-/max-width resolve against the containing block width (CSS2.1 §10.4), so a percentage
+        // carries only the ancestor zoom and needs this box's own zoom to reach the effective factor.
+        double resolved = ParseLengthWithLineHeight(value, basis, percentAgainstContainingBlock: true);
 
         // Only an absolute length (no percentage term) is independent of the
         // basis; cache it. Percentage / expression-with-% values differ per
@@ -663,6 +668,81 @@ internal abstract partial class CssBoxProperties
     public string Float { get; set; } = "none";
     public string Clear { get; set; } = "none";
     public string Position { get; set; } = "static";
+
+    // CSS Viewport `zoom`: the cascaded per-element zoom factor, surfaced on the box for the native zoom
+    // model (HtmlBridge complexity-reduction roadmap Phase 5, the CSS-`zoom`/visual-viewport endgame).
+    // Populated by CssUtils.SetPropertyValue from the declared cascade; consumed only when
+    // NativeZoom.Enabled (via EffectiveZoom), so it is inert by default and the HtmlBridge serialization
+    // bake continues to carry zoom as it does today. Initial value `normal` (== factor 1).
+    public string Zoom { get; set; } = "normal";
+
+    /// <summary>
+    /// This box's specified <c>zoom</c> as a positive factor: a number (<c>zoom: 2</c>), a percentage
+    /// (<c>zoom: 150%</c> → 1.5), or 1.0 for the initial/<c>normal</c>/<c>inherit</c>/unparseable value.
+    /// Not itself inherited — each element has its own zoom; the multiplicative compounding across
+    /// ancestors is expressed by <see cref="EffectiveZoom"/>.
+    /// </summary>
+    internal double OwnZoom
+    {
+        get
+        {
+            var z = Zoom?.Trim();
+            if (string.IsNullOrEmpty(z)
+                || z.Equals("normal", System.StringComparison.OrdinalIgnoreCase)
+                || z.Equals("inherit", System.StringComparison.OrdinalIgnoreCase))
+                return 1.0;
+            if (z.EndsWith('%')
+                && double.TryParse(z[..^1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var pct)
+                && pct > 0)
+                return pct / 100.0;
+            if (double.TryParse(z, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var num) && num > 0)
+                return num;
+            return 1.0;
+        }
+    }
+
+    /// <summary>
+    /// The compounded (effective) zoom applied to this box's used values: the product of this box's own
+    /// <see cref="OwnZoom"/> and every ancestor's, per CSS <c>zoom</c> (the factor compounds down the
+    /// tree). Always <c>1.0</c> unless <see cref="NativeZoom.Enabled"/>, so the engine is zoom-neutral by
+    /// default and this foundation is inert until the used-value increments consume it.
+    /// </summary>
+    public double EffectiveZoom =>
+        !NativeZoom.Enabled ? 1.0 : (GetParent()?.EffectiveZoom ?? 1.0) * OwnZoom;
+
+    /// <summary>
+    /// The CSS <em>computed</em> font size in points — unaffected by <c>zoom</c> (which scales only used
+    /// values, CSS Viewport). Font-size <c>%</c>/<c>em</c>/<c>larger</c>/<c>smaller</c> and inheritance
+    /// resolve against this, so the ancestor zoom is applied exactly once (via
+    /// <see cref="EffectiveZoom"/>) to the <em>used</em> size (<see cref="ActualFont"/>.Size) rather than
+    /// compounding through the font-size chain. Only consulted on the native-zoom path (parent
+    /// EffectiveZoom ≠ 1); off it, the existing <c>ActualFont.Size</c>-based resolution is unchanged.
+    /// </summary>
+    internal double ComputedFontSizePoints
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(FontSize))
+                return CssConstants.FontSize;
+
+            double parentSize = GetParent() != null ? GetParent().ComputedFontSizePoints : CssConstants.FontSize;
+            var fsize = FontSize switch
+            {
+                CssConstants.Medium => CssConstants.FontSize,
+                CssConstants.XXSmall => CssConstants.FontSize - 4,
+                CssConstants.XSmall => CssConstants.FontSize - 3,
+                CssConstants.Small => CssConstants.FontSize - 2,
+                CssConstants.Large => CssConstants.FontSize + 2,
+                CssConstants.XLarge => CssConstants.FontSize + 3,
+                CssConstants.XXLarge => CssConstants.FontSize + 4,
+                CssConstants.Smaller => parentSize - 2,
+                CssConstants.Larger => parentSize + 2,
+                _ => CssLengthParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
+            };
+
+            return fsize <= 0 ? 0.001 : fsize;
+        }
+    }
 
     // CSS Anchor Positioning: the cascaded values are surfaced on the box so the
     // layout engine's anchor-placement post-pass can read them (HtmlBridge
@@ -1005,7 +1085,11 @@ internal abstract partial class CssBoxProperties
                 && GetParent() != null
                 && double.TryParse(trimmedValue[..^1], NumberStyles.Float, CultureInfo.InvariantCulture, out _))
             {
-                double resolvedPoints = CssLengthParser.ParseNumber(trimmedValue, GetParent().ActualFont.Size);
+                // Percentage font-size resolves against the parent's COMPUTED (unzoomed) font size on the
+                // native-zoom path, so `zoom` applies once (via EffectiveZoom on the used size) rather than
+                // compounding through the font-size chain; off it, the existing used-size basis is kept.
+                double parentBasis = GetParent().EffectiveZoom != 1.0 ? GetParent().ComputedFontSizePoints : GetParent().ActualFont.Size;
+                double resolvedPoints = CssLengthParser.ParseNumber(trimmedValue, parentBasis);
                 _fontSize = resolvedPoints.ToString("0.0###", CultureInfo.InvariantCulture) + "pt";
                 InvalidateFontDependentValues();
                 
@@ -1031,7 +1115,10 @@ internal abstract partial class CssBoxProperties
                 }
                 else if (len.Unit == CssUnit.Em && GetParent() != null)
                 {
-                    computedValue = len.ConvertEmToPoints(GetParent().ActualFont.Size).ToString();
+                    // em font-size resolves against the parent's COMPUTED (unzoomed) size on the
+                    // native-zoom path (see the percentage branch above).
+                    double parentBasis = GetParent().EffectiveZoom != 1.0 ? GetParent().ComputedFontSizePoints : GetParent().ActualFont.Size;
+                    computedValue = len.ConvertEmToPoints(parentBasis).ToString();
                 }
                 else
                 {
@@ -1317,7 +1404,7 @@ internal abstract partial class CssBoxProperties
 
             if (double.IsNaN(_actualBorderTopWidth))
             {
-                _actualBorderTopWidth = CssLengthParser.GetActualBorderWidth(BorderTopWidth, GetEmHeight());
+                _actualBorderTopWidth = ApplyZoomToLength(BorderTopWidth, CssLengthParser.GetActualBorderWidth(BorderTopWidth, GetEmHeight()));
 
                 if (string.IsNullOrEmpty(BorderTopStyle) || BorderTopStyle == CssConstants.None)
                     _actualBorderTopWidth = 0f;
@@ -1336,7 +1423,7 @@ internal abstract partial class CssBoxProperties
 
             if (double.IsNaN(_actualBorderLeftWidth))
             {
-                _actualBorderLeftWidth = CssLengthParser.GetActualBorderWidth(BorderLeftWidth, GetEmHeight());
+                _actualBorderLeftWidth = ApplyZoomToLength(BorderLeftWidth, CssLengthParser.GetActualBorderWidth(BorderLeftWidth, GetEmHeight()));
 
                 if (string.IsNullOrEmpty(BorderLeftStyle) || BorderLeftStyle == CssConstants.None)
                     _actualBorderLeftWidth = 0f;
@@ -1355,7 +1442,7 @@ internal abstract partial class CssBoxProperties
 
             if (double.IsNaN(_actualBorderBottomWidth))
             {
-                _actualBorderBottomWidth = CssLengthParser.GetActualBorderWidth(BorderBottomWidth, GetEmHeight());
+                _actualBorderBottomWidth = ApplyZoomToLength(BorderBottomWidth, CssLengthParser.GetActualBorderWidth(BorderBottomWidth, GetEmHeight()));
 
                 if (string.IsNullOrEmpty(BorderBottomStyle) || BorderBottomStyle == CssConstants.None)
                     _actualBorderBottomWidth = 0f;
@@ -1374,7 +1461,7 @@ internal abstract partial class CssBoxProperties
 
             if (double.IsNaN(_actualBorderRightWidth))
             {
-                _actualBorderRightWidth = CssLengthParser.GetActualBorderWidth(BorderRightWidth, GetEmHeight());
+                _actualBorderRightWidth = ApplyZoomToLength(BorderRightWidth, CssLengthParser.GetActualBorderWidth(BorderRightWidth, GetEmHeight()));
 
                 if (string.IsNullOrEmpty(BorderRightStyle) || BorderRightStyle == CssConstants.None)
                     _actualBorderRightWidth = 0f;
@@ -1635,7 +1722,11 @@ internal abstract partial class CssBoxProperties
             ? Math.Max(0, Size.Width)
             : 0;
 
-        return CssLengthParser.ParseLength(radius, basis, GetEmHeight());
+        // Paint-only used length (increment 5): border-radius scales with the box's zoom — absolute
+        // radii × EffectiveZoom, a `%` radius resolves against the box's own (already zoom-scaled) border
+        // box so it carries the full factor already (percentAgainstContainingBlock: false). The paint
+        // walker derives the Y radius proportionally from this X value, so it scales with no further work.
+        return ApplyZoomToLength(radius, CssLengthParser.ParseLength(radius, basis, GetEmHeight()), percentAgainstContainingBlock: false);
     }
 
     public double ActualCornerNw
@@ -1780,24 +1871,35 @@ internal abstract partial class CssBoxProperties
             if (IsBoldWeight(FontWeight, GetParent()))
                 st |= LayoutFontStyle.Bold;
 
-            double parentSize = CssConstants.FontSize;
-
-            if (GetParent() != null)
-                parentSize = GetParent().ActualFont.Size;
-
-            var fsize = FontSize switch
+            double fsize;
+            if (EffectiveZoom != 1.0)
             {
-                CssConstants.Medium => CssConstants.FontSize,
-                CssConstants.XXSmall => CssConstants.FontSize - 4,
-                CssConstants.XSmall => CssConstants.FontSize - 3,
-                CssConstants.Small => CssConstants.FontSize - 2,
-                CssConstants.Large => CssConstants.FontSize + 2,
-                CssConstants.XLarge => CssConstants.FontSize + 3,
-                CssConstants.XXLarge => CssConstants.FontSize + 4,
-                CssConstants.Smaller => parentSize - 2,
-                CssConstants.Larger => parentSize + 2,
-                _ => CssLengthParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
-            };
+                // Native CSS `zoom`: the used font size is the computed (unzoomed) size scaled by the
+                // effective zoom. `em`/`%`/inheritance resolve against the computed size (unaffected by
+                // zoom), so they compound the ancestor zoom exactly once, through EffectiveZoom.
+                fsize = ComputedFontSizePoints * EffectiveZoom;
+            }
+            else
+            {
+                double parentSize = CssConstants.FontSize;
+
+                if (GetParent() != null)
+                    parentSize = GetParent().ActualFont.Size;
+
+                fsize = FontSize switch
+                {
+                    CssConstants.Medium => CssConstants.FontSize,
+                    CssConstants.XXSmall => CssConstants.FontSize - 4,
+                    CssConstants.XSmall => CssConstants.FontSize - 3,
+                    CssConstants.Small => CssConstants.FontSize - 2,
+                    CssConstants.Large => CssConstants.FontSize + 2,
+                    CssConstants.XLarge => CssConstants.FontSize + 3,
+                    CssConstants.XXLarge => CssConstants.FontSize + 4,
+                    CssConstants.Smaller => parentSize - 2,
+                    CssConstants.Larger => parentSize + 2,
+                    _ => CssLengthParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
+                };
+            }
 
             // CSS 2.1 §15.4: font-size: 0 results in a zero-size em box.
             // Use a tiny positive value so the font object remains valid
@@ -1904,13 +2006,81 @@ internal abstract partial class CssBoxProperties
     /// </summary>
     protected virtual double GetChWidth() => double.NaN;
 
-    protected double ParseLengthWithLineHeight(string length, double hundredPercent)
+    /// <summary>
+    /// Native CSS <c>zoom</c>: scales a resolved absolute length by <see cref="EffectiveZoom"/> (CSS
+    /// Viewport — <c>zoom</c> multiplies used values). Applied per unit: absolute lengths
+    /// (<c>px</c>/<c>pt</c>/<c>cm</c>/<c>mm</c>/<c>in</c>/<c>pc</c>/<c>q</c>), root-relative <c>rem</c>/
+    /// <c>rlh</c>, keyword widths and unitless values scale by the full effective zoom; font-relative
+    /// units (<c>em</c>/<c>ex</c>/<c>ch</c>/<c>ic</c>/non-root <c>lh</c>) are already scaled through the
+    /// zoomed font metrics (<see cref="ActualFont"/>) and are left unchanged; viewport units are
+    /// unaffected. Percentages and <c>calc()</c> resolve against their (already-zoomed) basis and are not
+    /// re-scaled here — full <c>%</c>/<c>calc()</c> zoom is a follow-up. No-op unless
+    /// <see cref="NativeZoom"/> is enabled and this box is zoomed, so it is inert by default.
+    /// </summary>
+    /// <param name="percentAgainstContainingBlock">
+    /// Whether a <c>%</c> length was resolved against the containing block (ancestor-zoomed) rather than
+    /// this box's own already-<see cref="EffectiveZoom"/>-scaled size. When the basis is the box's own
+    /// size (padding/margin/…), the percentage already carries the full effective zoom, so it is not
+    /// re-scaled; when it is the containing block (width/height/insets), the percentage carries only the
+    /// ancestor zoom and needs the box's own <see cref="OwnZoom"/> to reach the effective factor.
+    /// </param>
+    internal double ApplyZoomToLength(string length, double resolved, bool percentAgainstContainingBlock = false)
+    {
+        if (!NativeZoom.Enabled)
+            return resolved;
+        if (EffectiveZoom == 1.0 && OwnZoom == 1.0)
+            return resolved;
+
+        var t = length?.Trim();
+        if (string.IsNullOrEmpty(t) || t == "0" || t.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            return resolved;
+        if (t.Contains('('))
+            return resolved; // calc()/math — handled by CssLengthParser (increment 3 calc patch)
+
+        var lower = t.ToLowerInvariant();
+        if (lower.EndsWith('%'))
+            return percentAgainstContainingBlock ? resolved * OwnZoom : resolved;
+        if ((lower.EndsWith("em") && !lower.EndsWith("rem"))
+            || lower.EndsWith("ex") || lower.EndsWith("ch") || lower.EndsWith("ic")
+            || (lower.EndsWith("lh") && !lower.EndsWith("rlh")))
+            return resolved; // font-relative — already scaled via the zoomed font metrics
+        if (lower.EndsWith("vw") || lower.EndsWith("vh") || lower.EndsWith("vmin") || lower.EndsWith("vmax"))
+            return resolved; // viewport-relative — unaffected by element zoom
+
+        return resolved * EffectiveZoom; // absolute / rem / keyword / unitless
+    }
+
+    /// <summary>
+    /// Resolves a used length (an inset, or an abspos/percentage block size / min-/max-size) against its
+    /// basis via the direct <see cref="Broiler.CSS.CssLengthParser.ParseLength(string,double,double)"/> —
+    /// i.e. without the line-height context of <see cref="ParseLengthWithLineHeight(string,double,bool)"/> —
+    /// and applies native <c>zoom</c> the same way <see cref="ApplyZoomToLength"/> does: absolute lengths
+    /// scale by <see cref="EffectiveZoom"/>, <c>em</c>/<c>ch</c> ride the already-zoomed font, viewport units
+    /// are untouched, and percentages scale by this box's own zoom when the basis is the (ancestor-zoomed)
+    /// containing block. Inert unless <see cref="NativeZoom"/> is enabled and the box is zoomed — flag-off it
+    /// is byte-identical to a bare <c>ParseLength</c>.
+    /// </summary>
+    /// <param name="percentAgainstContainingBlock">
+    /// <c>true</c> (the default) when <paramref name="basis"/> is the containing block's size — the usual
+    /// case for insets and percentage/abspos block sizes; <c>false</c> when it is the box's own already
+    /// effective-zoom-scaled size (e.g. a relative-positioning offset resolved against <c>Size</c>).
+    /// </param>
+    private protected double ParseUsedLength(string value, double basis, bool percentAgainstContainingBlock = true)
+        => ApplyZoomToLength(value, CssLengthParser.ParseLength(value, basis, GetEmHeight()), percentAgainstContainingBlock);
+
+    /// <param name="percentAgainstContainingBlock">
+    /// Set when <paramref name="hundredPercent"/> is the containing block's (ancestor-zoomed) size —
+    /// e.g. resolving <c>width</c>/<c>height</c>/insets — so a <c>%</c> length picks up this box's own
+    /// zoom to reach the effective factor. Leave <c>false</c> when the basis is the box's own already
+    /// effective-zoom-scaled size (padding/margin), where the percentage already carries the full factor.
+    /// </param>
+    protected double ParseLengthWithLineHeight(string length, double hundredPercent, bool percentAgainstContainingBlock = false)
     {
         if (!string.IsNullOrWhiteSpace(length) &&
             length.EndsWith("rem", StringComparison.OrdinalIgnoreCase) &&
             double.TryParse(length[..^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var rem))
         {
-            return rem * GetRootEmHeight();
+            return ApplyZoomToLength(length, rem * GetRootEmHeight(), percentAgainstContainingBlock);
         }
 
         // CSS Values 3 §5.1.1: 1ch is the advance measure of the "0" glyph in the
@@ -1925,10 +2095,10 @@ internal abstract partial class CssBoxProperties
         {
             double chWidth = GetChWidth();
             if (!double.IsNaN(chWidth) && chWidth > 0)
-                return chCount * chWidth;
+                return ApplyZoomToLength(length, chCount * chWidth, percentAgainstContainingBlock);
         }
 
-        return CssLengthParser.ParseLength(
+        return ApplyZoomToLength(length, CssLengthParser.ParseLength(
             length,
             hundredPercent,
             GetEmHeight(),
@@ -1936,7 +2106,7 @@ internal abstract partial class CssBoxProperties
             false,
             false,
             ActualLineHeight,
-            GetRootLineHeight());
+            GetRootLineHeight()), percentAgainstContainingBlock);
     }
 
     private double ParseLineHeightLength(string length, double hundredPercent)
@@ -2112,7 +2282,7 @@ internal abstract partial class CssBoxProperties
             BorderLeftColor = BorderTopColor = BorderRightColor = BorderBottomColor = color;
     }
 
-    protected void MeasureWordSpacing(ILayoutEnvironment g)
+    protected internal void MeasureWordSpacing(ILayoutEnvironment g)
     {
         if (!double.IsNaN(ActualWordSpacing))
             return;
@@ -2123,7 +2293,9 @@ internal abstract partial class CssBoxProperties
             return;
 
         string len = RegexParserUtils.Search(RegexParserUtils.CssLengthRegex(), WordSpacing);
-        ActualWordSpacing += CssLengthParser.ParseLength(len, 1, GetEmHeight());
+        // word-spacing is a used length: scale it by the box's zoom (absolute × EffectiveZoom; an em term
+        // already rides the zoomed font via GetEmHeight). Inert while NativeZoom is off — byte-identical.
+        ActualWordSpacing += ApplyZoomToLength(len, CssLengthParser.ParseLength(len, 1, GetEmHeight()));
     }
 
     protected void InheritStyle(CssBox p, bool everything)

@@ -395,6 +395,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // the scrolled geometry; independent of the anchor pass that follows.
                 RunStickyPositioning(this);
                 RunNativeAnchorPlacement(this);
+                // CSS2.1 §10.6.4 block-axis auto-margin centring for out-of-flow boxes whose used
+                // height is only final now (content / intrinsic-keyword heights) — the inline axis and
+                // definite heights are centred in-line during layout. Runs last so it sees the final
+                // (scrolled / anchor-placed) geometry. Powers content-height modal <dialog> vertical
+                // centring; inert unless such a box exists.
+                CenterOutOfFlowBlockAxis(this);
             }
         }
         catch (Exception ex)

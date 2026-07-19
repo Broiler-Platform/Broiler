@@ -41,6 +41,31 @@ internal static partial class StyleDeclarationBinding
         return JSUndefined.Value;
     }
 
+    /// <summary>
+    /// The <c>element.style = "prop: val; ..."</c> assignment setter: in browsers <c>element.style</c> is
+    /// effectively read-only, so assigning a string parses it as <c>cssText</c>. Unlike
+    /// <see cref="InlineSetCssText"/> (the <c>style.cssText =</c> path, which stringifies any value), this
+    /// only acts on a string right-hand side and is otherwise a no-op — a quirk preserved verbatim from the
+    /// bridge's original <c>element.style</c> setter, so the clear happens inside the string guard.
+    /// </summary>
+    internal static JSValue SetInlineStyleCssText(IInlineStyleHost host, DomElement element, Action? onMutation, in Arguments a)
+    {
+        if (a.Length > 0 && a[0] is JSString s)
+        {
+            host.InlineStyle(element).Clear();
+            host.ClearInlineStylePropsSetByJs(element);
+            foreach (var kv in DomBridge.ParseStyle(s.ToString(), reportDrops: true))
+            {
+                host.InlineStyle(element)[kv.Key] = kv.Value;
+                host.MarkInlineStylePropSetByJs(element, kv.Key);
+            }
+
+            onMutation?.Invoke();
+        }
+
+        return JSUndefined.Value;
+    }
+
     private static JSValue InlineSetProperty(IInlineStyleHost host, DomElement element, Action? onMutation, in Arguments a)
     {
         if (a.Length >= 2)

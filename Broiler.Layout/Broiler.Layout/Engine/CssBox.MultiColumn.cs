@@ -83,14 +83,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         if (hasMaxHeight)
         {
-            double maxH = CssLengthParser.ParseLength(MaxHeight, ContainingBlock?.Size.Height ?? Size.Height, GetEmHeight());
+            double maxH = ParseUsedLength(MaxHeight, ContainingBlock?.Size.Height ?? Size.Height);
             maxAllowedHeight = maxH - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
         }
 
         double columnHeight;
         if (hasExplicitHeight)
         {
-            double h = CssLengthParser.ParseLength(Height, ContainingBlock?.Size.Height ?? Size.Height, GetEmHeight());
+            double h = ParseUsedLength(Height, ContainingBlock?.Size.Height ?? Size.Height);
             columnHeight = h;
         }
         else if (ColumnFill == "auto" && hasMaxHeight)

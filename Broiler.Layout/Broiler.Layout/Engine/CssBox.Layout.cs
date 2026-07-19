@@ -150,11 +150,27 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     - ContainingBlock.ActualBorderLeftWidth - ContainingBlock.ActualBorderRightWidth;
         }
 
-        if (IsIntrinsicWidthKeyword(Width) && Float == CssConstants.None && Position != CssConstants.Absolute && Position != CssConstants.Fixed)
+        if (IsIntrinsicWidthKeyword(Width) && Float == CssConstants.None)
         {
             // CSS Sizing 3 §5: width resolves to an intrinsic size
-            // (min-content / max-content / fit-content).
-            width = ResolveIntrinsicWidth(g, Width, width);
+            // (min-content / max-content / fit-content). This also applies to an
+            // out-of-flow (absolutely/fixed positioned) box: an intrinsic-keyword width
+            // shrink-wraps to content rather than filling the inset-modified containing
+            // block, so a `dialog:modal { inset:0; width:fit-content; margin:auto }` box
+            // sizes to its content and the auto margins then centre it (§10.3.7). For such a
+            // box with both opposing insets, fit-content clamps to the space between the
+            // insets (the inset-modified containing block), not the full containing block.
+            double availableForIntrinsic = width;
+            if ((Position == CssConstants.Absolute || Position == CssConstants.Fixed)
+                && Left != null && Left != CssConstants.Auto
+                && Right != null && Right != CssConstants.Auto)
+            {
+                double insetLeft = ParseUsedLength(Left, width);
+                double insetRight = ParseUsedLength(Right, width);
+                availableForIntrinsic = Math.Max(0, width - insetLeft - insetRight);
+            }
+
+            width = ResolveIntrinsicWidth(g, Width, availableForIntrinsic);
         }
         else if (Width != CssConstants.Auto && !string.IsNullOrEmpty(Width) && !IsIntrinsicWidthKeyword(Width))
         {
@@ -162,7 +178,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             width = string.Equals(Width, "inherit", StringComparison.OrdinalIgnoreCase) && GetParent() != null
                 ? GetParent().ActualWidth
-                : ParseLengthWithLineHeight(Width, containingWidth);
+                : ParseLengthWithLineHeight(Width, containingWidth, percentAgainstContainingBlock: true);
 
             // CSS2.1 §10.4: Apply max-width constraint
             if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
@@ -195,8 +211,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (Position == CssConstants.Fixed && LayoutEnvironment != null)
                 cbContentWidth = FixedPositioningViewport().Width;
 
-            double cssLeft = CssLengthParser.ParseLength(Left, cbContentWidth, GetEmHeight());
-            double cssRight = CssLengthParser.ParseLength(Right, cbContentWidth, GetEmHeight());
+            double cssLeft = ParseUsedLength(Left, cbContentWidth);
+            double cssRight = ParseUsedLength(Right, cbContentWidth);
 
             width = cbContentWidth - cssLeft - cssRight - ActualMarginLeft - ActualMarginRight;
 
@@ -877,27 +893,27 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                 if (Left != null && Left != CssConstants.Auto)
                 {
-                    double cssLeft = CssLengthParser.ParseLength(Left, cbPadWidth, GetEmHeight());
+                    double cssLeft = ParseUsedLength(Left, cbPadWidth);
                     newX = (float)(cbPadLeft + cssLeft + ActualMarginLeft);
                 }
                 else if (Right != null && Right != CssConstants.Auto)
                 {
                     // CSS2.1 §10.3.7: When left is auto and right is
                     // specified, position from the right padding edge.
-                    double cssRight = CssLengthParser.ParseLength(Right, cbPadWidth, GetEmHeight());
+                    double cssRight = ParseUsedLength(Right, cbPadWidth);
                     newX = (float)(cbPadLeft + cbPadWidth - cssRight - ActualMarginRight - Size.Width);
                 }
 
                 if (Top != null && Top != CssConstants.Auto)
                 {
-                    double cssTop = CssLengthParser.ParseLength(Top, cbPadHeight, GetEmHeight());
+                    double cssTop = ParseUsedLength(Top, cbPadHeight);
                     newY = (float)(cbPadTop + cssTop + ActualMarginTop);
                 }
                 else if (Bottom != null && Bottom != CssConstants.Auto)
                 {
                     // CSS2.1 §10.6.4: When top is auto and bottom is
                     // specified, position from the bottom padding edge.
-                    double cssBottom = CssLengthParser.ParseLength(Bottom, cbPadHeight, GetEmHeight());
+                    double cssBottom = ParseUsedLength(Bottom, cbPadHeight);
                     double boxHeight = ActualBottom - Location.Y;
 
                     // boxHeight may be zero when the box position was
@@ -947,23 +963,23 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                     if (hasLeft)
                     {
-                        double cssLeft = CssLengthParser.ParseLength(Left, vp.Width, GetEmHeight());
+                        double cssLeft = ParseUsedLength(Left, vp.Width);
                         newX = (float)(vp.X + cssLeft + ActualMarginLeft);
                     }
                     else if (hasRight)
                     {
-                        double cssRight = CssLengthParser.ParseLength(Right, vp.Width, GetEmHeight());
+                        double cssRight = ParseUsedLength(Right, vp.Width);
                         newX = (float)(vp.X + vp.Width - cssRight - ActualMarginRight - Size.Width);
                     }
 
                     if (hasTop)
                     {
-                        double cssTop = CssLengthParser.ParseLength(Top, vp.Height, GetEmHeight());
+                        double cssTop = ParseUsedLength(Top, vp.Height);
                         newY = (float)(vp.Y + cssTop + ActualMarginTop);
                     }
                     else if (hasBottom)
                     {
-                        double cssBottom = CssLengthParser.ParseLength(Bottom, vp.Height, GetEmHeight());
+                        double cssBottom = ParseUsedLength(Bottom, vp.Height);
                         double boxHeight = ActualBottom - Location.Y;
 
                         if (boxHeight <= 0)
@@ -980,7 +996,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                             && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
                             && !Height.Contains('%'))
                         {
-                            double cssHeight = CssLengthParser.ParseLength(Height, 0, GetEmHeight());
+                            double cssHeight = ParseUsedLength(Height, 0);
                             boxHeight = ResolveSpecifiedHeightToBorderBox(cssHeight);
                         }
 
@@ -1016,7 +1032,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height) && Height.Contains('%') && !HeightPercentageResolvesToAuto())
         {
             double cbHeight = PercentageHeightContainingBlockHeight();
-            double length = CssLengthParser.ParseLength(Height, cbHeight, GetEmHeight());
+            double length = ParseUsedLength(Height, cbHeight);
             double preHeight = ResolveSpecifiedHeightToBorderBox(length);
 
             Size = new SizeF(Size.Width, (float)preHeight);
@@ -1152,7 +1168,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 {
                     // Auto column-count from column-width: compute the
                     // number of columns so we can pre-constrain width.
-                    double cwVal = CssLengthParser.ParseLength(ColumnWidth, Size.Width, GetEmHeight());
+                    double cwVal = ParseUsedLength(ColumnWidth, Size.Width, percentAgainstContainingBlock: false);
                     double gap = ResolveColumnGap();
                     double available = Size.Width - ActualPaddingLeft - ActualPaddingRight
                         - ActualBorderLeftWidth - ActualBorderRightWidth;
@@ -1221,7 +1237,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (!hasExplicitCount && hasColumnWidth)
             {
                 // Auto column-count from column-width: CSS Multi-column §3.4
-                double cw = CssLengthParser.ParseLength(ColumnWidth, Size.Width, GetEmHeight());
+                double cw = ParseUsedLength(ColumnWidth, Size.Width, percentAgainstContainingBlock: false);
                 double gap = GetEmHeight();
                 double available = Size.Width - ActualPaddingLeft - ActualPaddingRight
                     - ActualBorderLeftWidth - ActualBorderRightWidth;
@@ -1265,7 +1281,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 if (Height.Contains('%'))
                 {
                     double cbHeight = PercentageHeightContainingBlockHeight();
-                    contentHeight = CssLengthParser.ParseLength(Height, cbHeight, GetEmHeight());
+                    contentHeight = ParseUsedLength(Height, cbHeight);
                 }
                 else
                 {
@@ -1304,8 +1320,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 GetAbsoluteContainingBlockPaddingBox(cb, out _, out _, out _, out cbHeight);
             }
 
-            double cssTop = CssLengthParser.ParseLength(Top, cbHeight, GetEmHeight());
-            double cssBottom = CssLengthParser.ParseLength(Bottom, cbHeight, GetEmHeight());
+            double cssTop = ParseUsedLength(Top, cbHeight);
+            double cssBottom = ParseUsedLength(Bottom, cbHeight);
             double resolvedHeight = cbHeight - cssTop - cssBottom - ActualMarginTop - ActualMarginBottom
                 - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
 
@@ -1403,7 +1419,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                 if (!maxIsPercentageAuto)
                 {
-                    double maxH = CssLengthParser.ParseLength(MaxHeight, cbHeight, GetEmHeight());
+                    double maxH = ParseUsedLength(MaxHeight, cbHeight);
 
                     if (contentHeight > maxH)
                     {
@@ -1427,7 +1443,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                 if (!minIsPercentageAuto)
                 {
-                    double minH = CssLengthParser.ParseLength(MinHeight, cbHeight, GetEmHeight());
+                    double minH = ParseUsedLength(MinHeight, cbHeight);
                     if (contentHeight < minH)
                     {
                         contentHeight = minH;
@@ -1470,7 +1486,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 if (Height.Contains('%'))
                 {
                     double cbHeight = PercentageHeightContainingBlockHeight();
-                    contentHeight = CssLengthParser.ParseLength(Height, cbHeight, GetEmHeight());
+                    contentHeight = ParseUsedLength(Height, cbHeight);
                 }
                 else
                 {
@@ -1518,9 +1534,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (hasLeft && hasRight && IsSpecifiedMarginLeftAuto && IsSpecifiedMarginRightAuto
             && IsDefiniteBorderBoxWidth())
         {
-            double l = CssLengthParser.ParseLength(Left, cbWidth, GetEmHeight());
-            double r = CssLengthParser.ParseLength(Right, cbWidth, GetEmHeight());
-            var m = (Math.Max(0, cbWidth - l - r - Size.Width) / 2)
+            double l = ParseUsedLength(Left, cbWidth);
+            double r = ParseUsedLength(Right, cbWidth);
+            // The insets and Size are used (zoom-scaled) values, so this is the used centring margin;
+            // ActualMargin* re-applies EffectiveZoom to the stored string, so store the pre-zoom value
+            // (÷ EffectiveZoom, a no-op while NativeZoom is off since EffectiveZoom is then 1.0) so the
+            // read-back restores the used margin rather than double-counting the zoom.
+            var m = (Math.Max(0, cbWidth - l - r - Size.Width) / 2 / EffectiveZoom)
                 .ToString("F4", CultureInfo.InvariantCulture) + "px";
             MarginLeft = m;
             MarginRight = m;
@@ -1532,9 +1552,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (hasTop && hasBottom && IsSpecifiedMarginTopAuto && IsSpecifiedMarginBottomAuto
             && IsDefiniteBorderBoxHeight(out double boxHeight))
         {
-            double t = CssLengthParser.ParseLength(Top, cbHeight, GetEmHeight());
-            double b = CssLengthParser.ParseLength(Bottom, cbHeight, GetEmHeight());
-            var m = (Math.Max(0, cbHeight - t - b - boxHeight) / 2)
+            double t = ParseUsedLength(Top, cbHeight);
+            double b = ParseUsedLength(Bottom, cbHeight);
+            // Pre-zoom the stored margin (÷ EffectiveZoom) for the same reason as the inline axis above.
+            var m = (Math.Max(0, cbHeight - t - b - boxHeight) / 2 / EffectiveZoom)
                 .ToString("F4", CultureInfo.InvariantCulture) + "px";
             MarginTop = m;
             MarginBottom = m;
@@ -1545,22 +1566,32 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             InvalidateActualMargins();
     }
 
-    // The used border-box inline size is known (Size.Width has been resolved by positioning time)
-    // when width is an explicit, non-intrinsic value — the case §10.3.7 centring needs.
+    // The used border-box inline size is known (Size.Width has been resolved by positioning time) —
+    // the case §10.3.7 centring needs — for an explicit length/percentage width AND for an
+    // intrinsic-keyword (min-/max-/fit-content) width, which ResolveBlockUsedWidth now shrink-wraps
+    // into Size.Width before positioning. Only `width:auto` is excluded: with both insets it fills the
+    // inset-modified containing block (auto margins resolve to 0), so there is no free space to centre.
     private bool IsDefiniteBorderBoxWidth() =>
-        Width != CssConstants.Auto && !string.IsNullOrEmpty(Width) && !IsIntrinsicWidthKeyword(Width);
+        Width != CssConstants.Auto && !string.IsNullOrEmpty(Width);
 
     // The used border-box block size for §10.6.4 centring: Size.Height once resolved, else derived
     // from an explicit non-percentage height (mirrors the bottom-anchored fixed/abspos fallback).
     // False when the height is auto/percentage and not yet resolved — vertical centring is skipped.
+    // Also false for an intrinsic-keyword (fit-content/min-/max-content) height: its content height is
+    // not known until layout completes (the pre-layout Size.Height holds only the box chrome), so
+    // block-axis centring for such a box is deferred to the CenterOutOfFlowBlockAxis root post-pass,
+    // which sees the final height. Centring it here against the chrome-only size would mis-centre it.
     private bool IsDefiniteBorderBoxHeight(out double boxHeight)
     {
+        boxHeight = 0;
+        if (IsIntrinsicSizingHeightKeyword(Height))
+            return false;
         boxHeight = Size.Height;
         if (boxHeight > 0)
             return true;
         if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height) && !Height.Contains('%'))
         {
-            boxHeight = ResolveSpecifiedHeightToBorderBox(CssLengthParser.ParseLength(Height, 0, GetEmHeight()));
+            boxHeight = ResolveSpecifiedHeightToBorderBox(ParseUsedLength(Height, 0));
             return boxHeight > 0;
         }
         return false;
@@ -1589,7 +1620,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     if (boxWidth <= 0)
                         boxWidth = Size.Width;
 
-                    double cssRight = CssLengthParser.ParseLength(Right, cbPadWidth, GetEmHeight());
+                    double cssRight = ParseUsedLength(Right, cbPadWidth);
                     newX = (float)(cbPadLeft + cbPadWidth - cssRight - ActualMarginRight - boxWidth);
                 }
 
@@ -1600,7 +1631,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     if (boxHeight <= 0)
                         boxHeight = Size.Height;
 
-                    double cssBottom = CssLengthParser.ParseLength(Bottom, cbPadHeight, GetEmHeight());
+                    double cssBottom = ParseUsedLength(Bottom, cbPadHeight);
                     newY = (float)(cbPadTop + cbPadHeight - cssBottom - ActualMarginBottom - boxHeight);
                 }
 
@@ -1664,8 +1695,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 {
                     if (!cbVertical && hasL && hasR)
                     {
-                        double cssLeft = CssLengthParser.ParseLength(Left, cbPadWidth, GetEmHeight());
-                        double cssRight = CssLengthParser.ParseLength(Right, cbPadWidth, GetEmHeight());
+                        double cssLeft = ParseUsedLength(Left, cbPadWidth);
+                        double cssRight = ParseUsedLength(Right, cbPadWidth);
                         double imcbLeft = cbPadLeft + cssLeft;
                         double imcbWidth = cbPadWidth - cssLeft - cssRight;
 
@@ -1702,8 +1733,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     }
                     else if (cbVertical && hasT && hasB)
                     {
-                        double cssTop = CssLengthParser.ParseLength(Top, cbPadHeight, GetEmHeight());
-                        double cssBottom = CssLengthParser.ParseLength(Bottom, cbPadHeight, GetEmHeight());
+                        double cssTop = ParseUsedLength(Top, cbPadHeight);
+                        double cssBottom = ParseUsedLength(Bottom, cbPadHeight);
                         double imcbTop = cbPadTop + cssTop;
                         double imcbHeight = cbPadHeight - cssTop - cssBottom;
 
@@ -1818,8 +1849,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 {
                     if (!cbVertical && hasT && hasB)
                     {
-                        double cssTop = CssLengthParser.ParseLength(Top, cbPadHeight, GetEmHeight());
-                        double cssBottom = CssLengthParser.ParseLength(Bottom, cbPadHeight, GetEmHeight());
+                        double cssTop = ParseUsedLength(Top, cbPadHeight);
+                        double cssBottom = ParseUsedLength(Bottom, cbPadHeight);
                         double imcbTop = cbPadTop + cssTop;
                         double imcbHeight = cbPadHeight - cssTop - cssBottom;
 
@@ -1853,8 +1884,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     }
                     else if (cbVertical && hasL && hasR)
                     {
-                        double cssLeft = CssLengthParser.ParseLength(Left, cbPadWidth, GetEmHeight());
-                        double cssRight = CssLengthParser.ParseLength(Right, cbPadWidth, GetEmHeight());
+                        double cssLeft = ParseUsedLength(Left, cbPadWidth);
+                        double cssRight = ParseUsedLength(Right, cbPadWidth);
                         double imcbLeft = cbPadLeft + cssLeft;
                         double imcbWidth = cbPadWidth - cssLeft - cssRight;
 
@@ -2312,14 +2343,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             bool hasBottom = Bottom != null && Bottom != CssConstants.Auto;
 
             if (hasLeft)
-                dx = CssLengthParser.ParseLength(Left, Size.Width, GetEmHeight());
+                dx = ParseUsedLength(Left, Size.Width, percentAgainstContainingBlock: false);
             else if (hasRight)
-                dx = -CssLengthParser.ParseLength(Right, Size.Width, GetEmHeight());
+                dx = -ParseUsedLength(Right, Size.Width, percentAgainstContainingBlock: false);
 
             if (hasTop)
-                dy = CssLengthParser.ParseLength(Top, Size.Height, GetEmHeight());
+                dy = ParseUsedLength(Top, Size.Height, percentAgainstContainingBlock: false);
             else if (hasBottom)
-                dy = -CssLengthParser.ParseLength(Bottom, Size.Height, GetEmHeight());
+                dy = -ParseUsedLength(Bottom, Size.Height, percentAgainstContainingBlock: false);
 
             if (dx != 0)
                 OffsetLeft(dx);

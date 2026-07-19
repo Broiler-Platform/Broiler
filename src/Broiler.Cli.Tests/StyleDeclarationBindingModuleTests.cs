@@ -131,4 +131,55 @@ public sealed class StyleDeclarationBindingModuleTests
 
         Assert.Equal("green|purple|12px", result.ToString());
     }
+
+    // -- P3.63: the `element.style = "..."` assignment setter, moved off the bridge
+    //    (JsJsObjectsSetStyle025Core) into StyleDeclarationBinding.SetInlineStyleCssText. --
+
+    [Fact]
+    public void ElementStyle_Assignment_Setter_Moved_Off_The_Bridge()
+    {
+        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+        Assert.Null(typeof(DomBridge).GetMethod("JsJsObjectsSetStyle025Core", all));
+        Assert.NotNull(typeof(StyleDeclarationBinding).GetMethod("SetInlineStyleCssText", all));
+    }
+
+    [Fact]
+    public void Assigning_ElementStyle_A_String_Parses_CssText_And_Writes_Through()
+    {
+        using var bridge = Attach(out var context,
+            "<!DOCTYPE html><html><body><div id='d' style='color: green'></div></body></html>");
+
+        var result = context.Eval("""
+            (() => {
+                var d = document.getElementById('d');
+                d.style = 'color: red; font-size: 10px';           // assignment parses as cssText
+                var afterFirst = d.style.color + '|' + d.style.fontSize + '|' +
+                                 (d.getAttribute('style').indexOf('color: red') >= 0);  // write-through
+                d.style = 'margin-top: 4px';                       // reassign clears prior props
+                var afterSecond = d.style.color + '|' + d.style.marginTop;
+                return afterFirst + '||' + afterSecond;
+            })()
+            """);
+
+        Assert.Equal("red|10px|true||" + "|4px", result.ToString());
+    }
+
+    [Fact]
+    public void Assigning_ElementStyle_A_NonString_Is_A_No_Op()
+    {
+        using var bridge = Attach(out var context,
+            "<!DOCTYPE html><html><body><div id='d' style='color: green'></div></body></html>");
+
+        // The element.style assignment setter only acts on a string RHS (a quirk preserved from the
+        // original bridge setter); a non-string assignment leaves the existing inline style intact.
+        var result = context.Eval("""
+            (() => {
+                var d = document.getElementById('d');
+                d.style = 123;
+                return d.style.color + '|' + (d.getAttribute('style').indexOf('green') >= 0);
+            })()
+            """);
+
+        Assert.Equal("green|true", result.ToString());
+    }
 }

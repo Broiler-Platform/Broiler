@@ -20,7 +20,7 @@ own status entries for the specifics; the summary below is the quick view.
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
-| 3 — feature modules | Bulk delivered | Window/Document, Canvas modules still to come (SVG done — P3.50; Element/geometry done — P3.51; `<object>` sub-document accessors done — P3.52); `DomBridge.cs` facade now within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is now under the limit and the `OversizedFileExemptions` debt list is empty. |
+| 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~200 sites) deferred (Phase-5-entangled); item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling. |
 | 5 — used-value behaviour into Layout | Bulk delivered | Anchor-track deletion complete through step 6; ALWAYS-pass + not-yet-native residue remains; full completion gated on the native dialog/backdrop track and the visual-viewport LayoutSnapshot endgame. |
 
@@ -1633,15 +1633,148 @@ collapsing children to one text node). Regression check: the element-content / H
 / Acid3 / shadow-DOM / public-API-snapshot / architecture-guard suites pass; `Broiler.HtmlBridge.Dom` builds
 clean.
 
+Status: **P3.58 completed** 2026-07-18 (branch `claude/htmlbridge-complexity-phases-r2w0r9`) — the **DOM `Node`
+child-mutation methods**, the "tree mutation" slice named first in the still-to-come list, extracted off the
+mixed `JsObjects.cs` element-member callbacks. `TreeMutationBinding` (namespace
+`Broiler.HtmlBridge.Dom.Features`) co-locates `insertBefore` / `appendChild` / `append` / `prepend` /
+`removeChild` / `replaceChild` — pure canonical tree mutation that resolves the child wrapper(s), enforces
+the `HierarchyRequestError` circular-reference guard, and positions or detaches nodes. The neutral tree
+helpers (`ParentEl`, `ChildAt`, `ChildIndexOf`, `RemoveNthChild`, `RemoveChildFrom`, `SetParent`,
+`ThrowDOMException`) stay the bridge's `internal static` helpers, called directly (matching the P3.47
+`ChildNodeBinding` sibling); the side-effecting insertion (`InsertNodeAt`), the JS-object→node resolver
+(`FindDomNodeByJSObject`), the `append`/`prepend` argument builder (`BuildChildNodeArgumentNodes`),
+style-scope invalidation, the JS context the DOM-exception thrower needs, and the node-iterator /
+mutation-observer notifications (`NotifyNodeIteratorPreRemoval` / `NotifyChildAdded` / `NotifyChildRemoved`)
+are reached through the eight-member `ITreeMutationHost` contract (`DomBridge.TreeMutationHost.cs`). The six
+inline registrations in `DomBridge/JsObjects.cs` become `Dom.Features.TreeMutationBinding.*` calls in place
+(behaviour-preserving property order; the interleaved `attachShadow` and ElementTraversal getters keep their
+positions), and the six callbacks are gone from `JsFunctionCallbacks/JsObjects.cs` (462 → 320 lines), along
+with the now-dead `bridgeForInsert` / `bridgeForAppend` capture locals. Behaviour-preserving; no public-API
+change (module + contract internal). Tests: `Broiler.Cli.Tests/TreeMutationBindingModuleTests.cs`
+(feature-module / host-contract / six-callbacks-moved-off-bridge guards + end-to-end characterizations:
+`appendChild`/`append`/`insertBefore`/`prepend` ordering, `removeChild`/`replaceChild` mutation and return
+values, and the `appendChild` circular-insertion `HierarchyRequestError`). Regression check: the
+TreeMutation / ChildNode / ElementContent / HtmlDomInterface / DomImplementation / Acid3 / DOM-edge-case /
+inner-HTML-parallel-state / public-API-snapshot / architecture-guard suites pass (151 tests across the two
+runs); `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.59 completed** 2026-07-18 (same branch) — the **inline `on*` event-handler IDL reflectors**
+(`onclick`, `onload`, … — one property per `InlineEventNames` entry), extracted off the mixed `JsObjects.cs`
+element-member callbacks. `EventHandlerReflectorBinding` (namespace `Broiler.HtmlBridge.Dom.Features`)
+co-locates the getter (returns the stored handler function or `null`) and the setter (stores a function or,
+given a non-function, clears the entry), both against the bridge's live inline-handler map reached through the
+one-member `IEventHandlerReflectorHost` contract (`DomBridge.EventHandlerReflectorHost.cs`). This is the
+distinct *write* concern separated from `EventDispatchBinding` (P3.10), which only *reads* the same map to
+dispatch: inline-handler compilation from `on*` content attributes stays the bridge's
+`CompileInlineEventAttributes`. The `foreach (InlineEventNames)` registration in `DomBridge/JsObjects.cs` now
+calls `Dom.Features.EventHandlerReflectorBinding.GetOn` / `SetOn`, and the two callbacks
+(`JsJsObjectsCallback104Core`/`Callback105Core`) are gone from `JsFunctionCallbacks/JsObjects.cs`
+(320 → 305 lines). Behaviour-preserving; no public-API change (module + contract internal). Tests:
+`Broiler.Cli.Tests/EventHandlerReflectorBindingModuleTests.cs` (feature-module / host-contract /
+two-callbacks-moved-off-bridge guards + an end-to-end characterization: unset reads `null`, assign a function
+then read it back, `click()` fires the inline handler, assigning `null` clears it and it no longer fires).
+Regression check: the reflector / EventDispatch / EventTarget / Acid3 / public-API-snapshot / architecture-guard
+suites pass (65 tests); `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.60 completed** 2026-07-18 (same branch) — the **form-control IDL reflectors** (`value`, `checked`,
+`type`, `name`, `disabled`, `hidden`, `tabIndex`, `required`), extracted off the mixed `JsObjects.cs`
+element-member callbacks. `FormControlBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) is a stateful
+`internal sealed class(host)` — the `SelectBinding`/`FormBinding` (P3.8/P3.9) precedent — constructed once as
+`_formControl` and installed via a single `_formControl.Install(obj, element)` call replacing the contiguous
+value…required registration block (behaviour-preserving property order). `value`/`checked` read and write the
+input's dirty IDL state, and `value` delegates the `<select>` branch to `SelectBinding`, through the named
+primitives of the eight-member `IFormControlHost` contract (`DomBridge.FormControlHost.cs`) — the module never
+touches the `FormControlRuntimeState` object (the P3.7 pattern); the radio-group mutual-exclusion walk and the
+boolean setters' style-scope invalidation forward through the same host, and the remaining members are plain
+content-attribute reflection through the assembly's static `DomBridge` helpers. The eight callbacks
+(`JsJsObjectsGetValue106Core`..`SetRequired121Core`) are gone from `JsFunctionCallbacks/JsObjects.cs`
+(305 → 157 lines — roughly halved); `submit()` (a form-submission action with event-dispatch coupling, not an
+IDL property reflector) stays on the bridge for a later slice. Behaviour-preserving; no public-API change
+(module + contract internal). Tests: `Broiler.Cli.Tests/FormControlBindingModuleTests.cs` (feature-module /
+host-contract / thirteen-callbacks-moved-off-bridge guards + end-to-end characterizations: value/type/name/
+tabIndex reflection incl. the IDL-value-vs-attribute split, the disabled/hidden/required boolean round-trip,
+the checked IDL state plus radio-group mutual exclusion, and `<select>` value resolution through
+`SelectBinding`). Regression check: the form-control / Select / Form / EventTarget / Acid3 / Acid3-HTML-element
+/ HtmlDomInterface / DomImplementation / public-API-snapshot / architecture-guard suites pass (158 tests across
+the two runs); `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.61 completed** 2026-07-18 (same branch) — the **`form.submit()` action**, extracted off the mixed
+`JsObjects.cs` element-member callbacks. `FormSubmitBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) fires
+the synthetic cancelable `submit` event on a `<form>` and invokes the form's registered `submit` listeners,
+honouring `preventDefault()` (this engine does not navigate on submit, so the prevention is logged). It is kept
+distinct from `FormBinding` (P3.9, whose deliberately narrow `IFormHost` couples only through `ToJSObject`) so
+the event-dispatch concern does not dilute that module. Only the listener-store read needs the bridge — reached
+through the one-member `IFormSubmitHost` contract (`DomBridge.FormSubmitHost.cs`); the no-op function factory
+(`UndefinedFunction`), the listener invoker (`InvokeEventListener`) and the render logger are the bridge's
+`internal static` helpers, called directly. The `submit` registration in `DomBridge/JsObjects.cs` now calls
+`Dom.Features.FormSubmitBinding.Submit`, and the callback (`JsJsObjectsSubmit125Core`, with its nested
+`preventDefault` closure) is gone from `JsFunctionCallbacks/JsObjects.cs` (157 → 119 lines). Behaviour-preserving;
+no public-API change (module + contract internal). Tests: `Broiler.Cli.Tests/FormSubmitBindingModuleTests.cs`
+(feature-module / host-contract / callback-moved guards + end-to-end characterizations: the `submit` listener
+fires, sees a cancelable event and `preventDefault()` sets `defaultPrevented`; `submit()` on a non-form is a
+no-op). Regression check: the form-submit / Form / EventTarget / EventDispatch / Acid3 / public-API-snapshot /
+architecture-guard suites pass (one pre-existing environment-sensitive `SelectListBox…WritingMode` render check
+fails identically on `origin/main`, unrelated to this change); `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.62 completed** 2026-07-18 (same branch) — the **shadow-DOM JS-binding members** (the
+`element.shadowRoot` getter and `element.attachShadow()` method), extracted off the mixed `JsObjects.cs`
+element-member callbacks. `ShadowDomBinding` (namespace `Broiler.HtmlBridge.Dom.Features`) exposes an attached
+root only when its mode is `open`, and `attachShadow` rejects a second attachment (`NotSupportedError`),
+normalizes the requested mode to `open`/`closed`, and creates + links the root. The per-element shadow linkage
+(host/root/mode) stays the bridge's `ElementRuntimeState.Shadow` slot, reached only through the named primitives
+of the five-member `IShadowDomHost` contract (`DomBridge.ShadowDomHost.cs`) — the module never touches the
+runtime-state object (the P3.7 pattern); the whole create-parent-and-record step is a single `AttachShadowRoot`
+host primitive, so the `#shadow-root` element construction and the four state writes stay on the bridge. The two
+registrations in `DomBridge/JsObjects.cs` now call `Dom.Features.ShadowDomBinding.GetShadowRoot` / `AttachShadow`,
+and the two callbacks (`JsJsObjectsGetShadowRoot019Core`/`AttachShadow087Core`) are gone from
+`JsFunctionCallbacks/JsObjects.cs` (119 → 86 lines). **This leaves only two callbacks in that file — the
+`element.style` cssText setter (deferred, Phase-4-item-2-entangled) and the Canvas `getContext` (Phase-6-gated) —
+both explicitly deferred/gated rather than merely not-yet-extracted.** Behaviour-preserving; no public-API change
+(module + contract internal). Tests: `Broiler.Cli.Tests/ShadowDomBindingModuleTests.cs` (feature-module /
+host-contract / two-callbacks-moved-off-bridge guards + end-to-end characterizations: open attachment exposes an
+identity-stable root and a second attach throws; closed attachment returns the root but the getter hides it).
+Regression check: the shadow-DOM / GoogleSearchPolyfill / Acid3 / public-API-snapshot / architecture-guard suites
+pass; `Broiler.HtmlBridge.Dom` builds clean.
+
+Status: **P3.63 completed** 2026-07-18 (same branch) — the **`element.style = "..."` cssText assignment
+setter**, the last non-Canvas callback in the mixed `JsObjects.cs` element-member file, moved into the CSSOM
+owner `StyleDeclarationBinding` (P3.14) rather than a new module: `element.style` is effectively read-only, so
+assigning a string is spec-equivalent to setting `style.cssText`, and the setter already lived one method away
+(`InlineSetCssText`). The new `StyleDeclarationBinding.SetInlineStyleCssText` reuses the module's existing
+`IInlineStyleHost` seam (the inline-style dict + "set via JS" bookkeeping — no *new* coupling) and the shared
+`onMutation` write-through; it preserves verbatim the original setter's quirk that only a **string** RHS acts
+(a non-string assignment is a no-op, unlike `style.cssText =` which stringifies), so the dict clear stays inside
+the string guard. In `DomBridge/JsObjects.cs` the previously-inline `onMutation` lambda became a shared local
+function `OnStyleMutation` passed to both `BuildInlineDeclaration` and the setter, and the setter now calls
+`Dom.Features.StyleDeclarationBinding.SetInlineStyleCssText`. The callback (`JsJsObjectsSetStyle025Core`) is gone
+from `JsFunctionCallbacks/JsObjects.cs` (86 → 66 lines). **The mixed element-member callbacks file now holds a
+single callback — the Canvas `getContext` (Phase-6-gated) — so every callback that could be extracted as a
+behaviour-preserving refactor has been.** Behaviour-preserving; no public-API change (method added to an existing
+internal module). Tests: added to `Broiler.Cli.Tests/StyleDeclarationBindingModuleTests.cs` (callback-moved /
+method-present guard + end-to-end: a string assignment parses cssText and writes through to `getAttribute("style")`
+and a reassignment clears prior props; a non-string assignment is a no-op). Regression check: the
+StyleDeclaration / InlineStyle-write-through / InlineStyle-drop-diagnostics / CssStyleDeclaration-validation /
+Selectors-CSSOM / ComputedStyle / Acid3 / public-API-snapshot / architecture-guard suites pass (one pre-existing
+`Lang_Matches_XmlLang_Ancestor` selector check fails identically on `origin/main`, unrelated to this change);
+`Broiler.HtmlBridge.Dom` builds clean.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
 shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
-any residual coupling: the rest of the mixed `JsObjects.cs` element-member callbacks (tree mutation, form-control
-IDL, on* event-handler reflectors), Canvas (better done with Phase 6, which dissolves
-`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`), and the DomBridge 500-800-line facade target. **Frames is
-done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is done** (P3.50);
+any residual coupling: the last callback in the mixed `JsObjects.cs` element-member file is Canvas
+`getContext` (better done with Phase 6, which dissolves
+`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`); the DomBridge 500-800-line facade target is already met
+(682 lines).
+**Frames is done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is done** (P3.50);
 **Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done** (P3.52); **the mixed
 `ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global attribute reflectors
-are done** (P3.54); **insertAdjacent\* is done** (P3.56); **the element-content members are done** (P3.57).
+are done** (P3.54); **insertAdjacent\* is done** (P3.56); **the element-content members are done** (P3.57);
+**tree mutation is done** (P3.58 — `insertBefore`/`appendChild`/`append`/`prepend`/`removeChild`/`replaceChild`);
+**the on\* event-handler reflectors are done** (P3.59); **the form-control IDL reflectors are done** (P3.60 —
+`value`/`checked`/`type`/`name`/`disabled`/`hidden`/`tabIndex`/`required`); **`form.submit()` is done** (P3.61);
+**the shadow-DOM `shadowRoot`/`attachShadow` binding is done** (P3.62); **the `element.style` cssText assignment
+setter is done** (P3.63 — into `StyleDeclarationBinding`). The mixed `JsObjects.cs` element-member callbacks file
+now holds a single callback — Canvas `getContext` (Phase-6-gated) — so every behaviour-preservingly-extractable
+callback has been peeled out.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.

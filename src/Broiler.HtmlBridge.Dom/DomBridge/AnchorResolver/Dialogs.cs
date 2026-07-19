@@ -78,7 +78,76 @@ public sealed partial class DomBridge
             // Set position:fixed as UA default for modal dialogs that have
             // no explicit position, matching Chromium's top-layer behaviour.
             InlineStyle(el)["position"] = "fixed";
+
+            // HTML UA `dialog:modal { inset:0; margin:auto }` centring. With the box
+            // fixed-positioned, both insets 0 and auto margins, the layout engine's
+            // §10.3.7 / §10.6.4 auto-margin resolution centres a definite-size box in the
+            // viewport (Broiler.Layout CssBox.ResolveOverconstrainedAutoMargins).
+            ApplyModalCenteringDefaults(el);
         }
+    }
+
+    // The HTML UA `dialog:modal` inset/margin properties (checked both as their shorthands and
+    // as longhands): any author declaration on these means the page positions the modal itself,
+    // so the UA centring default must not fight it.
+    private static readonly string[] ModalPositioningProps =
+    [
+        "inset", "inset-block", "inset-inline", "left", "right", "top", "bottom",
+        "margin", "margin-block", "margin-inline",
+        "margin-left", "margin-right", "margin-top", "margin-bottom",
+    ];
+
+    /// <summary>
+    /// Applies the HTML user-agent <c>dialog:modal { inset:0; width:fit-content; height:fit-content;
+    /// margin:auto }</c> centring default to a modal <c>&lt;dialog&gt;</c> the bridge just gave the UA
+    /// <c>position:fixed</c>. The layout engine centres a box on an axis when it has a resolvable used
+    /// size there and both opposing insets + auto margins (CSS2.1 §10.3.7/§10.6.4): the inline axis and
+    /// definite heights are centred in-line during layout, and a content / intrinsic-keyword block size is
+    /// centred by the engine's block-axis root post-pass (<c>CssBox.CenterOutOfFlowBlockAxis</c>) once the
+    /// final height is known. Per axis: a modal with no author size gets the UA <c>fit-content</c> so it
+    /// shrink-wraps to content and centres; an explicit or intrinsic author size centres as-is; an
+    /// explicit author <c>auto</c> is left alone (with both insets it fills the viewport — no free space).
+    /// The default is suppressed entirely when the author declares any inset/margin — the page owns the
+    /// positioning then.
+    /// </summary>
+    private void ApplyModalCenteringDefaults(DomElement el)
+    {
+        var specified = BuildSpecifiedStyleMap(el);
+
+        foreach (var prop in ModalPositioningProps)
+            if (specified.ContainsKey(prop))
+                return;
+
+        if (ResolveModalAxisCentres(el, specified, "width"))
+        {
+            InlineStyle(el)["left"] = "0";
+            InlineStyle(el)["right"] = "0";
+            InlineStyle(el)["margin-left"] = "auto";
+            InlineStyle(el)["margin-right"] = "auto";
+        }
+
+        if (ResolveModalAxisCentres(el, specified, "height"))
+        {
+            InlineStyle(el)["top"] = "0";
+            InlineStyle(el)["bottom"] = "0";
+            InlineStyle(el)["margin-top"] = "auto";
+            InlineStyle(el)["margin-bottom"] = "auto";
+        }
+    }
+
+    // Decides whether the modal's axis can be centred, applying the UA <c>fit-content</c> default when the
+    // author gave no size so the box shrink-wraps to content. Returns false only when the author explicitly
+    // set the axis to <c>auto</c> — with both insets that fills the containing block, leaving no free space
+    // for the auto margins to distribute.
+    private bool ResolveModalAxisCentres(DomElement el, Dictionary<string, string> specified, string sizeProperty)
+    {
+        if (!specified.TryGetValue(sizeProperty, out var value) || string.IsNullOrWhiteSpace(value))
+        {
+            InlineStyle(el)[sizeProperty] = "fit-content"; // UA dialog:modal shrink-to-fit default
+            return true;
+        }
+
+        return !string.Equals(value.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

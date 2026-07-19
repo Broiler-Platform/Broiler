@@ -188,6 +188,9 @@ internal static class ComputedStyleBuilder
             // Text shadow
             TextShadow = box.TextShadow,
 
+            // Zoom hook for paint-only lengths the paint layer resolves itself (e.g. text-shadow offsets).
+            EffectiveZoom = box.EffectiveZoom,
+
             // Positioning
             Left = box.Left,
             Top = box.Top,

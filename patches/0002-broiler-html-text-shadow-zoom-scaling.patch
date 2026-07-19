@@ -1,0 +1,45 @@
+From 3c24d21a376ae3b6749bf2c530da16909e0410dc Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 19 Jul 2026 10:26:32 +0000
+Subject: [PATCH] PaintWalker: scale text-shadow offsets by the box's effective
+ CSS zoom
+
+The text-shadow offsets are resolved in the paint walker from the raw
+text-shadow string rather than from the zoomed box geometry, so under the
+native CSS zoom engine they were left unscaled. Scale shadowX/shadowY by the
+ComputedStyle IR's new EffectiveZoom hook (populated from CssBox.EffectiveZoom
+in Broiler.Layout). Guarded on EffectiveZoom != 1.0, so it is inert while the
+native-zoom engine is off (the default) and the serialization bake continues to
+carry zoom unchanged.
+
+Depends on the Broiler.Layout ComputedStyle.EffectiveZoom field (added in the
+parent repo alongside this patch).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Ert9d7aRuuFxoLMRzYN2G3
+---
+ Source/Broiler.HTML.Orchestration/IR/PaintWalker.Text.cs | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Text.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Text.cs
+index f05f098..232ba6b 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Text.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Text.cs
+@@ -69,6 +69,14 @@ internal static partial class PaintWalker
+                     textColor = CompositeTextColor(bgClipTextColor.Value, textColor);
+ 
+                 var (shadowX, shadowY, shadowColor) = ParseTextShadow(inlineStyle.TextShadow);
++                // Paint-only used length (CSS zoom, increment 5): the text-shadow offsets are resolved here
++                // from the raw string rather than from the zoomed box geometry, so scale them by the box's
++                // effective zoom. 1.0 (the default) while the native-zoom engine is off, so this is inert.
++                if (inlineStyle.EffectiveZoom != 1.0)
++                {
++                    shadowX *= (float)inlineStyle.EffectiveZoom;
++                    shadowY *= (float)inlineStyle.EffectiveZoom;
++                }
+ 
+                 items.Add(new DrawTextItem
+                 {
+-- 
+2.43.0
+

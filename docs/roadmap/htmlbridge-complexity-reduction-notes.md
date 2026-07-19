@@ -154,6 +154,69 @@ synthesis (and its author-geometry / position-try helpers) from `Dialogs.cs`.
   overwriting the specified value) and running after used size is known — then a one-line DomParser UA rule
   (`inset:0; margin:auto` on a top-layer `<dialog>` with auto insets) centres modals. Deferred as its own
   engine increment.
+
+  **Landed (2026-07-17/18) — the engine work item AND the bridge wiring for definite-size modals.** The
+  "deferred engine increment" above was implemented as `CssBox.ResolveOverconstrainedAutoMargins`
+  (commit `e45bd33`, `Broiler.Layout`, main-repo): CSS2.1 §10.3.7/§10.6.4 auto-margin centring for
+  absolutely-positioned and fixed boxes, resolving *both* snags — snag (1) via the latched
+  `IsSpecifiedMargin{Left,Right,Top,Bottom}Auto` flags (which survive the getter's lossy `auto→"0"`
+  rewrite) plus `InvalidateActualMargins()`, and snag (2) via `IsDefiniteBorderBoxHeight` (uses the
+  resolved `Size.Height`, or derives it from an explicit non-percentage height). Covered by
+  `Broiler.Layout.Tests/AutoMarginCenteringTests.cs` (7 tests, incl. the margin-already-read-as-auto case
+  and the negative-excess clamp). **Bridge wiring (2026-07-18, main-repo):** `ApplyDialogUAPositioning`
+  now applies the UA `dialog:modal { inset:0; margin:auto }` default via `ApplyModalCenteringDefaults`,
+  **per axis and only where the modal has a definite specified size** (`IsDefiniteSizeValue` — not
+  auto/`fit-content`/`min-content`/`max-content`; a `<percentage>` counts), so the engine centres a
+  definite-size modal in the viewport. A content-sized (auto/intrinsic) axis is deliberately left
+  untouched — with both insets it would *stretch* to fill the viewport, because the engine still does not
+  shrink-wrap a both-inset abspos/fixed box (`ResolveBlockUsedWidth` line ~185 fills the IMCB for
+  `width:auto`/intrinsic with both insets); that shrink-to-fit sizing is the remaining engine increment
+  for content-sized modal centring. Any author inset/margin declaration suppresses the UA default
+  entirely. Covered by `Broiler.Cli.Tests/NativeModalCenteringTests.cs` (definite-size centred;
+  content-sized not stretched; author-positioned untouched; definite-width/auto-height centres only
+  horizontally). Zero regressions — the dialog/backdrop/popover/anchor/Acid3/architecture-guard/public-API
+  suites pass (the standing zoom / visual-viewport / anchor-size / iframe-scroll serialization
+  environmental fails are identical with the change stashed).
+
+  **Landed (2026-07-18) — horizontal shrink-to-fit: content-*width* modals now shrink-wrap and centre.**
+  The engine increment named above ("shrink-to-fit sizing … remaining") is delivered for the inline axis
+  (`Broiler.Layout`, main-repo): `ResolveBlockUsedWidth` now resolves an **intrinsic-keyword width**
+  (`fit-content`/`min-content`/`max-content`) for an absolutely-positioned / fixed box too (previously the
+  `Position != Absolute && != Fixed` gate left such a box to the both-inset *fill* branch, so `inset:0;
+  width:fit-content` stretched to the IMCB instead of shrink-wrapping); for a both-inset box `fit-content`
+  clamps to the inset-modified containing block. `IsDefiniteBorderBoxWidth` now treats the resolved
+  intrinsic width as definite, so the existing `ResolveOverconstrainedAutoMargins` centres it. The bridge's
+  `ApplyModalCenteringDefaults` gives a modal with no author width the UA `width: fit-content` default, so a
+  content-sized modal shrink-wraps and centres **horizontally**. Tests:
+  `Broiler.Layout.Tests/AutoMarginCenteringTests.IntrinsicWidth_ShrinkWrapped_IsCentred` and the
+  `NativeModalCenteringTests` set (content-width shrink-wrap + horizontal centre; explicit-both-axes centre;
+  content-height stays vertically natural). **Zero regression:** 213 engine layout tests, the anchor /
+  position-area / abspos / dialog / Acid3 / guard / public-API Cli suites, and the **css-anchor-position WPT
+  corpus (33/6, identical to baseline)** all pass.
+
+  **Landed (2026-07-18) — block-axis shrink-to-fit: content-*height* modals now centre vertically too.**
+  A content-*height* out-of-flow box's used height is not final until layout completes — a fixed/abspos
+  box reports only its chrome height at every *mid-layout* centring phase (verified: a fixed modal with an
+  80px block child reads a 34px chrome height at `PositionAbsoluteBox` time; the content height folds in
+  after its own layout pass returns). So block-axis centring is done as a **root post-pass**,
+  `CssBox.CenterOutOfFlowBlockAxis` (`CssBox.AutoMarginBlockCentering.cs`), run at the document root after
+  the single-pass layout (and after scroll/sticky/anchor), where `Bounds.Height` is final. It walks the
+  tree top-down and, for each absolute/fixed box with both block-axis insets, both block-axis margins auto
+  and a content/intrinsic-keyword height, re-positions it by the §10.6.4 auto-margin offset. To stop the
+  in-line `ResolveOverconstrainedAutoMargins` from mis-centring such a box against the chrome-only
+  pre-layout size, `IsDefiniteBorderBoxHeight` now returns **false** for an intrinsic-keyword height,
+  deferring it to the post-pass (explicit length/percentage heights still centre in-line as before). It is
+  gated with the other native-placement post-passes (`NativeAnchorPlacement.Enabled`, on in the bridge
+  geometry / WPT paths, inert by default). The bridge's `ApplyModalCenteringDefaults` now gives a modal
+  with no author height the UA `height: fit-content` default (symmetric with width), so a fully
+  content-sized modal shrink-wraps and centres on **both** axes. Tests: `NativeModalCenteringTests`
+  (content-size shrink-wrap + centre on both axes; explicit-width/content-height centre on both). **Zero
+  regression:** 213 engine layout tests, the anchor / position-area / abspos / dialog / backdrop / popover /
+  Acid3 / guard / public-API Cli suites, and the css-anchor-position WPT corpus (33/6, identical to
+  baseline) all pass (the standing zoom / visual-viewport / anchor-size / iframe-scroll serialization
+  environmental fails are unchanged). This closes the modal-centring track: a native modal `<dialog>`
+  (definite or content-sized) now centres in the viewport via the engine's §10.3.7/§10.6.4 auto-margin
+  resolution — no bridge position bake.
 - **Anchor-track render residue** stays exhausted (established earlier): the only un-handed-off case is a
   `position-area` box that *also* uses `position-try`, for which **no WPT test exists**, so widening the MVP
   gate has no observable payoff.
@@ -736,6 +799,233 @@ fail the identical 17 pre-existing Skia/environmental tests with and without the
 Still remaining (the non-mechanical cutover): thread the bridge's `_visualViewportScale` into the render
 entry (`HtmlContainerInt.ViewportZoom`) and stop the serialization `zoom` bake for pinch-zoom, retiring
 `ApplyVisualViewportSerializationState` — the one step that needs pixel validation with no reftest corpus.
+
+**Landed (2026-07-18) — (b2) general engine `zoom`: the `EffectiveZoom` foundation (increment 1,
+main-repo, flag-gated).** The engine was entirely zoom-blind — a tree-wide search found no `zoom` property
+and no reads; all `zoom` handling was the bridge serialization bake (`ApplyZoomSerializationStyles`,
+Chrome's "pre-multiply lengths at style time" model done at the DOM level). This increment gives the engine
+the property + the compounding factor it needs before any used-value scaling can consume it:
+`CssBoxProperties.Zoom` (a per-box string, wired into the `CssUtils` get/set property dispatch so the
+cascade populates it like any longhand), `OwnZoom` (parses a number / percentage / `normal`), and
+`EffectiveZoom` (this box's `OwnZoom` × every ancestor's — the multiplicative compounding CSS `zoom`
+implies). All gated by the new thread-static `NativeZoom.Enabled` flag (mirrors `NativeAnchorPlacement`):
+**`EffectiveZoom` is `1.0` everywhere while off, so the engine is zoom-neutral by default** and the bridge
+bake continues to carry zoom unchanged. Tests: `Broiler.Layout.Tests/EffectiveZoomTests.cs` (compounding
+down the tree when enabled; `1.0` everywhere when disabled; number / percentage / `normal` / non-positive
+parsing). Zero regression: 213 engine layout tests, and the Acid3 / guard / public-API / shared-geometry /
+position-area-live-geometry / modal-centering Cli suites all pass — the foundation is inert.
+
+**Landed (2026-07-18) — (b2) increment 2: used font-size scaling (main-repo).** `ActualFont.Size` (the
+used font size — what renders and what `GetEmHeight` feeds to other lengths' `em`) is now the *computed*
+size × `EffectiveZoom` when the box is zoomed. A new `ComputedFontSizePoints` holds the CSS computed size
+(unzoomed, per spec `zoom` scales only used values), and the font-size `%`/`em`/`larger`/`smaller`
+resolution + inheritance resolve against the *parent's* `ComputedFontSizePoints` — so a nested zoom
+compounds the ancestor factor exactly once (through `EffectiveZoom`), not through the font-size chain. Both
+the used-size path and the parent-basis swap are guarded on `EffectiveZoom != 1`, so with `NativeZoom` off
+the original `ActualFont.Size`-based resolution is byte-identical. No `Broiler.CSS` change needed — the
+computed size is built from the unzoomed parent basis and multiplied uniformly, so px/em/% all scale
+correctly without touching the length parser. Tests: `Broiler.Layout.Tests/ZoomFontSizeTests.cs` (absolute
+scales ×zoom / ×nested-zoom; `2em` under `zoom:2` is exactly 2× the un-zoomed `2em` — ancestor zoom applied
+once; disabled = unscaled; via a size-echoing font environment). Zero regression: 227 engine layout tests
+and the Acid3 / guard / public-API / computed-style / shared-geometry Cli suites.
+
+**Landed (2026-07-18) — (b2) increment 3: absolute-length scaling (main-repo, no submodule patch needed).**
+A closer look at `CssLengthParser` showed the clean split does **not** require the `Broiler.CSS` patch after
+all: font-relative units already carry zoom (their `emFactor` is the zoomed `GetEmHeight` from increment 2),
+so only *absolute* used values need scaling — a per-unit **post-scale of the resolved value** in the box's
+own `ParseLengthWithLineHeight`, all main-repo. New `ApplyZoomToLength(length, resolved)` scales the resolved
+value by `EffectiveZoom` for absolute units (`px`/`pt`/`cm`/`mm`/`in`/`pc`/`q`), `rem`/`rlh`, keyword widths
+and unitless values; leaves `em`/`ex`/`ch`/`ic`/non-root `lh` unchanged (already scaled through the zoomed
+font); and leaves viewport units untouched. Wired into `ParseLengthWithLineHeight` (covers **padding,
+margin, width, height, text-indent, border-spacing**) and the four border-width getters. No-op unless
+`NativeZoom` is on and the box is zoomed, so flag-off is byte-identical. Tests:
+`Broiler.Layout.Tests/ZoomLengthTests.cs` (padding/margin/border scale ×zoom; nested zoom compounds ×3;
+`2em` scales once through the zoomed font; disabled = unscaled). Zero regression: 231 engine layout tests +
+the Acid3 / guard / public-API / geometry / modal-centering Cli suites.
+
+**Landed (2026-07-19) — increment-3 follow-ups: basis-dependent `%` + inset scaling (main-repo).** The two
+tractable increment-3 gaps are now closed by teaching `ApplyZoomToLength` the *basis* of a percentage.
+`ApplyZoomToLength(length, resolved, percentAgainstContainingBlock)` now scales a `%` length by the box's
+own `OwnZoom` when the basis is the ancestor-zoomed containing block (`width`/`height`/insets) and leaves it
+unscaled when the basis is the box's own already-`EffectiveZoom`-scaled size (`padding`/`margin`) — the
+distinction that would otherwise double-count. `ParseLengthWithLineHeight` gained a matching
+`percentAgainstContainingBlock` flag, threaded `true` from the CB-basis width resolution
+(`ResolveBlockUsedWidth`, `CssBox.Layout.cs:181`). A new `ParseInsetLength(value, basis, …)` helper wraps the
+~32 direct `CssLengthParser.ParseLength(Left/Top/Right/Bottom, …)` callsites in `CssBox.Layout.cs` so a
+zoomed *positioned* box now scales its inset offsets too (absolute ×`EffectiveZoom`, `%` ×`OwnZoom` against
+the CB; the four relative-positioning offsets resolve against `Size` and pass
+`percentAgainstContainingBlock: false`). One latent-bug fix fell out: `ResolveOverconstrainedAutoMargins`
+computes a *used* centring margin, but `ActualMargin*` re-applies `EffectiveZoom` to the stored margin
+string, so the stored value is now pre-divided by `EffectiveZoom` (a no-op while the flag is off, since
+`EffectiveZoom` is then `1.0`) to avoid double-counting the zoom on the centred margin. All still gated by
+`NativeZoom` → flag-off byte-identical. Tests: `Broiler.Layout.Tests/ZoomInsetTests.cs` (absolute inset
+×`EffectiveZoom`, `%` inset ×`OwnZoom` against the CB, disabled = unscaled, observed through the auto-margin
+centring split). Zero regression: 234 engine layout tests + the Cli suites.
+
+**Landed (2026-07-19) — increment-3 `calc()` follow-up: per-term scaling (submodule patch, deferred wiring).**
+A `calc()`/`min()`/`max()` mixes units the call-site post-multiply cannot handle (absolute vs `%`, both
+against font-/viewport-relative terms that must stay put), so the scaling must happen *inside* the evaluator
+— and the hardcoded absolute unit→pixel factors in `Broiler.CSS.CssLengthParser` are the only lever, which
+is unreachable from the main repo. Added `CssLengthParser.SetElementZoom(absoluteZoom, percentZoom)` —
+thread-static factors (mirroring the existing viewport-factor pattern) applied during evaluation: absolute
+units + `rem`/`rlh` ×`absoluteZoom`, `%` ×`percentZoom`, `em`/`ex`/`ch`/`ic`/`lh` and viewport units
+untouched. Both default to `1.0` (neutral), so the parser is byte-identical for any caller that does not opt
+in. The `Broiler.CSS` remote is outside the session's push scope (push → 403), so per the submodule
+workflow this ships as **`patches/0001-broiler-css-calc-zoom-length-scaling.patch`** (with its own
+`CssLengthZoomTests`, 217 CSS tests pass) and the pointer is **not** bumped. The parent wiring
+(`ParseLengthWithLineHeight`/`ParseInsetLength` setting the hook for `(`-containing lengths while
+`NativeZoom` is on) is validated locally against the patched submodule — a `calc(20px + 10%)` inset under
+`zoom:2` centred exactly — then **reverted** for the pinned-pointer build, because it references
+`SetElementZoom` which the pinned SHA lacks (committing it would break the CI clone-by-pointer build). The
+feature is `NativeZoom`-gated (off), so nothing on CI needs it now; the wiring lands with the pointer bump.
+See `patches/README.md`.
+
+**Landed (2026-07-19) — increment-3 abspos block-size follow-up: the last direct-`ParseLength` gap (main-repo).**
+The `ParseInsetLength` helper is generalised to **`ParseUsedLength(value, basis, percentAgainstContainingBlock
+= true)`** (same body — direct `ParseLength` + `ApplyZoomToLength`, no line-height context) and now also wraps
+the seven direct-`ParseLength` **block-size** callsites in `CssBox.Layout.cs`: the abspos/percentage `height`
+resolutions against `cbHeight` (`PreResolveDefiniteHeightForDescendants`, `ApplyExplicitHeight`,
+`ApplyFloatExplicitHeight`), the `min-height`/`max-height` §10.7 clamps against `cbHeight`, and the two
+absolute-`height` fallbacks against basis `0` (the bottom-anchored fixed placement and
+`IsDefiniteBorderBoxHeight`). So a zoomed abspos box now scales its explicit/percentage block size too
+(absolute ×`EffectiveZoom`, `%` ×`OwnZoom` against the CB), consistent with the border/padding that
+`ResolveSpecifiedHeightToBorderBox` already adds zoomed. The same CB-basis `%` fix is applied to
+`min-width`/`max-width` (`ResolveCachedConstraintLength` now passes `percentAgainstContainingBlock: true`,
+matching the §10.4 containing-block basis). All gated by `NativeZoom` → flag-off byte-identical. Tests:
+`ZoomInsetTests` gains the absolute-height fallback (×`EffectiveZoom`, disabled = unscaled) observed through
+the §10.6.4 block-axis centring split; the `%` block-size behaviour is covered by the shared helper's
+existing `%`-inset test. Zero regression: 236 engine layout tests + the positioned/geometry/modal-centring
+Cli subset. This closes the last documented increment-3 length gap; only `calc()` (shipped as the
+`Broiler.CSS` patch, wiring deferred until the pointer bump) remains outside the flag-off engine.
+
+**Landed (2026-07-19) — increment 4, first slice: multi-column length scaling (main-repo).** The multicol
+`column-width`, `column-gap` and fragmentation `height`/`max-height` used lengths were still resolved via
+direct `CssLengthParser.ParseLength` and so unzoomed. All five callsites now route through `ParseUsedLength`:
+`ResolveColumnGap` (explicit gap ×`EffectiveZoom`, own-size basis; the `normal` default already rides the
+zoomed `GetEmHeight`), the two `column-width` auto-count resolutions in `CssBox.Layout.cs` (own-size basis),
+and the multicol balancing `height`/`max-height` in `CssBox.MultiColumn.cs` (CB basis). So a zoomed multicol
+container now sizes its columns and gaps at the effective factor, consistent with the padding/border it
+already subtracts zoomed. Gated by `NativeZoom` → flag-off byte-identical. `ResolveColumnGap` is now
+`internal` so `ZoomMultiColumnTests` can pin it directly (explicit gap ×zoom, nested zoom ×3, disabled =
+unscaled); the width/height callsites reuse the `ParseUsedLength` helper already pinned by `ZoomInsetTests`.
+Zero regression: 239 engine layout tests (the one failing Cli grid-auto-columns assertion is a pre-existing
+bare-container measurement difference, identical on clean HEAD).
+
+**Remaining within increment 4** (still carried by the bake, off the flag-off engine's main-repo layout
+surface): **`::before`/`::after` pseudo** and **SVG presentation/geometry attributes**. Both live in the
+render/serialization layers rather than the `Broiler.Layout` box-length surface the earlier increments cover
+— pseudo boxes and SVG attribute scaling are materialised upstream (renderer / bridge bake), so they fold in
+with the increment-5 render/paint pass rather than as a `ParseUsedLength` call-site sweep. The
+`ZoomScaledSerializationProperties` bake list also still owns a few paint-only lengths not consulted by box
+geometry (`border-radius`, `outline-width`/`outline-offset`, `column-rule-width`, `letter-spacing`/
+`word-spacing`), which likewise belong to the paint increment.
+
+**Landed (2026-07-19) — increment 5, first slice: outline paint-length scaling + the paint-model correction
+(main-repo).** Design correction first, because it reshapes increments 5–6: the roadmap sketch had increment
+5 *reuse the patch-0008/0009 `BCanvas.Scale` plumbing per zoomed subtree*. That is the **visual-viewport**
+(pinch) model — a canvas transform that leaves used values untouched — and it is **incompatible** with the
+used-value model increments 1–4 committed to. Layout already emits fully zoomed geometry (positions, box
+sizes, font size, borders, padding, insets, columns), so paint renders a zoomed subtree correctly *without*
+any canvas scale; adding a per-subtree `BCanvas.Scale` on top would **double-count** the zoom. So increment 5
+is not a canvas-scale pass — it is scaling the handful of **paint-only used lengths that do not flow from box
+geometry**, each at its own resolution site, exactly as increments 2–4 did for geometry lengths. This slice
+takes the two such lengths the `Broiler.Layout` read model resolves: **`outline-width`** (`ActualOutlineWidth`
+— now `ApplyZoomToLength(OutlineWidth, GetActualBorderWidth(...))`, so absolute / `thin`·`medium`·`thick`
+keyword × `EffectiveZoom`, `em` riding the zoomed font, mirroring the border widths) and **`outline-offset`**
+(`ActualOutlineOffset`, absolute × `EffectiveZoom`, negatives preserved). Outline never affects layout, so
+this is fully isolated. Gated by `NativeZoom` → flag-off byte-identical. Tests: `ZoomLengthTests` (outline
+width + offset ×zoom, `thick` keyword ×zoom, disabled = unscaled). Zero regression: 242 engine layout tests.
+
+**Landed (2026-07-19) — increment 5, second slice: paint-residue scaling (main-repo `border-radius` + the
+paint-layer zoom hook + the `text-shadow` submodule patch).** Investigating the "submodule paint residue"
+turned up a mis-classification: **`border-radius` is resolved in the main repo**, not the submodule.
+`ParseCornerRadius` (`CssBoxProperties`) feeds `ActualCornerNw/Ne/Se/Sw`, and the submodule paint walker only
+*derives the Y radius proportionally from that X value* (`GetEffectiveCornerRadiusY = cornerX × H/W`), so
+scaling the one main-repo resolver covers both axes. `ParseCornerRadius` now applies
+`ApplyZoomToLength(radius, …, percentAgainstContainingBlock: false)` — absolute radii × `EffectiveZoom`, a
+`%` radius resolves against the box's own already-zoomed border box so it is not re-scaled, and the Y
+derivation scales for free. Pinned by `ZoomLengthTests` (absolute ×zoom, `%` not re-scaled, disabled =
+unscaled).
+
+For the genuinely submodule-resolved paint lengths, a reusable hook: **`ComputedStyle.EffectiveZoom`** (new
+IR field, populated from `CssBox.EffectiveZoom` in `ComputedStyleBuilder.FromBox`; `1.0` while the flag is
+off). It is the general lever the paint layer scales by for any paint-only length it resolves from a raw
+string rather than from the zoomed box geometry. First consumer: **`text-shadow`** offsets, whose
+`shadowX`/`shadowY` are parsed in `PaintWalker.Text.cs` from the raw string — shipped as
+**`patches/0002-broiler-html-text-shadow-zoom-scaling.patch`** (`Broiler.HTML` push → 403, pointer pinned).
+Note the dependency direction is the reverse of patch 0001: here the *submodule* reads a *parent* field, so
+the `ComputedStyle.EffectiveZoom` hook is **kept** in the parent (the pinned unpatched submodule simply does
+not read it; the parent compiles either way) rather than reverted. The hook is pinned by `ZoomLengthTests`
+(`ComputedStyleIr_Carries_EffectiveZoom_For_PaintOnly_Lengths`); the submodule scaling built clean against
+the patched tree before revert. Gated by `NativeZoom` → flag-off byte-identical. Zero regression: 246 engine
+layout tests. See `patches/README.md`.
+
+**Landed (2026-07-19) — increment 5, third slice: SVG attribute scaling (main-repo seed + submodule patch).**
+As with border-radius, the SVG geometry work turned out to be **mostly main-repo**: `SvgRenderer` (in
+`Broiler.Layout`) parses the inline SVG, reads the geometry attributes (`x`/`y`/`width`/`height`/`points`/
+radii/`stroke-width`/`font-size`), and maps them to CSS pixels through a single `sx`/`sy`/`tx`/`ty` transform
+that every shape flows through. The insight is the two cases split cleanly: a **view-boxed** SVG already
+scales, because `sx = bounds.Width / viewBoxWidth` and `bounds` is the content box the layout emits *zoomed*;
+a **view-box-less** SVG maps raw user units 1:1 to CSS px and so needs the factor. `RenderSvgContent` gained
+an `effectiveZoom` parameter (default `1.0`) that **seeds** `sx`/`sy` — the view-box branch overrides the
+seed (from the zoomed bounds) so it never compounds, and the one seed covers every shape. The only caller is
+the submodule paint walker (`EmitSvgContent`), so passing `fragment.Style.EffectiveZoom` in ships as
+**`patches/0003-broiler-html-svg-attr-zoom-scaling.patch`** (same reverse-dependency shape as patch 0002 —
+the submodule passes a parent value, so the parent parameter is kept, default `1.0` for the pinned unpatched
+submodule). Pinned directly by `Broiler.Layout.Tests/ZoomSvgRenderTests` (no-viewBox raw geometry ×zoom; a
+viewBox does not compound; default `1.0` byte-identical). Gated by `NativeZoom` → flag-off byte-identical.
+Zero regression: 249 engine layout tests.
+
+**Landed (2026-07-19) — increment 5, fourth slice: `::before`/`::after` pseudo-elements (verified,
+zero-code).** The last paint-residue item needed **no code change** — and the investigation is the deliverable.
+Unlike the serialization bake, which *must* synthesise pseudo `<style>` overrides because the DOM has no
+pseudo nodes (`CollectZoomPseudoSerializationOverrides`), the engine materialises each pseudo as a **real
+`CssBox` child of the originating element's box** (`DomParser.CreatePseudoElementBox` →
+`CssBoxHelper.CreateBox(parentBox, …)`), storing its cascaded declarations as strings via
+`CssUtils.SetPropertyValue` — nothing is baked to fixed px. So the pseudo box inherits the originating
+element's `EffectiveZoom` through the box tree (`GetParent().EffectiveZoom`) and resolves its own lengths and
+font through the increments 1–5 zoom-aware getters — its zoomed geometry falls out for free. The one hazard —
+`InheritStyle` copying the parent's `zoom` string onto the child, which would *square* the factor — was
+checked and ruled out (`zoom` is not inherited). Pinned by `ZoomPseudoTests`, which builds a box exactly as
+the pseudo materialiser does and asserts: zoom inherited **exactly once** (not double-counted), an own
+`zoom` still compounds, generated-box lengths scale, disabled = unscaled. Zero regression: 253 engine layout
+tests. This closes increment 5's paint residue: outline, border-radius, text-shadow (patch 0002), SVG
+attributes (patch 0003), and pseudo are all handled behind the flag.
+
+**Landed (2026-07-19) — increment 5 follow-up: `word-spacing` (main-repo).** `word-spacing` feeds the
+per-word-gap advance (`ActualWordSpacing`, used across line layout / intrinsic sizing), and it is built at
+**two** sites — the base `CssUtils.WhiteSpace` (whitespace-glyph width + a `word-spacing` term) and the
+`MeasureWordSpacing` add — where `WhiteSpace` is only ever called from `MeasureWordSpacing`. Rather than
+disturb that pre-existing two-term measurement, both `word-spacing` `ParseLength` results now route through
+`ApplyZoomToLength`, so the whole advance scales by `EffectiveZoom` (absolute × zoom; an `em` term rides the
+already-zoomed `GetEmHeight`), while the whitespace-glyph part scales through the zoomed font on its own. To
+reach the helper from the static `CssUtils.WhiteSpace`, `ApplyZoomToLength` was widened `private` → `internal`;
+`MeasureWordSpacing` was widened `protected` → `protected internal` so `ActualWordSpacing` is directly
+testable. Inert while `NativeZoom` is off → byte-identical (verified: the text-measurement Cli subset fails
+the identical 7 pre-existing Skia/font/network environmental tests with and without this change). Pinned by
+`ZoomWordSpacingTests` (absolute advance ×`EffectiveZoom`; `em` rides the zoomed font once; disabled =
+unscaled). Zero regression: 256 engine layout tests. **`letter-spacing` is a non-issue** — a tree-wide search
+finds it nowhere in `Broiler.Layout`/`Broiler.HTML`; the engine does not lay it out or paint it at all (it
+lives only in the bake's serialization list), so there is nothing to scale, like the unimplemented element
+box-shadow.
+
+**Increment 5 is complete** — every paint-and-text residue the bake covers is now handled behind the flag:
+outline, border-radius, text-shadow (patch 0002), SVG attributes (patch 0003), pseudo-elements (inherited,
+verified), and word-spacing.
+
+**Increment 6 — the cutover (runbook authored, not executed).** Flip `NativeZoom` on and delete
+`ApplyZoomSerializationStyles`. This is the one *irreversible* step, so it is written up as an executable
+runbook rather than performed here: **`docs/roadmap/zoom-native-cutover.md`**. The bake and the engine are
+mutually exclusive (running both double-counts; neither drops zoom), so enabling the flag and deleting the
+bake are one atomic change, gated on four preconditions: **P1** the three submodule paint patches
+(`patches/0001`–`0003`) applied + `Broiler.CSS`/`Broiler.HTML` pointers bumped + the reverted calc parent
+wiring re-added (blocked — the submodule remotes 403 from this session, an environment/maintainer action);
+**P2** `NativeZoom.Enabled` (thread-static) set on the *layout* thread; **P3** the CSSOM metric divide-out
+(`LayoutMetrics.UnzoomSharedExtent` / `GetUsedZoomForElement`) stays green on the engine path — favourable,
+since it reads zoom from *computed* props and so is source-agnostic; **P4** an A/B bake-vs-engine equivalence
+harness (there is no reftest corpus). The `%`-vs-`px`-vs-`em` and *own*-vs-*effective* factor distinctions
+(increments 2–3) are the intricate, correctness-sensitive core — which is why this is "the large piece" and
+is being landed incrementally behind the flag. The runbook's readiness checklist tracks P1–P4.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
