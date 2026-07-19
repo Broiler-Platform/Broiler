@@ -28,7 +28,7 @@ quick view.
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
 | 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. |
-| 4 — eliminate parallel DOM state | Bulk delivered | Item 2: the serialize-time **baked style is now a distinct per-element overlay store**, split off the script-observable inline-style dict (P4.14 increments 1–3: anchor cluster + animation/synthetic/zoom bake writers seamed, then backed by a tombstone-aware overlay merged only at serialization) — verified byte-identical incl. the WPT anchor-position pixel corpus. `InlineStyleRuntimeState.Style` no longer carries bakes. Remaining: full-corpus WPT/Acid CI gate; item 5 `Normalize`/`CloneDomElement` swaps still blocked, now specified precisely (P4.15): `Normalize` needs the bridge's MutationObserver/NodeIterator/Range driven from canonical `DomDocument.Mutated` (architectural); `CloneDomElement` (runtime-state gate retired via P4.13/overlay) needs three canonical-`CloneNode` divergences reconciled — owner-document, attribute-case (SVG `viewBox`), shallow-ctor namespace — with SVG/Acid validation. |
+| 4 — eliminate parallel DOM state | Bulk delivered | Item 2: the serialize-time **baked style is now a distinct per-element overlay store**, split off the script-observable inline-style dict (P4.14 increments 1–3: anchor cluster + animation/synthetic/zoom bake writers seamed, then backed by a tombstone-aware overlay merged only at serialization) — verified byte-identical incl. the WPT anchor-position pixel corpus. `InlineStyleRuntimeState.Style` no longer carries bakes. Remaining: full-corpus WPT/Acid CI gate. Item 4/5 canonical reuses done (P4.8–4.12, P4.16–4.19; `IndexOfReference` visibility is pending `patches/0002`). `CloneDomElement` now delegates to canonical `CloneNode` (P4.20, verified byte-identical across ~14 clone suites). Item 5 reduces to `Normalize` alone — still blocked on driving the bridge's MutationObserver/NodeIterator/Range from canonical `DomDocument.Mutated` (P4.15). |
 | 5 — used-value behaviour into Layout | Bulk delivered; **in-scope terminal** | Anchor-track deletion complete through step 6. Feature (b) visual-viewport/zoom: read (CSSOM) **and** render (pixel) sides now validated on the engine used-value model (2026-07-19) — deleting the zoom bake is now only a *deployment* gate (enable `NativeZoom` at the external `CaptureService` renderer), plus the submodule-push-gated pinch render cutover (`patches/0001`). Feature (a) dialog/backdrop: native modal centering + modal box-chrome bake deletion landed; native `::backdrop` box + top-layer paint stay submodule-patch-gated. See the [2026-07-19 reconciliation](#reconciliation-2026-07-19--features-a-and-b-driven-to-their-in-scope-terminal-state). |
 
 Companion documents:
@@ -1969,6 +1969,33 @@ Exit criteria:
   133 tests with the guard) stays green.
 
 ### Phase 4 - eliminate parallel DOM state
+
+Status: **P4.20 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item 5:
+`CloneDomElement` now delegates the tree + attribute clone to canonical `DomNode.CloneNode`.** This closes the
+more tractable of the two P4.15 blocked swaps. `CloneDomElement` reimplemented cloning per node-kind — element
+via `CreateBridgeElementNS` (minted from the main `_document`) + a `SetAttribute`/`SetAttributeNS` copy loop,
+text/comment/doctype/fragment via the document factories, plus a recursive deep-clone. It now delegates to
+`source.CloneNode(deep)` (canonical `CloneShallow` handles every node kind — namespace + attribute set, text/
+comment data, doctype fields, fragment — and recurses in child order), and a new
+`CopyRuntimeStateForClonedSubtree` walks the source and clone in lockstep, applying the bridge's
+`CopyBridgeRuntimeStateTo` authority (P4.13 + the P4.14-inc3 baked overlay) to each element pair. Cloning does
+not mutate the live document, so — unlike `Normalize` — there is **no** MutationObserver/NodeIterator/live-range
+side-effect coupling, and the runtime-state gate was already retired, which is why this half was tractable.
+
+**The three P4.15 divergences turned out not to manifest** in the tested surface: canonical preserves the source
+owner document (vs the old mint-from-main-`_document`) and copies attribute keys verbatim (vs the old
+no-namespace `SetAttribute` lowercasing) — both spec-correct — and uses the `Name`-carrying `CloneShallow` ctor
+(namespace preserved). Verified byte-identical across a **comprehensive clone surface** (≈14 suites,
+stash-baseline-compared): general clone + form-control-state survival (`HtmlDomInterfaces`), whitespace/namespace
+(`NamespaceAndDomCore`), doctype (`DoctypeSentinelMigration`), fragment (`DocumentFragmentSentinelMigration`),
+deep-clone/Acid3 (`DomEventsEdgeCase`, `Acid3Regression`), **SVG attribute-case** (`SvgDomAndCrossDoc`,
+`SvgDomDynamicContent`, `Acid3SvgAndParsing`) and **sub-document owner-document** (`OwnerDocRootRemoval`,
+`SubdocRootGuardRemoval`) — **all 0 failures with the change, and 0 at baseline** for the divergence-sensitive
+SVG/owner-doc subset (so no regression, and no pre-existing failure masked). No public-API change; −30 net lines.
+There is no SVG WPT pixel subset in-repo, so the render gate here is the Cli SVG/Acid suites; the full WPT
+pixel + Acid CI corpus remains the belt-and-suspenders sign-off for a clone/render-adjacent change, consistent
+with the P4.15 note. **Item 5 now reduces to `Normalize` alone** (still blocked on the
+`DomDocument.Mutated`-subscription architecture — P4.15).
 
 Status: **P4.19 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item
 4/5: reuse canonical `CompareBoundaryPoints` for `CompareTreeOrder` (the last document-order duplicate).**

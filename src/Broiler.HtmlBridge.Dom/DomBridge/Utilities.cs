@@ -289,73 +289,43 @@ public sealed partial class DomBridge
     /// </summary>
     private DomNode CloneDomElement(DomNode source, bool deep)
     {
-        // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes clone via the document
-        // factories (DomText/DomComment ctors are internal). Dead on today's homogeneous facade
-        // tree — facade text/comment nodes are Broiler.Dom.DomElement and take the element path below; live
-        // once text/comment construction flips to canonical DomText/DomComment.
-        if (source is DomCharacterData sourceCharData)
-        {
-            return IsComment(source)
-                ? _document.CreateComment(sourceCharData.Data)
-                : _document.CreateTextNode(sourceCharData.Data);
-        }
+        // Phase 4 item 5: delegate the tree + attribute clone to canonical DomNode.CloneNode (spec §4.4)
+        // instead of the bridge's hand-rolled per-node-kind rebuild. Canonical CloneShallow handles every
+        // node kind — element (namespace + attribute set verbatim), text/comment (data), doctype
+        // (name/publicId/systemId) and fragment — and, when deep, recurses the child list in order. This
+        // replaces the former CreateBridgeElementNS-from-main-`_document` construction + SetAttribute
+        // attribute copy; canonical preserves the source's owner document and attribute keys verbatim,
+        // which is spec-correct (the old path minted every clone from the main document and lowercased
+        // no-namespace attribute names). Cloning does not mutate the live document, so there is no
+        // MutationObserver/NodeIterator/live-range side-effect coupling here (unlike Normalize).
+        var clone = source.CloneNode(deep);
 
-        // Phase 4 item 1: a canonical DomDocumentType clones its immutable name/publicId/systemId.
-        if (source is DomDocumentType sourceDocType)
-            return _document.CreateDocumentType(sourceDocType.Name, sourceDocType.PublicId, sourceDocType.SystemId);
-
-        // Phase 4 item 1: a canonical DomDocumentFragment clones to an empty fragment; a deep clone
-        // copies its children (a shallow clone is empty, per DOM).
-        if (source is DomDocumentFragment sourceFragment)
-        {
-            var fragmentClone = CreateBridgeDocumentFragment();
-            if (deep)
-                foreach (var child in sourceFragment.ChildNodes.ToArray())
-                    fragmentClone.AppendChild(CloneDomElement(child, true));
-            return fragmentClone;
-        }
-
-        var element = (DomElement)source;
-        // Preserve the source element's exact namespace (folds the old post-construction
-        // `clone.NamespaceURI = element.NamespaceURI` — see below); SVG/foreign clones keep
-        // their namespace rather than defaulting to HTML.
-        var clone = CreateBridgeElementNS(element.NamespaceUri, element.TagName, element.Id, element.ClassName);
-        // RF-BRIDGE-1c Phase C2: copy attributes straight from the canonical namespace-keyed
-        // set so namespaced attributes (namespace, prefix, local name) survive the clone —
-        // that fidelity used to depend on the separate NsAttrMap shadow. No-namespace
-        // attributes go through SetAttribute (which lowercases, matching the prior snapshot
-        // path); a prefixed qualified name can only exist with a namespace, so it never
-        // reaches the SetAttribute branch (which would throw on the ':').
-        foreach (var attribute in element.Attributes.Values)
-        {
-            if (attribute.NamespaceUri is null)
-                clone.SetAttribute(attribute.QualifiedName, attribute.Value);
-            else
-                clone.SetAttributeNS(attribute.NamespaceUri, attribute.QualifiedName, attribute.Value);
-        }
-        // RF-BRIDGE-1c Phase F (F3c part 2d): element text lives in child DomText nodes, cloned by
-        // the deep-clone loop below — no element-store TextContent scalar to copy.
-        // (The namespace was carried at construction via CreateBridgeElementNS above.)
-        // Copy all bridge per-element runtime state (inline style, form control, scroll, dialog/
-        // popover, shadow, stylesheet, document viewport, animation, position-area memo) through the
-        // single CopyBridgeRuntimeStateTo authority. Must run after the attributes are copied above:
-        // the inline-style copy first lazily seeds the clone from its `style=` attribute, then
-        // overwrites it with the source's live dict.
-        CopyBridgeRuntimeStateTo(element, clone);
-
-        if (deep)
-        {
-            // RF-BRIDGE-1c Phase F (F3c): iterate raw ChildNodes (not ChildElements) so text/
-            // comment children clone too once they flip to canonical DomText/DomComment. On the
-            // homogeneous facade tree every child is already an element, so this is a no-op widen.
-            foreach (var child in element.ChildNodes)
-            {
-                var childClone = CloneDomElement(child, true);
-                SetParent(childClone, clone);
-                clone.AppendChild(childClone);
-            }
-        }
+        // Canonical CloneNode knows nothing about the bridge's parallel per-element runtime state (inline
+        // style + baked overlay, form control, scroll, dialog/popover, shadow, stylesheet, document
+        // viewport, animation, position-area memo), so copy it onto every element in the cloned subtree
+        // through the single CopyBridgeRuntimeStateTo authority (P4.13 / P4.14-inc3).
+        CopyRuntimeStateForClonedSubtree(source, clone, deep);
         return clone;
+    }
+
+    /// <summary>
+    /// Walks a source subtree and its canonical <c>CloneNode</c> copy in lockstep, copying the bridge's
+    /// per-element runtime state (via <see cref="CopyBridgeRuntimeStateTo"/>) from each source element to
+    /// its clone. Canonical <c>CloneNode(deep)</c> reproduces the child list in order, so index <c>i</c>
+    /// of the source's children pairs with index <c>i</c> of the clone's.
+    /// </summary>
+    private void CopyRuntimeStateForClonedSubtree(DomNode source, DomNode clone, bool deep)
+    {
+        if (source is DomElement sourceElement && clone is DomElement cloneElement)
+            CopyBridgeRuntimeStateTo(sourceElement, cloneElement);
+
+        if (!deep)
+            return;
+
+        var sourceChildren = source.ChildNodes;
+        var cloneChildren = clone.ChildNodes;
+        for (var i = 0; i < sourceChildren.Count && i < cloneChildren.Count; i++)
+            CopyRuntimeStateForClonedSubtree(sourceChildren[i], cloneChildren[i], true);
     }
 
     /// <summary>
