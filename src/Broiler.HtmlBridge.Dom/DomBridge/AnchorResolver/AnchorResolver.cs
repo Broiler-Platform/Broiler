@@ -41,12 +41,15 @@ public sealed partial class DomBridge
     /// <c>patches/0006-html-visual-viewport-extraction-scale.patch</c>), and folds the same scale
     /// into <see cref="GetUsedZoomForElement"/> as a root-level zoom so <c>offset*</c> divides it
     /// back out and <c>getBoundingClientRect</c> keeps it (CSSOM-View: pinch-zoom is a root zoom in
-    /// this model). Off by default — the extraction scale and the read-path fold are inverse halves
-    /// of one balance, so enabling the fold without the (submodule) extraction would halve
-    /// <c>offset*</c>; the flag activates both together only once 0006 is applied. When off,
-    /// visual-viewport geometry is unchanged (the WPT-runner `zoom` bake path is untouched).
+    /// this model). **On by default now that patch 0006 is applied and pinned** — the extraction scale
+    /// and the read-path fold are inverse halves of one balance, and with 0006 at the pinned SHA both
+    /// are live, so the native pinch-zoom read model is authoritative. Inert for a non-pinch page
+    /// (<c>HasActiveVisualViewport()</c> is false unless the page sets <c>visualViewport.scale &gt; 1</c>),
+    /// so the blast radius is pinch-zoomed pages only. The WPT-runner render `zoom` bake path
+    /// (<c>ApplyVisualViewportSerializationState</c>, called only from <c>ResolveAnchorPositions</c>) is
+    /// a separate path and is untouched.
     /// </summary>
-    internal bool NativeVisualViewport { get; set; }
+    internal bool NativeVisualViewport { get; set; } = true;
 
     /// <summary>
     /// Phase 5 native dialog/backdrop track — top-layer paint. When on, the bridge stamps a

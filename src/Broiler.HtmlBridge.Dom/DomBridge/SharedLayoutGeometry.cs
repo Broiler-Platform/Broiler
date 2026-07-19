@@ -77,12 +77,19 @@ public sealed partial class DomBridge
 
     private IReadOnlyDictionary<DomElement, BoxGeometry> BuildSharedGeometrySnapshot()
     {
-        // RF-BRIDGE-1b render-doc/live-doc separation: install a revert log so the zoom
-        // baking GetRenderDocument applies (needed for correct RENDERED geometry, incl. a
-        // zoomed descendant's overflow) is undone on the live document afterward. That keeps
-        // the live/CSSOM document pristine, so unzoomed CSSOM queries on zoomed elements
-        // (routed to the estimator) read original styles instead of baked ones.
-        _zoomSerializationRevertLog = [];
+        // Phase-5 LayoutSnapshot endgame — the CSSOM read model uses the engine's used-value `zoom`
+        // (increments 1–5), not the serialization bake. Enabling NativeZoom for the snapshot layout makes
+        // GetRenderDocument skip the element-`zoom` bake (via ZoomBakeActive) and the engine scale used
+        // values instead, so a zoomed element's snapshot geometry — and the unzoomed `offset*`/`client*`
+        // the read path divides out of it — is correct for RELATIVE units (`%`, `em`, `rem`, `calc`) too,
+        // which the bake mis-scaled (e.g. `width:50%` of a 200px CB under `zoom:2` reported `offsetWidth`
+        // 50 instead of 100). Absolute lengths are unchanged (bake and engine already agreed). Thread-static
+        // save/restore keeps concurrent layouts unaffected. Because the snapshot never bakes, the live
+        // document stays pristine — no revert is needed (the old `_zoomSerializationRevertLog` machinery is
+        // retired); the render/serialize path (called directly by capture / WPT, not via this snapshot)
+        // still bakes.
+        var previousNativeZoom = Broiler.Layout.Engine.NativeZoom.Enabled;
+        Broiler.Layout.Engine.NativeZoom.Enabled = true;
         try
         {
             var document = GetRenderDocument();
@@ -120,7 +127,11 @@ public sealed partial class DomBridge
         }
         finally
         {
-            RevertZoomSerialization();
+            Broiler.Layout.Engine.NativeZoom.Enabled = previousNativeZoom;
+            // GetRenderDocument mutated the live document (ReflectRenderState / serialization transforms),
+            // so drop the computed-props cache — subsequent CSSOM queries must recompute against the live
+            // styles, not values cached mid-build. (Previously done incidentally by RevertZoomSerialization.)
+            ClearComputedPropsCache();
         }
     }
 

@@ -145,7 +145,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// The pure <c>@position-try</c> fallback algorithm shared by the render bake
     /// (<see cref="TryApplyFallback"/>) and the live read path
-    /// (<see cref="ResolvePositionTryForElement"/>): given the base placement geometry, tests
+    /// (the position-try live read path): given the base placement geometry, tests
     /// whether it overflows and, if so, returns the first fallback whose resolved placement fits
     /// (or <c>null</c> when the base fits or none fits). Reposition + resize; <c>anchor()</c> insets
     /// in a fallback resolve through <see cref="AnchorGeometry"/>, matching the base.
@@ -275,73 +275,6 @@ public sealed partial class DomBridge
             if (fits)
                 return (tryLeft, tryTop, tryWidth, tryHeight);
         }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Live read-path counterpart of <see cref="TryApplyFallback"/>: for an absolutely/fixed
-    /// positioned box with <c>position-try-fallbacks</c> whose base placement overflows, returns the
-    /// selected fallback's offsetParent-relative <c>left</c>/<c>top</c> and used border-box
-    /// <c>width</c>/<c>height</c> (or <c>null</c> when the box has no fallback, the base fits, or no
-    /// fallback fits — the base geometry then comes from the other live resolvers). Resolves the base
-    /// <c>anchor()</c> insets fresh (the render bake has not run during script) and drives the same
-    /// <see cref="ComputeFallbackPlacement"/> core the bake uses.
-    /// </summary>
-    internal (double? left, double? top, double? width, double? height)? ResolvePositionTryForElement(DomElement element)
-    {
-        var baseProps = CollectMatchedRuleProperties(element);
-        foreach (var kv in InlineStyle(element))
-            baseProps[kv.Key] = kv.Value;
-
-        var position = (baseProps.GetValueOrDefault("position") ?? string.Empty).Trim().ToLowerInvariant();
-        if (position is not ("absolute" or "fixed"))
-            return null;
-
-        string? fallbackList = baseProps.GetValueOrDefault("position-try-fallbacks")
-            ?? baseProps.GetValueOrDefault("position-try");
-        if (string.IsNullOrWhiteSpace(fallbackList))
-            return null;
-
-        var positionTryRules = GetPositionTryRulesForPass();
-        if (positionTryRules.Count == 0)
-            return null;
-
-        var anchorRegistry = GetAnchorRegistryForPass();
-
-        string? implicitAnchor = baseProps.GetValueOrDefault("position-anchor");
-        double cbWidth = FindContainingBlockWidth(element);
-        double cbHeight = FindContainingBlockHeight(element);
-
-        double ResolveBaseInset(string prop)
-        {
-            var v = baseProps.GetValueOrDefault(prop);
-            if (string.IsNullOrWhiteSpace(v) || v.Trim().Equals("auto", System.StringComparison.OrdinalIgnoreCase))
-                return 0;
-            if (v.Contains("anchor(", System.StringComparison.OrdinalIgnoreCase))
-            {
-                var rewritten = AnchorFunction.Rewrite(v, r =>
-                    ResolveAnchorEdge(r, anchorRegistry, prop, cbWidth, cbHeight, implicitAnchor));
-                return TryParsePx(rewritten) ?? 0;
-            }
-            return TryParsePx(v) ?? 0;
-        }
-
-        double baseLeft = ResolveBaseInset("left");
-        double baseTop = ResolveBaseInset("top");
-        double baseRight = ResolveBaseInset("right");
-        double baseBottom = ResolveBaseInset("bottom");
-
-        double baseWidth = TryParsePx(baseProps.GetValueOrDefault("width")) ?? 0;
-        double baseHeight = TryParsePx(baseProps.GetValueOrDefault("height")) ?? 0;
-        string? widthVal = baseProps.GetValueOrDefault("width");
-        bool hasAutoWidth = widthVal is "min-content" or "max-content" or "auto" or "fit-content";
-        if (hasAutoWidth && baseWidth == 0)
-            baseWidth = EstimateMinContentWidth(element);
-
-        if (ComputeFallbackPlacement(baseProps, anchorRegistry, positionTryRules, fallbackList,
-                baseLeft, baseTop, baseRight, baseBottom, baseWidth, baseHeight, cbWidth, cbHeight) is { } placed)
-            return (placed.left, placed.top, placed.width, placed.height);
 
         return null;
     }

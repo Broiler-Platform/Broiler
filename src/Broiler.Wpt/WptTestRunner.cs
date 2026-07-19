@@ -355,6 +355,17 @@ internal sealed partial class WptTestRunner
         Environment.GetEnvironmentVariable("BROILER_WPT_NATIVE_BACKDROP") is ("1" or "true" or "TRUE" or "on");
 
     /// <summary>
+    /// Native CSS <c>zoom</c> render lever (Phase 5 zoom endgame — render-side A/B validation). Default
+    /// OFF: the serialize path bakes <c>zoom</c> into the DOM (<c>ApplyZoomSerializationStyles</c>) and the
+    /// render lays out the pre-scaled HTML 1:1, exactly as today. When on, the runner enables the engine's
+    /// used-value <c>zoom</c> model (<c>Broiler.Layout.Engine.NativeZoom</c>) around the whole
+    /// serialize+render, so the bridge bake is skipped (<c>DomBridge.ZoomBakeActive</c>) and the engine
+    /// scales used values during layout. Used to validate that the engine render reproduces the correct
+    /// (reference) pixels for the zoom corpus — the render-side half of the increment-6 cutover's A/B gate.
+    /// </summary>
+    internal static bool NativeZoom { get; set; }
+
+    /// <summary>
     /// File extensions treated as test files.
     /// </summary>
     private static readonly HashSet<string> TestExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -1761,6 +1772,25 @@ internal sealed partial class WptTestRunner
     /// anchor resolution, rendering) and returns the resulting bitmap.
     /// </summary>
     private HTML.Image.BBitmap RenderHtmlFileBitmap(string htmlPath, string? wptRoot)
+    {
+        // Zoom render lever: enable the engine's used-value `zoom` for the whole serialize+render so the
+        // bridge bake is skipped (ZoomBakeActive) and the engine scales used values during layout. Default
+        // off → the serialize bakes and this is byte-identical. [ThreadStatic] save/restore, so it scopes to
+        // this render on this thread only.
+        var previousNativeZoom = Broiler.Layout.Engine.NativeZoom.Enabled;
+        if (NativeZoom)
+            Broiler.Layout.Engine.NativeZoom.Enabled = true;
+        try
+        {
+            return RenderHtmlFileBitmapCore(htmlPath, wptRoot);
+        }
+        finally
+        {
+            Broiler.Layout.Engine.NativeZoom.Enabled = previousNativeZoom;
+        }
+    }
+
+    private HTML.Image.BBitmap RenderHtmlFileBitmapCore(string htmlPath, string? wptRoot)
     {
         var html = File.ReadAllText(htmlPath);
 

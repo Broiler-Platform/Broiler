@@ -23,41 +23,6 @@ public sealed partial class DomBridge
     // renderer layout is the sole geometry source.
     private bool _layoutGeometryPassActive;
 
-    // Per-pass memos for the document-wide anchor inputs the live anchor-geometry resolvers
-    // (position-area / anchor()-inset / anchor-size() / position-try) all need: the anchor
-    // registry (a full Elements walk + per-anchor box computation) and the parsed @position-try
-    // rules (a tree walk + CSS parse). A single getBoundingClientRect over an anchor box invokes
-    // several resolvers (and each offset getter re-invokes them, plus the offsetParent recursion),
-    // so building these once per read pass — the DOM/styles are static within a WithLayoutGeometryCache
-    // pass — avoids the O(anchors) rebuild fan-out. Null outside a pass (each build is fresh, matching
-    // the render bake); cleared with the geometry snapshot when the owning pass ends.
-    private Dictionary<string, AnchorInfo>? _passAnchorRegistry;
-    private Dictionary<string, Dictionary<string, string>>? _passPositionTryRules;
-
-    /// <summary>The anchor registry (stylesheet + inline anchors), built once per read pass.</summary>
-    private Dictionary<string, AnchorInfo> GetAnchorRegistryForPass()
-    {
-        if (_layoutGeometryPassActive && _passAnchorRegistry is { } cached)
-            return cached;
-        var registry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);
-        BuildAnchorRegistry(registry);
-        BuildInlineAnchorRegistry(registry);
-        if (_layoutGeometryPassActive)
-            _passAnchorRegistry = registry;
-        return registry;
-    }
-
-    /// <summary>The parsed <c>@position-try</c> rules, parsed once per read pass.</summary>
-    private Dictionary<string, Dictionary<string, string>> GetPositionTryRulesForPass()
-    {
-        if (_layoutGeometryPassActive && _passPositionTryRules is { } cached)
-            return cached;
-        var rules = ParsePositionTryRules();
-        if (_layoutGeometryPassActive)
-            _passPositionTryRules = rules;
-        return rules;
-    }
-
     // Test seam retained so the equivalence tests compile. The shared snapshot is the
     // single geometry source now, so toggling this no longer selects an alternate path.
     internal static bool LayoutGeometryCacheEnabled = true;
@@ -98,8 +63,6 @@ public sealed partial class DomBridge
             {
                 // RF-BRIDGE-1b: the shared-geometry snapshot is scoped to the same pass.
                 ClearSharedGeometrySnapshot();
-                _passAnchorRegistry = null;
-                _passPositionTryRules = null;
                 _layoutGeometryPassActive = false;
             }
         }
@@ -157,28 +120,9 @@ public sealed partial class DomBridge
             if (ShouldReportZeroOffsetMetrics(element))
                 return 0;
 
-            // A live position-area resolution takes precedence over the shared
-            // renderer snapshot, matching offset-left/top below: the non-native
-            // renderer lays a position-area box out before its grid-cell placement
-            // is baked, so its shared border box is 0 — the resolution is the box's
-            // actual used size (css-anchor-position position-area-anchor-partially-outside).
-            var resolved = ResolvePositionAreaForElement(element);
-            if (resolved != null)
-                return resolved.Value.width;
-
-            // A live anchor-size() width resolves the box's used size the same way —
-            // the pre-bake snapshot sizes an unresolved anchor-size() box to 0.
-            if (ResolveAnchorSizeForElement(element) is { width: { } anchorWidth })
-                return anchorWidth;
-
-            // A position-try fallback sizes the box when it applies.
-            if (ResolvePositionTryForElement(element) is { width: { } tryWidth })
-                return tryWidth;
-
-            // An opposing-inset auto-width anchor box is sized by the two resolved insets.
-            if (ResolveAnchorInsetForElement(element) is { width: { } insetWidth })
-                return insetWidth;
-
+            // Anchor sizing (position-area / anchor-size() / position-try / opposing-inset auto) is
+            // resolved natively in the shared snapshot (HeadlessLayoutView's NativeAnchorPlacement pass),
+            // so the snapshot border box already carries the used size.
             if (TryGetSharedLayoutGeometry(element, out var shared))
                 return UnzoomSharedExtent(shared.BorderBox.Width, element);
 
@@ -194,22 +138,7 @@ public sealed partial class DomBridge
             if (ShouldReportZeroOffsetMetrics(element))
                 return 0;
 
-            // See GetOffsetWidthForDomElement: a live position-area resolution wins
-            // over the shared renderer snapshot (which is 0 pre-bake), matching
-            // offset-left/top.
-            var resolved = ResolvePositionAreaForElement(element);
-            if (resolved != null)
-                return resolved.Value.height;
-
-            if (ResolveAnchorSizeForElement(element) is { height: { } anchorHeight })
-                return anchorHeight;
-
-            if (ResolvePositionTryForElement(element) is { height: { } tryHeight })
-                return tryHeight;
-
-            if (ResolveAnchorInsetForElement(element) is { height: { } insetHeight })
-                return insetHeight;
-
+            // See GetOffsetWidthForDomElement: anchor sizing is resolved natively in the shared snapshot.
             if (TryGetSharedLayoutGeometry(element, out var shared))
                 return UnzoomSharedExtent(shared.BorderBox.Height, element);
 
@@ -222,19 +151,8 @@ public sealed partial class DomBridge
     private double GetOffsetTopForDomElement(DomElement element) =>
         WithLayoutGeometryCache(() =>
         {
-            var resolved = ResolvePositionAreaForElement(element);
-            if (resolved != null)
-                return resolved.Value.top;
-
-            // A position-try fallback (when the base overflows) overrides the base placement.
-            if (ResolvePositionTryForElement(element) is { top: { } tryTop })
-                return tryTop;
-
-            // A live anchor() vertical inset resolves the box's top the same way, before the
-            // render bake — the pre-bake snapshot lays an anchor()-positioned box at the origin.
-            if (ResolveAnchorInsetForElement(element) is { top: { } insetTop })
-                return insetTop;
-
+            // Anchor placement (position-area / position-try / anchor() inset) is resolved natively in the
+            // shared snapshot, so the snapshot offset already reflects it.
             var offsetParent = GetOffsetParentForDomElement(element);
             if (TryGetSharedOffset(element, offsetParent, vertical: true, out var sharedTop))
                 return sharedTop;
@@ -245,16 +163,7 @@ public sealed partial class DomBridge
     private double GetOffsetLeftForDomElement(DomElement element) =>
         WithLayoutGeometryCache(() =>
         {
-            var resolved = ResolvePositionAreaForElement(element);
-            if (resolved != null)
-                return resolved.Value.left;
-
-            if (ResolvePositionTryForElement(element) is { left: { } tryLeft })
-                return tryLeft;
-
-            if (ResolveAnchorInsetForElement(element) is { left: { } insetLeft })
-                return insetLeft;
-
+            // See GetOffsetTopForDomElement: anchor placement is resolved natively in the shared snapshot.
             var offsetParent = GetOffsetParentForDomElement(element);
             if (TryGetSharedOffset(element, offsetParent, vertical: false, out var sharedLeft))
                 return sharedLeft;
@@ -577,81 +486,10 @@ public sealed partial class DomBridge
 
     private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)
     {
-        // A live anchor resolution (position-area grid placement, an anchor() physical inset,
-        // or anchor-size() sizing) wins over the shared renderer snapshot — the non-native
-        // renderer lays such a box out at 0×0 / the static origin before the render bake runs, so
-        // getBoundingClientRect would disagree with the (already-corrected) offset getters for a box
-        // read during script (css-anchor-position position-area-anchor-partially-outside and the
-        // anchor()/anchor-size() tests read geometry live). POSITION: when the box is anchor-*placed*
-        // (position-area or anchor() inset) it is composed from the standard offsetParent invariant
-        // (border-box edge = offsetParent border-box origin + its border + the element's offset),
-        // reusing the offset getters; an only-anchor-*sized* box keeps the snapshot position (it is
-        // placed normally). SIZE: the position-area resolution's used box, or the snapshot border box
-        // with each anchor-size() axis overridden by its resolved dimension. Zoom/transform stay
-        // approximate on this live path, as elsewhere.
-        var areaResolution = ResolvePositionAreaForElement(element);
-        (double? left, double? top, double? width, double? height)? insetResolution = null;
-        (double? width, double? height)? sizeResolution = null;
-        (double? left, double? top, double? width, double? height)? tryResolution = null;
-        if (areaResolution is null)
-        {
-            tryResolution = ResolvePositionTryForElement(element);
-            insetResolution = ResolveAnchorInsetForElement(element);
-            sizeResolution = ResolveAnchorSizeForElement(element);
-        }
-        bool anchorPlaced = areaResolution is not null
-            || (tryResolution is { } tr && (tr.left is not null || tr.top is not null))
-            || (insetResolution is { } ins && (ins.left is not null || ins.top is not null));
-        bool anchorSized = (sizeResolution is { } sz && (sz.width is not null || sz.height is not null))
-            || (insetResolution is { } isz && (isz.width is not null || isz.height is not null))
-            || (tryResolution is { } tsz && (tsz.width is not null || tsz.height is not null));
-        if (anchorPlaced || anchorSized)
-        {
-            bool haveSnapshot = TryGetSharedLayoutGeometry(element, out var snapBox);
-            var z = GetUsedZoomForElement(element);
-            var iz = z > 0.0001 ? 1.0 / z : 1.0;
-
-            double width, height;
-            if (areaResolution is { } ar)
-            {
-                width = ar.width;
-                height = ar.height;
-            }
-            else
-            {
-                width = haveSnapshot ? snapBox.BorderBox.Width * iz : 0;
-                height = haveSnapshot ? snapBox.BorderBox.Height * iz : 0;
-                // anchor-size(), opposing-inset auto, then position-try fallback sizing override the snapshot.
-                if (sizeResolution?.width is { } aw) width = aw;
-                if (sizeResolution?.height is { } ah) height = ah;
-                if (insetResolution?.width is { } iw) width = iw;
-                if (insetResolution?.height is { } ih) height = ih;
-                if (tryResolution?.width is { } tw) width = tw;
-                if (tryResolution?.height is { } th) height = th;
-            }
-
-            double left, top;
-            if (anchorPlaced)
-            {
-                left = GetOffsetLeftForDomElement(element);
-                top = GetOffsetTopForDomElement(element);
-                if (GetOffsetParentForDomElement(element) is { } offsetParent)
-                {
-                    var parentRect = ComputeUnzoomedLayoutRect(offsetParent);
-                    left += parentRect.Left + GetClientLeftForDomElement(offsetParent);
-                    top += parentRect.Top + GetClientTopForDomElement(offsetParent);
-                }
-            }
-            else
-            {
-                // Only anchor-*sized* — the box is placed normally, so its snapshot origin is right.
-                left = haveSnapshot ? snapBox.BorderBox.Left : 0;
-                top = haveSnapshot ? snapBox.BorderBox.Top : 0;
-            }
-
-            return (left, top, width, height);
-        }
-
+        // Phase-5 LayoutSnapshot endgame: anchor-positioned boxes (position-area / anchor() / anchor-size()
+        // / position-try) are resolved natively in the shared snapshot itself — HeadlessLayoutView enables
+        // the engine's NativeAnchorPlacement post-pass, so the snapshot already carries their placed/sized
+        // geometry. No bridge live resolver is needed; the plain snapshot path below serves every element.
         // RF-BRIDGE-1b: the element's rect comes from the renderer's real layout (border
         // box, document coords), which powers getBoundingClientRect and offset top/left.
         // The snapshot is in zoom-baked space and ComputeRenderedRect re-applies zoom to

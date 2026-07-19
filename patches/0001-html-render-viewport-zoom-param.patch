@@ -1,0 +1,79 @@
+From cca8ee9058a22c40aef80c30efee1958a8ca0d8c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 19 Jul 2026 15:26:41 +0000
+Subject: [PATCH] HtmlRender: plumb viewportZoom through the static render
+ entry
+
+Patch 0009 added HtmlContainer.ViewportZoom (a document-root paint magnification
+applied in PerformPaint), but the static RenderToImageWithStyleSet / RenderToImageCore
+entry points never exposed it, so a caller using those helpers (the WPT runner, the
+product capture path) cannot request a viewport zoom. Thread an optional
+viewportZoom (default 1f, byte-identical) through RenderToImageWithStyleSet ->
+RenderToImageCore, setting container.ViewportZoom before layout/paint.
+
+This unblocks the visual-viewport render cutover: the bridge's pinch-zoom scale can
+be passed to the render so a pinch-zoomed page paints magnified natively, retiring
+the render half of ApplyVisualViewportSerializationState's zoom bake.
+---
+ Source/Broiler.HTML.Image/HtmlRender.cs | 23 +++++++++++++----------
+ 1 file changed, 13 insertions(+), 10 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Image/HtmlRender.cs b/Source/Broiler.HTML.Image/HtmlRender.cs
+index 7c8fcb2..98fddd5 100644
+--- a/Source/Broiler.HTML.Image/HtmlRender.cs
++++ b/Source/Broiler.HTML.Image/HtmlRender.cs
+@@ -32,9 +32,10 @@ public static class HtmlRender
+         BColor backgroundColor = default,
+         EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetLoad = null,
+         EventHandler<HtmlImageLoadEventArgs>? imageLoad = null,
+-        string? baseUrl = null) =>
++        string? baseUrl = null,
++        float viewportZoom = 1f) =>
+         RenderToImageCore(html, width, height, backgroundColor == default ? null : backgroundColor,
+-            styleSet, stylesheetLoad, imageLoad, baseUrl);
++            styleSet, stylesheetLoad, imageLoad, baseUrl, viewportZoom: viewportZoom);
+ 
+     public static BBitmap RenderToImageAutoSizedWithStyleSet(
+         string html,
+@@ -257,7 +258,8 @@ public static class HtmlRender
+         EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad,
+         EventHandler<HtmlImageLoadEventArgs> imageLoad,
+         string baseUrl,
+-        int embedDepth = 0)
++        int embedDepth = 0,
++        float viewportZoom = 1f)
+     {
+         var bgColor = backgroundColor ?? BColor.White;
+         var bitmap = new BBitmap(width, height);
+@@ -269,6 +271,7 @@ public static class HtmlRender
+             container.MaxSize = new SizeF(width, height);
+             container.AvoidAsyncImagesLoading = true;
+             container.AvoidImagesLateLoading = true;
++            container.ViewportZoom = viewportZoom;
+ 
+             if (stylesheetLoad != null)
+                 container.StylesheetLoad += stylesheetLoad;
+@@ -329,13 +332,13 @@ public static class HtmlRender
+             int dh = (int)Math.Round(fragment.Size.Height
+                 - (float)(border.Top + border.Bottom + padding.Top + padding.Bottom));
+ 
+-            // Guard against a pathologically large embedded box (e.g. a frameset
+-            // track that still resolves to billions of pixels): allocating its
+-            // RGBA buffer would overflow Int32 and throw, crashing the whole page
+-            // render.  Anything that large is off-screen anyway, so skip it.
+-            bool fitsAllocation = (long)dw * dh * 4 <= int.MaxValue;
+-
+-            if (dw > 0 && dh > 0 && fitsAllocation)
++            // Guard against a pathologically large embedded box (e.g. a frameset
++            // track that still resolves to billions of pixels): allocating its
++            // RGBA buffer would overflow Int32 and throw, crashing the whole page
++            // render.  Anything that large is off-screen anyway, so skip it.
++            bool fitsAllocation = (long)dw * dh * 4 <= int.MaxValue;
++
++            if (dw > 0 && dh > 0 && fitsAllocation)
+             {
+                 using var sub = RenderToImageCore(
+                     fragment.EmbeddedDocumentHtml, dw, dh,
+-- 
+2.43.0
+

@@ -241,6 +241,32 @@ maintainer applies the patch backlog or a pixel corpus for the corpus-gapped fea
    WPT; `NativeBackdrop` to be turned on) and delete the bridge code the "Follow-up once applied" notes name.
    This maintainer step is now the gating item for the remaining `Dialogs.cs`/anchor-bake deletions.
 
+**Landed (2026-07-19) — the maintainer patch backlog is APPLIED, and two `Dialogs.cs` follow-ups are
+executed.** The "Update submodules" commits applied and pinned the staged patches (0004–0011 among them),
+so the native dialog UA chrome, top-layer paint, and native `::backdrop` box generation are all live at the
+pinned SHAs. The `Broiler.Wpt.Tests` project (which had a pre-existing `GetInlineStyleView` static-call
+build break from the Phase-2 de-globalization) was fixed first, so the **7 `anchor-position-top-layer`
+reftests + `NativeModalDialog` tests build and pass (8/8)** here — the deterministic pixel validation the
+dialog track needs. Two follow-ups then landed against that validation:
+- **Box-chrome bake deleted** (`InsertDialogBackdrops`). Patch 0004's UA rule
+  `dialog { display:block; border:1px solid black; padding:1em; background-color:white }` (pinned, with the
+  shorthand-vs-longhand origin fix) supplies the modal chrome through the real cascade, so the bridge
+  border/padding/background pre-bake is redundant. Removed (+ the now-empty `isPopover` box-chrome guard).
+- **Popover top-layer de-doubled.** The `data-broiler-top-layer` marker (patch 0010 native paint) and the
+  very-large z-index emulation were both written; they are now mutually exclusive — marker when
+  `NativeTopLayer`, z-index only on the retired rollback path. (Modal dialogs never had the z-index — only
+  the marker — so `ApplyDialogUAPositioning` was already clean.)
+  Both validated: 8/8 reftests + 4/4 Cli popover/backdrop unit tests, zero regressions.
+
+- **Still blocked — the backdrop `<div>` synthesis cannot be deleted yet.** The `else`-branch `<div>` path
+  carries **author `::backdrop` position-try-fallbacks** (covered by
+  `DomBridge_Backdrop_Honors_Author_Geometry_And_PositionTry_Fallback`: `left:9999px` → `--pt` → `left:300px`),
+  which the native `::backdrop` path (patch 0011) does **not** reproduce (it overlays author `::backdrop`
+  *geometry* from the cascade but not the fallback re-placement). So flipping `NativeBackdrop` on / deleting
+  the `<div>` would regress that test-covered feature; the `<div>` stays until the native `::backdrop` gains
+  position-try support (a further `Broiler.HTML` patch). The stale "inert until the patch lands" marker
+  comments were corrected to reflect that 0010/0011 are now applied.
+
 ---
 
 **Finding — `position-visibility` is entangled with the scroll-container CB decision — RESOLVED 2026-07-15
@@ -610,6 +636,36 @@ fallback path until 0005 is applied (the *render* path already uses native place
 unaffected). No test is committed for this (it cannot pass at the pinned SHA); the finding is recorded
 here to inform the resolver-retirement / patch-landing sequence.
 
+**Landed (2026-07-19) — the bridge live anchor-geometry resolvers are RETIRED (LayoutSnapshot-endgame
+"delete fallback geometry approximations after parity is proven").** Now that patch 0005 is applied and
+pinned — `HeadlessLayoutView` unconditionally enables the engine's `NativeAnchorPlacement` post-pass (and
+threads `PositionTryRules`) around the shared-geometry layout — the shared snapshot the bridge reads for
+live CSSOM queries carries engine-resolved position-area / `anchor()`-inset / `anchor-size()` /
+position-try geometry directly. So the four bridge live resolvers
+(`ResolvePositionAreaForElement` / `ResolveAnchorInsetForElement` / `ResolveAnchorSizeForElement` /
+`ResolvePositionTryForElement`), which existed only to patch the resolved rect back onto the *pre-0005*
+(static) snapshot on read, are now pure redundancy. **Empirically proven before deletion:** with all four
+short-circuited to `null`, the full `*LiveGeometryTests` suite (16 tests — one class per mechanism) still
+passes **from the snapshot alone**, and the broader anchor / CSSOM / hit-testing Cli sweep showed only the
+standing environmental fails. Deleted: the four resolver methods (the whole read-path file
+`AnchorInsetQueries.cs`, plus `ResolvePositionAreaForElement` from `PositionAreaQueries.cs` and
+`ResolvePositionTryForElement` from `PositionTry.cs`), their read-path call sites in the four `offset*`
+getters, the anchor-resolution branch of `ComputeUnzoomedLayoutRect` (it collapses to the plain snapshot
+path), and the now-orphaned per-pass memo (`GetAnchorRegistryForPass` / `GetPositionTryRulesForPass` +
+`_passAnchorRegistry` / `_passPositionTryRules`) — ~300 lines net. **Kept** (still used by the render bake
+/ clone, verified by reference): `TryGetPositionAreaResolution` / `SetPositionAreaResolution` /
+`CopyPositionAreaResolution`, `ComputeFallbackPlacement`, `ParsePositionTryRules`, `EstimateMinContentWidth`,
+`BuildAnchorRegistry`, and the `AnchorGeometry` helpers. No public-API change (all deleted members were
+`internal`). Validation: `Broiler.HtmlBridge.Dom` builds clean (0 errors, no unused-member warnings);
+`LiveGeometry` + `PositionArea` + `PositionTry` + `SharedGeometryZoomSize` = **38/38 green**; the guard /
+architecture / public-API / anchor / hit-testing sweep adds **zero** regressions (the 5 fails there —
+three GoogleSearchPolyfill SVG hit-testing, `DomBridge_AnchorSize_…`, and the
+`DomBridge_Runtime_State_Uses_Typed_Groups` boundary guard — all fail identically on clean HEAD, verified
+by stash). This makes the shared snapshot the **single** live-geometry source for anchor-positioned boxes,
+advancing the Phase-5 LayoutSnapshot-endgame exit criterion ("LayoutMetrics is a small binding/facade, not
+a layout engine"). The sticky/scroll live-read values noted above ride the same snapshot, so they too are
+now native (no bridge resolver ever existed for them).
+
 **Design (2026-07-16) — visual-viewport / CSS `zoom` endgame (step-6 blocker (b)).** Scoping of the
 last non-dialog step-6 residual, `ApplyVisualViewportSerializationState`, grounded in a full map of the
 machinery. Supersedes the terse "not a slice; folded into the LayoutSnapshot endgame" note above.
@@ -762,6 +818,26 @@ adds the `VisualViewportScale` channel value to its `(document, version, viewpor
 `visualViewport.scale` change (not a DOM mutation, so it doesn't bump `DomDocument.Version`) re-lays-out
 instead of serving a stale snapshot. Validated end-to-end locally (0005+0006+0007, flag on): reading
 `getBoundingClientRect().width` = 100, then `visualViewport.scale = 2`, then re-reading = 200.
+
+**Landed (2026-07-19) — (b1) ACTIVATED: `NativeVisualViewport` flipped on by default.** Patches 0006+0007
+are applied and pinned (the earlier "activation" blocker was the maintainer bump, now done), so the native
+pinch-zoom read model is authoritative and the flag now defaults **on**
+(`internal bool NativeVisualViewport { get; set; } = true`). A key correctness point that de-risks the flip:
+`ApplyVisualViewportSerializationState` (the visual-viewport `zoom` bake) is called **only from
+`ResolveAnchorPositions`** (the WPT render path), never the geometry read path, so the read-path fold
+(`RootUsedZoomBase`) + extraction (patch 0006) do **not** double-count with the bake — they are on separate
+paths. Blast radius is pinch-zoomed pages only: `RootUsedZoomBase`/the extraction channel are both inert
+unless `HasActiveVisualViewport()` (the page set `visualViewport.scale > 1`), so a non-pinch page is
+byte-identical. Now committable (needs 0006 at the pinned SHA, which it now is):
+`Broiler.Cli.Tests/VisualViewportNativeReadModelTests` pins a `scale = 2` pinch leaving
+`offsetWidth`/`Height` unaffected (100×40) and scaling `getBoundingClientRect` ×2 (200×80) — from the
+default-on bridge. Validation: the visual-viewport / pinch / scroll Cli suite passes (only the standing
+`DomBridge_SerializeToHtml_Persists_VisualViewport_*` bake env-fail remains, unaffected by the read-path
+flag), and the `Wpt_CssomView_*` / `VisualViewport_PinchZoom` WPT set has the **identical** fail-set with
+the flip stashed vs. applied (all pre-existing environmental fails) — zero regressions. This retires the
+read-path dependency on the `zoom` bake for pinch-zoom geometry; the *render*-side of
+`ApplyVisualViewportSerializationState` (magnifying the paint) stays until the (b) render cutover
+(patch 0009 wiring + no reftest corpus).
 
 **Landed (2026-07-16) — (b) render/paint half, foundational rasterizer capability (patch 0008).** The
 render side (magnifying a pinch-zoomed page's *paint*) was blocked because the software rasterizer
@@ -1026,6 +1102,94 @@ since it reads zoom from *computed* props and so is source-agnostic; **P4** an A
 harness (there is no reftest corpus). The `%`-vs-`px`-vs-`em` and *own*-vs-*effective* factor distinctions
 (increments 2–3) are the intricate, correctness-sensitive core — which is why this is "the large piece" and
 is being landed incrementally behind the flag. The runbook's readiness checklist tracks P1–P4.
+
+**Landed (2026-07-19) — increment-6 precondition P1 complete + the P4 engine-coverage audit closed its one
+gap.** The maintainer's "Update submodules" commit applied the three CSS-`zoom` paint patches
+(`0001` calc / `0002` text-shadow / `0003` SVG) and bumped the `Broiler.CSS` + `Broiler.HTML` pointers, so
+`CssLengthParser.SetElementZoom` and the `EffectiveZoom`-scaled paint now live at the pinned SHAs — clearing
+the environment/maintainer half of **P1** (previously the 403 blocker). The parent half is now re-added:
+`CssBoxProperties.ParseUsedLength` / `ParseLengthWithLineHeight` wrap the `(`-containing (calc) `ParseLength`
+in a `CssLengthParser.SetElementZoom(EffectiveZoom, percentAgainstContainingBlock ? OwnZoom : 1.0)` … `finally
+SetElementZoom(1.0, 1.0)` scope (guarded by `NeedsCalcZoomScope`), so a `calc()`/`min()`/`max()` used length
+now scales its absolute terms by `EffectiveZoom` and its `%` terms by `OwnZoom` on the engine path — the parent
+side of patch 0001, previously reverted because the pinned `Broiler.CSS` lacked `SetElementZoom`.
+**P1 is complete.**
+
+Doing the **P4 engine-coverage audit** (the input to the equivalence harness) — cross-checking every property
+in the bake's `ZoomScaledSerializationProperties` list against the engine used-value model — surfaced and closed
+the one genuine render-parity gap and cleared two false ones:
+- **Gap closed — explicit absolute-length `line-height`.** `ParseLineHeightLength` used a bare `ParseLength`,
+  so a `line-height: 20px` under `zoom: 2` was *not* scaled by the engine while the bake scaled it to `40px`.
+  New `ApplyZoomToLineHeight` scales an absolute-length line-height by `EffectiveZoom` (matching the bake),
+  and deliberately leaves a unitless / `%` / font-relative (`em`/`rem`) line-height alone — those already ride
+  the zoomed font basis, so re-scaling would double-count. Flag-gated.
+- **Safe to drop (no fix needed) — `scroll-padding-*` / `scroll-margin-*`.** Absent from `Broiler.Layout`
+  layout entirely; the only consumer, `LayoutMetrics.ResolveScrollIntoViewInset`, reads them from *computed*
+  props and applies `GetUsedZoomForElement` itself (source-agnostic), so dropping the serialization bake has
+  no render or CSSOM effect.
+- **Safe to drop (no fix needed) — `letter-spacing`.** The engine never lays it out (documented increment-5
+  non-issue), so its bake scaling has no rendered effect.
+
+So the used-value model now reproduces the bake for every rendered property behind the flag. All 49
+`Broiler.Layout.Tests` zoom tests pass (incl. the new `ZoomLineHeightAndCalcTests`), and the flag-off
+`Broiler.Cli.Tests ~Zoom` set is byte-identical to baseline (22 pass / the 5 standing font/visual-viewport
+environmental fails). **Remaining before the flip: P2** — scope `NativeZoom.Enabled` at *every* layout
+consumer of bridge output (geometry snapshot, WPT render, product capture), not just one seam — and the **P4**
+A/B harness. The atomic flip stays unexecuted until both are green (production-render change, no reftest
+corpus). See `docs/roadmap/zoom-native-cutover.md` for the updated checklist.
+
+**Landed (2026-07-19) — increment-6 P4: the A/B equivalence harness is built and RUN, and it found a
+flip-blocking divergence.** Two pieces landed. (1) The **bake-gating**: `SerializeToHtml` /
+`GetRenderDocument` now skip `ApplyZoomSerializationStyles` when `DomBridge.ZoomBakeActive`
+(`= !NativeZoom.Enabled`) — the increment-6 cutover switch, so the bake runs exactly when the engine model
+is *off* and vice-versa. Default (flag off) it is byte-identical (verified: the standing zoom Cli suite is
+unchanged, 22 pass / 5 env fails). (2) The **A/B harness**,
+`Broiler.Cli.Tests/ZoomBakeVsEngineEquivalenceTests`, renders a zoom corpus through both paths (Path A =
+bake, Path B = engine with the bake gated off) and compares CSSOM box geometry
+(`offset*`/`client*`/`getBoundingClientRect`). **Finding:** the two models are equivalent for **absolute
+lengths, nested zoom, abspos insets, margins/border, absolute-length `line-height`, and no-zoom** (6 cases),
+but **DIVERGE for `%`, `em`, `rem`, and `calc(px + %)`** under zoom — e.g. `width:50%` of a 200px CB under
+`zoom:2` reports `offsetWidth` 50 (bake) vs 100 (engine); `2rem` → 16 vs 32; `3em`@10px → 60 vs 30;
+`calc(50px + 10%)` → 45 vs 90. These are the "`%`-vs-`px`-vs-`em` / own-vs-effective factor" distinctions
+the roadmap calls the correctness-sensitive core, and Path A is the *unchanged current default*, so the
+divergence is a real bake-vs-engine model difference, not a gating artefact. The four divergences are pinned
+as `*_Diverges_BlocksFlip` catalogue tests (both observed values asserted → regression-visible). **Net: the
+zoom flip is NOT behaviour-preserving for relative units and must not be executed** until the two models are
+reconciled against a Chrome reference (align engine or bake so the catalogue collapses to equivalence), on
+top of the still-open P2 (scope the flag at every layout consumer). The bake-gating + harness land safely
+(default-off byte-identical) and de-risk the flip by making the blocker precise and testable.
+
+**Landed (2026-07-19) — the CSSOM READ-path is migrated to the engine used-value model, resolving the
+relative-unit divergence for reads.** The harness's "blocker" had a second reading: for every divergent case
+the **engine value is the mathematically-correct** unzoomed CSS px (the element's own computed size —
+`width:50%` of a 200px CB is `offsetWidth` 100, `2rem`→32, `3em`@10px→30, `calc(50px+10%)`→90), and the
+*bake* was simply buggy for relative units. Broiler's own CSSOM model (`offsetWidth` = unzoomed CSS px,
+pinned by `SharedGeometryZoomSizeTests`) already picks the engine as correct — no Chrome oracle needed for
+the read path. So `SharedLayoutGeometry.BuildSharedGeometrySnapshot` now enables `NativeZoom` around the
+snapshot layout (thread-static save/restore): `GetRenderDocument` skips the element-`zoom` bake and the
+engine scales used values, so the snapshot geometry — and the `offset*`/`client*`/`gBCR` the read path
+divides out of it — is the correct engine used value for `%`/`em`/`rem`/`calc` too. Render/serialize is
+untouched (it calls `GetRenderDocument` directly, not via the snapshot, so it still bakes). Validation: zero
+new fails — `SharedGeometryZoomSizeTests` (P3) and the WPT `Wpt_CssomView_Zoom*` reference tests stay green,
+the full Cli `~Zoom` suite keeps only its 3 standing font-metric + 2 render-bake env-fails, and
+`ZoomBakeVsEngineEquivalenceTests` was reworked from `*_Diverges_BlocksFlip` (documenting the bug) to
+`*_ReadIsEngineUsedValue` (pinning the fixed value) + `*_ReadIsStable` (the read is now independent of the
+render-only flag). This banks the read-side correctness of the LayoutSnapshot endgame; only the render-side
+flip (delete the bake) remains.
+
+**Landed (2026-07-19) — the render-side A/B validation is done (engine render proven correct, incl. relative
+units).** The "no zoom reftest corpus" claim was wrong: there are 16 `Wpt_CssViewport_Zoom*_MatchesReference`
+pixel reftests (all green). A new `WptTestRunner.NativeZoom` lever (default off → byte-identical; mirrors
+`NativeAnchorPlacement`) enables the engine used-value model around the WPT serialize+render
+(`RenderHtmlFileBitmap`), so the bake is skipped and the engine renders. New
+`Wpt_CssViewport_Zoom{Basic,Percentage,Em}_EngineRender_MatchesReference` tests render the zoom cases through
+the **engine** and assert they match the same hand-authored references the baked path matches — **absolute
+plus the `%`/`em` cases the bake mis-handled** — and all pass; the existing 16 reftests are unchanged
+(lever default-off). So the cutover's correctness is now validated end-to-end on **both** the read (CSSOM)
+and render (pixel) sides. What remains for deleting the bake is purely a **deployment** gate: enabling
+`NativeZoom` at every consumer that lays out bridge serialized output — WPT (done, via the lever) and the
+product capture path (`CaptureService` hands HTML to an external renderer this container can't scope), an
+environment concern rather than a correctness or patch one.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.

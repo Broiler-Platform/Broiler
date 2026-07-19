@@ -19,14 +19,6 @@ public sealed partial class DomBridge
     private const double DefaultProgressLikeTrackLengthPx = 120;
     private readonly Dictionary<DomElement, Dictionary<string, string>> _zoomSpecifiedStyleCache = [];
 
-    // RF-BRIDGE-1b render-doc/live-doc separation: when non-null, ApplyZoomSerializationStyles
-    // records each mutated element's pre-bake Style + Attributes here so the geometry-snapshot
-    // path can restore the live document afterward (zoom baking is destructive — it scales
-    // sizes and drops the `zoom` property — which would otherwise corrupt subsequent unzoomed
-    // CSSOM queries, e.g. clientWidth of a zoomed element). The render/serialize paths leave
-    // this null so their baking stays permanent.
-    private List<(DomElement Element, Dictionary<string, string> Style, Dictionary<string, string> Attributes)>? _zoomSerializationRevertLog;
-
     /// <summary>
     /// Serialises the current DOM tree back to an HTML string.
     /// Call this after JavaScript execution to obtain the modified page
@@ -34,7 +26,8 @@ public sealed partial class DomBridge
     /// </summary>
     public string SerializeToHtml()
     {
-        ApplyZoomSerializationStyles(DocumentElement, 1.0);
+        if (ZoomBakeActive)
+            ApplyZoomSerializationStyles(DocumentElement, 1.0);
         ApplySerializationTransforms();
         return HtmlSerializer.Serialize(
             DocumentElement,
@@ -54,48 +47,29 @@ public sealed partial class DomBridge
     /// </summary>
     public DomDocument GetRenderDocument()
     {
-        // Zoom baking runs per call (not part of the run-once guarded transforms) so the
-        // geometry-snapshot path can revert it afterward via _zoomSerializationRevertLog;
-        // it is idempotent once baked (the `zoom` property is stripped), so repeat calls on
-        // the render path are no-ops. Must run before the guarded pseudo/progress transforms,
-        // which depend on the baked sizes.
-        ApplyZoomSerializationStyles(DocumentElement, 1.0);
+        // Zoom baking runs per call (not part of the run-once guarded transforms); it is idempotent
+        // once baked (the `zoom` property is stripped), so repeat calls on the render path are no-ops.
+        // Must run before the guarded pseudo/progress transforms, which depend on the baked sizes. The
+        // geometry-snapshot path enables NativeZoom (so ZoomBakeActive is false) and never bakes, so it
+        // needs no revert — the live document stays pristine.
+        if (ZoomBakeActive)
+            ApplyZoomSerializationStyles(DocumentElement, 1.0);
         ApplySerializationTransforms();
         ReflectRenderState(DocumentElement);
         return _document;
     }
 
     /// <summary>
-    /// RF-BRIDGE-1b render-doc/live-doc separation: restores the live document's zoom-baked
-    /// elements to their pre-bake Style/Attributes (captured in
-    /// <see cref="_zoomSerializationRevertLog"/>). Called by the geometry-snapshot path after
-    /// the layout is captured, so subsequent CSSOM/estimator queries see pristine (unzoomed)
-    /// styles rather than the render-oriented baked sizes.
+    /// Whether the element-<c>zoom</c> serialization bake (<see cref="ApplyZoomSerializationStyles"/>)
+    /// runs. The bake and the engine used-value model (<c>Broiler.Layout.Engine.NativeZoom</c>,
+    /// increments 1–5) are mutually exclusive: running both double-counts <c>zoom</c>, running neither
+    /// drops it. The engine flag is <c>[ThreadStatic]</c> and set on the layout thread; the bake mutates
+    /// the DOM thread-independently. So the bake is skipped exactly when the engine model is enabled on
+    /// this thread — the increment-6 cutover switch. Default (flag off) the bake runs, byte-identical to
+    /// before this gate.
     /// </summary>
-    private void RevertZoomSerialization()
-    {
-        var log = _zoomSerializationRevertLog;
-        _zoomSerializationRevertLog = null;
-        if (log == null)
-            return;
+    private static bool ZoomBakeActive => !Broiler.Layout.Engine.NativeZoom.Enabled;
 
-        for (var i = log.Count - 1; i >= 0; i--)
-        {
-            var (element, style, attributes) = log[i];
-            RestoreStringMap(InlineStyle(element), style);
-            RestoreAttributes(element, attributes);
-        }
-
-        // Reverted styles must not read back the baked values from the computed cache.
-        ClearComputedPropsCache();
-    }
-
-    private static void RestoreStringMap(IDictionary<string, string> target, Dictionary<string, string> saved)
-    {
-        target.Clear();
-        foreach (var kv in saved)
-            target[kv.Key] = kv.Value;
-    }
 
     /// <summary>
     /// Serializes the element's authoritative inline-style dict back into its canonical
@@ -401,14 +375,6 @@ public sealed partial class DomBridge
 
         var willScale = Math.Abs(usedZoom - 1.0) > ZoomSerializationEpsilon;
         var willSvg = ShouldApplySvgSerializationAttributes(element);
-        // Record the pre-bake state for the geometry-snapshot revert (only when this element
-        // is actually mutated — scaled, SVG-adjusted, or carrying a `zoom` to strip).
-        if (_zoomSerializationRevertLog != null && (willScale || willSvg || InlineStyle(element).ContainsKey("zoom")))
-            _zoomSerializationRevertLog.Add((
-                element,
-                new Dictionary<string, string>(InlineStyle(element)),
-                AttributeSnapshot(element)));
-
         if (willScale)
         {
             foreach (var property in ZoomScaledSerializationProperties)
