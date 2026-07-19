@@ -44,7 +44,7 @@ public sealed class AnimationInnerHtmlStyleTests
         bridge.ResolveAnimationSnapshots();
 
         // animation-delay:-10s over a 10s duration snapshots at t=0 to the 100% ("to") keyframe.
-        var style = Broiler.HtmlBridge.DomBridge.GetInlineStyleView(box!);
+        var style = bridge.GetInlineStyleView(box!);
         Assert.True(style.TryGetValue("margin-left", out var ml) && ml == "200px",
             $"Expected margin-left:200px from @keyframes in <style>, got [{string.Join(", ", style.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
     }
@@ -69,7 +69,7 @@ public sealed class AnimationInnerHtmlStyleTests
 
         bridge.ResolveAnimationSnapshots();
 
-        var style = Broiler.HtmlBridge.DomBridge.GetInlineStyleView(box!);
+        var style = bridge.GetInlineStyleView(box!);
         Assert.True(style.TryGetValue("margin-left", out var ml) && ml == "200px",
             $"Expected margin-left:200px from stylesheet animation in <style>, got [{string.Join(", ", style.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
     }
