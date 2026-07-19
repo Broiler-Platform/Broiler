@@ -819,6 +819,26 @@ adds the `VisualViewportScale` channel value to its `(document, version, viewpor
 instead of serving a stale snapshot. Validated end-to-end locally (0005+0006+0007, flag on): reading
 `getBoundingClientRect().width` = 100, then `visualViewport.scale = 2`, then re-reading = 200.
 
+**Landed (2026-07-19) — (b1) ACTIVATED: `NativeVisualViewport` flipped on by default.** Patches 0006+0007
+are applied and pinned (the earlier "activation" blocker was the maintainer bump, now done), so the native
+pinch-zoom read model is authoritative and the flag now defaults **on**
+(`internal bool NativeVisualViewport { get; set; } = true`). A key correctness point that de-risks the flip:
+`ApplyVisualViewportSerializationState` (the visual-viewport `zoom` bake) is called **only from
+`ResolveAnchorPositions`** (the WPT render path), never the geometry read path, so the read-path fold
+(`RootUsedZoomBase`) + extraction (patch 0006) do **not** double-count with the bake — they are on separate
+paths. Blast radius is pinch-zoomed pages only: `RootUsedZoomBase`/the extraction channel are both inert
+unless `HasActiveVisualViewport()` (the page set `visualViewport.scale > 1`), so a non-pinch page is
+byte-identical. Now committable (needs 0006 at the pinned SHA, which it now is):
+`Broiler.Cli.Tests/VisualViewportNativeReadModelTests` pins a `scale = 2` pinch leaving
+`offsetWidth`/`Height` unaffected (100×40) and scaling `getBoundingClientRect` ×2 (200×80) — from the
+default-on bridge. Validation: the visual-viewport / pinch / scroll Cli suite passes (only the standing
+`DomBridge_SerializeToHtml_Persists_VisualViewport_*` bake env-fail remains, unaffected by the read-path
+flag), and the `Wpt_CssomView_*` / `VisualViewport_PinchZoom` WPT set has the **identical** fail-set with
+the flip stashed vs. applied (all pre-existing environmental fails) — zero regressions. This retires the
+read-path dependency on the `zoom` bake for pinch-zoom geometry; the *render*-side of
+`ApplyVisualViewportSerializationState` (magnifying the paint) stays until the (b) render cutover
+(patch 0009 wiring + no reftest corpus).
+
 **Landed (2026-07-16) — (b) render/paint half, foundational rasterizer capability (patch 0008).** The
 render side (magnifying a pinch-zoomed page's *paint*) was blocked because the software rasterizer
 `BCanvas` was **translate-only** — a document-root viewport zoom had no way to scale painted pixels (the
