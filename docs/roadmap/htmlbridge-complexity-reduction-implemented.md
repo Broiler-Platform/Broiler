@@ -28,7 +28,7 @@ quick view.
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
 | 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. |
-| 4 — eliminate parallel DOM state | Bulk delivered | Item 2 full inline-style dict elimination (~170 sites) in progress — the anchor-resolver cluster (98 sites) is now behind the `BakedInlineStyle`/`BakedStyleMap` seam (P4.14), so the baked-vs-script store split is a single-point change; the store split itself + non-cluster sites remain. Item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling (clone runtime-state copy consolidated behind one authority, P4.13). |
+| 4 — eliminate parallel DOM state | Bulk delivered | Item 2: the serialize-time **baked style is now a distinct per-element overlay store**, split off the script-observable inline-style dict (P4.14 increments 1–3: anchor cluster + animation/synthetic/zoom bake writers seamed, then backed by a tombstone-aware overlay merged only at serialization) — verified byte-identical incl. the WPT anchor-position pixel corpus. `InlineStyleRuntimeState.Style` no longer carries bakes. Remaining: full-corpus WPT/Acid CI gate; item 5 `Normalize`/`CloneDomElement` swaps blocked by side-effect coupling (clone runtime-state copy consolidated behind one authority, P4.13). |
 | 5 — used-value behaviour into Layout | Bulk delivered; **in-scope terminal** | Anchor-track deletion complete through step 6. Feature (b) visual-viewport/zoom: read (CSSOM) **and** render (pixel) sides now validated on the engine used-value model (2026-07-19) — deleting the zoom bake is now only a *deployment* gate (enable `NativeZoom` at the external `CaptureService` renderer), plus the submodule-push-gated pinch render cutover (`patches/0001`). Feature (a) dialog/backdrop: native modal centering + modal box-chrome bake deletion landed; native `::backdrop` box + top-layer paint stay submodule-patch-gated. See the [2026-07-19 reconciliation](#reconciliation-2026-07-19--features-a-and-b-driven-to-their-in-scope-terminal-state). |
 
 Companion documents:
@@ -1970,8 +1970,37 @@ Exit criteria:
 
 ### Phase 4 - eliminate parallel DOM state
 
-Status: **P4.14 in progress** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item 2,
-inline-style single authority. Increment 2 (this commit): route the remaining serialize-time bake writers through
+Status: **P4.14 increment 3 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) —
+**work item 2, inline-style single authority: split the baked-style storage off the script-observable dict.**
+With every serialize-time bake write behind the `BakedInlineStyle` seam (increments 1–2), the writes now land
+in a per-element **baked overlay** (`_bakedStyleOverlays`, a `ConditionalWeakTable<DomElement,
+Dictionary<string, string?>>` in `AnchorResolver/BakedStyle.cs`) instead of `InlineStyleRuntimeState.Style`, so
+that dict is no longer polluted by bakes. A `null` overlay value is a **tombstone** — a bake resolver removing an
+authored/prior property (the animation resolver dropping the `animation` shorthand after baking longhands, the
+anchor resolver dropping `margin`/`padding`/`inset`, sticky dropping `bottom`/`right`) so the merged view
+excludes it. `BakedStyleMap` now writes to the overlay and reads the **merged** base ∪ overlay view (overlay
+wins, tombstones remove); the resolvers' cross-pass reads are unchanged by construction. The serializer's own
+effective-style reads — the `GetStyles` emit, `SyncStyleAttributeFromInlineStyle` (the `style=`-attribute
+write-back at `ReflectRenderState`), and the zoom / SVG-zoom source reads — route to the new
+`EffectiveInlineStyle(element)` (materialized merge) / `BakedInlineStyle(...).TryGetValue`, which are exactly the
+merge points; every other reader (script-CSSOM `element.style`, cascade cleanup, parse-time authored copy) stays
+on `InlineStyle` and is unaffected because it runs **pre-bake**, when the overlay is empty. `CloneDomElement`'s
+runtime-state copy (P4.13) also copies the overlay. **Why it's byte-identical:** bakes are strictly terminal
+(serialize-time, after all script/cascade writes), so applying the overlay last reproduces the old single-dict
+content exactly. **Validation:** builds clean; the anchor / position-area / position-try / sticky / animation /
+inline-style / CssStyleDeclaration / computed-style / CSSOM / synthetic-form-control / clone / dialog / SVG /
+cross-document Cli suites show a **failure set identical to baseline** (stash-compares), the three
+`DomBridge_SerializeToHtml_*` zoom/srcdoc failures are the standing environmental ones (no new), and — the render
+gate for a serialization-affecting change — the **WPT `css/css-anchor-position` pixel corpus is byte-identical
+between baseline and this change** (40 discovered → 32 pass / 7 fail / 1 skip, 97.98% average match, same failing
+names). The full-corpus WPT pixel + Acid run (beyond the anchor subset) is the remaining CI-only gate, but the
+terminal-bake argument makes the serialized output byte-identical for every element, not just anchor ones.
+**This completes the anchor-cluster item-2 elimination:** the parallel inline-style dict no longer carries baked
+geometry; `InlineStyleRuntimeState.Style` is the script/cascade authority and the baked overlay is a distinct
+serialize-time store. Still open: the non-cluster read-side (none observed — script surfaces already exclude
+bakes) and the item-5 `Normalize`/`CloneDomElement` swaps.
+
+Status: **P4.14 increment 2 completed** 2026-07-19 — **work item 2, route the remaining serialize-time bake writers through
 the `BakedInlineStyle` seam, so every bridge-internal bake write now goes through one chokepoint.** Investigation
 of the store-split target found the `Style` dict is a **multi-purpose scratch**, not just inline style: it holds
 script-set inline style (marked by `JsSetStyleProps`), lazily-seeded `style=`-attribute values, **CSS-cascade-derived

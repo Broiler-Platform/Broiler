@@ -82,7 +82,10 @@ public sealed partial class DomBridge
     /// </summary>
     private void SyncStyleAttributeFromInlineStyle(DomElement element)
     {
-        var style = InlineStyle(element);
+        // Merge the baked overlay in: at serialize time (ReflectRenderState) the style= attribute must
+        // reflect the resolved bakes, exactly as it did when bakes lived in the inline-style dict. At
+        // script time the overlay is empty, so this equals the base dict (byte-identical write-through).
+        var style = EffectiveInlineStyle(element);
         if (style.Count == 0)
         {
             RemoveAttr(element, "style");
@@ -420,7 +423,7 @@ public sealed partial class DomBridge
         if (props.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
-        if (!InlineStyle(element).TryGetValue(property, out var specified) ||
+        if (!BakedInlineStyle(element).TryGetValue(property, out var specified) ||
             !string.Equals(specified?.Trim(), "inherit", StringComparison.OrdinalIgnoreCase) ||
             ParentEl(element) == null)
         {
@@ -431,7 +434,7 @@ public sealed partial class DomBridge
         if (parentProps.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
-        if (InlineStyle(ParentEl(element)!).TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
+        if (BakedInlineStyle(ParentEl(element)!).TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
             return true;
 
         return false;
@@ -555,7 +558,7 @@ public sealed partial class DomBridge
         GetChildren: static node => node.ChildNodes,
         GetAttributes: node => node is DomElement element ? GetSerializableAttributes(element) : [],
         GetStyles: node => node is DomElement element
-            ? InlineStyle(element).OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
+            ? EffectiveInlineStyle(element).OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
             : [],
         // RF-BRIDGE-1c Phase F (F3c part 2d): text nodes serialize with the same HTML escaping the
         // former element-store textContent path applied — except inside raw-text elements

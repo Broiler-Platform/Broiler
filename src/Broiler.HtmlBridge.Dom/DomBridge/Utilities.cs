@@ -413,6 +413,10 @@ public sealed partial class DomBridge
         // Memoized position-area resolution (was ElementRuntimeState.Layout, now the bridge-level
         // PositionAreaResolutions cache — see PositionAreaQueries.cs).
         CopyPositionAreaResolution(source, clone);
+
+        // Baked-style overlay (Phase 4 item 2 increment 3): serialize-time bakes now live off the
+        // inline-style dict, so copy the overlay too. A no-op unless the source was cloned after baking.
+        CopyBakedStyleOverlay(source, clone);
     }
 
     /// <summary>
