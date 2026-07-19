@@ -279,25 +279,25 @@ public sealed partial class DomBridge
         var reverseInline = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
         var ratio = ResolveProgressLikeValueRatio(element, tag);
 
-        InlineStyle(element)["display"] = "inline-block";
-        InlineStyle(element)["box-sizing"] = "border-box";
-        InlineStyle(element)["position"] = "relative";
-        InlineStyle(element)["overflow"] = "hidden";
-        InlineStyle(element)["padding"] = "0";
-        InlineStyle(element)["border"] = "1px solid #767676";
-        InlineStyle(element)["background-color"] = tag == "meter" ? "#e6e6e6" : "#f0f0f0";
-        InlineStyle(element)["vertical-align"] = "middle";
+        BakedInlineStyle(element)["display"] = "inline-block";
+        BakedInlineStyle(element)["box-sizing"] = "border-box";
+        BakedInlineStyle(element)["position"] = "relative";
+        BakedInlineStyle(element)["overflow"] = "hidden";
+        BakedInlineStyle(element)["padding"] = "0";
+        BakedInlineStyle(element)["border"] = "1px solid #767676";
+        BakedInlineStyle(element)["background-color"] = tag == "meter" ? "#e6e6e6" : "#f0f0f0";
+        BakedInlineStyle(element)["vertical-align"] = "middle";
         if (!string.IsNullOrWhiteSpace(width) && !string.Equals(width, "auto", StringComparison.OrdinalIgnoreCase))
-            InlineStyle(element)["width"] = width;
+            BakedInlineStyle(element)["width"] = width;
         if (!string.IsNullOrWhiteSpace(height) && !string.Equals(height, "auto", StringComparison.OrdinalIgnoreCase))
-            InlineStyle(element)["height"] = height;
+            BakedInlineStyle(element)["height"] = height;
 
         ClearChildren(element);
 
         var fill = CreateBridgeElement("div");
         SetParent(fill, element);
-        InlineStyle(fill)["position"] = "absolute";
-        InlineStyle(fill)["background-color"] = tag == "meter" ? "#4caf50" : "#0a84ff";
+        BakedInlineStyle(fill)["position"] = "absolute";
+        BakedInlineStyle(fill)["background-color"] = tag == "meter" ? "#4caf50" : "#0a84ff";
 
         var fillExtent = vertical
             ? ReadPixelLength(height, DefaultProgressLikeTrackLengthPx) * ratio
@@ -305,17 +305,17 @@ public sealed partial class DomBridge
         var fillExtentPx = $"{fillExtent.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}px";
         if (vertical)
         {
-            InlineStyle(fill)["left"] = "0";
-            InlineStyle(fill)["right"] = "0";
-            InlineStyle(fill)[reverseInline ? "bottom" : "top"] = "0";
-            InlineStyle(fill)["height"] = fillExtentPx;
+            BakedInlineStyle(fill)["left"] = "0";
+            BakedInlineStyle(fill)["right"] = "0";
+            BakedInlineStyle(fill)[reverseInline ? "bottom" : "top"] = "0";
+            BakedInlineStyle(fill)["height"] = fillExtentPx;
         }
         else
         {
-            InlineStyle(fill)["top"] = "0";
-            InlineStyle(fill)["bottom"] = "0";
-            InlineStyle(fill)[reverseInline ? "right" : "left"] = "0";
-            InlineStyle(fill)["width"] = fillExtentPx;
+            BakedInlineStyle(fill)["top"] = "0";
+            BakedInlineStyle(fill)["bottom"] = "0";
+            BakedInlineStyle(fill)[reverseInline ? "right" : "left"] = "0";
+            BakedInlineStyle(fill)["width"] = fillExtentPx;
         }
 
         element.AppendChild(fill);
@@ -383,7 +383,7 @@ public sealed partial class DomBridge
                     continue;
 
                 if (TryScaleSerializableCssValue(value, usedZoom, out var scaled))
-                    InlineStyle(element)[property] = scaled;
+                    BakedInlineStyle(element)[property] = scaled;
             }
 
         }
@@ -391,7 +391,7 @@ public sealed partial class DomBridge
         if (willSvg)
             ApplyZoomSerializationSvgAttributes(element, usedZoom);
 
-        InlineStyle(element).Remove("zoom");
+        BakedInlineStyle(element).Remove("zoom");
 
         foreach (var child in ChildElements(element))
             ApplyZoomSerializationStyles(child, usedZoom);

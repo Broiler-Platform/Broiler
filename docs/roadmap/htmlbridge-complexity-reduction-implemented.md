@@ -1971,7 +1971,33 @@ Exit criteria:
 ### Phase 4 - eliminate parallel DOM state
 
 Status: **P4.14 in progress** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item 2,
-inline-style single authority, increment 1: seam the anchor-resolver cluster off the raw dict.** The remaining
+inline-style single authority. Increment 2 (this commit): route the remaining serialize-time bake writers through
+the `BakedInlineStyle` seam, so every bridge-internal bake write now goes through one chokepoint.** Investigation
+of the store-split target found the `Style` dict is a **multi-purpose scratch**, not just inline style: it holds
+script-set inline style (marked by `JsSetStyleProps`), lazily-seeded `style=`-attribute values, **CSS-cascade-derived
+values** (added by the cascade, stripped by `Css.InvalidateElementStyles`), and the serialize-time bakes. The
+script-observable surfaces already exclude bakes — `element.style` is rebuilt from the `style=` attribute + only the
+`JsSetStyleProps` keys (`StyleDeclarationBinding.BuildDeclaredInlineStyleMap`), and the computed-style author layer
+keeps only inline/JS-set keys — so the bakes are already logically separate on the read side; what's missing is a
+single write-side chokepoint and a clean storage split. A blind storage swap is unsafe (it touches every reader of
+this entangled dict and needs the full WPT pixel/Acid corpus, which can't run reliably in-container), so increment 2
+completes the **write** boundary: the animation-snapshot resolver (`AnimationResolver.cs`, a serialize-time bake
+resolver run beside `ResolveAnchorPositions`) is routed wholesale, and the synthetic-form-control (meter/progress) +
+zoom bake **writes** in `DomBridge.Serialization.cs` are routed, while the script path (`StyleDeclarationBinding`/
+`AttributesHost`, which write-throughs to the attribute), the parse-time authored-style copy (`HtmlParsing`), and the
+cascade cleanup (`Css.cs`) stay on `InlineStyle`. The four remaining `InlineStyle` reads in the serializer
+(`SyncStyleAttributeFromInlineStyle`, the two zoom source reads, and the final property emit) are exactly the
+**merge points** increment 3 will switch to a merged base∪overlay read when it backs `BakedInlineStyle` with a
+distinct baked-overlay store. Byte-identical (the wrapper still forwards to the same dict); no public-API change.
+Added `Count` to `BakedStyleMap`. Validation: `Broiler.HtmlBridge.Dom` builds clean; the Animation / Serialization /
+FormControl / NativeAnchor / InlineStyleWriteThrough Cli suites pass (110), and the 5 failures in that batch are a
+**byte-identical pre-existing set at baseline** (the three standing environmental `DomBridge_SerializeToHtml_*`
+zoom/srcdoc tests, the `HttpClientMigration` WebClient assembly guard, and the font-dependent
+`FormControlRenderTests.SelectListBox…WritingMode`) — confirmed by a stash-compare. **Increment 3 (not done):** the
+actual storage swap (baked overlay + serializer merge-point reads), then the non-cluster read-side + the item-5
+`Normalize`/`CloneDomElement` swaps.
+
+Status: **P4.14 in progress (increment 1)** 2026-07-19 — **work item 2, seam the anchor-resolver cluster off the raw dict.** The remaining
 item-2 work (fully eliminate the parallel inline-style `Style` dict) is a ~170-site rewrite, ~98 of them in the
 anchor-resolver cluster where the dict is used as **baked-geometry scratch** — the resolver reads an element's
 effective inline style and writes resolved position/insets/margins/borders/size, and those direct writes

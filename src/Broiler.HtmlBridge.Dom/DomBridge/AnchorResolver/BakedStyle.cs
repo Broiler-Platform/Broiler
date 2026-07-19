@@ -6,19 +6,25 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     /// <summary>
-    /// The anchor resolver's seam onto an element's inline-style working store: it reads the
-    /// element's effective inline style and writes resolved/baked geometry (position, insets,
-    /// margins, borders, width/height) as the passes build on one another.
+    /// The seam onto an element's inline-style working store for the bridge's <b>serialize-time bake
+    /// writers</b> — the anchor resolver (position/insets/margins/borders/size), the animation-snapshot
+    /// resolver (interpolated keyframe values), synthetic form-control styling (meter/progress) and the
+    /// zoom serialization bake. Each reads the element's effective inline style and writes resolved/baked
+    /// values, as the passes build on one another.
     ///
-    /// HtmlBridge complexity-reduction roadmap Phase 4 item 2 (inline-style single authority),
-    /// first increment: the anchor-resolver cluster reaches the store ONLY through this accessor and
-    /// the <see cref="BakedStyleMap"/> it returns, instead of indexing the raw <see cref="InlineStyle"/>
-    /// dictionary at ~90 scattered sites. Today it wraps that same per-element dict, so behaviour is
-    /// byte-identical. The seam exists so a later increment can split the resolver's baked-geometry
-    /// writes into a store distinct from the script-observable inline style — those writes must NOT
-    /// leak into live <c>getAttribute("style")</c> mid-resolution (unlike the <c>element.style</c> JS
-    /// path, which write-throughs to the attribute), which is exactly why the dict is currently a
-    /// dual-purpose parallel store. That split then changes only this method and the struct below.
+    /// HtmlBridge complexity-reduction roadmap Phase 4 item 2 (inline-style single authority). Increment 1
+    /// routed the anchor-resolver cluster (~98 sites) here; increment 2 routed the remaining bridge-internal
+    /// bake writers (AnimationResolver, and the synthetic-form-control + zoom bake writes in
+    /// DomBridge.Serialization.cs), so <b>every</b> serialize-time bake write now goes through this one
+    /// chokepoint while the script path (<c>element.style</c>/<c>setAttribute</c>, which write-throughs to
+    /// the <c>style=</c> attribute) and the cascade cleanup stay on <see cref="InlineStyle"/>. Today it
+    /// wraps that same per-element dict, so behaviour is byte-identical. The seam exists so a later
+    /// increment can split the baked writes into a store distinct from the script-observable inline style —
+    /// those writes must NOT leak into live <c>getAttribute("style")</c> mid-resolution, which is exactly
+    /// why the dict is currently a dual-purpose parallel store — by changing only this method, the struct
+    /// below, and the serializer's effective-style read (the merge point). The remaining
+    /// <see cref="InlineStyle"/> reads in the serializer (<c>SyncStyleAttributeFromInlineStyle</c>, the zoom
+    /// source reads, and the final property emit) are exactly those merge points.
     /// </summary>
     internal BakedStyleMap BakedInlineStyle(DomElement element) => new(InlineStyle(element));
 }
@@ -52,6 +58,8 @@ internal readonly struct BakedStyleMap
         _store.TryGetValue(key, out value);
 
     public string? GetValueOrDefault(string key) => _store.GetValueOrDefault(key);
+
+    public int Count => _store.Count;
 
     public Dictionary<string, string>.KeyCollection Keys => _store.Keys;
 
