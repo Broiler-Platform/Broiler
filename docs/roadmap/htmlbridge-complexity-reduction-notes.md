@@ -976,21 +976,32 @@ submodule). Pinned directly by `Broiler.Layout.Tests/ZoomSvgRenderTests` (no-vie
 viewBox does not compound; default `1.0` byte-identical). Gated by `NativeZoom` → flag-off byte-identical.
 Zero regression: 249 engine layout tests.
 
-**Remaining within increment 5**: only **`::before`/`::after`** pseudo boxes — materialised upstream (the
-renderer / bridge), the one paint-residue item not reachable from the `Broiler.Layout` read model or a
-single submodule call site. Non-issues confirmed: box-shadow is carried in the IR but has **no paint
-consumer** (element box-shadow unimplemented); text-decoration underline rides the zoomed font metrics; SVG
-`text` `font-size` scales through the same seeded `sx`/`sy`. The one main-repo remnant deliberately left is
-**`letter-spacing`/`word-spacing`**: they *do* feed text layout (`MeasureWordSpacing` / `CssUtils.WhiteSpace`)
-and are entangled with the whitespace-advance measurement (a two-site add through `ParseLength(..., fontAdjust)`),
-so scaling them safely needs a focused text-measurement pass rather than a one-line getter wrap — a bounded
-follow-up.
+**Landed (2026-07-19) — increment 5, fourth slice: `::before`/`::after` pseudo-elements (verified,
+zero-code).** The last paint-residue item needed **no code change** — and the investigation is the deliverable.
+Unlike the serialization bake, which *must* synthesise pseudo `<style>` overrides because the DOM has no
+pseudo nodes (`CollectZoomPseudoSerializationOverrides`), the engine materialises each pseudo as a **real
+`CssBox` child of the originating element's box** (`DomParser.CreatePseudoElementBox` →
+`CssBoxHelper.CreateBox(parentBox, …)`), storing its cascaded declarations as strings via
+`CssUtils.SetPropertyValue` — nothing is baked to fixed px. So the pseudo box inherits the originating
+element's `EffectiveZoom` through the box tree (`GetParent().EffectiveZoom`) and resolves its own lengths and
+font through the increments 1–5 zoom-aware getters — its zoomed geometry falls out for free. The one hazard —
+`InheritStyle` copying the parent's `zoom` string onto the child, which would *square* the factor — was
+checked and ruled out (`zoom` is not inherited). Pinned by `ZoomPseudoTests`, which builds a box exactly as
+the pseudo materialiser does and asserts: zoom inherited **exactly once** (not double-counted), an own
+`zoom` still compounds, generated-box lengths scale, disabled = unscaled. Zero regression: 253 engine layout
+tests. This closes increment 5's paint residue: outline, border-radius, text-shadow (patch 0002), SVG
+attributes (patch 0003), and pseudo are all handled behind the flag.
+
+**Remaining follow-up (bounded, main-repo)**: **`letter-spacing`/`word-spacing`** — they *do* feed text
+layout (`MeasureWordSpacing` / `CssUtils.WhiteSpace`) and are entangled with the whitespace-advance
+measurement (a two-site add through `ParseLength(..., fontAdjust)`), so scaling them safely needs a focused
+text-measurement pass rather than a one-line getter wrap.
 
 **Remaining zoom increments**: (6) flip `NativeZoom` on and delete `ApplyZoomSerializationStyles` — once the
-submodule paint residue above is patched in, so the flag-on engine matches the bake before the bake is
-removed. The `%`-vs-`px`-vs-`em` and *own*-vs-*effective* factor distinctions (increments 2–3) are the
-intricate, correctness-sensitive core — which is why this is "the large piece" and is being landed
-incrementally behind the flag.
+three submodule paint patches (`patches/0001`–`0003`) are applied and their pointers bumped, so the flag-on
+engine matches the bake before the bake is removed. The `%`-vs-`px`-vs-`em` and *own*-vs-*effective* factor
+distinctions (increments 2–3) are the intricate, correctness-sensitive core — which is why this is "the large
+piece" and is being landed incrementally behind the flag.
 
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
