@@ -1159,6 +1159,25 @@ reconciled against a Chrome reference (align engine or bake so the catalogue col
 top of the still-open P2 (scope the flag at every layout consumer). The bake-gating + harness land safely
 (default-off byte-identical) and de-risk the flip by making the blocker precise and testable.
 
+**Landed (2026-07-19) — the CSSOM READ-path is migrated to the engine used-value model, resolving the
+relative-unit divergence for reads.** The harness's "blocker" had a second reading: for every divergent case
+the **engine value is the mathematically-correct** unzoomed CSS px (the element's own computed size —
+`width:50%` of a 200px CB is `offsetWidth` 100, `2rem`→32, `3em`@10px→30, `calc(50px+10%)`→90), and the
+*bake* was simply buggy for relative units. Broiler's own CSSOM model (`offsetWidth` = unzoomed CSS px,
+pinned by `SharedGeometryZoomSizeTests`) already picks the engine as correct — no Chrome oracle needed for
+the read path. So `SharedLayoutGeometry.BuildSharedGeometrySnapshot` now enables `NativeZoom` around the
+snapshot layout (thread-static save/restore): `GetRenderDocument` skips the element-`zoom` bake and the
+engine scales used values, so the snapshot geometry — and the `offset*`/`client*`/`gBCR` the read path
+divides out of it — is the correct engine used value for `%`/`em`/`rem`/`calc` too. Render/serialize is
+untouched (it calls `GetRenderDocument` directly, not via the snapshot, so it still bakes). Validation: zero
+new fails — `SharedGeometryZoomSizeTests` (P3) and the WPT `Wpt_CssomView_Zoom*` reference tests stay green,
+the full Cli `~Zoom` suite keeps only its 3 standing font-metric + 2 render-bake env-fails, and
+`ZoomBakeVsEngineEquivalenceTests` was reworked from `*_Diverges_BlocksFlip` (documenting the bug) to
+`*_ReadIsEngineUsedValue` (pinning the fixed value) + `*_ReadIsStable` (the read is now independent of the
+render-only flag). This banks the read-side correctness of the LayoutSnapshot endgame; only the render-side
+flip (delete the bake) remains, still gated on P2 render-consumer scoping + render validation (no zoom
+reftest corpus).
+
 Goal: turn LayoutMetrics and AnchorResolver into a thin API adapter over a
 single layout snapshot.
 

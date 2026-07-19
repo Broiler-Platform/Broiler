@@ -179,12 +179,22 @@ reftest corpus exists.
   The used-value model reproduces the bake for every *absolute*-length rendered property — but the A/B
   harness (above) then showed it does **not** for `%`/`em`/`rem`/`calc`, which is the open P4 blocker.
 
-**Status 2026-07-19:** P1 is complete (patches + pointers landed; calc parent wiring re-added). The
-bake-gating (`ZoomBakeActive`) has landed (default-off byte-identical), so the cutover switch is in
-place. The P4 A/B harness is **written and run — and it surfaced a hard blocker**: the bake and engine
-`zoom` models diverge for **relative units and `calc()`** (`%`/`em`/`rem`), so the flip is not
-behaviour-preserving and stays **unexecuted**. Remaining before the flip: **(R)** reconcile the two
-models for relative units against a Chrome reference (align engine or bake so the `*_Diverges_BlocksFlip`
-catalogue collapses to equivalence), then **(P2)** scope `NativeZoom.Enabled` at every layout consumer of
-bridge output. Only when the full corpus is A ≈ B **and** P2 is done should "The flip" above be executed
-as a single commit.
+**Status 2026-07-19 (updated):** P1 complete; bake-gating (`ZoomBakeActive`) landed default-off
+byte-identical. The A/B harness surfaced that the bake and engine diverge for **relative units and
+`calc()`** — and, crucially, established that **the engine value is the correct one** (the element's own
+unzoomed CSS px: `width:50%` of a 200px CB is `offsetWidth` 100, not the bake's 50; likewise `2rem`→32,
+`3em`@10px→30, `calc(50px+10%)`→90). The bake was simply buggy for relative units. So no Chrome oracle is
+needed to pick a winner for the **read path** — Broiler's own CSSOM model (`offsetWidth` = unzoomed CSS px,
+pinned by `SharedGeometryZoomSizeTests`) already decides it.
+
+- **DONE — the CSSOM read-path migration.** `SharedLayoutGeometry.BuildSharedGeometrySnapshot` now enables
+  `NativeZoom` around the snapshot layout, so every zoomed element's `offset*`/`client*`/`getBoundingClientRect`
+  is the engine used value — fixing the relative-unit bugs. Validated: `SharedGeometryZoomSizeTests` (P3) and
+  the WPT `Wpt_CssomView_Zoom*` reference tests stay green, the whole Cli `~Zoom` suite has **zero new fails**
+  (only the 3 standing font-metric + 2 render-bake env-fails remain), and `ZoomBakeVsEngineEquivalenceTests`
+  now pins the correct engine read values (`*_ReadIsEngineUsedValue`) instead of documenting the divergence.
+  The render/serialize path still bakes (called directly, not via the snapshot), so this is read-side only.
+- **Remaining — the render-side flip** (delete the bake). Still needs **(P2)** `NativeZoom` scoped at the
+  render/serialize consumers (capture / WPT) and **render validation** — and note the render bake is likely
+  *also* buggy for relative-unit *pixels*, so the engine render would change (fix) those, with no zoom reftest
+  corpus to confirm the magnitude. That is the remaining gated piece; the read-side correctness win is banked.

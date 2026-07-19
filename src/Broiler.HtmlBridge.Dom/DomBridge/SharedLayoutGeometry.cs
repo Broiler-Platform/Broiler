@@ -83,6 +83,18 @@ public sealed partial class DomBridge
         // the live/CSSOM document pristine, so unzoomed CSSOM queries on zoomed elements
         // (routed to the estimator) read original styles instead of baked ones.
         _zoomSerializationRevertLog = [];
+        // Phase-5 LayoutSnapshot endgame — the CSSOM read model uses the engine's used-value `zoom`
+        // (increments 1–5), not the serialization bake. Enabling NativeZoom for the snapshot layout makes
+        // GetRenderDocument skip the element-`zoom` bake (via ZoomBakeActive) and the engine scale used
+        // values instead, so a zoomed element's snapshot geometry — and the unzoomed `offset*`/`client*`
+        // the read path divides out of it — is correct for RELATIVE units (`%`, `em`, `rem`, `calc`) too,
+        // which the bake mis-scaled (e.g. `width:50%` of a 200px CB under `zoom:2` reported `offsetWidth`
+        // 50 instead of 100). Absolute lengths are unchanged (bake and engine already agreed). Thread-static
+        // save/restore keeps concurrent layouts unaffected; the render/serialize path (called directly by
+        // capture / WPT, not via this snapshot) still bakes, so RevertZoomSerialization stays as its no-op
+        // here (nothing was baked) and remains live for the render path.
+        var previousNativeZoom = Broiler.Layout.Engine.NativeZoom.Enabled;
+        Broiler.Layout.Engine.NativeZoom.Enabled = true;
         try
         {
             var document = GetRenderDocument();
@@ -120,6 +132,7 @@ public sealed partial class DomBridge
         }
         finally
         {
+            Broiler.Layout.Engine.NativeZoom.Enabled = previousNativeZoom;
             RevertZoomSerialization();
         }
     }
