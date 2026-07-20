@@ -159,18 +159,31 @@ Exit criteria:
   `CorrectIframeBoxes` — so `StripIframeContent` is now a redundant (harmless) belt-and-suspenders strip whose
   removal is unblocked; `patches/README.md` corrected accordingly.
 
+- **P6.7 (2026-07-20) — Concern 2, native-behaviour migration: `<progress>`/`<meter>` replaced-element
+  handling (submodule patch `0006`, pending).** Native replacement for
+  `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder` (which string-rewrites the elements into a styled
+  `<div>` track + fill). Added a post-cascade `CorrectProgressBoxes` pass in `Broiler.HTML` (`DomParser`) that
+  renders each as a bordered `inline-block` track (1px `#767676`, bg `#f0f0f0`/`#e6e6e6`, `120×16` or `16×120`
+  vertical) with an absolutely-positioned fill bar proportional to `value` (`#0a84ff`/`#4caf50`), honouring
+  `writing-mode`/`direction` for vertical and RTL bars, hiding the fallback text — matching the fallback's
+  exact colours/sizes. **Verified via the parent build + a render probe on raw `<progress>`/`<meter>`**: the
+  fill paints blue/green over the left ratio·120 px and the remainder is track grey. Push **403** → ships as
+  `patches/0006-…patch`, pointer **unbumped**, working tree reverted; `ReplaceProgressLike` stays the active
+  fallback (string pipeline, pre-renderer) until the patch lands and the pointer is bumped. `select multiple`
+  is the one remaining replaced-element fallback.
+
 - **Remaining for Phase 6 — Concern 2 native migration + project deletion.** The live transforms still in
   `HtmlPostProcessor` are: the production/harness replaced-element passes (`StripScriptTags` [protective],
   `StripIframeContent` [now redundant — `patches/0004` applied at `52f65d9`; removal unblocked],
-  `ReplaceVideo` [native `patches/0005` pending], `ReplaceProgressLike`/`ReplaceSelectMultiple` [legitimate
-  fallbacks]) and the test-harness-only `StripHiddenTestArtifacts` (map/linktest/FAIL/red-bg Acid scaffolding),
-  `StripObjectContent`, and `RewriteRootSelector` (proven redundant, kept for the harness pending reftest
-  validation). Fully emptying the file to delete the Rendering project needs: (a) the applied iframe/video
-  patches' pointer bumps so `StripIframeContent`/`ReplaceVideo` drop; (b) native replaced-element rendering
-  for progress/meter/select so those fallbacks retire (largely `Broiler.HTML`, **submodule-push-gated → patch
-  workflow**); and (c) relocating the residual Acid scaffolding shims to test support once the reftest gate can
-  validate. Per the disposition, `HtmlPostProcessor` must **not** be moved wholesale to rename it; the
-  migration is behavioural.
+  `ReplaceVideo` [native `patches/0005` pending], `ReplaceProgressLike` [native `patches/0006` pending],
+  `ReplaceSelectMultiple` [legitimate fallback — native rendering not yet written]) and the test-harness-only
+  `StripHiddenTestArtifacts` (map/linktest/FAIL/red-bg Acid scaffolding), `StripObjectContent`, and
+  `RewriteRootSelector` (proven redundant, kept for the harness pending reftest validation). Fully emptying the
+  file to delete the Rendering project needs: (a) the applied/pending replaced-element patches' pointer bumps
+  so `StripIframeContent`/`ReplaceVideo`/`ReplaceProgressLike` drop; (b) native `<select multiple>` rendering
+  so its fallback retires (largely `Broiler.HTML`, **submodule-push-gated → patch workflow**); and (c)
+  relocating the residual Acid scaffolding shims to test support once the reftest gate can validate. Per the
+  disposition, `HtmlPostProcessor` must **not** be moved wholesale to rename it; the migration is behavioural.
 
 ### Phase 7 - isolate loading, security and browsing-context policy
 

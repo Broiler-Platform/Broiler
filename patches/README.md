@@ -12,7 +12,9 @@ pointers pin the commits that contain them** (retained only for provenance). Pat
 treat `<iframe>` as a replaced element; hide inline fallback content"* contains its
 `CorrectIframeBoxes` pass (verified 2026-07-20). Patch **0005 is PENDING** — its
 Broiler.HTML working-tree change was reverted after a 403, so the pinned SHA does **not**
-contain it and the main-repo fallback stays active.
+contain it and the main-repo fallback stays active. Patch **0006 is PENDING** on the
+same basis (reverted after a 403; the main-repo `ReplaceProgressLike` fallback stays
+active).
 
 | Patch | Target submodule | Pinned commit / status | Main-repo follow-up |
 |---|---|---|---|
@@ -21,6 +23,7 @@ contain it and the main-repo fallback stays active.
 | 0003 — `Normalize()` fires one `characterData` record per text run | `Broiler.DOM` | applied — `8e8325f` *DomNode.Normalize(): one characterData record per contiguous text run* (the pinned pointer) | **Done / works either way** — `DomBridge.NormalizeNode` already delegates to `node.Normalize()`; canonical now matches the bridge's former one-record-per-run behaviour exactly. |
 | 0004 — treat `<iframe>` as a replaced element (hide inline fallback) | `Broiler.HTML` | **applied** — pinned `52f65d9` *DomParser: treat `<iframe>` as a replaced element; hide inline fallback content* contains `CorrectIframeBoxes` | **Unblocked, not yet wired** — the pinned renderer now hides iframe fallback natively, so `HtmlPostProcessor.StripIframeContent` can be dropped (it is now a redundant belt-and-suspenders strip). Not done here to keep this change focused. |
 | 0005 — render `<video>` as a black inline-block replaced box (hide fallback) | `Broiler.HTML` | **PENDING** — reverted from the working tree after a 403; pinned SHA `52f65d9` does **not** contain it | **Not yet wired** — once applied + pointer bumped, drop `HtmlPostProcessor.ReplaceVideoWithPlaceholder` (Phase 6 concern 2). Until then that regex rewrite is the active fallback. |
+| 0006 — render `<progress>`/`<meter>` as a native track with proportional fill | `Broiler.HTML` | **PENDING** — reverted from the working tree after a 403; pinned SHA `52f65d9` does **not** contain it | **Not yet wired** — once applied + pointer bumped, drop `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder`. Until then that regex rewrite is the active fallback. Adds `CorrectProgressBoxes` after `CorrectIframeBoxes` — same call-site line as `0005`, so applying both together needs a trivial adjacency resolution. |
 
 To apply a *future* patch (kept for reference):
 
@@ -35,6 +38,41 @@ git add <Submodule>                         # bump the pointer
 Then do the "Follow-up (main-repo)" wiring named for that patch — it is deferred until
 the pointer is bumped because it references the patched API, which does not exist at the
 previously-pinned submodule SHA (so it would not compile against the pinned clone on CI).
+
+---
+
+## 0006 — `Broiler.HTML`: render `<progress>`/`<meter>` as a native track with proportional fill
+
+**Target:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs`).
+**Status: PENDING** (reverted after a 403; pinned SHA `52f65d9` does not contain it).
+**Depends on:** nothing (adds a call adjacent to `0005`'s — see the table note).
+
+**What it does.** HTML §4.10.13/4.10.14: `<progress>`/`<meter>` are replaced form controls. Broiler has no
+native control chrome, so a post-cascade `CorrectProgressBoxes` pass renders each as a bordered
+`inline-block` track (1px `#767676`, background `#f0f0f0` progress / `#e6e6e6` meter, `120×16` — `16×120`
+vertical) with an **absolutely-positioned fill bar** proportional to `value` (`#0a84ff` progress / `#4caf50`
+meter), honouring `writing-mode`/`direction` for vertical and RTL-reversed bars, and hides the element's
+fallback text. The value ratio mirrors the fallback (`meter` reads `min`/`max`/`value`; `progress` reads
+`value`/`max`). Runs post-cascade so the injected fill box and forced track geometry are not re-cascaded (the
+absolute fill is still laid out — the engine discovers absolutely-positioned boxes by walking the box tree at
+layout time).
+
+**Verified locally** (patch applied in the submodule working tree, parent build compiling it in place) via a
+render-probe using `HtmlRender.RenderToImageWithStyleSet` on **raw** `<progress value="0.5">` / `<meter
+value="0.5">` (bypassing the string fallback): the track paints border `#767676` + track grey, the left ~60px
+(ratio 0.5 × 120) paints the fill colour — `(10,132,255)` blue for progress, `(76,175,80)` green for meter —
+and the region past the fill is track grey `(240,240,240)`. Full pixel validation needs the Acid/WPT reftest
+gate.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403** (submodule remote outside the session's GitHub
+scope), so per `CLAUDE.md` it ships as `patches/0006-html-progress-meter-native-track-fill.patch` with the
+pointer left **unbumped** and the working tree reverted.
+
+**Main-repo follow-up (once applied + pointer bumped).** Drop
+`HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder` (the regex that rewrites `<progress>`/`<meter>` into a
+styled `<div>` track) — the renderer then boxes them natively. **Current fallback (unchanged until applied):**
+that rewrite runs in the string pipeline before the renderer, so a real `<progress>`/`<meter>` never reaches
+`CorrectProgressBoxes` yet and nothing on CI depends on this patch.
 
 ---
 
