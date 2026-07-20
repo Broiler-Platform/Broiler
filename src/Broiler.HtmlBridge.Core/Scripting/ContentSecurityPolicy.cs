@@ -256,6 +256,50 @@ public sealed class ContentSecurityPolicy
     }
 
     /// <summary>
+    /// Returns whether an external stylesheet URL (a <c>&lt;link rel="stylesheet"&gt;</c> href) is allowed
+    /// under the effective <c>style-src-elem</c> → <c>style-src</c> → <c>default-src</c> directive. This is
+    /// the style analogue of <see cref="AllowsExternalScript"/>: it applies the same source-token matching
+    /// (<c>*</c>, <c>'self'</c>, scheme source, absolute host source) plus a <c>&lt;link&gt;</c> nonce, but
+    /// not <c>'unsafe-inline'</c> (which does not apply to a fetched URL) nor <c>'strict-dynamic'</c> (a
+    /// script-only keyword).
+    /// </summary>
+    public bool AllowsExternalStyle(string styleUrl, string? pageUrl, string? nonce = null)
+    {
+        var sources = GetEffectiveStyleElementSources();
+        if (sources.Count == 0)
+            return true;
+
+        if (IsNoneOnly(sources))
+            return false;
+
+        if (!string.IsNullOrEmpty(nonce) && MatchesNonce(sources, nonce))
+            return true;
+
+        var resolved = CspSourceMatching.ResolveUri(styleUrl, pageUrl);
+        if (resolved == null)
+            return false;
+
+        foreach (var source in sources)
+        {
+            if (string.Equals(source, "*", StringComparison.Ordinal))
+                return true;
+
+            if (string.Equals(source, "'self'", StringComparison.OrdinalIgnoreCase) &&
+                CspSourceMatching.IsSameOrigin(resolved, pageUrl))
+                return true;
+
+            if (CspSourceMatching.IsSchemeSource(source) &&
+                string.Equals(resolved.Scheme, source[..^1], StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (CspSourceMatching.MatchesAbsoluteSource(source, resolved))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Extract the first CSP policy declared through a
     /// <c>&lt;meta http-equiv=\"Content-Security-Policy\"&gt;</c> tag.
     /// Returns <c>null</c> when no supported policy is present.

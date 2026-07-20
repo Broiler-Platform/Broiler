@@ -1,6 +1,11 @@
 # HtmlBridge complexity-reduction roadmap
 
-Status: proposed
+Status: **in delivery** — Phases 0–5 delivered to their in-scope terminal state (see the
+[implemented delivery log](htmlbridge-complexity-reduction-implemented.md)); Phase 6's native-rendering
+migration is complete and merged (submodule patches `0004`–`0007` applied upstream), with only the terminal
+`Broiler.HtmlBridge.Rendering` project deletion outstanding (WPT-reftest-gated); Phase 7 items 1–5 are
+done, leaving item 6's module import/export graph + event-loop integration; Phase 8 remains proposed. Per-phase
+detail: [remaining phases](htmlbridge-complexity-reduction-remaining.md).
 
 Baseline date: 2026-07-13
 

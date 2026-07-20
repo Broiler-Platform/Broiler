@@ -569,12 +569,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         {
             _pageUrl = uri.ToString();
             _pageProtocol = uri.Scheme + ":";
-            _pageHost = uri.IsDefaultPort ? uri.Host : $"{uri.Host}:{uri.Port}";
+            _pageHost = Origin.HostOf(uri);
             _pageHostName = uri.Host;
             _pagePathName = uri.AbsolutePath;
             _pageSearch = uri.Query;
             _pageHash = uri.Fragment;
-            _pageOrigin = $"{uri.Scheme}://{(uri.IsDefaultPort ? uri.Host : $"{uri.Host}:{uri.Port}")}";
+            _pageOrigin = Origin.Of(uri);
         }
         else
         {

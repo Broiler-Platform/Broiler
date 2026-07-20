@@ -330,7 +330,8 @@ public sealed partial class DomBridge
         if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
             cssText.Length == 0 &&
             TryGetAttribute(styleEl, "href", out var href) &&
-            !string.IsNullOrEmpty(href))
+            !string.IsNullOrEmpty(href) &&
+            IsExternalStyleAllowedByCsp(styleEl, href))
         {
             if (StyleSheetStateFor(styleEl).FetchedCss.TryGet(out var cachedCss) && cachedCss is string cachedStr)
             {
@@ -704,6 +705,22 @@ public sealed partial class DomBridge
 
         var px = ParseCssLengthToPixels(value.Trim());
         return !double.IsNaN(px) && px > 0 ? (int)px : 0;
+    }
+
+    /// <summary>
+    /// Whether the document's Content Security Policy permits fetching and applying an external stylesheet
+    /// from <paramref name="href"/> (a <c>&lt;link rel="stylesheet"&gt;</c>). When no policy is configured
+    /// every stylesheet is allowed. Mirrors the script-side <see cref="ContentSecurityPolicy.AllowsExternalScript"/>
+    /// gate so DOM/CSS never fetch or apply a <c>style-src</c>-blocked external stylesheet (Phase 7 item 5:
+    /// CSP stays in the host layer; DOM and CSS receive already-authorised content).
+    /// </summary>
+    private bool IsExternalStyleAllowedByCsp(DomElement linkEl, string href)
+    {
+        if (Csp == null)
+            return true;
+
+        var nonce = TryGetAttribute(linkEl, "nonce", out var nonceValue) ? nonceValue : null;
+        return Csp.AllowsExternalStyle(href, _pageUrl, nonce);
     }
 
     /// <summary>

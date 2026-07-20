@@ -29,9 +29,7 @@ internal static class CspSourceMatching
             string.Equals(pageUri.Scheme, "file", StringComparison.OrdinalIgnoreCase))
             return true;
 
-        return string.Equals(candidate.Scheme, pageUri.Scheme, StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(candidate.Host, pageUri.Host, StringComparison.OrdinalIgnoreCase) &&
-               candidate.Port == pageUri.Port;
+        return Origin.SchemeHostPortEquals(candidate, pageUri);
     }
 
     /// <summary>Whether a CSP source token is a bare scheme source such as <c>https:</c>

@@ -477,4 +477,67 @@ public class ContentSecurityPolicyTests
         Assert.Contains("background: green", result);
         Assert.Contains("<style", result);
     }
+
+    // Phase 7 item 5: external-stylesheet (<link rel=stylesheet>) CSP gating. The style analogue of
+    // AllowsExternalScript, applied at the FetchExternalStylesheet call site so DOM/CSS never fetch or
+    // apply a style-src-blocked external stylesheet.
+
+    [Fact]
+    public void AllowsExternalStyle_None_Blocks_Every_External_Stylesheet()
+    {
+        var csp = new ContentSecurityPolicy();
+        csp.Parse("style-src 'none'");
+
+        Assert.False(csp.AllowsExternalStyle("https://cdn.test/a.css", "https://a.test/page.html"));
+        Assert.False(csp.AllowsExternalStyle("a.css", "https://a.test/page.html"));
+    }
+
+    [Fact]
+    public void AllowsExternalStyle_Self_Allows_SameOrigin_And_Blocks_CrossOrigin()
+    {
+        var csp = new ContentSecurityPolicy();
+        csp.Parse("style-src 'self'");
+
+        Assert.True(csp.AllowsExternalStyle("https://a.test/theme.css", "https://a.test/page.html"));
+        Assert.False(csp.AllowsExternalStyle("https://cdn.test/theme.css", "https://a.test/page.html"));
+    }
+
+    [Fact]
+    public void AllowsExternalStyle_Honours_Host_Scheme_And_Nonce_Sources()
+    {
+        var host = new ContentSecurityPolicy();
+        host.Parse("style-src https://cdn.test");
+        Assert.True(host.AllowsExternalStyle("https://cdn.test/lib/a.css", "https://a.test/page.html"));
+        Assert.False(host.AllowsExternalStyle("https://evil.test/a.css", "https://a.test/page.html"));
+
+        var scheme = new ContentSecurityPolicy();
+        scheme.Parse("style-src https:");
+        Assert.True(scheme.AllowsExternalStyle("https://anywhere.test/a.css", "https://a.test/page.html"));
+        Assert.False(scheme.AllowsExternalStyle("http://anywhere.test/a.css", "https://a.test/page.html"));
+
+        var nonce = new ContentSecurityPolicy();
+        nonce.Parse("style-src 'nonce-abc123'");
+        Assert.True(nonce.AllowsExternalStyle("https://cdn.test/a.css", "https://a.test/page.html", "abc123"));
+        Assert.False(nonce.AllowsExternalStyle("https://cdn.test/a.css", "https://a.test/page.html", "wrong"));
+    }
+
+    [Fact]
+    public void AllowsExternalStyle_StyleSrcElem_Takes_Precedence_And_Falls_Back_To_DefaultSrc()
+    {
+        // style-src-elem wins over style-src for a <link>.
+        var elem = new ContentSecurityPolicy();
+        elem.Parse("style-src 'none'; style-src-elem 'self'");
+        Assert.True(elem.AllowsExternalStyle("https://a.test/a.css", "https://a.test/page.html"));
+
+        // With neither style directive, default-src applies.
+        var fallback = new ContentSecurityPolicy();
+        fallback.Parse("default-src 'self'");
+        Assert.True(fallback.AllowsExternalStyle("https://a.test/a.css", "https://a.test/page.html"));
+        Assert.False(fallback.AllowsExternalStyle("https://cdn.test/a.css", "https://a.test/page.html"));
+
+        // No relevant directive at all → allowed (empty effective source set).
+        var empty = new ContentSecurityPolicy();
+        empty.Parse("img-src 'self'");
+        Assert.True(empty.AllowsExternalStyle("https://cdn.test/a.css", "https://a.test/page.html"));
+    }
 }
