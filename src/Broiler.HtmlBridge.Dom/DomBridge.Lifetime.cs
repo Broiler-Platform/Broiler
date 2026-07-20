@@ -96,6 +96,7 @@ public sealed partial class DomBridge : IDisposable
         _messaging.ClearPorts();
 
         _mutations.Clear();
-        _traversal.ClearActive();
+        // Ranges / NodeIterators now self-subscribe to their document's DomDocument.Mutated and are
+        // released with the document; the bridge keeps no active-range/iterator registry to clear.
     }
 }

@@ -16,4 +16,12 @@ internal interface IMutationObserverHost
 
     /// <summary>Resolves the canonical node behind a JS wrapper, or null.</summary>
     DomNode? FindDomNodeByJSObject(JSObject? jsObj);
+
+    /// <summary>
+    /// Whether script-observable mutation-record delivery is currently suppressed. Set while the
+    /// bridge mutates the live tree internally (serialize/render bakes, parse) so those
+    /// implementation-detail mutations — which fire canonical <see cref="DomDocument.Mutated"/>
+    /// records — are not delivered to script observers (and cannot re-enter script mid-serialize).
+    /// </summary>
+    bool MutationDeliverySuppressed { get; }
 }

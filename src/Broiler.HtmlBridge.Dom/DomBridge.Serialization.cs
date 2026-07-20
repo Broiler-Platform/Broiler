@@ -26,6 +26,9 @@ public sealed partial class DomBridge
     /// </summary>
     public string SerializeToHtml()
     {
+        // The serialize transforms/zoom bakes mutate the live tree; suppress observer delivery so
+        // they neither deliver spurious records nor re-enter script synchronously mid-serialize.
+        using var mutationSuppression = SuppressMutationDelivery();
         if (ZoomBakeActive)
             ApplyZoomSerializationStyles(DocumentElement, 1.0);
         ApplySerializationTransforms();
@@ -47,6 +50,9 @@ public sealed partial class DomBridge
     /// </summary>
     public DomDocument GetRenderDocument()
     {
+        // ReflectRenderState + transforms bake style/value attributes onto the live tree; suppress
+        // observer delivery so they neither deliver spurious records nor re-enter script mid-bake.
+        using var mutationSuppression = SuppressMutationDelivery();
         // Zoom baking runs per call (not part of the run-once guarded transforms); it is idempotent
         // once baked (the `zoom` property is stripped), so repeat calls on the render path are no-ops.
         // Must run before the guarded pseudo/progress transforms, which depend on the baked sizes. The

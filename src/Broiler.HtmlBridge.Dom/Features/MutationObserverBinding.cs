@@ -28,6 +28,13 @@ internal sealed class MutationObserverBinding(IMutationObserverHost host)
     // snapshot for delivery). Owned here now that the whole feature is co-located.
     private readonly MutationObserverHub _hub = new();
 
+    // The documents whose canonical DomDocument.Mutated we have subscribed to. Delivery is driven
+    // off that event (not explicit bridge Notify* calls), so we subscribe lazily the first time an
+    // observer targets a node in a given document — the main document and each sub-document (iframe
+    // content) uniformly, without hooking document construction. NodeIterator and Range self-manage
+    // their own canonical Mutated subscriptions; this is the MutationObserver half.
+    private readonly HashSet<DomDocument> _subscribedDocuments = [];
+
     // -------- Registration --------
 
     /// <summary>
@@ -88,8 +95,52 @@ internal sealed class MutationObserverBinding(IMutationObserverHost host)
         var target = _host.FindDomNodeByJSObject(targetObject);
         if (target == null)
             return JSUndefined.Value;
+        EnsureSubscribed(target.OwnerDocument);
         _hub.Register(observerObject, target, CreateMutationObserverOptions(a.Length > 2 ? a[2] : JSUndefined.Value));
         return JSUndefined.Value;
+    }
+
+    // -------- Canonical mutation subscription --------
+
+    /// <summary>Subscribes to a document's <see cref="DomDocument.Mutated"/> once (idempotent).</summary>
+    private void EnsureSubscribed(DomDocument document)
+    {
+        if (_subscribedDocuments.Add(document))
+            document.Mutated += OnDocumentMutation;
+    }
+
+    /// <summary>
+    /// Translates a canonical mutation record into the feature's childList/attribute/characterData
+    /// delivery. Suppressed while the bridge mutates the live tree internally (serialize/render
+    /// bakes, re-parse) so those implementation-detail mutations are not delivered to script (and
+    /// cannot re-enter script mid-serialize). Delivery is synchronous, matching the pre-existing
+    /// observer model (a script reads its record log on the line after the mutation).
+    /// </summary>
+    private void OnDocumentMutation(DomMutationRecord record)
+    {
+        if (_hub.Count == 0 || _host.MutationDeliverySuppressed)
+            return;
+
+        switch (record.Type)
+        {
+            case DomMutationType.ChildList:
+                if (record.AddedNodes is { Count: > 0 } added)
+                    foreach (var node in added)
+                        DeliverChildListMutation(record.Target, node, null, record.PreviousSibling, record.NextSibling);
+                if (record.RemovedNodes is { Count: > 0 } removed)
+                    foreach (var node in removed)
+                        DeliverChildListMutation(record.Target, null, node, record.PreviousSibling, record.NextSibling);
+                break;
+            case DomMutationType.Attributes when record.Target is DomElement element && record.AttributeName is { } attributeName:
+                // The bridge reports "" (not null) as the prior value of a newly-added attribute
+                // (its TryGetAttribute default); canonical publishes null. Coalesce to preserve the
+                // characterized observer oldValue behaviour.
+                DeliverAttributeMutation(element, attributeName, record.OldValue ?? string.Empty);
+                break;
+            case DomMutationType.CharacterData:
+                DeliverCharacterDataMutation(record.Target, record.OldValue);
+                break;
+        }
     }
 
     private JSValue UnregisterObserver(in Arguments a)
@@ -215,6 +266,12 @@ internal sealed class MutationObserverBinding(IMutationObserverHost host)
         }
     }
 
-    /// <summary>Drops all registered observers (session reset/dispose).</summary>
-    internal void Clear() => _hub.Clear();
+    /// <summary>Drops all registered observers and canonical subscriptions (session reset/dispose).</summary>
+    internal void Clear()
+    {
+        foreach (var document in _subscribedDocuments)
+            document.Mutated -= OnDocumentMutation;
+        _subscribedDocuments.Clear();
+        _hub.Clear();
+    }
 }

@@ -120,57 +120,26 @@ public sealed partial class DomBridge
         return result;
     }
 
-    /// <summary>
-    /// Notifies all active ranges that a child was removed from <paramref name="parent"/>
-    /// at the given <paramref name="index"/>.
-    /// </summary>
-    private void NotifyChildAdded(DomNode parent, DomNode addedChild, int index)
-    {
-        var previousSibling = index > 0 ? ChildAt(parent, index - 1) : null;
-        var nextSibling = index + 1 < parent.ChildNodes.Count ? ChildAt(parent, index + 1) : null;
-        NotifyMutationObservers(parent, addedChild, null, previousSibling, nextSibling);
-    }
+    // Mutation-delivery consolidation (Phase 4): the bridge no longer pushes MutationObserver,
+    // Range, or NodeIterator notifications from its mutation path. Delivery is driven off canonical
+    // DomDocument.Mutated — MutationObserverBinding subscribes per observed document, and canonical
+    // DomRange (trackMutations) / DomNodeIterator self-subscribe. Because the step-1 primitive
+    // cleanup makes each logical op fire exactly one canonical record, the subscribers see the same
+    // record stream the explicit channel produced. These former Notify* seams are kept as no-ops so
+    // the ~35 historical mutation-path call sites (child add/remove, attribute writes, the
+    // NodeIterator pre-removal marker) need no edit.
+    private void NotifyChildAdded(DomNode parent, DomNode addedChild, int index) { }
 
-    private void NotifyChildRemoved(DomNode parent, DomNode removedChild, int index, DomNode? previousSibling = null, DomNode? nextSibling = null)
-    {
-        // Range boundary adjustment for the removed child lives with the traversal feature module,
-        // which owns the active-range registry.
-        _traversal.NotifyNodeRemoved(parent, removedChild, index);
+    private void NotifyChildRemoved(DomNode parent, DomNode removedChild, int index, DomNode? previousSibling = null, DomNode? nextSibling = null) { }
 
-        previousSibling ??= index > 0 ? ChildAt(parent, index - 1) : null;
-        nextSibling ??= index < parent.ChildNodes.Count ? ChildAt(parent, index) : null;
-        NotifyMutationObservers(parent, null, removedChild, previousSibling, nextSibling);
-    }
-
-    // MutationObserver record delivery lives in the MutationObserverBinding feature module (Phase 3
-    // P3.2), which owns the observer registry. These thin delegators keep the bridge mutation path's
-    // historical call sites (child add/remove here, attribute writes in Attributes.cs/JsObjects.cs,
-    // character-data writes below) source-compatible.
-    private void NotifyMutationObservers(DomNode target,
-        DomNode? addedChild, DomNode? removedChild, DomNode? previousSibling, DomNode? nextSibling) =>
-        _mutations.DeliverChildListMutation(target, addedChild, removedChild, previousSibling, nextSibling);
-
-    private void NotifyAttributeMutationObservers(DomElement target, string attributeName, string? oldValue) =>
-        _mutations.DeliverAttributeMutation(target, attributeName, oldValue);
-
-    private void NotifyCharacterDataMutationObservers(DomNode target, string? oldValue) =>
-        _mutations.DeliverCharacterDataMutation(target, oldValue);
+    private void NotifyAttributeMutationObservers(DomElement target, string attributeName, string? oldValue) { }
 
     private static void UpdateCharacterData(DomNode target, string? newValue) => SetBridgeText(target, newValue ?? string.Empty);
 
-    private void SetCharacterData(DomNode target, string? newValue)
-    {
-        var previousValue = BridgeText(target);
-        UpdateCharacterData(target, newValue);
-        if (!string.Equals(previousValue, BridgeText(target), StringComparison.Ordinal))
-            NotifyCharacterDataMutationObservers(target, previousValue);
-    }
+    // The canonical DomCharacterData.Data setter publishes a CharacterData record to
+    // DomDocument.Mutated (with its own value-changed guard), so the observer subscription delivers
+    // it — no explicit notify needed.
+    private void SetCharacterData(DomNode target, string? newValue) => UpdateCharacterData(target, newValue);
 
-    /// <summary>
-    /// Executes NodeIterator pre-removing steps per DOM §7.2.
-    /// Must be called BEFORE the node is actually removed from the tree
-    /// so that tree traversal can find neighboring nodes.
-    /// </summary>
-    private void NotifyNodeIteratorPreRemoval(DomNode nodeToBeRemoved) =>
-        _traversal.PruneDeadNodeIterators();
+    private void NotifyNodeIteratorPreRemoval(DomNode nodeToBeRemoved) { }
 }
