@@ -51,16 +51,17 @@ public sealed class HtmlPostProcessorProfileTests
     {
         const string html =
             "<script>doStuff()</script>" +
-            "<video width=\"320\" height=\"240\"><source src=\"x.mp4\"></video>" +
-            "<style>:root{color:red}</style>";
+            "<video width=\"320\" height=\"240\"><source src=\"x.mp4\"></video>";
 
         var result = browsing
             ? HtmlPostProcessor.ProcessForBrowsing(html)
             : HtmlPostProcessor.Process(html);
 
+        // Shared replaced-element preparation applies in both profiles. (The :root->html rewrite is
+        // NOT shared: it is test-harness only now that production relies on native :root support — see
+        // HtmlPostProcessorNativeSupportTests.)
         Assert.DoesNotContain("<script", result, StringComparison.OrdinalIgnoreCase);   // scripts already ran
         Assert.DoesNotContain("<video", result, StringComparison.OrdinalIgnoreCase);    // boxed as a placeholder
-        Assert.DoesNotContain(":root", result, StringComparison.Ordinal);              // rewritten to html
     }
 
     [Theory]

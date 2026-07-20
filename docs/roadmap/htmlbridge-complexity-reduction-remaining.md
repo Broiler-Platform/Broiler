@@ -88,17 +88,40 @@ Exit criteria:
     `CaptureService` capture now call it — closing the exit criterion *"production browsing does not apply
     Acid/WPT-specific transforms."* (This also stops production from mangling real `<map>` elements.)
   - New `HtmlPostProcessorProfileTests` (6) pin the split deterministically: production preserves
-    `<map>`/`linktest`/`FAIL`; the harness still strips them; both apply the shared preparation
-    (script/video/`:root`) and neither strips `<table>`. Full Cli.Tests run: only the 3 pre-existing
+    `<map>`/`linktest`/`FAIL`; the harness still strips them; both apply the shared replaced-element
+    preparation (script/video) and neither strips `<table>`. Full Cli.Tests run: only the 3 pre-existing
     environmental pixel/writing-mode failures (`CssPseudoElement_ContentUrl_Renders_Image_Content`,
     `Border_Shorthand_Expands_Color_To_Individual_Sides`, `SelectListBox_SizingAndScrolling_Follow_WritingMode`),
     confirmed identical on the clean baseline → zero regressions.
 
-- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** The other outstanding exit
-  criterion, replacing each remaining regex workaround with **native HTML/Layout behavior** (e.g. native
-  `<map>`/`:root` handling so `RewriteRootSelector` and the harness strips become unnecessary), is largely
-  `Broiler.HTML` / `Broiler.CSS` — **submodule-push-gated → patch workflow** — and needs the Acid/WPT
-  pixel reftest gate (environmental in a bare container) to validate. Per the disposition,
+- **P6.3 (2026-07-20) — Concern 2, native-behaviour migration: retire `RewriteRootSelector` from
+  production.** A/B render-probe investigation (font-independent background-colour / text-presence checks
+  via `HtmlRender.RenderToImageWithStyleSet`) classified each production transform as dead vs still-needed:
+  - `RewriteRootSelector` (`:root`→`html`) — **DEAD.** The renderer paints a `:root{background}` rule
+    natively without the rewrite, and the rewrite was actively *buggy* (it lowered `:root`'s specificity
+    from a pseudo-class (0,1,0) to the `html` type selector (0,0,1), which can flip the cascade on real
+    pages). **Removed from `ProcessForBrowsing`** — production now relies on native `:root`.
+  - `StripScriptTags` — dead for its stated *content-bleed* purpose (the renderer does not render
+    `<script>` bodies, incl. HTML-like markup inside them), but **kept**: it runs first as a protective
+    normaliser so the later regex passes cannot match `<video>`/`<iframe>` literals inside a script string
+    and corrupt real content across the boundary.
+  - `StripIframeContent` — **still needed** (the renderer *does* render `<iframe>` fallback children as a
+    visible block; probe: 6400 green px). Native fix (treat `<iframe>` as a replaced element, suppress
+    fallback) is `Broiler.HTML` → submodule-push-gated.
+  - `ReplaceVideo`/`ReplaceProgressLike`/`ReplaceSelectMultiple` — legitimate replaced-element fallbacks
+    (Broiler cannot decode video / lacks native progress/meter/listbox chrome); kept pending native support.
+
+  New `HtmlPostProcessorNativeSupportTests` (4) pin the evidence (native `:root` paints; `<script>` content
+  does not bleed) and the string-level split (production keeps `:root`; the harness still rewrites it).
+  Only the same 3 environmental failures; zero regressions. `RewriteRootSelector` stays in the test-harness
+  `Process()` pending the WPT/Acid reftest gate to retire it there too.
+
+- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** The still-needed workarounds —
+  `StripIframeContent` (native iframe replaced-element handling) and, in the test-harness profile, the
+  Acid/WPT strips (`StripHiddenTestArtifacts`, `StripCssDataUriBackgrounds`, `StripObjectContent`,
+  `StripTables`, `StripForms`) plus the now-redundant `StripScriptTags`/`RewriteRootSelector` — are largely
+  `Broiler.HTML` / `Broiler.CSS` **submodule-push-gated → patch workflow** and need the Acid/WPT pixel
+  reftest gate (environmental in a bare container) to validate. Per the disposition,
   `HtmlPostProcessor` must **not** be moved wholesale to rename it; the migration is behavioural. Once the
   test-harness profile's remaining transforms are relocated to test support, the Rendering project (then
   empty) is deleted.

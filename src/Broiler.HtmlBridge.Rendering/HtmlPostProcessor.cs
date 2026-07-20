@@ -208,18 +208,21 @@ internal static class HtmlPostProcessor
     }
 
     /// <summary>
-    /// Production render-preparation for browsing / image capture: the shared replaced-element passes
-    /// plus the <c>:root</c>→<c>html</c> rewrite. It does <b>not</b> apply the Acid/WPT test-harness
-    /// artifact cleanup (<see cref="StripHiddenTestArtifacts"/>), which strips test scaffolding — and,
-    /// incidentally, valid content such as <c>&lt;map&gt;</c> — that real pages must keep. Phase 6 exit
-    /// criterion: production browsing does not apply Acid/WPT-specific transforms.
+    /// Production render-preparation for browsing / image capture: only the shared replaced-element
+    /// passes. It does <b>not</b> apply the Acid/WPT test-harness artifact cleanup
+    /// (<see cref="StripHiddenTestArtifacts"/>), which strips test scaffolding — and, incidentally, valid
+    /// content such as <c>&lt;map&gt;</c> — that real pages must keep.
     /// </summary>
-    internal static string ProcessForBrowsing(string html)
-    {
-        html = ApplyReplacedElementPasses(html);
-        html = RewriteRootSelector(html);
-        return html;
-    }
+    /// <remarks>
+    /// Phase 6 (P6.3) native-behaviour migration: the <c>:root</c>→<c>html</c> rewrite
+    /// (<see cref="RewriteRootSelector"/>) is <b>not</b> applied in production. The renderer now supports
+    /// the <c>:root</c> pseudo-class natively (verified by <c>HtmlPostProcessorNativeSupportTests</c>: a
+    /// <c>:root{background}</c> rule paints without the rewrite), so the rewrite is a dead workaround —
+    /// and a buggy one, since it lowered <c>:root</c>'s specificity from a pseudo-class (0,1,0) to the
+    /// type selector <c>html</c> (0,0,1), which could flip the cascade on real pages. It remains in the
+    /// test-harness <see cref="Process"/> pending the WPT/Acid pixel reftest gate to retire it there too.
+    /// </remarks>
+    internal static string ProcessForBrowsing(string html) => ApplyReplacedElementPasses(html);
 
     /// <summary>
     /// Test-harness profile: the shared render preparation plus the Acid/WPT-specific artifact cleanup
