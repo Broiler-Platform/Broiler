@@ -88,6 +88,12 @@ public sealed partial class DomBridge
     /// <param name="viewportHeight">Viewport height in pixels (default 768).</param>
     public void ResolveAnchorPositions(int viewportWidth = 1024, int viewportHeight = 768)
     {
+        // Serialize-time bakes mutate the live tree (SetAttr / element replacement / backdrop
+        // insertion) as an implementation detail of render. Suppress script-observable mutation
+        // delivery so these do not deliver spurious records to — or synchronously re-enter — a
+        // registered MutationObserver mid-render.
+        using var mutationSuppression = SuppressMutationDelivery();
+
         // -1. CSS Content 3 element replacement: when the root element's
         //     `content` computes to a replaced value (an image), the root is
         //     replaced by that image and its descendants generate no boxes —

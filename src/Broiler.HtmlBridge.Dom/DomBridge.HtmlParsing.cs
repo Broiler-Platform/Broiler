@@ -20,6 +20,10 @@ public sealed partial class DomBridge
 
     private void ParseHtml(string html)
     {
+        // Parse/re-parse tears down and rebuilds the live tree wholesale (ClearChildren + build);
+        // these are document-construction mutations, not script mutations, so suppress observer
+        // delivery for them (matching the prior explicit channel, which parse never drove).
+        using var mutationSuppression = SuppressMutationDelivery();
         // P2.2: one call clears both wrapper maps. Re-parse now also releases stale sub-document
         // wrappers (keyed by detached roots that no lookup can reach again) — observably
         // equivalent to before, but it stops them lingering until disposal.

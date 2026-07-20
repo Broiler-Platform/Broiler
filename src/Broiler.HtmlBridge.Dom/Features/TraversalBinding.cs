@@ -27,13 +27,6 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
 {
     private readonly ITraversalHost _host = host;
 
-    // Live Range boundary stores and NodeIterator pointers, held weakly so a script-abandoned range
-    // or iterator stays GC-collectable. The bridge drives boundary adjustment through
-    // NotifyNodeRemoved (ranges are constructed non-tracking so they do not self-subscribe to the
-    // document mutation event).
-    private readonly List<WeakReference<DomRange>> _activeRanges = [];
-    private readonly List<WeakReference<DomNodeIterator>> _activeNodeIterators = [];
-
     // -------- Registration --------
 
     /// <summary>
@@ -218,10 +211,11 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
     internal JSObject BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn)
     {
         var iter = new JSObject();
+        // Canonical DomNodeIterator self-subscribes to root.OwnerDocument.Mutated and runs the DOM
+        // §6.1 pre-removal reference-node adjustment itself, so the bridge keeps no registry.
         var iterator = new DomNodeIterator(root,
             (DomWhatToShow)(uint)whatToShow,
             node => (DomFilterResult)ApplyFilter(node, whatToShow, filterFn));
-        _activeNodeIterators.Add(new WeakReference<DomNodeIterator>(iterator));
 
         iter.FastAddValue((KeyString)"root",
             _host.ToJSObject(root),
@@ -264,12 +258,9 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
     {
         var range = new JSObject();
         var docRoot = documentRoot ?? _host.DocumentNode;
+        // The range self-subscribes to its document's DomDocument.Mutated (trackMutations) and runs
+        // the DOM "removing steps" itself, so the bridge keeps no active-range registry.
         var state = new BridgeDomRange(_host, docRoot);
-
-        // Register this range for mutation tracking. The range is non-tracking (it does not
-        // subscribe to the document mutation event), so a script-abandoned range stays weakly held
-        // here and is GC-collectable; NotifyNodeRemoved drives its adjustment.
-        _activeRanges.Add(new WeakReference<DomRange>(state));
 
         range.FastAddProperty((KeyString)"startContainer",
             new JSFunction((in a) => _host.ToJSObject(state.StartContainer), "get startContainer"),
@@ -357,57 +348,18 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
         return range;
     }
 
-    // -------- Active range / iterator registry (bridge-driven mutation adjustment) --------
-
-    /// <summary>
-    /// Notifies all active ranges that a child was removed from <paramref name="parent"/> at the
-    /// given <paramref name="index"/>, and prunes GC'd range references. Called by the bridge's
-    /// mutation path.
-    /// </summary>
-    internal void NotifyNodeRemoved(DomNode parent, DomNode removedChild, int index)
-    {
-        for (var i = _activeRanges.Count - 1; i >= 0; i--)
-        {
-            if (_activeRanges[i].TryGetTarget(out var state))
-                state.NotifyNodeRemoved(parent, removedChild, index);
-            else
-                _activeRanges.RemoveAt(i); // GC'd — prune
-        }
-    }
-
-    /// <summary>
-    /// Prunes GC'd node-iterator references. Executes the NodeIterator pre-removing bookkeeping per
-    /// DOM §7.2; called by the bridge BEFORE a node is removed from the tree.
-    /// </summary>
-    internal void PruneDeadNodeIterators()
-    {
-        for (var i = _activeNodeIterators.Count - 1; i >= 0; i--)
-        {
-            if (_activeNodeIterators[i].TryGetTarget(out _))
-                continue;
-            else
-                _activeNodeIterators.RemoveAt(i); // GC'd — prune
-        }
-    }
-
-    /// <summary>Drops all active range and node-iterator registrations (session reset/dispose).</summary>
-    internal void ClearActive()
-    {
-        _activeRanges.Clear();
-        _activeNodeIterators.Clear();
-    }
-
     /// <summary>
     /// The bridge's live <c>Range</c> boundary store and content-operation engine — the canonical
     /// <see cref="DomRange"/> with the node-creation seams overridden so content operations mint
     /// bridge nodes through <see cref="ITraversalHost"/>: <c>#document-fragment</c> result
     /// fragments and clones that carry host runtime state, all registered so the host's
-    /// <c>ToJSObject</c> can wrap them. Constructed <c>trackMutations: false</c> — the bridge drives
-    /// boundary adjustment from its mutation path via the weak active-range registry, so the range
-    /// must not also self-subscribe to the document mutation event.
+    /// <c>ToJSObject</c> can wrap them. Constructed <c>trackMutations: true</c> — the range
+    /// self-subscribes to its document's <see cref="DomDocument.Mutated"/> and runs the DOM
+    /// "removing steps" (boundary adjustment) itself, uniformly with NodeIterator, now that the
+    /// bridge no longer drives a separate notification channel.
     /// </summary>
     private sealed class BridgeDomRange(ITraversalHost host, DomNode root)
-        : DomRange(root, trackMutations: false)
+        : DomRange(root, trackMutations: true)
     {
         protected override DomNode CreateResultFragment() => host.CreateRangeResultFragment();
 

@@ -149,9 +149,12 @@ internal static class TreeMutationBinding
             }
         }
 
-        DomBridge.SetParent(oldEl, null);
-        DomBridge.SetParent(newEl, element);
-        element.ReplaceChild(newEl, element.ChildNodes[idx]);
+        // Single canonical replace: ReplaceChild removes oldEl and inserts newEl at its exact
+        // position, firing one ChildList(removed oldEl) + one ChildList(added newEl). The prior
+        // detach-oldEl + append-newEl-at-end + ReplaceChild(ChildNodes[idx]) dance fired several
+        // spurious canonical records that the NodeIterator/CSS mutation subscribers observe. newEl
+        // was already detached from any prior parent above; oldEl is still a child of element here.
+        element.ReplaceChild(newEl, oldEl);
         host.InvalidateStyleScope(element);
         host.NotifyChildRemoved(element, oldEl, idx, previousSibling, nextSibling);
         host.NotifyChildAdded(element, newEl, idx);

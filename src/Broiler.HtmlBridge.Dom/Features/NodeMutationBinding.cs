@@ -69,7 +69,8 @@ internal static class NodeMutationBinding
             }
 
             var doc = host.DocumentNode;
-            DomBridge.SetParent(childEl, doc);
+            // Single canonical append (the move-block above already detached childEl). The prior
+            // SetParent(childEl, doc) did the append, leaving this AppendChild a redundant no-op.
             doc.AppendChild(childEl);
             host.NotifyChildAdded(doc, childEl, doc.ChildNodes.Count - 1);
         }
@@ -107,7 +108,8 @@ internal static class NodeMutationBinding
                 var idx = DomBridge.ChildIndexOf(doc, refEl);
                 if (idx >= 0)
                 {
-                    DomBridge.SetParent(newEl, doc);
+                    // Single canonical insert (newEl detached above); the prior SetParent-append +
+                    // reposition fired spurious add-at-end/remove records.
                     DomBridge.InsertChildAt(doc, idx, newEl);
                     host.NotifyChildAdded(doc, newEl, idx);
                     return a[0];
@@ -115,8 +117,7 @@ internal static class NodeMutationBinding
             }
         }
 
-        // If refChild is null or not found, append.
-        DomBridge.SetParent(newEl, doc);
+        // If refChild is null or not found, append (single canonical op; newEl detached above).
         doc.AppendChild(newEl);
         host.NotifyChildAdded(doc, newEl, doc.ChildNodes.Count - 1);
         return a[0];

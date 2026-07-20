@@ -53,7 +53,8 @@ internal static class CharacterDataBinding
         if (DomBridge.ParentEl(node) != null)
         {
             var idx = DomBridge.ChildIndexOf(DomBridge.ParentEl(node), node);
-            DomBridge.SetParent(newNode, DomBridge.ParentEl(node));
+            // Single canonical insert of the fresh split node as next sibling (the prior SetParent
+            // appended it at the end first, then InsertChildAt re-moved it — spurious records).
             DomBridge.InsertChildAt(DomBridge.ParentEl(node), idx + 1, newNode);
         }
 
