@@ -663,6 +663,9 @@ internal abstract partial class CssBoxProperties
     public string Content { get; set; } = "normal";
     public string Display { get; set; } = "inline";
     public string Direction { get; set; } = "ltr";
+    // CSS Basic UI 'appearance'. Defaults to "auto" so a UA-styled control (e.g. a list box) keeps its
+    // native rendering unless the author opts out with 'appearance: none'.
+    public string Appearance { get; set; } = "auto";
     public string EmptyCells { get; set; } = "show";
     public string CaptionSide { get; set; } = "top";
     public string Float { get; set; } = "none";

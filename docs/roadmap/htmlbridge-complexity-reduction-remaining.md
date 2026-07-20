@@ -182,20 +182,31 @@ Exit criteria:
   `(56,117,215)`, alternating rows `(247,247,247)`, chrome `(220,220,220)`). Push **403** → ships as
   `patches/0007-…patch`, pointer **unbumped**, working tree reverted. **Scope limitation:** the
   `appearance:none` variant needs a CSS `appearance` box property (a separate `Broiler.Layout` change), so the
-  fallback must stay for `appearance:none` selects until that lands. This is the last replaced-element native
-  pass — all of video/progress/meter/select now have native rendering (patches `0005`–`0007`), the iframe pass
-  is already upstream (`0004`).
+  fallback stays for `appearance:none` only until the box `appearance` property lands (P6.9, below, now done).
+  This is the last replaced-element native pass — all of video/progress/meter/select now have native rendering
+  (patches `0005`–`0007`), the iframe pass is already upstream (`0004`).
+
+- **P6.9 (2026-07-20) — `appearance` box property + `<select multiple appearance:none>` completed.** Added a
+  CSS `appearance` box property to **`Broiler.Layout`** (`CssBox.Appearance`, default `auto`, wired through
+  `CssUtils` get/set dispatch for `appearance`/`-webkit-appearance`; the `SharedRendererCascade` populates it
+  like any other longhand). `Broiler.Layout` is a **directory in this repo, not a submodule**, so this is a
+  direct main-repo change (no patch) — additive, `Broiler.Layout` builds and the CSS/render sanity suites stay
+  green. Patch `0007` was then extended to branch `CorrectSelectMultipleBoxes` on the box's `Appearance`:
+  `appearance:none` drops the scrollbar chrome, uses a white field and a lighter `#9a9a9a` border, matching the
+  fallback's non-native variant. **Verified via render probes**: `appearance:auto` keeps the chrome strip
+  (528 px) and grey field; `appearance:none` drops the chrome entirely (0 px) and uses white. Patch `0007`
+  regenerated to include this; `<select multiple>` native rendering now covers both appearance modes.
 
 - **Remaining for Phase 6 — Concern 2 native migration + project deletion.** With native rendering written for
-  every replaced element, the residue is: (a) **pointer bumps** for `patches/0005`–`0007` (submodule-push
-  authorization — out of session scope) so `ReplaceVideo`/`ReplaceProgressLike`/`ReplaceSelectMultiple` (and
-  the now-redundant `StripIframeContent`, `0004` already applied) can drop from `HtmlPostProcessor`; (b) a
-  small `Broiler.Layout` `appearance` box property so `<select multiple appearance:none>` also goes native;
-  (c) the protective `StripScriptTags` and the test-harness-only shims (`StripHiddenTestArtifacts`,
-  `StripObjectContent`, `RewriteRootSelector`) relocated to test support once the reftest gate can validate;
-  then the emptied `Broiler.HtmlBridge.Rendering` project is deleted. Per the disposition, `HtmlPostProcessor`
-  must **not** be moved wholesale to rename it; the migration is behavioural. The native-rendering *authoring*
-  is done; the remaining steps are push-authorization and test-harness relocation, not new rendering code.
+  every replaced element **and both `<select>` appearance modes**, the residue is: (a) **pointer bumps** for
+  `patches/0005`–`0007` (submodule-push authorization — out of session scope) so
+  `ReplaceVideo`/`ReplaceProgressLike`/`ReplaceSelectMultiple` (and the now-redundant `StripIframeContent`,
+  `0004` already applied) can drop from `HtmlPostProcessor`; (b) the protective `StripScriptTags` and the
+  test-harness-only shims (`StripHiddenTestArtifacts`, `StripObjectContent`, `RewriteRootSelector`) relocated
+  to test support once the reftest gate can validate; then the emptied `Broiler.HtmlBridge.Rendering` project
+  is deleted. Per the disposition, `HtmlPostProcessor` must **not** be moved wholesale to rename it; the
+  migration is behavioural. **All native-rendering authoring is done**; the remaining steps are
+  push-authorization and test-harness relocation, not new rendering code.
 
 ### Phase 7 - isolate loading, security and browsing-context policy
 
