@@ -653,16 +653,6 @@ public class CaptureService
     }
 
     /// <summary>
-    /// Strips CSS <c>background</c> declarations that reference
-    /// <c>data:</c> URI images.
-    /// Delegates to <see cref="HtmlPostProcessor.StripCssDataUriBackgrounds"/>.
-    /// </summary>
-    internal static string StripCssDataUriBackgrounds(string html)
-    {
-        return HtmlPostProcessor.StripCssDataUriBackgrounds(html);
-    }
-
-    /// <summary>
     /// Replaces the fallback content of every <c>&lt;iframe&gt;</c> element
     /// with an empty body.
     /// Delegates to <see cref="HtmlPostProcessor.StripIframeContent"/>.
@@ -690,17 +680,6 @@ public class CaptureService
     internal static string StripHiddenTestArtifacts(string html)
     {
         return HtmlPostProcessor.StripHiddenTestArtifacts(html);
-    }
-
-    /// <summary>
-    /// Strips all <c>&lt;table&gt;…&lt;/table&gt;</c> elements.
-    /// Intended for Acid3-specific post-processing only — structural tables
-    /// in other pages (e.g. Acid2) must be preserved.
-    /// Delegates to <see cref="HtmlPostProcessor.StripTables"/>.
-    /// </summary>
-    internal static string StripTables(string html)
-    {
-        return HtmlPostProcessor.StripTables(html);
     }
 
     /// <summary>

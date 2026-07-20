@@ -132,15 +132,27 @@ Exit criteria:
   public Canvas types (`CanvasRenderingContext2D`/`CanvasDrawCommand`/`CanvasDrawCommandType`) — regenerated
   so the assembly's now-empty public surface is the baseline.
 
-- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** After `patches/0004` lands,
-  the still-outstanding workarounds live in the test-harness profile: the Acid/WPT strips
-  (`StripHiddenTestArtifacts`, `StripCssDataUriBackgrounds`, `StripObjectContent`, `StripTables`,
-  `StripForms`) plus the now-proven-redundant `StripScriptTags`/`RewriteRootSelector`. These are relocated
-  to test support (or retired once native behaviour covers them — largely `Broiler.HTML`/`Broiler.CSS`,
-  **submodule-push-gated → patch workflow**, needing the Acid/WPT pixel reftest gate to validate). Per the
-  disposition, `HtmlPostProcessor` must **not** be moved wholesale to rename it; the migration is
-  behavioural. Once the test-harness profile's remaining transforms are relocated to test support, the
-  Rendering project (then empty) is deleted.
+- **P6.5 (2026-07-20) — Concern 2, dead-shim removal.** Consumer analysis showed three of the
+  `HtmlPostProcessor` Acid-shim transforms had **no live callers**: `StripForms` (never referenced) and
+  `StripTables` / `StripCssDataUriBackgrounds` (only their `CaptureService` delegators existed, and nothing
+  called those — `Acid3RegressionTests` uses `StripObjectContent`/`StripScriptTags`/`StripIframeContent`/
+  `StripHiddenTestArtifacts` but not these). Render probes corroborated that the renderer no longer paints
+  empty `<form>`/`<table>` as visible blocks. Removed the three methods, their regexes
+  (`FormPattern`/`TablePattern`/`CssDataUriBgPattern`), and the two dead `CaptureService` delegators;
+  refreshed the stale "intentionally NOT applied" notes. Pure dead-code deletion — builds green;
+  `Acid3RegressionTests` + guards/profile/native suites green (no public-API change: all internal).
+
+- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** The live transforms still in
+  `HtmlPostProcessor` are: the production/harness replaced-element passes (`StripScriptTags` [protective],
+  `StripIframeContent` [pending `patches/0004`], `ReplaceVideo`/`ReplaceProgressLike`/`ReplaceSelectMultiple`
+  [legitimate fallbacks]) and the test-harness-only `StripHiddenTestArtifacts` (map/linktest/FAIL/red-bg
+  Acid scaffolding), `StripObjectContent`, and `RewriteRootSelector` (proven redundant, kept for the
+  harness pending reftest validation). Fully emptying the file to delete the Rendering project needs: (a)
+  `patches/0004` applied (drops `StripIframeContent`); (b) native replaced-element rendering for
+  video/progress/meter/select so those fallbacks retire (largely `Broiler.HTML`, **submodule-push-gated →
+  patch workflow**); and (c) relocating the residual Acid scaffolding shims to test support once the
+  reftest gate can validate. Per the disposition, `HtmlPostProcessor` must **not** be moved wholesale to
+  rename it; the migration is behavioural.
 
 ### Phase 7 - isolate loading, security and browsing-context policy
 
