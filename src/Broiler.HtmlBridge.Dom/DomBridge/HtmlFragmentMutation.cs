@@ -37,35 +37,14 @@ public sealed partial class DomBridge
 
     private void NormalizeNode(DomElement node)
     {
-        for (var index = 0; index < node.ChildNodes.Count;)
-        {
-            var child = ChildAt(node, index);
-            if (!IsText(child))
-            {
-                // Recurse into element children (a comment has no text children to merge).
-                if (child is DomElement childElement)
-                    NormalizeNode(childElement);
-                index++;
-                continue;
-            }
-
-            var mergedText = BridgeText(child);
-            var nextIndex = index + 1;
-            while (nextIndex < node.ChildNodes.Count && IsText(ChildAt(node, nextIndex)))
-            {
-                mergedText += BridgeText(ChildAt(node, nextIndex));
-                RemoveChildAt(node, nextIndex);
-            }
-
-            if (mergedText.Length == 0)
-            {
-                RemoveChildAt(node, index);
-                continue;
-            }
-
-            SetCharacterData(child, mergedText);
-            index++;
-        }
+        // Phase 4 (item 5): delegate text-node coalescing to canonical DomNode.Normalize(). Its
+        // internal RemoveChild / Data-set operations publish canonical DomDocument.Mutated records,
+        // which now drive the bridge's MutationObserver / Range / NodeIterator (mutation-consolidation
+        // steps 1-2) — so normalize's removals adjust ranges/iterators and deliver observer records
+        // exactly as the former hand-rolled loop did. The one bridge-only side effect canonical has
+        // no equivalent for is the style-scope invalidation, applied once for the normalized subtree.
+        node.Normalize();
+        InvalidateStyleScope(node);
     }
 
     private void RemoveChildAt(DomElement parent, int index)

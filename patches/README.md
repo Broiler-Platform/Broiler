@@ -24,6 +24,32 @@ SHA (so it would not compile against the pinned clone on CI).
 
 ---
 
+## 0003 — `Broiler.DOM`: `DomNode.Normalize()` fires one `characterData` record per text run
+
+**Target:** `Broiler.DOM` (`Broiler.Dom/DomNode.cs`).
+**Depends on:** nothing.
+
+**What it does.** DOM Standard §4.4 `normalize` replaces a Text node's data with the
+concatenation of its contiguous exclusive Text siblings' data in a single "replace data" step, so
+a `characterData` MutationObserver observes **one** record per contiguous text run. Canonical
+`DomNode.Normalize()` did `text.Data += next.Data` per merged sibling, publishing one CharacterData
+record per merge step. The patch concatenates into a `StringBuilder` and sets `Data` once. Final
+tree state is unchanged (the canonical `Normalize_Merges_Adjacent_Text_And_Removes_Empty_Text`
+test still passes); only the mutation-record granularity is corrected.
+
+**Why it's a patch.** The `Broiler.DOM` push returned **403** (submodule remote outside the
+session's GitHub scope), so per `CLAUDE.md` it ships as
+`patches/0003-dom-normalize-single-characterdata-record.patch` with the submodule pointer left
+**unbumped**.
+
+**Main-repo dependency (already landed, works either way).** The bridge's
+`DomBridge.NormalizeNode` (`HtmlFragmentMutation.cs`) now delegates to `node.Normalize()` (Phase 4
+item 5, mutation-consolidation step 3). That delegation compiles and behaves correctly against the
+**pinned** canonical — the only difference until this patch lands is that a `characterData`
+observer sees one record per merged sibling instead of one per run during `normalize()` (a rare
+edge; no test asserts the granularity). Once applied and the pointer bumped, canonical matches the
+bridge's former hand-rolled one-record-per-run behaviour exactly.
+
 ## 0002 — `Broiler.DOM`: make `DomNodeCollectionExtensions` public
 
 **Target:** `Broiler.DOM` (`Broiler.Dom/DomNode.cs`).

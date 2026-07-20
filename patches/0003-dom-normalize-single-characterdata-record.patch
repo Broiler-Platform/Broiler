@@ -1,0 +1,49 @@
+From d31cf8ed4859277c0ed372c0098c24d2d3f1d1e4 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 20 Jul 2026 08:50:58 +0000
+Subject: [PATCH] DomNode.Normalize(): one characterData record per contiguous
+ text run
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+DOM Standard §4.4 normalize replaces a Text node's data with the concatenation of its
+contiguous exclusive Text siblings' data in a single 'replace data' step, so a
+characterData MutationObserver observes one record per run. The prior loop did
+text.Data += next.Data per sibling, publishing one CharacterData record per merge step.
+Concatenate into a StringBuilder and set Data once; final tree state is unchanged.
+---
+ Broiler.Dom/DomNode.cs | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/Broiler.Dom/DomNode.cs b/Broiler.Dom/DomNode.cs
+index b4d8fee..c4183fa 100644
+--- a/Broiler.Dom/DomNode.cs
++++ b/Broiler.Dom/DomNode.cs
+@@ -315,12 +315,22 @@ public abstract class DomNode
+         {
+             if (_children[index] is DomText text)
+             {
++                // DOM §4.4 "normalize": concatenate the node's contiguous exclusive Text siblings'
++                // data and set the node's data ONCE, so a characterData observer sees a single
++                // record per contiguous text run (not one per merged sibling). The following Text
++                // siblings are then removed. (Previously `text.Data += next.Data` per sibling, which
++                // published one CharacterData record for each merge step.)
++                System.Text.StringBuilder? merged = null;
+                 while (index + 1 < _children.Count && _children[index + 1] is DomText next)
+                 {
+-                    text.Data += next.Data;
++                    merged ??= new System.Text.StringBuilder(text.Data);
++                    merged.Append(next.Data);
+                     RemoveChild(next);
+                 }
+ 
++                if (merged is not null)
++                    text.Data = merged.ToString();
++
+                 if (text.Data.Length == 0)
+                 {
+                     RemoveChild(text);
+-- 
+2.43.0
+
