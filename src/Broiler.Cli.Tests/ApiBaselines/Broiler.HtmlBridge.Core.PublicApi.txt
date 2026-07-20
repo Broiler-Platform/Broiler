@@ -55,6 +55,7 @@ TYPE Broiler.HtmlBridge.Scripting.ContentSecurityPolicy
   method Broiler.HtmlBridge.Scripting.ContentSecurityPolicy FromHtml(System.String)
   method System.Boolean AffectsStyles()
   method System.Boolean AllowsExternalScript(System.String, System.String, System.String)
+  method System.Boolean AllowsExternalStyle(System.String, System.String, System.String)
   method System.Boolean AllowsInlineEventHandler(System.String)
   method System.Boolean AllowsInlineScript(System.String, System.String)
   method System.Boolean AllowsInlineStyleAttribute()

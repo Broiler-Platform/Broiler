@@ -400,7 +400,7 @@ internal sealed class MessagingBinding(IMessagingHost host, EventTargetRegistry 
                 return origin;
 
             if (Uri.TryCreate(href, UriKind.Absolute, out var hrefUri))
-                return $"{hrefUri.Scheme}://{(hrefUri.IsDefaultPort ? hrefUri.Host : $"{hrefUri.Host}:{hrefUri.Port}")}";
+                return Scripting.Origin.Of(hrefUri);
         }
 
         return string.Empty;

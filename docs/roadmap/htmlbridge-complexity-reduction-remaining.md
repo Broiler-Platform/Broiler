@@ -1,8 +1,16 @@
 # HtmlBridge complexity-reduction — remaining phases
 
-Status: Phase 6 in progress (concerns 1 & 3 delivered); Phases 7–8 proposed
+Status: **Phase 6 native-rendering migration complete** (all three concerns delivered; submodule
+patches `0004`–`0007` applied upstream and the `Broiler.HTML` pointer bumped to `5c16c12`; the
+`HtmlPostProcessor` video/progress/meter/select fallbacks are dropped) — only the terminal
+`Broiler.HtmlBridge.Rendering` project deletion remains, gated on relocating the test-harness shims
+behind the WPT pixel reftest gate. **Phase 7 items 1–5 complete** (CSP split, script descriptors,
+loader/`UrlResolver`/`Origin` consolidation, external-stylesheet CSP, and host-layer CSP enforcement) **and
+item 6's static import/export module graph linked and executing** (P7.17); the remaining item-6 tail is the
+engine-coupled part — live cyclic bindings, `import.meta`, top-level-await-as-async, dynamic `import()`, and
+event-loop ordering. **Phase 8 proposed.**
 
-This document tracks the **not-yet-delivered** phases of the HtmlBridge
+This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
 isolating loading / security / browsing-context policy (Phase 7), and
 simplifying Core and Scripting before reconsidering assemblies (Phase 8).
@@ -143,7 +151,10 @@ Exit criteria:
   `Acid3RegressionTests` + guards/profile/native suites green (no public-API change: all internal).
 
 - **P6.6 (2026-07-20) — Concern 2, native-behaviour migration: `<video>` replaced-element handling
-  (submodule patch `0005`, pending).** Native replacement for `HtmlPostProcessor.ReplaceVideoWithPlaceholder`
+  (submodule patch `0005`, applied upstream).** **Update:** patch `0005` was pushed to `Broiler.HTML`
+  (`5561eb0`, contained in the pinned `5c16c12`) and the pointer bumped, so
+  `HtmlPostProcessor.ReplaceVideoWithPlaceholder` has been **dropped** — the renderer boxes `<video>`
+  natively. Original authoring note follows. Native replacement for `HtmlPostProcessor.ReplaceVideoWithPlaceholder`
   (which string-rewrites `<video>…</video>` into a black `<div>` at its width/height or 300×150). Added a
   post-cascade `CorrectVideoBoxes` pass in `Broiler.HTML` (`DomParser`) — mirroring `CorrectIframeBoxes` — that
   makes a `<video>` box `inline-block`, sizes it (author CSS size wins; else the `width`/`height` presentation
@@ -160,7 +171,11 @@ Exit criteria:
   removal is unblocked; `patches/README.md` corrected accordingly.
 
 - **P6.7 (2026-07-20) — Concern 2, native-behaviour migration: `<progress>`/`<meter>` replaced-element
-  handling (submodule patch `0006`, pending).** Native replacement for
+  handling (submodule patch `0006`, applied upstream).** **Update:** patch `0006` was pushed to
+  `Broiler.HTML` (`444cace`, contained in the pinned `5c16c12`) and the pointer bumped, so
+  `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder` has been **dropped** (native coverage:
+  `FormControlRenderTests.Meter_NativeRender_Follows_WritingMode_And_Direction`). Original authoring note
+  follows. Native replacement for
   `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder` (which string-rewrites the elements into a styled
   `<div>` track + fill). Added a post-cascade `CorrectProgressBoxes` pass in `Broiler.HTML` (`DomParser`) that
   renders each as a bordered `inline-block` track (1px `#767676`, bg `#f0f0f0`/`#e6e6e6`, `120×16` or `16×120`
@@ -173,7 +188,11 @@ Exit criteria:
   is the one remaining replaced-element fallback.
 
 - **P6.8 (2026-07-20) — Concern 2, native-behaviour migration: `<select multiple>` replaced-element handling
-  (submodule patch `0007`, pending, stacks on `0006`).** Native replacement (native-appearance case) for
+  (submodule patch `0007`, applied upstream, stacks on `0006`).** **Update:** patch `0007` was pushed to
+  `Broiler.HTML` (`5c16c12`, the pinned pointer) and the pointer bumped, so
+  `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder` has been **dropped** (both appearance modes render
+  natively; the string-rewrite unit test was retired in favour of the WPT/Acid reftest gate). Original
+  authoring note follows. Native replacement (native-appearance case) for
   `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder`. Added a post-cascade `CorrectSelectMultipleBoxes`
   pass in `Broiler.HTML` (`DomParser`) rendering the control as an `inline-block` list box: one 16px row track
   per visible option (`size` clamped 2..8, default 4), first row `#3875d7` selection highlight, alternating
@@ -197,16 +216,20 @@ Exit criteria:
   (528 px) and grey field; `appearance:none` drops the chrome entirely (0 px) and uses white. Patch `0007`
   regenerated to include this; `<select multiple>` native rendering now covers both appearance modes.
 
-- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** With native rendering written for
-  every replaced element **and both `<select>` appearance modes**, the residue is: (a) **pointer bumps** for
-  `patches/0005`–`0007` (submodule-push authorization — out of session scope) so
-  `ReplaceVideo`/`ReplaceProgressLike`/`ReplaceSelectMultiple` (and the now-redundant `StripIframeContent`,
-  `0004` already applied) can drop from `HtmlPostProcessor`; (b) the protective `StripScriptTags` and the
-  test-harness-only shims (`StripHiddenTestArtifacts`, `StripObjectContent`, `RewriteRootSelector`) relocated
-  to test support once the reftest gate can validate; then the emptied `Broiler.HtmlBridge.Rendering` project
-  is deleted. Per the disposition, `HtmlPostProcessor` must **not** be moved wholesale to rename it; the
-  migration is behavioural. **All native-rendering authoring is done**; the remaining steps are
-  push-authorization and test-harness relocation, not new rendering code.
+- **Remaining for Phase 6 — Concern 2 project deletion only.** The native migration is **done and shipped**:
+  patches `0004`–`0007` are applied upstream, the `Broiler.HTML` pointer is bumped to `5c16c12`, and the
+  `ReplaceVideo`/`ReplaceProgressLike`/`ReplaceSelectMultiple` fallbacks (and their exclusive
+  helpers/patterns) have been **dropped** from `HtmlPostProcessor` — the renderer now boxes every replaced
+  element natively (both `<select>` appearance modes). The residue is: (a) `StripIframeContent` is now a
+  redundant belt-and-suspenders strip (`0004`'s native `CorrectIframeBoxes` is pinned) whose removal is
+  **unblocked** but deliberately deferred to keep changes focused and because it touches the WPT render
+  harness path (pixel-reftest-gated, not validatable in a bare container); (b) the protective `StripScriptTags`
+  and the test-harness-only shims (`StripHiddenTestArtifacts`, `StripObjectContent`, `RewriteRootSelector`)
+  relocated to test support once the reftest gate can validate; then the emptied `Broiler.HtmlBridge.Rendering`
+  project (still consumed by `Broiler.Browser.Core`/`Broiler.Cli`/`Broiler.Wpt`) is deleted. Per the
+  disposition, `HtmlPostProcessor` must **not** be moved wholesale to rename it; the migration is behavioural.
+  **All native-rendering authoring is done and merged**; the terminal step is test-harness relocation +
+  project deletion, both gated on the WPT pixel reftest gate — not new rendering code.
 
 ### Phase 7 - isolate loading, security and browsing-context policy
 
@@ -461,18 +484,84 @@ Exit criteria:
   CSP and giving the WPT runner the same `bridge.Csp`-driven path are follow-ups, but DOM/CSS never seeing CSP
   and every execution path delivering authorised inline-style content is done.
 
-- **Remaining for Phase 7.** Still open: item 6 (rest) — the deepest part of module loading beyond P7.12/P7.13: the
-  **import/export module graph** (specifier resolution, linking, dedup of *dependencies* via the module map,
-  cyclic handling), `import.meta`/top-level-`await`, and moving module ordering into the real browser **event
-  loop** (rather than the current deferred-bucket approximation). Fetching + inline/data/file execution +
-  URL dedup are done (P7.12–P7.13); the graph/linker and event-loop integration are the substantial
-  remainder. These and item 5 are larger or WPT-reftest-sensitive.
-  Item 1 (CSP split), item 3 (script descriptors) and item 4 (loader/resolver consolidation) are **done**:
-  the file/http text dispatch (P7.3–P7.4), one shared URL resolver across all five named consumers —
-  script/CSP (P7.6), frames (P7.7) and fetch/XHR (P7.9) — and the sub-resource file/local reads (P7.8) all now
-  live behind the loader/`UrlResolver`, so no feature callback constructs an `HttpClient` or inlines a
-  `file`/`data`-URI/`File.*` switch for the text-load paths. The one remaining item-4-adjacent cleanup is
-  unifying the *origin* helpers (same-origin/origin-extraction), tracked as a separate scoped step.
+- **P7.15 (2026-07-20) — item 4 complete: unify the origin helpers behind one `Origin` primitive.** The
+  `scheme://host[:port]` origin serialization was copy-pasted in **five** places and the scheme+host+port
+  comparison in **two**: `MessagingBinding.GetWindowOrigin` (`postMessage` target-origin delivery),
+  `DomBridge.Attach` (`_pageOrigin`/`_pageHost`), `SubWindowBinding` (the iframe `Location`
+  `origin`/`host` projections), `Utilities.IsCrossOrigin` (cross-origin check), and
+  `CspSourceMatching.IsSameOrigin` (CSP `'self'` match). Added an internal `Origin`
+  (`Broiler.HtmlBridge.Core/Scripting/Origin.cs`, alongside `UrlResolver`) with three primitives —
+  `Of(Uri)` (origin serialization, default port omitted), `HostOf(Uri)` (the `Location.host` form), and
+  `SchemeHostPortEquals(Uri, Uri)` (the origin-equality primitive) — and routed all five/two sites through
+  it. **Behaviour-preserving:** the serialization is byte-identical across all sites and the compare
+  primitive is identical in `IsCrossOrigin`/`IsSameOrigin`, so each caller keeps its own surrounding policy
+  (which of `about:blank`/`data:`/`file:` inherit the embedding origin, and the null-page handling) — only
+  the shared primitive is consolidated. `Origin` is `internal` in Core, visible to Dom via
+  `InternalsVisibleTo`, so **no public-API change**. New `OriginTests` (4) pin the serialization / host form
+  / scheme+host+port equality / case-insensitivity; the CSP / messaging / sub-window / sub-resource suites
+  stay green (the same 3 `HttpSubResource` relative-iframe/WPT-root failures are pre-existing network-env
+  failures, identical on the `2b33fe6` baseline). This closes the "one URL resolution/**origin**
+  implementation shared by script, CSS, fetch, XHR and frames" exit criterion's origin half, so **item 4 is
+  now fully done**.
+
+- **P7.16 (2026-07-20) — item 5 complete: external-stylesheet (`<link rel=stylesheet>`) CSP gating.** P7.14
+  centralised *inline* style CSP into the bridge, but the **external**-stylesheet load path
+  (`DomBridge.FetchExternalStylesheet`, reached from computed-style building) consulted **no** CSP at all —
+  a `style-src`-blocked `<link>` href was still fetched and applied. Added
+  `ContentSecurityPolicy.AllowsExternalStyle(styleUrl, pageUrl, nonce)` — the style analogue of
+  `AllowsExternalScript`, applying the same source-token matching (`*`, `'self'` via the shared
+  `CspSourceMatching`/`Origin`, scheme source, absolute host source) plus a `<link>` nonce over the
+  `style-src-elem` → `style-src` → `default-src` fallback, but **not** `'unsafe-inline'` (irrelevant to a
+  fetched URL) nor `'strict-dynamic'` (script-only). Gated the fetch at its call site
+  (`GetStyleElementSourceText`) via a new `IsExternalStyleAllowedByCsp` helper, so DOM/CSS never fetch or
+  apply a blocked external stylesheet — the item-5 rule ("CSP stays in the host layer; DOM and CSS receive
+  already-authorised content") now holds for external styles too. New `ContentSecurityPolicyTests` (4) pin
+  `'none'`/`'self'`/host/scheme/nonce matching and the `style-src-elem`/`default-src` fallback. `AllowsExternalStyle`
+  is public on `ContentSecurityPolicy` → **Core public-API baseline regenerated** (adds the one method);
+  CSP / origin / resolver / snapshot suites green. With this, **item 5 is done** (the WPT runner sharing the
+  same `bridge.Csp`-driven path remains a harness follow-up, not a DOM/CSS-visibility gap).
+
+- **P7.17 (2026-07-20) — item 6 (major slice): the ES module import/export graph + linker.** Extended module
+  handling from "run an isolated inline module body" (P7.12/P7.13) to a real **linked import graph**.
+  Engine-capability audit first: `Broiler.JS` *parses* `import`/`export` but has **no drivable module records**
+  — the compiler desugars static import/export into CommonJS-style ops keyed on magic scope vars that exist
+  only when a body is compiled with the module arg list (via `JSModuleContext`, which needs the **`internal`**
+  `CoreScript.AllowTopLevelAwaitScope`). Driving the engine's lowering therefore needs a `Broiler.JS` change
+  (submodule, push-gated) and cannot ship on CI now. So the graph is linked at the **bridge layer** (main-repo,
+  CI-landable) by a source-to-source transform the existing `JSContext.Eval` path runs:
+  - `EsModuleScanner` — a string/template/comment/regex-aware scanner that finds a module's **top-level**
+    static `import`/`export` statements only (never one inside a string, comment, `obj.export`, `exports.x`,
+    or a nested scope; `import(...)`/`import.meta` are left as expressions). Any unrecognised/malformed form
+    marks the module unsupported so the linker leaves it as-is — the feature is strictly **additive**.
+  - `EsModuleLinker` — rewrites each module into a strict IIFE wired to an idempotent runtime registry: it
+    registers its exports object under its key *before* running (so a cycle sees the in-progress object), reads
+    imports from the registry, and publishes exports. Supported forms: default/named(+`as`)/namespace/side-effect
+    imports; `export` declarations, export lists, `export default`, and re-exports (`export {…} from`,
+    `export *`, `export * as`). Bindings are snapshots (namespace imports are live references) — the one
+    spec-fidelity caveat, matching the engine's own non-live desugaring.
+  - `ModuleGraphLoader` — from the document's module roots, resolves each specifier (shared `UrlResolver`,
+    relative to the importing module), fetches (CSP-gated, same authorised path as classic scripts), dedups by
+    resolved URL, orders the graph **dependency-first** (cycle-safe post-order), and renders the ordered linked
+    programs. `ScriptExtractionService.ExtractAll` now feeds its authorised module roots to the loader and
+    returns the linked graph in `ModuleScripts`; the existing deferred-bucket consumers
+    (`RenderingPipeline`, `DomBridge.ExecuteSubDocumentScripts`) run them in list order unchanged.
+    New `EsModuleGraphTests` (16) drive real graphs through a live `JSContext` — named/default/namespace/aliased
+    imports, `export`/re-export/`export *`, diamond dedup (shared module evaluated once), cycles, side-effect
+    imports, scope isolation, scanner robustness (strings/comments/dynamic-import not mis-transformed),
+    unsupported-form fallback, and a 3-module disk-backed graph through `ExtractAll` — all green. New syntax
+    types are `internal` → **no public-API change**; the existing `ModuleScriptSliceTests` (10) stay green.
+
+- **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17 the static import/export graph is
+  linked and executed. What remains is the engine-coupled tail, deliberately deferred because it needs
+  `Broiler.JS` (submodule, push-authorization-gated) or is architecturally larger: **live bindings across
+  cycles** (the bridge linker uses snapshot semantics — matching the engine's own desugaring — so a value
+  read across a cycle before its exporter finishes is stale), **`import.meta`** beyond leaving it inert,
+  **top-level `await`** as genuinely async (the transform is synchronous; a TLA module falls back), **dynamic
+  `import()`** wired to the graph via the engine's `HostImportModule` hook, and moving module ordering into the
+  real browser **event loop** rather than the deferred-bucket approximation. The cleanest long-term path for
+  these is to drive the engine's own module lowering (expose a public module-compile entry / make
+  `CoreScript.AllowTopLevelAwaitScope` public) via a `Broiler.JS` patch, then have the bridge supply the
+  URL-based loader — captured here as the follow-up seam.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 

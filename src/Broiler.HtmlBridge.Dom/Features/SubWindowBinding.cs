@@ -63,12 +63,12 @@ internal sealed class SubWindowBinding(
         if (Uri.TryCreate(locationHref, UriKind.Absolute, out var locationUri))
         {
             iframeLocation.FastAddValue((KeyString)"protocol", new JSString(locationUri.Scheme + ":"), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"host", new JSString(locationUri.IsDefaultPort ? locationUri.Host : $"{locationUri.Host}:{locationUri.Port}"), JSPropertyAttributes.EnumerableConfigurableValue);
+            iframeLocation.FastAddValue((KeyString)"host", new JSString(Scripting.Origin.HostOf(locationUri)), JSPropertyAttributes.EnumerableConfigurableValue);
             iframeLocation.FastAddValue((KeyString)"hostname", new JSString(locationUri.Host), JSPropertyAttributes.EnumerableConfigurableValue);
             iframeLocation.FastAddValue((KeyString)"pathname", new JSString(locationUri.AbsolutePath), JSPropertyAttributes.EnumerableConfigurableValue);
             iframeLocation.FastAddValue((KeyString)"search", new JSString(locationUri.Query), JSPropertyAttributes.EnumerableConfigurableValue);
             iframeLocation.FastAddValue((KeyString)"hash", new JSString(locationUri.Fragment), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"origin", new JSString($"{locationUri.Scheme}://{(locationUri.IsDefaultPort ? locationUri.Host : $"{locationUri.Host}:{locationUri.Port}")}"), JSPropertyAttributes.EnumerableConfigurableValue);
+            iframeLocation.FastAddValue((KeyString)"origin", new JSString(Scripting.Origin.Of(locationUri)), JSPropertyAttributes.EnumerableConfigurableValue);
         }
         else
         {

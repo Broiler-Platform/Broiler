@@ -9,10 +9,11 @@ namespace Broiler.HtmlBridge.Scripting;
 /// <c>this</c> is <c>undefined</c> (a strict function invoked without a receiver) as in a module.
 /// </summary>
 /// <remarks>
-/// This is deliberately a first slice: it does not provide <c>import</c>/<c>export</c>, <c>import.meta</c>
-/// or top-level <c>await</c>. A wrapped module that uses those raises a syntax/runtime error at execution
-/// (surfaced to the caller's logger) rather than being silently skipped — full module-graph loading is a
-/// later slice.
+/// This wrapper handles a module with no <c>import</c>/<c>export</c>. Modules that use them are linked by
+/// the <see cref="ModuleGraphLoader"/> (resolve + fetch + dedup + dependency-first order + import/export
+/// rewrite); this wrapper is the loader's <b>fallback</b> for a module whose syntax the scanner cannot
+/// confidently transform (destructuring exports, top-level <c>await</c>) — the module then runs as-is and
+/// any unsupported construct surfaces its error at execution rather than being silently skipped.
 /// </remarks>
 public static class ModuleScriptWrapper
 {

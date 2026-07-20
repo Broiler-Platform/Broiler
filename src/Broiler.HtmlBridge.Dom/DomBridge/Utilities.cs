@@ -201,10 +201,8 @@ public sealed partial class DomBridge
         if (string.Equals(targetUri.Scheme, "file", StringComparison.OrdinalIgnoreCase)) return false;
         if (string.IsNullOrWhiteSpace(pageUrl)) return false;
         if (!Uri.TryCreate(pageUrl, UriKind.Absolute, out var pageUri)) return false;
-        // Same-origin: same scheme + host + port
-        return !string.Equals(targetUri.Scheme, pageUri.Scheme, StringComparison.OrdinalIgnoreCase) ||
-               !string.Equals(targetUri.Host, pageUri.Host, StringComparison.OrdinalIgnoreCase) ||
-               targetUri.Port != pageUri.Port;
+        // Same-origin: same scheme + host + port (shared origin primitive)
+        return !Scripting.Origin.SchemeHostPortEquals(targetUri, pageUri);
     }
 
     private static string NormalizeWptPlaceholderUrl(string url)
