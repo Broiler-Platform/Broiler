@@ -1,6 +1,6 @@
 # HtmlBridge complexity-reduction — remaining phases
 
-Status: proposed (not yet started)
+Status: Phase 6 in progress (concerns 1 & 3 delivered); Phases 7–8 proposed
 
 This document tracks the **not-yet-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -43,6 +43,45 @@ Exit criteria:
 - Render preparation never mutates the live script-visible DOM.
 - Production browsing does not apply Acid/WPT-specific transforms.
 - Canvas commands are either rendered and bounded or are not recorded.
+
+#### Delivered increments
+
+- **Concern 1 — `SharedLayoutGeometryProvider` (already dissolved).** The end state is in place: the
+  geometry provider moved behind `ILayoutView`, implemented by `HeadlessLayoutView` in
+  `Broiler.HTML.Headless`, with the bridge's `DomBridge/SharedLayoutGeometry.cs` seam. No
+  `SharedLayoutGeometryProvider` type remains in production (only the historical test name persists), and
+  the Rendering project no longer contains it.
+
+- **P6.1 (2026-07-20) — Concern 3, Canvas: internalized + unused command storage removed.** The
+  `canvas.getContext("2d")` binding's `CanvasRenderingContext2D` recorded every drawing call into a
+  growing `List<CanvasDrawCommand>` that **no renderer ever read** — the context lived only inside the
+  `BuildCanvas2DContext` JS closures, and no code path retrieved a canvas element's commands to paint
+  them (unbounded dead storage). Per the exit criterion "Canvas commands are either rendered and bounded
+  or are not recorded", the recorder and its `CanvasDrawCommand` / `CanvasDrawCommandType` DTOs were
+  deleted and the type internalized into the Canvas binding (`Broiler.HtmlBridge.Dom`,
+  `DomBridge/CanvasRenderingContext2D.cs`, now `internal`). It keeps only the script-observable drawing
+  state (styles + the `save`/`restore` state stack); the pure drawing methods stay callable no-ops so the
+  JS API is unchanged. `CanvasCommandRecorder.cs` is removed from the Rendering project and the
+  `Broiler.HtmlBridge.Dom → Broiler.HtmlBridge.Rendering` project reference is dropped (Dom used Rendering
+  only for Canvas); `Broiler.Browser.Core` — which consumed `HtmlPostProcessor` transitively through that
+  edge — now references Rendering directly. New `CanvasContextBindingTests` (5) pin the observable
+  behaviour (context object, style round-trip, save/restore stack, no-op draws don't throw); guard suites
+  green. Since a headless canvas is never painted, the disposition's conditional end state (a real
+  Broiler.Graphics display list "if a renderer consumes it") does not apply.
+
+- **Remaining for Phase 6 — Concern 2, `HtmlPostProcessor` (the substantive part).** After P6.1 the
+  Rendering project holds only `HtmlPostProcessor.cs`, so deleting the project is gated on relocating it.
+  It is a ~660-line regex HTML-string rewriter whose `Process()` pipeline is applied in **production
+  browsing** (`BrowserApp`) and CLI capture (`CaptureService`), not only WPT/Acid, and it mixes
+  production-legitimate passes with Acid/WPT-specific transforms (`StripHiddenTestArtifacts`,
+  `RewriteRootSelector`, the `FailDiv`/`Linktest`/`RemoveLastChildTest` patterns, …). Closing the two
+  outstanding exit criteria — "render preparation never mutates the live script-visible DOM" and
+  "production browsing does not apply Acid/WPT-specific transforms" — requires (a) splitting the
+  production subset from the test-only transforms so production callers stop applying the latter, and
+  (b) replacing each remaining workaround with native HTML/Layout behavior (largely `Broiler.HTML` /
+  `Broiler.CSS`, i.e. **submodule-push-gated → patch workflow**). Per the disposition, `HtmlPostProcessor`
+  must **not** be moved wholesale to rename it; the migration is behavioural. Then the Rendering project
+  is deleted.
 
 ### Phase 7 - isolate loading, security and browsing-context policy
 
