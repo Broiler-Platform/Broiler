@@ -208,14 +208,26 @@ Exit criteria:
   items 4 (loader) and 6 (module event loop) consume. Core public-API baseline regenerated; extraction +
   CSP + snapshot suites green.
 
+- **P7.3 (2026-07-20) — item 4 (partial): consolidate the file/http dispatch into the loader.** The
+  `ResourceLoader` (P2.6) only wrapped HTTP; the file-vs-http *switch* still lived inline in feature
+  callbacks — exactly the "direct file/http switch in a feature callback" the exit criterion forbids. Added
+  `ResourceLoader.LoadText(url)` which owns the dispatch policy in one place (a `file://` URL reads from
+  disk, `http(s)` goes through the shared client, everything else → `null`; I/O exceptions propagate so the
+  caller logs with its own context). Routed `DomBridge.FetchExternalStylesheet` (`Css.cs`) through it,
+  deleting its inline `Uri`/`File.Exists`/`File.ReadAllText`/`GetStringAsync` branch. New
+  `ResourceLoaderTests` (2) cover the file-read and null-for-missing/relative/unsupported-scheme paths
+  (deterministic, no network). `ResourceLoader` is internal → no public-API change; CSS/stylesheet + loader
+  suites green (the one failure, `HttpClientMigrationTests.StylesheetLoadHandler_Uses_HttpClient`, is a
+  pre-existing environmental failure — identical on the `6a19eeb` baseline).
+
 - **Remaining for Phase 7.** Still open: item 1's URL/origin-context extraction (`ResolveUri`/`IsSameOrigin`/
   `MatchesAbsoluteSource` still live inside the policy); item 2 (replace the `CspMetaDiscovery` /
   `ScriptExtractionService` **regex** HTML discovery with `Broiler.Dom.Html` parser output — now localised
-  behind `FindPolicyContent` and `ExtractAll`); item 4 (route `ScriptExtractionService.FetchExternalScript`'s
-  file/data/HTTP switch — and `CaptureService`'s duplicate copy + the remaining feature-callback I/O —
-  through the injected `ResourceLoader`; the new descriptors carry the `Url`/`Kind` the loader needs); items
-  5–6 (host-layer CSP enforcement; execute `IsModule` descriptors in the event loop instead of skipping
-  them). These are all main-repo and validatable here.
+  behind `FindPolicyContent` and `ExtractAll`); item 4 (rest) — route the richer
+  `SubDocuments.TryFetchSubResource` data/file/http+MIME/WPT switch and `ScriptExtractionService`/
+  `CaptureService` `FetchExternalScript` (a duplicated file/http switch) through the loader, extending
+  `LoadText` with a bytes/MIME variant; items 5–6 (host-layer CSP enforcement; execute `IsModule`
+  descriptors in the event loop instead of skipping them). These are all main-repo and validatable here.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 
