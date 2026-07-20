@@ -342,9 +342,40 @@ Exit criteria:
   2 is now done for both discovery sites (CSP-meta P7.10, scripts P7.11); full WPT-reftest confirmation
   remains the standing gate for the render-path scripts as for prior increments.
 
-- **Remaining for Phase 7.** Still open: items 5–6 (host-layer CSP enforcement so DOM/CSS receive
-  already-authorised content; execute `IsModule` descriptors in the event loop instead of skipping them — a
-  substantial module-loading feature). Items 5–6 and the parser piece are larger or WPT-reftest-sensitive.
+- **P7.12 (2026-07-20) — item 6 (first slice): module map + inline-module execution.** Recognised
+  `<script type="module">` scripts were *silently dropped* by the `ExtractAll` pipeline (recorded in a
+  descriptor but absent from every execution bucket). First slice, three parts:
+  - **Module map.** New `ModuleMap` / `ModuleMapEntry` (Core): the ordered registry of every recognised
+    module in a document. `ExtractAll` records each one — inline modules keyed `inline:{order}` carrying
+    their authorised body, module scripts with a `src` keyed by URL and marked non-executable (fetch + import
+    graph is a later slice). So a module is no longer silently skipped — it is at minimum *mapped*.
+  - **Inline-module execution.** An authorised inline module body (passes the same CSP inline check as a
+    classic inline script) is exposed, in document order, in the new `ScriptExtractionResult.ModuleScripts`,
+    each wrapped by `ModuleScriptWrapper.WrapInlineModule` into a strict self-invoking function. That
+    reproduces the module top-level semantics that matter for an import-free module: strict mode, top-level
+    declarations kept out of the global object, and top-level `this === undefined` (unit-verified against a
+    live `JSContext`). `import`/`export`/`import.meta`/top-level-`await` are **not** supported — such a module
+    surfaces a syntax/runtime error at execution (caught + logged) instead of being dropped.
+  - **Wiring.** Module scripts are deferred, so the two `ExtractAll` consumers run them after the classic
+    deferred scripts: `RenderingPipeline` appends `ModuleScripts` to the deferred bucket, and the sub-document
+    executor (`DomBridge.ExecuteSubDocumentScripts`) runs them last. The CLI capture path
+    (`CaptureService.ExecuteScriptsWithDom`) has its own regex extraction and already ran modules as classic
+    inline scripts — left untouched, so Acid/CSS captures are unaffected.
+
+  New `ModuleScriptSliceTests` (8) pin the map/bucket population (inline executable + wrapped, external
+  mapped-not-executable, CSP-blocked mapped-not-executable, empty map) and the wrapper's module semantics;
+  the classic buckets and `ScriptDescriptor`s are unchanged (`ScriptDescriptorTests` green). Additive
+  public-surface change — Core API baseline regenerated (adds `ModuleMap`/`ModuleMapEntry`/`ModuleScriptWrapper`
+  and the two result properties; the old ctor stays source-compatible via optional params). Regression sweep
+  over the touched paths (`ScriptEngineExecute`/`SubDocument`/`SubWindow`/`ContentSecurityPolicy`/`SubResource`,
+  96 pass) shows only the 4 pre-existing geometry/serialization env failures, identical on baseline.
+
+- **Remaining for Phase 7.** Still open: item 5 (host-layer CSP enforcement so DOM/CSS receive
+  already-authorised content); item 6 (rest) — the substantial part of module loading beyond the P7.12 first
+  slice: **external/data-URI module fetching**, the **import/export module graph** (resolution, dedup via the
+  module map, cyclic handling), `import.meta`/top-level-`await`, and moving module ordering into the real
+  browser **event loop** (rather than the deferred-bucket approximation). These and item 5 are larger or
+  WPT-reftest-sensitive.
   Item 1 (CSP split), item 3 (script descriptors) and item 4 (loader/resolver consolidation) are **done**:
   the file/http text dispatch (P7.3–P7.4), one shared URL resolver across all five named consumers —
   script/CSP (P7.6), frames (P7.7) and fetch/XHR (P7.9) — and the sub-resource file/local reads (P7.8) all now

@@ -333,7 +333,8 @@ public sealed partial class DomBridge
         var extraction = ScriptExtractionService.ExtractAll(html, GetSubDocumentBaseUrl(containerElement));
         if (extraction.Scripts.Count == 0 &&
             extraction.AsyncScripts.Count == 0 &&
-            extraction.DeferredScripts.Count == 0)
+            extraction.DeferredScripts.Count == 0 &&
+            extraction.ModuleScripts.Count == 0)
             return;
 
         var subWindow = _subWindows.GetOrCreate(containerElement);
@@ -376,6 +377,22 @@ public sealed partial class DomBridge
                 {
                     RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ExecuteSubDocumentScripts",
                         $"Sub-document deferred script error: {ex.Message}", ex);
+                }
+            }
+
+            // Phase 7 item 6 (first slice): authorised inline module scripts, deferred, run last. Already
+            // wrapped for module semantics by ExtractAll; an unsupported (import/export) module surfaces its
+            // error here instead of being silently skipped.
+            foreach (var script in extraction.ModuleScripts)
+            {
+                try
+                {
+                    _jsContext.Eval(script);
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ExecuteSubDocumentScripts",
+                        $"Sub-document module script error: {ex.Message}", ex);
                 }
             }
         });

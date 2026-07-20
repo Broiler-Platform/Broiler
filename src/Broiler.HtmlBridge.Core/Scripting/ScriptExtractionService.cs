@@ -137,6 +137,8 @@ public static partial class ScriptExtractionService
         var deferredScripts = new List<string>();
         var asyncScripts = new List<string>();
         var descriptors = new List<ScriptDescriptor>();
+        var moduleScripts = new List<string>();
+        var moduleMap = new ModuleMap();
         var csp = ContentSecurityPolicy.FromHtml(html);
 
         var documentOrder = 0;
@@ -152,6 +154,26 @@ public static partial class ScriptExtractionService
                 : src.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ? ScriptSourceKind.DataUri
                 : ScriptSourceKind.External;
             var url = kind == ScriptSourceKind.Inline ? null : src;
+
+            // Phase 7 item 6 (first slice): record every recognised module in the module map so it is not
+            // silently dropped, and make an authorised inline module executable with module semantics. The
+            // classic execution buckets/descriptors below are unchanged (modules stay out of them).
+            if (isModule)
+            {
+                string? moduleSource = null;
+                if (kind == ScriptSourceKind.Inline)
+                {
+                    var moduleBody = tag.RawContent.Trim();
+                    if (!string.IsNullOrEmpty(moduleBody) && (csp == null || csp.AllowsInlineScript(nonce, moduleBody)))
+                    {
+                        moduleSource = moduleBody;
+                        moduleScripts.Add(ModuleScriptWrapper.WrapInlineModule(moduleBody));
+                    }
+                }
+
+                var moduleKey = kind == ScriptSourceKind.Inline ? $"inline:{documentOrder}" : url ?? $"module:{documentOrder}";
+                moduleMap.Add(new ModuleMapEntry(documentOrder, kind, moduleKey, url, moduleSource, IsExecutable: moduleSource != null));
+            }
 
             // Resolve the program text for the classic execution buckets. Module scripts are recorded in
             // the descriptor list but omitted from execution here (item 6 wires them into the event loop).
@@ -204,7 +226,7 @@ public static partial class ScriptExtractionService
                 scripts.Add(scriptContent);
         }
 
-        return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts, descriptors);
+        return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts, descriptors, moduleScripts, moduleMap);
     }
 
     /// <summary>
