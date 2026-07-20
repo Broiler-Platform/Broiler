@@ -40,8 +40,9 @@ public sealed class ModuleScriptSliceTests
     }
 
     [Fact]
-    public void External_Module_Is_Mapped_But_Not_Executable_In_This_Slice()
+    public void External_Module_With_Unresolvable_Url_Is_Mapped_But_Not_Executable()
     {
+        // No page URL → the relative src cannot be resolved/fetched → mapped but not executable.
         const string html = "<script type=\"module\" src=\"app.mjs\"></script>";
         var result = ScriptExtractionService.ExtractAll(html);
 
@@ -53,6 +54,73 @@ public sealed class ModuleScriptSliceTests
         Assert.Null(entry.Source);
         Assert.Equal("app.mjs", entry.Url);
         Assert.Equal("app.mjs", entry.Key);
+    }
+
+    [Fact]
+    public void DataUri_Module_Is_Decoded_And_Executable()
+    {
+        // Phase 7 item 6 slice 2: a data: URI module is decoded through the same path as a classic data script.
+        const string html = "<script type=\"module\" src=\"data:text/javascript,globalThis.y%20%3D%202%3B\"></script>";
+        var result = ScriptExtractionService.ExtractAll(html);
+
+        Assert.Single(result.ModuleScripts);
+        Assert.Contains("globalThis.y = 2;", result.ModuleScripts[0]);
+        var entry = result.ModuleMap.Entries[0];
+        Assert.Equal(ScriptSourceKind.DataUri, entry.Kind);
+        Assert.True(entry.IsExecutable);
+        Assert.Equal("globalThis.y = 2;", entry.Source);
+    }
+
+    [Fact]
+    public void External_File_Module_Is_Fetched_And_Executable()
+    {
+        // Phase 7 item 6 slice 2: an external module resolvable to a local file is fetched and executable.
+        var dir = Path.Combine(Path.GetTempPath(), $"broiler-mod-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        var modPath = Path.Combine(dir, "m.mjs");
+        File.WriteAllText(modPath, "globalThis.z = 3;");
+        try
+        {
+            var pageUrl = new Uri(Path.Combine(dir, "index.html")).AbsoluteUri;
+            var result = ScriptExtractionService.ExtractAll("<script type=\"module\" src=\"m.mjs\"></script>", pageUrl);
+
+            Assert.Single(result.ModuleScripts);
+            Assert.Contains("globalThis.z = 3;", result.ModuleScripts[0]);
+            var entry = result.ModuleMap.Entries[0];
+            Assert.Equal(ScriptSourceKind.External, entry.Kind);
+            Assert.True(entry.IsExecutable);
+            Assert.Equal("globalThis.z = 3;", entry.Source);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Repeated_Module_Url_Is_Fetched_And_Executed_Once_Module_Map_Dedup()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"broiler-mod-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "m.mjs"), "globalThis.z = 3;");
+        try
+        {
+            var pageUrl = new Uri(Path.Combine(dir, "index.html")).AbsoluteUri;
+            const string html =
+                "<script type=\"module\" src=\"m.mjs\"></script>" +
+                "<script type=\"module\" src=\"m.mjs\"></script>";
+            var result = ScriptExtractionService.ExtractAll(html, pageUrl);
+
+            // The module map holds the URL once and it is queued for execution once (evaluated once) ...
+            Assert.Single(result.ModuleScripts);
+            Assert.Equal(1, result.ModuleMap.Count);
+            // ... though both occurrences are still recorded in the per-element descriptor list.
+            Assert.Equal(2, result.Descriptors.Count(d => d.IsModule));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
     }
 
     [Fact]

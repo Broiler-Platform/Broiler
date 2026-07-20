@@ -370,12 +370,30 @@ Exit criteria:
   over the touched paths (`ScriptEngineExecute`/`SubDocument`/`SubWindow`/`ContentSecurityPolicy`/`SubResource`,
   96 pass) shows only the 4 pre-existing geometry/serialization env failures, identical on baseline.
 
+- **P7.13 (2026-07-20) — item 6 (second slice): external/data-URI module fetching + module-map dedup.**
+  Extended the P7.12 module handling so a module with a `src` is resolved through the **same authorised path
+  as a classic script**: a new `ResolveModuleSource` centralises the three cases — an inline body passes the
+  CSP inline check; a `data:` source passes the CSP external check then is `DecodeDataUri`-decoded; an
+  external source passes the CSP external check then is `FetchExternalScript`-fetched (file/http via the
+  shared `UrlResolver` + loader, exactly as classic external scripts). A resolved module source becomes an
+  executable wrapped entry in `ModuleScripts` and an `IsExecutable` map entry. Added **module-map dedup**: a
+  repeated module URL is fetched and evaluated once (`ModuleMap.TryGet` guards re-fetch/re-queue), matching
+  the browser module map's single-evaluation rule — while both occurrences still appear in the per-element
+  descriptor list. New `ModuleScriptSliceTests` cases (4) pin the data-URI decode, the file-module fetch, the
+  unresolvable-URL non-executable case, and the dedup (one `ModuleScripts` entry / one map entry for a
+  repeated URL, two module descriptors). No public-surface change (a private helper + logic only — API
+  snapshot unchanged); the extraction/CSP/descriptor/execution suites (33 + 57) stay green with only the 4
+  pre-existing geometry/serialization env failures. External *http* modules still hit the network like
+  classic external scripts (unreachable in the sandbox → non-executable there); the file/data paths are
+  deterministic.
+
 - **Remaining for Phase 7.** Still open: item 5 (host-layer CSP enforcement so DOM/CSS receive
-  already-authorised content); item 6 (rest) — the substantial part of module loading beyond the P7.12 first
-  slice: **external/data-URI module fetching**, the **import/export module graph** (resolution, dedup via the
-  module map, cyclic handling), `import.meta`/top-level-`await`, and moving module ordering into the real
-  browser **event loop** (rather than the deferred-bucket approximation). These and item 5 are larger or
-  WPT-reftest-sensitive.
+  already-authorised content); item 6 (rest) — the deepest part of module loading beyond P7.12/P7.13: the
+  **import/export module graph** (specifier resolution, linking, dedup of *dependencies* via the module map,
+  cyclic handling), `import.meta`/top-level-`await`, and moving module ordering into the real browser **event
+  loop** (rather than the current deferred-bucket approximation). Fetching + inline/data/file execution +
+  URL dedup are done (P7.12–P7.13); the graph/linker and event-loop integration are the substantial
+  remainder. These and item 5 are larger or WPT-reftest-sensitive.
   Item 1 (CSP split), item 3 (script descriptors) and item 4 (loader/resolver consolidation) are **done**:
   the file/http text dispatch (P7.3–P7.4), one shared URL resolver across all five named consumers —
   script/CSP (P7.6), frames (P7.7) and fetch/XHR (P7.9) — and the sub-resource file/local reads (P7.8) all now

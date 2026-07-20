@@ -87,6 +87,37 @@ public static partial class ScriptExtractionService
     private static string? GetSrc(IReadOnlyDictionary<string, string> attrs) =>
         attrs.TryGetValue("src", out var src) && !string.IsNullOrEmpty(src) ? src : null;
 
+    /// <summary>
+    /// Resolves an authorised module's program text (Phase 7 item 6), by the same rules a classic script
+    /// uses: an inline body must pass the CSP inline check; a <c>data:</c>/external source must pass the CSP
+    /// external check, then is decoded / fetched. Returns <c>null</c> when blocked, empty, or unresolvable.
+    /// </summary>
+    private static string? ResolveModuleSource(
+        ScriptSourceKind kind, string? url, string rawContent, string? nonce, ContentSecurityPolicy? csp, string? pageUrl)
+    {
+        switch (kind)
+        {
+            case ScriptSourceKind.Inline:
+                var body = rawContent.Trim();
+                return !string.IsNullOrEmpty(body) && (csp == null || csp.AllowsInlineScript(nonce, body)) ? body : null;
+
+            case ScriptSourceKind.DataUri:
+                if (csp != null && !csp.AllowsExternalScript(url!, pageUrl, nonce))
+                    return null;
+                var decoded = DecodeDataUri(url!);
+                return string.IsNullOrEmpty(decoded) ? null : decoded;
+
+            case ScriptSourceKind.External:
+                if (csp != null && !csp.AllowsExternalScript(url!, pageUrl, nonce))
+                    return null;
+                var fetched = FetchExternalScript(url!, pageUrl);
+                return string.IsNullOrEmpty(fetched) ? null : fetched;
+
+            default:
+                return null;
+        }
+    }
+
     /// <inheritdoc />
     public static IReadOnlyList<string> Extract(string html)
     {
@@ -155,24 +186,24 @@ public static partial class ScriptExtractionService
                 : ScriptSourceKind.External;
             var url = kind == ScriptSourceKind.Inline ? null : src;
 
-            // Phase 7 item 6 (first slice): record every recognised module in the module map so it is not
-            // silently dropped, and make an authorised inline module executable with module semantics. The
-            // classic execution buckets/descriptors below are unchanged (modules stay out of them).
+            // Phase 7 item 6: record every recognised module in the module map so it is not silently
+            // dropped, and make an authorised module executable with module semantics. Inline bodies
+            // (slice 1) plus data:/external sources (slice 2) are resolved through the same authorised
+            // decode/fetch path as classic scripts. The classic buckets/descriptors below are unchanged
+            // (modules stay out of them).
             if (isModule)
             {
-                string? moduleSource = null;
-                if (kind == ScriptSourceKind.Inline)
-                {
-                    var moduleBody = tag.RawContent.Trim();
-                    if (!string.IsNullOrEmpty(moduleBody) && (csp == null || csp.AllowsInlineScript(nonce, moduleBody)))
-                    {
-                        moduleSource = moduleBody;
-                        moduleScripts.Add(ModuleScriptWrapper.WrapInlineModule(moduleBody));
-                    }
-                }
-
                 var moduleKey = kind == ScriptSourceKind.Inline ? $"inline:{documentOrder}" : url ?? $"module:{documentOrder}";
-                moduleMap.Add(new ModuleMapEntry(documentOrder, kind, moduleKey, url, moduleSource, IsExecutable: moduleSource != null));
+
+                // Module-map dedup: a module URL is fetched and evaluated once. Inline modules get a unique
+                // per-occurrence key, so they never dedup; a repeated src module is recorded once.
+                if (kind == ScriptSourceKind.Inline || !moduleMap.TryGet(moduleKey, out _))
+                {
+                    var moduleSource = ResolveModuleSource(kind, url, tag.RawContent, nonce, csp, pageUrl);
+                    if (moduleSource != null)
+                        moduleScripts.Add(ModuleScriptWrapper.WrapInlineModule(moduleSource));
+                    moduleMap.Add(new ModuleMapEntry(documentOrder, kind, moduleKey, url, moduleSource, IsExecutable: moduleSource != null));
+                }
             }
 
             // Resolve the program text for the classic execution buckets. Module scripts are recorded in
