@@ -324,10 +324,25 @@ Exit criteria:
   nonce path still parses a raw attribute string). `ScriptExtractionService` discovery (the other half of
   item 2) is still regex — larger and WPT-sensitive, tracked below.
 
-- **Remaining for Phase 7.** Still open: item 2 (rest) — replace the `ScriptExtractionService` **regex**
-  `<script>` discovery with `Broiler.Dom.Html` parser output (localised behind `ExtractAll`; larger and
-  WPT-reftest-sensitive because script text extraction, ordering, module handling and trimming must stay
-  byte-identical — the CSP-meta half is done in P7.10); items 5–6 (host-layer CSP enforcement so DOM/CSS receive
+- **P7.11 (2026-07-20) — item 2 complete: `<script>` discovery is parser-backed.** Replaced the eight
+  `<script>`/attribute regexes in `ScriptExtractionService` with the shared `Broiler.Dom.Html` tokenizer. A
+  single `EnumerateScriptTags(html)` walks the token stream and pairs each `<script>` start tag with its raw
+  body (the tokenizer treats `<script>` as a raw-text element, so the body is taken verbatim and never
+  entity-decoded — byte-identical to the former `[\s\S]*?` capture + `.Trim()`); the flag/`src`/`nonce`
+  reads (`type=module`, `defer`, `async`, `src` data-vs-external, `nonce`) come from the parsed lower-cased
+  attribute map instead of per-tag regexes. `Extract`, `ExtractAll` and the `ScriptDescriptor` pipeline keep
+  identical shape — document order, CSP inline/external gating, data-URI decode and defer/async/regular
+  bucketing are unchanged. Parser-backed discovery also fixes the same class of regex defects as P7.10 (a
+  `<script>` literal inside a comment/another element's text is not mis-discovered; a `>` inside a quoted
+  attribute no longer truncates the start tag; an unterminated final `<script>` yields its body to EOF per
+  parser behaviour). Only `WhitespacePattern` (used by `DecodeDataUri`'s base64 fold-strip) remains a regex.
+  Validated with zero regressions across the extraction-exercising suites — `ScriptDescriptorTests` (4),
+  `ContentSecurityPolicyTests` (19), `CspMetaDiscoveryTests` (11) and `ScriptEngineExecuteTests` (53 pass;
+  the 4 failures are pre-existing geometry/serialization env failures, identical on the P7.10 baseline). Item
+  2 is now done for both discovery sites (CSP-meta P7.10, scripts P7.11); full WPT-reftest confirmation
+  remains the standing gate for the render-path scripts as for prior increments.
+
+- **Remaining for Phase 7.** Still open: items 5–6 (host-layer CSP enforcement so DOM/CSS receive
   already-authorised content; execute `IsModule` descriptors in the event loop instead of skipping them — a
   substantial module-loading feature). Items 5–6 and the parser piece are larger or WPT-reftest-sensitive.
   Item 1 (CSP split), item 3 (script descriptors) and item 4 (loader/resolver consolidation) are **done**:
