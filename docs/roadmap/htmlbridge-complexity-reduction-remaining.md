@@ -254,16 +254,36 @@ Exit criteria:
   frames" — script + CSP now share it; CSS/fetch/frames (the Dom `ResourceLoader`) adopt it when the
   cross-assembly loader seam lands.
 
+- **P7.7 (2026-07-20) — item 4 (partial): frames adopt the shared `UrlResolver`.** The nested-browsing-context
+  fetch path (`DomBridge/SubDocuments.cs`) carried its **own** copy of the "absolute stays / relative resolves
+  against base / else empty" resolution in two places — `ResolveSubResourceUrl` (the `ISubWindowHost` seam used
+  by `SubWindowBinding` to resolve an iframe/frame `src`) and the relative branch of `TryFetchSubResource`
+  (object/iframe sub-resource fetch). Both now delegate to the single `Broiler.HtmlBridge.Scripting.UrlResolver`
+  (already shared by script + CSP, P7.6) — `ResolveSubResourceUrl` collapses to
+  `UrlResolver.Resolve(url, baseUrl)?.AbsoluteUri ?? string.Empty` (byte-identical: the old code returned
+  `AbsoluteUri` for both the absolute and resolved cases), and `TryFetchSubResource` routes its *relative* case
+  through the resolver while deliberately keeping the **raw string** for an already-absolute URL so the
+  downstream `file://` / `http(s)` scheme checks and the WPT `web-platform.test` host mapping still see the
+  original prefix (changing it to a normalised `AbsoluteUri` there could shift casing/normalisation). Frames
+  now share the same URL resolution as script and CSP — three of the five consumers named in the exit criterion
+  ("one URL resolution/origin implementation shared by script, CSS, fetch, XHR and frames"). Behaviour-preserving
+  (`UrlResolver` is `internal` in Core, visible to Dom via `InternalsVisibleTo`, so no public-API change); the
+  43 `SubResourceFetching`/`SubWindowBinding`/`SubDocumentBinding`/`IframeElementBinding` sub-resource tests
+  pass unchanged and the CSP/resolver/descriptor guard suites (44) stay green (the 3 `HttpSubResource`
+  relative-iframe failures are pre-existing network-env failures — identical on the `e03b140` baseline).
+
 - **Remaining for Phase 7.** Still open: item 2 (replace the `CspMetaDiscovery` /
   `ScriptExtractionService` **regex** HTML discovery with `Broiler.Dom.Html` parser output — now localised
   behind `FindPolicyContent` and `ExtractAll`; has a cross-assembly wrinkle since discovery lives in Core
-  and the DOM parser is a submodule component); item 4 (rest) — route the richer
-  `SubDocuments.TryFetchSubResource` data/file/http+MIME/WPT switch through the loader (extend `LoadText`
-  with a bytes/MIME variant) and have the Dom `ResourceLoader` adopt the shared `UrlResolver`; items 5–6
-  (host-layer CSP enforcement so DOM/CSS receive already-authorised content; execute `IsModule` descriptors
-  in the event loop instead of skipping them — a substantial module-loading feature). Items 5–6 and the
-  `SubDocuments`/parser pieces are larger or WPT-reftest-sensitive; the CSP split (item 1), script
-  descriptors (item 3), and the loader/resolver consolidation (item 4 partial) are done.
+  and the DOM parser is a submodule component); item 4 (rest) — route the residual `file://` reads in
+  `SubDocuments.TryFetchSubResource` / `TryReadFileResource` / `TryReadLocalResource` through the loader
+  (extend `LoadText` with a bytes/MIME variant carrying the binary-null-content + extension-MIME policy); the
+  Dom URL *resolution* now shares `UrlResolver` (P7.7). Items 5–6 (host-layer CSP enforcement so DOM/CSS
+  receive already-authorised content; execute `IsModule` descriptors in the event loop instead of skipping
+  them — a substantial module-loading feature). Items 5–6 and the `SubDocuments`/parser pieces are larger or
+  WPT-reftest-sensitive; the CSP split (item 1), script descriptors (item 3), and the loader/resolver
+  consolidation (item 4 partial — file/http dispatch P7.3–P7.4, one shared resolver P7.6 across script/CSP and
+  P7.7 across frames) are done.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 

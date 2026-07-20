@@ -5,6 +5,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
+using Broiler.HtmlBridge.Scripting;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;
@@ -240,14 +241,10 @@ public sealed partial class DomBridge
         if (string.IsNullOrWhiteSpace(resourceUrl))
             return string.Empty;
 
-        if (Uri.TryCreate(resourceUrl, UriKind.Absolute, out var absoluteUri))
-            return absoluteUri.AbsoluteUri;
-
+        // Frames adopt the one shared resolver (Phase 7 item 4) — same absolute-stays / relative-resolves /
+        // else-empty behaviour that script and CSP already share via UrlResolver.
         var effectiveBaseUrl = string.IsNullOrWhiteSpace(baseUrl) ? _pageUrl : baseUrl;
-        return Uri.TryCreate(effectiveBaseUrl, UriKind.Absolute, out var baseUri) &&
-               Uri.TryCreate(baseUri, resourceUrl, out var resolved)
-            ? resolved.AbsoluteUri
-            : string.Empty;
+        return UrlResolver.Resolve(resourceUrl, effectiveBaseUrl)?.AbsoluteUri ?? string.Empty;
     }
 
     private bool TryGetWptRootDirectory(out string wptRoot)
@@ -502,14 +499,15 @@ public sealed partial class DomBridge
                 return localResult;
         }
 
-        // Resolve relative URL against page URL
+        // Resolve relative URL against page URL. An absolute URL keeps its raw string so the scheme
+        // checks below (file:// / http(s)) and WPT host mapping see the exact original prefix; only the
+        // relative case goes through the shared resolver (Phase 7 item 4).
         string resolvedUrl;
         if (Uri.TryCreate(resourceUrl, UriKind.Absolute, out _))
         {
             resolvedUrl = resourceUrl;
         }
-        else if (Uri.TryCreate(string.IsNullOrWhiteSpace(baseUrl) ? _pageUrl : baseUrl, UriKind.Absolute, out var baseUri) &&
-                 Uri.TryCreate(baseUri, resourceUrl, out var resolved))
+        else if (UrlResolver.Resolve(resourceUrl, string.IsNullOrWhiteSpace(baseUrl) ? _pageUrl : baseUrl) is { } resolved)
         {
             resolvedUrl = resolved.AbsoluteUri;
         }
