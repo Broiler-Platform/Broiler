@@ -5,8 +5,10 @@ patches `0004`–`0007` applied upstream and the `Broiler.HTML` pointer bumped t
 `HtmlPostProcessor` video/progress/meter/select fallbacks are dropped) — only the terminal
 `Broiler.HtmlBridge.Rendering` project deletion remains, gated on relocating the test-harness shims
 behind the WPT pixel reftest gate. **Phase 7 items 1–5 complete** (CSP split, script descriptors,
-loader/`UrlResolver`/`Origin` consolidation, external-stylesheet CSP, and host-layer CSP enforcement);
-the remainder is item 6's module import/export graph + event-loop integration. **Phase 8 proposed.**
+loader/`UrlResolver`/`Origin` consolidation, external-stylesheet CSP, and host-layer CSP enforcement) **and
+item 6's static import/export module graph linked and executing** (P7.17); the remaining item-6 tail is the
+engine-coupled part — live cyclic bindings, `import.meta`, top-level-await-as-async, dynamic `import()`, and
+event-loop ordering. **Phase 8 proposed.**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -519,18 +521,47 @@ Exit criteria:
   CSP / origin / resolver / snapshot suites green. With this, **item 5 is done** (the WPT runner sharing the
   same `bridge.Csp`-driven path remains a harness follow-up, not a DOM/CSS-visibility gap).
 
-- **Remaining for Phase 7 — item 6 module graph/linker only.** Items 1 (CSP split — P7.1/P7.5/P7.10/P7.11),
-  3 (script descriptors — P7.2), 4 (loader/`UrlResolver`/`Origin` consolidation — P7.3–P7.9, P7.15) and
-  5 (host-layer CSP incl. external stylesheets — P7.14, P7.16) are **done**: no feature callback constructs
-  an `HttpClient` or inlines a `file`/`data`-URI/`File.*` switch; one `UrlResolver` and one `Origin` primitive
-  are shared across all five named consumers (script, CSS, fetch, XHR, frames); and DOM/CSS never see CSP.
-  **Still open — item 6 (rest):** the deepest part of module loading beyond P7.12/P7.13 — the
-  **import/export module graph** (specifier resolution, linking, dedup of *dependencies* via the module map,
-  cyclic handling), `import.meta`/top-level-`await`, and moving module ordering into the real browser **event
-  loop** (rather than the current deferred-bucket approximation). Fetching + inline/data/file execution +
-  URL dedup are done (P7.12–P7.13); the graph/linker and event-loop integration are the substantial
-  remainder — a genuine module-system feature that reaches into the `Broiler.JS` engine (submodule,
-  push-authorization-gated) and is best delivered as its own multi-slice track, not folded into this pass.
+- **P7.17 (2026-07-20) — item 6 (major slice): the ES module import/export graph + linker.** Extended module
+  handling from "run an isolated inline module body" (P7.12/P7.13) to a real **linked import graph**.
+  Engine-capability audit first: `Broiler.JS` *parses* `import`/`export` but has **no drivable module records**
+  — the compiler desugars static import/export into CommonJS-style ops keyed on magic scope vars that exist
+  only when a body is compiled with the module arg list (via `JSModuleContext`, which needs the **`internal`**
+  `CoreScript.AllowTopLevelAwaitScope`). Driving the engine's lowering therefore needs a `Broiler.JS` change
+  (submodule, push-gated) and cannot ship on CI now. So the graph is linked at the **bridge layer** (main-repo,
+  CI-landable) by a source-to-source transform the existing `JSContext.Eval` path runs:
+  - `EsModuleScanner` — a string/template/comment/regex-aware scanner that finds a module's **top-level**
+    static `import`/`export` statements only (never one inside a string, comment, `obj.export`, `exports.x`,
+    or a nested scope; `import(...)`/`import.meta` are left as expressions). Any unrecognised/malformed form
+    marks the module unsupported so the linker leaves it as-is — the feature is strictly **additive**.
+  - `EsModuleLinker` — rewrites each module into a strict IIFE wired to an idempotent runtime registry: it
+    registers its exports object under its key *before* running (so a cycle sees the in-progress object), reads
+    imports from the registry, and publishes exports. Supported forms: default/named(+`as`)/namespace/side-effect
+    imports; `export` declarations, export lists, `export default`, and re-exports (`export {…} from`,
+    `export *`, `export * as`). Bindings are snapshots (namespace imports are live references) — the one
+    spec-fidelity caveat, matching the engine's own non-live desugaring.
+  - `ModuleGraphLoader` — from the document's module roots, resolves each specifier (shared `UrlResolver`,
+    relative to the importing module), fetches (CSP-gated, same authorised path as classic scripts), dedups by
+    resolved URL, orders the graph **dependency-first** (cycle-safe post-order), and renders the ordered linked
+    programs. `ScriptExtractionService.ExtractAll` now feeds its authorised module roots to the loader and
+    returns the linked graph in `ModuleScripts`; the existing deferred-bucket consumers
+    (`RenderingPipeline`, `DomBridge.ExecuteSubDocumentScripts`) run them in list order unchanged.
+    New `EsModuleGraphTests` (16) drive real graphs through a live `JSContext` — named/default/namespace/aliased
+    imports, `export`/re-export/`export *`, diamond dedup (shared module evaluated once), cycles, side-effect
+    imports, scope isolation, scanner robustness (strings/comments/dynamic-import not mis-transformed),
+    unsupported-form fallback, and a 3-module disk-backed graph through `ExtractAll` — all green. New syntax
+    types are `internal` → **no public-API change**; the existing `ModuleScriptSliceTests` (10) stay green.
+
+- **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17 the static import/export graph is
+  linked and executed. What remains is the engine-coupled tail, deliberately deferred because it needs
+  `Broiler.JS` (submodule, push-authorization-gated) or is architecturally larger: **live bindings across
+  cycles** (the bridge linker uses snapshot semantics — matching the engine's own desugaring — so a value
+  read across a cycle before its exporter finishes is stale), **`import.meta`** beyond leaving it inert,
+  **top-level `await`** as genuinely async (the transform is synchronous; a TLA module falls back), **dynamic
+  `import()`** wired to the graph via the engine's `HostImportModule` hook, and moving module ordering into the
+  real browser **event loop** rather than the deferred-bucket approximation. The cleanest long-term path for
+  these is to drive the engine's own module lowering (expose a public module-compile entry / make
+  `CoreScript.AllowTopLevelAwaitScope` public) via a `Broiler.JS` patch, then have the bridge supply the
+  URL-based loader — captured here as the follow-up seam.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 

@@ -34,10 +34,12 @@ public sealed record ScriptDescriptor(
 
 /// <summary>
 /// One entry in a document's <see cref="ModuleMap"/> (Phase 7 item 6): a recognised
-/// <c>&lt;script type="module"&gt;</c> keyed for the browser module system. Inline modules are keyed by a
-/// synthetic <c>inline:{order}</c> id and carry their authorised body in <see cref="Source"/>; module
-/// scripts with a <c>src</c> are recorded with their URL but not yet fetched (a later slice loads them),
-/// so their <see cref="Source"/> is <c>null</c> and <see cref="IsExecutable"/> is <c>false</c>.
+/// <c>&lt;script type="module"&gt;</c> root keyed for the browser module system. Inline modules are keyed by
+/// a synthetic <c>inline:{order}</c> id; module scripts with a <c>src</c> are keyed by URL. An authorised
+/// module carries its resolved body in <see cref="Source"/> with <see cref="IsExecutable"/> <c>true</c>; a
+/// module blocked by CSP or unresolvable has a <c>null</c> <see cref="Source"/> and is not executable. The
+/// map records the document's top-level module roots; the linked graph (roots + transitive dependencies)
+/// is in <see cref="ScriptExtractionResult.ModuleScripts"/>.
 /// </summary>
 public sealed record ModuleMapEntry(
     int DocumentOrder,
@@ -48,11 +50,11 @@ public sealed record ModuleMapEntry(
     bool IsExecutable);
 
 /// <summary>
-/// The document's module map (Phase 7 item 6, first slice): the registry of recognised
-/// <c>&lt;script type="module"&gt;</c> elements in document order, so a module is no longer silently
-/// dropped. Inline modules are executable now; external/data-URI module loading (fetch + import graph) is
-/// a later slice. Keyed by <see cref="ModuleMapEntry.Key"/> (an inline module's synthetic id or an
-/// external module's URL).
+/// The document's module map (Phase 7 item 6): the registry of recognised
+/// <c>&lt;script type="module"&gt;</c> roots in document order, so a module is never silently dropped.
+/// Inline, <c>data:</c> and external module roots are all resolved and, when authorised, linked into the
+/// executable graph. Keyed by <see cref="ModuleMapEntry.Key"/> (an inline module's synthetic id or a module
+/// URL).
 /// </summary>
 public sealed class ModuleMap
 {
@@ -106,11 +108,12 @@ public sealed class ScriptExtractionResult(
     public IReadOnlyList<ScriptDescriptor> Descriptors { get; } = descriptors ?? [];
 
     /// <summary>
-    /// Executable inline module bodies (Phase 7 item 6, first slice), in document order, each already
-    /// wrapped for module top-level semantics (strict mode, own scope) by
-    /// <see cref="ModuleScriptWrapper.WrapInlineModule"/>. Module scripts are deferred, so a consumer runs
-    /// these after the classic <see cref="DeferredScripts"/>. External/data-URI module loading is a later
-    /// slice, so those modules appear only in <see cref="ModuleMap"/>, not here.
+    /// The document's linked module graph (Phase 7 item 6) as executable programs in <b>dependency-first</b>
+    /// order — every module (each <c>&lt;script type="module"&gt;</c> root plus its transitively imported
+    /// dependencies) rewritten so its <c>import</c>/<c>export</c> statements read/write a shared runtime
+    /// registry, each in its own strict module scope. Module scripts are deferred, so a consumer runs these
+    /// after the classic <see cref="DeferredScripts"/>; running them in list order satisfies the graph's
+    /// evaluation order. A module whose syntax cannot be transformed runs as-is (fallback).
     /// </summary>
     public IReadOnlyList<string> ModuleScripts { get; } = moduleScripts ?? [];
 

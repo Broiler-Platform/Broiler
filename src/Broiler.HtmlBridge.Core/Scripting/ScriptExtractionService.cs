@@ -170,6 +170,8 @@ public static partial class ScriptExtractionService
         var descriptors = new List<ScriptDescriptor>();
         var moduleScripts = new List<string>();
         var moduleMap = new ModuleMap();
+        var moduleEntries = new List<ModuleGraphLoader.GraphModule>();
+        var moduleEntryKeys = new HashSet<string>(StringComparer.Ordinal);
         var csp = ContentSecurityPolicy.FromHtml(html);
 
         var documentOrder = 0;
@@ -187,10 +189,11 @@ public static partial class ScriptExtractionService
             var url = kind == ScriptSourceKind.Inline ? null : src;
 
             // Phase 7 item 6: record every recognised module in the module map so it is not silently
-            // dropped, and make an authorised module executable with module semantics. Inline bodies
-            // (slice 1) plus data:/external sources (slice 2) are resolved through the same authorised
-            // decode/fetch path as classic scripts. The classic buckets/descriptors below are unchanged
-            // (modules stay out of them).
+            // dropped, and collect the authorised top-level modules as roots of the import graph. Inline
+            // bodies plus data:/external sources are resolved through the same authorised decode/fetch path
+            // as classic scripts; the graph loader (below) then resolves+fetches their transitive imports,
+            // dedups, orders dependency-first, and links import/export. The classic buckets/descriptors
+            // below are unchanged (modules stay out of them).
             if (isModule)
             {
                 var moduleKey = kind == ScriptSourceKind.Inline ? $"inline:{documentOrder}" : url ?? $"module:{documentOrder}";
@@ -200,9 +203,22 @@ public static partial class ScriptExtractionService
                 if (kind == ScriptSourceKind.Inline || !moduleMap.TryGet(moduleKey, out _))
                 {
                     var moduleSource = ResolveModuleSource(kind, url, tag.RawContent, nonce, csp, pageUrl);
-                    if (moduleSource != null)
-                        moduleScripts.Add(ModuleScriptWrapper.WrapInlineModule(moduleSource));
                     moduleMap.Add(new ModuleMapEntry(documentOrder, kind, moduleKey, url, moduleSource, IsExecutable: moduleSource != null));
+
+                    if (moduleSource != null)
+                    {
+                        // The graph key must be the resolved absolute URL so a module's relative imports
+                        // resolve against it and repeated modules dedup; inline/data keep a synthetic/data key.
+                        var graphKey = kind switch
+                        {
+                            ScriptSourceKind.Inline => $"inline:{documentOrder}",
+                            ScriptSourceKind.DataUri => url!,
+                            _ => UrlResolver.Resolve(url!, pageUrl)?.AbsoluteUri ?? url!,
+                        };
+                        var baseUrl = kind == ScriptSourceKind.Inline ? pageUrl : graphKey;
+                        if (moduleEntryKeys.Add(graphKey))
+                            moduleEntries.Add(new ModuleGraphLoader.GraphModule(graphKey, moduleSource, baseUrl));
+                    }
                 }
             }
 
@@ -257,7 +273,47 @@ public static partial class ScriptExtractionService
                 scripts.Add(scriptContent);
         }
 
+        // Phase 7 item 6: build and link the module graph from the authorised top-level module roots.
+        // The loader resolves+fetches each transitive dependency (CSP-gated), dedups, orders the graph
+        // dependency-first, and renders each module to a linked plain-JS program the existing evaluator
+        // runs in order. A module whose syntax the scanner cannot transform falls back to running as-is.
+        if (moduleEntries.Count > 0)
+        {
+            var graph = ModuleGraphLoader.Load(moduleEntries,
+                (specifier, baseUrl) => ResolveDependencyModule(specifier, baseUrl, csp, pageUrl));
+            moduleScripts.AddRange(graph.Programs);
+        }
+
         return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts, descriptors, moduleScripts, moduleMap);
+    }
+
+    /// <summary>
+    /// Resolves and fetches one module-graph dependency (Phase 7 item 6): a <c>data:</c> specifier is
+    /// decoded; anything else is resolved against the importing module's base URL and fetched via the same
+    /// authorised path as a classic external script. Every fetch is CSP-gated (<c>script-src</c>). Returns
+    /// the resolved absolute key + source, or <c>null</c> when unresolvable, empty, or blocked.
+    /// </summary>
+    private static (string Key, string Source)? ResolveDependencyModule(
+        string specifier, string? baseUrl, ContentSecurityPolicy? csp, string? pageUrl)
+    {
+        if (specifier.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            if (csp != null && !csp.AllowsExternalScript(specifier, pageUrl, null))
+                return null;
+            var decoded = DecodeDataUri(specifier);
+            return string.IsNullOrEmpty(decoded) ? null : (specifier, decoded);
+        }
+
+        var resolved = UrlResolver.Resolve(specifier, baseUrl);
+        if (resolved == null)
+            return null;
+
+        var key = resolved.AbsoluteUri;
+        if (csp != null && !csp.AllowsExternalScript(key, pageUrl, null))
+            return null;
+
+        var source = FetchExternalScript(key, baseUrl);
+        return string.IsNullOrEmpty(source) ? null : (key, source);
     }
 
     /// <summary>

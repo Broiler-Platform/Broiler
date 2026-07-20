@@ -380,9 +380,9 @@ public sealed partial class DomBridge
                 }
             }
 
-            // Phase 7 item 6 (first slice): authorised inline module scripts, deferred, run last. Already
-            // wrapped for module semantics by ExtractAll; an unsupported (import/export) module surfaces its
-            // error here instead of being silently skipped.
+            // Phase 7 item 6: the linked module graph, deferred, runs last in dependency-first order.
+            // ExtractAll resolves+links import/export; an unsupported module falls back to running as-is and
+            // surfaces its error here instead of being silently skipped.
             foreach (var script in extraction.ModuleScripts)
             {
                 try

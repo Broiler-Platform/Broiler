@@ -32,8 +32,9 @@ public sealed class RenderingPipeline(
             ? result.Scripts
             : result.Scripts.Concat(result.AsyncScripts).ToArray();
 
-        // Module scripts are deferred (Phase 7 item 6, first slice): run authorised inline modules after
-        // the classic deferred scripts. They are already wrapped for module semantics by ExtractAll.
+        // Module scripts are deferred (Phase 7 item 6): run the linked module graph after the classic
+        // deferred scripts. ExtractAll returns the programs in dependency-first order, so running them in
+        // list order (appended after the classic deferred scripts) satisfies the graph's evaluation order.
         var deferred = result.ModuleScripts.Count == 0
             ? result.DeferredScripts
             : result.DeferredScripts.Concat(result.ModuleScripts).ToArray();
