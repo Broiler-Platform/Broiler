@@ -11,6 +11,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Dom.Runtime;
+using Broiler.HtmlBridge.Scripting;
 
 namespace Broiler.HtmlBridge.Dom.Features;
 
@@ -672,16 +673,11 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
             if (string.IsNullOrWhiteSpace(redirectUrl))
                 throw new JSException("Failed to execute 'redirect' on 'Response': Invalid URL");
 
-            if (Uri.TryCreate(redirectUrl, UriKind.Absolute, out var absoluteUri))
-                return absoluteUri.AbsoluteUri;
-
-            if (Uri.TryCreate(_host.PageUrl, UriKind.Absolute, out var baseUri) &&
-                Uri.TryCreate(baseUri, redirectUrl, out var resolvedUri))
-            {
-                return resolvedUri.AbsoluteUri;
-            }
-
-            throw new JSException("Failed to execute 'redirect' on 'Response': Invalid URL");
+            // fetch adopts the one shared resolver (Phase 7 item 4) — absolute stays, relative resolves
+            // against the page URL; an unresolvable URL is the spec's "Invalid URL" TypeError.
+            return (UrlResolver.Resolve(redirectUrl, _host.PageUrl)
+                    ?? throw new JSException("Failed to execute 'redirect' on 'Response': Invalid URL"))
+                .AbsoluteUri;
         }
         var formDataCtor = new JSFunction((in a) => CreateFormDataObject(a.Length > 0 ? a[0] : null), "FormData", 1);
         var headersCtor = new JSFunction((in a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);

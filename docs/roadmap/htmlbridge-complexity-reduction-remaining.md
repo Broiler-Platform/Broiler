@@ -292,6 +292,22 @@ Exit criteria:
   and the HTTP `GetAsync` (already the loader) + the WPT host→local-root mapping (test policy, correctly
   bridge-owned).
 
+- **P7.9 (2026-07-20) — item 4 (partial): fetch adopts the shared `UrlResolver`.** The fetch binding's one
+  inline C# URL resolution — `FetchBinding.ResolveResponseRedirectUrl` (the `Response.redirect(url, status)`
+  static: resolve the `Location` relative to the page URL) — carried its own copy of the "absolute stays /
+  relative resolves against base" pattern, throwing the spec's `TypeError` ("Invalid URL") on failure. It now
+  delegates to `UrlResolver.Resolve(redirectUrl, _host.PageUrl)`, mapping a `null` result to that same
+  `JSException`. (XHR needs no change — it is implemented in JS on top of `fetch` and stores its URL verbatim;
+  `CreateRequestObject` likewise stores the request URL as-is, so fetch's only resolution site is the redirect
+  helper.) Behaviour-preserving — the existing `Fetch_Response_Redirect_Static_Sets_Status_And_Location_Header`
+  test (`/next` → `file:///next` against `file:///test.html`) and the invalid-status guard pass unchanged; 117
+  fetch/network tests green (the 2 `bodyUsed`-reader failures are pre-existing, identical on the P7.8 baseline).
+  With this, **all five** consumers named in the exit criterion — script, CSS, fetch, XHR and frames — resolve
+  URLs through the single `UrlResolver`. The residual duplication is the *origin* concern
+  (`Utilities.IsCrossOrigin` same-origin compare, `MessagingBinding` origin extraction, `CspSourceMatching`
+  origin matching), which is a separate consolidation with different per-site semantics (e.g. `file://`
+  handling) and is deliberately left for a scoped origin-unification step.
+
 - **Remaining for Phase 7.** Still open: item 2 (replace the `CspMetaDiscovery` /
   `ScriptExtractionService` **regex** HTML discovery with `Broiler.Dom.Html` parser output — now localised
   behind `FindPolicyContent` and `ExtractAll`; has a cross-assembly wrinkle since discovery lives in Core
@@ -299,9 +315,11 @@ Exit criteria:
   already-authorised content; execute `IsModule` descriptors in the event loop instead of skipping them — a
   substantial module-loading feature). Items 5–6 and the parser piece are larger or WPT-reftest-sensitive.
   Item 1 (CSP split), item 3 (script descriptors) and item 4 (loader/resolver consolidation) are **done**:
-  the file/http text dispatch (P7.3–P7.4), one shared URL resolver across script/CSP (P7.6) and frames (P7.7),
-  and the sub-resource file/local reads (P7.8) all now live behind the loader/`UrlResolver`, so no feature
-  callback constructs an `HttpClient` or inlines a `file`/`data`-URI/`File.*` switch for the text-load paths.
+  the file/http text dispatch (P7.3–P7.4), one shared URL resolver across all five named consumers —
+  script/CSP (P7.6), frames (P7.7) and fetch/XHR (P7.9) — and the sub-resource file/local reads (P7.8) all now
+  live behind the loader/`UrlResolver`, so no feature callback constructs an `HttpClient` or inlines a
+  `file`/`data`-URI/`File.*` switch for the text-load paths. The one remaining item-4-adjacent cleanup is
+  unifying the *origin* helpers (same-origin/origin-extraction), tracked as a separate scoped step.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 
