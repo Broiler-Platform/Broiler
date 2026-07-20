@@ -14,9 +14,10 @@ namespace Broiler.HtmlBridge.Scripting;
 /// then leaves that module untransformed rather than emitting wrong code — so the feature is additive.
 /// </summary>
 /// <remarks>
-/// Deliberately out of scope (each marks the module unsupported, or is left as-is): destructuring exports
-/// (<c>export const { a } = o</c>), <c>import.meta</c> and dynamic <c>import(...)</c> at statement start
-/// (left untouched — they are expressions, not module statements), and top-level <c>await</c>.
+/// <c>import.meta</c> is recognised (at any depth) and its spans recorded for the linker to rewrite into a
+/// per-module meta object. Deliberately out of scope (each marks the module unsupported, or is left as-is):
+/// destructuring exports (<c>export const { a } = o</c>), dynamic <c>import(...)</c> (an engine-coupled
+/// expression, left untouched), and top-level <c>await</c>.
 /// </remarks>
 internal static class EsModuleScanner
 {
@@ -82,34 +83,41 @@ internal static class EsModuleScanner
             if (c is '(' or '[' or '{') { depth++; prevSignificant = c; i++; continue; }
             if (c is ')' or ']' or '}') { if (depth > 0) depth--; prevSignificant = c; i++; continue; }
 
-            // Only top-level import/export statements are module syntax.
-            if (depth == 0 && (c == 'i' || c == 'e') && prevSignificant != '.' &&
-                IsWordAt(source, i, out int wordEnd) is { } word &&
-                (word == "import" || word == "export") &&
+            // `import` — a statement only at top level, but `import.meta` and dynamic `import(...)` are
+            // expressions recognised at any bracket depth.
+            if (c == 'i' && prevSignificant != '.' &&
+                IsWordAt(source, i, out int importEnd) == "import" &&
                 (i == 0 || !IsIdentPart(source[i - 1])))
             {
-                if (word == "import")
+                int p = SkipTrivia(source, importEnd);
+                if (p < n && source[p] == '.')
                 {
-                    // Distinguish `import(...)` / `import.meta` (expressions) from an import statement.
-                    int p = SkipTrivia(source, wordEnd);
-                    if (p < n && (source[p] == '(' || source[p] == '.'))
+                    // import.meta (the only valid meta-property): record its span so the linker can replace
+                    // it with a synthesized per-module meta object.
+                    int metaStart = SkipTrivia(source, p + 1);
+                    if (StartsWord(source, metaStart, "meta"))
                     {
-                        // Dynamic import / import.meta — leave untouched, advance past the keyword.
-                        prevSignificant = 't';
-                        i = wordEnd;
+                        int metaEnd = metaStart + 4;
+                        syntax.ImportMetaSpans.Add((i, metaEnd - i));
+                        prevSignificant = 'a'; // ident char: a following '/' is division, '.' is member access
+                        i = metaEnd;
                         continue;
                     }
-                    if (!ParseImport(source, i, wordEnd, syntax, out i))
-                    {
-                        syntax.Supported = false;
-                        return syntax;
-                    }
-                    prevSignificant = ';';
+                    // import.<other> — not a standard meta-property; leave the keyword untouched.
+                    prevSignificant = 't';
+                    i = importEnd;
                     continue;
                 }
-                else // export
+                if (p < n && source[p] == '(')
                 {
-                    if (!ParseExport(source, i, wordEnd, syntax, out i))
+                    // Dynamic import(...) — an expression; left untouched (engine-coupled, tracked separately).
+                    prevSignificant = 't';
+                    i = importEnd;
+                    continue;
+                }
+                if (depth == 0)
+                {
+                    if (!ParseImport(source, i, importEnd, syntax, out i))
                     {
                         syntax.Supported = false;
                         return syntax;
@@ -117,6 +125,24 @@ internal static class EsModuleScanner
                     prevSignificant = ';';
                     continue;
                 }
+                // An `import` statement is invalid below top level; leave it (the module runs as-is).
+                prevSignificant = 't';
+                i = importEnd;
+                continue;
+            }
+
+            // Only top-level export statements are module syntax.
+            if (depth == 0 && c == 'e' && prevSignificant != '.' &&
+                IsWordAt(source, i, out int exportEnd) == "export" &&
+                (i == 0 || !IsIdentPart(source[i - 1])))
+            {
+                if (!ParseExport(source, i, exportEnd, syntax, out i))
+                {
+                    syntax.Supported = false;
+                    return syntax;
+                }
+                prevSignificant = ';';
+                continue;
             }
 
             prevSignificant = c;

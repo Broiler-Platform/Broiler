@@ -17,6 +17,9 @@ namespace Broiler.HtmlBridge.Scripting;
 /// populated exports object; the snapshot only differs from spec behaviour for a value reassigned after
 /// evaluation or read across a cycle. A namespace import (<c>import * as ns</c>) binds the exports object
 /// itself, so it does reflect later writes.</para>
+/// <para>Each <c>import.meta</c> occurrence is rewritten to a synthesized per-module object whose
+/// <c>url</c> is the module's registry key. Dynamic <c>import()</c> and live cross-cycle bindings remain
+/// engine-coupled and are tracked separately.</para>
 /// <para>The bootstrap program (<see cref="Bootstrap"/>) must run once before any module program.</para>
 /// </remarks>
 internal static class EsModuleLinker
@@ -125,6 +128,10 @@ internal static class EsModuleLinker
             }
         }
 
+        // import.meta → a synthesized per-module meta object (see the preamble below).
+        foreach (var (start, length) in syntax.ImportMetaSpans)
+            edits.Add(new Edit(start, length, "__brmeta"));
+
         edits.Sort((a, b) => a.Start.CompareTo(b.Start));
 
         var body = new StringBuilder(source.Length + 64);
@@ -145,6 +152,10 @@ internal static class EsModuleLinker
         program.Append(Bootstrap).Append('\n');
         program.Append("(function(){\"use strict\";\n");
         program.Append("var __E=globalThis.__brreg(").Append(JsString(moduleKey)).Append(");\n");
+        // import.meta: a fresh object per module. `url` is the module's registry key (its resolved URL, or
+        // the synthetic id for an inline module). Declared only when the module references import.meta.
+        if (syntax.ImportMetaSpans.Count > 0)
+            program.Append("var __brmeta={url:").Append(JsString(moduleKey)).Append("};\n");
         program.Append(body);
         program.Append('\n');
         program.Append(endAssigns);

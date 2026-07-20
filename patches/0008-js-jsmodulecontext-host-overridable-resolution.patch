@@ -1,0 +1,167 @@
+From a7de67605e219bcce04902af7e7968d4dfeee9f3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 20 Jul 2026 22:07:33 +0000
+Subject: [PATCH] JSModuleContext: host-overridable module resolution and
+ source read
+
+Make module resolution and source acquisition overridable so a non-filesystem
+host (e.g. a browser bridge resolving URLs against a base and fetching them
+under a content-security policy) can drive the existing module machinery
+instead of the built-in node_modules/File.Exists resolver:
+
+- Resolve(dirPath, relativePath): internal -> protected virtual.
+- Extract the module directory computation in LoadModuleAsync into a
+  GetModuleDirectory(fullPath) protected virtual (a URL host returns the
+  module's URL base so relative imports resolve as URLs, not filesystem paths).
+- Extract the StreamReader read in CompileModuleAsync into a
+  ReadModuleSourceAsync(module) protected virtual.
+
+Behaviour-preserving for the default filesystem context. New Modules.Tests case
+drives a URL entry + URL dependency entirely through the three seams (no
+filesystem), asserting resolution/fetch/execution.
+---
+ .../ModulesTests.cs                           | 57 +++++++++++++++++++
+ .../JSModuleContext.cs                        | 35 +++++++++---
+ 2 files changed, 85 insertions(+), 7 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Modules.Tests/ModulesTests.cs b/Broiler.JS/Broiler.JavaScript.Modules.Tests/ModulesTests.cs
+index 7087de1c..78e7d05e 100644
+--- a/Broiler.JS/Broiler.JavaScript.Modules.Tests/ModulesTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Modules.Tests/ModulesTests.cs
+@@ -1,3 +1,7 @@
++using System;
++using System.Collections.Generic;
++using System.IO;
++using System.Threading.Tasks;
+ using Broiler.JavaScript.Ast.Misc;
+ using Broiler.JavaScript.Runtime;
+ using Broiler.JavaScript.Storage;
+@@ -6,6 +10,59 @@ namespace Broiler.JavaScript.Modules.Tests;
+ 
+ public class ModulesTests
+ {
++    /// <summary>
++    /// A host that loads modules by URL from an in-memory map instead of the filesystem, driving the
++    /// <see cref="JSModuleContext"/> resolution/read seams (Resolve / GetModuleDirectory /
++    /// ReadModuleSourceAsync). This is the shape a browser bridge uses to resolve URLs against a base and
++    /// fetch them under a content-security policy while reusing the engine's real module compilation.
++    /// </summary>
++    private sealed class UrlModuleContext(Dictionary<string, string> files) : JSModuleContext
++    {
++        protected override string Resolve(string dirPath, string relativePath)
++        {
++            if (Uri.TryCreate(relativePath, UriKind.Absolute, out var abs))
++                return abs.AbsoluteUri;
++            return Uri.TryCreate(new Uri(dirPath), relativePath, out var rel) ? rel.AbsoluteUri : null;
++        }
++
++        // A module's own relative imports resolve against its full URL (URL relative-reference semantics),
++        // not a filesystem directory.
++        protected override string GetModuleDirectory(string fullPath) => fullPath;
++
++        protected override Task<string> ReadModuleSourceAsync(JSModule module) =>
++            Task.FromResult(files.TryGetValue(module.filePath, out var src)
++                ? src
++                : throw new FileNotFoundException(module.filePath));
++    }
++
++    [Fact]
++    public async Task HostUrlSeams_Resolve_Fetch_And_Execute_A_Url_Dependency()
++    {
++        // A URL entry imports a dependency living under a different sub-path; the specifier './lib/dep.js'
++        // must be resolved against the entry's URL base (Resolve, relative→absolute) and the dependency
++        // fetched from the in-memory store (ReadModuleSourceAsync) — no filesystem involved. This is the
++        // host seam a browser bridge needs to reuse the engine's module machinery over URLs/CSP fetch.
++        var files = new Dictionary<string, string>
++        {
++            ["file:///app/lib/dep.js"] =
++                "globalThis.ranDep = (globalThis.ranDep || 0) + 1;\n" +
++                "export const d = 7;",
++        };
++        using var ctx = new UrlModuleContext(files);
++
++        await ctx.RunScriptAsync(
++            "globalThis.ranMain = 1;\n" +
++            "import { d } from './lib/dep.js';",
++            "file:///app/main.js", uniqueModuleID: "file:///app/main.js");
++
++        // The entry ran, and its URL dependency was resolved + fetched through the seams and executed
++        // exactly once. (The static import *value* binding and nested/transitive async module ordering are
++        // separate, pre-existing engine concerns — see the module-graph linker in the HtmlBridge; here we
++        // validate only the host resolution/fetch/execution path these seams add.)
++        Assert.Equal(1.0, ctx.Eval("globalThis.ranMain|0").DoubleValue);
++        Assert.Equal(1.0, ctx.Eval("globalThis.ranDep|0").DoubleValue);
++    }
++
+     [Fact]
+     public void JSModuleContext_Create_Succeeds()
+     {
+diff --git a/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs b/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
+index c9536990..4fee8d14 100644
+--- a/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
++++ b/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
+@@ -76,7 +76,12 @@ public class JSModuleContext : JSContext
+ 
+     protected string[] extensions = [".js"];
+ 
+-    internal string Resolve(string dirPath, string relativePath)
++    /// <summary>
++    /// Resolves an import specifier to a module key. The default is a filesystem/node_modules resolution.
++    /// A host that loads modules over another scheme (e.g. a browser resolving URLs against a base and
++    /// fetching them) overrides this to return its own key form (typically an absolute URL).
++    /// </summary>
++    protected virtual string Resolve(string dirPath, string relativePath)
+     {
+         bool Exists(string folder, string file, out string path)
+         {
+@@ -297,7 +302,7 @@ public class JSModuleContext : JSContext
+         m = moduleCache.GetOrCreate(fullPath, () =>
+         {
+             var newModule = new JSModule(this, fullPath);
+-            var dirPath = Path.GetDirectoryName(fullPath);
++            var dirPath = GetModuleDirectory(fullPath);
+ 
+             newModule.Import = new JSFunction((in Arguments a) =>
+             {
+@@ -332,17 +337,33 @@ public class JSModuleContext : JSContext
+         return m.Exports;
+     }
+ 
++    /// <summary>
++    /// Returns the base directory a resolved module's own relative imports resolve against. The default is
++    /// the filesystem directory of <paramref name="fullPath"/>; a URL-loading host overrides this to return
++    /// the module URL's base so nested relative imports resolve as URLs rather than being mangled by
++    /// filesystem path semantics.
++    /// </summary>
++    protected virtual string GetModuleDirectory(string fullPath) => Path.GetDirectoryName(fullPath);
++
++    /// <summary>
++    /// Reads the source text of a resolved module whose <see cref="JSModule.Code"/> has not been supplied.
++    /// The default reads the file at <see cref="JSModule.filePath"/>; a host that fetches modules over
++    /// another transport (e.g. HTTP/data URLs under a content-security policy) overrides this.
++    /// </summary>
++    protected virtual async Task<string> ReadModuleSourceAsync(JSModule module)
++    {
++        using var reader = new StreamReader(module.filePath, Encoding.UTF8);
++        return await reader.ReadToEndAsync();
++    }
++
+     internal protected virtual async Task CompileModuleAsync(JSModule module)
+     {
+         // Console.WriteLine($"{DateTime.Now} - Compiling module {module.filePath}");
+         var filePath = module.filePath;
+ 
+-        // if this is a json file... then pad with module.exports = 
++        // if this is a json file... then pad with module.exports =
+         if (module.Code == null)
+-        {
+-            using var reader = new StreamReader(filePath, Encoding.UTF8);
+-            module.Code = await reader.ReadToEndAsync();
+-        }
++            module.Code = await ReadModuleSourceAsync(module);
+ 
+         var code = module.Code;
+ 
+-- 
+2.43.0
+

@@ -296,4 +296,65 @@ public sealed class EsModuleGraphTests
         catch { threw = true; }
         Assert.True(threw);
     }
+
+    [Fact]
+    public void Import_Meta_Url_Resolves_To_The_Module_Key()
+    {
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs", "globalThis.here = import.meta.url;", "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, []);
+        Assert.Equal("file:///app/main.mjs", Eval(ctx, "globalThis.here"));
+    }
+
+    [Fact]
+    public void Import_Meta_Works_Alongside_Static_Imports()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] = "export const answer = 42;",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { answer } from './util.mjs';\n" +
+                "globalThis.combo = answer + '@' + import.meta.url;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("42@file:///app/main.mjs", Eval(ctx, "globalThis.combo"));
+    }
+
+    [Fact]
+    public void Import_Meta_Is_Rewritten_Inside_A_Nested_Function_Scope()
+    {
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "function whereAmI(){ return import.meta.url; } globalThis.deep = whereAmI();",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, []);
+        Assert.Equal("file:///app/main.mjs", Eval(ctx, "globalThis.deep"));
+    }
+
+    [Fact]
+    public void Import_Meta_Text_In_A_String_Or_Comment_Is_Not_Rewritten()
+    {
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "// import.meta in a comment must be ignored\n" +
+                "globalThis.literal = 'import.meta'; globalThis.real = import.meta.url;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, []);
+        Assert.Equal("import.meta", Eval(ctx, "globalThis.literal")); // the string literal is untouched
+        Assert.Equal("file:///app/main.mjs", Eval(ctx, "globalThis.real"));
+    }
 }

@@ -69,11 +69,19 @@ internal sealed class EsModuleSyntax
     /// <summary>Top-level <c>export</c> statements in source order.</summary>
     public List<ModuleExport> Exports { get; } = [];
 
+    /// <summary>
+    /// Spans of every <c>import.meta</c> meta-property occurrence in the module (Phase 7 item 6). Each is
+    /// the <c>(Start, Length)</c> of the whole <c>import.meta</c> form so the linker can replace it with a
+    /// synthesized per-module meta object; <c>import.meta</c> is an expression (not a statement) and is
+    /// recognised at any bracket depth.
+    /// </summary>
+    public List<(int Start, int Length)> ImportMetaSpans { get; } = [];
+
     /// <summary>Whether every top-level import/export was recognised (so the transform is safe to apply).</summary>
     public bool Supported { get; internal set; } = true;
 
-    /// <summary>Whether the module has any static import/export at all (else it needs no linking).</summary>
-    public bool HasModuleSyntax => Imports.Count > 0 || Exports.Count > 0;
+    /// <summary>Whether the module has any static import/export or <c>import.meta</c> at all (else it needs no linking).</summary>
+    public bool HasModuleSyntax => Imports.Count > 0 || Exports.Count > 0 || ImportMetaSpans.Count > 0;
 
     /// <summary>The distinct import specifiers this module depends on, in first-seen order (imports then re-exports).</summary>
     public IReadOnlyList<string> Dependencies()

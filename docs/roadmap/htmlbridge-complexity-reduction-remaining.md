@@ -6,9 +6,12 @@ patches `0004`–`0007` applied upstream and the `Broiler.HTML` pointer bumped t
 `Broiler.HtmlBridge.Rendering` project deletion remains, gated on relocating the test-harness shims
 behind the WPT pixel reftest gate. **Phase 7 items 1–5 complete** (CSP split, script descriptors,
 loader/`UrlResolver`/`Origin` consolidation, external-stylesheet CSP, and host-layer CSP enforcement) **and
-item 6's static import/export module graph linked and executing** (P7.17); the remaining item-6 tail is the
-engine-coupled part — live cyclic bindings, `import.meta`, top-level-await-as-async, dynamic `import()`, and
-event-loop ordering. **Phase 8 proposed.**
+item 6's static import/export module graph linked and executing** (P7.17) **with `import.meta` handled at the
+bridge layer** (P7.18); the remaining item-6 tail is the engine-coupled part — live cyclic bindings,
+top-level-await-as-async, dynamic `import()`, and event-loop ordering. The `Broiler.JS` host-resolution seam
+for driving the engine's own module machinery ships as patch `0008` (P7.19), but the engine-driven path is
+**blocked below it** by the engine's own incomplete module execution (static-import value binding +
+nested-async ordering, reproduced on the stock engine). **Phase 8 proposed.**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -551,17 +554,46 @@ Exit criteria:
     unsupported-form fallback, and a 3-module disk-backed graph through `ExtractAll` — all green. New syntax
     types are `internal` → **no public-API change**; the existing `ModuleScriptSliceTests` (10) stay green.
 
-- **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17 the static import/export graph is
-  linked and executed. What remains is the engine-coupled tail, deliberately deferred because it needs
-  `Broiler.JS` (submodule, push-authorization-gated) or is architecturally larger: **live bindings across
-  cycles** (the bridge linker uses snapshot semantics — matching the engine's own desugaring — so a value
-  read across a cycle before its exporter finishes is stale), **`import.meta`** beyond leaving it inert,
-  **top-level `await`** as genuinely async (the transform is synchronous; a TLA module falls back), **dynamic
-  `import()`** wired to the graph via the engine's `HostImportModule` hook, and moving module ordering into the
-  real browser **event loop** rather than the deferred-bucket approximation. The cleanest long-term path for
-  these is to drive the engine's own module lowering (expose a public module-compile entry / make
-  `CoreScript.AllowTopLevelAwaitScope` public) via a `Broiler.JS` patch, then have the bridge supply the
-  URL-based loader — captured here as the follow-up seam.
+- **P7.18 (2026-07-20) — item 6: `import.meta` support (bridge linker).** `import.meta` was previously left
+  inert — the scanner advanced past the keyword and recorded nothing, so a module using `import.meta.url`
+  hit a syntax/reference error under the plain-`Eval` module path and failed (caught + logged). Delivered at
+  the bridge layer (main-repo, CI-landable, no engine dependency): `EsModuleScanner` now recognises
+  `import.meta` at **any** bracket depth (string/comment/regex/template-aware, so `"import.meta"` in a
+  literal or a `// import.meta` comment is untouched) and records each occurrence's span on a new
+  `EsModuleSyntax.ImportMetaSpans`; `EsModuleLinker` rewrites each span to a synthesized per-module object
+  `__brmeta` declared at the module IIFE top with `url` = the module's registry key (its resolved URL, or the
+  synthetic id for an inline module). Dynamic `import(...)` is still left as an expression (engine-coupled —
+  see below). New `EsModuleGraphTests` cases (4) drive `import.meta.url` through a live `JSContext`: as the
+  sole module syntax, alongside a static import, inside a nested function scope, and asserting the
+  string/comment literal is not rewritten. Additive, all `internal` → no public-API change; the module-graph
+  and descriptor suites stay green (33 pass).
+
+- **P7.19 (2026-07-20) — item 6 tail: engine host-resolution seam (`Broiler.JS` patch `0008`).** Toward
+  driving the engine's *own* module machinery (its `Broiler.JavaScript.Modules` system already compiles
+  modules with the ES-module arg list under `CoreScript.AllowTopLevelAwaitScope()`, so top-level `await` and
+  dynamic `import()` are supported there), the blocker was that its resolution is hard-wired to the
+  **filesystem**. Patch `0008` makes `JSModuleContext` host-overridable — `Resolve` becomes `protected
+  virtual`, and new `GetModuleDirectory` / `ReadModuleSourceAsync` seams let a subclass resolve URLs against a
+  base and fetch under CSP — validated by a `Modules.Tests` case that drives a URL entry + URL dependency with
+  no filesystem. **Push 403 → shipped as `patches/0008-…` with the pointer unbumped** (per `CLAUDE.md`).
+  However, validating the patch surfaced that the engine's module machinery is **incomplete beyond
+  resolution**: a static `import { x } from …` does **not** bind a value (the `yield import(...)` desugaring
+  resolves to `undefined`, reproduced on the **stock** filesystem context — independent of the seams), and
+  nested/transitive async module bodies do not run to completion under `RunScriptAsync`. So the engine-driven
+  path is blocked below the patch, and the bridge continues to use its own working `EsModuleLinker`.
+
+- **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17/P7.18 the static import/export graph
+  is linked and executed and `import.meta` is handled at the bridge layer. What remains is the engine-coupled
+  tail: **live bindings across cycles** (the bridge linker uses snapshot semantics — matching the engine's own
+  desugaring — so a value read across a cycle before its exporter finishes is stale), **top-level `await`** as
+  genuinely async (the bridge transform is synchronous; a TLA module falls back), **dynamic `import()`** wired
+  to the graph, and moving module ordering into the real browser **event loop** rather than the deferred-bucket
+  approximation. The intended path — drive the engine's own module lowering, for which the host-resolution seam
+  `0008` (P7.19) is the enabling `Broiler.JS` patch — is **blocked below that patch** by the engine's own
+  incomplete module execution (static-import value binding and nested-async ordering, both reproduced on the
+  stock engine). Closing this tail therefore requires either those deeper `Broiler.JS` engine fixes (submodule,
+  push-authorization-gated) or continued extension of the bridge-layer linker; both are tracked here as the
+  Phase 7 residue.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 

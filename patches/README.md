@@ -28,6 +28,7 @@ stacks on 0006** (they share `SetUniformBorder`/`ReadNumericAttribute`).
 | 0005 — render `<video>` as a black inline-block replaced box (hide fallback) | `Broiler.HTML` | **applied** — pushed as `5561eb0`; contained in the pinned `5c16c12` | **Done** — the pinned renderer paints `<video>` natively, so `HtmlPostProcessor.ReplaceVideoWithPlaceholder` (Phase 6 concern 2) was dropped. |
 | 0006 — render `<progress>`/`<meter>` as a native track with proportional fill | `Broiler.HTML` | **applied** — pushed as `444cace`; contained in the pinned `5c16c12` | **Done** — the pinned renderer paints `<progress>`/`<meter>` natively, so `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder` was dropped (native coverage: `FormControlRenderTests.Meter_NativeRender_Follows_WritingMode_And_Direction`). |
 | 0007 — render `<select multiple>` as a native list box (both appearance modes) | `Broiler.HTML` | **applied** — pushed as `5c16c12` (the pinned pointer); **stacks on 0006** | **Done** — the pinned renderer paints `<select multiple>` natively (both `appearance:auto`/`none`), so `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder` was dropped; the string-rewrite unit test was retired in favour of the WPT/Acid reftest gate. Reads the box's `Appearance` (the `appearance` box property landed in the main repo's `Broiler.Layout`). |
+| 0008 — `JSModuleContext`: host-overridable module resolution/source read | `Broiler.JS` | **PENDING** (push 403; pinned `3a8f302` does not contain it) | **Unblocked, not yet wired** — Phase 7 item 6 tail. Lets a bridge subclass drive URL/CSP module loading through the engine's own machinery. *Not* wired because the engine's static-import value binding + nested-async ordering are separately incomplete (see below), so the bridge keeps its own `EsModuleLinker`. |
 
 To apply a *future* patch (kept for reference):
 
@@ -243,3 +244,45 @@ the bridge's pinch scale into the render:
 **Current fallback (unchanged until the cutover lands):** `ApplyVisualViewportSerializationState`
 still bakes `zoom = usedZoom × scale` on the root, so pinch-zoom rendering works via the existing
 serialization bake. Nothing on CI depends on the cutover.
+
+---
+
+## 0008 — `Broiler.JS`: host-overridable module resolution and source read
+
+**Target:** `Broiler.JS` (`Broiler.JavaScript.Modules/JSModuleContext.cs`, `+` a `Modules.Tests` case).
+**Status: PENDING** (reverted after a 403; pinned SHA `3a8f302` does not contain it).
+**Depends on:** nothing (behaviour-preserving for the default filesystem context).
+
+**What it does.** Phase 7 item 6 tail. `Broiler.JavaScript.Modules` already implements a capable module
+system — `CompileModuleAsync` compiles each module with the ES-module arg list under
+`CoreScript.AllowTopLevelAwaitScope()` (so top-level `await` and dynamic `import()` are supported) — but
+its resolution is hard-wired to the **filesystem** (`Resolve` uses `File.Exists`/`node_modules`/
+`package.json`, `LoadModuleAsync` computes a filesystem directory, `CompileModuleAsync` reads via
+`StreamReader`). A browser host resolves **URLs** against a base and fetches them under a
+content-security policy, so it cannot use any of that. The patch opens three overridable seams without
+changing default behaviour:
+
+- `Resolve(dirPath, relativePath)`: `internal` → `protected virtual`.
+- `GetModuleDirectory(fullPath)` (new `protected virtual`, default `Path.GetDirectoryName`): the base a
+  loaded module's own relative imports resolve against — a URL host returns the module URL so nested
+  imports resolve as URLs, not mangled filesystem paths. Used by `LoadModuleAsync`.
+- `ReadModuleSourceAsync(module)` (new `protected virtual`, default reads the file): a URL host fetches
+  the source over its transport instead.
+
+**Validated** by a new `Modules.Tests` case (`HostUrlSeams_Resolve_Fetch_And_Execute_A_Url_Dependency`):
+a `UrlModuleContext` subclass overriding the three seams drives a URL entry importing a URL dependency
+from an in-memory store (no filesystem) — the entry and its dependency are resolved, fetched, and
+executed through the seams. Push **403** → ships here, pointer **unbumped**, working tree reverted.
+
+**Main-repo follow-up (NOT yet wired — and blocked below this patch).** The intent was for the bridge to
+subclass `JSModuleContext`, override these seams with its `UrlResolver` + CSP-gated `ResourceLoader`, and
+reuse the engine's real module compilation to gain the Phase 7 item-6 tail (live cyclic bindings, genuine
+top-level-await ordering, dynamic `import()`) instead of the bridge's own `EsModuleLinker` string
+transform. Investigation while validating this patch established that the engine's module machinery is
+**itself incomplete beyond resolution**: a static `import { x } from …` does **not** bind a value (the
+`yield import(...)` desugaring resolves to `undefined` — reproduced on the **stock** filesystem context,
+independent of these seams), and nested/transitive async module bodies do not run to completion under
+`RunScriptAsync`. So driving the engine for modules needs those deeper engine fixes first; until then the
+bridge keeps its own working `EsModuleLinker`, and `import.meta` is handled there (roadmap P7.18). This
+patch is the correct, minimal enabling seam for that future engine-driven path — necessary, not
+sufficient.
