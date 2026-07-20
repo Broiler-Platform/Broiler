@@ -233,28 +233,15 @@ public static partial class ScriptExtractionService
     {
         try
         {
-            // Resolve relative URLs against the page URL
-            string resolvedUrl;
-            if (Uri.TryCreate(scriptUrl, UriKind.Absolute, out _))
-            {
-                resolvedUrl = scriptUrl;
-            }
-            else if (!string.IsNullOrEmpty(pageUrl)
-                  && Uri.TryCreate(pageUrl, UriKind.Absolute, out var baseUri)
-                  && Uri.TryCreate(baseUri, scriptUrl, out var resolved))
-            {
-                resolvedUrl = resolved.AbsoluteUri;
-            }
-            else
-            {
+            // Resolve relative URLs against the page URL via the shared resolver.
+            if (UrlResolver.Resolve(scriptUrl, pageUrl) is not { } resolvedUri)
                 return null;
-            }
+            var resolvedUrl = resolvedUri.AbsoluteUri;
 
             // Handle file:// URLs — read from local filesystem
-            if (resolvedUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            if (resolvedUri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
             {
-                var uri = new Uri(resolvedUrl);
-                var path = uri.LocalPath;
+                var path = resolvedUri.LocalPath;
                 return File.Exists(path) ? File.ReadAllText(path) : null;
             }
 

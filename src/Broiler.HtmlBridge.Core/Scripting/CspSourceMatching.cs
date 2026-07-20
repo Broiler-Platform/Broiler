@@ -14,19 +14,9 @@ namespace Broiler.HtmlBridge.Scripting;
 internal static class CspSourceMatching
 {
     /// <summary>Resolves <paramref name="url"/> to an absolute URI, using <paramref name="pageUrl"/> as
-    /// the base for a relative URL. Returns <c>null</c> when it cannot be resolved.</summary>
-    public static Uri? ResolveUri(string url, string? pageUrl)
-    {
-        if (Uri.TryCreate(url, UriKind.Absolute, out var absolute))
-            return absolute;
-
-        if (!string.IsNullOrWhiteSpace(pageUrl) &&
-            Uri.TryCreate(pageUrl, UriKind.Absolute, out var baseUri) &&
-            Uri.TryCreate(baseUri, url, out var resolved))
-            return resolved;
-
-        return null;
-    }
+    /// the base for a relative URL. Returns <c>null</c> when it cannot be resolved. Delegates to the
+    /// shared <see cref="UrlResolver"/>.</summary>
+    public static Uri? ResolveUri(string url, string? pageUrl) => UrlResolver.Resolve(url, pageUrl);
 
     /// <summary>Whether <paramref name="candidate"/> is same-origin with <paramref name="pageUrl"/>
     /// (scheme/host/port; two <c>file:</c> URLs are treated as same-origin).</summary>

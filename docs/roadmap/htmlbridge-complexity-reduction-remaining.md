@@ -243,14 +243,27 @@ Exit criteria:
   suites green. (`CspSourceMatching` is also the natural seam toward the exit criterion's "one URL
   resolution/origin implementation shared by script, CSS, fetch, XHR and frames".)
 
+- **P7.6 (2026-07-20) — item 4 (partial): one shared URL resolver.** `CspSourceMatching.ResolveUri` and
+  `ScriptExtractionService.FetchExternalScript` each carried an identical "absolute stays / relative
+  resolves against base / else null" resolution. Extracted the single `UrlResolver.Resolve(url, baseUrl)`
+  (internal, Core); the CSP matcher now delegates to it and `FetchExternalScript` uses it (also tightening
+  its file-scheme check to the resolved `Uri` rather than a `StartsWith("file://")` string test).
+  Behaviour-preserving (verified: a leading-slash path like `/x.js` still parses as an absolute `file:` URI
+  on Unix, as before). New `UrlResolverTests` (3); internal → no public-API change. This is the seam toward
+  the exit criterion's "one URL resolution/origin implementation shared by script, CSS, fetch, XHR and
+  frames" — script + CSP now share it; CSS/fetch/frames (the Dom `ResourceLoader`) adopt it when the
+  cross-assembly loader seam lands.
+
 - **Remaining for Phase 7.** Still open: item 2 (replace the `CspMetaDiscovery` /
   `ScriptExtractionService` **regex** HTML discovery with `Broiler.Dom.Html` parser output — now localised
-  behind `FindPolicyContent` and `ExtractAll`); item 4 (rest) — route the richer
+  behind `FindPolicyContent` and `ExtractAll`; has a cross-assembly wrinkle since discovery lives in Core
+  and the DOM parser is a submodule component); item 4 (rest) — route the richer
   `SubDocuments.TryFetchSubResource` data/file/http+MIME/WPT switch through the loader (extend `LoadText`
-  with a bytes/MIME variant), and give the now-single `ScriptExtractionService.FetchExternalScript` an
-  injected loader seam so script fetching shares the same policy as CSS/fetch/frames; items 5–6 (host-layer
-  CSP enforcement; execute `IsModule` descriptors in the event loop instead of skipping them). These are all
-  main-repo and validatable here.
+  with a bytes/MIME variant) and have the Dom `ResourceLoader` adopt the shared `UrlResolver`; items 5–6
+  (host-layer CSP enforcement so DOM/CSS receive already-authorised content; execute `IsModule` descriptors
+  in the event loop instead of skipping them — a substantial module-loading feature). Items 5–6 and the
+  `SubDocuments`/parser pieces are larger or WPT-reftest-sensitive; the CSP split (item 1), script
+  descriptors (item 3), and the loader/resolver consolidation (item 4 partial) are done.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 
