@@ -172,18 +172,30 @@ Exit criteria:
   fallback (string pipeline, pre-renderer) until the patch lands and the pointer is bumped. `select multiple`
   is the one remaining replaced-element fallback.
 
-- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** The live transforms still in
-  `HtmlPostProcessor` are: the production/harness replaced-element passes (`StripScriptTags` [protective],
-  `StripIframeContent` [now redundant — `patches/0004` applied at `52f65d9`; removal unblocked],
-  `ReplaceVideo` [native `patches/0005` pending], `ReplaceProgressLike` [native `patches/0006` pending],
-  `ReplaceSelectMultiple` [legitimate fallback — native rendering not yet written]) and the test-harness-only
-  `StripHiddenTestArtifacts` (map/linktest/FAIL/red-bg Acid scaffolding), `StripObjectContent`, and
-  `RewriteRootSelector` (proven redundant, kept for the harness pending reftest validation). Fully emptying the
-  file to delete the Rendering project needs: (a) the applied/pending replaced-element patches' pointer bumps
-  so `StripIframeContent`/`ReplaceVideo`/`ReplaceProgressLike` drop; (b) native `<select multiple>` rendering
-  so its fallback retires (largely `Broiler.HTML`, **submodule-push-gated → patch workflow**); and (c)
-  relocating the residual Acid scaffolding shims to test support once the reftest gate can validate. Per the
-  disposition, `HtmlPostProcessor` must **not** be moved wholesale to rename it; the migration is behavioural.
+- **P6.8 (2026-07-20) — Concern 2, native-behaviour migration: `<select multiple>` replaced-element handling
+  (submodule patch `0007`, pending, stacks on `0006`).** Native replacement (native-appearance case) for
+  `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder`. Added a post-cascade `CorrectSelectMultipleBoxes`
+  pass in `Broiler.HTML` (`DomParser`) rendering the control as an `inline-block` list box: one 16px row track
+  per visible option (`size` clamped 2..8, default 4), first row `#3875d7` selection highlight, alternating
+  `#ffffff`/`#f7f7f7` rows, edge `#dcdcdc` scrollbar chrome, writing-mode-aware, `<option>` children hidden.
+  **Verified via the parent build + render probe on raw `<select multiple>`** (72×68 host, blue first row
+  `(56,117,215)`, alternating rows `(247,247,247)`, chrome `(220,220,220)`). Push **403** → ships as
+  `patches/0007-…patch`, pointer **unbumped**, working tree reverted. **Scope limitation:** the
+  `appearance:none` variant needs a CSS `appearance` box property (a separate `Broiler.Layout` change), so the
+  fallback must stay for `appearance:none` selects until that lands. This is the last replaced-element native
+  pass — all of video/progress/meter/select now have native rendering (patches `0005`–`0007`), the iframe pass
+  is already upstream (`0004`).
+
+- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** With native rendering written for
+  every replaced element, the residue is: (a) **pointer bumps** for `patches/0005`–`0007` (submodule-push
+  authorization — out of session scope) so `ReplaceVideo`/`ReplaceProgressLike`/`ReplaceSelectMultiple` (and
+  the now-redundant `StripIframeContent`, `0004` already applied) can drop from `HtmlPostProcessor`; (b) a
+  small `Broiler.Layout` `appearance` box property so `<select multiple appearance:none>` also goes native;
+  (c) the protective `StripScriptTags` and the test-harness-only shims (`StripHiddenTestArtifacts`,
+  `StripObjectContent`, `RewriteRootSelector`) relocated to test support once the reftest gate can validate;
+  then the emptied `Broiler.HtmlBridge.Rendering` project is deleted. Per the disposition, `HtmlPostProcessor`
+  must **not** be moved wholesale to rename it; the migration is behavioural. The native-rendering *authoring*
+  is done; the remaining steps are push-authorization and test-harness relocation, not new rendering code.
 
 ### Phase 7 - isolate loading, security and browsing-context policy
 

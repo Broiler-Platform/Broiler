@@ -12,9 +12,10 @@ pointers pin the commits that contain them** (retained only for provenance). Pat
 treat `<iframe>` as a replaced element; hide inline fallback content"* contains its
 `CorrectIframeBoxes` pass (verified 2026-07-20). Patch **0005 is PENDING** — its
 Broiler.HTML working-tree change was reverted after a 403, so the pinned SHA does **not**
-contain it and the main-repo fallback stays active. Patch **0006 is PENDING** on the
-same basis (reverted after a 403; the main-repo `ReplaceProgressLike` fallback stays
-active).
+contain it and the main-repo fallback stays active. Patches **0006 and 0007 are
+PENDING** on the same basis (reverted after a 403; the main-repo `ReplaceProgressLike`
+/ `ReplaceSelectMultiple` fallbacks stay active). **0007 stacks on 0006** (they share
+`SetUniformBorder`/`ReadNumericAttribute`) — apply 0006 first.
 
 | Patch | Target submodule | Pinned commit / status | Main-repo follow-up |
 |---|---|---|---|
@@ -24,6 +25,7 @@ active).
 | 0004 — treat `<iframe>` as a replaced element (hide inline fallback) | `Broiler.HTML` | **applied** — pinned `52f65d9` *DomParser: treat `<iframe>` as a replaced element; hide inline fallback content* contains `CorrectIframeBoxes` | **Unblocked, not yet wired** — the pinned renderer now hides iframe fallback natively, so `HtmlPostProcessor.StripIframeContent` can be dropped (it is now a redundant belt-and-suspenders strip). Not done here to keep this change focused. |
 | 0005 — render `<video>` as a black inline-block replaced box (hide fallback) | `Broiler.HTML` | **PENDING** — reverted from the working tree after a 403; pinned SHA `52f65d9` does **not** contain it | **Not yet wired** — once applied + pointer bumped, drop `HtmlPostProcessor.ReplaceVideoWithPlaceholder` (Phase 6 concern 2). Until then that regex rewrite is the active fallback. |
 | 0006 — render `<progress>`/`<meter>` as a native track with proportional fill | `Broiler.HTML` | **PENDING** — reverted from the working tree after a 403; pinned SHA `52f65d9` does **not** contain it | **Not yet wired** — once applied + pointer bumped, drop `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder`. Until then that regex rewrite is the active fallback. Adds `CorrectProgressBoxes` after `CorrectIframeBoxes` — same call-site line as `0005`, so applying both together needs a trivial adjacency resolution. |
+| 0007 — render `<select multiple>` as a native list box (appearance:auto) | `Broiler.HTML` | **PENDING** — reverted from the working tree after a 403; **stacks on 0006** (apply 0006 first) | **Not yet wired** — once applied + pointer bumped, drop `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder` for the `appearance:auto` case. The `appearance:none` variant needs a CSS `appearance` box property (a separate `Broiler.Layout` change), so the fallback must stay until that lands. |
 
 To apply a *future* patch (kept for reference):
 
@@ -38,6 +40,43 @@ git add <Submodule>                         # bump the pointer
 Then do the "Follow-up (main-repo)" wiring named for that patch — it is deferred until
 the pointer is bumped because it references the patched API, which does not exist at the
 previously-pinned submodule SHA (so it would not compile against the pinned clone on CI).
+
+---
+
+## 0007 — `Broiler.HTML`: render `<select multiple>` as a native list box (appearance:auto)
+
+**Target:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs`).
+**Status: PENDING** (reverted after a 403; pinned SHA `52f65d9` does not contain it).
+**Depends on:** **0006** (shares the `SetUniformBorder`/`ReadNumericAttribute` helpers — apply 0006 first).
+
+**What it does.** HTML §4.10.7: `<select multiple>` is a replaced list-box control. Broiler has no native
+control chrome, so a post-cascade `CorrectSelectMultipleBoxes` pass renders it as an `inline-block` list box:
+one 16px row track per visible option (`size`, clamped 2..8, default 4), the first row painted as the
+selection highlight `#3875d7` and the rest alternating `#ffffff`/`#f7f7f7`, an edge scrollbar-chrome strip
+`#dcdcdc` with a `#b8b8b8` border, honouring `writing-mode` for vertical/`-rl`-reversed boxes, and hides the
+real `<option>` children. Track/chrome boxes are absolutely positioned within the relative host (laid out
+because the engine discovers absolutes by walking the tree at layout time). Matches the **native-appearance**
+case of `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder`.
+
+**Scope / limitation.** Renders the `appearance:auto` list box only. The fallback also renders an
+`appearance:none` variant (no chrome, white background); distinguishing it natively needs a CSS `appearance`
+property on the box model — a separate `Broiler.Layout` change — so the fallback must stay for
+`appearance:none` selects until that lands.
+
+**Verified locally** (patch applied on top of 0006 in the submodule working tree, parent build compiling it in
+place) via a render-probe on raw `<select multiple>…</select>`: a 72×68 host paints border `#767676`, the
+first row `(56,117,215)` selection highlight, alternating rows `(247,247,247)`, the chrome strip `(220,220,220)`
+with a `(184,184,184)` border, and row borders `(208,208,208)` — all the fallback's colours. Full pixel
+validation needs the Acid/WPT reftest gate.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships as
+`patches/0007-html-select-multiple-native-listbox.patch` with the pointer left **unbumped** and the working
+tree reverted.
+
+**Main-repo follow-up (once applied + pointer bumped, and the `appearance` property exists).** Drop
+`HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder`. **Current fallback (unchanged until then):** the
+string rewrite runs before the renderer, so a real `<select multiple>` never reaches `CorrectSelectMultipleBoxes`
+yet and nothing on CI depends on this patch.
 
 ---
 
