@@ -16,15 +16,21 @@ remains is externally gated.** The bulk of each phase's planned work has landed.
 was closed on 2026-07-20** by the mutation-notification consolidation (P4.21: the
 bridge's MutationObserver/Range/NodeIterator now run off canonical `DomDocument.Mutated`,
 so `NormalizeNode` delegates to canonical `DomNode.Normalize()`; the 2026-07-19
-reconciliation had recorded it as blocked). What now remains is strictly external: a
-maintainer applying the pending submodule patches (`Broiler.CSS`/`Broiler.HTML`/`Broiler.DOM`,
-out of session push scope → 403 → patch workflow — now including `patches/0003`, the
-canonical `Normalize()` characterData-granularity spec-fix) and bumping the pointers; an
-environment-config change (enabling `NativeZoom` at the `CaptureService` external
-renderer to delete the zoom bake); and the deliberately later-phase / out-of-scope
-items (Phase 6 Canvas `getContext`; the JS-engine simultaneous-session isolation).
-Read each phase's own status entries for the specifics; the summary below is the
-quick view.
+reconciliation had recorded it as blocked). **Update 2026-07-20: the three captured
+submodule patches (`patches/0001` Broiler.HTML viewport-zoom render plumbing, `patches/0002`
+Broiler.DOM `DomNodeCollectionExtensions` public, `patches/0003` Broiler.DOM `Normalize()`
+characterData granularity) have all since been applied upstream and the parent submodule
+pointers now pin the commits that contain them** (`Broiler.HTML` `9977672`, `Broiler.DOM`
+`8e8325f`); see `patches/README.md`. What now remains is strictly external/deferred: the
+one still-unwired main-repo follow-up for `patches/0001` — the visual-viewport *render
+cutover* (pass `visualViewport.scale` into the render and drop the pinch-factor bake), now
+unblocked but not yet done, with the serialization bake as the active fallback meanwhile;
+an environment-config change (enabling `NativeZoom` at the `CaptureService` external
+renderer to delete the zoom bake); the native dialog/`::backdrop` box + top-layer paint
+slices (tracked separately, still WPT-runner-fallback-gated); and the deliberately
+later-phase / out-of-scope items (Phase 6 Canvas `getContext`; the JS-engine
+simultaneous-session isolation). Read each phase's own status entries for the specifics;
+the summary below is the quick view.
 
 | Phase | Status | Open residue |
 |---|---|---|
@@ -33,7 +39,7 @@ quick view.
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
 | 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2: the serialize-time **baked style is now a distinct per-element overlay store**, split off the script-observable inline-style dict (P4.14 increments 1–3: anchor cluster + animation/synthetic/zoom bake writers seamed, then backed by a tombstone-aware overlay merged only at serialization) — verified byte-identical incl. the WPT anchor-position pixel corpus. `InlineStyleRuntimeState.Style` no longer carries bakes. Remaining: full-corpus WPT/Acid CI gate. Item 4/5 canonical reuses done (P4.8–4.12, P4.16–4.19; the `ChildIndexOf` → canonical `IndexOfReference` follow-up landed 2026-07-20 now that `patches/0002` is pinned). `CloneDomElement` now delegates to canonical `CloneNode` (P4.20, verified byte-identical across ~14 clone suites). **Item 5 complete:** `Normalize` now delegates to canonical `DomNode.Normalize()` (P4.21) — the P4.15 blocker (bridge MutationObserver/Range/NodeIterator driven by a hand-rolled channel rather than canonical `DomDocument.Mutated`) was closed by the mutation-notification consolidation (steps 1–3): the primitives were cleaned so each logical op fires one canonical record, then MutationObserver/Range/NodeIterator were switched onto canonical `Mutated`, with a suppression scope for serialize/render/parse bakes. |
-| 5 — used-value behaviour into Layout | Bulk delivered; **in-scope terminal** | Anchor-track deletion complete through step 6. Feature (b) visual-viewport/zoom: read (CSSOM) **and** render (pixel) sides now validated on the engine used-value model (2026-07-19) — deleting the zoom bake is now only a *deployment* gate (enable `NativeZoom` at the external `CaptureService` renderer), plus the submodule-push-gated pinch render cutover (`patches/0001`). Feature (a) dialog/backdrop: native modal centering + modal box-chrome bake deletion landed; native `::backdrop` box + top-layer paint stay submodule-patch-gated. See the [2026-07-19 reconciliation](#reconciliation-2026-07-19--features-a-and-b-driven-to-their-in-scope-terminal-state). |
+| 5 — used-value behaviour into Layout | Bulk delivered; **in-scope terminal** | Anchor-track deletion complete through step 6. Feature (b) visual-viewport/zoom: read (CSSOM) **and** render (pixel) sides now validated on the engine used-value model (2026-07-19) — deleting the zoom bake is now only a *deployment* gate (enable `NativeZoom` at the external `CaptureService` renderer). The `patches/0001` viewport-zoom render plumbing **is now applied + pinned** (`Broiler.HTML` `9977672`), so the pinch render cutover (pass `visualViewport.scale` into the render, drop the bake) is **unblocked** — remaining as the one still-unwired main-repo follow-up, with the serialization bake as the active fallback. Feature (a) dialog/backdrop: native modal centering + modal box-chrome bake deletion landed; native `::backdrop` box + top-layer paint stay WPT-runner-fallback-gated. See the [2026-07-19 reconciliation](#reconciliation-2026-07-19--features-a-and-b-driven-to-their-in-scope-terminal-state). |
 
 Companion documents:
 
@@ -4332,12 +4338,13 @@ each now genuinely stops, so a reader knows exactly what full closure still need
     (`CaptureService`) hands the serialized HTML to an *external* renderer this container can neither scope nor
     validate. Until that consumer enables the flag — an environment-config change — the bake stays as the
     carry-through, so nothing on CI regresses. See `zoom-native-cutover.md` P2.
-  - **Pinch-zoom render cutover is submodule-push-gated.** `patches/0001-html-render-viewport-zoom-param.patch`
-    (`Broiler.HTML` `HtmlRender.RenderToImageWithStyleSet` → threads `viewportZoom`) is captured for a
-    maintainer to apply (403 push scope); its main-repo follow-up (pass `visualViewport.scale` into the render
-    and stop `ApplyVisualViewportSerializationState` baking the pinch factor onto the root `zoom`) is deferred
-    until the pointer is bumped, because it references the patched API that does not exist at the pinned SHA.
-    The serialization bake remains the active fallback meanwhile.
+  - **Pinch-zoom render cutover — submodule patch now applied; the main-repo follow-up remains.**
+    `patches/0001-html-render-viewport-zoom-param.patch` (`Broiler.HTML`
+    `HtmlRender.RenderToImageWithStyleSet` → threads `viewportZoom`) **has since been applied upstream and is
+    pinned** (`Broiler.HTML` `9977672`; verified 2026-07-20). Its main-repo follow-up (pass
+    `visualViewport.scale` into the render and stop `ApplyVisualViewportSerializationState` baking the pinch
+    factor onto the root `zoom`) is therefore **now unblocked but not yet wired** — the patched API now exists
+    at the pinned SHA. The serialization bake remains the active fallback until the cutover lands.
 
 - **(a) native dialog / backdrop — the in-scope, main-repo slices landed; the native box + paint stay
   submodule-patch-gated.** Native modal `<dialog>` centering is wired (horizontal and block-axis
@@ -4349,9 +4356,12 @@ each now genuinely stops, so a reader knows exactly what full closure still need
   `htmlbridge-complexity-reduction-notes.md`.
 
 **Net after this reconciliation.** Every Phase 0–5 residue is now at its terminal *in-scope* state: no
-further main-repo, in-session code change advances closure. What remains is strictly external — a maintainer
-applying the pending submodule patches (dialog/backdrop native box+paint; patch 0001 viewport-zoom render
-plumbing) and bumping the pointers, an environment change enabling `NativeZoom` at the `CaptureService`
-renderer, and the later-phase / out-of-scope items already recorded (Phase 6 Canvas `getContext`; the JS-engine
-simultaneous-session isolation). The `NativeAnchorPlacement` lever's full retirement stays the documented
-optional follow-up, still blocked only by the step-3e marker that the native-dialog track will remove.
+further main-repo, in-session code change advances closure. What remains is strictly external/deferred —
+**the three captured submodule patches (`patches/0001`–`0003`) have since been applied upstream and pinned
+(verified 2026-07-20; see `patches/README.md`)**, leaving: the one still-unwired main-repo follow-up for
+`patches/0001` (the visual-viewport render cutover, now unblocked); the native dialog/`::backdrop` box +
+top-layer paint slices (`Broiler.CSS`/`Broiler.HTML`, tracked separately, still WPT-runner-fallback-gated);
+an environment change enabling `NativeZoom` at the `CaptureService` renderer; and the later-phase /
+out-of-scope items already recorded (Phase 6 Canvas `getContext`; the JS-engine simultaneous-session
+isolation). The `NativeAnchorPlacement` lever's full retirement stays the documented optional follow-up,
+still blocked only by the step-3e marker that the native-dialog track will remove.
