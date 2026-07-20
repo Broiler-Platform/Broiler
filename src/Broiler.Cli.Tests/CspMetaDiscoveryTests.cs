@@ -59,4 +59,35 @@ public sealed class CspMetaDiscoveryTests
     {
         Assert.Null(CspMetaDiscovery.FindPolicyContent(html!));
     }
+
+    // ── Phase 7 item 2: parser-backed discovery (Broiler.Dom.Html tokenizer) ──
+
+    [Fact]
+    public void Ignores_A_Csp_Meta_Inside_An_Html_Comment()
+    {
+        // The former regex scan matched <meta> anywhere in the string, including inside a comment; the
+        // tokenizer only sees real start tags, so a commented-out policy is correctly not discovered.
+        const string html =
+            "<head><!-- <meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'none'\"> --></head>";
+        Assert.Null(CspMetaDiscovery.FindPolicyContent(html));
+    }
+
+    [Fact]
+    public void Ignores_A_Csp_Meta_Written_As_Text_Inside_A_Script_Body()
+    {
+        // <script> is a raw-text element: a meta literal inside it is script text, not a document meta.
+        const string html =
+            "<script>var s = '<meta http-equiv=\"Content-Security-Policy\" content=\"script-src http://evil\">';</script>";
+        Assert.Null(CspMetaDiscovery.FindPolicyContent(html));
+    }
+
+    [Fact]
+    public void Does_Not_Truncate_A_Content_Value_Containing_A_Greater_Than_Sign()
+    {
+        // The old <meta[^>]*> regex stopped at the first '>', truncating a policy whose value contained
+        // one; the tokenizer honours the quotes and returns the whole directive string.
+        const string html =
+            "<meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'self'; report-uri /r?a=1&b=2>x\">";
+        Assert.Equal("script-src 'self'; report-uri /r?a=1&b=2>x", CspMetaDiscovery.FindPolicyContent(html));
+    }
 }

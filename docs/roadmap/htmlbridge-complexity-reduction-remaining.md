@@ -308,10 +308,26 @@ Exit criteria:
   origin matching), which is a separate consolidation with different per-site semantics (e.g. `file://`
   handling) and is deliberately left for a scoped origin-unification step.
 
-- **Remaining for Phase 7.** Still open: item 2 (replace the `CspMetaDiscovery` /
-  `ScriptExtractionService` **regex** HTML discovery with `Broiler.Dom.Html` parser output — now localised
-  behind `FindPolicyContent` and `ExtractAll`; has a cross-assembly wrinkle since discovery lives in Core
-  and the DOM parser is a submodule component); items 5–6 (host-layer CSP enforcement so DOM/CSS receive
+- **P7.10 (2026-07-20) — item 2 (partial): CSP `<meta>` discovery is parser-backed.** `CspMetaDiscovery`
+  scanned the serialized HTML with a `<meta[^>]*>` regex + a quoted/unquoted attribute regex. Replaced it
+  with `Broiler.Dom.Html`'s shared `HtmlTokenizer`: `FindPolicyContent` now enumerates real start tokens and
+  reads the lower-cased `Attributes` map. This resolves the "cross-assembly wrinkle" by adding a `Broiler.HtmlBridge.Core`
+  → `Broiler.Dom.Html` project reference (no cycle — `Broiler.Dom.Html` only references `Broiler.Dom`, which
+  Core already used; the boundary-guard suite confirms the bridge→canonical direction is allowed). The
+  tokenizer stores attribute values **raw** (no entity decode — line-for-line what the regex returned), so
+  discovery of a normal `content="…"` is byte-identical, while three former regex defects are fixed: a
+  `<meta>` inside an HTML **comment** or a `<script>`/`<style>` **raw-text body** is no longer discovered, and
+  a `>` inside a quoted `content` value no longer truncates the directive. New `CspMetaDiscoveryTests` (3) pin
+  those three behaviours; the existing 8 discovery tests + 37 CSP/policy/public-API-snapshot tests stay green
+  (`CspMetaDiscovery` is still `public static` — dropping `partial` is not a public-surface change, so no
+  baseline regen). The regex + `GeneratedRegex` are gone from the class; `HtmlAttributeReader` stays (the
+  nonce path still parses a raw attribute string). `ScriptExtractionService` discovery (the other half of
+  item 2) is still regex — larger and WPT-sensitive, tracked below.
+
+- **Remaining for Phase 7.** Still open: item 2 (rest) — replace the `ScriptExtractionService` **regex**
+  `<script>` discovery with `Broiler.Dom.Html` parser output (localised behind `ExtractAll`; larger and
+  WPT-reftest-sensitive because script text extraction, ordering, module handling and trimming must stay
+  byte-identical — the CSP-meta half is done in P7.10); items 5–6 (host-layer CSP enforcement so DOM/CSS receive
   already-authorised content; execute `IsModule` descriptors in the event loop instead of skipping them — a
   substantial module-loading feature). Items 5–6 and the parser piece are larger or WPT-reftest-sensitive.
   Item 1 (CSP split), item 3 (script descriptors) and item 4 (loader/resolver consolidation) are **done**:
