@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using Broiler.HtmlBridge;
+using Broiler.HtmlBridge.Scripting;
+using Broiler.JavaScript.Engine;
 
 namespace Broiler.Cli.Tests;
 
@@ -383,6 +385,44 @@ public class ContentSecurityPolicyTests
 
         Assert.DoesNotContain("background: green", result);
         Assert.DoesNotContain("<style", result);
+    }
+
+    // --- Phase 7 item 5: style CSP is a host decision enforced during Attach ----
+
+    [Fact]
+    public void Attach_Enforces_Style_Csp_On_The_Bridge_Itself()
+    {
+        // The bridge authorises styles as the final step of Attach when a policy is configured, so every
+        // host path — including ScriptEngine.Execute, which never called ApplyStyleContentSecurityPolicy —
+        // hands scripts/rendering a CSP-authorised DOM, not just the CLI/WPT hosts.
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <head><meta http-equiv="Content-Security-Policy" content="style-src 'none'"></head>
+            <body style="background: green"></body>
+            </html>
+            """;
+
+        using var ctx = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Csp = ContentSecurityPolicy.FromHtml(html);
+        bridge.Attach(ctx, html, "file:///t.html");
+
+        Assert.DoesNotContain("background: green", bridge.SerializeToHtml());
+    }
+
+    [Fact]
+    public void Attach_Leaves_Inline_Style_When_No_Csp_Configured()
+    {
+        const string html = """
+            <!DOCTYPE html><html><head></head><body style="background: green"></body></html>
+            """;
+
+        using var ctx = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(ctx, html, "file:///t.html"); // no policy configured → nothing stripped
+
+        Assert.Contains("background: green", bridge.SerializeToHtml());
     }
 
     [Fact]

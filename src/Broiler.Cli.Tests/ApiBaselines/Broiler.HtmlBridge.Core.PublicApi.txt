@@ -70,6 +70,27 @@ TYPE Broiler.HtmlBridge.Scripting.MicroTaskQueue
   method System.Collections.Generic.IReadOnlyList<System.Exception> Drain()
   method System.Void Enqueue(System.Action)
   property System.Int32 Count { get; }
+TYPE Broiler.HtmlBridge.Scripting.ModuleMap
+  ctor ()
+  method System.Boolean TryGet(System.String, ref Broiler.HtmlBridge.Scripting.ModuleMapEntry)
+  property System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleMapEntry> Entries { get; }
+  property System.Int32 Count { get; }
+TYPE Broiler.HtmlBridge.Scripting.ModuleMapEntry : System.IEquatable<Broiler.HtmlBridge.Scripting.ModuleMapEntry>
+  ctor (System.Int32, Broiler.HtmlBridge.Scripting.ScriptSourceKind, System.String, System.String, System.String, System.Boolean)
+  method Broiler.HtmlBridge.Scripting.ModuleMapEntry <Clone>$()
+  method System.Boolean Equals(Broiler.HtmlBridge.Scripting.ModuleMapEntry)
+  method System.Boolean Equals(System.Object)
+  method System.Int32 GetHashCode()
+  method System.String ToString()
+  method System.Void Deconstruct(ref System.Int32, ref Broiler.HtmlBridge.Scripting.ScriptSourceKind, ref System.String, ref System.String, ref System.String, ref System.Boolean)
+  property Broiler.HtmlBridge.Scripting.ScriptSourceKind Kind { get; set; }
+  property System.Boolean IsExecutable { get; set; }
+  property System.Int32 DocumentOrder { get; set; }
+  property System.String Key { get; set; }
+  property System.String Source { get; set; }
+  property System.String Url { get; set; }
+TYPE Broiler.HtmlBridge.Scripting.ModuleScriptWrapper
+  method System.String WrapInlineModule(System.String)
 TYPE Broiler.HtmlBridge.Scripting.PageContent
   ctor (System.String, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.Collections.Generic.IReadOnlyList<System.String>)
   property System.Collections.Generic.IReadOnlyList<System.String> DeferredScripts { get; }
@@ -102,10 +123,12 @@ TYPE Broiler.HtmlBridge.Scripting.ScriptExecutionResult
   property System.Boolean Success { get; set; }
   property System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptError> Errors { get; set; }
 TYPE Broiler.HtmlBridge.Scripting.ScriptExtractionResult
-  ctor (System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptDescriptor>)
+  ctor (System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptDescriptor>, System.Collections.Generic.IReadOnlyList<System.String>, Broiler.HtmlBridge.Scripting.ModuleMap)
+  property Broiler.HtmlBridge.Scripting.ModuleMap ModuleMap { get; }
   property System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptDescriptor> Descriptors { get; }
   property System.Collections.Generic.IReadOnlyList<System.String> AsyncScripts { get; }
   property System.Collections.Generic.IReadOnlyList<System.String> DeferredScripts { get; }
+  property System.Collections.Generic.IReadOnlyList<System.String> ModuleScripts { get; }
   property System.Collections.Generic.IReadOnlyList<System.String> Scripts { get; }
 TYPE Broiler.HtmlBridge.Scripting.ScriptProfilingHook
   ctor ()

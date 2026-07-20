@@ -1,3 +1,4 @@
+using Broiler.Dom.Html;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
 using System;
@@ -10,44 +11,20 @@ using System.Text.RegularExpressions;
 namespace Broiler.HtmlBridge;
 
 /// <summary>
-/// Extracts the contents of <c>&lt;script&gt;</c> tags from HTML using a
-/// regular expression.  Inline scripts and <c>data:</c> URI scripts are
-/// returned; external <c>src</c> references (http/https/file) are skipped
-/// by <see cref="Extract"/> but resolved and fetched by <see cref="ExtractAll"/>.
+/// Extracts the contents of <c>&lt;script&gt;</c> tags from HTML using the shared
+/// <c>Broiler.Dom.Html</c> tokenizer (Phase 7 item 2).  Inline scripts and <c>data:</c> URI scripts are
+/// returned; external <c>src</c> references (http/https/file) are skipped by <see cref="Extract"/> but
+/// resolved and fetched by <see cref="ExtractAll"/>.
 /// </summary>
+/// <remarks>
+/// Discovery is parser-backed: the tokenizer treats <c>&lt;script&gt;</c> as a raw-text element, so a
+/// <c>&lt;script&gt;</c> literal inside a comment or another element's text is not discovered, a
+/// <c>&gt;</c> inside a quoted attribute no longer truncates the start tag, and attribute flags are read
+/// from the parsed (lower-cased) attribute map rather than a per-tag regex. Script body text is taken
+/// verbatim (raw text is never entity-decoded), so authorised inline/data-URI program text is unchanged.
+/// </remarks>
 public static partial class ScriptExtractionService
 {
-    // Match ALL <script> tags (both inline and with src attributes) in document order.
-    private static readonly Regex AnyScriptPattern = AnyScriptPatternRegex();
-
-    // Match src attribute whose value starts with "data:"
-    private static readonly Regex DataSrcAttrPattern = DataSrcAttrPatternRegex();
-
-    // Match any src attribute (to detect and skip external scripts)
-    private static readonly Regex AnySrcAttrPattern = AnySrcAttrPatternRegex();
-
-    /// <summary>
-    /// Matches any <c>src</c> attribute value (not just <c>data:</c> URIs).
-    /// Used to extract external script URLs for HTTP/HTTPS/file loading.
-    /// </summary>
-    private static readonly Regex AnySrcAttrWithValuePattern = AnySrcAttrWithValuePatternRegex();
-
-    /// <summary>
-    /// Matches the <c>defer</c> attribute on a script tag (standalone or with a value).
-    /// </summary>
-    private static readonly Regex DeferAttrPattern = DeferAttrPatternRegex();
-
-    /// <summary>
-    /// Matches the <c>async</c> attribute on a script tag (standalone or with a value).
-    /// </summary>
-    private static readonly Regex AsyncAttrPattern = AsyncAttrPatternRegex();
-
-    // Match <script type="module"> tags (inline only, no src)
-    private static readonly Regex ModuleScriptPattern = ModuleScriptPatternRegex();
-
-    // Match the type="module" attribute on a script tag
-    private static readonly Regex ModuleTypeAttribute = ModuleTypeModuleTypeAttributeRegex();
-
     private static readonly Regex WhitespacePattern = WhitespacePatternRegex();
 
     /// <summary>
@@ -58,40 +35,123 @@ public static partial class ScriptExtractionService
     /// </summary>
     private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
 
+    /// <summary>One discovered <c>&lt;script&gt;</c>: its parsed attributes and its raw body text.</summary>
+    private readonly record struct ScriptTagInfo(IReadOnlyDictionary<string, string> Attributes, string RawContent);
+
+    /// <summary>
+    /// Enumerates every <c>&lt;script&gt;</c> element in document order via the shared tokenizer, pairing
+    /// each start tag with its raw (never entity-decoded) body text. Because <c>&lt;script&gt;</c> is a
+    /// raw-text element, a start tag is followed by its character content and then its end tag; an
+    /// unterminated final script yields its content to end-of-input (matching parser behaviour).
+    /// </summary>
+    private static IEnumerable<ScriptTagInfo> EnumerateScriptTags(string html)
+    {
+        HtmlToken? open = null;
+        var content = new StringBuilder();
+
+        foreach (var token in new HtmlTokenizer().Tokenize(html))
+        {
+            if (open != null)
+            {
+                if (token.Type == TokenType.Character)
+                {
+                    content.Append(token.Data);
+                    continue;
+                }
+
+                // Any non-character token (the </script> end tag) closes the current script.
+                yield return new ScriptTagInfo(open.Attributes, content.ToString());
+                open = null;
+                content.Clear();
+            }
+
+            if (token.Type == TokenType.StartTag &&
+                string.Equals(token.Name, "script", StringComparison.OrdinalIgnoreCase))
+            {
+                open = token;
+                content.Clear();
+            }
+        }
+
+        if (open != null)
+            yield return new ScriptTagInfo(open.Attributes, content.ToString());
+    }
+
+    private static string? GetNonce(IReadOnlyDictionary<string, string> attrs) =>
+        attrs.TryGetValue("nonce", out var nonce) ? nonce : null;
+
+    private static bool IsModule(IReadOnlyDictionary<string, string> attrs) =>
+        attrs.TryGetValue("type", out var type) && string.Equals(type, "module", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The <c>src</c> value when present and non-empty (an empty <c>src</c> is treated as no src).</summary>
+    private static string? GetSrc(IReadOnlyDictionary<string, string> attrs) =>
+        attrs.TryGetValue("src", out var src) && !string.IsNullOrEmpty(src) ? src : null;
+
+    /// <summary>
+    /// Resolves an authorised module's program text (Phase 7 item 6), by the same rules a classic script
+    /// uses: an inline body must pass the CSP inline check; a <c>data:</c>/external source must pass the CSP
+    /// external check, then is decoded / fetched. Returns <c>null</c> when blocked, empty, or unresolvable.
+    /// </summary>
+    private static string? ResolveModuleSource(
+        ScriptSourceKind kind, string? url, string rawContent, string? nonce, ContentSecurityPolicy? csp, string? pageUrl)
+    {
+        switch (kind)
+        {
+            case ScriptSourceKind.Inline:
+                var body = rawContent.Trim();
+                return !string.IsNullOrEmpty(body) && (csp == null || csp.AllowsInlineScript(nonce, body)) ? body : null;
+
+            case ScriptSourceKind.DataUri:
+                if (csp != null && !csp.AllowsExternalScript(url!, pageUrl, nonce))
+                    return null;
+                var decoded = DecodeDataUri(url!);
+                return string.IsNullOrEmpty(decoded) ? null : decoded;
+
+            case ScriptSourceKind.External:
+                if (csp != null && !csp.AllowsExternalScript(url!, pageUrl, nonce))
+                    return null;
+                var fetched = FetchExternalScript(url!, pageUrl);
+                return string.IsNullOrEmpty(fetched) ? null : fetched;
+
+            default:
+                return null;
+        }
+    }
+
     /// <inheritdoc />
     public static IReadOnlyList<string> Extract(string html)
     {
         var scripts = new List<string>();
         var csp = ContentSecurityPolicy.FromHtml(html);
 
-        foreach (Match match in AnyScriptPattern.Matches(html))
+        foreach (var tag in EnumerateScriptTags(html))
         {
-            var attrs = match.Groups["attrs"].Value;
-            var nonce = ContentSecurityPolicy.ExtractNonceFromAttributes(attrs);
+            var nonce = GetNonce(tag.Attributes);
 
             // Skip module scripts — they are extracted separately
-            if (ModuleTypeAttribute.IsMatch(attrs))
+            if (IsModule(tag.Attributes))
                 continue;
 
+            var src = GetSrc(tag.Attributes);
+
             // Check for data: URI src attribute
-            var dataSrcMatch = DataSrcAttrPattern.Match(attrs);
-            if (dataSrcMatch.Success)
+            if (src != null && src.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
             {
-                if (csp != null && !csp.AllowsExternalScript(dataSrcMatch.Groups["uri"].Value, pageUrl: null, nonce))
+                if (csp != null && !csp.AllowsExternalScript(src, pageUrl: null, nonce))
                     continue;
 
-                var decoded = DecodeDataUri(dataSrcMatch.Groups["uri"].Value);
+                var decoded = DecodeDataUri(src);
                 if (!string.IsNullOrEmpty(decoded))
                     scripts.Add(decoded);
                 continue;
             }
 
             // Skip external (non-data:) src scripts
-            if (AnySrcAttrPattern.IsMatch(attrs))
+            if (src != null)
                 continue;
 
             // Inline script
-            var content = match.Groups["content"].Value.Trim();
+            var content = tag.RawContent.Trim();
             if (!string.IsNullOrEmpty(content) && (csp == null || csp.AllowsInlineScript(nonce, content)))
             {
                 scripts.Add(content);
@@ -108,28 +168,43 @@ public static partial class ScriptExtractionService
         var deferredScripts = new List<string>();
         var asyncScripts = new List<string>();
         var descriptors = new List<ScriptDescriptor>();
+        var moduleScripts = new List<string>();
+        var moduleMap = new ModuleMap();
         var csp = ContentSecurityPolicy.FromHtml(html);
 
         var documentOrder = 0;
-        foreach (Match match in AnyScriptPattern.Matches(html))
+        foreach (var tag in EnumerateScriptTags(html))
         {
-            var attrs = match.Groups["attrs"].Value;
-            var nonce = ContentSecurityPolicy.ExtractNonceFromAttributes(attrs);
-            var isModule = ModuleTypeAttribute.IsMatch(attrs);
-            var isDefer = DeferAttrPattern.IsMatch(attrs);
-            var isAsync = AsyncAttrPattern.IsMatch(attrs);
+            var nonce = GetNonce(tag.Attributes);
+            var isModule = IsModule(tag.Attributes);
+            var isDefer = tag.Attributes.ContainsKey("defer");
+            var isAsync = tag.Attributes.ContainsKey("async");
 
-            var dataSrcMatch = DataSrcAttrPattern.Match(attrs);
-            var anySrcMatch = dataSrcMatch.Success ? null : AnySrcAttrWithValuePattern.Match(attrs);
-            var kind = dataSrcMatch.Success ? ScriptSourceKind.DataUri
-                : anySrcMatch is { Success: true } ? ScriptSourceKind.External
-                : ScriptSourceKind.Inline;
-            var url = kind switch
+            var src = GetSrc(tag.Attributes);
+            var kind = src == null ? ScriptSourceKind.Inline
+                : src.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ? ScriptSourceKind.DataUri
+                : ScriptSourceKind.External;
+            var url = kind == ScriptSourceKind.Inline ? null : src;
+
+            // Phase 7 item 6: record every recognised module in the module map so it is not silently
+            // dropped, and make an authorised module executable with module semantics. Inline bodies
+            // (slice 1) plus data:/external sources (slice 2) are resolved through the same authorised
+            // decode/fetch path as classic scripts. The classic buckets/descriptors below are unchanged
+            // (modules stay out of them).
+            if (isModule)
             {
-                ScriptSourceKind.DataUri => dataSrcMatch.Groups["uri"].Value,
-                ScriptSourceKind.External => anySrcMatch!.Groups["uri"].Value,
-                _ => null,
-            };
+                var moduleKey = kind == ScriptSourceKind.Inline ? $"inline:{documentOrder}" : url ?? $"module:{documentOrder}";
+
+                // Module-map dedup: a module URL is fetched and evaluated once. Inline modules get a unique
+                // per-occurrence key, so they never dedup; a repeated src module is recorded once.
+                if (kind == ScriptSourceKind.Inline || !moduleMap.TryGet(moduleKey, out _))
+                {
+                    var moduleSource = ResolveModuleSource(kind, url, tag.RawContent, nonce, csp, pageUrl);
+                    if (moduleSource != null)
+                        moduleScripts.Add(ModuleScriptWrapper.WrapInlineModule(moduleSource));
+                    moduleMap.Add(new ModuleMapEntry(documentOrder, kind, moduleKey, url, moduleSource, IsExecutable: moduleSource != null));
+                }
+            }
 
             // Resolve the program text for the classic execution buckets. Module scripts are recorded in
             // the descriptor list but omitted from execution here (item 6 wires them into the event loop).
@@ -156,7 +231,7 @@ public static partial class ScriptExtractionService
                 }
                 else
                 {
-                    var content = match.Groups["content"].Value.Trim();
+                    var content = tag.RawContent.Trim();
                     if (!string.IsNullOrEmpty(content) && (csp == null || csp.AllowsInlineScript(nonce, content)))
                         scriptContent = content;
                 }
@@ -182,7 +257,7 @@ public static partial class ScriptExtractionService
                 scripts.Add(scriptContent);
         }
 
-        return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts, descriptors);
+        return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts, descriptors, moduleScripts, moduleMap);
     }
 
     /// <summary>
@@ -261,22 +336,6 @@ public static partial class ScriptExtractionService
         }
     }
 
-    [GeneratedRegex(@"<script(?<attrs>[^>]*)>(?<content>[\s\S]*?)</script>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex AnyScriptPatternRegex();
-    [GeneratedRegex(@"\ssrc\s*=\s*(?:""(?<uri>data:[^""]+)""|'(?<uri>data:[^']+)'|(?<uri>data:[^\s>]+))", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex DataSrcAttrPatternRegex();
-    [GeneratedRegex(@"\ssrc\s*=", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex AnySrcAttrPatternRegex();
-    [GeneratedRegex(@"\ssrc\s*=\s*(?:""(?<uri>[^""]+)""|'(?<uri>[^']+)'|(?<uri>[^\s>]+))", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex AnySrcAttrWithValuePatternRegex();
-    [GeneratedRegex(@"(?:^|\s)defer(?:\s|$|=)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex DeferAttrPatternRegex();
-    [GeneratedRegex(@"(?:^|\s)async(?:\s|$|=)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex AsyncAttrPatternRegex();
-    [GeneratedRegex(@"<script\s[^>]*type\s*=\s*[""']module[""'][^>]*>(?<content>[\s\S]*?)</script>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex ModuleScriptPatternRegex();
-    [GeneratedRegex(@"\stype\s*=\s*[""']module[""']", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex ModuleTypeModuleTypeAttributeRegex();
     [GeneratedRegex(@"\s+", RegexOptions.Compiled)]
     private static partial Regex WhitespacePatternRegex();
 }

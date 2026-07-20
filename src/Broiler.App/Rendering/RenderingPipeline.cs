@@ -31,7 +31,13 @@ public sealed class RenderingPipeline(
         var executableScripts = result.AsyncScripts.Count == 0
             ? result.Scripts
             : result.Scripts.Concat(result.AsyncScripts).ToArray();
-        return (normalisedUrl, new PageContent(html, executableScripts, normalisedUrl, result.DeferredScripts));
+
+        // Module scripts are deferred (Phase 7 item 6, first slice): run authorised inline modules after
+        // the classic deferred scripts. They are already wrapped for module semantics by ExtractAll.
+        var deferred = result.ModuleScripts.Count == 0
+            ? result.DeferredScripts
+            : result.DeferredScripts.Concat(result.ModuleScripts).ToArray();
+        return (normalisedUrl, new PageContent(html, executableScripts, normalisedUrl, deferred));
     }
 
     /// <summary>

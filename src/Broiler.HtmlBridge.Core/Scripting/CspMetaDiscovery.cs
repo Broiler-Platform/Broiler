@@ -1,5 +1,6 @@
 using System;
 using System.Text.RegularExpressions;
+using Broiler.Dom.Html;
 
 namespace Broiler.HtmlBridge.Scripting;
 
@@ -33,13 +34,13 @@ internal static class HtmlAttributeReader
 /// "what does it allow" (Phase 7 item 1: split parse / discovery / policy).
 /// </summary>
 /// <remarks>
-/// Discovery is currently a regex scan of the serialized HTML; Phase 7 item 2 replaces it with
-/// <c>Broiler.Dom.Html</c> parser output. Keeping it behind this single method localises that swap.
+/// Discovery is <c>Broiler.Dom.Html</c> parser output (Phase 7 item 2): the shared
+/// <see cref="HtmlTokenizer"/> enumerates start tags, so — unlike the former regex scan — a
+/// <c>&lt;meta&gt;</c> inside a comment or a <c>&lt;script&gt;</c>/<c>&lt;style&gt;</c> raw-text body is
+/// correctly ignored, and a <c>&gt;</c> inside a quoted attribute value no longer truncates the tag.
 /// </remarks>
-public static partial class CspMetaDiscovery
+public static class CspMetaDiscovery
 {
-    private static readonly Regex MetaPattern = MetaPatternRegex();
-
     /// <summary>
     /// Returns the directive string (the <c>content</c> value) of the first supported CSP
     /// <c>&lt;meta&gt;</c> tag in <paramref name="html"/>, or <c>null</c> when none is present.
@@ -50,21 +51,21 @@ public static partial class CspMetaDiscovery
         if (string.IsNullOrWhiteSpace(html))
             return null;
 
-        foreach (Match match in MetaPattern.Matches(html))
+        foreach (var token in new HtmlTokenizer().Tokenize(html))
         {
-            var attrs = match.Groups["attrs"].Value;
-            var httpEquiv = HtmlAttributeReader.ExtractAttributeValue(attrs, "http-equiv");
-            if (!string.Equals(httpEquiv, "Content-Security-Policy", StringComparison.OrdinalIgnoreCase))
+            if (token.Type != TokenType.StartTag ||
+                !string.Equals(token.Name, "meta", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var content = HtmlAttributeReader.ExtractAttributeValue(attrs, "content");
-            if (!string.IsNullOrWhiteSpace(content))
+            if (!token.Attributes.TryGetValue("http-equiv", out var httpEquiv) ||
+                !string.Equals(httpEquiv, "Content-Security-Policy", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (token.Attributes.TryGetValue("content", out var content) &&
+                !string.IsNullOrWhiteSpace(content))
                 return content;
         }
 
         return null;
     }
-
-    [GeneratedRegex(@"<meta(?<attrs>[^>]*)>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex MetaPatternRegex();
 }

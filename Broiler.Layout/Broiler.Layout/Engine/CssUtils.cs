@@ -88,6 +88,8 @@ internal static partial class CssUtils
             "color" => cssBox.Color,
             "display" => cssBox.Display,
             "direction" => cssBox.Direction,
+            "appearance" => cssBox.Appearance,
+            "-webkit-appearance" => cssBox.Appearance,
             "empty-cells" => cssBox.EmptyCells,
             "caption-side" => cssBox.CaptionSide,
             "float" => cssBox.Float,
@@ -574,6 +576,10 @@ internal static partial class CssUtils
                 break;
             case "direction":
                 cssBox.Direction = value;
+                break;
+            case "appearance":
+            case "-webkit-appearance":
+                cssBox.Appearance = value;
                 break;
             case "empty-cells":
                 cssBox.EmptyCells = value;

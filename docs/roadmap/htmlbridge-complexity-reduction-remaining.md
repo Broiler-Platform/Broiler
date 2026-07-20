@@ -142,17 +142,71 @@ Exit criteria:
   refreshed the stale "intentionally NOT applied" notes. Pure dead-code deletion — builds green;
   `Acid3RegressionTests` + guards/profile/native suites green (no public-API change: all internal).
 
-- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** The live transforms still in
-  `HtmlPostProcessor` are: the production/harness replaced-element passes (`StripScriptTags` [protective],
-  `StripIframeContent` [pending `patches/0004`], `ReplaceVideo`/`ReplaceProgressLike`/`ReplaceSelectMultiple`
-  [legitimate fallbacks]) and the test-harness-only `StripHiddenTestArtifacts` (map/linktest/FAIL/red-bg
-  Acid scaffolding), `StripObjectContent`, and `RewriteRootSelector` (proven redundant, kept for the
-  harness pending reftest validation). Fully emptying the file to delete the Rendering project needs: (a)
-  `patches/0004` applied (drops `StripIframeContent`); (b) native replaced-element rendering for
-  video/progress/meter/select so those fallbacks retire (largely `Broiler.HTML`, **submodule-push-gated →
-  patch workflow**); and (c) relocating the residual Acid scaffolding shims to test support once the
-  reftest gate can validate. Per the disposition, `HtmlPostProcessor` must **not** be moved wholesale to
-  rename it; the migration is behavioural.
+- **P6.6 (2026-07-20) — Concern 2, native-behaviour migration: `<video>` replaced-element handling
+  (submodule patch `0005`, pending).** Native replacement for `HtmlPostProcessor.ReplaceVideoWithPlaceholder`
+  (which string-rewrites `<video>…</video>` into a black `<div>` at its width/height or 300×150). Added a
+  post-cascade `CorrectVideoBoxes` pass in `Broiler.HTML` (`DomParser`) — mirroring `CorrectIframeBoxes` — that
+  makes a `<video>` box `inline-block`, sizes it (author CSS size wins; else the `width`/`height` presentation
+  attributes; else the CSS-default intrinsic 300×150), paints it black, and hides the fallback children.
+  **Verified via the parent build + a render probe on raw `<video>`** (`HtmlRender.RenderToImageWithStyleSet`,
+  bypassing the string fallback): a bare `<video>` paints black inside the 300×150 box, and inline fallback
+  content is hidden (black, not green, over the fallback area). The `Broiler.HTML` push returned **403**, so
+  per `CLAUDE.md` it ships as `patches/0005-html-video-replaced-element-black-box.patch` with the pointer
+  **unbumped** and the working tree reverted; `HtmlPostProcessor.ReplaceVideoWithPlaceholder` stays the active
+  fallback (it runs in the string pipeline before the renderer, so a real `<video>` never reaches
+  `CorrectVideoBoxes` yet) until the patch lands and the pointer is bumped (then it is dropped). Also observed
+  while reverting: patch **`0004` is now applied upstream** — the pinned `Broiler.HTML` `52f65d9` contains
+  `CorrectIframeBoxes` — so `StripIframeContent` is now a redundant (harmless) belt-and-suspenders strip whose
+  removal is unblocked; `patches/README.md` corrected accordingly.
+
+- **P6.7 (2026-07-20) — Concern 2, native-behaviour migration: `<progress>`/`<meter>` replaced-element
+  handling (submodule patch `0006`, pending).** Native replacement for
+  `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder` (which string-rewrites the elements into a styled
+  `<div>` track + fill). Added a post-cascade `CorrectProgressBoxes` pass in `Broiler.HTML` (`DomParser`) that
+  renders each as a bordered `inline-block` track (1px `#767676`, bg `#f0f0f0`/`#e6e6e6`, `120×16` or `16×120`
+  vertical) with an absolutely-positioned fill bar proportional to `value` (`#0a84ff`/`#4caf50`), honouring
+  `writing-mode`/`direction` for vertical and RTL bars, hiding the fallback text — matching the fallback's
+  exact colours/sizes. **Verified via the parent build + a render probe on raw `<progress>`/`<meter>`**: the
+  fill paints blue/green over the left ratio·120 px and the remainder is track grey. Push **403** → ships as
+  `patches/0006-…patch`, pointer **unbumped**, working tree reverted; `ReplaceProgressLike` stays the active
+  fallback (string pipeline, pre-renderer) until the patch lands and the pointer is bumped. `select multiple`
+  is the one remaining replaced-element fallback.
+
+- **P6.8 (2026-07-20) — Concern 2, native-behaviour migration: `<select multiple>` replaced-element handling
+  (submodule patch `0007`, pending, stacks on `0006`).** Native replacement (native-appearance case) for
+  `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder`. Added a post-cascade `CorrectSelectMultipleBoxes`
+  pass in `Broiler.HTML` (`DomParser`) rendering the control as an `inline-block` list box: one 16px row track
+  per visible option (`size` clamped 2..8, default 4), first row `#3875d7` selection highlight, alternating
+  `#ffffff`/`#f7f7f7` rows, edge `#dcdcdc` scrollbar chrome, writing-mode-aware, `<option>` children hidden.
+  **Verified via the parent build + render probe on raw `<select multiple>`** (72×68 host, blue first row
+  `(56,117,215)`, alternating rows `(247,247,247)`, chrome `(220,220,220)`). Push **403** → ships as
+  `patches/0007-…patch`, pointer **unbumped**, working tree reverted. **Scope limitation:** the
+  `appearance:none` variant needs a CSS `appearance` box property (a separate `Broiler.Layout` change), so the
+  fallback stays for `appearance:none` only until the box `appearance` property lands (P6.9, below, now done).
+  This is the last replaced-element native pass — all of video/progress/meter/select now have native rendering
+  (patches `0005`–`0007`), the iframe pass is already upstream (`0004`).
+
+- **P6.9 (2026-07-20) — `appearance` box property + `<select multiple appearance:none>` completed.** Added a
+  CSS `appearance` box property to **`Broiler.Layout`** (`CssBox.Appearance`, default `auto`, wired through
+  `CssUtils` get/set dispatch for `appearance`/`-webkit-appearance`; the `SharedRendererCascade` populates it
+  like any other longhand). `Broiler.Layout` is a **directory in this repo, not a submodule**, so this is a
+  direct main-repo change (no patch) — additive, `Broiler.Layout` builds and the CSS/render sanity suites stay
+  green. Patch `0007` was then extended to branch `CorrectSelectMultipleBoxes` on the box's `Appearance`:
+  `appearance:none` drops the scrollbar chrome, uses a white field and a lighter `#9a9a9a` border, matching the
+  fallback's non-native variant. **Verified via render probes**: `appearance:auto` keeps the chrome strip
+  (528 px) and grey field; `appearance:none` drops the chrome entirely (0 px) and uses white. Patch `0007`
+  regenerated to include this; `<select multiple>` native rendering now covers both appearance modes.
+
+- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** With native rendering written for
+  every replaced element **and both `<select>` appearance modes**, the residue is: (a) **pointer bumps** for
+  `patches/0005`–`0007` (submodule-push authorization — out of session scope) so
+  `ReplaceVideo`/`ReplaceProgressLike`/`ReplaceSelectMultiple` (and the now-redundant `StripIframeContent`,
+  `0004` already applied) can drop from `HtmlPostProcessor`; (b) the protective `StripScriptTags` and the
+  test-harness-only shims (`StripHiddenTestArtifacts`, `StripObjectContent`, `RewriteRootSelector`) relocated
+  to test support once the reftest gate can validate; then the emptied `Broiler.HtmlBridge.Rendering` project
+  is deleted. Per the disposition, `HtmlPostProcessor` must **not** be moved wholesale to rename it; the
+  migration is behavioural. **All native-rendering authoring is done**; the remaining steps are
+  push-authorization and test-harness relocation, not new rendering code.
 
 ### Phase 7 - isolate loading, security and browsing-context policy
 
@@ -254,16 +308,171 @@ Exit criteria:
   frames" — script + CSP now share it; CSS/fetch/frames (the Dom `ResourceLoader`) adopt it when the
   cross-assembly loader seam lands.
 
-- **Remaining for Phase 7.** Still open: item 2 (replace the `CspMetaDiscovery` /
-  `ScriptExtractionService` **regex** HTML discovery with `Broiler.Dom.Html` parser output — now localised
-  behind `FindPolicyContent` and `ExtractAll`; has a cross-assembly wrinkle since discovery lives in Core
-  and the DOM parser is a submodule component); item 4 (rest) — route the richer
-  `SubDocuments.TryFetchSubResource` data/file/http+MIME/WPT switch through the loader (extend `LoadText`
-  with a bytes/MIME variant) and have the Dom `ResourceLoader` adopt the shared `UrlResolver`; items 5–6
-  (host-layer CSP enforcement so DOM/CSS receive already-authorised content; execute `IsModule` descriptors
-  in the event loop instead of skipping them — a substantial module-loading feature). Items 5–6 and the
-  `SubDocuments`/parser pieces are larger or WPT-reftest-sensitive; the CSP split (item 1), script
-  descriptors (item 3), and the loader/resolver consolidation (item 4 partial) are done.
+- **P7.7 (2026-07-20) — item 4 (partial): frames adopt the shared `UrlResolver`.** The nested-browsing-context
+  fetch path (`DomBridge/SubDocuments.cs`) carried its **own** copy of the "absolute stays / relative resolves
+  against base / else empty" resolution in two places — `ResolveSubResourceUrl` (the `ISubWindowHost` seam used
+  by `SubWindowBinding` to resolve an iframe/frame `src`) and the relative branch of `TryFetchSubResource`
+  (object/iframe sub-resource fetch). Both now delegate to the single `Broiler.HtmlBridge.Scripting.UrlResolver`
+  (already shared by script + CSP, P7.6) — `ResolveSubResourceUrl` collapses to
+  `UrlResolver.Resolve(url, baseUrl)?.AbsoluteUri ?? string.Empty` (byte-identical: the old code returned
+  `AbsoluteUri` for both the absolute and resolved cases), and `TryFetchSubResource` routes its *relative* case
+  through the resolver while deliberately keeping the **raw string** for an already-absolute URL so the
+  downstream `file://` / `http(s)` scheme checks and the WPT `web-platform.test` host mapping still see the
+  original prefix (changing it to a normalised `AbsoluteUri` there could shift casing/normalisation). Frames
+  now share the same URL resolution as script and CSP — three of the five consumers named in the exit criterion
+  ("one URL resolution/origin implementation shared by script, CSS, fetch, XHR and frames"). Behaviour-preserving
+  (`UrlResolver` is `internal` in Core, visible to Dom via `InternalsVisibleTo`, so no public-API change); the
+  43 `SubResourceFetching`/`SubWindowBinding`/`SubDocumentBinding`/`IframeElementBinding` sub-resource tests
+  pass unchanged and the CSP/resolver/descriptor guard suites (44) stay green (the 3 `HttpSubResource`
+  relative-iframe failures are pre-existing network-env failures — identical on the `e03b140` baseline).
+
+- **P7.8 (2026-07-20) — item 4 (partial): sub-resource `file://`/local reads move into the loader.** The
+  nested-browsing-context fetch path inlined `File.Exists`/`File.ReadAllText` in two feature callbacks —
+  `TryReadFileResource` (a resolved `file://` URL) and `TryReadLocalResource` (the `LocalBasePath` directory)
+  — each with its own copy of the binary-content-type predicate (`image/`/`font/`/`audio/`/`video/`/`pdf` →
+  return the MIME but not the decoded bytes). Exactly the "direct file switch in a feature callback" the exit
+  criterion forbids. Added `ResourceLoader.LoadLocalResource(path, extensionMime)` — the one place that owns
+  the file existence + binary/text read policy: missing → `(null, "")` (empty document, not a fetch failure),
+  binary MIME → `(null, extensionMime)` (bytes not decoded), else → `(File.ReadAllText, extensionMime)` with
+  I/O exceptions propagating — plus a shared `ResourceLoader.IsBinaryMime` so the binary-content rule lives
+  once. `TryReadFileResource` collapses to mapping the URL to a path + delegating (and is no longer `static`,
+  so it reaches the loader); `TryReadLocalResource` keeps only its query/fragment strip, scheme reject, and
+  the generic-MIME content sniff (`DetectContentTypeFromContent`, bridge-owned), delegating the read. New
+  `ResourceLoaderTests` cases (2) pin `LoadLocalResource` (text read / binary skip / missing) and
+  `IsBinaryMime` (9 content types) deterministically. Behaviour-preserving: the 55 sub-resource / sub-window
+  binding tests pass unchanged (the same 3 `HttpSubResource` relative-iframe/WPT-root failures are
+  pre-existing network-env failures, identical on the P7.7 baseline). `ResourceLoader` remains `internal` to
+  Dom → no public-API change. The residual sub-resource dispatch still in the callback is the `data:` decode
+  and the HTTP `GetAsync` (already the loader) + the WPT host→local-root mapping (test policy, correctly
+  bridge-owned).
+
+- **P7.9 (2026-07-20) — item 4 (partial): fetch adopts the shared `UrlResolver`.** The fetch binding's one
+  inline C# URL resolution — `FetchBinding.ResolveResponseRedirectUrl` (the `Response.redirect(url, status)`
+  static: resolve the `Location` relative to the page URL) — carried its own copy of the "absolute stays /
+  relative resolves against base" pattern, throwing the spec's `TypeError` ("Invalid URL") on failure. It now
+  delegates to `UrlResolver.Resolve(redirectUrl, _host.PageUrl)`, mapping a `null` result to that same
+  `JSException`. (XHR needs no change — it is implemented in JS on top of `fetch` and stores its URL verbatim;
+  `CreateRequestObject` likewise stores the request URL as-is, so fetch's only resolution site is the redirect
+  helper.) Behaviour-preserving — the existing `Fetch_Response_Redirect_Static_Sets_Status_And_Location_Header`
+  test (`/next` → `file:///next` against `file:///test.html`) and the invalid-status guard pass unchanged; 117
+  fetch/network tests green (the 2 `bodyUsed`-reader failures are pre-existing, identical on the P7.8 baseline).
+  With this, **all five** consumers named in the exit criterion — script, CSS, fetch, XHR and frames — resolve
+  URLs through the single `UrlResolver`. The residual duplication is the *origin* concern
+  (`Utilities.IsCrossOrigin` same-origin compare, `MessagingBinding` origin extraction, `CspSourceMatching`
+  origin matching), which is a separate consolidation with different per-site semantics (e.g. `file://`
+  handling) and is deliberately left for a scoped origin-unification step.
+
+- **P7.10 (2026-07-20) — item 2 (partial): CSP `<meta>` discovery is parser-backed.** `CspMetaDiscovery`
+  scanned the serialized HTML with a `<meta[^>]*>` regex + a quoted/unquoted attribute regex. Replaced it
+  with `Broiler.Dom.Html`'s shared `HtmlTokenizer`: `FindPolicyContent` now enumerates real start tokens and
+  reads the lower-cased `Attributes` map. This resolves the "cross-assembly wrinkle" by adding a `Broiler.HtmlBridge.Core`
+  → `Broiler.Dom.Html` project reference (no cycle — `Broiler.Dom.Html` only references `Broiler.Dom`, which
+  Core already used; the boundary-guard suite confirms the bridge→canonical direction is allowed). The
+  tokenizer stores attribute values **raw** (no entity decode — line-for-line what the regex returned), so
+  discovery of a normal `content="…"` is byte-identical, while three former regex defects are fixed: a
+  `<meta>` inside an HTML **comment** or a `<script>`/`<style>` **raw-text body** is no longer discovered, and
+  a `>` inside a quoted `content` value no longer truncates the directive. New `CspMetaDiscoveryTests` (3) pin
+  those three behaviours; the existing 8 discovery tests + 37 CSP/policy/public-API-snapshot tests stay green
+  (`CspMetaDiscovery` is still `public static` — dropping `partial` is not a public-surface change, so no
+  baseline regen). The regex + `GeneratedRegex` are gone from the class; `HtmlAttributeReader` stays (the
+  nonce path still parses a raw attribute string). `ScriptExtractionService` discovery (the other half of
+  item 2) is still regex — larger and WPT-sensitive, tracked below.
+
+- **P7.11 (2026-07-20) — item 2 complete: `<script>` discovery is parser-backed.** Replaced the eight
+  `<script>`/attribute regexes in `ScriptExtractionService` with the shared `Broiler.Dom.Html` tokenizer. A
+  single `EnumerateScriptTags(html)` walks the token stream and pairs each `<script>` start tag with its raw
+  body (the tokenizer treats `<script>` as a raw-text element, so the body is taken verbatim and never
+  entity-decoded — byte-identical to the former `[\s\S]*?` capture + `.Trim()`); the flag/`src`/`nonce`
+  reads (`type=module`, `defer`, `async`, `src` data-vs-external, `nonce`) come from the parsed lower-cased
+  attribute map instead of per-tag regexes. `Extract`, `ExtractAll` and the `ScriptDescriptor` pipeline keep
+  identical shape — document order, CSP inline/external gating, data-URI decode and defer/async/regular
+  bucketing are unchanged. Parser-backed discovery also fixes the same class of regex defects as P7.10 (a
+  `<script>` literal inside a comment/another element's text is not mis-discovered; a `>` inside a quoted
+  attribute no longer truncates the start tag; an unterminated final `<script>` yields its body to EOF per
+  parser behaviour). Only `WhitespacePattern` (used by `DecodeDataUri`'s base64 fold-strip) remains a regex.
+  Validated with zero regressions across the extraction-exercising suites — `ScriptDescriptorTests` (4),
+  `ContentSecurityPolicyTests` (19), `CspMetaDiscoveryTests` (11) and `ScriptEngineExecuteTests` (53 pass;
+  the 4 failures are pre-existing geometry/serialization env failures, identical on the P7.10 baseline). Item
+  2 is now done for both discovery sites (CSP-meta P7.10, scripts P7.11); full WPT-reftest confirmation
+  remains the standing gate for the render-path scripts as for prior increments.
+
+- **P7.12 (2026-07-20) — item 6 (first slice): module map + inline-module execution.** Recognised
+  `<script type="module">` scripts were *silently dropped* by the `ExtractAll` pipeline (recorded in a
+  descriptor but absent from every execution bucket). First slice, three parts:
+  - **Module map.** New `ModuleMap` / `ModuleMapEntry` (Core): the ordered registry of every recognised
+    module in a document. `ExtractAll` records each one — inline modules keyed `inline:{order}` carrying
+    their authorised body, module scripts with a `src` keyed by URL and marked non-executable (fetch + import
+    graph is a later slice). So a module is no longer silently skipped — it is at minimum *mapped*.
+  - **Inline-module execution.** An authorised inline module body (passes the same CSP inline check as a
+    classic inline script) is exposed, in document order, in the new `ScriptExtractionResult.ModuleScripts`,
+    each wrapped by `ModuleScriptWrapper.WrapInlineModule` into a strict self-invoking function. That
+    reproduces the module top-level semantics that matter for an import-free module: strict mode, top-level
+    declarations kept out of the global object, and top-level `this === undefined` (unit-verified against a
+    live `JSContext`). `import`/`export`/`import.meta`/top-level-`await` are **not** supported — such a module
+    surfaces a syntax/runtime error at execution (caught + logged) instead of being dropped.
+  - **Wiring.** Module scripts are deferred, so the two `ExtractAll` consumers run them after the classic
+    deferred scripts: `RenderingPipeline` appends `ModuleScripts` to the deferred bucket, and the sub-document
+    executor (`DomBridge.ExecuteSubDocumentScripts`) runs them last. The CLI capture path
+    (`CaptureService.ExecuteScriptsWithDom`) has its own regex extraction and already ran modules as classic
+    inline scripts — left untouched, so Acid/CSS captures are unaffected.
+
+  New `ModuleScriptSliceTests` (8) pin the map/bucket population (inline executable + wrapped, external
+  mapped-not-executable, CSP-blocked mapped-not-executable, empty map) and the wrapper's module semantics;
+  the classic buckets and `ScriptDescriptor`s are unchanged (`ScriptDescriptorTests` green). Additive
+  public-surface change — Core API baseline regenerated (adds `ModuleMap`/`ModuleMapEntry`/`ModuleScriptWrapper`
+  and the two result properties; the old ctor stays source-compatible via optional params). Regression sweep
+  over the touched paths (`ScriptEngineExecute`/`SubDocument`/`SubWindow`/`ContentSecurityPolicy`/`SubResource`,
+  96 pass) shows only the 4 pre-existing geometry/serialization env failures, identical on baseline.
+
+- **P7.13 (2026-07-20) — item 6 (second slice): external/data-URI module fetching + module-map dedup.**
+  Extended the P7.12 module handling so a module with a `src` is resolved through the **same authorised path
+  as a classic script**: a new `ResolveModuleSource` centralises the three cases — an inline body passes the
+  CSP inline check; a `data:` source passes the CSP external check then is `DecodeDataUri`-decoded; an
+  external source passes the CSP external check then is `FetchExternalScript`-fetched (file/http via the
+  shared `UrlResolver` + loader, exactly as classic external scripts). A resolved module source becomes an
+  executable wrapped entry in `ModuleScripts` and an `IsExecutable` map entry. Added **module-map dedup**: a
+  repeated module URL is fetched and evaluated once (`ModuleMap.TryGet` guards re-fetch/re-queue), matching
+  the browser module map's single-evaluation rule — while both occurrences still appear in the per-element
+  descriptor list. New `ModuleScriptSliceTests` cases (4) pin the data-URI decode, the file-module fetch, the
+  unresolvable-URL non-executable case, and the dedup (one `ModuleScripts` entry / one map entry for a
+  repeated URL, two module descriptors). No public-surface change (a private helper + logic only — API
+  snapshot unchanged); the extraction/CSP/descriptor/execution suites (33 + 57) stay green with only the 4
+  pre-existing geometry/serialization env failures. External *http* modules still hit the network like
+  classic external scripts (unreachable in the sandbox → non-executable there); the file/data paths are
+  deterministic.
+
+- **P7.14 (2026-07-20) — item 5: CSP style enforcement centralised into the bridge (host) layer.** Audit
+  first: the canonical `Broiler.Dom` / `Broiler.CSS` / `Broiler.CSS.Dom` engines are **CSP-free** (no
+  reference to `ContentSecurityPolicy` or any `Allows*` check), so CSP already lived entirely in the
+  bridge/host layer — item 5's core rule held. The gap was *uniformity*: `DomBridge.ApplyStyleContentSecurityPolicy`
+  (which strips `style-src`-blocked inline `style=` attributes and `<style>` elements from the parsed DOM)
+  was called **by hand** only by the CLI capture host and the WPT runner. The main `ScriptEngine.Execute*`
+  path set `bridge.Csp` (so inline *event handlers* were gated) but never called it, so it handed scripts and
+  rendering a DOM that still contained CSP-blocked styles. Fixed by moving the enforcement **into
+  `DomBridge.Attach`** (both overloads): when a policy is configured via `bridge.Csp`, attach applies the
+  `style-src` family as its final step, so **every** host path receives already-authorised content — not just
+  the CLI/WPT hosts. Idempotent, so the now-redundant explicit call in `CaptureService` was removed (attach
+  does it); the WPT runner keeps its explicit call because it authorises with a fresh `FromHtml(html)` without
+  setting `bridge.Csp`. New `ContentSecurityPolicyTests` (2) exercise the bridge directly — attach with a
+  `style-src 'none'` policy strips a blocked `style=`; attach with no policy leaves it. The style-src family
+  suite (`StyleSrcAttr_None`/`StyleSrcElem_None`, now relying on attach-level enforcement) plus the CSP /
+  network / Acid3-CSS suites stay green (185 pass; the 3 failures are the pre-existing pixel + two `bodyUsed`
+  env failures, identical on baseline). Remaining item-5 nuance: external-stylesheet (`<link rel=stylesheet>`)
+  CSP and giving the WPT runner the same `bridge.Csp`-driven path are follow-ups, but DOM/CSS never seeing CSP
+  and every execution path delivering authorised inline-style content is done.
+
+- **Remaining for Phase 7.** Still open: item 6 (rest) — the deepest part of module loading beyond P7.12/P7.13: the
+  **import/export module graph** (specifier resolution, linking, dedup of *dependencies* via the module map,
+  cyclic handling), `import.meta`/top-level-`await`, and moving module ordering into the real browser **event
+  loop** (rather than the current deferred-bucket approximation). Fetching + inline/data/file execution +
+  URL dedup are done (P7.12–P7.13); the graph/linker and event-loop integration are the substantial
+  remainder. These and item 5 are larger or WPT-reftest-sensitive.
+  Item 1 (CSP split), item 3 (script descriptors) and item 4 (loader/resolver consolidation) are **done**:
+  the file/http text dispatch (P7.3–P7.4), one shared URL resolver across all five named consumers —
+  script/CSP (P7.6), frames (P7.7) and fetch/XHR (P7.9) — and the sub-resource file/local reads (P7.8) all now
+  live behind the loader/`UrlResolver`, so no feature callback constructs an `HttpClient` or inlines a
+  `file`/`data`-URI/`File.*` switch for the text-load paths. The one remaining item-4-adjacent cleanup is
+  unifying the *origin* helpers (same-origin/origin-extraction), tracked as a separate scoped step.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 
