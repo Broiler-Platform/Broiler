@@ -11,11 +11,15 @@ the move of used-value behaviour into Layout — including per-slice status entr
 branches, tests and regression checks.
 
 **These phases are complete to their in-scope terminal state; the residue that
-remains is externally gated.** The bulk of each phase's planned work has landed,
-and as of the 2026-07-19 reconciliation no further main-repo, in-session code
-change advances closure — what is left is strictly external: a maintainer applying
-the pending submodule patches (`Broiler.CSS`/`Broiler.HTML`/`Broiler.DOM`, out of
-session push scope → 403 → patch workflow) and bumping the pointers; an
+remains is externally gated.** The bulk of each phase's planned work has landed. The
+**last in-scope in-session code item — Phase 4 item 5's `Normalize` canonical reuse —
+was closed on 2026-07-20** by the mutation-notification consolidation (P4.21: the
+bridge's MutationObserver/Range/NodeIterator now run off canonical `DomDocument.Mutated`,
+so `NormalizeNode` delegates to canonical `DomNode.Normalize()`; the 2026-07-19
+reconciliation had recorded it as blocked). What now remains is strictly external: a
+maintainer applying the pending submodule patches (`Broiler.CSS`/`Broiler.HTML`/`Broiler.DOM`,
+out of session push scope → 403 → patch workflow — now including `patches/0003`, the
+canonical `Normalize()` characterData-granularity spec-fix) and bumping the pointers; an
 environment-config change (enabling `NativeZoom` at the `CaptureService` external
 renderer to delete the zoom bake); and the deliberately later-phase / out-of-scope
 items (Phase 6 Canvas `getContext`; the JS-engine simultaneous-session isolation).
@@ -28,7 +32,7 @@ quick view.
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
 | 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. |
-| 4 — eliminate parallel DOM state | Bulk delivered | Item 2: the serialize-time **baked style is now a distinct per-element overlay store**, split off the script-observable inline-style dict (P4.14 increments 1–3: anchor cluster + animation/synthetic/zoom bake writers seamed, then backed by a tombstone-aware overlay merged only at serialization) — verified byte-identical incl. the WPT anchor-position pixel corpus. `InlineStyleRuntimeState.Style` no longer carries bakes. Remaining: full-corpus WPT/Acid CI gate. Item 4/5 canonical reuses done (P4.8–4.12, P4.16–4.19; `IndexOfReference` visibility is pending `patches/0002`). `CloneDomElement` now delegates to canonical `CloneNode` (P4.20, verified byte-identical across ~14 clone suites). Item 5 reduces to `Normalize` alone — still blocked on driving the bridge's MutationObserver/NodeIterator/Range from canonical `DomDocument.Mutated` (P4.15). |
+| 4 — eliminate parallel DOM state | Bulk delivered | Item 2: the serialize-time **baked style is now a distinct per-element overlay store**, split off the script-observable inline-style dict (P4.14 increments 1–3: anchor cluster + animation/synthetic/zoom bake writers seamed, then backed by a tombstone-aware overlay merged only at serialization) — verified byte-identical incl. the WPT anchor-position pixel corpus. `InlineStyleRuntimeState.Style` no longer carries bakes. Remaining: full-corpus WPT/Acid CI gate. Item 4/5 canonical reuses done (P4.8–4.12, P4.16–4.19; `IndexOfReference` visibility is pending `patches/0002`). `CloneDomElement` now delegates to canonical `CloneNode` (P4.20, verified byte-identical across ~14 clone suites). **Item 5 complete:** `Normalize` now delegates to canonical `DomNode.Normalize()` (P4.21) — the P4.15 blocker (bridge MutationObserver/Range/NodeIterator driven by a hand-rolled channel rather than canonical `DomDocument.Mutated`) was closed by the mutation-notification consolidation (steps 1–3): the primitives were cleaned so each logical op fires one canonical record, then MutationObserver/Range/NodeIterator were switched onto canonical `Mutated`, with a suppression scope for serialize/render/parse bakes. |
 | 5 — used-value behaviour into Layout | Bulk delivered; **in-scope terminal** | Anchor-track deletion complete through step 6. Feature (b) visual-viewport/zoom: read (CSSOM) **and** render (pixel) sides now validated on the engine used-value model (2026-07-19) — deleting the zoom bake is now only a *deployment* gate (enable `NativeZoom` at the external `CaptureService` renderer), plus the submodule-push-gated pinch render cutover (`patches/0001`). Feature (a) dialog/backdrop: native modal centering + modal box-chrome bake deletion landed; native `::backdrop` box + top-layer paint stay submodule-patch-gated. See the [2026-07-19 reconciliation](#reconciliation-2026-07-19--features-a-and-b-driven-to-their-in-scope-terminal-state). |
 
 Companion documents:
@@ -1969,6 +1973,52 @@ Exit criteria:
   133 tests with the guard) stays green.
 
 ### Phase 4 - eliminate parallel DOM state
+
+Status: **P4.21 completed** 2026-07-20 (branch `claude/htmlbridge-phases-0-5-leky35`) — **work item 5, the last
+in-scope item: `Normalize` now delegates to canonical `DomNode.Normalize()`, closing the P4.15 blocker via a
+three-step mutation-notification consolidation.** P4.15 established that the swap was blocked not by the
+text-coalescing itself but by the bridge's **hand-rolled mutation-notification channel**: `NormalizeNode` fired
+`NotifyNodeIteratorPreRemoval` / `NotifyChildRemoved` (MutationObserver + Range) / `SetCharacterData` explicitly,
+whereas canonical `Normalize()` only publishes to `DomDocument.Mutated`, which the bridge's MutationObserver and
+Range did **not** subscribe to. A deep, code-grounded run at forcing the swap surfaced two further hard blockers a
+naïve global subscription would hit — the bridge's insert primitives fired **3–4 canonical records per logical op**
+(a `SetParent`-attach + reposition double-op), so any `Mutated` subscriber would over-deliver; and serialize/render
+**bakes mutate the live tree** through canonical setters, so a global subscription would deliver spurious records to
+— and synchronously re-enter — a registered observer mid-serialize. The consolidation resolves all three in
+independently-validated steps:
+
+- **Step 1 — one canonical record per logical op.** The redundant `SetParent(child, parent)` before an insert was
+  dropped across the script-driven mutation paths (`InsertNodeAt`, inner/outerHTML, `appendChild`/`insertBefore`/
+  `replaceChild`, `splitText`, `select.add`, `document.write`, table-level row/section inserts), and `replaceChild`
+  became a single canonical `ReplaceChild(newEl, oldEl)`. Behaviour-preserving for the explicit channel and the
+  tree end-state; the canonical `Mutated` stream (which NodeIterator and the CSS style engine already observe) is
+  now clean. Full parallel `Broiler.Cli.Tests` **improved by 85** vs the clean tree (the spurious records had been
+  destabilising NodeIterator/CSS tests under load).
+- **Step 2 — switch delivery onto canonical `Mutated`.** `MutationObserverBinding` subscribes to each observed
+  document's `Mutated` (lazily, on `observe()`, covering the main document and every sub-document uniformly) and
+  translates the canonical records into the existing childList/attribute/characterData delivery (coalescing a null
+  attribute `oldValue` to `""` to preserve the characterized observer behaviour); `BridgeDomRange` flips to canonical
+  `trackMutations: true` and `DomNodeIterator` already self-subscribes, so both self-adjust from `Mutated`; the weak
+  active-range/iterator registries and the `Notify*` push seams are retired (kept as no-ops so the ~35 call sites
+  need no edit). A depth-counted `SuppressMutationDelivery` scope gates delivery off while the bridge bakes/reparses
+  the live tree (`SerializeToHtml`, `GetRenderDocument`, `ResolveAnchorPositions`, `ParseHtml`).
+- **Step 3 — `NormalizeNode` → `node.Normalize()` + `InvalidateStyleScope(node)`.** The 30-line hand-rolled loop is
+  gone; canonical `Normalize()`'s internal `RemoveChild` / `Data`-set now drive MutationObserver, Range and
+  NodeIterator through `Mutated`, exactly as the explicit channel did. The one bridge-only side effect canonical has
+  no equivalent for — style-scope invalidation — is applied once for the normalized subtree.
+
+**Trade-off (accepted):** a range now self-subscribes to its document's `Mutated` for its lifetime (consistent with
+NodeIterator's existing behaviour) rather than being weakly held. **Submodule spec-fix as a patch:** canonical
+`Normalize()` published a characterData record per merged sibling (`text.Data += next.Data`);
+`patches/0003-dom-normalize-single-characterdata-record.patch` (403 push scope) concatenates and sets `Data` once so
+it matches the bridge's former one-record-per-run behaviour — until applied, delegating to the pinned canonical
+differs only in that granularity (a rare edge; no test asserts it). **Validation:** every mutation / observer /
+Range / NodeIterator / traversal / Acid3 / SVG / DOM-events suite passes in isolation (observer+attribute+range
+175/176, DOM/Acid3/SVG 116/116, the normalize+range+events set 192/193, and 101/101 rebuilt against the pinned
+canonical — the one failure throughout is the standing headless-geometry Range test). The full parallel
+`Broiler.Cli.Tests` run remains dominated by the container's environmental render/CSS/network noise (a ~70–155-test
+run-to-run swing at a ~44% baseline failure rate; every Step-2-adjacent "new failure" passes in isolation), so the
+**full WPT pixel + Acid corpus on CI is the authoritative gate** for the render-adjacent surface.
 
 Status: **P4.20 completed** 2026-07-19 (branch `claude/htmlbridge-complexity-reduction-4ho9hr`) — **work item 5:
 `CloneDomElement` now delegates the tree + attribute clone to canonical `DomNode.CloneNode`.** This closes the
