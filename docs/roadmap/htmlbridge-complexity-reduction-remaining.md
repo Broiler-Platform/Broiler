@@ -272,18 +272,36 @@ Exit criteria:
   pass unchanged and the CSP/resolver/descriptor guard suites (44) stay green (the 3 `HttpSubResource`
   relative-iframe failures are pre-existing network-env failures — identical on the `e03b140` baseline).
 
+- **P7.8 (2026-07-20) — item 4 (partial): sub-resource `file://`/local reads move into the loader.** The
+  nested-browsing-context fetch path inlined `File.Exists`/`File.ReadAllText` in two feature callbacks —
+  `TryReadFileResource` (a resolved `file://` URL) and `TryReadLocalResource` (the `LocalBasePath` directory)
+  — each with its own copy of the binary-content-type predicate (`image/`/`font/`/`audio/`/`video/`/`pdf` →
+  return the MIME but not the decoded bytes). Exactly the "direct file switch in a feature callback" the exit
+  criterion forbids. Added `ResourceLoader.LoadLocalResource(path, extensionMime)` — the one place that owns
+  the file existence + binary/text read policy: missing → `(null, "")` (empty document, not a fetch failure),
+  binary MIME → `(null, extensionMime)` (bytes not decoded), else → `(File.ReadAllText, extensionMime)` with
+  I/O exceptions propagating — plus a shared `ResourceLoader.IsBinaryMime` so the binary-content rule lives
+  once. `TryReadFileResource` collapses to mapping the URL to a path + delegating (and is no longer `static`,
+  so it reaches the loader); `TryReadLocalResource` keeps only its query/fragment strip, scheme reject, and
+  the generic-MIME content sniff (`DetectContentTypeFromContent`, bridge-owned), delegating the read. New
+  `ResourceLoaderTests` cases (2) pin `LoadLocalResource` (text read / binary skip / missing) and
+  `IsBinaryMime` (9 content types) deterministically. Behaviour-preserving: the 55 sub-resource / sub-window
+  binding tests pass unchanged (the same 3 `HttpSubResource` relative-iframe/WPT-root failures are
+  pre-existing network-env failures, identical on the P7.7 baseline). `ResourceLoader` remains `internal` to
+  Dom → no public-API change. The residual sub-resource dispatch still in the callback is the `data:` decode
+  and the HTTP `GetAsync` (already the loader) + the WPT host→local-root mapping (test policy, correctly
+  bridge-owned).
+
 - **Remaining for Phase 7.** Still open: item 2 (replace the `CspMetaDiscovery` /
   `ScriptExtractionService` **regex** HTML discovery with `Broiler.Dom.Html` parser output — now localised
   behind `FindPolicyContent` and `ExtractAll`; has a cross-assembly wrinkle since discovery lives in Core
-  and the DOM parser is a submodule component); item 4 (rest) — route the residual `file://` reads in
-  `SubDocuments.TryFetchSubResource` / `TryReadFileResource` / `TryReadLocalResource` through the loader
-  (extend `LoadText` with a bytes/MIME variant carrying the binary-null-content + extension-MIME policy); the
-  Dom URL *resolution* now shares `UrlResolver` (P7.7). Items 5–6 (host-layer CSP enforcement so DOM/CSS
-  receive already-authorised content; execute `IsModule` descriptors in the event loop instead of skipping
-  them — a substantial module-loading feature). Items 5–6 and the `SubDocuments`/parser pieces are larger or
-  WPT-reftest-sensitive; the CSP split (item 1), script descriptors (item 3), and the loader/resolver
-  consolidation (item 4 partial — file/http dispatch P7.3–P7.4, one shared resolver P7.6 across script/CSP and
-  P7.7 across frames) are done.
+  and the DOM parser is a submodule component); items 5–6 (host-layer CSP enforcement so DOM/CSS receive
+  already-authorised content; execute `IsModule` descriptors in the event loop instead of skipping them — a
+  substantial module-loading feature). Items 5–6 and the parser piece are larger or WPT-reftest-sensitive.
+  Item 1 (CSP split), item 3 (script descriptors) and item 4 (loader/resolver consolidation) are **done**:
+  the file/http text dispatch (P7.3–P7.4), one shared URL resolver across script/CSP (P7.6) and frames (P7.7),
+  and the sub-resource file/local reads (P7.8) all now live behind the loader/`UrlResolver`, so no feature
+  callback constructs an `HttpClient` or inlines a `file`/`data`-URI/`File.*` switch for the text-load paths.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 

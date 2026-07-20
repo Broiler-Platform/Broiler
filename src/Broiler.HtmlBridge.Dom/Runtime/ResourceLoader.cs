@@ -58,6 +58,42 @@ internal sealed class ResourceLoader
         return null;
     }
 
+    /// <summary>
+    /// Reads a local file <paramref name="path"/> as a sub-resource, applying the file read + MIME policy
+    /// in one place (Phase 7 item 4) so a sub-document/object feature callback no longer inlines a
+    /// <c>File.Exists</c>/<c>File.ReadAllText</c> switch. Returns:
+    /// <list type="bullet">
+    /// <item><c>(null, "")</c> when the file is missing — the caller treats this as an empty document, not
+    /// a fetch failure.</item>
+    /// <item><c>(null, extensionMime)</c> for a binary content type (image/font/audio/video/pdf): the bytes
+    /// are not decoded to text, but the detected MIME is preserved.</item>
+    /// <item><c>(text, extensionMime)</c> otherwise, with <see cref="File.ReadAllText(string)"/> semantics
+    /// (BOM/encoding detection).</item>
+    /// </list>
+    /// I/O exceptions from the read propagate so the caller can map them to its own failure contract.
+    /// </summary>
+    public (string? content, string contentType) LoadLocalResource(string path, string extensionMime)
+    {
+        if (!File.Exists(path))
+            return (null, string.Empty);
+
+        if (IsBinaryMime(extensionMime))
+            return (null, extensionMime);
+
+        return (File.ReadAllText(path), extensionMime);
+    }
+
+    /// <summary>
+    /// True for content types whose bytes must not be decoded to text (images, fonts, media, PDF). Shared
+    /// by the sub-resource file and local-base-path read paths so the binary-content policy lives once.
+    /// </summary>
+    public static bool IsBinaryMime(string mime) =>
+        mime.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
+        mime.StartsWith("font/", StringComparison.OrdinalIgnoreCase) ||
+        mime.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) ||
+        mime.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(mime, "application/pdf", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Sends a prepared request (e.g. XMLHttpRequest).</summary>
     public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request) => SharedClient.SendAsync(request);
 

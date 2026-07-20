@@ -49,6 +49,46 @@ public sealed class ResourceLoaderTests
     }
 
     [Fact]
+    public void LoadLocalResource_Reads_Text_Returns_Null_For_Missing_And_Skips_Binary()
+    {
+        // Phase 7 item 4 (P7.8): the sub-resource file existence + binary/text read policy lives in the
+        // loader. Deterministic (no network).
+        var loader = new ResourceLoader();
+
+        var textPath = Path.Combine(Path.GetTempPath(), $"broiler-local-{Guid.NewGuid():N}.html");
+        File.WriteAllText(textPath, "<p>hi</p>");
+        try
+        {
+            // Text content type → (content, extensionMime).
+            Assert.Equal(("<p>hi</p>", "text/html"), loader.LoadLocalResource(textPath, "text/html"));
+
+            // Binary content type → bytes not decoded to text, but MIME preserved.
+            Assert.Equal(((string?)null, "image/png"), loader.LoadLocalResource(textPath, "image/png"));
+        }
+        finally
+        {
+            File.Delete(textPath);
+        }
+
+        // Missing file → (null, "") — an empty document, not a fetch failure.
+        var missing = Path.Combine(Path.GetTempPath(), $"broiler-missing-{Guid.NewGuid():N}.html");
+        Assert.Equal(((string?)null, ""), loader.LoadLocalResource(missing, "text/html"));
+    }
+
+    [Theory]
+    [InlineData("image/png", true)]
+    [InlineData("font/woff2", true)]
+    [InlineData("audio/mpeg", true)]
+    [InlineData("video/mp4", true)]
+    [InlineData("application/pdf", true)]
+    [InlineData("text/html", false)]
+    [InlineData("application/xhtml+xml", false)]
+    [InlineData("application/octet-stream", false)]
+    [InlineData("", false)]
+    public void IsBinaryMime_Classifies_Content_Types(string mime, bool expected)
+        => Assert.Equal(expected, ResourceLoader.IsBinaryMime(mime));
+
+    [Fact]
     public void Bridge_SetLocalBasePath_Does_Not_Throw_And_Attach_Still_Works()
     {
         // Characterization: SetLocalBasePath now configures the loader; a subsequent attach + query

@@ -553,28 +553,16 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Reads a file:// URL from the local filesystem and returns its content with detected MIME type.
+    /// The file existence + binary/text read policy lives in the host <see cref="Runtime.ResourceLoader"/>
+    /// (Phase 7 item 4); this method only maps the URL to a path and the loader's I/O exceptions to the
+    /// empty-document contract.
     /// </summary>
-    private static (string? content, string contentType) TryReadFileResource(string fileUrl, string extensionMime)
+    private (string? content, string contentType) TryReadFileResource(string fileUrl, string extensionMime)
     {
         try
         {
-            var uri = new Uri(fileUrl);
-            var path = uri.LocalPath;
-            if (!File.Exists(path))
-                return (null, string.Empty); // File not found → empty document (not a fetch failure)
-
-            // For binary content types (images, fonts, etc.) return null content with MIME type
-            if (extensionMime.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
-                extensionMime.StartsWith("font/", StringComparison.OrdinalIgnoreCase) ||
-                extensionMime.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) ||
-                extensionMime.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(extensionMime, "application/pdf", StringComparison.OrdinalIgnoreCase))
-            {
-                return (null, extensionMime);
-            }
-
-            var content = File.ReadAllText(path);
-            return (content, extensionMime);
+            var path = new Uri(fileUrl).LocalPath;
+            return _resources.LoadLocalResource(path, extensionMime);
         }
         catch
         {
@@ -604,27 +592,17 @@ public sealed partial class DomBridge
         if (filename.Contains("://")) return (null, string.Empty);
 
         var localPath = Path.Combine(_resources.LocalBasePath, filename);
-        if (!File.Exists(localPath))
-            return (null, string.Empty);
-
-        // For binary content types (images, fonts, etc.) return null content with MIME type
-        if (extensionMime.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
-            extensionMime.StartsWith("font/", StringComparison.OrdinalIgnoreCase) ||
-            extensionMime.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) ||
-            extensionMime.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(extensionMime, "application/pdf", StringComparison.OrdinalIgnoreCase))
-        {
-            return (null, extensionMime);
-        }
 
         try
         {
-            var content = File.ReadAllText(localPath);
+            // The existence + binary/text read policy lives in the host loader (Phase 7 item 4); missing
+            // → (null, ""), binary → (null, extensionMime), text → (content, extensionMime).
+            var (content, detectedMime) = _resources.LoadLocalResource(localPath, extensionMime);
 
-            // Detect content type from content when extension is generic
-            var detectedMime = extensionMime;
-            if (string.Equals(detectedMime, "application/octet-stream", StringComparison.OrdinalIgnoreCase)
-                || string.IsNullOrEmpty(detectedMime))
+            // Detect content type from the read text when extension-based detection was generic.
+            if (content != null &&
+                (string.Equals(detectedMime, "application/octet-stream", StringComparison.OrdinalIgnoreCase)
+                 || string.IsNullOrEmpty(detectedMime)))
             {
                 detectedMime = DetectContentTypeFromContent(content, filename);
             }
