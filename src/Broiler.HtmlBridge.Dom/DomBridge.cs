@@ -267,20 +267,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <summary>Index of <paramref name="child"/> among the element's children, or -1
     /// (old <c>Children.IndexOf</c>, reference equality). Phase 4 item 4/5: canonical
     /// <c>Broiler.Dom.DomNodeCollectionExtensions.IndexOfReference</c> is the byte-identical scan, but the
-    /// extension class is <c>internal</c> at the pinned submodule SHA; making it public ships as
-    /// <c>patches/0002-dom-make-domnodecollectionextensions-public.patch</c> (Broiler.DOM push 403'd). Once
-    /// applied + pointer-bumped, the follow-up is <c>=> element.ChildNodes.IndexOfReference(child)</c>; the
-    /// loop is the active fallback until then.</summary>
-    internal static int ChildIndexOf(DomNode element, DomNode child)
-    {
-        for (var i = 0; i < element.ChildNodes.Count; i++)
-        {
-            if (ReferenceEquals(element.ChildNodes[i], child))
-                return i;
-        }
-
-        return -1;
-    }
+    /// reference-equality child-index scan is the canonical <c>DomNodeCollectionExtensions.IndexOfReference</c>
+    /// (P4.17 reuse), which `patches/0002` made public and which is now pinned — so the former manual loop
+    /// delegates to it (byte-identical).</summary>
+    internal static int ChildIndexOf(DomNode element, DomNode child) => element.ChildNodes.IndexOfReference(child);
 
     // RF-BRIDGE-1c Phase F (F3c part 2b): the child-mutation helpers take a DomNode parent so
     // range-extract code (whose ancestor-chain clones are DomNode-typed) can reparent without

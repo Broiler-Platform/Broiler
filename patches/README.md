@@ -61,15 +61,13 @@ DomNode)` — the reference-equality child-index scan `DomRange` already uses in
 (the method is already `public`) so the canonical scan can be shared. Behaviour-neutral (visibility
 only); the full css/dom test corpus is unaffected.
 
-**Follow-up (main-repo, once applied + pointer bumped).** Delegate `DomBridge.ChildIndexOf`
-(`DomBridge.cs`) to `element.ChildNodes.IndexOfReference(child)` and delete its manual loop — the
-byte-identical reuse. Deferred because it references the newly-public API, which does not exist at
-the pinned submodule SHA (so it would not compile against the pinned clone on CI).
-
-**Current fallback (unchanged until applied):** `ChildIndexOf` keeps its manual reference-equality
-loop, so nothing on CI depends on this patch. (The sibling `IsPositionAfter` →
+**Status: APPLIED + pointer bumped.** The pinned `Broiler.DOM` SHA now makes
+`DomNodeCollectionExtensions` public, so this patch has landed. The main-repo follow-up is **done**:
+`DomBridge.ChildIndexOf` (`DomBridge.cs`) delegates to `element.ChildNodes.IndexOfReference(child)`,
+the manual loop deleted (byte-identical reuse; 2026-07-20). (The sibling `IsPositionAfter` →
 `DomRange.CompareBoundaryPoints` reuse in the same Phase-4 cluster needed **no** patch — that
-canonical method was already public — and is already landed in the main repo.)
+canonical method was already public — and landed earlier.) This entry is retained for provenance;
+the patch file can be dropped once a maintainer confirms it matches the pinned SHA.
 
 ## 0001 — `Broiler.HTML`: plumb `viewportZoom` through the static render entry
 
