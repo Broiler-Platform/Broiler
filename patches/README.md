@@ -6,18 +6,21 @@ scope, so `git push` returns **403**). Each is captured here as a `git format-pa
 file for a maintainer to apply to the target submodule, push, and bump the submodule
 pointer in the parent repo.
 
-**Status.** Patches **0001–0003 have been applied upstream and the parent submodule
-pointers pin the commits that contain them** (retained only for provenance; they no
-longer apply — verified 2026-07-20 by reverse-apply against the pinned trees).
-Patch **0004 is PENDING** — its Broiler.HTML working-tree change was reverted after a
-403, so the pinned SHA does **not** contain it and the main-repo fallback stays active.
+**Status.** Patches **0001–0004 have been applied upstream and the parent submodule
+pointers pin the commits that contain them** (retained only for provenance). Patch
+**0004** in particular is now applied — the pinned `Broiler.HTML` `52f65d9` *"DomParser:
+treat `<iframe>` as a replaced element; hide inline fallback content"* contains its
+`CorrectIframeBoxes` pass (verified 2026-07-20). Patch **0005 is PENDING** — its
+Broiler.HTML working-tree change was reverted after a 403, so the pinned SHA does **not**
+contain it and the main-repo fallback stays active.
 
 | Patch | Target submodule | Pinned commit / status | Main-repo follow-up |
 |---|---|---|---|
 | 0001 — plumb `viewportZoom` through the static render entry | `Broiler.HTML` | applied — `9977672` *HtmlRender: plumb viewportZoom through the static render entry* | **Unblocked, not yet wired** — the visual-viewport render cutover (see below). The serialization bake remains the active fallback until it lands. |
 | 0002 — make `DomNodeCollectionExtensions` public | `Broiler.DOM` | applied — `5c71ac9` *Make DomNodeCollectionExtensions public for host reuse* (ancestor of the pinned `8e8325f`) | **Done** — `DomBridge.ChildIndexOf` delegates to `element.ChildNodes.IndexOfReference(child)`. |
 | 0003 — `Normalize()` fires one `characterData` record per text run | `Broiler.DOM` | applied — `8e8325f` *DomNode.Normalize(): one characterData record per contiguous text run* (the pinned pointer) | **Done / works either way** — `DomBridge.NormalizeNode` already delegates to `node.Normalize()`; canonical now matches the bridge's former one-record-per-run behaviour exactly. |
-| 0004 — treat `<iframe>` as a replaced element (hide inline fallback) | `Broiler.HTML` | **PENDING** — reverted from the working tree after a 403; pinned SHA `9977672` does **not** contain it | **Not yet wired** — once applied + pointer bumped, drop `HtmlPostProcessor.StripIframeContent` (Phase 6 concern 2). Until then that regex strip is the active fallback. |
+| 0004 — treat `<iframe>` as a replaced element (hide inline fallback) | `Broiler.HTML` | **applied** — pinned `52f65d9` *DomParser: treat `<iframe>` as a replaced element; hide inline fallback content* contains `CorrectIframeBoxes` | **Unblocked, not yet wired** — the pinned renderer now hides iframe fallback natively, so `HtmlPostProcessor.StripIframeContent` can be dropped (it is now a redundant belt-and-suspenders strip). Not done here to keep this change focused. |
+| 0005 — render `<video>` as a black inline-block replaced box (hide fallback) | `Broiler.HTML` | **PENDING** — reverted from the working tree after a 403; pinned SHA `52f65d9` does **not** contain it | **Not yet wired** — once applied + pointer bumped, drop `HtmlPostProcessor.ReplaceVideoWithPlaceholder` (Phase 6 concern 2). Until then that regex rewrite is the active fallback. |
 
 To apply a *future* patch (kept for reference):
 
@@ -32,6 +35,38 @@ git add <Submodule>                         # bump the pointer
 Then do the "Follow-up (main-repo)" wiring named for that patch — it is deferred until
 the pointer is bumped because it references the patched API, which does not exist at the
 previously-pinned submodule SHA (so it would not compile against the pinned clone on CI).
+
+---
+
+## 0005 — `Broiler.HTML`: render `<video>` as a black inline-block replaced box (hide fallback)
+
+**Target:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs`).
+**Status: PENDING** (reverted after a 403; pinned SHA `52f65d9` does not contain it).
+**Depends on:** nothing.
+
+**What it does.** HTML §4.8.9: a `<video>` is a replaced element; a UA that cannot present the media shows
+the poster/first frame and never renders the inline fallback content between the tags. Broiler cannot decode
+video, so a post-cascade `CorrectVideoBoxes` pass (mirroring `CorrectIframeBoxes`/`CorrectFramesetBoxes`)
+sets the box to `inline-block`, sizes it (author CSS size wins; else the `width`/`height` presentation
+attributes; else the CSS-default intrinsic **300×150**), paints it **black**, and hides the fallback children
+(`display:none`). Runs post-cascade so a cascade-time hide of a block fallback child cannot be re-shown.
+
+**Verified locally** (patch applied in the submodule working tree, parent build compiling it in place) via a
+render-probe using `HtmlRender.RenderToImageWithStyleSet` on **raw** `<video>` (bypassing the string
+fallback): a bare `<video></video>` paints black at a pixel well inside the 300×150 box (0,0,0), and a
+`<video><div style="background-color:green;width:120px;height:120px"></div></video>` paints **black** — not
+green — over the fallback area (the inline fallback is hidden). Full pixel validation needs the Acid/WPT
+reftest gate.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403** (submodule remote outside the session's GitHub
+scope), so per `CLAUDE.md` it ships as `patches/0005-html-video-replaced-element-black-box.patch` with the
+pointer left **unbumped** and the working tree reverted.
+
+**Main-repo follow-up (once applied + pointer bumped).** Drop `HtmlPostProcessor.ReplaceVideoWithPlaceholder`
+(the regex that rewrites `<video>…</video>` into a black `<div>`) from `Process`/`ProcessForBrowsing` — the
+renderer then boxes `<video>` natively. **Current fallback (unchanged until applied):** that rewrite runs in
+the string pipeline *before* the renderer, so a real `<video>` never reaches `CorrectVideoBoxes` yet and
+nothing on CI depends on this patch.
 
 ---
 

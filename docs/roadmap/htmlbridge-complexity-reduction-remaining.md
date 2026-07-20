@@ -142,17 +142,35 @@ Exit criteria:
   refreshed the stale "intentionally NOT applied" notes. Pure dead-code deletion — builds green;
   `Acid3RegressionTests` + guards/profile/native suites green (no public-API change: all internal).
 
+- **P6.6 (2026-07-20) — Concern 2, native-behaviour migration: `<video>` replaced-element handling
+  (submodule patch `0005`, pending).** Native replacement for `HtmlPostProcessor.ReplaceVideoWithPlaceholder`
+  (which string-rewrites `<video>…</video>` into a black `<div>` at its width/height or 300×150). Added a
+  post-cascade `CorrectVideoBoxes` pass in `Broiler.HTML` (`DomParser`) — mirroring `CorrectIframeBoxes` — that
+  makes a `<video>` box `inline-block`, sizes it (author CSS size wins; else the `width`/`height` presentation
+  attributes; else the CSS-default intrinsic 300×150), paints it black, and hides the fallback children.
+  **Verified via the parent build + a render probe on raw `<video>`** (`HtmlRender.RenderToImageWithStyleSet`,
+  bypassing the string fallback): a bare `<video>` paints black inside the 300×150 box, and inline fallback
+  content is hidden (black, not green, over the fallback area). The `Broiler.HTML` push returned **403**, so
+  per `CLAUDE.md` it ships as `patches/0005-html-video-replaced-element-black-box.patch` with the pointer
+  **unbumped** and the working tree reverted; `HtmlPostProcessor.ReplaceVideoWithPlaceholder` stays the active
+  fallback (it runs in the string pipeline before the renderer, so a real `<video>` never reaches
+  `CorrectVideoBoxes` yet) until the patch lands and the pointer is bumped (then it is dropped). Also observed
+  while reverting: patch **`0004` is now applied upstream** — the pinned `Broiler.HTML` `52f65d9` contains
+  `CorrectIframeBoxes` — so `StripIframeContent` is now a redundant (harmless) belt-and-suspenders strip whose
+  removal is unblocked; `patches/README.md` corrected accordingly.
+
 - **Remaining for Phase 6 — Concern 2 native migration + project deletion.** The live transforms still in
   `HtmlPostProcessor` are: the production/harness replaced-element passes (`StripScriptTags` [protective],
-  `StripIframeContent` [pending `patches/0004`], `ReplaceVideo`/`ReplaceProgressLike`/`ReplaceSelectMultiple`
-  [legitimate fallbacks]) and the test-harness-only `StripHiddenTestArtifacts` (map/linktest/FAIL/red-bg
-  Acid scaffolding), `StripObjectContent`, and `RewriteRootSelector` (proven redundant, kept for the
-  harness pending reftest validation). Fully emptying the file to delete the Rendering project needs: (a)
-  `patches/0004` applied (drops `StripIframeContent`); (b) native replaced-element rendering for
-  video/progress/meter/select so those fallbacks retire (largely `Broiler.HTML`, **submodule-push-gated →
-  patch workflow**); and (c) relocating the residual Acid scaffolding shims to test support once the
-  reftest gate can validate. Per the disposition, `HtmlPostProcessor` must **not** be moved wholesale to
-  rename it; the migration is behavioural.
+  `StripIframeContent` [now redundant — `patches/0004` applied at `52f65d9`; removal unblocked],
+  `ReplaceVideo` [native `patches/0005` pending], `ReplaceProgressLike`/`ReplaceSelectMultiple` [legitimate
+  fallbacks]) and the test-harness-only `StripHiddenTestArtifacts` (map/linktest/FAIL/red-bg Acid scaffolding),
+  `StripObjectContent`, and `RewriteRootSelector` (proven redundant, kept for the harness pending reftest
+  validation). Fully emptying the file to delete the Rendering project needs: (a) the applied iframe/video
+  patches' pointer bumps so `StripIframeContent`/`ReplaceVideo` drop; (b) native replaced-element rendering
+  for progress/meter/select so those fallbacks retire (largely `Broiler.HTML`, **submodule-push-gated → patch
+  workflow**); and (c) relocating the residual Acid scaffolding shims to test support once the reftest gate can
+  validate. Per the disposition, `HtmlPostProcessor` must **not** be moved wholesale to rename it; the
+  migration is behavioural.
 
 ### Phase 7 - isolate loading, security and browsing-context policy
 
