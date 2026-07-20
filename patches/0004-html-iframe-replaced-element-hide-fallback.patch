@@ -1,0 +1,62 @@
+From 8876f67c48ee0e5a6699a2244957706d829ca4e2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 20 Jul 2026 13:48:08 +0000
+Subject: [PATCH] DomParser: treat <iframe> as a replaced element; hide inline
+ fallback content
+
+HTML 4.8.5: an <iframe> hosts a nested browsing context; UAs that support iframes
+never render the inline fallback content between the tags. This static renderer
+rendered the fallback children as a visible block. Add a post-cascade CorrectIframeBoxes
+pass that sets display:none on an iframe box's direct children (hiding the fallback
+subtree), mirroring the frameset <noframes> handling. Post-cascade so the per-box
+cascade cannot re-show a block child after the fact. Sub-documents compose separately
+(no in-tree #subdoc-root child), so loaded iframe content is unaffected.
+---
+ .../Parse/DomParser.cs                        | 24 +++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+index fd7a0aa..7076f3d 100644
+--- a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
++++ b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+@@ -98,6 +98,7 @@ internal sealed class DomParser
+         CorrectImgBoxes(root, baseUrl);
+         CorrectObjectBoxes(root);
+         CorrectFramesetBoxes(root);
++        CorrectIframeBoxes(root);
+ 
+         bool followingBlock = true;
+         CorrectLineBreaksBlocks(root, ref followingBlock);
+@@ -905,6 +906,29 @@ internal sealed class DomParser
+     /// outermost frameset fills the viewport; nested framesets fill their parent cell.
+     /// <c>&lt;noframes&gt;</c> fallback content is hidden because frames are supported.
+     /// </summary>
++    /// <summary>
++    /// HTML §4.8.5: an <c>&lt;iframe&gt;</c> is a replaced element hosting a nested browsing context.
++    /// UAs that support iframes never render the inline fallback content between the tags — the loaded
++    /// sub-document replaces it. This static renderer cannot load a sub-document, so the iframe paints as
++    /// an empty replaced box (its UA <c>border: 2px inset</c> at the explicit/auto size) and its fallback
++    /// children must not lay out or paint. Runs post-cascade so the per-box cascade cannot re-show a block
++    /// child (e.g. a <c>&lt;div&gt;</c>) after the fact — the reason a cascade-time hide is insufficient.
++    /// </summary>
++    private static void CorrectIframeBoxes(CssBox box)
++    {
++        if (box.HtmlTag != null
++            && box.HtmlTag.Name.Equals("iframe", StringComparison.OrdinalIgnoreCase))
++        {
++            // display:none on each direct child hides that child and its whole subtree.
++            foreach (var child in box.Boxes)
++                child.Display = CssConstants.None;
++            return;
++        }
++
++        foreach (var child in box.Boxes)
++            CorrectIframeBoxes(child);
++    }
++
+     private static void CorrectFramesetBoxes(CssBox box)
+     {
+         bool isFrameset = box.HtmlTag != null
+-- 
+2.43.0
+

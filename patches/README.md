@@ -1,24 +1,23 @@
-# Submodule patches — all applied + pinned
+# Submodule patches
 
-These captured the submodule changes that could not be pushed from the session (the
+These capture submodule changes that could not be pushed from the session (the
 `Broiler-Platform/Broiler.*` submodule remotes are outside the session's GitHub push
-scope, so `git push` returns **403**). Each was captured here as a `git format-patch`
+scope, so `git push` returns **403**). Each is captured here as a `git format-patch`
 file for a maintainer to apply to the target submodule, push, and bump the submodule
 pointer in the parent repo.
 
-**Status (verified 2026-07-20): every captured patch below has been applied upstream
-and the parent submodule pointers now pin the commits that contain them.** The `.patch`
-files are retained only for provenance — they no longer apply (their changes are already
-present at the pinned SHAs) and can be dropped at a maintainer's discretion. Verification
-method: each patch reverses cleanly against the pinned submodule tree (`git apply -R`)
-or, where the surrounding file has since drifted, the changed lines are byte-identical to
-the pinned source and the pinned submodule commit's subject line is the patch subject.
+**Status.** Patches **0001–0003 have been applied upstream and the parent submodule
+pointers pin the commits that contain them** (retained only for provenance; they no
+longer apply — verified 2026-07-20 by reverse-apply against the pinned trees).
+Patch **0004 is PENDING** — its Broiler.HTML working-tree change was reverted after a
+403, so the pinned SHA does **not** contain it and the main-repo fallback stays active.
 
-| Patch | Target submodule | Pinned commit that contains it | Main-repo follow-up |
+| Patch | Target submodule | Pinned commit / status | Main-repo follow-up |
 |---|---|---|---|
-| 0001 — plumb `viewportZoom` through the static render entry | `Broiler.HTML` | `9977672` *HtmlRender: plumb viewportZoom through the static render entry* | **Unblocked, not yet wired** — the visual-viewport render cutover (see below). The serialization bake remains the active fallback until it lands. |
-| 0002 — make `DomNodeCollectionExtensions` public | `Broiler.DOM` | `5c71ac9` *Make DomNodeCollectionExtensions public for host reuse* (ancestor of the pinned `8e8325f`) | **Done** — `DomBridge.ChildIndexOf` delegates to `element.ChildNodes.IndexOfReference(child)`. |
-| 0003 — `Normalize()` fires one `characterData` record per text run | `Broiler.DOM` | `8e8325f` *DomNode.Normalize(): one characterData record per contiguous text run* (the pinned pointer) | **Done / works either way** — `DomBridge.NormalizeNode` already delegates to `node.Normalize()`; canonical now matches the bridge's former one-record-per-run behaviour exactly. |
+| 0001 — plumb `viewportZoom` through the static render entry | `Broiler.HTML` | applied — `9977672` *HtmlRender: plumb viewportZoom through the static render entry* | **Unblocked, not yet wired** — the visual-viewport render cutover (see below). The serialization bake remains the active fallback until it lands. |
+| 0002 — make `DomNodeCollectionExtensions` public | `Broiler.DOM` | applied — `5c71ac9` *Make DomNodeCollectionExtensions public for host reuse* (ancestor of the pinned `8e8325f`) | **Done** — `DomBridge.ChildIndexOf` delegates to `element.ChildNodes.IndexOfReference(child)`. |
+| 0003 — `Normalize()` fires one `characterData` record per text run | `Broiler.DOM` | applied — `8e8325f` *DomNode.Normalize(): one characterData record per contiguous text run* (the pinned pointer) | **Done / works either way** — `DomBridge.NormalizeNode` already delegates to `node.Normalize()`; canonical now matches the bridge's former one-record-per-run behaviour exactly. |
+| 0004 — treat `<iframe>` as a replaced element (hide inline fallback) | `Broiler.HTML` | **PENDING** — reverted from the working tree after a 403; pinned SHA `9977672` does **not** contain it | **Not yet wired** — once applied + pointer bumped, drop `HtmlPostProcessor.StripIframeContent` (Phase 6 concern 2). Until then that regex strip is the active fallback. |
 
 To apply a *future* patch (kept for reference):
 
@@ -35,6 +34,37 @@ the pointer is bumped because it references the patched API, which does not exis
 previously-pinned submodule SHA (so it would not compile against the pinned clone on CI).
 
 ---
+
+## 0004 — `Broiler.HTML`: treat `<iframe>` as a replaced element (hide inline fallback)
+
+**Target:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs`).
+**Status: PENDING** (reverted after a 403; pinned SHA `9977672` does not contain it).
+**Depends on:** nothing.
+
+**What it does.** HTML §4.8.5: an `<iframe>` hosts a nested browsing context; UAs that support
+iframes never render the inline fallback content between the tags (the loaded sub-document replaces
+it). This static renderer laid out and painted the fallback children as a visible block (probe: an
+`<iframe><div style="background:green;width:80px;height:80px"></div></iframe>` painted 6400 green px).
+The patch adds a post-cascade `CorrectIframeBoxes` pass that sets `display:none` on each iframe box's
+direct children (hiding the whole fallback subtree), mirroring the frameset `<noframes>` handling. It
+runs **post-cascade** because a cascade-time hide is re-shown by the per-box cascade for a block child
+(e.g. a `<div>`). Sub-documents compose separately (no in-tree `#subdoc-root` child), so a *loaded*
+iframe sub-document is unaffected.
+
+**Verified locally** (patch applied in the submodule working tree, parent build compiling it in place):
+the same probe now paints **0** green px (fallback hidden) while a real out-of-iframe green div still
+paints 6400; the standing iframe sub-resource tests fail identically to baseline (pre-existing network
+env, not this change). Full pixel validation needs the Acid/WPT reftest gate.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403** (submodule remote outside the session's
+GitHub scope), so per `CLAUDE.md` it ships as
+`patches/0004-html-iframe-replaced-element-hide-fallback.patch` with the pointer left **unbumped**.
+
+**Main-repo follow-up (once applied + pointer bumped).** Drop `HtmlPostProcessor.StripIframeContent`
+(the regex that empties `<iframe>…</iframe>` fallback) from `ProcessForBrowsing` and `Process` — the
+renderer then suppresses the fallback natively. **Current fallback (unchanged until applied):**
+`StripIframeContent` stays in both pipelines, so iframe fallback is still emptied at the string level
+and nothing on CI depends on this patch.
 
 ## 0003 — `Broiler.DOM`: `DomNode.Normalize()` fires one `characterData` record per text run
 

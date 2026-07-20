@@ -116,15 +116,31 @@ Exit criteria:
   Only the same 3 environmental failures; zero regressions. `RewriteRootSelector` stays in the test-harness
   `Process()` pending the WPT/Acid reftest gate to retire it there too.
 
-- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** The still-needed workarounds —
-  `StripIframeContent` (native iframe replaced-element handling) and, in the test-harness profile, the
-  Acid/WPT strips (`StripHiddenTestArtifacts`, `StripCssDataUriBackgrounds`, `StripObjectContent`,
-  `StripTables`, `StripForms`) plus the now-redundant `StripScriptTags`/`RewriteRootSelector` — are largely
-  `Broiler.HTML` / `Broiler.CSS` **submodule-push-gated → patch workflow** and need the Acid/WPT pixel
-  reftest gate (environmental in a bare container) to validate. Per the disposition,
-  `HtmlPostProcessor` must **not** be moved wholesale to rename it; the migration is behavioural. Once the
-  test-harness profile's remaining transforms are relocated to test support, the Rendering project (then
-  empty) is deleted.
+- **P6.4 (2026-07-20) — Concern 2, native-behaviour migration: `<iframe>` replaced-element handling
+  (submodule patch `0004`, pending).** The render probe classified `StripIframeContent` as still-needed
+  because the renderer painted `<iframe>` fallback children as a visible block. The native fix is in
+  `Broiler.HTML` (`DomParser`): a post-cascade `CorrectIframeBoxes` pass sets `display:none` on an iframe
+  box's direct children, mirroring the frameset `<noframes>` handling (post-cascade because a cascade-time
+  hide is re-shown for a block child; sub-documents compose separately, so loaded iframe content is
+  unaffected). **Verified via the parent build + render probe** (iframe fallback 6400→0 green px; real
+  content still paints; the standing iframe sub-resource tests fail identically to baseline — pre-existing
+  network env). The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships as
+  `patches/0004-html-iframe-replaced-element-hide-fallback.patch` with the pointer **unbumped** and the
+  working tree reverted; `HtmlPostProcessor.StripIframeContent` stays as the active fallback in both
+  profiles until the patch lands and the pointer is bumped (then it is dropped). Also fixed the P6.1
+  fallout: the `Broiler.HtmlBridge.Rendering` public-API snapshot baseline, which still listed the removed
+  public Canvas types (`CanvasRenderingContext2D`/`CanvasDrawCommand`/`CanvasDrawCommandType`) — regenerated
+  so the assembly's now-empty public surface is the baseline.
+
+- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** After `patches/0004` lands,
+  the still-outstanding workarounds live in the test-harness profile: the Acid/WPT strips
+  (`StripHiddenTestArtifacts`, `StripCssDataUriBackgrounds`, `StripObjectContent`, `StripTables`,
+  `StripForms`) plus the now-proven-redundant `StripScriptTags`/`RewriteRootSelector`. These are relocated
+  to test support (or retired once native behaviour covers them — largely `Broiler.HTML`/`Broiler.CSS`,
+  **submodule-push-gated → patch workflow**, needing the Acid/WPT pixel reftest gate to validate). Per the
+  disposition, `HtmlPostProcessor` must **not** be moved wholesale to rename it; the migration is
+  behavioural. Once the test-harness profile's remaining transforms are relocated to test support, the
+  Rendering project (then empty) is deleted.
 
 ### Phase 7 - isolate loading, security and browsing-context policy
 
