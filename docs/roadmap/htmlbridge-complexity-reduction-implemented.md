@@ -407,6 +407,14 @@ Two findings recorded for later phases:
       `InlineStyleStateFor`, and `_elementRuntimeStates` → `_inlineStyleStates`; the now-grab-bag state file
       `DomBridge/ElementRuntimeState.cs` → `DomBridge/RuntimeStates.cs` (it holds the per-concern
       `*RuntimeState` DTOs, `EventListenerRegistration` and `RuntimeValue`). Pure rename, build-verified.
+      Guard realignment (2026-07-20): the rename updated the file-size/architecture ratchet but left the
+      sibling boundary guard `HtmlBridgeBoundaryGuardTests.DomBridge_Runtime_State_Uses_Typed_Groups_Without_A_String_Property_Bag`
+      still asserting the removed `Broiler.HtmlBridge.Dom.Runtime.ElementRuntimeState` type existed, so it had
+      been failing on a null type since 2026-07-17 (guarding nothing). It now enforces the completed end-state
+      instead: both the monolithic composite **and** the older `ElementRuntimeProperties` string bag are gone,
+      the per-concern typed `*RuntimeState` groups (incl. `InlineStyleRuntimeState`) exist, and **none** of
+      them carries a `Dictionary<string, object>` catch-all bag (typed value maps keyed by property name are
+      allowed). Boundary-guard suite 12/12 green.
 
 Goal: make hidden state dependencies explicit while preserving behavior.
 

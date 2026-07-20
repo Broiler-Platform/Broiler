@@ -77,21 +77,48 @@ public class HtmlBridgeBoundaryGuardTests
     public void DomBridge_Runtime_State_Uses_Typed_Groups_Without_A_String_Property_Bag()
     {
         var bridgeAssembly = typeof(DomBridge).Assembly;
-        // P0.1 relocated the runtime-state group off the top-level bridge namespace into
-        // the internal Broiler.HtmlBridge.Dom.Runtime namespace (the DomBridge folder no
-        // longer drives a colliding Broiler.HtmlBridge.DomBridge namespace).
-        var runtimeStateType = bridgeAssembly.GetType("Broiler.HtmlBridge.Dom.Runtime.ElementRuntimeState");
 
-        Assert.NotNull(runtimeStateType);
+        // Phase 2/4 de-globalization (2026-07-17): the former process-static, catch-all per-element
+        // runtime-state composite (`ElementRuntimeState`, itself the successor to an even earlier
+        // string->object `ElementRuntimeProperties` bag) has been split into one per-bridge typed
+        // *RuntimeState DTO per concern in the internal Broiler.HtmlBridge.Dom.Runtime namespace, so no
+        // single element-runtime-state type — and no property bag — remains. (The last remnant was
+        // renamed `ElementRuntimeState` -> `InlineStyleRuntimeState` once it held only the inline-style
+        // concern.) Both the monolithic composite and the old string bag must be gone.
+        Assert.Null(bridgeAssembly.GetType("Broiler.HtmlBridge.Dom.Runtime.ElementRuntimeState"));
         Assert.Null(bridgeAssembly.GetType("Broiler.HtmlBridge.Dom.Runtime.ElementRuntimeProperties"));
-        Assert.DoesNotContain(
-            runtimeStateType!.GetProperties(BindingFlags.Public | BindingFlags.Instance),
-            static property =>
-                property.PropertyType.IsGenericType &&
-                property.PropertyType.GetGenericTypeDefinition() == typeof(Dictionary<,>) &&
-                property.PropertyType.GetGenericArguments() is [var keyType, var valueType] &&
-                keyType == typeof(string) &&
-                valueType == typeof(object));
+
+        // The per-concern typed groups that replaced it live in that Runtime namespace; the inline-style
+        // group (the renamed remnant) must be among them.
+        var typedGroups = bridgeAssembly.GetTypes()
+            .Where(static type =>
+                type.Namespace == "Broiler.HtmlBridge.Dom.Runtime" &&
+                type.Name.EndsWith("RuntimeState", StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.Contains(typedGroups, static type => type.Name == "InlineStyleRuntimeState");
+
+        // None of the typed groups is a string->object property bag. Typed value maps (e.g. the CSS
+        // property dictionaries keyed by property name — Dictionary<string, string> / <string, JSValue>)
+        // are legitimate; only a catch-all Dictionary<string, object> is the forbidden bag shape.
+        foreach (var group in typedGroups)
+        {
+            var memberTypes = group
+                .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .Select(static property => property.PropertyType)
+                .Concat(group
+                    .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Select(static field => field.FieldType));
+
+            Assert.DoesNotContain(
+                memberTypes,
+                static memberType =>
+                    memberType.IsGenericType &&
+                    memberType.GetGenericTypeDefinition() == typeof(Dictionary<,>) &&
+                    memberType.GetGenericArguments() is [var keyType, var valueType] &&
+                    keyType == typeof(string) &&
+                    valueType == typeof(object));
+        }
     }
 
     [Fact]
