@@ -10,12 +10,14 @@ pointer in the parent repo.
 pointers pin the commits that contain them** (retained only for provenance). Patch
 **0004** in particular is now applied — the pinned `Broiler.HTML` `52f65d9` *"DomParser:
 treat `<iframe>` as a replaced element; hide inline fallback content"* contains its
-`CorrectIframeBoxes` pass (verified 2026-07-20). Patch **0005 is PENDING** — its
-Broiler.HTML working-tree change was reverted after a 403, so the pinned SHA does **not**
-contain it and the main-repo fallback stays active. Patches **0006 and 0007 are
-PENDING** on the same basis (reverted after a 403; the main-repo `ReplaceProgressLike`
-/ `ReplaceSelectMultiple` fallbacks stay active). **0007 stacks on 0006** (they share
-`SetUniformBorder`/`ReadNumericAttribute`) — apply 0006 first.
+`CorrectIframeBoxes` pass (verified 2026-07-20). Patches **0005, 0006 and 0007 are now
+applied upstream** — the submodule commits were pushed to `Broiler.HTML` `main`
+(`52f65d9..5c16c12`) and the parent pointer is bumped to `5c16c12`, which contains
+`CorrectVideoBoxes` (0005), `CorrectProgressBoxes` (0006) and `CorrectSelectMultipleBoxes`
+(0007). Their main-repo `ReplaceVideoWithPlaceholder` / `ReplaceProgressLike` /
+`ReplaceSelectMultiple` fallbacks (and their exclusive helpers/patterns) **have been dropped
+from `HtmlPostProcessor`** now that the renderer handles these elements natively. **0007
+stacks on 0006** (they share `SetUniformBorder`/`ReadNumericAttribute`).
 
 | Patch | Target submodule | Pinned commit / status | Main-repo follow-up |
 |---|---|---|---|
@@ -23,9 +25,9 @@ PENDING** on the same basis (reverted after a 403; the main-repo `ReplaceProgres
 | 0002 — make `DomNodeCollectionExtensions` public | `Broiler.DOM` | applied — `5c71ac9` *Make DomNodeCollectionExtensions public for host reuse* (ancestor of the pinned `8e8325f`) | **Done** — `DomBridge.ChildIndexOf` delegates to `element.ChildNodes.IndexOfReference(child)`. |
 | 0003 — `Normalize()` fires one `characterData` record per text run | `Broiler.DOM` | applied — `8e8325f` *DomNode.Normalize(): one characterData record per contiguous text run* (the pinned pointer) | **Done / works either way** — `DomBridge.NormalizeNode` already delegates to `node.Normalize()`; canonical now matches the bridge's former one-record-per-run behaviour exactly. |
 | 0004 — treat `<iframe>` as a replaced element (hide inline fallback) | `Broiler.HTML` | **applied** — pinned `52f65d9` *DomParser: treat `<iframe>` as a replaced element; hide inline fallback content* contains `CorrectIframeBoxes` | **Unblocked, not yet wired** — the pinned renderer now hides iframe fallback natively, so `HtmlPostProcessor.StripIframeContent` can be dropped (it is now a redundant belt-and-suspenders strip). Not done here to keep this change focused. |
-| 0005 — render `<video>` as a black inline-block replaced box (hide fallback) | `Broiler.HTML` | **PENDING** — reverted from the working tree after a 403; pinned SHA `52f65d9` does **not** contain it | **Not yet wired** — once applied + pointer bumped, drop `HtmlPostProcessor.ReplaceVideoWithPlaceholder` (Phase 6 concern 2). Until then that regex rewrite is the active fallback. |
-| 0006 — render `<progress>`/`<meter>` as a native track with proportional fill | `Broiler.HTML` | **PENDING** — reverted from the working tree after a 403; pinned SHA `52f65d9` does **not** contain it | **Not yet wired** — once applied + pointer bumped, drop `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder`. Until then that regex rewrite is the active fallback. Adds `CorrectProgressBoxes` after `CorrectIframeBoxes` — same call-site line as `0005`, so applying both together needs a trivial adjacency resolution. |
-| 0007 — render `<select multiple>` as a native list box (both appearance modes) | `Broiler.HTML` | **PENDING** — reverted from the working tree after a 403; **stacks on 0006** (apply 0006 first) | **Not yet wired** — once applied + pointer bumped, drop `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder`. Reads the box's `Appearance` (the `appearance` box property landed in the main repo's `Broiler.Layout`, so it is present when this submodule is built in the parent), covering both `appearance:auto` and `appearance:none`. |
+| 0005 — render `<video>` as a black inline-block replaced box (hide fallback) | `Broiler.HTML` | **applied** — pushed as `5561eb0`; contained in the pinned `5c16c12` | **Done** — the pinned renderer paints `<video>` natively, so `HtmlPostProcessor.ReplaceVideoWithPlaceholder` (Phase 6 concern 2) was dropped. |
+| 0006 — render `<progress>`/`<meter>` as a native track with proportional fill | `Broiler.HTML` | **applied** — pushed as `444cace`; contained in the pinned `5c16c12` | **Done** — the pinned renderer paints `<progress>`/`<meter>` natively, so `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder` was dropped (native coverage: `FormControlRenderTests.Meter_NativeRender_Follows_WritingMode_And_Direction`). |
+| 0007 — render `<select multiple>` as a native list box (both appearance modes) | `Broiler.HTML` | **applied** — pushed as `5c16c12` (the pinned pointer); **stacks on 0006** | **Done** — the pinned renderer paints `<select multiple>` natively (both `appearance:auto`/`none`), so `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder` was dropped; the string-rewrite unit test was retired in favour of the WPT/Acid reftest gate. Reads the box's `Appearance` (the `appearance` box property landed in the main repo's `Broiler.Layout`). |
 
 To apply a *future* patch (kept for reference):
 
