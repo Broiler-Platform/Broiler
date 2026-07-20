@@ -120,7 +120,12 @@ public sealed partial class DomBridge
             }
         }
 
-        SetParent(node, parent);
+        // Phase 4 (mutation-primitive cleanup): a single canonical insert. The prior
+        // SetParent(node, parent) appended node at the end first, so the InsertChildAt below then
+        // re-moved it to `index` — firing spurious canonical add-at-end + remove records that the
+        // canonical NodeIterator/CSS mutation subscribers observe. The move-block above already
+        // detached node from any old parent, so InsertChildAt alone lands it at `index` with one
+        // canonical ChildList(added) record.
         InsertChildAt(parent, index, node);
         if (parent is DomElement parentElement)
         {
@@ -211,7 +216,9 @@ public sealed partial class DomBridge
             // RF-BRIDGE-1c Phase F (F3c part 2d): move ALL children so parsed text/comment survive.
             foreach (var child in fragmentContainer.ChildNodes.ToArray())
             {
-                SetParent(child, element);
+                // Single canonical move: AppendChild removes the child from the parsed fragment and
+                // appends it to element in one op. The prior SetParent(child, element) did the same
+                // move, leaving the following AppendChild a no-op — redundant, not wrong.
                 element.AppendChild(child);
             }
         }
@@ -255,7 +262,9 @@ public sealed partial class DomBridge
             var insertIndex = index;
             foreach (var child in parsedContainer.ChildNodes.ToArray())
             {
-                SetParent(child, parent);
+                // Single canonical insert (InsertChildAt moves child out of the parsed fragment and
+                // into parent at insertIndex); the prior SetParent-append + reposition fired spurious
+                // records. The explicit NotifyChildAdded record is unchanged.
                 InsertChildAt(parent, insertIndex, child);
                 NotifyChildAdded(parent, child, insertIndex);
                 insertIndex++;

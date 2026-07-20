@@ -68,8 +68,9 @@ internal sealed class SelectBinding(ISelectHost host)
         if (a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined && a[1] is JSObject refObj)
             refEl = _host.FindDomElementByJSObject(refObj);
 
+        // optEl.Remove() detaches; the insert/append below reattaches in one canonical op. The prior
+        // SetParent(optEl, element) appended at the end first, so a ref-node insert then re-moved it.
         optEl.Remove();
-        DomBridge.SetParent(optEl, element);
         if (refEl != null)
         {
             var idx = DomBridge.ChildIndexOf(element, refEl);

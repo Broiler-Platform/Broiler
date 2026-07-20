@@ -99,7 +99,6 @@ internal sealed class TableBinding(ITableHost host)
         if (cap != null)
             return _host.ToJSObject(cap);
         cap = _host.CreateElement("caption");
-        DomBridge.SetParent(cap, element);
         DomBridge.InsertChildAt(element, 0, cap);
         return _host.ToJSObject(cap);
     }
@@ -114,7 +113,6 @@ internal sealed class TableBinding(ITableHost host)
         if (existing != null)
             return _host.ToJSObject(existing);
         var section = _host.CreateElement(tag);
-        DomBridge.SetParent(section, element);
         element.AppendChild(section);
         return _host.ToJSObject(section);
     }
@@ -318,18 +316,15 @@ internal sealed class TableBinding(ITableHost host)
             {
                 // No sections and no rows at all: create a new tbody per spec
                 var tbody = _host.CreateElement("tbody");
-                DomBridge.SetParent(tbody, table);
                 table.AppendChild(tbody);
                 lastSection = tbody;
             }
             if (lastSection != null)
             {
-                DomBridge.SetParent(tr, lastSection);
                 lastSection.AppendChild(tr);
             }
             else
             {
-                DomBridge.SetParent(tr, table);
                 table.AppendChild(tr);
             }
         }
@@ -337,7 +332,6 @@ internal sealed class TableBinding(ITableHost host)
         {
             var refRow = allRows[index];
             var parent = DomBridge.ParentEl(refRow) ?? table;
-            DomBridge.SetParent(tr, parent);
             var idx = DomBridge.ChildIndexOf(parent, refRow);
             DomBridge.InsertChildAt(parent, idx >= 0 ? idx : parent.ChildNodes.Count, tr);
         }

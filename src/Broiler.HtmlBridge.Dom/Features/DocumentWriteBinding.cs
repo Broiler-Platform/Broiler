@@ -54,16 +54,16 @@ internal static class DocumentWriteBinding
                         var insertIdx = DomBridge.ChildIndexOf(mainBody, currentScript) + 1;
                         for (int ci = 0; ci < writtenChildren.Length; ci++)
                         {
-                            DomBridge.SetParent(writtenChildren[ci], mainBody);
+                            // Single canonical move out of the parsed fragment into mainBody at the
+                            // insert position (prior SetParent-append + reposition fired spurious records).
                             DomBridge.InsertChildAt(mainBody, insertIdx + ci, writtenChildren[ci]);
                         }
                     }
                     else
                     {
-                        // Fallback: append to end.
+                        // Fallback: append to end (single canonical move per child).
                         foreach (var child in writtenChildren)
                         {
-                            DomBridge.SetParent(child, mainBody);
                             mainBody.AppendChild(child);
                         }
                     }
