@@ -22,10 +22,8 @@ namespace Broiler.HtmlBridge.Scripting;
 /// non-script directives are intentionally not yet implemented and therefore
 /// remain explicit gaps.
 /// </summary>
-public sealed partial class ContentSecurityPolicy
+public sealed class ContentSecurityPolicy
 {
-    private static readonly Regex MetaPattern = MetaPatternRegex();
-
     private readonly HashSet<string> _defaultSrcTokens = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _scriptSrcTokens = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _scriptSrcElemTokens = new(StringComparer.OrdinalIgnoreCase);
@@ -233,7 +231,7 @@ public sealed partial class ContentSecurityPolicy
         if (ignoreStaticAllowlistSources)
             return false;
 
-        var resolved = ResolveUri(scriptUrl, pageUrl);
+        var resolved = CspSourceMatching.ResolveUri(scriptUrl, pageUrl);
         if (resolved == null)
             return false;
 
@@ -243,14 +241,14 @@ public sealed partial class ContentSecurityPolicy
                 return true;
 
             if (string.Equals(source, "'self'", StringComparison.OrdinalIgnoreCase) &&
-                IsSameOrigin(resolved, pageUrl))
+                CspSourceMatching.IsSameOrigin(resolved, pageUrl))
                 return true;
 
-            if (IsSchemeSource(source) &&
+            if (CspSourceMatching.IsSchemeSource(source) &&
                 string.Equals(resolved.Scheme, source[..^1], StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            if (MatchesAbsoluteSource(source, resolved))
+            if (CspSourceMatching.MatchesAbsoluteSource(source, resolved))
                 return true;
         }
 
@@ -264,33 +262,23 @@ public sealed partial class ContentSecurityPolicy
     /// </summary>
     public static ContentSecurityPolicy? FromHtml(string html)
     {
-        if (string.IsNullOrWhiteSpace(html))
+        // Discovery (where is the policy in the document) is CspMetaDiscovery's job; this method only
+        // composes it with parsing (what the policy allows). Phase 7 item 1.
+        var content = CspMetaDiscovery.FindPolicyContent(html);
+        if (string.IsNullOrWhiteSpace(content))
             return null;
 
-        foreach (Match match in MetaPattern.Matches(html))
-        {
-            var attrs = match.Groups["attrs"].Value;
-            var httpEquiv = ExtractAttributeValue(attrs, "http-equiv");
-            if (!string.Equals(httpEquiv, "Content-Security-Policy", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var content = ExtractAttributeValue(attrs, "content");
-            if (string.IsNullOrWhiteSpace(content))
-                continue;
-
-            var policy = new ContentSecurityPolicy();
-            policy.Parse(content);
-            return policy;
-        }
-
-        return null;
+        var policy = new ContentSecurityPolicy();
+        policy.Parse(content);
+        return policy;
     }
 
     /// <summary>
     /// Extract a <c>nonce</c> attribute value from a script tag attribute list.
     /// Returns <c>null</c> when no nonce is present.
     /// </summary>
-    public static string? ExtractNonceFromAttributes(string attributes) => ExtractAttributeValue(attributes, "nonce");
+    public static string? ExtractNonceFromAttributes(string attributes) =>
+        HtmlAttributeReader.ExtractAttributeValue(attributes, "nonce");
 
     private bool IsEvalAllowed()
     {
@@ -408,64 +396,4 @@ public sealed partial class ContentSecurityPolicy
         return Convert.ToBase64String(hash);
     }
 
-    private static bool IsSchemeSource(string source)
-        => source.EndsWith(':') &&
-           !source.StartsWith('\'') &&
-           !source.Contains("://", StringComparison.Ordinal);
-
-    private static bool MatchesAbsoluteSource(string source, Uri candidate)
-    {
-        if (!Uri.TryCreate(source, UriKind.Absolute, out var sourceUri))
-            return false;
-
-        if (!string.Equals(sourceUri.Scheme, candidate.Scheme, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(sourceUri.Host, candidate.Host, StringComparison.OrdinalIgnoreCase) ||
-            sourceUri.Port != candidate.Port)
-            return false;
-
-        var path = sourceUri.AbsolutePath;
-        return string.IsNullOrEmpty(path) ||
-               string.Equals(path, "/", StringComparison.Ordinal) ||
-               candidate.AbsolutePath.StartsWith(path, StringComparison.Ordinal);
-    }
-
-    private static bool IsSameOrigin(Uri candidate, string? pageUrl)
-    {
-        if (string.IsNullOrWhiteSpace(pageUrl) || !Uri.TryCreate(pageUrl, UriKind.Absolute, out var pageUri))
-            return false;
-
-        if (string.Equals(candidate.Scheme, "file", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(pageUri.Scheme, "file", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        return string.Equals(candidate.Scheme, pageUri.Scheme, StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(candidate.Host, pageUri.Host, StringComparison.OrdinalIgnoreCase) &&
-               candidate.Port == pageUri.Port;
-    }
-
-    private static Uri? ResolveUri(string url, string? pageUrl)
-    {
-        if (Uri.TryCreate(url, UriKind.Absolute, out var absolute))
-            return absolute;
-
-        if (!string.IsNullOrWhiteSpace(pageUrl) &&
-            Uri.TryCreate(pageUrl, UriKind.Absolute, out var baseUri) &&
-            Uri.TryCreate(baseUri, url, out var resolved))
-            return resolved;
-
-        return null;
-    }
-
-    private static string? ExtractAttributeValue(string attributes, string attributeName)
-    {
-        if (string.IsNullOrWhiteSpace(attributes))
-            return null;
-
-        var pattern = $@"\b{Regex.Escape(attributeName)}\s*=\s*(?:""(?<value>[^""]*)""|'(?<value>[^']*)'|(?<value>[^\s>]+))";
-        var match = Regex.Match(attributes, pattern, RegexOptions.IgnoreCase);
-        return match.Success ? match.Groups["value"].Value : null;
-    }
-
-    [GeneratedRegex(@"<meta(?<attrs>[^>]*)>", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial Regex MetaPatternRegex();
 }

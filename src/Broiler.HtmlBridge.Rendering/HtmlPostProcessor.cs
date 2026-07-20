@@ -44,14 +44,6 @@ internal static class HtmlPostProcessor
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
-    /// Matches CSS <c>background</c> (or <c>background-image</c>)
-    /// declarations that reference a <c>data:</c> URI.
-    /// </summary>
-    private static readonly Regex CssDataUriBgPattern = new(
-        @"background(?:-image)?\s*:[^;]*url\s*\(\s*[""']?data:[^)]+\)[^;]*;",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    /// <summary>
     /// Matches <c>&lt;iframe …&gt;…&lt;/iframe&gt;</c> elements including
     /// their inline fallback content.
     /// </summary>
@@ -141,24 +133,6 @@ internal static class HtmlPostProcessor
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
-    /// Matches <c>&lt;form …&gt;…&lt;/form&gt;</c> elements injected by
-    /// Acid3 <c>document.write()</c>.  HtmlRenderer renders the form and
-    /// its hidden input as a visible block.
-    /// </summary>
-    private static readonly Regex FormPattern = new(
-        @"<form\b[^>]*>[\s\S]*?</form>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    /// <summary>
-    /// Matches <c>&lt;table …&gt;…&lt;/table&gt;</c> elements injected
-    /// by Acid3 <c>document.write()</c>.  These empty tables render as
-    /// visible blocks in HtmlRenderer.
-    /// </summary>
-    private static readonly Regex TablePattern = new(
-        @"<table\b[^>]*>[\s\S]*?</table>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    /// <summary>
     /// Matches <c>&lt;p id="remove-last-child-test"&gt;…&lt;/p&gt;</c>,
     /// a scripting-disabled fallback that should be removed after JS runs.
     /// </summary>
@@ -185,26 +159,53 @@ internal static class HtmlPostProcessor
         RegexOptions.Compiled);
 
     /// <summary>
-    /// Applies the full set of post-processing steps to the HTML so that
-    /// it renders correctly in HtmlRenderer (WPF or Image).
+    /// Render-preparation transforms that approximate native browser rendering of replaced or
+    /// unsupported elements — stripping already-executed <c>&lt;script&gt;</c>s, emptying
+    /// <c>&lt;iframe&gt;</c> fallback, and boxing <c>&lt;video&gt;</c>/<c>&lt;progress&gt;</c>/
+    /// <c>&lt;meter&gt;</c>/<c>&lt;select multiple&gt;</c> — plus the <c>:root</c>→<c>html</c> selector
+    /// rewrite. These apply in both production browsing and the test harness.
     /// </summary>
-    internal static string Process(string html)
+    /// <remarks>
+    /// <see cref="StripObjectContent"/> is intentionally NOT part of this pipeline: stripping
+    /// <c>&lt;object&gt;</c> fallback destroys essential visual content (the Acid2 face's eyes are nested
+    /// <c>&lt;object&gt;</c>s with image fallback). Acid3 paths that need it call the method directly.
+    /// </remarks>
+    private static string ApplyReplacedElementPasses(string html)
     {
         html = StripScriptTags(html);
-        // Note: StripCssDataUriBackgrounds is intentionally NOT called here.
-        // Stripping data-URI CSS backgrounds destroys essential visual content
-        // (e.g., the Acid2 face uses data-URI backgrounds for forehead, eyes,
-        // and chin colours).  HtmlRenderer can render these backgrounds; the
-        // original stripping was a workaround that caused acid2 regression.
         html = StripIframeContent(html);
-        // Note: StripObjectContent is intentionally NOT called here.
-        // Stripping <object> fallback content destroys nested objects used by
-        // the Acid2 test (the eyes are formed by nested <object> elements with
-        // image fallback).  Acid3 tests that need object stripping call
-        // StripObjectContent() directly; the default pipeline preserves them.
         html = ReplaceVideoWithPlaceholder(html);
         html = ReplaceProgressLikeWithPlaceholder(html);
         html = ReplaceSelectMultipleWithPlaceholder(html);
+        return html;
+    }
+
+    /// <summary>
+    /// Production render-preparation for browsing / image capture: only the shared replaced-element
+    /// passes. It does <b>not</b> apply the Acid/WPT test-harness artifact cleanup
+    /// (<see cref="StripHiddenTestArtifacts"/>), which strips test scaffolding — and, incidentally, valid
+    /// content such as <c>&lt;map&gt;</c> — that real pages must keep.
+    /// </summary>
+    /// <remarks>
+    /// Phase 6 (P6.3) native-behaviour migration: the <c>:root</c>→<c>html</c> rewrite
+    /// (<see cref="RewriteRootSelector"/>) is <b>not</b> applied in production. The renderer now supports
+    /// the <c>:root</c> pseudo-class natively (verified by <c>HtmlPostProcessorNativeSupportTests</c>: a
+    /// <c>:root{background}</c> rule paints without the rewrite), so the rewrite is a dead workaround —
+    /// and a buggy one, since it lowered <c>:root</c>'s specificity from a pseudo-class (0,1,0) to the
+    /// type selector <c>html</c> (0,0,1), which could flip the cascade on real pages. It remains in the
+    /// test-harness <see cref="Process"/> pending the WPT/Acid pixel reftest gate to retire it there too.
+    /// </remarks>
+    internal static string ProcessForBrowsing(string html) => ApplyReplacedElementPasses(html);
+
+    /// <summary>
+    /// Test-harness profile: the shared render preparation plus the Acid/WPT-specific artifact cleanup
+    /// (<see cref="StripHiddenTestArtifacts"/>), preserving the historical ordering (artifact cleanup
+    /// runs after the replaced-element passes and before the <c>:root</c> rewrite). Used by the WPT
+    /// runner and Acid harness; production browsing uses <see cref="ProcessForBrowsing"/> instead.
+    /// </summary>
+    internal static string Process(string html)
+    {
+        html = ApplyReplacedElementPasses(html);
         html = StripHiddenTestArtifacts(html);
         html = RewriteRootSelector(html);
         return html;
@@ -218,17 +219,6 @@ internal static class HtmlPostProcessor
     internal static string StripScriptTags(string html)
     {
         return ScriptTagPattern.Replace(html, string.Empty);
-    }
-
-    /// <summary>
-    /// Strips CSS <c>background</c> declarations that reference
-    /// <c>data:</c> URI images.  HtmlRenderer does not reliably parse
-    /// the complex <c>background</c> shorthand when it contains a URL,
-    /// repeat mode, position and colour in one value.
-    /// </summary>
-    internal static string StripCssDataUriBackgrounds(string html)
-    {
-        return CssDataUriBgPattern.Replace(html, string.Empty);
     }
 
     /// <summary>
@@ -456,47 +446,13 @@ internal static class HtmlPostProcessor
         // the background images it was meant to cover.
         html = MapAfterRulePattern.Replace(html, string.Empty);
         html = NeutraliseRedBackgroundImages(html);
-        // Note: FormPattern is intentionally NOT applied here.
-        // Stripping all <form> elements destroys form controls (inputs,
-        // buttons, selects) on real web pages.  Acid3's document.write()
-        // forms that need stripping should use StripForms() in the
-        // Acid3-specific pipeline (similar to StripTables).
-        // Note: TablePattern is intentionally NOT applied here.
-        // Stripping all <table> elements destroys structural tables used by
-        // Acid2 (e.g. the <table> that implicitly closes a <p>, enabling the
-        // p + table + p sibling combinator).  Acid3's document.write() tables
-        // should be stripped via StripTables() in the Acid3-specific pipeline.
+        // <form> and <table> are deliberately NOT stripped: real pages rely on forms to wrap their
+        // input controls, and Acid2 relies on a structural <table> (the one that implicitly closes a
+        // <p>, enabling the p + table + p sibling combinator). The renderer no longer paints the empty
+        // <form>/<table> elements that Acid3 injects via document.write() as visible blocks, so the
+        // former Acid3-only StripForms()/StripTables() shims were removed as dead code (P6.5).
         html = RemoveLastChildTestPattern.Replace(html, string.Empty);
         return html;
-    }
-
-    /// <summary>
-    /// Strips all <c>&lt;table&gt;…&lt;/table&gt;</c> elements.  This is
-    /// intended for Acid3 post-processing where <c>document.write()</c>
-    /// injects empty tables that render as visible blocks in HtmlRenderer.
-    /// <para>
-    /// <b>Do not use in the general pipeline</b> — Acid2 and other pages
-    /// rely on structural <c>&lt;table&gt;</c> elements for correct layout.
-    /// </para>
-    /// </summary>
-    internal static string StripTables(string html)
-    {
-        return TablePattern.Replace(html, string.Empty);
-    }
-
-    /// <summary>
-    /// Strips all <c>&lt;form&gt;…&lt;/form&gt;</c> elements.  This is
-    /// intended for Acid3 post-processing where <c>document.write()</c>
-    /// injects form elements that render as visible blocks in HtmlRenderer.
-    /// <para>
-    /// <b>Do not use in the general pipeline</b> — real web pages rely on
-    /// <c>&lt;form&gt;</c> elements to wrap their input controls, buttons,
-    /// and other form widgets.
-    /// </para>
-    /// </summary>
-    internal static string StripForms(string html)
-    {
-        return FormPattern.Replace(html, string.Empty);
     }
 
     /// <summary>

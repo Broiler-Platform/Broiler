@@ -208,10 +208,6 @@ public class CaptureService
         @"<style[^>]*>(?<content>[\s\S]*?)</style>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly Regex WhitespacePattern = new(
-        @"\s+",
-        RegexOptions.Compiled);
-
 
     /// <summary>
     /// Captures website content from the specified URL, processes it using
@@ -334,10 +330,11 @@ public class CaptureService
         // is present before rendering.
         html = ExecuteScriptsWithDom(html, options.Url);
 
-        // Apply the shared post-processing pipeline (strip scripts,
-        // data-URI backgrounds, iframe/object fallback content, and
-        // hidden test artifacts) so that HtmlRenderer produces clean output.
-        html = HtmlPostProcessor.Process(html);
+        // Apply the production render-preparation pipeline (strip already-executed scripts, empty
+        // iframe fallback, box replaced video/progress/meter/select-multiple, :root->html) so that
+        // HtmlRenderer produces clean output. This is the browsing profile: it deliberately does NOT
+        // apply the Acid/WPT test-harness artifact cleanup (which strips valid content like <map>).
+        html = HtmlPostProcessor.ProcessForBrowsing(html);
 
         var format = options.ImageFormat == ImageFormat.Jpeg
             ? ImageEncodeFormat.Jpeg
@@ -598,49 +595,14 @@ public class CaptureService
     /// Relative URLs are resolved against the page <paramref name="pageUrl"/>.
     /// Returns the script text content, or <c>string.Empty</c> on failure.
     /// </summary>
-    internal static string FetchExternalScript(string scriptUrl, string pageUrl)
-    {
-        try
-        {
-            // Resolve relative URLs against the page URL
-            string resolvedUrl;
-            if (Uri.TryCreate(scriptUrl, UriKind.Absolute, out _))
-            {
-                resolvedUrl = scriptUrl;
-            }
-            else if (Uri.TryCreate(pageUrl, UriKind.Absolute, out var baseUri) &&
-                     Uri.TryCreate(baseUri, scriptUrl, out var resolved))
-            {
-                resolvedUrl = resolved.AbsoluteUri;
-            }
-            else
-            {
-                return string.Empty;
-            }
-
-            // Handle file:// URLs — read from local filesystem
-            if (resolvedUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
-            {
-                var uri = new Uri(resolvedUrl);
-                var path = uri.LocalPath;
-                return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
-            }
-
-            using var response = SharedHttpClient.GetAsync(resolvedUrl).GetAwaiter().GetResult();
-            if (!response.IsSuccessStatusCode)
-                return string.Empty;
-
-            return response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-        }
-        catch (Exception ex)
-        {
-            RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.FetchExternalScript",
-                $"Failed to fetch external script '{scriptUrl}': {ex.Message}", ex);
-            return string.Empty;
-        }
-    }
-
-    private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+    /// <remarks>
+    /// Phase 7 item 4: delegates to the single <see cref="ScriptExtractionService.FetchExternalScript"/>
+    /// implementation rather than duplicating the resolve + file/http switch (and a second
+    /// <c>HttpClient</c>) here; the empty-on-failure contract this method's callers/tests expect is
+    /// preserved by mapping the service's <c>null</c> to <see cref="string.Empty"/>.
+    /// </remarks>
+    internal static string FetchExternalScript(string scriptUrl, string pageUrl) =>
+        ScriptExtractionService.FetchExternalScript(scriptUrl, pageUrl) ?? string.Empty;
 
     /// <summary>
     /// Removes all <c>&lt;script&gt;</c> tags from the HTML.
@@ -649,16 +611,6 @@ public class CaptureService
     internal static string StripScriptTags(string html)
     {
         return HtmlPostProcessor.StripScriptTags(html);
-    }
-
-    /// <summary>
-    /// Strips CSS <c>background</c> declarations that reference
-    /// <c>data:</c> URI images.
-    /// Delegates to <see cref="HtmlPostProcessor.StripCssDataUriBackgrounds"/>.
-    /// </summary>
-    internal static string StripCssDataUriBackgrounds(string html)
-    {
-        return HtmlPostProcessor.StripCssDataUriBackgrounds(html);
     }
 
     /// <summary>
@@ -692,55 +644,15 @@ public class CaptureService
     }
 
     /// <summary>
-    /// Strips all <c>&lt;table&gt;…&lt;/table&gt;</c> elements.
-    /// Intended for Acid3-specific post-processing only — structural tables
-    /// in other pages (e.g. Acid2) must be preserved.
-    /// Delegates to <see cref="HtmlPostProcessor.StripTables"/>.
-    /// </summary>
-    internal static string StripTables(string html)
-    {
-        return HtmlPostProcessor.StripTables(html);
-    }
-
-    /// <summary>
     /// Decodes a <c>data:</c> URI to its text content.
     /// Supports <c>data:text/javascript,...</c> (percent-encoded) and
     /// <c>data:text/javascript;base64,...</c> formats.
     /// </summary>
-    internal static string DecodeDataUri(string dataUri)
-    {
-        if (!dataUri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-            return string.Empty;
-
-        var rest = dataUri[5..]; // strip "data:"
-        var commaIdx = rest.IndexOf(',');
-        if (commaIdx < 0)
-            return string.Empty;
-
-        var meta = rest[..commaIdx];
-        var payload = rest[(commaIdx + 1)..];
-
-        if (meta.Contains("base64", StringComparison.OrdinalIgnoreCase))
-        {
-            // Percent-decode first (some Acid3 data URIs percent-encode the base64)
-            var decoded = Uri.UnescapeDataString(payload);
-            // Strip whitespace (RFC 2045 allows folding)
-            decoded = WhitespacePattern.Replace(decoded, string.Empty);
-            try
-            {
-                var bytes = Convert.FromBase64String(decoded);
-                return Encoding.UTF8.GetString(bytes);
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-        else
-        {
-            return Uri.UnescapeDataString(payload);
-        }
-    }
+    /// <remarks>
+    /// Phase 7 item 4: delegates to the single <see cref="ScriptExtractionService.DecodeDataUri"/>
+    /// implementation rather than keeping a byte-identical copy here.
+    /// </remarks>
+    internal static string DecodeDataUri(string dataUri) => ScriptExtractionService.DecodeDataUri(dataUri);
 
     /// <summary>
     /// Registers minimal <c>window</c> and <c>document</c> global stubs on the

@@ -23,6 +23,32 @@ public sealed class ResourceLoaderTests
     }
 
     [Fact]
+    public void LoadText_Reads_A_File_Url_From_Disk()
+    {
+        // Phase 7 item 4: the file/http dispatch lives in the loader. Deterministic (no network).
+        var path = Path.Combine(Path.GetTempPath(), $"broiler-loadtext-{Guid.NewGuid():N}.css");
+        File.WriteAllText(path, "body { color: green; }");
+        try
+        {
+            var loader = new ResourceLoader();
+            Assert.Equal("body { color: green; }", loader.LoadText(new Uri(path).AbsoluteUri));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void LoadText_Returns_Null_For_Missing_File_Relative_And_Unsupported_Scheme()
+    {
+        var loader = new ResourceLoader();
+        Assert.Null(loader.LoadText(new Uri(Path.Combine(Path.GetTempPath(), "broiler-nope-xyz.css")).AbsoluteUri));
+        Assert.Null(loader.LoadText("styles.css"));          // not absolute
+        Assert.Null(loader.LoadText("ftp://example.com/x")); // unsupported scheme
+    }
+
+    [Fact]
     public void Bridge_SetLocalBasePath_Does_Not_Throw_And_Attach_Still_Works()
     {
         // Characterization: SetLocalBasePath now configures the loader; a subsequent attach + query

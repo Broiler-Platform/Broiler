@@ -107,54 +107,70 @@ public static partial class ScriptExtractionService
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
         var asyncScripts = new List<string>();
+        var descriptors = new List<ScriptDescriptor>();
         var csp = ContentSecurityPolicy.FromHtml(html);
 
+        var documentOrder = 0;
         foreach (Match match in AnyScriptPattern.Matches(html))
         {
             var attrs = match.Groups["attrs"].Value;
             var nonce = ContentSecurityPolicy.ExtractNonceFromAttributes(attrs);
-
-            // Skip module scripts — they are extracted separately
-            if (ModuleTypeAttribute.IsMatch(attrs))
-                continue;
-
+            var isModule = ModuleTypeAttribute.IsMatch(attrs);
             var isDefer = DeferAttrPattern.IsMatch(attrs);
             var isAsync = AsyncAttrPattern.IsMatch(attrs);
-            string? scriptContent = null;
 
-            // Check for data: URI src attribute
             var dataSrcMatch = DataSrcAttrPattern.Match(attrs);
-            if (dataSrcMatch.Success)
+            var anySrcMatch = dataSrcMatch.Success ? null : AnySrcAttrWithValuePattern.Match(attrs);
+            var kind = dataSrcMatch.Success ? ScriptSourceKind.DataUri
+                : anySrcMatch is { Success: true } ? ScriptSourceKind.External
+                : ScriptSourceKind.Inline;
+            var url = kind switch
             {
-                if (csp != null && !csp.AllowsExternalScript(dataSrcMatch.Groups["uri"].Value, pageUrl, nonce))
-                    continue;
+                ScriptSourceKind.DataUri => dataSrcMatch.Groups["uri"].Value,
+                ScriptSourceKind.External => anySrcMatch!.Groups["uri"].Value,
+                _ => null,
+            };
 
-                var decoded = DecodeDataUri(dataSrcMatch.Groups["uri"].Value);
-                if (!string.IsNullOrEmpty(decoded))
-                    scriptContent = decoded;
-            }
-            else
+            // Resolve the program text for the classic execution buckets. Module scripts are recorded in
+            // the descriptor list but omitted from execution here (item 6 wires them into the event loop).
+            string? scriptContent = null;
+            if (!isModule)
             {
-                // Check for any src= attribute (http/https/file/relative)
-                var anySrcMatch = AnySrcAttrWithValuePattern.Match(attrs);
-                if (anySrcMatch.Success)
+                if (kind == ScriptSourceKind.DataUri)
                 {
-                    var srcUri = anySrcMatch.Groups["uri"].Value;
-                    if (csp != null && !csp.AllowsExternalScript(srcUri, pageUrl, nonce))
-                        continue;
-
-                    var fetched = FetchExternalScript(srcUri, pageUrl);
-                    if (!string.IsNullOrEmpty(fetched))
-                        scriptContent = fetched;
+                    if (csp == null || csp.AllowsExternalScript(url!, pageUrl, nonce))
+                    {
+                        var decoded = DecodeDataUri(url!);
+                        if (!string.IsNullOrEmpty(decoded))
+                            scriptContent = decoded;
+                    }
+                }
+                else if (kind == ScriptSourceKind.External)
+                {
+                    if (csp == null || csp.AllowsExternalScript(url!, pageUrl, nonce))
+                    {
+                        var fetched = FetchExternalScript(url!, pageUrl);
+                        if (!string.IsNullOrEmpty(fetched))
+                            scriptContent = fetched;
+                    }
                 }
                 else
                 {
-                    // Inline script
                     var content = match.Groups["content"].Value.Trim();
                     if (!string.IsNullOrEmpty(content) && (csp == null || csp.AllowsInlineScript(nonce, content)))
                         scriptContent = content;
                 }
             }
+
+            descriptors.Add(new ScriptDescriptor(
+                DocumentOrder: documentOrder++,
+                Kind: kind,
+                Url: url,
+                Nonce: nonce,
+                IsAsync: isAsync,
+                IsDefer: isDefer,
+                IsModule: isModule,
+                Content: scriptContent ?? string.Empty));
 
             if (scriptContent == null) continue;
 
@@ -166,7 +182,7 @@ public static partial class ScriptExtractionService
                 scripts.Add(scriptContent);
         }
 
-        return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts);
+        return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts, descriptors);
     }
 
     /// <summary>
@@ -217,28 +233,15 @@ public static partial class ScriptExtractionService
     {
         try
         {
-            // Resolve relative URLs against the page URL
-            string resolvedUrl;
-            if (Uri.TryCreate(scriptUrl, UriKind.Absolute, out _))
-            {
-                resolvedUrl = scriptUrl;
-            }
-            else if (!string.IsNullOrEmpty(pageUrl)
-                  && Uri.TryCreate(pageUrl, UriKind.Absolute, out var baseUri)
-                  && Uri.TryCreate(baseUri, scriptUrl, out var resolved))
-            {
-                resolvedUrl = resolved.AbsoluteUri;
-            }
-            else
-            {
+            // Resolve relative URLs against the page URL via the shared resolver.
+            if (UrlResolver.Resolve(scriptUrl, pageUrl) is not { } resolvedUri)
                 return null;
-            }
+            var resolvedUrl = resolvedUri.AbsoluteUri;
 
             // Handle file:// URLs — read from local filesystem
-            if (resolvedUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            if (resolvedUri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
             {
-                var uri = new Uri(resolvedUrl);
-                var path = uri.LocalPath;
+                var path = resolvedUri.LocalPath;
                 return File.Exists(path) ? File.ReadAllText(path) : null;
             }
 

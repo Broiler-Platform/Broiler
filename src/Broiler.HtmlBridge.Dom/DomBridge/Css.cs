@@ -714,17 +714,8 @@ public sealed partial class DomBridge
     {
         try
         {
-            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
-                return null;
-            if (uri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
-            {
-                var path = uri.LocalPath;
-                return File.Exists(path) ? File.ReadAllText(path) : null;
-            }
-            return _resources.GetStringAsync(url)
-                .ConfigureAwait(false)
-                .GetAwaiter()
-                .GetResult();
+            // The file/http dispatch policy lives in the loader (Phase 7 item 4), not here.
+            return _resources.LoadText(url);
         }
         catch (Exception ex)
         {

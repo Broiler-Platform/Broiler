@@ -33,6 +33,31 @@ internal sealed class ResourceLoader
     /// <summary>Fetches <paramref name="url"/> as a string (e.g. an external stylesheet).</summary>
     public Task<string> GetStringAsync(string url) => SharedClient.GetStringAsync(url);
 
+    /// <summary>
+    /// Loads an absolute <paramref name="url"/> as text, applying the file/http dispatch policy in one
+    /// place (Phase 7 item 4): a <c>file://</c> URL is read from disk, <c>http(s)</c> is fetched via the
+    /// shared client. Returns <c>null</c> for a non-absolute URL, an unsupported scheme, or a missing
+    /// file. I/O exceptions propagate so the caller can log with its own context. This replaces the
+    /// file/http switch that stylesheet/sub-resource feature callbacks used to inline.
+    /// </summary>
+    public string? LoadText(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return null;
+
+        if (uri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
+        {
+            var path = uri.LocalPath;
+            return File.Exists(path) ? File.ReadAllText(path) : null;
+        }
+
+        if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
+            uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
+            return GetStringAsync(url).ConfigureAwait(false).GetAwaiter().GetResult();
+
+        return null;
+    }
+
     /// <summary>Sends a prepared request (e.g. XMLHttpRequest).</summary>
     public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request) => SharedClient.SendAsync(request);
 
