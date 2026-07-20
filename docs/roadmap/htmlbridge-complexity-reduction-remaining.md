@@ -220,14 +220,26 @@ Exit criteria:
   suites green (the one failure, `HttpClientMigrationTests.StylesheetLoadHandler_Uses_HttpClient`, is a
   pre-existing environmental failure — identical on the `6a19eeb` baseline).
 
+- **P7.4 (2026-07-20) — item 4 (partial): dedup the script fetch/decode switch to one implementation.**
+  The external-script file/http switch and the `data:` decoder were **duplicated** — a near-identical
+  `FetchExternalScript` (resolve + file/http + a second 30 s `HttpClient`) and a byte-identical
+  `DecodeDataUri` existed in both `ScriptExtractionService` (Core) and `CaptureService` (Cli). Collapsed the
+  Cli copies to thin delegators onto the single Core implementation (`CaptureService.FetchExternalScript`
+  maps the service's `null` → `string.Empty` to preserve its callers'/tests' empty-on-failure contract),
+  and deleted `CaptureService`'s now-unused `SharedHttpClient` and `WhitespacePattern`. Behaviour-preserving
+  — the `SubResourceFetching`/`HttpSubResource` `FetchExternalScript` assertions and the
+  `CaptureServiceJsTests` `DecodeDataUri` assertions (base64/percent/empty) pass unchanged; internal-only, no
+  public-API change. One fewer file/http switch and one fewer process `HttpClient`.
+
 - **Remaining for Phase 7.** Still open: item 1's URL/origin-context extraction (`ResolveUri`/`IsSameOrigin`/
   `MatchesAbsoluteSource` still live inside the policy); item 2 (replace the `CspMetaDiscovery` /
   `ScriptExtractionService` **regex** HTML discovery with `Broiler.Dom.Html` parser output — now localised
   behind `FindPolicyContent` and `ExtractAll`); item 4 (rest) — route the richer
-  `SubDocuments.TryFetchSubResource` data/file/http+MIME/WPT switch and `ScriptExtractionService`/
-  `CaptureService` `FetchExternalScript` (a duplicated file/http switch) through the loader, extending
-  `LoadText` with a bytes/MIME variant; items 5–6 (host-layer CSP enforcement; execute `IsModule`
-  descriptors in the event loop instead of skipping them). These are all main-repo and validatable here.
+  `SubDocuments.TryFetchSubResource` data/file/http+MIME/WPT switch through the loader (extend `LoadText`
+  with a bytes/MIME variant), and give the now-single `ScriptExtractionService.FetchExternalScript` an
+  injected loader seam so script fetching shares the same policy as CSS/fetch/frames; items 5–6 (host-layer
+  CSP enforcement; execute `IsModule` descriptors in the event loop instead of skipping them). These are all
+  main-repo and validatable here.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 
