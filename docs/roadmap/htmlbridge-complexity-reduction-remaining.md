@@ -181,6 +181,29 @@ Exit criteria:
   and frames.
 - CSP tests distinguish parse, discovery, policy and load/execution decisions.
 
+#### Delivered increments
+
+- **P7.1 (2026-07-20) — item 1 (partial): split CSP document-discovery from policy.** `ContentSecurityPolicy`
+  mixed three concerns (directive parse/evaluation, document `<meta>` discovery, URL/origin source
+  matching). Extracted the **discovery** concern into a new `CspMetaDiscovery.FindPolicyContent(html)` — it
+  answers "where is the policy declared in this document" and returns the raw, unparsed directive string;
+  `ContentSecurityPolicy.FromHtml` now composes it with `Parse` (so all six callers are unchanged). The
+  shared attribute reader moved to an internal `HtmlAttributeReader` (used by both discovery and the nonce
+  extractor), and the meta regex + the now-unused `partial` moved out of the policy class. New
+  `CspMetaDiscoveryTests` (6) exercise discovery in isolation — distinct from `ContentSecurityPolicyTests`
+  (policy) — satisfying the "tests distinguish parse / discovery / policy" exit criterion for the discovery
+  boundary. Behaviour-preserving; Core public API baseline regenerated (adds `CspMetaDiscovery`);
+  CSP + snapshot suites green.
+
+- **Remaining for Phase 7.** Still open: item 1's URL/origin-context extraction (`ResolveUri`/`IsSameOrigin`/
+  `MatchesAbsoluteSource` still live inside the policy); item 2 (replace the `CspMetaDiscovery` /
+  `ScriptExtractionService` **regex** HTML discovery with `Broiler.Dom.Html` parser output — now localised
+  behind `FindPolicyContent`); item 3 (metadata-rich script descriptors — `ScriptExtractionResult` still
+  returns plain `string` lists, no source-kind/URL/nonce/async-defer-module/order); item 4 (route
+  `ScriptExtractionService.FetchExternalScript`'s file/data/HTTP switch and the remaining feature-callback
+  I/O through the injected `ResourceLoader`); items 5–6 (host-layer CSP enforcement; module-script support in
+  the event loop). These are all main-repo and validatable here.
+
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 
 Goal: leave small contracts whose names match their responsibility.
