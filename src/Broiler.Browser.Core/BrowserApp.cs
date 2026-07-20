@@ -349,7 +349,7 @@ internal sealed class BrowserApp : IDisposable
         var (normalisedUrl, content) = await pipeline.LoadPageAsync(url, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
-        string html = HtmlPostProcessor.Process(content.Html);
+        string html = HtmlPostProcessor.ProcessForBrowsing(content.Html);
         InteractiveSession? session = null;
         try
         {
@@ -360,7 +360,7 @@ internal sealed class BrowserApp : IDisposable
             {
                 string initial = session.CurrentHtml();
                 if (!string.IsNullOrWhiteSpace(initial))
-                    html = HtmlPostProcessor.Process(initial);
+                    html = HtmlPostProcessor.ProcessForBrowsing(initial);
 
                 if (!session.HasPendingWork)
                 {
@@ -878,7 +878,7 @@ internal sealed class BrowserApp : IDisposable
                 _suppressNavigation = true;
                 try
                 {
-                    _container.SetHtmlWithStyleSet(HtmlPostProcessor.Process(html), baseUrl: BaseUrl);
+                    _container.SetHtmlWithStyleSet(HtmlPostProcessor.ProcessForBrowsing(html), baseUrl: BaseUrl);
                 }
                 finally
                 {

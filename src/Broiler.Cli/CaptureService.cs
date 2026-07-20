@@ -334,10 +334,11 @@ public class CaptureService
         // is present before rendering.
         html = ExecuteScriptsWithDom(html, options.Url);
 
-        // Apply the shared post-processing pipeline (strip scripts,
-        // data-URI backgrounds, iframe/object fallback content, and
-        // hidden test artifacts) so that HtmlRenderer produces clean output.
-        html = HtmlPostProcessor.Process(html);
+        // Apply the production render-preparation pipeline (strip already-executed scripts, empty
+        // iframe fallback, box replaced video/progress/meter/select-multiple, :root->html) so that
+        // HtmlRenderer produces clean output. This is the browsing profile: it deliberately does NOT
+        // apply the Acid/WPT test-harness artifact cleanup (which strips valid content like <map>).
+        html = HtmlPostProcessor.ProcessForBrowsing(html);
 
         var format = options.ImageFormat == ImageFormat.Jpeg
             ? ImageEncodeFormat.Jpeg

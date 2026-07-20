@@ -185,26 +185,51 @@ internal static class HtmlPostProcessor
         RegexOptions.Compiled);
 
     /// <summary>
-    /// Applies the full set of post-processing steps to the HTML so that
-    /// it renders correctly in HtmlRenderer (WPF or Image).
+    /// Render-preparation transforms that approximate native browser rendering of replaced or
+    /// unsupported elements — stripping already-executed <c>&lt;script&gt;</c>s, emptying
+    /// <c>&lt;iframe&gt;</c> fallback, and boxing <c>&lt;video&gt;</c>/<c>&lt;progress&gt;</c>/
+    /// <c>&lt;meter&gt;</c>/<c>&lt;select multiple&gt;</c> — plus the <c>:root</c>→<c>html</c> selector
+    /// rewrite. These apply in both production browsing and the test harness.
     /// </summary>
-    internal static string Process(string html)
+    /// <remarks>
+    /// StripCssDataUriBackgrounds and StripObjectContent are intentionally NOT part of this pipeline:
+    /// stripping data-URI CSS backgrounds or <c>&lt;object&gt;</c> fallback destroys essential visual
+    /// content (the Acid2 face uses data-URI backgrounds for forehead/eyes/chin and nested
+    /// <c>&lt;object&gt;</c>s for the eyes). Acid3 paths that need them call those methods directly.
+    /// </remarks>
+    private static string ApplyReplacedElementPasses(string html)
     {
         html = StripScriptTags(html);
-        // Note: StripCssDataUriBackgrounds is intentionally NOT called here.
-        // Stripping data-URI CSS backgrounds destroys essential visual content
-        // (e.g., the Acid2 face uses data-URI backgrounds for forehead, eyes,
-        // and chin colours).  HtmlRenderer can render these backgrounds; the
-        // original stripping was a workaround that caused acid2 regression.
         html = StripIframeContent(html);
-        // Note: StripObjectContent is intentionally NOT called here.
-        // Stripping <object> fallback content destroys nested objects used by
-        // the Acid2 test (the eyes are formed by nested <object> elements with
-        // image fallback).  Acid3 tests that need object stripping call
-        // StripObjectContent() directly; the default pipeline preserves them.
         html = ReplaceVideoWithPlaceholder(html);
         html = ReplaceProgressLikeWithPlaceholder(html);
         html = ReplaceSelectMultipleWithPlaceholder(html);
+        return html;
+    }
+
+    /// <summary>
+    /// Production render-preparation for browsing / image capture: the shared replaced-element passes
+    /// plus the <c>:root</c>→<c>html</c> rewrite. It does <b>not</b> apply the Acid/WPT test-harness
+    /// artifact cleanup (<see cref="StripHiddenTestArtifacts"/>), which strips test scaffolding — and,
+    /// incidentally, valid content such as <c>&lt;map&gt;</c> — that real pages must keep. Phase 6 exit
+    /// criterion: production browsing does not apply Acid/WPT-specific transforms.
+    /// </summary>
+    internal static string ProcessForBrowsing(string html)
+    {
+        html = ApplyReplacedElementPasses(html);
+        html = RewriteRootSelector(html);
+        return html;
+    }
+
+    /// <summary>
+    /// Test-harness profile: the shared render preparation plus the Acid/WPT-specific artifact cleanup
+    /// (<see cref="StripHiddenTestArtifacts"/>), preserving the historical ordering (artifact cleanup
+    /// runs after the replaced-element passes and before the <c>:root</c> rewrite). Used by the WPT
+    /// runner and Acid harness; production browsing uses <see cref="ProcessForBrowsing"/> instead.
+    /// </summary>
+    internal static string Process(string html)
+    {
+        html = ApplyReplacedElementPasses(html);
         html = StripHiddenTestArtifacts(html);
         html = RewriteRootSelector(html);
         return html;

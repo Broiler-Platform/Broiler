@@ -69,19 +69,39 @@ Exit criteria:
   green. Since a headless canvas is never painted, the disposition's conditional end state (a real
   Broiler.Graphics display list "if a renderer consumes it") does not apply.
 
-- **Remaining for Phase 6 — Concern 2, `HtmlPostProcessor` (the substantive part).** After P6.1 the
-  Rendering project holds only `HtmlPostProcessor.cs`, so deleting the project is gated on relocating it.
-  It is a ~660-line regex HTML-string rewriter whose `Process()` pipeline is applied in **production
-  browsing** (`BrowserApp`) and CLI capture (`CaptureService`), not only WPT/Acid, and it mixes
-  production-legitimate passes with Acid/WPT-specific transforms (`StripHiddenTestArtifacts`,
-  `RewriteRootSelector`, the `FailDiv`/`Linktest`/`RemoveLastChildTest` patterns, …). Closing the two
-  outstanding exit criteria — "render preparation never mutates the live script-visible DOM" and
-  "production browsing does not apply Acid/WPT-specific transforms" — requires (a) splitting the
-  production subset from the test-only transforms so production callers stop applying the latter, and
-  (b) replacing each remaining workaround with native HTML/Layout behavior (largely `Broiler.HTML` /
-  `Broiler.CSS`, i.e. **submodule-push-gated → patch workflow**). Per the disposition, `HtmlPostProcessor`
-  must **not** be moved wholesale to rename it; the migration is behavioural. Then the Rendering project
-  is deleted.
+- **P6.2 (2026-07-20) — Concern 2, `HtmlPostProcessor`: production / test-harness profile split.** The
+  `Process()` pipeline (a ~660-line regex HTML-string rewriter) was applied verbatim in **production
+  browsing** (`BrowserApp`) and CLI capture (`CaptureService`) as well as the WPT/Acid harness, so
+  production applied the Acid/WPT-specific `StripHiddenTestArtifacts` cleanup — which strips test
+  scaffolding (`linktest`/`FailDiv`) **and, incidentally, valid content such as `<map>`** that real pages
+  must keep. Investigation confirmed the split is safe: `StripHiddenTestArtifacts` is entirely
+  Acid2/Acid3-specific; the production capture entry (`CaptureImageAsync`) has no test callers; and no
+  test asserts `Process()` *applies* the artifact cleanup (the Acid image tests render via
+  `HtmlRender.RenderToImageWithStyleSet` directly, `Acid3RegressionTests` call the individual `Strip*`
+  delegators, `Acid3CssComplianceTests` use `ExecuteScriptsWithDom`; the only `Process()` assertion is a
+  *negative* guard that it does not strip tables). Delivered:
+  - `HtmlPostProcessor.Process(html)` is kept **byte-identical** (shared replaced-element passes →
+    `StripHiddenTestArtifacts` → `RewriteRootSelector`) as the **test-harness** profile; the WPT runner and
+    the render-helper tests keep using it, so no test render input changes.
+  - New `HtmlPostProcessor.ProcessForBrowsing(html)` is the **production** profile: the shared
+    replaced-element passes + `:root`→`html`, but **not** `StripHiddenTestArtifacts`. `BrowserApp` (×3) and
+    `CaptureService` capture now call it — closing the exit criterion *"production browsing does not apply
+    Acid/WPT-specific transforms."* (This also stops production from mangling real `<map>` elements.)
+  - New `HtmlPostProcessorProfileTests` (6) pin the split deterministically: production preserves
+    `<map>`/`linktest`/`FAIL`; the harness still strips them; both apply the shared preparation
+    (script/video/`:root`) and neither strips `<table>`. Full Cli.Tests run: only the 3 pre-existing
+    environmental pixel/writing-mode failures (`CssPseudoElement_ContentUrl_Renders_Image_Content`,
+    `Border_Shorthand_Expands_Color_To_Individual_Sides`, `SelectListBox_SizingAndScrolling_Follow_WritingMode`),
+    confirmed identical on the clean baseline → zero regressions.
+
+- **Remaining for Phase 6 — Concern 2 native migration + project deletion.** The other outstanding exit
+  criterion, replacing each remaining regex workaround with **native HTML/Layout behavior** (e.g. native
+  `<map>`/`:root` handling so `RewriteRootSelector` and the harness strips become unnecessary), is largely
+  `Broiler.HTML` / `Broiler.CSS` — **submodule-push-gated → patch workflow** — and needs the Acid/WPT
+  pixel reftest gate (environmental in a bare container) to validate. Per the disposition,
+  `HtmlPostProcessor` must **not** be moved wholesale to rename it; the migration is behavioural. Once the
+  test-harness profile's remaining transforms are relocated to test support, the Rendering project (then
+  empty) is deleted.
 
 ### Phase 7 - isolate loading, security and browsing-context policy
 
