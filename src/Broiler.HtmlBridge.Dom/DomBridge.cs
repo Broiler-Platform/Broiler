@@ -554,6 +554,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         ThrowIfDisposed();
         ParseHtml(html);
         RegisterDocument(context);
+        EnforceConfiguredStyleContentSecurityPolicy();
     }
 
     /// <summary>
@@ -581,6 +582,21 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         }
         ParseHtml(html);
         RegisterDocument(context);
+        EnforceConfiguredStyleContentSecurityPolicy();
+    }
+
+    /// <summary>
+    /// Enforces the CSP <c>style-src</c> family on the freshly parsed DOM as the final step of attach, so
+    /// the document the host hands to scripts and rendering already excludes CSP-blocked inline styles and
+    /// <c>&lt;style&gt;</c> elements (Phase 7 item 5: CSP is a host-layer decision, and DOM/CSS receive
+    /// already-authorised content on every path — not just the CLI/WPT hosts that used to call
+    /// <see cref="ApplyStyleContentSecurityPolicy"/> by hand). Runs only when a policy is configured via
+    /// <see cref="Csp"/>; idempotent, so a host that still applies the policy explicitly removes nothing more.
+    /// </summary>
+    private void EnforceConfiguredStyleContentSecurityPolicy()
+    {
+        if (Csp != null)
+            ApplyStyleContentSecurityPolicy(Csp);
     }
 
     /// <summary>

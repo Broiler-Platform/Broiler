@@ -387,8 +387,27 @@ Exit criteria:
   classic external scripts (unreachable in the sandbox → non-executable there); the file/data paths are
   deterministic.
 
-- **Remaining for Phase 7.** Still open: item 5 (host-layer CSP enforcement so DOM/CSS receive
-  already-authorised content); item 6 (rest) — the deepest part of module loading beyond P7.12/P7.13: the
+- **P7.14 (2026-07-20) — item 5: CSP style enforcement centralised into the bridge (host) layer.** Audit
+  first: the canonical `Broiler.Dom` / `Broiler.CSS` / `Broiler.CSS.Dom` engines are **CSP-free** (no
+  reference to `ContentSecurityPolicy` or any `Allows*` check), so CSP already lived entirely in the
+  bridge/host layer — item 5's core rule held. The gap was *uniformity*: `DomBridge.ApplyStyleContentSecurityPolicy`
+  (which strips `style-src`-blocked inline `style=` attributes and `<style>` elements from the parsed DOM)
+  was called **by hand** only by the CLI capture host and the WPT runner. The main `ScriptEngine.Execute*`
+  path set `bridge.Csp` (so inline *event handlers* were gated) but never called it, so it handed scripts and
+  rendering a DOM that still contained CSP-blocked styles. Fixed by moving the enforcement **into
+  `DomBridge.Attach`** (both overloads): when a policy is configured via `bridge.Csp`, attach applies the
+  `style-src` family as its final step, so **every** host path receives already-authorised content — not just
+  the CLI/WPT hosts. Idempotent, so the now-redundant explicit call in `CaptureService` was removed (attach
+  does it); the WPT runner keeps its explicit call because it authorises with a fresh `FromHtml(html)` without
+  setting `bridge.Csp`. New `ContentSecurityPolicyTests` (2) exercise the bridge directly — attach with a
+  `style-src 'none'` policy strips a blocked `style=`; attach with no policy leaves it. The style-src family
+  suite (`StyleSrcAttr_None`/`StyleSrcElem_None`, now relying on attach-level enforcement) plus the CSP /
+  network / Acid3-CSS suites stay green (185 pass; the 3 failures are the pre-existing pixel + two `bodyUsed`
+  env failures, identical on baseline). Remaining item-5 nuance: external-stylesheet (`<link rel=stylesheet>`)
+  CSP and giving the WPT runner the same `bridge.Csp`-driven path are follow-ups, but DOM/CSS never seeing CSP
+  and every execution path delivering authorised inline-style content is done.
+
+- **Remaining for Phase 7.** Still open: item 6 (rest) — the deepest part of module loading beyond P7.12/P7.13: the
   **import/export module graph** (specifier resolution, linking, dedup of *dependencies* via the module map,
   cyclic handling), `import.meta`/top-level-`await`, and moving module ordering into the real browser **event
   loop** (rather than the current deferred-bucket approximation). Fetching + inline/data/file execution +

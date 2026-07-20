@@ -505,11 +505,10 @@ public class CaptureService
         var bridge = new DomBridge();
         bridge.Csp = csp;
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
+        // Attach enforces the CSP style-src family on the parsed DOM itself (it runs
+        // when bridge.Csp is set), so blocked inline style attributes / <style> elements
+        // neither apply nor render — no separate ApplyStyleContentSecurityPolicy call needed.
         bridge.Attach(context, html, url);
-
-        // Enforce the CSP style-src family on the parsed DOM so blocked inline
-        // style attributes / <style> elements neither apply nor render.
-        bridge.ApplyStyleContentSecurityPolicy(csp);
 
         // Set local base path for sub-resource resolution (e.g. iframe src)
         if (!string.IsNullOrEmpty(localResourceBasePath))
