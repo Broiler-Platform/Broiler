@@ -76,6 +76,22 @@ TYPE Broiler.HtmlBridge.Scripting.PageContent
   property System.Collections.Generic.IReadOnlyList<System.String> Scripts { get; }
   property System.String Html { get; }
   property System.String Url { get; }
+TYPE Broiler.HtmlBridge.Scripting.ScriptDescriptor : System.IEquatable<Broiler.HtmlBridge.Scripting.ScriptDescriptor>
+  ctor (System.Int32, Broiler.HtmlBridge.Scripting.ScriptSourceKind, System.String, System.String, System.Boolean, System.Boolean, System.Boolean, System.String)
+  method Broiler.HtmlBridge.Scripting.ScriptDescriptor <Clone>$()
+  method System.Boolean Equals(Broiler.HtmlBridge.Scripting.ScriptDescriptor)
+  method System.Boolean Equals(System.Object)
+  method System.Int32 GetHashCode()
+  method System.String ToString()
+  method System.Void Deconstruct(ref System.Int32, ref Broiler.HtmlBridge.Scripting.ScriptSourceKind, ref System.String, ref System.String, ref System.Boolean, ref System.Boolean, ref System.Boolean, ref System.String)
+  property Broiler.HtmlBridge.Scripting.ScriptSourceKind Kind { get; set; }
+  property System.Boolean IsAsync { get; set; }
+  property System.Boolean IsDefer { get; set; }
+  property System.Boolean IsModule { get; set; }
+  property System.Int32 DocumentOrder { get; set; }
+  property System.String Content { get; set; }
+  property System.String Nonce { get; set; }
+  property System.String Url { get; set; }
 TYPE Broiler.HtmlBridge.Scripting.ScriptError
   ctor ()
   property System.Int32 ScriptIndex { get; set; }
@@ -86,7 +102,8 @@ TYPE Broiler.HtmlBridge.Scripting.ScriptExecutionResult
   property System.Boolean Success { get; set; }
   property System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptError> Errors { get; set; }
 TYPE Broiler.HtmlBridge.Scripting.ScriptExtractionResult
-  ctor (System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>)
+  ctor (System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptDescriptor>)
+  property System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptDescriptor> Descriptors { get; }
   property System.Collections.Generic.IReadOnlyList<System.String> AsyncScripts { get; }
   property System.Collections.Generic.IReadOnlyList<System.String> DeferredScripts { get; }
   property System.Collections.Generic.IReadOnlyList<System.String> Scripts { get; }
@@ -95,6 +112,11 @@ TYPE Broiler.HtmlBridge.Scripting.ScriptProfilingHook
   method System.Void Clear()
   method System.Void Measure(System.String, System.Action)
   property System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptTimingEntry> Entries { get; }
+TYPE Broiler.HtmlBridge.Scripting.ScriptSourceKind : System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  field System.Int32 value__
+  field const Broiler.HtmlBridge.Scripting.ScriptSourceKind DataUri
+  field const Broiler.HtmlBridge.Scripting.ScriptSourceKind External
+  field const Broiler.HtmlBridge.Scripting.ScriptSourceKind Inline
 TYPE Broiler.HtmlBridge.Scripting.ScriptTimingEntry
   ctor ()
   property System.Boolean Succeeded { get; set; }

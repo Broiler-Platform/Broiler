@@ -195,14 +195,27 @@ Exit criteria:
   boundary. Behaviour-preserving; Core public API baseline regenerated (adds `CspMetaDiscovery`);
   CSP + snapshot suites green.
 
+- **P7.2 (2026-07-20) — item 3: metadata-rich script descriptors.** `ScriptExtractionService.ExtractAll`
+  already computed each `<script>`'s nonce, module/defer/async flags and source kind internally, then
+  discarded all of it — returning only categorised program text. Added a neutral `ScriptDescriptor` record
+  (`DocumentOrder`, `ScriptSourceKind` {Inline, DataUri, External}, `Url`, `Nonce`, `IsAsync`, `IsDefer`,
+  `IsModule`, `Content`) and a `ScriptExtractionResult.Descriptors` list covering **every** discovered
+  script in document order — including `type=module` scripts, which the classic execution buckets still
+  omit (item 6 wires those into the event loop). Purely additive: the `Scripts`/`DeferredScripts`/
+  `AsyncScripts` buckets are derived exactly as before, so all consumers (`RenderingPipeline`,
+  `SubDocuments`, tests) and their assertions are unchanged. New `ScriptDescriptorTests` (4) pin the
+  metadata (kind/order/url/nonce/flags; modules recorded-but-not-executed). This is the host-agnostic shape
+  items 4 (loader) and 6 (module event loop) consume. Core public-API baseline regenerated; extraction +
+  CSP + snapshot suites green.
+
 - **Remaining for Phase 7.** Still open: item 1's URL/origin-context extraction (`ResolveUri`/`IsSameOrigin`/
   `MatchesAbsoluteSource` still live inside the policy); item 2 (replace the `CspMetaDiscovery` /
   `ScriptExtractionService` **regex** HTML discovery with `Broiler.Dom.Html` parser output — now localised
-  behind `FindPolicyContent`); item 3 (metadata-rich script descriptors — `ScriptExtractionResult` still
-  returns plain `string` lists, no source-kind/URL/nonce/async-defer-module/order); item 4 (route
-  `ScriptExtractionService.FetchExternalScript`'s file/data/HTTP switch and the remaining feature-callback
-  I/O through the injected `ResourceLoader`); items 5–6 (host-layer CSP enforcement; module-script support in
-  the event loop). These are all main-repo and validatable here.
+  behind `FindPolicyContent` and `ExtractAll`); item 4 (route `ScriptExtractionService.FetchExternalScript`'s
+  file/data/HTTP switch — and `CaptureService`'s duplicate copy + the remaining feature-callback I/O —
+  through the injected `ResourceLoader`; the new descriptors carry the `Url`/`Kind` the loader needs); items
+  5–6 (host-layer CSP enforcement; execute `IsModule` descriptors in the event loop instead of skipping
+  them). These are all main-repo and validatable here.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 
