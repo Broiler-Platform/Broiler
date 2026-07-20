@@ -231,8 +231,19 @@ Exit criteria:
   `CaptureServiceJsTests` `DecodeDataUri` assertions (base64/percent/empty) pass unchanged; internal-only, no
   public-API change. One fewer file/http switch and one fewer process `HttpClient`.
 
-- **Remaining for Phase 7.** Still open: item 1's URL/origin-context extraction (`ResolveUri`/`IsSameOrigin`/
-  `MatchesAbsoluteSource` still live inside the policy); item 2 (replace the `CspMetaDiscovery` /
+- **P7.5 (2026-07-20) — item 1 complete: extract the CSP URL/origin context.** With discovery already split
+  out (P7.1), moved the third concern — the URL/origin source-matching (`ResolveUri`, `IsSameOrigin`,
+  `IsSchemeSource`, `MatchesAbsoluteSource`) — out of `ContentSecurityPolicy` into a new internal
+  `CspSourceMatching`. `AllowsExternalScript` now calls the matcher; the policy class keeps only directive
+  parse/evaluation. New `CspSourceMatchingTests` (5) exercise resolution / same-origin (incl. file:) /
+  scheme-source / absolute-host-source matching in isolation. Item 1's split is now three independently
+  testable units — **discovery** (`CspMetaDiscovery`), **policy** (`ContentSecurityPolicy`), **URL/origin
+  matching** (`CspSourceMatching`) — satisfying the "CSP tests distinguish parse / discovery / policy" exit
+  criterion. Behaviour-preserving; `CspSourceMatching` is internal → no public-API change; CSP + snapshot
+  suites green. (`CspSourceMatching` is also the natural seam toward the exit criterion's "one URL
+  resolution/origin implementation shared by script, CSS, fetch, XHR and frames".)
+
+- **Remaining for Phase 7.** Still open: item 2 (replace the `CspMetaDiscovery` /
   `ScriptExtractionService` **regex** HTML discovery with `Broiler.Dom.Html` parser output — now localised
   behind `FindPolicyContent` and `ExtractAll`); item 4 (rest) — route the richer
   `SubDocuments.TryFetchSubResource` data/file/http+MIME/WPT switch through the loader (extend `LoadText`

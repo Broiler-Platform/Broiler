@@ -231,7 +231,7 @@ public sealed class ContentSecurityPolicy
         if (ignoreStaticAllowlistSources)
             return false;
 
-        var resolved = ResolveUri(scriptUrl, pageUrl);
+        var resolved = CspSourceMatching.ResolveUri(scriptUrl, pageUrl);
         if (resolved == null)
             return false;
 
@@ -241,14 +241,14 @@ public sealed class ContentSecurityPolicy
                 return true;
 
             if (string.Equals(source, "'self'", StringComparison.OrdinalIgnoreCase) &&
-                IsSameOrigin(resolved, pageUrl))
+                CspSourceMatching.IsSameOrigin(resolved, pageUrl))
                 return true;
 
-            if (IsSchemeSource(source) &&
+            if (CspSourceMatching.IsSchemeSource(source) &&
                 string.Equals(resolved.Scheme, source[..^1], StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            if (MatchesAbsoluteSource(source, resolved))
+            if (CspSourceMatching.MatchesAbsoluteSource(source, resolved))
                 return true;
         }
 
@@ -394,54 +394,6 @@ public sealed class ContentSecurityPolicy
         var bytes = Encoding.UTF8.GetBytes(value);
         var hash = hasher(bytes);
         return Convert.ToBase64String(hash);
-    }
-
-    private static bool IsSchemeSource(string source)
-        => source.EndsWith(':') &&
-           !source.StartsWith('\'') &&
-           !source.Contains("://", StringComparison.Ordinal);
-
-    private static bool MatchesAbsoluteSource(string source, Uri candidate)
-    {
-        if (!Uri.TryCreate(source, UriKind.Absolute, out var sourceUri))
-            return false;
-
-        if (!string.Equals(sourceUri.Scheme, candidate.Scheme, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(sourceUri.Host, candidate.Host, StringComparison.OrdinalIgnoreCase) ||
-            sourceUri.Port != candidate.Port)
-            return false;
-
-        var path = sourceUri.AbsolutePath;
-        return string.IsNullOrEmpty(path) ||
-               string.Equals(path, "/", StringComparison.Ordinal) ||
-               candidate.AbsolutePath.StartsWith(path, StringComparison.Ordinal);
-    }
-
-    private static bool IsSameOrigin(Uri candidate, string? pageUrl)
-    {
-        if (string.IsNullOrWhiteSpace(pageUrl) || !Uri.TryCreate(pageUrl, UriKind.Absolute, out var pageUri))
-            return false;
-
-        if (string.Equals(candidate.Scheme, "file", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(pageUri.Scheme, "file", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        return string.Equals(candidate.Scheme, pageUri.Scheme, StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(candidate.Host, pageUri.Host, StringComparison.OrdinalIgnoreCase) &&
-               candidate.Port == pageUri.Port;
-    }
-
-    private static Uri? ResolveUri(string url, string? pageUrl)
-    {
-        if (Uri.TryCreate(url, UriKind.Absolute, out var absolute))
-            return absolute;
-
-        if (!string.IsNullOrWhiteSpace(pageUrl) &&
-            Uri.TryCreate(pageUrl, UriKind.Absolute, out var baseUri) &&
-            Uri.TryCreate(baseUri, url, out var resolved))
-            return resolved;
-
-        return null;
     }
 
 }
