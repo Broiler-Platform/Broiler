@@ -296,4 +296,395 @@ public sealed class EsModuleGraphTests
         catch { threw = true; }
         Assert.True(threw);
     }
+
+    /// <summary>Links the graph over <paramref name="files"/>, then evaluates the dependency programs and
+    /// drives the last (entry) program through <see cref="JSContext.Execute"/> so the event loop pumps the
+    /// microtask that settles a dynamic <c>import()</c>; returns the context for assertions.</summary>
+    private static JSContext RunGraphDriving(
+        List<ModuleGraphLoader.GraphModule> entries,
+        Dictionary<string, string> files)
+    {
+        ModuleGraphLoader.ResolveAndFetch fetch = (specifier, baseUrl) =>
+        {
+            var resolved = UrlResolver.Resolve(specifier, baseUrl);
+            if (resolved == null) return null;
+            var key = resolved.AbsoluteUri;
+            return files.TryGetValue(key, out var src) ? (key, src) : null;
+        };
+
+        var result = ModuleGraphLoader.Load(entries, fetch);
+        var ctx = new JSContext();
+        for (int i = 0; i < result.Programs.Count - 1; i++)
+            ctx.Eval(result.Programs[i]);
+        ctx.Execute(result.Programs[^1]);
+        return ctx;
+    }
+
+    [Fact]
+    public void Dynamic_Import_Resolves_To_The_Linked_Module_Namespace()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] = "export const answer = 42;",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "globalThis.out = 'pending';\n" +
+                "import('./util.mjs').then(function (m) { globalThis.out = m.answer; });",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraphDriving(entries, files);
+        Assert.Equal("42", Eval(ctx, "''+globalThis.out"));
+    }
+
+    [Fact]
+    public void Dynamic_Import_Of_Unresolvable_Module_Rejects()
+    {
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "globalThis.state = 'pending';\n" +
+                "import('./missing.mjs').then(\n" +
+                "  function () { globalThis.state = 'resolved'; },\n" +
+                "  function () { globalThis.state = 'rejected'; });",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraphDriving(entries, new Dictionary<string, string>());
+        Assert.Equal("rejected", Eval(ctx, "globalThis.state"));
+    }
+
+    [Fact]
+    public void Dynamic_Import_Shares_One_Instance_With_A_Static_Import()
+    {
+        // util is imported statically (main) and dynamically (main); both must see the same singleton
+        // instance from the module registry, so a mutation through one is visible through the other.
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] =
+                "export const tag = {}; globalThis.evalCount = (globalThis.evalCount || 0) + 1;",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { tag } from './util.mjs';\n" +
+                "import('./util.mjs').then(function (m) { globalThis.same = (m.tag === tag); });",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraphDriving(entries, files);
+        Assert.Equal("true", Eval(ctx, "''+globalThis.same"));
+        Assert.Equal("1", Eval(ctx, "''+globalThis.evalCount")); // evaluated exactly once
+    }
+
+    // ── scope-accurate live named bindings (EsModuleLiveRefs) ─────────────────────────────────
+
+    [Fact]
+    public void Named_Import_Stays_Live_Through_A_Module_That_Has_Local_Functions()
+    {
+        // The lift: a consumer with its own function + params (that do NOT shadow the imports) must still
+        // get live named bindings — the old rewriter aborted the whole module on any `function`.
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/counter.mjs"] =
+                "export let count = 0;\n" +
+                "export function bump() { count += 5; }",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { count, bump } from './counter.mjs';\n" +
+                "function helper(n) { return n + 1; }\n" +
+                "bump();\n" +
+                "globalThis.out = helper(count);",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("6", Eval(ctx, "''+globalThis.out")); // count live → 5, helper(5) → 6 (snapshot would give 1)
+    }
+
+    [Fact]
+    public void A_Function_Parameter_Shadow_Is_Not_Rewritten()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "function f(v) { return v; }\n" +      // param v shadows the import
+                "globalThis.shadowed = f(7);\n" +      // must be 7, not the import 100
+                "globalThis.top = v;",                 // unshadowed → import → 100
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("7", Eval(ctx, "''+globalThis.shadowed"));
+        Assert.Equal("100", Eval(ctx, "''+globalThis.top"));
+    }
+
+    [Fact]
+    public void An_Arrow_Parameter_Shadow_Is_Not_Rewritten()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "var f = (v) => v;\n" +   // multi-form arrow param
+                "var g = v => v + 1;\n" + // single-form arrow param
+                "globalThis.a = f(3); globalThis.b = g(4); globalThis.top = v;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("3", Eval(ctx, "''+globalThis.a"));
+        Assert.Equal("5", Eval(ctx, "''+globalThis.b"));
+        Assert.Equal("100", Eval(ctx, "''+globalThis.top"));
+    }
+
+    [Fact]
+    public void A_Block_Scoped_Let_Shadow_Is_Not_Rewritten()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "var out = 0;\n" +
+                "{ let v = 9; out = v; }\n" +   // block-scoped shadow
+                "globalThis.blocked = out; globalThis.top = v;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("9", Eval(ctx, "''+globalThis.blocked"));
+        Assert.Equal("100", Eval(ctx, "''+globalThis.top"));
+    }
+
+    [Fact]
+    public void A_Destructuring_Binding_Shadow_Is_Not_Rewritten()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "function f() { var { v } = { v: 7 }; return v; }\n" +
+                "globalThis.d = f(); globalThis.top = v;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("7", Eval(ctx, "''+globalThis.d"));
+        Assert.Equal("100", Eval(ctx, "''+globalThis.top"));
+    }
+
+    [Fact]
+    public void A_Catch_Parameter_Shadow_Is_Not_Rewritten()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "var r; try { throw 5; } catch (v) { r = v; }\n" +
+                "globalThis.caught = r; globalThis.top = v;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("5", Eval(ctx, "''+globalThis.caught"));
+        Assert.Equal("100", Eval(ctx, "''+globalThis.top"));
+    }
+
+    [Fact]
+    public void A_Module_With_A_Class_Falls_Back_To_A_Correct_Snapshot()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "class C { m() { return 1; } }\n" +
+                "globalThis.out = v + new C().m();",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("101", Eval(ctx, "''+globalThis.out")); // snapshot v=100 (+1); module not corrupted
+    }
+
+    [Fact]
+    public void Named_Import_Is_A_Live_Binding_Not_A_Snapshot()
+    {
+        // The canonical live-binding case: an exported counter mutated by an exported function must be
+        // observed through a *named* import, not frozen at import time.
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/counter.mjs"] =
+                "export let count = 0;\n" +
+                "export function increment() { count++; }",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { count, increment } from './counter.mjs';\n" +
+                "increment(); increment();\n" +
+                "globalThis.out = count;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("2", Eval(ctx, "''+globalThis.out")); // live: 2 (a snapshot would read 0)
+    }
+
+    [Fact]
+    public void Namespace_Import_Reflects_Post_Evaluation_Mutation()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/counter.mjs"] =
+                "export let count = 0;\n" +
+                "export function increment() { count++; }",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import * as c from './counter.mjs';\n" +
+                "c.increment();\n" +
+                "globalThis.out = c.count;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("1", Eval(ctx, "''+globalThis.out"));
+    }
+
+    [Fact]
+    public void Named_Import_Live_Read_Works_Through_A_Call()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] = "export function twice(x) { return x * 2; }",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { twice } from './util.mjs'; globalThis.out = twice(21);",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("42", Eval(ctx, "''+globalThis.out"));
+    }
+
+    [Fact]
+    public void Named_Import_Read_Through_A_Local_Function_Call_Is_Handled()
+    {
+        // A non-shadowing local function whose parameter is unrelated to the import: the scope-accurate
+        // rewriter keeps the import live and does not confuse the parameter `x` with the import `answer`.
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] = "export const answer = 42;",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { answer } from './util.mjs';\n" +
+                "function id(x) { return x; }\n" +
+                "globalThis.out = id(answer);",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("42", Eval(ctx, "''+globalThis.out"));
+    }
+
+    [Fact]
+    public void Live_Rewrite_Does_Not_Corrupt_An_Object_Key_Matching_An_Import_Name()
+    {
+        // `{ answer: 5 }` has a *literal key* that collides with the import name; the rewriter must not turn
+        // it into a computed key. (It aborts the module's live rewrite on the ambiguity — snapshot stands.)
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] = "export const answer = 42;",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { answer } from './util.mjs';\n" +
+                "var o = { answer: 5 };\n" +
+                "globalThis.key = o.answer;\n" +
+                "globalThis.imp = answer;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("5", Eval(ctx, "''+globalThis.key"));  // literal key untouched
+        Assert.Equal("42", Eval(ctx, "''+globalThis.imp")); // import still bound (snapshot)
+    }
+
+    [Fact]
+    public void Import_Meta_Url_Resolves_To_The_Module_Key()
+    {
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs", "globalThis.here = import.meta.url;", "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, []);
+        Assert.Equal("file:///app/main.mjs", Eval(ctx, "globalThis.here"));
+    }
+
+    [Fact]
+    public void Import_Meta_Works_Alongside_Static_Imports()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] = "export const answer = 42;",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { answer } from './util.mjs';\n" +
+                "globalThis.combo = answer + '@' + import.meta.url;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("42@file:///app/main.mjs", Eval(ctx, "globalThis.combo"));
+    }
+
+    [Fact]
+    public void Import_Meta_Is_Rewritten_Inside_A_Nested_Function_Scope()
+    {
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "function whereAmI(){ return import.meta.url; } globalThis.deep = whereAmI();",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, []);
+        Assert.Equal("file:///app/main.mjs", Eval(ctx, "globalThis.deep"));
+    }
+
+    [Fact]
+    public void Import_Meta_Text_In_A_String_Or_Comment_Is_Not_Rewritten()
+    {
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "// import.meta in a comment must be ignored\n" +
+                "globalThis.literal = 'import.meta'; globalThis.real = import.meta.url;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, []);
+        Assert.Equal("import.meta", Eval(ctx, "globalThis.literal")); // the string literal is untouched
+        Assert.Equal("file:///app/main.mjs", Eval(ctx, "globalThis.real"));
+    }
 }

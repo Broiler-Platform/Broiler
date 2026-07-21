@@ -18,12 +18,13 @@ namespace Broiler.Cli.Tests;
 /// try/finally, so this class joins the <c>SharedGeometryStatics</c> collection to run
 /// sequentially with the other geometry-static tests.
 ///
-/// The Phase-2 "two *simultaneous* sessions are isolated" exit criterion is intentionally NOT
-/// exercised here: two live <see cref="JSContext"/> instances currently share global state at the
-/// Broiler.JS engine layer (the last-created context's globals win), so simultaneous-session
-/// isolation is blocked below the bridge and cannot be delivered by P2.1. The supported model is
-/// one active session per thread; sequential re-attach isolation (covered below) is what the
-/// bridge guarantees today.
+/// The Phase-2 "two *simultaneous* sessions are isolated" exit criterion is now met and exercised by
+/// <see cref="Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State"/>: the Broiler.JS engine isolates
+/// two live <see cref="JSContext"/> instances (each <c>Eval</c> enters its own realm scope; the current
+/// context is <c>[ThreadStatic]</c> + <c>AsyncLocal</c>-scoped, not a last-wins global), and every
+/// per-element/per-document runtime table is now per-<see cref="DomBridge"/> instance state (Phase-2
+/// de-globalization). An earlier revision of this note claimed simultaneous isolation was blocked at the
+/// engine layer; that is no longer true (verified 2026-07-21).
 /// </remarks>
 [Xunit.Collection("SharedGeometryStatics")]
 public sealed class DomBridgeSessionLifetimeTests
@@ -82,6 +83,40 @@ public sealed class DomBridgeSessionLifetimeTests
         bridge.FireWindowLoadEvent();
 
         Assert.Equal("0", ctx.Eval("__hits").ToString());
+    }
+
+    // ------------------------------------------------------------------
+    //  Two simultaneous sessions are isolated (exit criterion a)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State()
+    {
+        using var bridgeA = new DomBridge();
+        using var ctxA = new JSContext();
+        bridgeA.Attach(ctxA, "<!DOCTYPE html><html><body><p id='a'>A</p></body></html>", "file:///a.html");
+
+        // A second live session created AFTER the first — its JSContext ctor makes it the "last-created"
+        // current context — with both remaining attached and live at the same time.
+        using var bridgeB = new DomBridge();
+        using var ctxB = new JSContext();
+        bridgeB.Attach(ctxB, "<!DOCTYPE html><html><body><p id='b'>B</p></body></html>", "file:///b.html");
+
+        // Interleave DOM, global-variable and attribute mutations across the two live sessions.
+        ctxA.Eval("globalThis.who = 'A'; document.body.setAttribute('data-mark', 'A');");
+        ctxB.Eval("globalThis.who = 'B'; document.body.setAttribute('data-mark', 'B');");
+
+        // Each session sees only its own document nodes …
+        Assert.Equal("true", ctxA.Eval("document.getElementById('a') !== null && document.getElementById('b') === null").ToString());
+        Assert.Equal("true", ctxB.Eval("document.getElementById('b') !== null && document.getElementById('a') === null").ToString());
+
+        // … its own globals …
+        Assert.Equal("A", ctxA.Eval("''+globalThis.who").ToString());
+        Assert.Equal("B", ctxB.Eval("''+globalThis.who").ToString());
+
+        // … and its own DOM mutations.
+        Assert.Equal("A", ctxA.Eval("document.body.getAttribute('data-mark')").ToString());
+        Assert.Equal("B", ctxB.Eval("document.body.getAttribute('data-mark')").ToString());
     }
 
     // ------------------------------------------------------------------

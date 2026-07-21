@@ -28,6 +28,8 @@ stacks on 0006** (they share `SetUniformBorder`/`ReadNumericAttribute`).
 | 0005 — render `<video>` as a black inline-block replaced box (hide fallback) | `Broiler.HTML` | **applied** — pushed as `5561eb0`; contained in the pinned `5c16c12` | **Done** — the pinned renderer paints `<video>` natively, so `HtmlPostProcessor.ReplaceVideoWithPlaceholder` (Phase 6 concern 2) was dropped. |
 | 0006 — render `<progress>`/`<meter>` as a native track with proportional fill | `Broiler.HTML` | **applied** — pushed as `444cace`; contained in the pinned `5c16c12` | **Done** — the pinned renderer paints `<progress>`/`<meter>` natively, so `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder` was dropped (native coverage: `FormControlRenderTests.Meter_NativeRender_Follows_WritingMode_And_Direction`). |
 | 0007 — render `<select multiple>` as a native list box (both appearance modes) | `Broiler.HTML` | **applied** — pushed as `5c16c12` (the pinned pointer); **stacks on 0006** | **Done** — the pinned renderer paints `<select multiple>` natively (both `appearance:auto`/`none`), so `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder` was dropped; the string-rewrite unit test was retired in favour of the WPT/Acid reftest gate. Reads the box's `Appearance` (the `appearance` box property landed in the main repo's `Broiler.Layout`). |
+| 0008 — `JSModuleContext`: host-overridable module resolution/source read | `Broiler.JS` | **PENDING** (push 403; pinned `3a8f302` does not contain it) | **Unblocked, not yet wired** — Phase 7 item 6 tail. Lets a bridge subclass drive URL/CSP module loading through the engine's own machinery. *Not* wired because the engine's static-import value binding + nested-async ordering are separately incomplete (see below), so the bridge keeps its own `EsModuleLinker`. |
+| 0009 — session-isolation regression tests | `Broiler.JS` | **PENDING** (push 403; pinned `3a8f302` does not contain it) | **Test-only guard** — Phase 2. Locks in that two live `JSContext` instances are isolated (the property the bridge's "two simultaneous sessions" exit criterion relies on). No production change; the bridge-side criterion is already proven CI-green by `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`. |
 
 To apply a *future* patch (kept for reference):
 
@@ -243,3 +245,133 @@ the bridge's pinch scale into the render:
 **Current fallback (unchanged until the cutover lands):** `ApplyVisualViewportSerializationState`
 still bakes `zoom = usedZoom × scale` on the root, so pinch-zoom rendering works via the existing
 serialization bake. Nothing on CI depends on the cutover.
+
+---
+
+## 0008 — `Broiler.JS`: host-overridable module resolution and source read
+
+**Target:** `Broiler.JS` (`Broiler.JavaScript.Modules/JSModuleContext.cs`, `+` a `Modules.Tests` case).
+**Status: PENDING** (reverted after a 403; pinned SHA `3a8f302` does not contain it).
+**Depends on:** nothing (behaviour-preserving for the default filesystem context).
+
+**What it does.** Phase 7 item 6 tail. `Broiler.JavaScript.Modules` already implements a capable module
+system — `CompileModuleAsync` compiles each module with the ES-module arg list under
+`CoreScript.AllowTopLevelAwaitScope()` (so top-level `await` and dynamic `import()` are supported) — but
+its resolution is hard-wired to the **filesystem** (`Resolve` uses `File.Exists`/`node_modules`/
+`package.json`, `LoadModuleAsync` computes a filesystem directory, `CompileModuleAsync` reads via
+`StreamReader`). A browser host resolves **URLs** against a base and fetches them under a
+content-security policy, so it cannot use any of that. The patch opens three overridable seams without
+changing default behaviour:
+
+- `Resolve(dirPath, relativePath)`: `internal` → `protected virtual`.
+- `GetModuleDirectory(fullPath)` (new `protected virtual`, default `Path.GetDirectoryName`): the base a
+  loaded module's own relative imports resolve against — a URL host returns the module URL so nested
+  imports resolve as URLs, not mangled filesystem paths. Used by `LoadModuleAsync`.
+- `ReadModuleSourceAsync(module)` (new `protected virtual`, default reads the file): a URL host fetches
+  the source over its transport instead.
+
+**Validated** by a new `Modules.Tests` case (`HostUrlSeams_Resolve_Fetch_And_Execute_A_Url_Dependency`):
+a `UrlModuleContext` subclass overriding the three seams drives a URL entry importing a URL dependency
+from an in-memory store (no filesystem) — the entry and its dependency are resolved, fetched, and
+executed through the seams. Push **403** → ships here, pointer **unbumped**, working tree reverted.
+
+**Main-repo follow-up (NOT yet wired — and blocked below this patch).** The intent was for the bridge to
+subclass `JSModuleContext`, override these seams with its `UrlResolver` + CSP-gated `ResourceLoader`, and
+reuse the engine's real module compilation to gain the Phase 7 item-6 tail (live cyclic bindings, genuine
+top-level-await ordering, dynamic `import()`) instead of the bridge's own `EsModuleLinker` string
+transform. Validating this patch, and a subsequent deeper investigation, established that the engine's
+module machinery is **itself incomplete beyond resolution — the follow-up is blocked on a core async
+engine bug, not on this seam.**
+
+**Root cause (diagnosed, not yet fixed).** A module body with a **top-level `await`** does not run to
+completion — the code after the first `await` is dropped. Every static `import` desugars to
+`tempRequire = yield import(spec)` (see `FastCompiler.VisitImportStatement`), so a static import *is* a
+top-level await; that is why `import { x } from …` leaves `x` `undefined`. Reproduced minimally on the
+**stock** engine (no seams, filesystem `.js`): a module body `globalThis.a=1; await Promise.resolve();
+globalThis.a2=2;` sets `a` but never `a2`. The existing `Modules.Tests` TLA case only asserts the module's
+return value is non-null, so it never caught this. Mechanism: the working `JSContext.Execute` path runs the
+body under a **pumped** `AsyncPump` loop and drains the job loop (`WaitTask`) before taking the result,
+keeping the async continuation on the engine's loop; the module path
+(`RunAsync`/`RunScriptAsync` → `LoadModuleAsync` → `JSModule.InitAsync` → `CompileModuleAsync`) instead
+awaits an un-pumped `SynchronizationContext`, and drives the body through a **double-marshaled** bridge
+(`newModule.Compile` is a `JSFunction` returning `ClrInterop.Marshal(CompileModuleAsync())`, re-awaited via
+`IJSPromise.Task`). The body promise settles at the first suspension and the real continuation resumes
+later, off the loop.
+
+**Module-orchestration layer (necessary, not sufficient).** The module path
+(`RunAsync`/`RunScriptAsync` → `LoadModuleAsync` → `JSModule.InitAsync` → `CompileModuleAsync`) has two real
+defects versus the working `JSContext.ExecuteScriptAsync`: it awaits an un-pumped `SynchronizationContext`,
+and it drives the body through a **double-marshaled** bridge (`newModule.Compile` is a `JSFunction`
+returning `ClrInterop.Marshal(CompileModuleAsync())`, re-awaited via `IJSPromise.Task`, whose continuation
+hops to the thread pool). The correct module-side shape is to mirror `ExecuteScriptAsync`: run the whole
+init under one `AsyncPump.Run` worker loop, add a non-marshalled `CompileDirect` hook so `InitAsync` awaits
+`CompileModuleAsync` directly (no `JSFunction`/`IJSPromise` re-wrap), and in `CompileModuleAsync` drain
+`WaitTask` then `await` the body promise on that same loop. This change is regression-safe (all
+`Modules.Tests` stay green) — **but it does not make TLA work**, because the real blocker is one layer
+deeper, in the engine's codegen.
+
+**Deeper root cause — a stock-engine generator-rewriter codegen bug (proven, independent of the module
+layer).** With the double-marshal removed, the continuation no longer escapes the loop (the earlier
+`InvalidOperationException: The collection has been marked as complete` disappears) — it now resumes on the
+pumped loop and **throws a `NullReferenceException` from inside the compiled module body**. This same NRE
+reproduces on the **pristine** engine (pointer `3a8f302`, no seams, no module code) through the engine's own
+`JSContext.EvalWithTopLevelAwaitAsync`, and it is fully deterministic and thread-independent (fails
+identically under `AsyncPump` on a worker thread, under `AsyncPump` on the caller thread, and under a plain
+`await` with no pump at all). So it is a **compile-time bug in the top-level-await async generator**, not an
+async-runtime/pump/marshal problem.
+
+Precise trigger boundary (each line is a whole module body; `await Promise.resolve()` is the suspension):
+
+| Body after the first `await` resumes | Result |
+| --- | --- |
+| `… ; 1+1` / `'hi'.length` (constant receiver) | **OK** |
+| `… ; globalThis` / `Math` / `typeof Math` (bare identifier read) | **OK** |
+| `var g=Math; await …; g` (local read) | **OK** |
+| `… ; globalThis.z` (member get, **variable** receiver) | **NRE** |
+| `var g=Math; await …; g.max(1,2)` (member call, **variable** receiver) | **NRE** |
+| `… ; Math.max(1,2)` / `(Math).max(1,2)` | **NRE** |
+
+The discriminator is the **receiver**: a member access / call whose receiver is an identifier read
+(local *or* global) — which the compiler spills into a temporary — dereferences null after the resume,
+while a member access on a *constant* receiver (no spilled temp) survives. The failing frame is the
+generated `vm-` delegate itself (`ClrGeneratorV2` → `GetNext` → the compiled body), not the async driver.
+The fault is in the interaction between member-access **receiver spilling** and
+`GeneratorRewriter.VisitBlock`'s **box-lifting** of the await-containing block's locals
+(`Broiler.JavaScript.LinqExpressions/.../GeneratorsV2/GeneratorRewriter.cs`): the spilled receiver temp,
+lifted into a generator `Box`, reads null on the resume path. Because static `import` desugars to
+`tempRequire = yield import(spec)` (a top-level await), every static import that is followed by *any*
+member access / call on an imported or global value trips this — which is why `import { x } from …; x.y()`
+fails while the whole-module-snapshot linker does not.
+
+This is core generator-codegen surgery with broad regression surface across **all** async functions and
+generators (not just TLA), and it cannot be validated without the full engine test suite — so it is left to
+a maintainer with `Broiler.JS` push access. The corrected takeaway supersedes the earlier "the fix is a
+completion-mechanism/pump change" note: the module-side completion path above is correct and needed, but the
+gating defect is the generator-rewriter receiver-box bug.
+
+Until that lands, the bridge keeps its own working `EsModuleLinker` (which links static import/export,
+`import.meta` — roadmap P7.18 — and dynamic `import()` — P7.20 — via a synchronous IIFE + registry, with
+snapshot bindings and no TLA). This patch is the correct, minimal *resolution* seam for the future
+engine-driven path — necessary, but not sufficient until the top-level-await codegen bug above is fixed.
+
+---
+
+## 0009 — `Broiler.JS`: session-isolation regression tests
+
+**Target:** `Broiler.JS` (`Broiler.JavaScript.Integration.Tests/SessionIsolationTests.cs`) — test-only.
+**Status: PENDING** (push 403; pinned `3a8f302` does not contain it).
+**Depends on:** nothing (no production change).
+
+**What it does.** Phase 2 investigation established that the engine already isolates two live
+`JSContext` instances — the roadmap's earlier "two simultaneous sessions share globals, last-created
+wins" note was outdated. This patch adds the regression guard that pins the guarantee: interleaved evals
+on two contexts keep separate globals; a stored callback resolves *its own* context after another context
+is created (so the constructor's last-wins `CurrentContext = this` does not leak); and 2000× concurrent
+two-thread evals never clobber each other. Isolation comes from the `[ThreadStatic]` + `AsyncLocal`
+current-context flow (`JSEngine.Current`/`_current`) plus the realm scope entered by `Eval` /
+`InvokeFunction` — no production change is needed, so this is a guard only.
+
+**Why it's a patch.** The `Broiler.JS` push returned **403**, so per `CLAUDE.md` it ships as
+`patches/0009-js-session-isolation-tests.patch` with the pointer left **unbumped** and the working tree
+reverted. There is no main-repo follow-up: the bridge-level exit criterion it underpins is already proven
+CI-green in the parent by `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`.

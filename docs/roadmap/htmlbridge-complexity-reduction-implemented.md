@@ -28,16 +28,16 @@ unblocked but not yet done, with the serialization bake as the active fallback m
 an environment-config change (enabling `NativeZoom` at the `CaptureService` external
 renderer to delete the zoom bake); the native dialog/`::backdrop` box + top-layer paint
 slices (tracked separately, still WPT-runner-fallback-gated); and the deliberately
-later-phase / out-of-scope items (Phase 6 Canvas `getContext`; the JS-engine
-simultaneous-session isolation). Read each phase's own status entries for the specifics;
-the summary below is the quick view.
+later-phase item Phase 6 Canvas `getContext`. (The JS-engine simultaneous-session isolation,
+previously listed here as out of scope, was found already met on 2026-07-21 — see the Phase 2
+row.) Read each phase's own status entries for the specifics; the summary below is the quick view.
 
 | Phase | Status | Open residue |
 |---|---|---|
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
-| 2 — document services & single state authority | **Complete** (bar the JS-engine blocker) | Simultaneous-session isolation blocked below the bridge (JS engine, out of scope); the process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. |
-| 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (682 as of 2026-07-17), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. |
+| 2 — document services & single state authority | **Complete** | The process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. **Simultaneous-session isolation is met** (verified 2026-07-21) — the engine already isolates two live `JSContext` instances (`[ThreadStatic]`+`AsyncLocal` current-context, realm-scoped `Eval`/`InvokeFunction`), so with the bridge de-globalized two simultaneous sessions do not see each other's state (`SessionIsolationTests` patch 0009; `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`). The earlier "blocked below the bridge" note was outdated. |
+| 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (701 lines, verified 2026-07-21), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. Work item 6 (externalize the embedded content-rendering polyfill JS as a versioned asset) is done — P3.53. All four exit criteria are met; the only element-member residue is the Phase-6-gated Canvas `getContext`/2D callbacks. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2: the serialize-time **baked style is now a distinct per-element overlay store**, split off the script-observable inline-style dict (P4.14 increments 1–3: anchor cluster + animation/synthetic/zoom bake writers seamed, then backed by a tombstone-aware overlay merged only at serialization) — verified byte-identical incl. the WPT anchor-position pixel corpus. `InlineStyleRuntimeState.Style` no longer carries bakes. Remaining: full-corpus WPT/Acid CI gate. Item 4/5 canonical reuses done (P4.8–4.12, P4.16–4.19; the `ChildIndexOf` → canonical `IndexOfReference` follow-up landed 2026-07-20 now that `patches/0002` is pinned). `CloneDomElement` now delegates to canonical `CloneNode` (P4.20, verified byte-identical across ~14 clone suites). **Item 5 complete:** `Normalize` now delegates to canonical `DomNode.Normalize()` (P4.21) — the P4.15 blocker (bridge MutationObserver/Range/NodeIterator driven by a hand-rolled channel rather than canonical `DomDocument.Mutated`) was closed by the mutation-notification consolidation (steps 1–3): the primitives were cleaned so each logical op fires one canonical record, then MutationObserver/Range/NodeIterator were switched onto canonical `Mutated`, with a suppression scope for serialize/render/parse bakes. |
 | 5 — used-value behaviour into Layout | Bulk delivered; **in-scope terminal** | Anchor-track deletion complete through step 6. Feature (b) visual-viewport/zoom: read (CSSOM) **and** render (pixel) sides now validated on the engine used-value model (2026-07-19) — deleting the zoom bake is now only a *deployment* gate (enable `NativeZoom` at the external `CaptureService` renderer). The `patches/0001` viewport-zoom render plumbing **is now applied + pinned** (`Broiler.HTML` `9977672`), so the pinch render cutover (pass `visualViewport.scale` into the render, drop the bake) is **unblocked** — remaining as the one still-unwired main-repo follow-up, with the serialization bake as the active fallback. Feature (a) dialog/backdrop: native modal centering + modal box-chrome bake deletion landed; native `::backdrop` box + top-layer paint stay WPT-runner-fallback-gated. See the [2026-07-19 reconciliation](#reconciliation-2026-07-19--features-a-and-b-driven-to-their-in-scope-terminal-state). |
 
@@ -266,12 +266,19 @@ caches above are now consolidated into `BrowsingContextManager` — P3.16).
 
 Two findings recorded for later phases:
 
-- **The "two *simultaneous* sessions are isolated" exit criterion is blocked below the bridge.**
-  Two live `JSContext` instances currently share global state at the Broiler.JS engine layer (the
-  last-created context's globals win), so simultaneous-session isolation cannot be delivered by a
-  bridge-only change. The supported model today is one active session per thread; the bridge
-  guarantees *sequential* re-attach isolation. Full simultaneous isolation needs JS-engine work
-  (out of this roadmap's scope).
+- **The "two *simultaneous* sessions are isolated" exit criterion — now met (updated 2026-07-21).**
+  This note originally recorded the criterion as blocked below the bridge, on the belief that two live
+  `JSContext` instances shared global state (last-created wins). A direct engine investigation disproved
+  that: `JSContext.Eval` (and `JSFunction.InvokeFunction`) enter the target context's realm scope, and the
+  current context is `[ThreadStatic]` + `AsyncLocal`-scoped (`JSEngine.Current`/`_current`), not a
+  process-global — so the engine already isolates simultaneous contexts. Verified by
+  `Broiler.JavaScript.Integration.Tests.SessionIsolationTests` (interleaved evals keep separate globals; a
+  stored callback resolves its own context after another is created; 2000× concurrent two-thread evals never
+  clobber), shipped as `patches/0009` (engine push 403 → patch). Combined with the completed bridge
+  de-globalization (every runtime table is now per-`DomBridge` instance), two *simultaneous* bridge sessions
+  no longer see each other's nodes/globals/mutations — pinned by
+  `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`. **Phase 2 is
+  therefore fully complete, in-scope and exit-criteria.**
 - **De-globalizing the process-static per-element runtime tables** (`ElementRuntimeStates`,
   `PositionAreaResolutions`) is being done incrementally. Both tables are weak + node-keyed (they GC
   with the session's nodes, so they do not leak or cross sessions today), so this is a correctness/
@@ -1985,6 +1992,25 @@ Exit criteria:
   `VisualViewportEventTargetBindingModuleTests`, `WindowScrollBindingModuleTests`,
   `PositionAreaLiveGeometryTests`, `AnchorInsetLiveGeometryTests`, `AbsPosInlineCbGeometryTests`,
   133 tests with the guard) stays green.
+
+Status: **P3.53 completed** 2026-07-21 — **work item 6: externalize the embedded content-rendering
+polyfill JavaScript as a versioned asset** (the last non-exit-criterion Phase 3 work item; module
+ownership is now stable, its stated precondition). The seven pure-JS polyfill blocks that
+`DomBridge.RegisterContentRenderingPolyfills` used to install via inline `context.Eval(@"…")` C# string
+literals — `Image`, `IntersectionObserver`, `ResizeObserver`, `TextEncoder`/`TextDecoder`,
+`URLSearchParams`, `URL`, `AbortController` — moved verbatim into a versioned embedded asset
+`Polyfills/content-rendering-polyfills.js` (embedded in `Broiler.HtmlBridge.Dom` with an explicit
+`LogicalName`, a `// version: 1` header). A small `PolyfillAssets` loader reads it from the assembly
+manifest once (cached) and the registration now calls `context.Eval(PolyfillAssets.ContentRendering)`.
+`Registration/Polyfills.cs` drops 309 → 46 lines. The host-driven polyfills stay in C# (they are not pure
+JS): `document.cookie` (a `FastAddProperty` get/set over an in-memory store — moved after the JS eval,
+order-independent of it), and `crypto`/`DOMException`/`Node`/`SVGLength` in
+`RegisterSecurityAndConstructorPolyfills`. Behaviour-preserving (the JS is byte-for-byte the former
+literals, `�` kept as the escape); no public-API change (loader + asset internal). Tests: the
+`GoogleSearchPolyfill` / `GoogleSearchCompliance` suites (which exercise `new URL(...)`, `TextEncoder`,
+`IntersectionObserver`, `AbortController`, …) and the architecture-guard suite stay green;
+`Broiler.HtmlBridge.Dom` builds clean with the asset embedded. This closes the Phase 3 work list — every
+work item is delivered except Canvas, which is Phase-6-gated.
 
 ### Phase 4 - eliminate parallel DOM state
 
