@@ -5,9 +5,9 @@ Status: **in delivery** — Phases 0–5 delivered to their in-scope terminal st
 migration is complete and merged (submodule patches `0004`–`0007` applied upstream), with only the terminal
 `Broiler.HtmlBridge.Rendering` project deletion outstanding (WPT-reftest-gated); Phase 7 items 1–5 are
 done, item 6's static import/export module graph is linked and executing (P7.17) with `import.meta` (P7.18),
-dynamic `import()` (P7.20) and live bindings (P7.22) handled at the bridge layer, leaving item 6's
-engine-coupled tail (top-level-await-as-async with event-loop ordering, and fully general live named
-bindings). The `Broiler.JS` seam for driving the engine's own module machinery ships as patch `0008` (P7.19)
+dynamic `import()` (P7.20) and live bindings (P7.22, made scope-accurate in P7.23) handled at the bridge
+layer, leaving item 6's engine-coupled tail (top-level-await-as-async with event-loop ordering). The
+`Broiler.JS` seam for driving the engine's own module machinery ships as patch `0008` (P7.19)
 but is blocked below it by a core engine TLA-completion bug (root-caused in P7.21); Phase 8 remains proposed.
 Per-phase detail: [remaining phases](htmlbridge-complexity-reduction-remaining.md).
 

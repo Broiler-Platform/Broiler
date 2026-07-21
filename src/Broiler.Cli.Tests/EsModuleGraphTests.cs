@@ -379,6 +379,144 @@ public sealed class EsModuleGraphTests
         Assert.Equal("1", Eval(ctx, "''+globalThis.evalCount")); // evaluated exactly once
     }
 
+    // ── scope-accurate live named bindings (EsModuleLiveRefs) ─────────────────────────────────
+
+    [Fact]
+    public void Named_Import_Stays_Live_Through_A_Module_That_Has_Local_Functions()
+    {
+        // The lift: a consumer with its own function + params (that do NOT shadow the imports) must still
+        // get live named bindings — the old rewriter aborted the whole module on any `function`.
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/counter.mjs"] =
+                "export let count = 0;\n" +
+                "export function bump() { count += 5; }",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { count, bump } from './counter.mjs';\n" +
+                "function helper(n) { return n + 1; }\n" +
+                "bump();\n" +
+                "globalThis.out = helper(count);",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("6", Eval(ctx, "''+globalThis.out")); // count live → 5, helper(5) → 6 (snapshot would give 1)
+    }
+
+    [Fact]
+    public void A_Function_Parameter_Shadow_Is_Not_Rewritten()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "function f(v) { return v; }\n" +      // param v shadows the import
+                "globalThis.shadowed = f(7);\n" +      // must be 7, not the import 100
+                "globalThis.top = v;",                 // unshadowed → import → 100
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("7", Eval(ctx, "''+globalThis.shadowed"));
+        Assert.Equal("100", Eval(ctx, "''+globalThis.top"));
+    }
+
+    [Fact]
+    public void An_Arrow_Parameter_Shadow_Is_Not_Rewritten()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "var f = (v) => v;\n" +   // multi-form arrow param
+                "var g = v => v + 1;\n" + // single-form arrow param
+                "globalThis.a = f(3); globalThis.b = g(4); globalThis.top = v;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("3", Eval(ctx, "''+globalThis.a"));
+        Assert.Equal("5", Eval(ctx, "''+globalThis.b"));
+        Assert.Equal("100", Eval(ctx, "''+globalThis.top"));
+    }
+
+    [Fact]
+    public void A_Block_Scoped_Let_Shadow_Is_Not_Rewritten()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "var out = 0;\n" +
+                "{ let v = 9; out = v; }\n" +   // block-scoped shadow
+                "globalThis.blocked = out; globalThis.top = v;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("9", Eval(ctx, "''+globalThis.blocked"));
+        Assert.Equal("100", Eval(ctx, "''+globalThis.top"));
+    }
+
+    [Fact]
+    public void A_Destructuring_Binding_Shadow_Is_Not_Rewritten()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "function f() { var { v } = { v: 7 }; return v; }\n" +
+                "globalThis.d = f(); globalThis.top = v;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("7", Eval(ctx, "''+globalThis.d"));
+        Assert.Equal("100", Eval(ctx, "''+globalThis.top"));
+    }
+
+    [Fact]
+    public void A_Catch_Parameter_Shadow_Is_Not_Rewritten()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "var r; try { throw 5; } catch (v) { r = v; }\n" +
+                "globalThis.caught = r; globalThis.top = v;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("5", Eval(ctx, "''+globalThis.caught"));
+        Assert.Equal("100", Eval(ctx, "''+globalThis.top"));
+    }
+
+    [Fact]
+    public void A_Module_With_A_Class_Falls_Back_To_A_Correct_Snapshot()
+    {
+        var files = new Dictionary<string, string> { ["file:///app/lib.mjs"] = "export let v = 100;" };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { v } from './lib.mjs';\n" +
+                "class C { m() { return 1; } }\n" +
+                "globalThis.out = v + new C().m();",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("101", Eval(ctx, "''+globalThis.out")); // snapshot v=100 (+1); module not corrupted
+    }
+
     [Fact]
     public void Named_Import_Is_A_Live_Binding_Not_A_Snapshot()
     {
@@ -444,10 +582,10 @@ public sealed class EsModuleGraphTests
     }
 
     [Fact]
-    public void Live_Rewrite_Falls_Back_To_Snapshot_When_A_Local_Function_Could_Shadow()
+    public void Named_Import_Read_Through_A_Local_Function_Call_Is_Handled()
     {
-        // The importer defines a function (a scope the conservative rewriter will not analyse), so it keeps
-        // the snapshot binding — still correct, just not live. Asserts the fallback produces the right value.
+        // A non-shadowing local function whose parameter is unrelated to the import: the scope-accurate
+        // rewriter keeps the import live and does not confuse the parameter `x` with the import `answer`.
         var files = new Dictionary<string, string>
         {
             ["file:///app/util.mjs"] = "export const answer = 42;",

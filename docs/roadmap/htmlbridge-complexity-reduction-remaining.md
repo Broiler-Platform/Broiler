@@ -7,12 +7,12 @@ patches `0004`–`0007` applied upstream and the `Broiler.HTML` pointer bumped t
 behind the WPT pixel reftest gate. **Phase 7 items 1–5 complete** (CSP split, script descriptors,
 loader/`UrlResolver`/`Origin` consolidation, external-stylesheet CSP, and host-layer CSP enforcement) **and
 item 6's static import/export module graph linked and executing** (P7.17) **with `import.meta` (P7.18),
-dynamic `import()` (P7.20) and live bindings (P7.22) handled at the bridge layer** (exports + namespace live
-universally; named imports live where provably safe, else a correct snapshot); the remaining item-6 tail is
-the genuinely engine-coupled part — top-level-await-as-async (with event-loop ordering) and fully general live
-named bindings. The `Broiler.JS` host-resolution seam for driving the engine's own module machinery ships as
-patch `0008` (P7.19), but the engine-driven path is **blocked below it** by a core engine TLA-completion bug
-(root-caused in P7.21). **Phase 8 proposed.**
+dynamic `import()` (P7.20) and live bindings (P7.22, scope-accurate in P7.23) handled at the bridge layer**
+(exports + namespace live universally; named imports rewritten scope-accurately, falling back to a correct
+snapshot only for `class`/`with`/`eval` modules); the remaining item-6 tail is the genuinely engine-coupled
+part — top-level-await-as-async (with event-loop ordering). The `Broiler.JS` host-resolution seam for driving
+the engine's own module machinery ships as patch `0008` (P7.19), but the engine-driven path is **blocked
+below it** by a core engine TLA-completion bug (root-caused in P7.21). **Phase 8 proposed.**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -640,19 +640,36 @@ Exit criteria:
   `internal` → no public-API change; the full module-graph / descriptor / CSP suites stay green (66) with no
   regressions.
 
-- **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17/P7.18/P7.20/P7.22 the static
+- **P7.23 (2026-07-21) — item 6 tail: scope-accurate live named bindings (lift the conservative fallback).**
+  P7.22's `EsModuleLiveRefs` was sound-by-abdication — it aborted the *whole module* to snapshot on any
+  binding/scope construct (`function`, `=>`, `var`/`let`/`const`, `catch`), so a consumer that merely defined
+  a helper function got no live named bindings. Replaced it with a **scope-accurate, per-name** analyzer: the
+  same string/template/comment/regex-aware lexer now tracks every construct that can (re)bind a name —
+  `var`/`let`/`const` declarations and their destructuring patterns, function/arrow/`catch` parameters, and
+  function names — and marks an imported local **unrewritable** if it appears in *any* binding position
+  anywhere (a nearer binding could shadow it in some scope). An imported local that is **never** bound
+  anywhere is free in every scope, so each plain read-reference is rewritten live; the linker's `var` snapshot
+  bindings stay as the safety net for anything left unrewritten. It is still sound-biased — any ambiguous
+  occurrence marks the name unrewritable rather than risk a wrong rewrite, and `class`/`with`/`eval` (whose
+  scoping the lexer will not attempt) still fall back to a whole-module snapshot. New `EsModuleGraphTests` (7)
+  are adversarial: the **lift** (a named import stays live through a module with its own functions/params →
+  reads the mutated value), and correct *non*-rewriting under every shadow form — function param, arrow param
+  (both `(v)=>` and `v=>`), block `let`, destructuring, and `catch` — each asserting the **shadowed** reference
+  reads the local (which would fail if the analyzer wrongly rewrote it), plus the `class` snapshot fallback.
+  All 34 `EsModuleGraph` + 50 module/CSP tests green; `internal` → no public-API change.
+
+- **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17/P7.18/P7.20/P7.22/P7.23 the static
   import/export graph is linked and executed, `import.meta` is handled, dynamic `import()` is wired to the
-  graph, and bindings are live (exports + namespace universally; named imports where provably safe, else a
-  correct snapshot) — all at the bridge layer. The genuinely engine-coupled residue is now: **top-level
-  `await`** as genuinely async (the bridge transform is a synchronous IIFE, so a TLA module falls back), which
-  also wants module ordering moved into the real browser **event loop** rather than the deferred-bucket
-  approximation; and **fully general live named bindings** (the conservative rewriter falls back to snapshot
-  for modules with local scopes/declarations — a scope-accurate rewrite, or the engine's own module records,
-  would remove that limitation). The intended engine-driven path, for which the host-resolution seam `0008`
-  (P7.19) is the enabling `Broiler.JS` patch, remains **blocked below that patch** by the core engine
-  TLA-completion bug (root-caused in P7.21 / `patches/README.md` §0008 — a static import *is* a top-level
-  await, and the correct fix routes the async module body through the same pumped completion path
-  `ExecuteScriptAsync` uses). Both are tracked here as the Phase 7 residue.
+  graph, and bindings are live (exports + namespace universally; named imports **scope-accurately**, falling
+  back to a correct snapshot only for `class`/`with`/`eval` modules or template-interpolation reads) — all at
+  the bridge layer. The genuinely engine-coupled residue is now: **top-level `await`** as genuinely async (the
+  bridge transform is a synchronous IIFE, so a TLA module falls back), which also wants module ordering moved
+  into the real browser **event loop** rather than the deferred-bucket approximation. The intended
+  engine-driven path, for which the host-resolution seam `0008` (P7.19) is the enabling `Broiler.JS` patch,
+  remains **blocked below that patch** by the core engine TLA-completion bug (root-caused in P7.21 /
+  `patches/README.md` §0008 — a static import *is* a top-level await, and the correct fix routes the async
+  module body through the same pumped completion path `ExecuteScriptAsync` uses). Tracked here as the Phase 7
+  residue.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 
