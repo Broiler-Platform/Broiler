@@ -9,6 +9,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Phase 3 work item 6: content-rendering polyfill JavaScript as a versioned embedded asset
+         (externalized from inline C# string literals in Registration/Polyfills.cs). -->
+    <EmbeddedResource Include="Polyfills\content-rendering-polyfills.js">
+      <LogicalName>Broiler.HtmlBridge.Polyfills.content-rendering-polyfills.js</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Broiler" />
     <InternalsVisibleTo Include="Broiler.Cli" />
     <InternalsVisibleTo Include="Broiler.Cli.Tests" />
