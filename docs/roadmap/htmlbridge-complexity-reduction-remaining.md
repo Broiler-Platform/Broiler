@@ -599,6 +599,27 @@ Exit criteria:
   descriptor / CSP suites stay green (only the 4 pre-existing geometry/serialization env failures remain,
   identical on baseline).
 
+- **P7.21 (2026-07-20) — item 6 tail: deep-dive on the engine-driven path (root-caused, not fixed).** An
+  attempt to fix the engine so the bridge could drive its real module machinery (via seam `0008`) root-caused
+  the blocker precisely: **a module body with a top-level `await` does not run to completion — the code after
+  the first `await` is dropped.** Every static `import` desugars to `tempRequire = yield import(spec)`
+  (`FastCompiler.VisitImportStatement`), so a static import *is* a top-level await; that is why
+  `import { x } from …` leaves `x` undefined. Reproduced minimally on the **stock** engine (no seams,
+  filesystem): `globalThis.a=1; await Promise.resolve(); globalThis.a2=2;` sets `a` but never `a2` (the
+  existing `Modules.Tests` TLA case only asserts a non-null return, so it never caught this). The working
+  `JSContext.Execute` path runs the body under a **pumped** `AsyncPump` loop and drains the job loop
+  (`WaitTask`) before taking the result; the module path (`RunAsync`/`RunScriptAsync` → `InitAsync` →
+  `CompileModuleAsync`) awaits an un-pumped context and drives the body through a **double-marshaled**
+  `JSFunction`→`Marshal(CompileModuleAsync)`→`IJSPromise.Task` bridge, so the body promise settles at the
+  first suspension and the continuation resumes later, off the loop. A pump-plus-`WaitTask`-drain fix made the
+  continuation *try* to resume but it then posts to the completed `AsyncPump` queue (`InvalidOperationException:
+  the collection has been marked as complete`), confirming the continuation escapes the loop — the fix is not a
+  pump tweak but routing the async module body through the **same completion mechanism `ExecuteScriptAsync`
+  uses** (one promise await under one pumped loop, no re-marshal). That is core async-runtime surgery with
+  broad regression surface, left to a maintainer with the engine test suite (full diagnosis in
+  `patches/README.md` §0008). The engine change was **reverted** (a crashing partial fix is not shipped); the
+  seam patch `0008` stands as the necessary resolution hook for when the TLA-completion bug is fixed.
+
 - **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17/P7.18/P7.20 the static import/export
   graph is linked and executed, `import.meta` is handled, and dynamic `import()` is wired to the graph — all
   at the bridge layer. What remains is the genuinely engine-coupled residue: **live bindings across cycles**
@@ -607,11 +628,13 @@ Exit criteria:
   transform is a synchronous IIFE, so a TLA module falls back), which together also want module ordering moved
   into the real browser **event loop** rather than the deferred-bucket approximation. The intended path — drive
   the engine's own module lowering, for which the host-resolution seam `0008` (P7.19) is the enabling
-  `Broiler.JS` patch — is **blocked below that patch** by the engine's own incomplete module execution
-  (static-import value binding and nested-async ordering, both reproduced on the stock engine). Closing this
-  residue therefore requires either those deeper `Broiler.JS` engine fixes (submodule, push-authorization-gated)
-  or extending the bridge-layer linker with identifier-use rewriting (live named bindings) and an async module
-  wrapper tied to the event loop (TLA); both are tracked here as the Phase 7 residue.
+  `Broiler.JS` patch — is **blocked below that patch** by a core engine bug: a module body's top-level `await`
+  is not driven to completion (root-caused in P7.21 / `patches/README.md` §0008), and a static import *is* a
+  top-level await. Closing this residue therefore requires either fixing that engine TLA-completion bug
+  (submodule, push-authorization-gated — the correct fix routes the async module body through the same pumped
+  completion path `ExecuteScriptAsync` uses) or extending the bridge-layer linker with identifier-use rewriting
+  (live named bindings) and an async module wrapper tied to the event loop (TLA); both are tracked here as the
+  Phase 7 residue.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 

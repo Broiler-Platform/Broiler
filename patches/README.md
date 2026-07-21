@@ -278,11 +278,37 @@ executed through the seams. Push **403** → ships here, pointer **unbumped**, w
 subclass `JSModuleContext`, override these seams with its `UrlResolver` + CSP-gated `ResourceLoader`, and
 reuse the engine's real module compilation to gain the Phase 7 item-6 tail (live cyclic bindings, genuine
 top-level-await ordering, dynamic `import()`) instead of the bridge's own `EsModuleLinker` string
-transform. Investigation while validating this patch established that the engine's module machinery is
-**itself incomplete beyond resolution**: a static `import { x } from …` does **not** bind a value (the
-`yield import(...)` desugaring resolves to `undefined` — reproduced on the **stock** filesystem context,
-independent of these seams), and nested/transitive async module bodies do not run to completion under
-`RunScriptAsync`. So driving the engine for modules needs those deeper engine fixes first; until then the
-bridge keeps its own working `EsModuleLinker`, and `import.meta` is handled there (roadmap P7.18). This
-patch is the correct, minimal enabling seam for that future engine-driven path — necessary, not
-sufficient.
+transform. Validating this patch, and a subsequent deeper investigation, established that the engine's
+module machinery is **itself incomplete beyond resolution — the follow-up is blocked on a core async
+engine bug, not on this seam.**
+
+**Root cause (diagnosed, not yet fixed).** A module body with a **top-level `await`** does not run to
+completion — the code after the first `await` is dropped. Every static `import` desugars to
+`tempRequire = yield import(spec)` (see `FastCompiler.VisitImportStatement`), so a static import *is* a
+top-level await; that is why `import { x } from …` leaves `x` `undefined`. Reproduced minimally on the
+**stock** engine (no seams, filesystem `.js`): a module body `globalThis.a=1; await Promise.resolve();
+globalThis.a2=2;` sets `a` but never `a2`. The existing `Modules.Tests` TLA case only asserts the module's
+return value is non-null, so it never caught this. Mechanism: the working `JSContext.Execute` path runs the
+body under a **pumped** `AsyncPump` loop and drains the job loop (`WaitTask`) before taking the result,
+keeping the async continuation on the engine's loop; the module path
+(`RunAsync`/`RunScriptAsync` → `LoadModuleAsync` → `JSModule.InitAsync` → `CompileModuleAsync`) instead
+awaits an un-pumped `SynchronizationContext`, and drives the body through a **double-marshaled** bridge
+(`newModule.Compile` is a `JSFunction` returning `ClrInterop.Marshal(CompileModuleAsync())`, re-awaited via
+`IJSPromise.Task`). The body promise settles at the first suspension and the real continuation resumes
+later, off the loop.
+
+**Attempted (reverted — do not ship as-is).** Running `RunAsync`/`RunScriptAsync` under `AsyncPump.Run`
+(mirroring `ExecuteAsync`) plus draining `WaitTask` in `CompileModuleAsync` makes the continuation *try* to
+resume, but it then posts to the pumped loop **after** the outer task completed and `AsyncPump` marked the
+queue done → `InvalidOperationException: The collection has been marked as complete`. So the continuation
+genuinely escapes the loop (a thread hop through the double `Task`↔promise marshal), confirming the fix is
+not a pump tweak. The correct fix is to drive the async module body through the **same completion mechanism
+`ExecuteScriptAsync` uses** (single promise await under one pumped loop, no re-marshal of
+`CompileModuleAsync` back through a `JSFunction`) so the top-level-await continuation stays on the engine
+job loop and the body promise settles at body-end. That is core async-runtime surgery with broad regression
+surface across the engine's promise/async subsystem and is left to a maintainer with the engine test suite.
+
+Until that lands, the bridge keeps its own working `EsModuleLinker` (which links static import/export,
+`import.meta` — roadmap P7.18 — and dynamic `import()` — P7.20 — via a synchronous IIFE + registry, with
+snapshot bindings and no TLA). This patch is the correct, minimal *resolution* seam for the future
+engine-driven path — necessary, but not sufficient until the top-level-await completion bug above is fixed.
