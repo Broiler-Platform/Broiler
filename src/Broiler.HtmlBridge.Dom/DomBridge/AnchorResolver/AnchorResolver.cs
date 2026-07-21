@@ -58,26 +58,30 @@ public sealed partial class DomBridge
     /// <c>FragmentTreeBuilder</c> projects it to <see cref="Broiler.Layout.IR.Fragment.TopLayerOrder"/>,
     /// and the renderer's native top-layer paint pass (<c>PaintWalker.PaintTopLayer</c>) paints
     /// those boxes above every ordinary stacking context — the correct CSS Position 4 §top-layer
-    /// behaviour, replacing the bridge's approximate very-large-z-index emulation. Off by default:
-    /// the marker is inert until the renderer's native-top-layer paint patch is applied (the
-    /// pinned <c>PaintWalker</c> never reads the projected order), so stamping stays gated to the
-    /// native render path (the WPT runner enables it alongside <see cref="NativeAnchorPlacement"/>)
-    /// and the default/production serialization is unchanged.
+    /// behaviour, replacing the bridge's approximate very-large-z-index emulation. <b>On by
+    /// default (cutover 2026-07-21):</b> the renderer's native top-layer paint pass is applied and
+    /// pinned, so the default bridge stamps the marker and the engine paints the top layer. The
+    /// very-large-z-index emulation is retained as a gated fallback (set this flag off — e.g. the
+    /// WPT runner ties it to <see cref="NativeAnchorPlacement"/>, and <c>BROILER_WPT_NATIVE_ANCHOR=0</c>
+    /// forces the whole native path off for rollback).
     /// </summary>
-    internal bool NativeTopLayer { get; set; }
+    internal bool NativeTopLayer { get; set; } = true;
 
     /// <summary>
     /// Phase 5 native dialog/backdrop track — native <c>::backdrop</c>. When on, the bridge stops
     /// synthesizing a backdrop <c>&lt;div&gt;</c> in <c>InsertDialogBackdrops</c> and instead
     /// stamps the resolved backdrop background (<c>data-broiler-backdrop</c>) on the top-layer
-    /// element; the renderer generates the <c>::backdrop</c> box natively (Broiler.HTML DomParser,
-    /// patch 0011, which depends on the 0010 top-layer paint). Off by default and — unlike
-    /// <see cref="NativeTopLayer"/> — <em>not</em> auto-enabled by the WPT runner: the synthesized
-    /// <c>&lt;div&gt;</c> is the CI fallback until patch 0011 is applied (the pinned renderer would
-    /// otherwise drop backdrops entirely on the WPT path). Requires <see cref="NativeTopLayer"/> to
-    /// also be on (the native backdrop is painted by the top-layer pass).
+    /// element; the renderer generates the <c>::backdrop</c> box natively
+    /// (<c>Broiler.HTML DomParser.GenerateNativeBackdrops</c>, applied and pinned). <b>On by default
+    /// (cutover 2026-07-21).</b> The synthesized <c>&lt;div&gt;</c> path is retained as a gated
+    /// fallback for two cases that still need it: author <c>::backdrop</c> position-try-fallbacks
+    /// (the native box does not run the position-try pass, so <c>InsertDialogBackdrops</c> routes
+    /// only those through the <c>&lt;div&gt;</c>), and rollback (set this off). The WPT runner keeps
+    /// its own lever default-off until the full WPT <c>::backdrop</c> reftest corpus is swept.
+    /// Requires <see cref="NativeTopLayer"/> to also be on (the native backdrop is painted by the
+    /// top-layer pass).
     /// </summary>
-    internal bool NativeBackdrop { get; set; }
+    internal bool NativeBackdrop { get; set; } = true;
 
     /// <summary>
     /// Resolves <c>anchor()</c> function values and inserts <c>::backdrop</c>

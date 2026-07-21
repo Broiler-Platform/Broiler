@@ -128,6 +128,31 @@ byte-identical. Author `::backdrop` `position-try-fallbacks` stay on the baked p
 once 0010+0011 apply and the pointer bumps: flip `NativeBackdrop` on and delete the backdrop-`<div>`
 synthesis (and its author-geometry / position-try helpers) from `Dialogs.cs`.
 
+**Landed (2026-07-21) — native top-layer/`::backdrop` cutover: flags default on.** Both the native
+top-layer paint pass and the native `::backdrop` box generation (the "slice 1c/1d" submodule work referenced
+above as "patch 0010/0011") are **applied and pinned** in the `Broiler.HTML` pointer — `PaintWalker`'s
+`TopLayerOrder`-ordered top-layer paint (`PaintWalker.Stacking.cs`) and `DomParser.GenerateNativeBackdrops`
+(reads `data-broiler-top-layer` / `data-broiler-backdrop`) are present in the pinned source. (Note: those
+"0010/0011" are the *older* top-layer/backdrop patch numbers, since superseded — the current `patches/0010`
+and `patches/0011` are the unrelated TLA-codegen and module-orchestration patches. Number reuse, not a
+dependency.) With the renderer honouring the markers, this slice flips `DomBridge.NativeTopLayer` and
+`NativeBackdrop` to **default `true`**: the default bridge now stamps the native markers and lets the engine
+paint the top layer and generate the `::backdrop` box, rather than emulating a `2e9` z-index and synthesizing
+a backdrop `<div>`. The emulation is **retained, gated behind the flags**, as a live fallback — it is not
+dead code and is *not* deleted, because three paths still need it: (1) author `::backdrop`
+`position-try-fallbacks` (the native box does not run the position-try pass, so `Dialogs.cs` routes just
+those backdrops through the `<div>` path — `NativeBackdrop && !authorPositionTry`); (2) the WPT runner, whose
+`NativeBackdrop` lever stays default-off until the full WPT `::backdrop` reftest corpus is swept under it; and
+(3) env-var rollback (`BROILER_WPT_NATIVE_ANCHOR=0`). Validated: the two popover unit tests that asserted the
+removed z-index/`<div>` emulation now assert the native markers (`data-broiler-top-layer` /
+`data-broiler-backdrop`); a new end-to-end `NativeBackdropRenderTests` renders the bridge-serialized DOM
+through the real renderer and asserts painted backdrop-scrim pixels (proving the markers produce pixels, not
+just serialized attributes); the dialog/backdrop/top-layer/popover suite (16), `NativeModalDialogAnchorWptTests`,
+and `TopLayerFragmentProjectionTests` are green; the 4 pre-existing zoom/SVG-geometry/iframe-scroll/anchor-size
+`DomBridge_*` failures are unrelated (confirmed failing on a stash-clean tree). Remaining tail (a separate,
+pixel-reftest-gated step): flip the WPT `NativeBackdrop` lever on after sweeping the WPT `::backdrop` corpus,
+then the `<div>` synthesis can be reduced to just the position-try fallback.
+
 **Track status after slice 1c.** A systematic sweep after 0010 landed:
 - **Native `::backdrop` box generation** (the largest remaining piece of `Dialogs.cs`) is now **done —
   slice 1d, patch 0011 + main-repo IR/marker** (landing note below). It resolved the design points the

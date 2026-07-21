@@ -345,11 +345,15 @@ internal sealed partial class WptTestRunner
         Environment.GetEnvironmentVariable("BROILER_WPT_NATIVE_ANCHOR") is not ("0" or "false" or "FALSE" or "off");
 
     /// <summary>
-    /// Native <c>::backdrop</c> lever (Phase 5 native dialog/backdrop track). Default OFF — unlike
-    /// <see cref="NativeAnchorPlacement"/>, this is not on by default, because the native
-    /// <c>::backdrop</c> box generation lives in an unapplied submodule patch (0011); with it off
-    /// the bridge keeps synthesizing the backdrop <c>&lt;div&gt;</c> (the CI fallback). Turned on
-    /// by the native-backdrop render validation once patch 0011 is applied locally.
+    /// Native <c>::backdrop</c> lever (Phase 5 native dialog/backdrop track). The native
+    /// <c>::backdrop</c> box generation (<c>Broiler.HTML DomParser.GenerateNativeBackdrops</c> +
+    /// <c>PaintWalker</c> top-layer paint) is <em>pinned</em> in the submodule, so the engine
+    /// honours the <c>data-broiler-backdrop</c> / <c>data-broiler-top-layer</c> markers — the
+    /// default <see cref="DomBridge"/> now stamps them (native) rather than emulating a scrim, and
+    /// the end-to-end render is covered by <c>NativeBackdropRenderTests</c>. This WPT lever stays
+    /// Default OFF here only until the full WPT <c>::backdrop</c> reftest corpus has been swept
+    /// under it; with it off the runner keeps synthesizing the backdrop <c>&lt;div&gt;</c> (the
+    /// established CI-green fallback). Force on with <c>BROILER_WPT_NATIVE_BACKDROP=1</c>.
     /// </summary>
     internal static bool NativeBackdrop { get; set; } =
         Environment.GetEnvironmentVariable("BROILER_WPT_NATIVE_BACKDROP") is ("1" or "true" or "TRUE" or "on");

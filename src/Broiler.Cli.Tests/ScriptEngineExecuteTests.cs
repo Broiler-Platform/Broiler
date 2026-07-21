@@ -1228,9 +1228,12 @@ document.getElementById('out').appendChild(p);
     public void DomBridge_Popover_ShowPopover_Promotes_To_Top_Layer_With_Backdrop()
     {
         // HTML §popover: showPopover() puts the element in the top layer, so it
-        // is elevated above ordinary content (synthetic z-index) and generates a
-        // ::backdrop honouring the author `background-color` (WPT css-position
-        // overlay-transition-backdrop / replaced-object-backdrop).
+        // is elevated above ordinary content and generates a ::backdrop honouring
+        // the author `background-color` (WPT css-position overlay-transition-backdrop
+        // / replaced-object-backdrop). The native path (NativeTopLayer/NativeBackdrop)
+        // stamps top-layer and backdrop markers on the element and lets the renderer
+        // generate the top-layer/::backdrop boxes, rather than emulating them with a
+        // synthetic z-index and a synthesized ::backdrop <div>.
         const string html = """
 <!DOCTYPE html>
 <html><head><style>
@@ -1246,10 +1249,11 @@ document.getElementById('out').appendChild(p);
 
         var result = bridge.SerializeToHtml();
 
-        // The popover is elevated into the synthetic top layer.
-        Assert.Contains("z-index: 2000000", result);
-        // A ::backdrop div was synthesized carrying the author background.
-        Assert.Contains("background-color: rgb(1, 200, 3)", result);
+        // The popover is elevated into the top layer (native top-layer marker).
+        Assert.Contains("data-broiler-top-layer=", result);
+        // The ::backdrop carries the resolved author background (native marker),
+        // rather than a synthesized <div> with an inline background-color.
+        Assert.Contains("data-broiler-backdrop=\"rgb(1, 200, 3)\"", result);
     }
 
     [Fact]
@@ -1271,6 +1275,9 @@ document.getElementById('out').appendChild(p);
 
         var result = bridge.SerializeToHtml();
 
+        // Left the top layer: no native top-layer marker (and no legacy z-index
+        // emulation) survives after the popover is hidden with no overlay transition.
+        Assert.DoesNotContain("data-broiler-top-layer", result);
         Assert.DoesNotContain("z-index: 2000000", result);
     }
 
@@ -1280,7 +1287,9 @@ document.getElementById('out').appendChild(p);
         // CSS Position §overlay: hiding while `overlay` transitions out with
         // transition-behavior: allow-discrete keeps the popover in the top layer
         // as it animates. A static snapshot is taken mid-transition, so it must
-        // still render (WPT overlay-transition-backdrop / -out-rendering).
+        // still render (WPT overlay-transition-backdrop / -out-rendering). The
+        // native path keeps the top-layer marker on the element for the duration
+        // of the transition rather than emulating it with a synthetic z-index.
         const string html = """
 <!DOCTYPE html>
 <html><head><style>
@@ -1299,7 +1308,8 @@ document.getElementById('out').appendChild(p);
 
         var result = bridge.SerializeToHtml();
 
-        Assert.Contains("z-index: 2000000", result);
+        // Still in the top layer mid-transition (native top-layer marker present).
+        Assert.Contains("data-broiler-top-layer=", result);
     }
 
     [Fact]
