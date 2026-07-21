@@ -1,0 +1,150 @@
+From 25379941cf278bc57b1373a95a079d0ac5f71dc6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 21 Jul 2026 15:46:56 +0000
+Subject: [PATCH] GeneratorRewriter: only seed the ScriptInfo box on first
+ entry (fix TLA resume)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The generator box-load prologue runs on every (re)entry, including each
+await/yield resume, and unconditionally re-seeded the persisted ScriptInfo box
+(scriptInfoBox.Value) from the body-local scriptInfo parameter. That local is
+only ever written inside the body — the write is redirected into the box — so as
+a bare local it is always its default (null) at prologue time. Re-seeding on
+resume therefore clobbered the ScriptInfo the box had persisted from the first
+run, including its Indices key table, back to null.
+
+Any statement after a top-level-await resume that resolves an identifier or
+member through scriptInfo.Value.Indices[...] then dereferenced null and threw a
+NullReferenceException (a constant receiver or a bare global read resolves via
+constant KeyStrings and so survived, which made the fault look receiver-shaped).
+This reproduces on the pristine engine via EvalWithTopLevelAwaitAsync with no
+module code, and gates every static import (which desugars to a top-level await)
+followed by use of the imported binding.
+
+Guard the seed on nextJump == 0 (first entry only): the first-entry seed that
+nested async/generator functions rely on is preserved, while every resume keeps
+the value the box persisted. Adds TopLevelAwaitResumeTests covering local reads,
+member get/call/assign, member-on-awaited-value, sequential awaits, and
+constant-receiver survival, plus async-function / generator regression guards.
+Full Broiler.JS suite stays green (only pre-existing Intl/doc env failures).
+---
+ .../TopLevelAwaitResumeTests.cs               | 73 +++++++++++++++++++
+ .../GeneratorsV2/GeneratorRewriter.cs         | 20 ++++-
+ 2 files changed, 92 insertions(+), 1 deletion(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Core.Tests/TopLevelAwaitResumeTests.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Core.Tests/TopLevelAwaitResumeTests.cs b/Broiler.JS/Broiler.JavaScript.Core.Tests/TopLevelAwaitResumeTests.cs
+new file mode 100644
+index 00000000..15e28947
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Core.Tests/TopLevelAwaitResumeTests.cs
+@@ -0,0 +1,73 @@
++using System.Threading.Tasks;
++using Broiler.JavaScript.Engine;
++using Broiler.JavaScript.Runtime;
++using Xunit;
++
++namespace Broiler.JavaScript.Core.Tests;
++
++/// <summary>
++/// Regression guard for a generator-rewriter codegen bug: after a top-level-<c>await</c>
++/// resume, statements that resolve an identifier or member through the script's
++/// <c>ScriptInfo.Indices</c> key table used to dereference null (the box-load prologue
++/// re-seeded the persisted <c>ScriptInfo</c> box with a null body-local on every resume).
++/// A constant receiver or a bare global read resolves via constant <c>KeyStrings</c> and so
++/// always survived, which made the fault look receiver-shaped. These pin the corrected
++/// behaviour and guard that ordinary async functions / generators still work.
++/// </summary>
++public class TopLevelAwaitResumeTests
++{
++    private static async Task<JSValue> Tla(string code)
++    {
++        using var ctx = new JSContext();
++        return await ctx.EvalWithTopLevelAwaitAsync(code);
++    }
++
++    [Fact]
++    public async Task Local_Read_After_Await()
++        => Assert.Equal(5.0, (await Tla("await Promise.resolve(); var x = 5; x;")).DoubleValue);
++
++    [Fact]
++    public async Task Member_Get_On_Identifier_Receiver_After_Await()
++        => Assert.Equal(3.141592653589793, (await Tla("await Promise.resolve(); Math.PI;")).DoubleValue, 12);
++
++    [Fact]
++    public async Task Member_Call_On_Identifier_Receiver_After_Await()
++        => Assert.Equal(2.0, (await Tla("await Promise.resolve(); Math.max(1, 2);")).DoubleValue);
++
++    [Fact]
++    public async Task Member_Assign_After_Await()
++        => Assert.Equal(2.0, (await Tla("await Promise.resolve(); globalThis.__a = 2; globalThis.__a;")).DoubleValue);
++
++    [Fact]
++    public async Task Member_On_Awaited_Value()
++        => Assert.Equal(7.0, (await Tla("var o = await Promise.resolve({ m: 7 }); o.m;")).DoubleValue);
++
++    [Fact]
++    public async Task Sequential_Awaits_Keep_Bindings()
++        => Assert.Equal(3.0, (await Tla("var a = await Promise.resolve(1); var b = await Promise.resolve(2); a + b;")).DoubleValue);
++
++    [Fact]
++    public async Task Constant_Receiver_Member_After_Await_Still_Works()
++        => Assert.Equal(2.0, (await Tla("await Promise.resolve(); 'hi'.length;")).DoubleValue);
++
++    [Fact]
++    public async Task Nested_Async_Function_Member_After_Await_Unregressed()
++    {
++        using var ctx = new JSContext();
++        var r = await ctx.ExecuteAsync(
++            "async function f(){ await Promise.resolve(); var q = Math.max(5, 6); return q + globalThis.__z; }\n" +
++            "globalThis.__z = 100;\n" +
++            "f();");
++        Assert.Equal(106.0, r.DoubleValue);
++    }
++
++    [Fact]
++    public void Generator_Member_After_Yield_Unregressed()
++    {
++        using var ctx = new JSContext();
++        var r = ctx.Eval(
++            "function* g(){ yield 1; var q = Math.max(3, 4); return q + 10; }\n" +
++            "var it = g(); it.next(); it.next().value;");
++        Assert.Equal(14.0, r.DoubleValue);
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/GeneratorsV2/GeneratorRewriter.cs b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/GeneratorsV2/GeneratorRewriter.cs
+index d78f03a6..8904ccb1 100644
+--- a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/GeneratorsV2/GeneratorRewriter.cs
++++ b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/GeneratorsV2/GeneratorRewriter.cs
+@@ -92,7 +92,25 @@ public class GeneratorRewriter(ParameterExpression pe, LabelTarget @return, Para
+             vlist.Add(box);
+             boxes.Add(Expression.Assign(box, ClrGeneratorV2Builder.GetVariable(pe, index, original.Type)));
+             if (original == _replaceScriptInfo)
+-                boxes.Add(Expression.Assign(Expression.Field(_scriptInfoBox, "Value"), _replaceScriptInfo));
++            {
++                // Seed the ScriptInfo box from the incoming `scriptInfo` local — but ONLY on the
++                // first entry (`nextJump == 0`). This box-load prologue runs on *every* (re)entry,
++                // including each await/yield resume, and the seed value `_replaceScriptInfo` is a
++                // body-local whose only writes were redirected into `_scriptInfoBox.Value`, so as a
++                // bare local it is always its default (null) at prologue time. Seeding unconditionally
++                // therefore clobbers, on every resume, the ScriptInfo the box persisted from the first
++                // run — including its `Indices` key table — back to null; any post-resume identifier /
++                // member access that resolves a name through `scriptInfo.Value.Indices[…]` then
++                // dereferences null (constant receivers and bare globals resolve via constant
++                // KeyStrings and survive, which made the fault look receiver-shaped). Guarding on
++                // `nextJump == 0` keeps the first-entry seed that nested async/generator functions rely
++                // on, while preserving the persisted value across every resume.
++                boxes.Add(Expression.IfThen(
++                    Expression.Equal(nextJump, Expression.Constant(0)),
++                    Expression.Block(
++                        Expression.Assign(Expression.Field(_scriptInfoBox, "Value"), _replaceScriptInfo),
++                        Expression.Empty)));
++            }
+         }
+ 
+         if (vlist.Count == 0)
+-- 
+2.43.0
+
