@@ -8,7 +8,9 @@ done, item 6's static import/export module graph is linked and executing (P7.17)
 dynamic `import()` (P7.20) and live bindings (P7.22, made scope-accurate in P7.23) handled at the bridge
 layer, leaving item 6's engine-coupled tail (top-level-await-as-async with event-loop ordering). The
 `Broiler.JS` seam for driving the engine's own module machinery ships as patch `0008` (P7.19)
-but is blocked below it by a core engine TLA-completion bug (root-caused in P7.21); Phase 8 remains proposed.
+but is blocked below it by a core engine top-level-await **codegen** bug (root-caused in P7.21, corrected and
+proven in P7.24 — a member access with a spilled receiver reads null after the await resume, reproducible on
+the pristine engine with no module code); Phase 8 remains proposed.
 Per-phase detail: [remaining phases](htmlbridge-complexity-reduction-remaining.md).
 
 Baseline date: 2026-07-13

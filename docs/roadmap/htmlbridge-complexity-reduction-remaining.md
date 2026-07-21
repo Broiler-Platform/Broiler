@@ -12,7 +12,9 @@ dynamic `import()` (P7.20) and live bindings (P7.22, scope-accurate in P7.23) ha
 snapshot only for `class`/`with`/`eval` modules); the remaining item-6 tail is the genuinely engine-coupled
 part — top-level-await-as-async (with event-loop ordering). The `Broiler.JS` host-resolution seam for driving
 the engine's own module machinery ships as patch `0008` (P7.19), but the engine-driven path is **blocked
-below it** by a core engine TLA-completion bug (root-caused in P7.21). **Phase 8 proposed.**
+below it** by a core engine top-level-await **codegen** bug — a member access whose receiver is spilled into
+a temporary reads null after the await resume, reproducible on the pristine engine with zero module code
+(root-caused in P7.21, corrected and proven in P7.24). **Phase 8 proposed.**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -620,6 +622,29 @@ Exit criteria:
   broad regression surface, left to a maintainer with the engine test suite (full diagnosis in
   `patches/README.md` §0008). The engine change was **reverted** (a crashing partial fix is not shipped); the
   seam patch `0008` stands as the necessary resolution hook for when the TLA-completion bug is fixed.
+  **Superseded in part by P7.24** — the real blocker is one layer deeper than the pump/marshal.
+
+- **P7.24 (2026-07-21) — item 6 tail: TLA blocker re-diagnosed to a stock-engine codegen bug (proven, not
+  fixed).** Carrying the P7.21 fix through cleanly (a non-marshalled `CompileDirect` hook on `JSModule` so
+  `InitAsync` awaits `CompileModuleAsync` directly, plus draining `WaitTask` and awaiting the body promise
+  under one `AsyncPump.Run` loop — mirroring `ExecuteScriptAsync`, all `Modules.Tests` green) removed the
+  double-marshal thread-hop **and the `InvalidOperationException`** — and exposed the true blocker: the
+  resumed module body throws a **`NullReferenceException` from inside the compiled body itself**. This NRE
+  reproduces on the **pristine** engine (`3a8f302`) via the engine's own
+  `JSContext.EvalWithTopLevelAwaitAsync` with **zero module code**, and is deterministic and
+  thread-independent (identical under `AsyncPump` on a worker thread, `AsyncPump` on the caller thread, and a
+  plain `await` with no pump). So it is a **compile-time top-level-await codegen bug**, not a runtime/pump
+  problem. Trigger boundary: after the first `await` resumes, a member access / call whose **receiver is an
+  identifier read** (local *or* global — e.g. `Math.max(1,2)`, `globalThis.z`, `var g=Math; g.max(1,2)`)
+  dereferences null, while a bare identifier read (`globalThis`, `Math`, a local `g`) and a member access on
+  a **constant** receiver (`'hi'.length`) both survive. The discriminator is the **spilled receiver
+  temporary**: `GeneratorRewriter.VisitBlock` box-lifts the await-containing block's locals, and the spilled
+  member-receiver temp reads null on the resume path (`GeneratorsV2/GeneratorRewriter.cs`; fault is in the
+  generated `vm-` delegate, not the async driver). This gates every static import followed by a member
+  access/call on the imported value. It is core generator-codegen surgery affecting **all** async
+  functions/generators, unvalidatable without the full engine suite — left to a maintainer with `Broiler.JS`
+  push access. Submodule left **pristine** (pointer unbumped `3a8f302`); no partial engine change shipped.
+  Full boundary table and analysis in `patches/README.md` §0008.
 
 - **P7.22 (2026-07-20) — item 6 tail: live bindings (bridge linker).** Replaced the linker's snapshot
   bindings with **live** ones. **Exports** are now published as **getters** on the exports object
@@ -666,10 +691,12 @@ Exit criteria:
   bridge transform is a synchronous IIFE, so a TLA module falls back), which also wants module ordering moved
   into the real browser **event loop** rather than the deferred-bucket approximation. The intended
   engine-driven path, for which the host-resolution seam `0008` (P7.19) is the enabling `Broiler.JS` patch,
-  remains **blocked below that patch** by the core engine TLA-completion bug (root-caused in P7.21 /
-  `patches/README.md` §0008 — a static import *is* a top-level await, and the correct fix routes the async
-  module body through the same pumped completion path `ExecuteScriptAsync` uses). Tracked here as the Phase 7
-  residue.
+  remains **blocked below that patch** by a core engine top-level-await **codegen** bug (root-caused in
+  P7.21, corrected and proven in P7.24 / `patches/README.md` §0008 — a static import *is* a top-level await;
+  the module-side completion path that mirrors `ExecuteScriptAsync` is correct and needed, but the gating
+  defect is that a member access whose receiver is spilled into a temporary reads null after the await
+  resume, reproducible on the pristine engine via `EvalWithTopLevelAwaitAsync` with no module code). Tracked
+  here as the Phase 7 residue.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 

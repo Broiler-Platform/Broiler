@@ -298,21 +298,61 @@ awaits an un-pumped `SynchronizationContext`, and drives the body through a **do
 `IJSPromise.Task`). The body promise settles at the first suspension and the real continuation resumes
 later, off the loop.
 
-**Attempted (reverted — do not ship as-is).** Running `RunAsync`/`RunScriptAsync` under `AsyncPump.Run`
-(mirroring `ExecuteAsync`) plus draining `WaitTask` in `CompileModuleAsync` makes the continuation *try* to
-resume, but it then posts to the pumped loop **after** the outer task completed and `AsyncPump` marked the
-queue done → `InvalidOperationException: The collection has been marked as complete`. So the continuation
-genuinely escapes the loop (a thread hop through the double `Task`↔promise marshal), confirming the fix is
-not a pump tweak. The correct fix is to drive the async module body through the **same completion mechanism
-`ExecuteScriptAsync` uses** (single promise await under one pumped loop, no re-marshal of
-`CompileModuleAsync` back through a `JSFunction`) so the top-level-await continuation stays on the engine
-job loop and the body promise settles at body-end. That is core async-runtime surgery with broad regression
-surface across the engine's promise/async subsystem and is left to a maintainer with the engine test suite.
+**Module-orchestration layer (necessary, not sufficient).** The module path
+(`RunAsync`/`RunScriptAsync` → `LoadModuleAsync` → `JSModule.InitAsync` → `CompileModuleAsync`) has two real
+defects versus the working `JSContext.ExecuteScriptAsync`: it awaits an un-pumped `SynchronizationContext`,
+and it drives the body through a **double-marshaled** bridge (`newModule.Compile` is a `JSFunction`
+returning `ClrInterop.Marshal(CompileModuleAsync())`, re-awaited via `IJSPromise.Task`, whose continuation
+hops to the thread pool). The correct module-side shape is to mirror `ExecuteScriptAsync`: run the whole
+init under one `AsyncPump.Run` worker loop, add a non-marshalled `CompileDirect` hook so `InitAsync` awaits
+`CompileModuleAsync` directly (no `JSFunction`/`IJSPromise` re-wrap), and in `CompileModuleAsync` drain
+`WaitTask` then `await` the body promise on that same loop. This change is regression-safe (all
+`Modules.Tests` stay green) — **but it does not make TLA work**, because the real blocker is one layer
+deeper, in the engine's codegen.
+
+**Deeper root cause — a stock-engine generator-rewriter codegen bug (proven, independent of the module
+layer).** With the double-marshal removed, the continuation no longer escapes the loop (the earlier
+`InvalidOperationException: The collection has been marked as complete` disappears) — it now resumes on the
+pumped loop and **throws a `NullReferenceException` from inside the compiled module body**. This same NRE
+reproduces on the **pristine** engine (pointer `3a8f302`, no seams, no module code) through the engine's own
+`JSContext.EvalWithTopLevelAwaitAsync`, and it is fully deterministic and thread-independent (fails
+identically under `AsyncPump` on a worker thread, under `AsyncPump` on the caller thread, and under a plain
+`await` with no pump at all). So it is a **compile-time bug in the top-level-await async generator**, not an
+async-runtime/pump/marshal problem.
+
+Precise trigger boundary (each line is a whole module body; `await Promise.resolve()` is the suspension):
+
+| Body after the first `await` resumes | Result |
+| --- | --- |
+| `… ; 1+1` / `'hi'.length` (constant receiver) | **OK** |
+| `… ; globalThis` / `Math` / `typeof Math` (bare identifier read) | **OK** |
+| `var g=Math; await …; g` (local read) | **OK** |
+| `… ; globalThis.z` (member get, **variable** receiver) | **NRE** |
+| `var g=Math; await …; g.max(1,2)` (member call, **variable** receiver) | **NRE** |
+| `… ; Math.max(1,2)` / `(Math).max(1,2)` | **NRE** |
+
+The discriminator is the **receiver**: a member access / call whose receiver is an identifier read
+(local *or* global) — which the compiler spills into a temporary — dereferences null after the resume,
+while a member access on a *constant* receiver (no spilled temp) survives. The failing frame is the
+generated `vm-` delegate itself (`ClrGeneratorV2` → `GetNext` → the compiled body), not the async driver.
+The fault is in the interaction between member-access **receiver spilling** and
+`GeneratorRewriter.VisitBlock`'s **box-lifting** of the await-containing block's locals
+(`Broiler.JavaScript.LinqExpressions/.../GeneratorsV2/GeneratorRewriter.cs`): the spilled receiver temp,
+lifted into a generator `Box`, reads null on the resume path. Because static `import` desugars to
+`tempRequire = yield import(spec)` (a top-level await), every static import that is followed by *any*
+member access / call on an imported or global value trips this — which is why `import { x } from …; x.y()`
+fails while the whole-module-snapshot linker does not.
+
+This is core generator-codegen surgery with broad regression surface across **all** async functions and
+generators (not just TLA), and it cannot be validated without the full engine test suite — so it is left to
+a maintainer with `Broiler.JS` push access. The corrected takeaway supersedes the earlier "the fix is a
+completion-mechanism/pump change" note: the module-side completion path above is correct and needed, but the
+gating defect is the generator-rewriter receiver-box bug.
 
 Until that lands, the bridge keeps its own working `EsModuleLinker` (which links static import/export,
 `import.meta` — roadmap P7.18 — and dynamic `import()` — P7.20 — via a synchronous IIFE + registry, with
 snapshot bindings and no TLA). This patch is the correct, minimal *resolution* seam for the future
-engine-driven path — necessary, but not sufficient until the top-level-await completion bug above is fixed.
+engine-driven path — necessary, but not sufficient until the top-level-await codegen bug above is fixed.
 
 ---
 
