@@ -1234,6 +1234,32 @@ pieces so the cluster can be closed incrementally:
 - [ ] **`try-tactic` flips** (`flip-block` / `flip-inline` / `flip-start`) — the other fallback
   mechanism (axis-mirroring tactics) distinct from named `@position-try` rules. Not yet modelled.
 
+### `position-area` percentage margin/padding under vertical writing modes (2026-07-21)
+
+Triaging the `css-anchor-position` `position-area` tail found the near-misses are **not** a shared
+geometry bug — the grid kernel (`Broiler.Layout.PositionAreaGrid`) and the engine's **native**
+placement (`CssBox.Anchor.ApplyPercentBoxPropsPlacement`) already produce spec-correct geometry,
+including resolving percentage margin/padding against the containing block's **inline** axis (CSS
+Writing Modes §7.4 — cell width for a horizontal CB, cell height for a vertical one). The remaining
+`position-area` failures are gated elsewhere: `position-area-anchor-partially-outside` (94.2 %) is a
+`testharness` results-table render (the partially-outside grid geometry itself is correct and pinned
+by `PositionAreaLiveGeometryTests`); `position-area-inline-container` (95.8 %) renders Ahem in the
+test (the font-load-ordering caveat, cluster 40); `position-area-percents-001` (98.8 %) is a
+pervasive ~1 px border/edge sub-pixel tail on the *native* path (its padding basis is already
+correct — verified via the render diff and a live probe), not a geometry defect; `anchor-size-css-zoom`
+is the externally-gated zoom renderer; and the two `position-area-scrolling-*` are dynamic scroll.
+
+**Fixed this session (main-repo `Broiler.HtmlBridge.Dom`):** the bridge's **baked** position-area
+fallback (`PositionArea.cs`, reached for boxes outside the MVP-native subset — `@position-try` /
+`anchor()` / `anchor-size()` / `auto`-or-unregistered anchors) resolved percentage margin/padding
+against the cell **width** unconditionally, over-sizing them in a `vertical-rl` containing block —
+the exact divergence `CssBox.Anchor.cs` already documented ("the bridge always used the width… which
+the bridge gets wrong"). It now uses the CB's inline-axis dimension (cell height for a vertical CB),
+matching the native path. Guard `PositionAreaLiveGeometryTests.BakedPositionArea_MarginPadding_ResolveAgainstContainingBlockInlineAxis`
+(10 % padding → 4 px against a 40 px vertical cell vs a larger width-basis value horizontally). No WPT
+score moves (the failing tests take the native path or are sub-pixel/font/dynamic-gated); 0 regressions
+on the vendored css-anchor-position subset (32/40, unchanged) and the anchor/position-area unit suites.
+
 ### Remaining failure landscape (after the merged clusters)
 
 The tractable in-flow / parse / DOM wins are largely exhausted. What remains
