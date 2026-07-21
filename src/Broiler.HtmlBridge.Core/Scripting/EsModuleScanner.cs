@@ -458,7 +458,7 @@ internal static class EsModuleScanner
 
     // ── low-level lexing helpers ──────────────────────────────────────────────
 
-    private static int SkipTrivia(string src, int i)
+    internal static int SkipTrivia(string src, int i)
     {
         int n = src.Length;
         while (i < n)
@@ -472,7 +472,7 @@ internal static class EsModuleScanner
         return i;
     }
 
-    private static int SkipString(string src, int i, char quote)
+    internal static int SkipString(string src, int i, char quote)
     {
         int n = src.Length;
         i++;
@@ -486,7 +486,7 @@ internal static class EsModuleScanner
         return n;
     }
 
-    private static int SkipTemplate(string src, int i)
+    internal static int SkipTemplate(string src, int i)
     {
         int n = src.Length;
         i++; // past opening `
@@ -516,7 +516,7 @@ internal static class EsModuleScanner
         return n;
     }
 
-    private static int SkipRegex(string src, int i)
+    internal static int SkipRegex(string src, int i)
     {
         int n = src.Length;
         i++; // past opening /
@@ -536,7 +536,7 @@ internal static class EsModuleScanner
         return i;
     }
 
-    private static bool RegexAllowed(char prev)
+    internal static bool RegexAllowed(char prev)
     {
         // A regex may follow nothing, an operator, or an opener — but not an identifier/number/closer/string.
         if (prev == '\0') return true;
@@ -615,6 +615,6 @@ internal static class EsModuleScanner
         return i;
     }
 
-    private static bool IsIdentStart(char c) => char.IsLetter(c) || c == '_' || c == '$';
-    private static bool IsIdentPart(char c) => char.IsLetterOrDigit(c) || c == '_' || c == '$';
+    internal static bool IsIdentStart(char c) => char.IsLetter(c) || c == '_' || c == '$';
+    internal static bool IsIdentPart(char c) => char.IsLetterOrDigit(c) || c == '_' || c == '$';
 }

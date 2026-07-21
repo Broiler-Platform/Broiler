@@ -380,6 +380,116 @@ public sealed class EsModuleGraphTests
     }
 
     [Fact]
+    public void Named_Import_Is_A_Live_Binding_Not_A_Snapshot()
+    {
+        // The canonical live-binding case: an exported counter mutated by an exported function must be
+        // observed through a *named* import, not frozen at import time.
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/counter.mjs"] =
+                "export let count = 0;\n" +
+                "export function increment() { count++; }",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { count, increment } from './counter.mjs';\n" +
+                "increment(); increment();\n" +
+                "globalThis.out = count;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("2", Eval(ctx, "''+globalThis.out")); // live: 2 (a snapshot would read 0)
+    }
+
+    [Fact]
+    public void Namespace_Import_Reflects_Post_Evaluation_Mutation()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/counter.mjs"] =
+                "export let count = 0;\n" +
+                "export function increment() { count++; }",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import * as c from './counter.mjs';\n" +
+                "c.increment();\n" +
+                "globalThis.out = c.count;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("1", Eval(ctx, "''+globalThis.out"));
+    }
+
+    [Fact]
+    public void Named_Import_Live_Read_Works_Through_A_Call()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] = "export function twice(x) { return x * 2; }",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { twice } from './util.mjs'; globalThis.out = twice(21);",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("42", Eval(ctx, "''+globalThis.out"));
+    }
+
+    [Fact]
+    public void Live_Rewrite_Falls_Back_To_Snapshot_When_A_Local_Function_Could_Shadow()
+    {
+        // The importer defines a function (a scope the conservative rewriter will not analyse), so it keeps
+        // the snapshot binding — still correct, just not live. Asserts the fallback produces the right value.
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] = "export const answer = 42;",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { answer } from './util.mjs';\n" +
+                "function id(x) { return x; }\n" +
+                "globalThis.out = id(answer);",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("42", Eval(ctx, "''+globalThis.out"));
+    }
+
+    [Fact]
+    public void Live_Rewrite_Does_Not_Corrupt_An_Object_Key_Matching_An_Import_Name()
+    {
+        // `{ answer: 5 }` has a *literal key* that collides with the import name; the rewriter must not turn
+        // it into a computed key. (It aborts the module's live rewrite on the ambiguity — snapshot stands.)
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] = "export const answer = 42;",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { answer } from './util.mjs';\n" +
+                "var o = { answer: 5 };\n" +
+                "globalThis.key = o.answer;\n" +
+                "globalThis.imp = answer;",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraph(entries, files);
+        Assert.Equal("5", Eval(ctx, "''+globalThis.key"));  // literal key untouched
+        Assert.Equal("42", Eval(ctx, "''+globalThis.imp")); // import still bound (snapshot)
+    }
+
+    [Fact]
     public void Import_Meta_Url_Resolves_To_The_Module_Key()
     {
         var entries = new List<ModuleGraphLoader.GraphModule>

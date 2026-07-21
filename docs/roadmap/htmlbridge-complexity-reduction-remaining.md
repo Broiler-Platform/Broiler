@@ -6,12 +6,13 @@ patches `0004`–`0007` applied upstream and the `Broiler.HTML` pointer bumped t
 `Broiler.HtmlBridge.Rendering` project deletion remains, gated on relocating the test-harness shims
 behind the WPT pixel reftest gate. **Phase 7 items 1–5 complete** (CSP split, script descriptors,
 loader/`UrlResolver`/`Origin` consolidation, external-stylesheet CSP, and host-layer CSP enforcement) **and
-item 6's static import/export module graph linked and executing** (P7.17) **with `import.meta` (P7.18) and
-dynamic `import()` (P7.20) handled at the bridge layer**; the remaining item-6 tail is the genuinely
-engine-coupled part — live cyclic bindings and top-level-await-as-async (with event-loop ordering). The
-`Broiler.JS` host-resolution seam for driving the engine's own module machinery ships as patch `0008` (P7.19),
-but the engine-driven path is **blocked below it** by the engine's own incomplete module execution
-(static-import value binding + nested-async ordering, reproduced on the stock engine). **Phase 8 proposed.**
+item 6's static import/export module graph linked and executing** (P7.17) **with `import.meta` (P7.18),
+dynamic `import()` (P7.20) and live bindings (P7.22) handled at the bridge layer** (exports + namespace live
+universally; named imports live where provably safe, else a correct snapshot); the remaining item-6 tail is
+the genuinely engine-coupled part — top-level-await-as-async (with event-loop ordering) and fully general live
+named bindings. The `Broiler.JS` host-resolution seam for driving the engine's own module machinery ships as
+patch `0008` (P7.19), but the engine-driven path is **blocked below it** by a core engine TLA-completion bug
+(root-caused in P7.21). **Phase 8 proposed.**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -620,21 +621,38 @@ Exit criteria:
   `patches/README.md` §0008). The engine change was **reverted** (a crashing partial fix is not shipped); the
   seam patch `0008` stands as the necessary resolution hook for when the TLA-completion bug is fixed.
 
-- **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17/P7.18/P7.20 the static import/export
-  graph is linked and executed, `import.meta` is handled, and dynamic `import()` is wired to the graph — all
-  at the bridge layer. What remains is the genuinely engine-coupled residue: **live bindings across cycles**
-  (the bridge linker uses snapshot semantics — matching the engine's own desugaring — so a value read across a
-  cycle before its exporter finishes is stale) and **top-level `await`** as genuinely async (the bridge
-  transform is a synchronous IIFE, so a TLA module falls back), which together also want module ordering moved
-  into the real browser **event loop** rather than the deferred-bucket approximation. The intended path — drive
-  the engine's own module lowering, for which the host-resolution seam `0008` (P7.19) is the enabling
-  `Broiler.JS` patch — is **blocked below that patch** by a core engine bug: a module body's top-level `await`
-  is not driven to completion (root-caused in P7.21 / `patches/README.md` §0008), and a static import *is* a
-  top-level await. Closing this residue therefore requires either fixing that engine TLA-completion bug
-  (submodule, push-authorization-gated — the correct fix routes the async module body through the same pumped
-  completion path `ExecuteScriptAsync` uses) or extending the bridge-layer linker with identifier-use rewriting
-  (live named bindings) and an async module wrapper tied to the event loop (TLA); both are tracked here as the
-  Phase 7 residue.
+- **P7.22 (2026-07-20) — item 6 tail: live bindings (bridge linker).** Replaced the linker's snapshot
+  bindings with **live** ones. **Exports** are now published as **getters** on the exports object
+  (`Object.defineProperty(__E,name,{get:()=>local})`) defined before the body, so a value reassigned after the
+  module finishes — the canonical counter-mutated-by-an-exported-function case — is observed by importers, and
+  a **namespace import** (`import * as ns`) reflects it member-wise (`ns.count`) universally. **Named imports**
+  (`import { x }`) are made live by a new `EsModuleLiveRefs` pass that rewrites their read-references to the
+  same live getter access. That rewriter is **sound by abdication**, not a scope-accurate parser: it reuses the
+  scanner's string/comment/template/regex lexer and rewrites only occurrences it can prove are plain reads,
+  **aborting the whole module to the (correct, non-live) snapshot binding** the moment it meets a
+  binding/scope construct (`function`, `=>`, `class`, `catch`, `var`/`let`/`const`) or an ambiguous position (a
+  property key `name:`, an assignment/default `name=`, an object-shorthand/pattern slot `{name}`/`,name,`, a
+  spread `...name`) — so a mis-analysis can only fall back, never emit wrong code, and each named-import keeps a
+  `var` snapshot as the safety net for any read it does not rewrite. New `EsModuleGraphTests` (5) drive real
+  graphs through a live `JSContext`: the canonical named-import counter reads **2** (a snapshot would read 0),
+  the namespace form reflects the mutation, a live read through a call works, a module with a local function
+  falls back to a correct snapshot, and an object key colliding with an import name is not corrupted. All
+  `internal` → no public-API change; the full module-graph / descriptor / CSP suites stay green (66) with no
+  regressions.
+
+- **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17/P7.18/P7.20/P7.22 the static
+  import/export graph is linked and executed, `import.meta` is handled, dynamic `import()` is wired to the
+  graph, and bindings are live (exports + namespace universally; named imports where provably safe, else a
+  correct snapshot) — all at the bridge layer. The genuinely engine-coupled residue is now: **top-level
+  `await`** as genuinely async (the bridge transform is a synchronous IIFE, so a TLA module falls back), which
+  also wants module ordering moved into the real browser **event loop** rather than the deferred-bucket
+  approximation; and **fully general live named bindings** (the conservative rewriter falls back to snapshot
+  for modules with local scopes/declarations — a scope-accurate rewrite, or the engine's own module records,
+  would remove that limitation). The intended engine-driven path, for which the host-resolution seam `0008`
+  (P7.19) is the enabling `Broiler.JS` patch, remains **blocked below that patch** by the core engine
+  TLA-completion bug (root-caused in P7.21 / `patches/README.md` §0008 — a static import *is* a top-level
+  await, and the correct fix routes the async module body through the same pumped completion path
+  `ExecuteScriptAsync` uses). Both are tracked here as the Phase 7 residue.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 
