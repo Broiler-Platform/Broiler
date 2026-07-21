@@ -37,12 +37,28 @@ the pre-existing Intl/ICU-locale and doc-file env failures remain), and a new
 `TopLevelAwaitResumeTests` pins the corrected behaviour. Push returned **403**, so it ships
 here as `patches/0010-…` with the pointer **unbumped** (pinned `3f0c7054`). **No main-repo
 fallback is needed** — the bridge does not use the engine-driven TLA path (it uses its own
-`EsModuleLinker`), so nothing in the parent repo regresses without the patch. Note `0010`
-fixes the *codegen* blocker but does **not** by itself make the engine-driven ES-module
-path bind static-import values: that additionally needs the separate module-orchestration
-completion fix (§0008 "necessary but not sufficient" — `CompileDirect` + one pumped
-`AsyncPump.Run` loop + `WaitTask` drain), without which a static import still resolves to
-`undefined`/`0` (no crash). So the bridge continues to use its `EsModuleLinker`.
+`EsModuleLinker`), so nothing in the parent repo regresses without the patch. `0010` fixes
+the *codegen* blocker; the module-orchestration completion piece is patch **`0011`** below.
+
+Patch **`0011` — PENDING (push 403)** — the module-orchestration completion fix that lets the
+engine's own ES-module machinery **bind a static import's value** (with `0010` alone it no
+longer crashed but resolved to `undefined`/`0`). Three coupled changes in
+`Broiler.JavaScript.Modules`: (a) `RunScriptAsync`/`RunAsync` run the whole init under one
+pumped `AsyncPump.Run` loop (like `JSContext.ExecuteAsync`) so a top-level-await body's
+continuation actually drains instead of stalling on the default un-pumped context; (b) a
+direct `JSModule.CompileDirect` hook that `InitAsync` awaits, removing the
+`Task → IJSPromise → Task` compile double-marshal that re-posted the body off the loop; and
+(c) `import()`/`require()` convert their module `Task<JSValue>` to a promise via the
+engine-native `JSValue.CreatePromiseFromTask` instead of `JSEngine.ClrInterop.Marshal` —
+the interop is only the full `DefaultClrInterop` when the optional `Broiler.JavaScript.Clr`
+assembly is loaded, and its fallback returns `undefined` for a `Task`, which is why an
+imported binding silently came back `undefined`. **Validated against the full `Broiler.JS`
+suite — zero regressions**, plus a new `EngineModuleImportBindingTests` (named/namespace/
+default imports, transitive chain, diamond shared-dep-evaluated-once, top-level-await
+dependency). Push **403** → ships as `patches/0011-…`, pointer **unbumped**, **stacks on
+`0010`**. **No main-repo fallback needed** — the bridge still uses its `EsModuleLinker`;
+wiring it to the now-working engine path (and retiring the linker) is the remaining,
+separately-scoped bridge task.
 
 | Patch | Target submodule | Pinned commit / status | Main-repo follow-up |
 |---|---|---|---|
@@ -55,7 +71,8 @@ completion fix (§0008 "necessary but not sufficient" — `CompileDirect` + one 
 | 0007 — render `<select multiple>` as a native list box (both appearance modes) | `Broiler.HTML` | **applied** — pushed as `5c16c12` (the pinned pointer); **stacks on 0006** | **Done** — the pinned renderer paints `<select multiple>` natively (both `appearance:auto`/`none`), so `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder` was dropped; the string-rewrite unit test was retired in favour of the WPT/Acid reftest gate. Reads the box's `Appearance` (the `appearance` box property landed in the main repo's `Broiler.Layout`). |
 | 0008 — `JSModuleContext`: host-overridable module resolution/source read | `Broiler.JS` | **applied** — `ffe8956e`; contained in the pinned `3f0c7054` | **Applied, still not wired** — Phase 7 item 6 tail. The seam now lives in the pinned engine, but the engine-driven path stays blocked below it by the top-level-await codegen bug (§0008), re-confirmed on `3f0c7054` (2026-07-21), so the bridge keeps its own `EsModuleLinker`. |
 | 0009 — session-isolation regression tests | `Broiler.JS` | **applied** — `3f0c7054` (the pinned pointer) | **Test-only guard** — Phase 2. Locks in that two live `JSContext` instances are isolated (the property the bridge's "two simultaneous sessions" exit criterion relies on). No production change; the bridge-side criterion is also proven CI-green by `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`. |
-| 0010 — `GeneratorRewriter`: seed the `ScriptInfo` box on first entry only (fix TLA resume) | `Broiler.JS` | **PENDING** (push 403; pinned `3f0c7054` does not contain it) | **Fixes the §0008 codegen blocker** — Phase 7 item 6 tail. Top-level await now runs post-resume statements correctly (full-suite validated, zero regressions). **No main-repo follow-up** — the bridge does not use the engine-driven TLA path. Fully wiring the engine-driven module path additionally needs the separate module-orchestration completion fix (§0008), so the bridge keeps its `EsModuleLinker` for now. |
+| 0010 — `GeneratorRewriter`: seed the `ScriptInfo` box on first entry only (fix TLA resume) | `Broiler.JS` | **PENDING** (push 403; pinned `3f0c7054` does not contain it) | **Fixes the §0008 codegen blocker** — Phase 7 item 6 tail. Top-level await now runs post-resume statements correctly (full-suite validated, zero regressions). **No main-repo follow-up** — the bridge does not use the engine-driven TLA path. Module *value* binding additionally needs `0011`. |
+| 0011 — `Modules`: pumped module init + Clr-independent import binding | `Broiler.JS` | **PENDING** (push 403; pinned `3f0c7054` does not contain it); **stacks on `0010`** | **Completes the engine-driven module path** — Phase 7 item 6 tail. A static import now binds its value (was `undefined`/`0`): pumped `AsyncPump.Run` init, `CompileDirect` (no compile double-marshal), and `import()` via `JSValue.CreatePromiseFromTask` instead of the Clr-only interop. Full-suite validated, zero regressions. **No main-repo follow-up** — remaining bridge task is to drive the engine path and retire `EsModuleLinker`. |
 
 To apply a *future* patch (kept for reference):
 
@@ -387,13 +404,12 @@ a box-lifted local / an `Indices`-resolved name after the resume." The fix was v
 completion-mechanism/pump change" note: the module-side completion path above is still correct and needed,
 but the *gating* defect was the generator-rewriter re-seed bug — and that is what `0010` fixes.
 
-Even with `0010` applied, the bridge keeps its own working `EsModuleLinker` (which links static
-import/export, `import.meta` — roadmap P7.18 — and dynamic `import()` — P7.20 — via a synchronous IIFE +
-registry, with snapshot bindings and no TLA), because fully driving the engine's own module machinery *also*
-needs the module-orchestration completion fix (the `CompileDirect` + single pumped loop + `WaitTask` drain
-described above): with `0010` alone, a static import no longer crashes but its value binding still resolves
-to `undefined`/`0`. Patch `0008` is the *resolution* seam and `0010` is the *codegen* fix — both necessary;
-the module-orchestration completion change is the remaining, separately-scoped piece.
+Patch `0008` is the *resolution* seam, `0010` is the *codegen* fix, and **`0011` is the
+module-orchestration completion fix** (§0011 below) — together they let the engine's own module machinery
+bind a static import's value. The bridge still keeps its own working `EsModuleLinker` for now (which links
+static import/export, `import.meta` — roadmap P7.18 — and dynamic `import()` — P7.20 — via a synchronous
+IIFE + registry, with snapshot bindings and no TLA); driving the engine path instead and retiring the linker
+is a remaining, separately-scoped bridge task, not a `Broiler.JS` gap.
 
 ---
 
@@ -488,7 +504,65 @@ the parent bridge does not exercise the engine-driven top-level-await path (it r
 `EsModuleLinker`), so nothing in the parent repo depends on or regresses without this patch.
 
 **Scope.** `0010` fixes the *codegen* blocker only. Fully driving the engine's own ES-module machinery
-(so a static import binds its value) additionally requires the module-orchestration completion fix described
-in §0008 (`CompileDirect` + one pumped `AsyncPump.Run` loop + `WaitTask` drain); with `0010` alone a static
-import no longer crashes but its value still resolves to `undefined`/`0`. That orchestration change is a
-separate, still-open engine concern, so the bridge keeps its `EsModuleLinker`.
+(so a static import binds its value) additionally requires the module-orchestration completion fix — now
+shipped as patch **`0011`** (§0011 below: `CompileDirect` + one pumped `AsyncPump.Run` loop + Clr-independent
+import promise). With `0010` alone a static import no longer crashes but its value still resolves to
+`undefined`/`0`; with `0010`+`0011` it binds. The bridge keeps its `EsModuleLinker` until it is wired to the
+engine path.
+
+---
+
+## 0011 — `Broiler.JS`: pumped module init + Clr-independent import binding (module-orchestration completion)
+
+**Target:** `Broiler.JS` (`Broiler.JavaScript.Modules/JSModule.cs`, `Broiler.JavaScript.Modules/JSModuleContext.cs`,
+`+` a new `Broiler.JavaScript.Modules.Tests/EngineModuleImportBindingTests.cs`).
+**Status: PENDING** (push 403; pinned SHA `3f0c7054` does not contain it).
+**Depends on / stacks on:** **`0010`** (the codegen fix — without it a top-level-await body still NREs).
+
+**What it does.** With `0010` applied, an engine-driven static import no longer crashes but its value
+resolved to `undefined`/`0` — the dependency *ran* (side effects fired) yet the imported binding was empty.
+Three coupled defects, each fixed here:
+
+1. **Un-pumped init loop.** `RunScriptAsync`/`RunAsync` set a plain (default) `SynchronizationContext` and
+   `await`-ed the module init on the caller's thread. A module body compiled with `AllowTopLevelAwaitScope`
+   is an async state machine; its continuation after the first `await` (every static import desugars to
+   `tempRequire = yield import(spec)`, a top-level await) is *posted* to the ambient context. The default
+   context never pumps on the current thread, so the body stalled at its first suspension. Now both entry
+   points run their core under one `AsyncPump.Run` loop on a worker thread — exactly like
+   `JSContext.ExecuteAsync` — so continuations drain and the body runs to completion. (The async-local
+   current context flows across the `Task.Run` boundary, so engine state resolves on the worker thread.)
+
+2. **Compile double-marshal.** `JSModule.InitAsync` invoked the `Compile` **JS function**, which wrapped the
+   `CompileModuleAsync` .NET task in a JS promise (`ClrInterop.Marshal(task)`) that `InitAsync` then
+   re-awaited (`promise.Task`) — a `Task → IJSPromise → Task` round-trip whose continuation hops off the
+   running loop. Added a direct `JSModule.CompileDirect` (`Func<Task>`) hook that `InitAsync` awaits when set,
+   so compilation stays on the one pumped loop with no re-marshal. The `Compile` JS function is retained for
+   the JS-facing `module.compile()` API and as the fallback when `CompileDirect` is null.
+
+3. **Clr-dependent import promise (the actual value loss).** `import()`/`require()` converted their
+   `LoadModuleAsync` `Task<JSValue>` to a JS promise with `JSEngine.ClrInterop.Marshal(task)`. `ClrInterop`
+   is only the full `DefaultClrInterop` (which maps `Task<JSValue> → CreatePromiseFromTask`) when the
+   **optional** `Broiler.JavaScript.Clr` assembly is loaded; otherwise it is `FallbackClrInterop`, whose
+   `Marshal` returns `JSUndefined` for any `Task` (`_ => UndefinedValue`). `Broiler.JavaScript.Modules` does
+   **not** reference Clr, so `import(...)` resolved to `undefined` and the imported binding was lost — the
+   dependency still ran because `LoadModuleAsync` was invoked for its side effects before the (undefined)
+   marshal. Routed these through the engine-native `JSValue.CreatePromiseFromTask` (the same factory
+   `DefaultClrInterop` uses for a `Task<JSValue>`, populated by the always-referenced BuiltIns assembly), via
+   a small `TaskToPromise` helper, so import value binding works with or without Clr.
+
+**Validated.** New `EngineModuleImportBindingTests` (6) drive the engine's own module machinery over an
+in-memory URL store (no filesystem, no Clr): named import (`add(d,5)==12`), namespace import (`ns.d==7`),
+default import (`v+1==42`), a transitive chain (`b==11`), a diamond whose shared dependency is evaluated
+exactly once (`x+y==13`, `evalCount==1`), and a top-level-await dependency (`await Promise.resolve(42)` →
+`v+1==43`). The pre-existing `Modules.Tests` (7, incl. `HostUrlSeams…`) stay green. The **full `Broiler.JS`
+suite** was re-run: Core/Compiler/Runtime/Modules/Ast/Parser/Clr/Debugger/Portable/Storage green; BuiltIns
+(1908/1909), Integration (4481/4486), ModuleExtensions (2/3) carry only the same **pre-existing** Intl/ICU
+and doc-file env failures as at `0010` — **zero regressions**.
+
+**Why it's a patch.** The `Broiler.JS` push returned **403**, so per `CLAUDE.md` it ships as
+`patches/0011-js-module-orchestration-completion.patch` with the pointer left **unbumped** (pinned
+`3f0c7054`) and the submodule working tree reverted. It **stacks on `0010`** (apply `0010` first, then
+`0011`). **No main-repo follow-up / fallback is needed**: the parent bridge runs modules through its own
+`EsModuleLinker`, so nothing in the parent repo depends on or regresses without this patch. Driving the
+now-working engine module path from the bridge (and retiring the `EsModuleLinker`) is the remaining Phase-7
+bridge task — application wiring, not a `Broiler.JS` gap.
