@@ -11,10 +11,14 @@ dynamic `import()` (P7.20) and live bindings (P7.22, scope-accurate in P7.23) ha
 (exports + namespace live universally; named imports rewritten scope-accurately, falling back to a correct
 snapshot only for `class`/`with`/`eval` modules); the remaining item-6 tail is the genuinely engine-coupled
 part — top-level-await-as-async (with event-loop ordering). The `Broiler.JS` host-resolution seam for driving
-the engine's own module machinery ships as patch `0008` (P7.19), but the engine-driven path is **blocked
-below it** by a core engine top-level-await **codegen** bug — a member access whose receiver is spilled into
-a temporary reads null after the await resume, reproducible on the pristine engine with zero module code
-(root-caused in P7.21, corrected and proven in P7.24). **Phase 8 proposed.**
+the engine's own module machinery (patch `0008`, P7.19) **is now applied upstream** — the engine pointer is
+bumped to `3f0c7054`, which also carries the Phase-2 session-isolation guard (patch `0009`), so **all nine
+submodule patches `0001`–`0009` are applied upstream and pinned**. The engine-driven path is nonetheless
+still **blocked below** patch `0008` by a core engine top-level-await **codegen** bug — a member access whose
+receiver is spilled into a temporary (and, more broadly, any read of a box-lifted local) reads null after the
+await resume, reproducible on the pristine engine with zero module code (root-caused in P7.21, corrected and
+proven in P7.24); **re-confirmed present on the now-pinned `3f0c7054`** (2026-07-21), so the pointer bump did
+not unblock it and the bridge keeps its own `EsModuleLinker`. **Phase 8 proposed.**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -578,7 +582,9 @@ Exit criteria:
   **filesystem**. Patch `0008` makes `JSModuleContext` host-overridable — `Resolve` becomes `protected
   virtual`, and new `GetModuleDirectory` / `ReadModuleSourceAsync` seams let a subclass resolve URLs against a
   base and fetch under CSP — validated by a `Modules.Tests` case that drives a URL entry + URL dependency with
-  no filesystem. **Push 403 → shipped as `patches/0008-…` with the pointer unbumped** (per `CLAUDE.md`).
+  no filesystem. **Delivered as `patches/0008-…` after an initial push 403; now applied upstream (2026-07-21)** —
+  a maintainer pushed it as `ffe8956e` and the parent pointer is bumped to `Broiler.JS` `3f0c7054`, which
+  contains it (the patch file is retained for provenance).
   However, validating the patch surfaced that the engine's module machinery is **incomplete beyond
   resolution**: a static `import { x } from …` does **not** bind a value (the `yield import(...)` desugaring
   resolves to `undefined`, reproduced on the **stock** filesystem context — independent of the seams), and
@@ -643,8 +649,13 @@ Exit criteria:
   generated `vm-` delegate, not the async driver). This gates every static import followed by a member
   access/call on the imported value. It is core generator-codegen surgery affecting **all** async
   functions/generators, unvalidatable without the full engine suite — left to a maintainer with `Broiler.JS`
-  push access. Submodule left **pristine** (pointer unbumped `3a8f302`); no partial engine change shipped.
-  Full boundary table and analysis in `patches/README.md` §0008.
+  push access. At authoring time the submodule was left **pristine** (pointer `3a8f302`); no partial engine
+  change was shipped. **Re-confirmation (2026-07-21):** the `Broiler.JS` pointer has since advanced to
+  `3f0c7054` (carrying patches `0008`/`0009`), and the codegen bug was re-verified on that pinned engine via
+  `EvalWithTopLevelAwaitAsync` with zero module code — the boundary reproduces unchanged, and a further probe
+  shows a **local declared *after* the await** and then read (`await …; var x=5; x`) also NREs, i.e. the fault
+  is any resume-path read of a box-lifted local, slightly broader than the receiver-spill framing above. The
+  pointer bump therefore did **not** unblock it. Full boundary table and analysis in `patches/README.md` §0008.
 
 - **P7.22 (2026-07-20) — item 6 tail: live bindings (bridge linker).** Replaced the linker's snapshot
   bindings with **live** ones. **Exports** are now published as **getters** on the exports object
@@ -691,11 +702,14 @@ Exit criteria:
   bridge transform is a synchronous IIFE, so a TLA module falls back), which also wants module ordering moved
   into the real browser **event loop** rather than the deferred-bucket approximation. The intended
   engine-driven path, for which the host-resolution seam `0008` (P7.19) is the enabling `Broiler.JS` patch,
-  remains **blocked below that patch** by a core engine top-level-await **codegen** bug (root-caused in
-  P7.21, corrected and proven in P7.24 / `patches/README.md` §0008 — a static import *is* a top-level await;
-  the module-side completion path that mirrors `ExecuteScriptAsync` is correct and needed, but the gating
-  defect is that a member access whose receiver is spilled into a temporary reads null after the await
-  resume, reproducible on the pristine engine via `EvalWithTopLevelAwaitAsync` with no module code). Tracked
+  **now has that seam applied upstream** (pinned `Broiler.JS` `3f0c7054`), but remains **blocked below the
+  patch** by a core engine top-level-await **codegen** bug (root-caused in P7.21, corrected and proven in
+  P7.24 / `patches/README.md` §0008 — a static import *is* a top-level await; the module-side completion path
+  that mirrors `ExecuteScriptAsync` is correct and needed, but the gating defect is that a member access whose
+  receiver is spilled into a temporary — and, more broadly, any read of a box-lifted local — reads null after
+  the await resume, reproducible on the pristine engine via `EvalWithTopLevelAwaitAsync` with no module code).
+  This was **re-confirmed present on the now-pinned `3f0c7054`** (2026-07-21): bumping the pointer did not
+  unblock it, so it stays engine-coupled and left to a maintainer with `Broiler.JS` push access. Tracked
   here as the Phase 7 residue.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies

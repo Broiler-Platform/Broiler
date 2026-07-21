@@ -19,6 +19,19 @@ applied upstream** — the submodule commits were pushed to `Broiler.HTML` `main
 from `HtmlPostProcessor`** now that the renderer handles these elements natively. **0007
 stacks on 0006** (they share `SetUniformBorder`/`ReadNumericAttribute`).
 
+Patches **0008 and 0009 are now also applied upstream** (verified 2026-07-21) — the
+`Broiler.JS` pointer is bumped from `3a8f302` to **`3f0c7054`**, whose history contains
+`ffe8956e` *"JSModuleContext: host-overridable module resolution and source read"* (0008)
+and `3f0c7054` *"Integration tests: lock in simultaneous JSContext session isolation"*
+(0009). So **all nine patches (0001–0009) are applied upstream and pinned by the parent
+pointers**; the files here are retained for provenance. Note this does **not** unblock the
+Phase 7 item-6 engine-driven module path: with `0008`'s host-resolution seam now in the
+pinned engine, the residual blocker is the top-level-await **codegen** bug (§0008 below),
+which is **re-confirmed still present on the now-pinned `3f0c7054`** (2026-07-21) — a
+static `import` desugars to a top-level `await`, and any read of a box-lifted local after
+that await resume dereferences null on the pristine engine (see §0008 for the refined
+boundary). The bridge therefore keeps its own `EsModuleLinker`.
+
 | Patch | Target submodule | Pinned commit / status | Main-repo follow-up |
 |---|---|---|---|
 | 0001 — plumb `viewportZoom` through the static render entry | `Broiler.HTML` | applied — `9977672` *HtmlRender: plumb viewportZoom through the static render entry* | **Unblocked, not yet wired** — the visual-viewport render cutover (see below). The serialization bake remains the active fallback until it lands. |
@@ -28,8 +41,8 @@ stacks on 0006** (they share `SetUniformBorder`/`ReadNumericAttribute`).
 | 0005 — render `<video>` as a black inline-block replaced box (hide fallback) | `Broiler.HTML` | **applied** — pushed as `5561eb0`; contained in the pinned `5c16c12` | **Done** — the pinned renderer paints `<video>` natively, so `HtmlPostProcessor.ReplaceVideoWithPlaceholder` (Phase 6 concern 2) was dropped. |
 | 0006 — render `<progress>`/`<meter>` as a native track with proportional fill | `Broiler.HTML` | **applied** — pushed as `444cace`; contained in the pinned `5c16c12` | **Done** — the pinned renderer paints `<progress>`/`<meter>` natively, so `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder` was dropped (native coverage: `FormControlRenderTests.Meter_NativeRender_Follows_WritingMode_And_Direction`). |
 | 0007 — render `<select multiple>` as a native list box (both appearance modes) | `Broiler.HTML` | **applied** — pushed as `5c16c12` (the pinned pointer); **stacks on 0006** | **Done** — the pinned renderer paints `<select multiple>` natively (both `appearance:auto`/`none`), so `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder` was dropped; the string-rewrite unit test was retired in favour of the WPT/Acid reftest gate. Reads the box's `Appearance` (the `appearance` box property landed in the main repo's `Broiler.Layout`). |
-| 0008 — `JSModuleContext`: host-overridable module resolution/source read | `Broiler.JS` | **PENDING** (push 403; pinned `3a8f302` does not contain it) | **Unblocked, not yet wired** — Phase 7 item 6 tail. Lets a bridge subclass drive URL/CSP module loading through the engine's own machinery. *Not* wired because the engine's static-import value binding + nested-async ordering are separately incomplete (see below), so the bridge keeps its own `EsModuleLinker`. |
-| 0009 — session-isolation regression tests | `Broiler.JS` | **PENDING** (push 403; pinned `3a8f302` does not contain it) | **Test-only guard** — Phase 2. Locks in that two live `JSContext` instances are isolated (the property the bridge's "two simultaneous sessions" exit criterion relies on). No production change; the bridge-side criterion is already proven CI-green by `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`. |
+| 0008 — `JSModuleContext`: host-overridable module resolution/source read | `Broiler.JS` | **applied** — `ffe8956e`; contained in the pinned `3f0c7054` | **Applied, still not wired** — Phase 7 item 6 tail. The seam now lives in the pinned engine, but the engine-driven path stays blocked below it by the top-level-await codegen bug (§0008), re-confirmed on `3f0c7054` (2026-07-21), so the bridge keeps its own `EsModuleLinker`. |
+| 0009 — session-isolation regression tests | `Broiler.JS` | **applied** — `3f0c7054` (the pinned pointer) | **Test-only guard** — Phase 2. Locks in that two live `JSContext` instances are isolated (the property the bridge's "two simultaneous sessions" exit criterion relies on). No production change; the bridge-side criterion is also proven CI-green by `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`. |
 
 To apply a *future* patch (kept for reference):
 
@@ -50,7 +63,7 @@ previously-pinned submodule SHA (so it would not compile against the pinned clon
 ## 0007 — `Broiler.HTML`: render `<select multiple>` as a native list box (appearance:auto)
 
 **Target:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs`).
-**Status: PENDING** (reverted after a 403; pinned SHA `52f65d9` does not contain it).
+**Status: APPLIED** — pushed as `5c16c12` (the pinned pointer); the note below is the original authoring record.
 **Depends on:** **0006** (shares the `SetUniformBorder`/`ReadNumericAttribute` helpers — apply 0006 first)
 and the main-repo `Broiler.Layout` `appearance` box property (already landed in the parent — see below).
 
@@ -90,7 +103,7 @@ real `<select multiple>` never reaches `CorrectSelectMultipleBoxes` yet and noth
 ## 0006 — `Broiler.HTML`: render `<progress>`/`<meter>` as a native track with proportional fill
 
 **Target:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs`).
-**Status: PENDING** (reverted after a 403; pinned SHA `52f65d9` does not contain it).
+**Status: APPLIED** — pushed as `444cace`; contained in the pinned `5c16c12`. The note below is the original authoring record.
 **Depends on:** nothing (adds a call adjacent to `0005`'s — see the table note).
 
 **What it does.** HTML §4.10.13/4.10.14: `<progress>`/`<meter>` are replaced form controls. Broiler has no
@@ -125,7 +138,7 @@ that rewrite runs in the string pipeline before the renderer, so a real `<progre
 ## 0005 — `Broiler.HTML`: render `<video>` as a black inline-block replaced box (hide fallback)
 
 **Target:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs`).
-**Status: PENDING** (reverted after a 403; pinned SHA `52f65d9` does not contain it).
+**Status: APPLIED** — pushed as `5561eb0`; contained in the pinned `5c16c12`. The note below is the original authoring record.
 **Depends on:** nothing.
 
 **What it does.** HTML §4.8.9: a `<video>` is a replaced element; a UA that cannot present the media shows
@@ -157,7 +170,7 @@ nothing on CI depends on this patch.
 ## 0004 — `Broiler.HTML`: treat `<iframe>` as a replaced element (hide inline fallback)
 
 **Target:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/Parse/DomParser.cs`).
-**Status: PENDING** (reverted after a 403; pinned SHA `9977672` does not contain it).
+**Status: APPLIED** — pinned `52f65d9` contains its `CorrectIframeBoxes` pass. The note below is the original authoring record.
 **Depends on:** nothing.
 
 **What it does.** HTML §4.8.5: an `<iframe>` hosts a nested browsing context; UAs that support
@@ -251,7 +264,8 @@ serialization bake. Nothing on CI depends on the cutover.
 ## 0008 — `Broiler.JS`: host-overridable module resolution and source read
 
 **Target:** `Broiler.JS` (`Broiler.JavaScript.Modules/JSModuleContext.cs`, `+` a `Modules.Tests` case).
-**Status: PENDING** (reverted after a 403; pinned SHA `3a8f302` does not contain it).
+**Status: APPLIED** (2026-07-21) — pushed as `ffe8956e`; the parent pointer is bumped and the pinned
+`Broiler.JS` `3f0c7054` contains it. (Original authoring note preserved below.)
 **Depends on:** nothing (behaviour-preserving for the default filesystem context).
 
 **What it does.** Phase 7 item 6 tail. `Broiler.JavaScript.Modules` already implements a capable module
@@ -320,6 +334,16 @@ identically under `AsyncPump` on a worker thread, under `AsyncPump` on the calle
 `await` with no pump at all). So it is a **compile-time bug in the top-level-await async generator**, not an
 async-runtime/pump/marshal problem.
 
+**Re-confirmed on the now-pinned engine (2026-07-21).** With patch `0008` applied upstream and the parent
+pointer bumped from `3a8f302` to **`3f0c7054`**, the codegen bug was re-verified to still be present on
+that pinned engine via `JSContext.EvalWithTopLevelAwaitAsync` with **zero module code**: the boundary below
+reproduces unchanged (e.g. `await Promise.resolve(); Math.max(1,2)` → NRE; `await Promise.resolve();
+'hi'.length` → OK). A companion probe also shows the failure extends to a **local declared *after* the
+await** and then read (`await Promise.resolve(); var x=5; x` → NRE), i.e. any read that dereferences a
+box-lifted local on the resume path — consistent with, and slightly broader than, the receiver-spill
+description below. Bumping the pointer therefore did **not** unblock the engine-driven module path; the
+bridge `EsModuleLinker` remains in use.
+
 Precise trigger boundary (each line is a whole module body; `await Promise.resolve()` is the suspension):
 
 | Body after the first `await` resumes | Result |
@@ -359,7 +383,8 @@ engine-driven path — necessary, but not sufficient until the top-level-await c
 ## 0009 — `Broiler.JS`: session-isolation regression tests
 
 **Target:** `Broiler.JS` (`Broiler.JavaScript.Integration.Tests/SessionIsolationTests.cs`) — test-only.
-**Status: PENDING** (push 403; pinned `3a8f302` does not contain it).
+**Status: APPLIED** (2026-07-21) — pushed as `3f0c7054` (the pinned pointer). (Original authoring note
+preserved below.)
 **Depends on:** nothing (no production change).
 
 **What it does.** Phase 2 investigation established that the engine already isolates two live
