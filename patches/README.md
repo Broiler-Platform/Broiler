@@ -29,6 +29,7 @@ stacks on 0006** (they share `SetUniformBorder`/`ReadNumericAttribute`).
 | 0006 — render `<progress>`/`<meter>` as a native track with proportional fill | `Broiler.HTML` | **applied** — pushed as `444cace`; contained in the pinned `5c16c12` | **Done** — the pinned renderer paints `<progress>`/`<meter>` natively, so `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder` was dropped (native coverage: `FormControlRenderTests.Meter_NativeRender_Follows_WritingMode_And_Direction`). |
 | 0007 — render `<select multiple>` as a native list box (both appearance modes) | `Broiler.HTML` | **applied** — pushed as `5c16c12` (the pinned pointer); **stacks on 0006** | **Done** — the pinned renderer paints `<select multiple>` natively (both `appearance:auto`/`none`), so `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder` was dropped; the string-rewrite unit test was retired in favour of the WPT/Acid reftest gate. Reads the box's `Appearance` (the `appearance` box property landed in the main repo's `Broiler.Layout`). |
 | 0008 — `JSModuleContext`: host-overridable module resolution/source read | `Broiler.JS` | **PENDING** (push 403; pinned `3a8f302` does not contain it) | **Unblocked, not yet wired** — Phase 7 item 6 tail. Lets a bridge subclass drive URL/CSP module loading through the engine's own machinery. *Not* wired because the engine's static-import value binding + nested-async ordering are separately incomplete (see below), so the bridge keeps its own `EsModuleLinker`. |
+| 0009 — session-isolation regression tests | `Broiler.JS` | **PENDING** (push 403; pinned `3a8f302` does not contain it) | **Test-only guard** — Phase 2. Locks in that two live `JSContext` instances are isolated (the property the bridge's "two simultaneous sessions" exit criterion relies on). No production change; the bridge-side criterion is already proven CI-green by `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`. |
 
 To apply a *future* patch (kept for reference):
 
@@ -312,3 +313,25 @@ Until that lands, the bridge keeps its own working `EsModuleLinker` (which links
 `import.meta` — roadmap P7.18 — and dynamic `import()` — P7.20 — via a synchronous IIFE + registry, with
 snapshot bindings and no TLA). This patch is the correct, minimal *resolution* seam for the future
 engine-driven path — necessary, but not sufficient until the top-level-await completion bug above is fixed.
+
+---
+
+## 0009 — `Broiler.JS`: session-isolation regression tests
+
+**Target:** `Broiler.JS` (`Broiler.JavaScript.Integration.Tests/SessionIsolationTests.cs`) — test-only.
+**Status: PENDING** (push 403; pinned `3a8f302` does not contain it).
+**Depends on:** nothing (no production change).
+
+**What it does.** Phase 2 investigation established that the engine already isolates two live
+`JSContext` instances — the roadmap's earlier "two simultaneous sessions share globals, last-created
+wins" note was outdated. This patch adds the regression guard that pins the guarantee: interleaved evals
+on two contexts keep separate globals; a stored callback resolves *its own* context after another context
+is created (so the constructor's last-wins `CurrentContext = this` does not leak); and 2000× concurrent
+two-thread evals never clobber each other. Isolation comes from the `[ThreadStatic]` + `AsyncLocal`
+current-context flow (`JSEngine.Current`/`_current`) plus the realm scope entered by `Eval` /
+`InvokeFunction` — no production change is needed, so this is a guard only.
+
+**Why it's a patch.** The `Broiler.JS` push returned **403**, so per `CLAUDE.md` it ships as
+`patches/0009-js-session-isolation-tests.patch` with the pointer left **unbumped** and the working tree
+reverted. There is no main-repo follow-up: the bridge-level exit criterion it underpins is already proven
+CI-green in the parent by `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`.

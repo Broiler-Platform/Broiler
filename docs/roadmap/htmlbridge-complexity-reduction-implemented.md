@@ -266,12 +266,19 @@ caches above are now consolidated into `BrowsingContextManager` — P3.16).
 
 Two findings recorded for later phases:
 
-- **The "two *simultaneous* sessions are isolated" exit criterion is blocked below the bridge.**
-  Two live `JSContext` instances currently share global state at the Broiler.JS engine layer (the
-  last-created context's globals win), so simultaneous-session isolation cannot be delivered by a
-  bridge-only change. The supported model today is one active session per thread; the bridge
-  guarantees *sequential* re-attach isolation. Full simultaneous isolation needs JS-engine work
-  (out of this roadmap's scope).
+- **The "two *simultaneous* sessions are isolated" exit criterion — now met (updated 2026-07-21).**
+  This note originally recorded the criterion as blocked below the bridge, on the belief that two live
+  `JSContext` instances shared global state (last-created wins). A direct engine investigation disproved
+  that: `JSContext.Eval` (and `JSFunction.InvokeFunction`) enter the target context's realm scope, and the
+  current context is `[ThreadStatic]` + `AsyncLocal`-scoped (`JSEngine.Current`/`_current`), not a
+  process-global — so the engine already isolates simultaneous contexts. Verified by
+  `Broiler.JavaScript.Integration.Tests.SessionIsolationTests` (interleaved evals keep separate globals; a
+  stored callback resolves its own context after another is created; 2000× concurrent two-thread evals never
+  clobber), shipped as `patches/0009` (engine push 403 → patch). Combined with the completed bridge
+  de-globalization (every runtime table is now per-`DomBridge` instance), two *simultaneous* bridge sessions
+  no longer see each other's nodes/globals/mutations — pinned by
+  `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`. **Phase 2 is
+  therefore fully complete, in-scope and exit-criteria.**
 - **De-globalizing the process-static per-element runtime tables** (`ElementRuntimeStates`,
   `PositionAreaResolutions`) is being done incrementally. Both tables are weak + node-keyed (they GC
   with the session's nodes, so they do not leak or cross sessions today), so this is a correctness/
