@@ -88,7 +88,18 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
 
     /// <inheritdoc />
     public string? Execute(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url)
-        => ExecuteCore(scripts, deferredScripts, html, url, static bridge => bridge.SerializeToHtml());
+        => Execute(scripts, deferredScripts, html, url, moduleRoots: null);
+
+    /// <summary>
+    /// As <see cref="Execute(IReadOnlyList{string}, IReadOnlyList{string}, string, string?)"/>, with the
+    /// document's authorised ES-module roots. When the engine binds imports (<see cref="EngineModuleSupport"/>),
+    /// the roots run through the engine's own module machinery on a <see cref="BridgeModuleContext"/>; the
+    /// caller must then NOT have pre-appended the linked <see cref="ScriptExtractionResult.ModuleScripts"/> to
+    /// <paramref name="deferredScripts"/>. When the engine does not, the roots are ignored and the linked
+    /// strings in <paramref name="deferredScripts"/> run as before.
+    /// </summary>
+    public string? Execute(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url, IReadOnlyList<ModuleRoot>? moduleRoots)
+        => ExecuteCore(scripts, deferredScripts, html, url, moduleRoots, static bridge => bridge.SerializeToHtml());
 
     /// <summary>
     /// Executes scripts against the canonical DOM and returns that same
@@ -100,25 +111,44 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
         IReadOnlyList<string> deferredScripts,
         string html,
         string? url)
-        => ExecuteCore(scripts, deferredScripts, html, url, static bridge => bridge.GetRenderDocument());
+        => ExecuteToDocument(scripts, deferredScripts, html, url, moduleRoots: null);
+
+    /// <summary>
+    /// As <see cref="ExecuteToDocument(IReadOnlyList{string}, IReadOnlyList{string}, string, string?)"/>,
+    /// with the document's authorised ES-module roots for the engine-driven module path.
+    /// </summary>
+    public Broiler.Dom.DomDocument? ExecuteToDocument(
+        IReadOnlyList<string> scripts,
+        IReadOnlyList<string> deferredScripts,
+        string html,
+        string? url,
+        IReadOnlyList<ModuleRoot>? moduleRoots)
+        => ExecuteCore(scripts, deferredScripts, html, url, moduleRoots, static bridge => bridge.GetRenderDocument());
 
     private T? ExecuteCore<T>(
         IReadOnlyList<string> scripts,
         IReadOnlyList<string> deferredScripts,
         string html,
         string? url,
+        IReadOnlyList<ModuleRoot>? moduleRoots,
         Func<IDomBridgeRuntime, T> createResult)
         where T : class
     {
-        if (scripts.Count == 0 && deferredScripts.Count == 0)
+        var roots = moduleRoots ?? [];
+        if (scripts.Count == 0 && deferredScripts.Count == 0 && roots.Count == 0)
             return null;
 
         var previousCsp = Csp;
         Csp = ContentSecurityPolicy.FromHtml(html) ?? previousCsp;
 
+        // Drive the engine's own module machinery only when it actually binds imports (patches 0010/0011);
+        // otherwise the page runs on a plain JSContext and modules come in as linked strings via the linker.
+        var useEngineModules = roots.Count > 0 && EngineModuleSupport.Available;
+        var moduleContext = useEngineModules ? new BridgeModuleContext(Csp, url) : null;
+
         try
         {
-            using var context = new JSContext();
+            using JSContext context = moduleContext ?? new JSContext();
             RegisterRuntimeExtensions(context);
             var bridge = _domBridgeFactory.Create();
             bridge.Csp = Csp;
@@ -179,6 +209,27 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
                 }
             }
 
+            // Engine-driven ES modules (Phase 7 item 6): modules are deferred, so run the authorised roots
+            // after the classic deferred scripts. Each root executes on the same realm the DOM is attached
+            // to, and the engine loads its transitive imports itself (CSP-gated) via BridgeModuleContext's
+            // resolution seams — no EsModuleLinker involved. Reached only when EngineModuleSupport.Available.
+            if (moduleContext != null)
+            {
+                foreach (var root in roots)
+                {
+                    try
+                    {
+                        moduleContext.RunScriptAsync(root.Source, root.BaseUrl ?? url ?? string.Empty, uniqueModuleID: root.Key)
+                            .GetAwaiter().GetResult();
+                        DrainAsyncWork(bridge);
+                    }
+                    catch (Exception ex)
+                    {
+                        RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Module root {root.Key} failed: {ex.Message}", ex);
+                    }
+                }
+            }
+
             // Fire body onload event after all scripts have executed
             // (simulates end-of-parsing / window load in browsers).
             // This is critical for test harnesses like Acid3 that bootstrap
@@ -195,16 +246,30 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
 
     /// <inheritdoc />
     public InteractiveSession? ExecuteInteractive(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url)
+        => ExecuteInteractive(scripts, deferredScripts, html, url, moduleRoots: null);
+
+    /// <summary>
+    /// As <see cref="ExecuteInteractive(IReadOnlyList{string}, IReadOnlyList{string}, string, string?)"/>,
+    /// with the document's authorised ES-module roots. When the engine binds imports the roots run through
+    /// the engine's module machinery on a <see cref="BridgeModuleContext"/> (whose lifetime transfers to the
+    /// returned session); otherwise they are ignored and the linked strings in <paramref name="deferredScripts"/>
+    /// run as before. Modules are deferred, so they run eagerly here after the deferred scripts.
+    /// </summary>
+    public InteractiveSession? ExecuteInteractive(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url, IReadOnlyList<ModuleRoot>? moduleRoots)
     {
-        if (scripts.Count == 0 && deferredScripts.Count == 0)
+        var roots = moduleRoots ?? [];
+        if (scripts.Count == 0 && deferredScripts.Count == 0 && roots.Count == 0)
             return null;
 
         var previousCsp = Csp;
         Csp = ContentSecurityPolicy.FromHtml(html) ?? previousCsp;
 
+        var useEngineModules = roots.Count > 0 && EngineModuleSupport.Available;
+        var moduleContext = useEngineModules ? new BridgeModuleContext(Csp, url) : null;
+
         // The JSContext is NOT disposed here – ownership transfers to the
         // InteractiveSession which will dispose it when the caller is done.
-        var context = new JSContext();
+        JSContext context = moduleContext ?? new JSContext();
         RegisterRuntimeExtensions(context);
         var bridge = _domBridgeFactory.Create();
         bridge.Csp = Csp;
@@ -252,6 +317,24 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             catch (Exception ex)
             {
                 RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Deferred script failed: {ex.Message}", ex);
+            }
+        }
+
+        // Engine-driven ES modules (see ExecuteCore): run the authorised roots on the DOM-attached realm.
+        if (moduleContext != null)
+        {
+            foreach (var root in roots)
+            {
+                try
+                {
+                    moduleContext.RunScriptAsync(root.Source, root.BaseUrl ?? url ?? string.Empty, uniqueModuleID: root.Key)
+                        .GetAwaiter().GetResult();
+                    MicroTasks.Drain();
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Module root {root.Key} failed: {ex.Message}", ex);
+                }
             }
         }
 

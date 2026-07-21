@@ -27,6 +27,15 @@ namespace Broiler.HtmlBridge.Scripting;
 /// specifier rejects). Live cross-cycle bindings and top-level <c>await</c> as genuinely async remain
 /// engine-coupled and are tracked separately.</para>
 /// <para>The bootstrap program (<see cref="Bootstrap"/>) must run once before any module program.</para>
+/// <para><b>Retirement status (Phase 7 item 6).</b> This string-rewriting linker is now the <em>fallback</em>
+/// module path. When the JS engine binds ES-module imports natively (<c>EngineModuleSupport.Available</c>,
+/// i.e. once submodule patches <c>0010</c>/<c>0011</c> are applied upstream and the pointer is bumped),
+/// <c>ScriptEngine</c> runs the authorised <see cref="ScriptExtractionResult.ModuleRoots"/> through the
+/// engine's own module machinery on a <c>BridgeModuleContext</c> instead, and this linker is not invoked.
+/// It is retained only because the pinned engine does not yet carry those patches; delete this file (and
+/// <c>EsModuleScanner</c>/<c>EsModuleLiveRefs</c>/<c>ModuleGraphLoader</c>/<c>ModuleScriptWrapper</c> and the
+/// <see cref="ScriptExtractionResult.ModuleScripts"/> production) once the engine-driven path is always
+/// available.</para>
 /// </remarks>
 internal static class EsModuleLinker
 {

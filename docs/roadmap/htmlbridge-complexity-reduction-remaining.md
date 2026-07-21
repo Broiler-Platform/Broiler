@@ -769,7 +769,36 @@ Exit criteria:
   `0010`). What remains for item 6 is therefore **not** an engine gap but a **bridge application task**: wire
   `DomBridge` to drive the engine's module path (resolution seam + host CSP fetch), replace the synchronous
   `EsModuleLinker` IIFE with genuine async module evaluation on the real event loop, and retire the linker.
-  Tracked here as the Phase 7 residue — now purely main-repo bridge wiring on top of a working engine.
+
+- **P7.27 (2026-07-21) — item 6: `DomBridge` wired to the engine module path (capability-gated).** The bridge
+  now drives the JS engine's own module machinery when the engine binds imports, with the `EsModuleLinker`
+  demoted to a fallback. New (`Broiler.HtmlBridge.Scripting`): `BridgeModuleContext : JSModuleContext` maps the
+  patch-`0008` seams to the host — `Resolve` does URL/`data:` resolution, `GetModuleDirectory` returns the
+  module's own URL base, and `ReadModuleSourceAsync` fetches through the bridge's CSP-gated
+  `ScriptExtractionService` (`file`/`http(s)`/`data:`); a `DomBridge` attached to it installs the DOM globals
+  on the **same realm** the modules execute in, so a module touches `document`/`window` like a classic script
+  (validated: a module mutates the live DOM). `EngineModuleSupport.Available` is a one-time,
+  **timeout-guarded** probe (a real `data:`-import module through a throwaway `BridgeModuleContext`) that is
+  `true` only when the engine binds imports (patches `0010`+`0011`); on an un-patched engine it returns
+  `false` fast (≈0.5 s, no hang) so the bridge keeps the linker. `ScriptExtractionResult`/`PageContent` gained
+  `ModuleRoots` (the authorised roots), and `ScriptEngine.Execute`/`ExecuteToDocument`/`ExecuteInteractive`
+  gained a `moduleRoots` overload: when `Available`, the page runs on a `BridgeModuleContext` and each root is
+  executed via `RunScriptAsync` (the engine loads its transitive imports itself) after the classic deferred
+  scripts; otherwise the current `JSContext` + linked-string path is unchanged. `RenderingPipeline` gates the
+  cutover — when `Available` it passes the roots and keeps the linked `ModuleScripts` out of the deferred
+  bucket, else it appends them as before. **CI-safe:** the pinned engine has `Available == false`, so the
+  entire engine path is dormant and the existing module/`ScriptEngine` suites pass unchanged (only the 4
+  pre-existing geometry/zoom env failures); with `0010`/`0011` applied locally, a `<script type="module">`
+  import binds and mutates the DOM through the engine path. A new `EngineModuleWiringTests` drives a module
+  page through `ScriptEngine` the way `RenderingPipeline` does and is green on **both** engine states. The
+  `EsModuleLinker` (and `EsModuleScanner`/`EsModuleLiveRefs`/`ModuleGraphLoader`/`ModuleScriptWrapper` and the
+  `ModuleScripts` production) stay as the fallback — deletable once `0010`/`0011` land upstream and the
+  submodule pointer is bumped, at which point the probe is always `true`. Remaining tail: the sub-document
+  (`DomBridge.ExecuteSubDocumentScripts`) and CLI-capture (`CaptureService`) paths still use the linker, and
+  genuine event-loop ordering (vs the eager deferred-bucket run) is a follow-up.
+
+  Tracked here as the Phase 7 residue — now the sub-document/CLI paths and event-loop ordering on top of a
+  working, capability-gated bridge cutover.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 

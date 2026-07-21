@@ -90,10 +90,22 @@ TYPE Broiler.HtmlBridge.Scripting.ModuleMapEntry : System.IEquatable<Broiler.Htm
   property System.String Key { get; set; }
   property System.String Source { get; set; }
   property System.String Url { get; set; }
+TYPE Broiler.HtmlBridge.Scripting.ModuleRoot : System.IEquatable<Broiler.HtmlBridge.Scripting.ModuleRoot>
+  ctor (System.String, System.String, System.String)
+  method Broiler.HtmlBridge.Scripting.ModuleRoot <Clone>$()
+  method System.Boolean Equals(Broiler.HtmlBridge.Scripting.ModuleRoot)
+  method System.Boolean Equals(System.Object)
+  method System.Int32 GetHashCode()
+  method System.String ToString()
+  method System.Void Deconstruct(ref System.String, ref System.String, ref System.String)
+  property System.String BaseUrl { get; set; }
+  property System.String Key { get; set; }
+  property System.String Source { get; set; }
 TYPE Broiler.HtmlBridge.Scripting.ModuleScriptWrapper
   method System.String WrapInlineModule(System.String)
 TYPE Broiler.HtmlBridge.Scripting.PageContent
-  ctor (System.String, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.Collections.Generic.IReadOnlyList<System.String>)
+  ctor (System.String, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleRoot>)
+  property System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleRoot> ModuleRoots { get; }
   property System.Collections.Generic.IReadOnlyList<System.String> DeferredScripts { get; }
   property System.Collections.Generic.IReadOnlyList<System.String> Scripts { get; }
   property System.String Html { get; }
@@ -124,8 +136,9 @@ TYPE Broiler.HtmlBridge.Scripting.ScriptExecutionResult
   property System.Boolean Success { get; set; }
   property System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptError> Errors { get; set; }
 TYPE Broiler.HtmlBridge.Scripting.ScriptExtractionResult
-  ctor (System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptDescriptor>, System.Collections.Generic.IReadOnlyList<System.String>, Broiler.HtmlBridge.Scripting.ModuleMap)
+  ctor (System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptDescriptor>, System.Collections.Generic.IReadOnlyList<System.String>, Broiler.HtmlBridge.Scripting.ModuleMap, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleRoot>)
   property Broiler.HtmlBridge.Scripting.ModuleMap ModuleMap { get; }
+  property System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleRoot> ModuleRoots { get; }
   property System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ScriptDescriptor> Descriptors { get; }
   property System.Collections.Generic.IReadOnlyList<System.String> AsyncScripts { get; }
   property System.Collections.Generic.IReadOnlyList<System.String> DeferredScripts { get; }
