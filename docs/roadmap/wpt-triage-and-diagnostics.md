@@ -1260,6 +1260,45 @@ matching the native path. Guard `PositionAreaLiveGeometryTests.BakedPositionArea
 score moves (the failing tests take the native path or are sub-pixel/font/dynamic-gated); 0 regressions
 on the vendored css-anchor-position subset (32/40, unchanged) and the anchor/position-area unit suites.
 
+### Vendored-subset near-miss sweep — font-metric fidelity is the dominant blocker (2026-07-21)
+
+A systematic pixel-level sweep of the highest-match failures across every vendored subset
+(css-anchor-position, css-align, css-backgrounds, CSS2) reached a decisive conclusion: **the underlying
+layout/paint is already correct; the residual near-misses are overwhelmingly gated on font/text-metric
+fidelity**, plus multicol column layout and image resampling — not on per-test geometry bugs. Six
+concrete investigations, each confirmed by rendered/reference/diff PNGs:
+
+- **`css-align/blocks/align-content-block-*` (91.2 %).** `align-content` on block containers is
+  **already correct** — an isolated probe of the `start`/`center`/`end` cases returns the exact
+  `data-offset-y` values (15/28/41). The tests fail because they lay the cases out in a `columns: 3`
+  **multicol** with `break-inside: avoid`; the pixel mismatch is multicol column balancing/fragmentation,
+  not alignment.
+- **`css-align/self-alignment/block-justify-self` (85.9 %).** Diff is dominated by **text/font**
+  anti-aliasing across the many label rows (`ApplyBlockJustifySelf` exists); only a few real justify-self
+  leaks remain, but the font-wide mismatch caps it well below 99 %.
+- **`css-backgrounds/background-clip/clip-{content,padding}-box*` (72–75 %).** The `background-clip`
+  itself is **correct** — a column scan confirms the photo clips exactly to the content box
+  (border 30 → padding 30 → photo, in both). The mismatch is that the intro `<p>` **wraps to an extra
+  line** because Broiler's text is wider than Chromium's, shifting the whole `.view` box ~25 px down so
+  every subsequent pixel mismatches. Pure font-width fallout.
+- **`CSS2/abspos/abspos-in-block-in-inline-in-relpos-inline` (94.8 %).** The abspos containing-block
+  resolution is **correct** — the green `width:100%` box is 100 px (the inline CB's width), matching the
+  reference. The residual is the top text (font) plus a ~18 px vertical offset of the colour bar driven by
+  the `<p>` paragraph height (font line-height) shifting the abspos static position.
+- **`css-anchor-position` position-area tail** (prior sweep, above): geometry correct; near-misses
+  font/sub-pixel/dynamic-gated.
+
+**Conclusion / highest-leverage next investment.** The single change that would unblock the most vendored
+near-misses at once is **font-metric fidelity in the headless/compat render backend** — Broiler's default
+text renders wider/taller than the Chromium-generated references (different fallback face + metrics), and
+that width/line-height delta cascades into wrapping, paragraph height, and every downstream box position.
+It is cross-cutting (touches `Broiler.Graphics`/`Broiler.HTML.Image` text measurement, submodule → 403
+patch) and hard, but it is the true gate on the css-align/css-backgrounds/CSS2 text-adjacent tails and the
+Ahem font-load-ordering caveat (cluster 40). Secondary cross-cutting gates: **multicol** column
+layout/balancing (gates `align-content-block-*`, `anchor-position-multicol`) and **image resampling**
+fidelity (the `background-clip` texture tail once the font shift is removed). Per-test geometry/paint wins
+in the vendored subsets are effectively exhausted.
+
 ### Remaining failure landscape (after the merged clusters)
 
 The tractable in-flow / parse / DOM wins are largely exhausted. What remains
