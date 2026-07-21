@@ -61,6 +61,24 @@ internal static class ModuleGraphLoader
         var visited = new HashSet<string>(StringComparer.Ordinal);
         var visiting = new HashSet<string>(StringComparer.Ordinal);
 
+        void LoadDependency(Node node, string specifier)
+        {
+            if (node.DepKeys.ContainsKey(specifier))
+                return; // already resolved (e.g. imported both statically and dynamically)
+
+            var loaded = resolveAndFetch(specifier, node.BaseUrl);
+            if (loaded is not { } dep)
+            {
+                node.DepKeys[specifier] = null; // unresolved — a static import throws / a dynamic import rejects
+                return;
+            }
+
+            node.DepKeys[specifier] = dep.Key;
+            var depNode = Intern(new GraphModule(dep.Key, dep.Source, dep.Key));
+            if (!visiting.Contains(depNode.Key))   // skip the back-edge of a cycle
+                Visit(depNode);
+        }
+
         void Visit(Node node)
         {
             if (!visited.Add(node.Key)) return;   // already fully processed
@@ -68,20 +86,14 @@ internal static class ModuleGraphLoader
 
             if (node.Syntax.Supported)
             {
+                // Static imports/re-exports, then dynamic import("literal") specifiers. Both are resolved,
+                // fetched, and linked into the registry ahead of the importer so the module namespace exists
+                // when it is needed (a dynamic import is loaded eagerly rather than on first call — a timing
+                // approximation, but it makes import() resolve to the linked namespace).
                 foreach (var specifier in node.Syntax.Dependencies())
-                {
-                    var loaded = resolveAndFetch(specifier, node.BaseUrl);
-                    if (loaded is not { } dep)
-                    {
-                        node.DepKeys[specifier] = null; // unresolved — renders a runtime throw
-                        continue;
-                    }
-
-                    node.DepKeys[specifier] = dep.Key;
-                    var depNode = Intern(new GraphModule(dep.Key, dep.Source, dep.Key));
-                    if (!visiting.Contains(depNode.Key))   // skip the back-edge of a cycle
-                        Visit(depNode);
-                }
+                    LoadDependency(node, specifier);
+                foreach (var specifier in node.Syntax.DynamicDependencies())
+                    LoadDependency(node, specifier);
             }
 
             visiting.Remove(node.Key);

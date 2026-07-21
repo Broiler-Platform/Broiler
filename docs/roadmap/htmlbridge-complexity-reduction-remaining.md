@@ -6,12 +6,12 @@ patches `0004`–`0007` applied upstream and the `Broiler.HTML` pointer bumped t
 `Broiler.HtmlBridge.Rendering` project deletion remains, gated on relocating the test-harness shims
 behind the WPT pixel reftest gate. **Phase 7 items 1–5 complete** (CSP split, script descriptors,
 loader/`UrlResolver`/`Origin` consolidation, external-stylesheet CSP, and host-layer CSP enforcement) **and
-item 6's static import/export module graph linked and executing** (P7.17) **with `import.meta` handled at the
-bridge layer** (P7.18); the remaining item-6 tail is the engine-coupled part — live cyclic bindings,
-top-level-await-as-async, dynamic `import()`, and event-loop ordering. The `Broiler.JS` host-resolution seam
-for driving the engine's own module machinery ships as patch `0008` (P7.19), but the engine-driven path is
-**blocked below it** by the engine's own incomplete module execution (static-import value binding +
-nested-async ordering, reproduced on the stock engine). **Phase 8 proposed.**
+item 6's static import/export module graph linked and executing** (P7.17) **with `import.meta` (P7.18) and
+dynamic `import()` (P7.20) handled at the bridge layer**; the remaining item-6 tail is the genuinely
+engine-coupled part — live cyclic bindings and top-level-await-as-async (with event-loop ordering). The
+`Broiler.JS` host-resolution seam for driving the engine's own module machinery ships as patch `0008` (P7.19),
+but the engine-driven path is **blocked below it** by the engine's own incomplete module execution
+(static-import value binding + nested-async ordering, reproduced on the stock engine). **Phase 8 proposed.**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -582,18 +582,36 @@ Exit criteria:
   nested/transitive async module bodies do not run to completion under `RunScriptAsync`. So the engine-driven
   path is blocked below the patch, and the bridge continues to use its own working `EsModuleLinker`.
 
-- **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17/P7.18 the static import/export graph
-  is linked and executed and `import.meta` is handled at the bridge layer. What remains is the engine-coupled
-  tail: **live bindings across cycles** (the bridge linker uses snapshot semantics — matching the engine's own
-  desugaring — so a value read across a cycle before its exporter finishes is stale), **top-level `await`** as
-  genuinely async (the bridge transform is synchronous; a TLA module falls back), **dynamic `import()`** wired
-  to the graph, and moving module ordering into the real browser **event loop** rather than the deferred-bucket
-  approximation. The intended path — drive the engine's own module lowering, for which the host-resolution seam
-  `0008` (P7.19) is the enabling `Broiler.JS` patch — is **blocked below that patch** by the engine's own
-  incomplete module execution (static-import value binding and nested-async ordering, both reproduced on the
-  stock engine). Closing this tail therefore requires either those deeper `Broiler.JS` engine fixes (submodule,
-  push-authorization-gated) or continued extension of the bridge-layer linker; both are tracked here as the
-  Phase 7 residue.
+- **P7.20 (2026-07-20) — item 6 tail: dynamic `import()` wired to the module graph.** A dynamic
+  `import(spec)` was previously left as-is (an expression the plain-`Eval` path throws on when executed).
+  Delivered at the bridge layer (main-repo, CI-landable): `EsModuleScanner` now records each dynamic
+  `import(...)` call site (keyword span, at any depth) plus its argument when a single string literal
+  (`EsModuleSyntax.DynamicImports` / `DynamicDependencies()`); `ModuleGraphLoader` resolves/fetches/links
+  each literal dynamic dependency into the registry ahead of the importer (eager load — a timing
+  approximation of the spec's lazy evaluation, but it makes `import()` resolve to the linked namespace);
+  and `EsModuleLinker` rewrites `import(spec)` to a per-module graph-backed loader (`__brdimp`) that returns
+  a `Promise` of the linked module namespace via a published specifier→key map (`__brdynmap`) — an
+  unresolved or runtime-computed specifier rejects with `Cannot find module`. A dynamically-and-statically
+  imported module resolves to the same singleton registry instance (evaluated once). New `EsModuleGraphTests`
+  (3) drive real graphs through a live `JSContext` with the event loop pumped via `JSContext.Execute`:
+  `import().then(...)` resolves to the namespace value, an unresolvable specifier rejects, and the dynamic +
+  static singleton is shared (one evaluation). All `internal` → no public-API change; the module-graph /
+  descriptor / CSP suites stay green (only the 4 pre-existing geometry/serialization env failures remain,
+  identical on baseline).
+
+- **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17/P7.18/P7.20 the static import/export
+  graph is linked and executed, `import.meta` is handled, and dynamic `import()` is wired to the graph — all
+  at the bridge layer. What remains is the genuinely engine-coupled residue: **live bindings across cycles**
+  (the bridge linker uses snapshot semantics — matching the engine's own desugaring — so a value read across a
+  cycle before its exporter finishes is stale) and **top-level `await`** as genuinely async (the bridge
+  transform is a synchronous IIFE, so a TLA module falls back), which together also want module ordering moved
+  into the real browser **event loop** rather than the deferred-bucket approximation. The intended path — drive
+  the engine's own module lowering, for which the host-resolution seam `0008` (P7.19) is the enabling
+  `Broiler.JS` patch — is **blocked below that patch** by the engine's own incomplete module execution
+  (static-import value binding and nested-async ordering, both reproduced on the stock engine). Closing this
+  residue therefore requires either those deeper `Broiler.JS` engine fixes (submodule, push-authorization-gated)
+  or extending the bridge-layer linker with identifier-use rewriting (live named bindings) and an async module
+  wrapper tied to the event loop (TLA); both are tracked here as the Phase 7 residue.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 

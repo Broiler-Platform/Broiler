@@ -297,6 +297,88 @@ public sealed class EsModuleGraphTests
         Assert.True(threw);
     }
 
+    /// <summary>Links the graph over <paramref name="files"/>, then evaluates the dependency programs and
+    /// drives the last (entry) program through <see cref="JSContext.Execute"/> so the event loop pumps the
+    /// microtask that settles a dynamic <c>import()</c>; returns the context for assertions.</summary>
+    private static JSContext RunGraphDriving(
+        List<ModuleGraphLoader.GraphModule> entries,
+        Dictionary<string, string> files)
+    {
+        ModuleGraphLoader.ResolveAndFetch fetch = (specifier, baseUrl) =>
+        {
+            var resolved = UrlResolver.Resolve(specifier, baseUrl);
+            if (resolved == null) return null;
+            var key = resolved.AbsoluteUri;
+            return files.TryGetValue(key, out var src) ? (key, src) : null;
+        };
+
+        var result = ModuleGraphLoader.Load(entries, fetch);
+        var ctx = new JSContext();
+        for (int i = 0; i < result.Programs.Count - 1; i++)
+            ctx.Eval(result.Programs[i]);
+        ctx.Execute(result.Programs[^1]);
+        return ctx;
+    }
+
+    [Fact]
+    public void Dynamic_Import_Resolves_To_The_Linked_Module_Namespace()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] = "export const answer = 42;",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "globalThis.out = 'pending';\n" +
+                "import('./util.mjs').then(function (m) { globalThis.out = m.answer; });",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraphDriving(entries, files);
+        Assert.Equal("42", Eval(ctx, "''+globalThis.out"));
+    }
+
+    [Fact]
+    public void Dynamic_Import_Of_Unresolvable_Module_Rejects()
+    {
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "globalThis.state = 'pending';\n" +
+                "import('./missing.mjs').then(\n" +
+                "  function () { globalThis.state = 'resolved'; },\n" +
+                "  function () { globalThis.state = 'rejected'; });",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraphDriving(entries, new Dictionary<string, string>());
+        Assert.Equal("rejected", Eval(ctx, "globalThis.state"));
+    }
+
+    [Fact]
+    public void Dynamic_Import_Shares_One_Instance_With_A_Static_Import()
+    {
+        // util is imported statically (main) and dynamically (main); both must see the same singleton
+        // instance from the module registry, so a mutation through one is visible through the other.
+        var files = new Dictionary<string, string>
+        {
+            ["file:///app/util.mjs"] =
+                "export const tag = {}; globalThis.evalCount = (globalThis.evalCount || 0) + 1;",
+        };
+        var entries = new List<ModuleGraphLoader.GraphModule>
+        {
+            new("file:///app/main.mjs",
+                "import { tag } from './util.mjs';\n" +
+                "import('./util.mjs').then(function (m) { globalThis.same = (m.tag === tag); });",
+                "file:///app/main.mjs"),
+        };
+
+        using var ctx = RunGraphDriving(entries, files);
+        Assert.Equal("true", Eval(ctx, "''+globalThis.same"));
+        Assert.Equal("1", Eval(ctx, "''+globalThis.evalCount")); // evaluated exactly once
+    }
+
     [Fact]
     public void Import_Meta_Url_Resolves_To_The_Module_Key()
     {

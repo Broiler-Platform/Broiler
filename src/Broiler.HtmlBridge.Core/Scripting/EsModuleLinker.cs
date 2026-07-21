@@ -18,7 +18,10 @@ namespace Broiler.HtmlBridge.Scripting;
 /// evaluation or read across a cycle. A namespace import (<c>import * as ns</c>) binds the exports object
 /// itself, so it does reflect later writes.</para>
 /// <para>Each <c>import.meta</c> occurrence is rewritten to a synthesized per-module object whose
-/// <c>url</c> is the module's registry key. Dynamic <c>import()</c> and live cross-cycle bindings remain
+/// <c>url</c> is the module's registry key. A dynamic <c>import(spec)</c> is routed through the module
+/// graph: it resolves to a <c>Promise</c> of the already-linked module namespace (the graph loader
+/// resolves/fetches/links a string-literal specifier ahead of time; an unresolved or runtime-computed
+/// specifier rejects). Live cross-cycle bindings and top-level <c>await</c> as genuinely async remain
 /// engine-coupled and are tracked separately.</para>
 /// <para>The bootstrap program (<see cref="Bootstrap"/>) must run once before any module program.</para>
 /// </remarks>
@@ -28,7 +31,13 @@ internal static class EsModuleLinker
     public const string Bootstrap =
         "globalThis.__brmods=globalThis.__brmods||{};" +
         "globalThis.__brreg=function(k){var m=globalThis.__brmods[k];if(!m){m={};globalThis.__brmods[k]=m;}return m;};" +
-        "globalThis.__brqr=function(k){var m=globalThis.__brmods[k];if(!m){m={};globalThis.__brmods[k]=m;}return m;};";
+        "globalThis.__brqr=function(k){var m=globalThis.__brmods[k];if(!m){m={};globalThis.__brmods[k]=m;}return m;};" +
+        // Dynamic import(): a per-module specifier→key map (__brdynmap) and a loader that returns a Promise
+        // of the already-linked module namespace (or rejects for an unknown/unresolved specifier).
+        "globalThis.__brdynmap=globalThis.__brdynmap||{};" +
+        "globalThis.__brdynimp=globalThis.__brdynimp||function(b,s){return new Promise(function(res,rej){" +
+        "var mp=globalThis.__brdynmap[b];var k=mp&&mp[s];var m=k?globalThis.__brmods[k]:null;" +
+        "if(m){res(m);}else{rej(new Error(\"Cannot find module: \"+s));}});};";
 
     private readonly record struct Edit(int Start, int Length, string Text);
 
@@ -132,6 +141,10 @@ internal static class EsModuleLinker
         foreach (var (start, length) in syntax.ImportMetaSpans)
             edits.Add(new Edit(start, length, "__brmeta"));
 
+        // Dynamic import(spec) → a per-module graph-backed loader (see the preamble below).
+        foreach (var d in syntax.DynamicImports)
+            edits.Add(new Edit(d.KeywordStart, d.KeywordLength, "__brdimp"));
+
         edits.Sort((a, b) => a.Start.CompareTo(b.Start));
 
         var body = new StringBuilder(source.Length + 64);
@@ -156,6 +169,23 @@ internal static class EsModuleLinker
         // the synthetic id for an inline module). Declared only when the module references import.meta.
         if (syntax.ImportMetaSpans.Count > 0)
             program.Append("var __brmeta={url:").Append(JsString(moduleKey)).Append("};\n");
+        // Dynamic import(): bind this module's key into the loader and publish its resolved specifier→key
+        // map, so a top-level import() sees it before the body runs.
+        if (syntax.DynamicImports.Count > 0)
+        {
+            var keyLit = JsString(moduleKey);
+            program.Append("var __brdimp=function(__s){return globalThis.__brdynimp(").Append(keyLit).Append(",__s);};\n");
+            program.Append("globalThis.__brdynmap[").Append(keyLit).Append("]=globalThis.__brdynmap[").Append(keyLit).Append("]||{};\n");
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var d in syntax.DynamicImports)
+            {
+                if (string.IsNullOrEmpty(d.LiteralSpecifier) || !seen.Add(d.LiteralSpecifier!)) continue;
+                var depKey = keyOf(d.LiteralSpecifier!);
+                if (depKey == null) continue; // unresolved — the loader rejects it at runtime
+                program.Append("globalThis.__brdynmap[").Append(keyLit).Append("][")
+                    .Append(JsString(d.LiteralSpecifier!)).Append("]=").Append(JsString(depKey)).Append(";\n");
+            }
+        }
         program.Append(body);
         program.Append('\n');
         program.Append(endAssigns);

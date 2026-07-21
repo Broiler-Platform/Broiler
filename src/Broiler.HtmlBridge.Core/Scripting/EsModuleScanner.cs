@@ -15,9 +15,11 @@ namespace Broiler.HtmlBridge.Scripting;
 /// </summary>
 /// <remarks>
 /// <c>import.meta</c> is recognised (at any depth) and its spans recorded for the linker to rewrite into a
-/// per-module meta object. Deliberately out of scope (each marks the module unsupported, or is left as-is):
-/// destructuring exports (<c>export const { a } = o</c>), dynamic <c>import(...)</c> (an engine-coupled
-/// expression, left untouched), and top-level <c>await</c>.
+/// per-module meta object. Dynamic <c>import(...)</c> is recognised (at any depth): its keyword span is
+/// recorded so the linker can route it through the module graph, and a single string-literal argument is
+/// captured so the graph loader can resolve/fetch/link that dependency. Deliberately out of scope (marks the
+/// module unsupported, or is left as-is): destructuring exports (<c>export const { a } = o</c>) and top-level
+/// <c>await</c>.
 /// </remarks>
 internal static class EsModuleScanner
 {
@@ -110,7 +112,11 @@ internal static class EsModuleScanner
                 }
                 if (p < n && source[p] == '(')
                 {
-                    // Dynamic import(...) — an expression; left untouched (engine-coupled, tracked separately).
+                    // Dynamic import(...) — record the keyword span (the linker rewrites it to a graph-backed
+                    // loader) and the argument if it is a single string literal (so the graph loader can
+                    // resolve/fetch/link that dependency ahead of time).
+                    var litSpec = TryReadDynamicImportLiteral(source, p);
+                    syntax.DynamicImports.Add(new DynamicImport(i, importEnd - i, litSpec));
                     prevSignificant = 't';
                     i = importEnd;
                     continue;
@@ -150,6 +156,22 @@ internal static class EsModuleScanner
         }
 
         return syntax;
+    }
+
+    /// <summary>
+    /// Reads the argument of a dynamic <c>import(</c> when it is a single string literal, returning its
+    /// value; returns <c>null</c> for a runtime-computed argument (e.g. <c>import("a"+x)</c>) or attributes
+    /// that make the first argument non-literal. <paramref name="parenPos"/> is the index of the <c>(</c>.
+    /// </summary>
+    private static string? TryReadDynamicImportLiteral(string src, int parenPos)
+    {
+        int i = SkipTrivia(src, parenPos + 1);
+        if (i >= src.Length || src[i] is not ('"' or '\'')) return null;
+        if (!ReadStringLiteral(src, i, out var spec, out int after)) return null;
+        int j = SkipTrivia(src, after);
+        // A pure literal specifier: the first argument ends here — either the call closes ')' or a second
+        // argument (import options) follows ','. Anything else (operator, template, etc.) is computed.
+        return j < src.Length && src[j] is ')' or ',' ? spec : null;
     }
 
     // ── import ──────────────────────────────────────────────────────────────
