@@ -1292,12 +1292,40 @@ concrete investigations, each confirmed by rendered/reference/diff PNGs:
 near-misses at once is **font-metric fidelity in the headless/compat render backend** — Broiler's default
 text renders wider/taller than the Chromium-generated references (different fallback face + metrics), and
 that width/line-height delta cascades into wrapping, paragraph height, and every downstream box position.
-It is cross-cutting (touches `Broiler.Graphics`/`Broiler.HTML.Image` text measurement, submodule → 403
-patch) and hard, but it is the true gate on the css-align/css-backgrounds/CSS2 text-adjacent tails and the
-Ahem font-load-ordering caveat (cluster 40). Secondary cross-cutting gates: **multicol** column
-layout/balancing (gates `align-content-block-*`, `anchor-position-multicol`) and **image resampling**
-fidelity (the `background-clip` texture tail once the font shift is removed). Per-test geometry/paint wins
-in the vendored subsets are effectively exhausted.
+It is cross-cutting (touches `Broiler.Graphics`/`Broiler.HTML.Image` text measurement) and hard, but it is
+the true gate on the css-align/css-backgrounds/CSS2 text-adjacent tails and the Ahem font-load-ordering
+caveat (cluster 40). Secondary cross-cutting gates: **multicol** column layout/balancing (gates
+`align-content-block-*`, `anchor-position-multicol`) and **image resampling** fidelity (the
+`background-clip` texture tail once the font shift is removed). Per-test geometry/paint wins in the vendored
+subsets are effectively exhausted.
+
+### Font-metric fidelity — two root causes fixed (2026-07-21, main-repo runner)
+
+Acting on the conclusion above, the font-metric divergence turned out to be **two concrete, main-repo bugs
+in the WPT runner** (no submodule patch), both proven by direct measurement against the reference-generating
+Chromium (chromium-1194) and the Liberation/DejaVu TTF advance tables:
+
+1. **Wrong generic faces.** `EnsureGenericFontsLoaded` registered `serif`/`sans-serif`/`monospace` as
+   **DejaVu** on the theory that the reference Chromium resolves generics through system fontconfig. Measured
+   directly, the reference Chromium renders `serif` and the unstyled default at **274.97px** for a 43-char
+   probe — **Liberation Serif is 276.38px; DejaVu Serif is 349.52px** (27 % wider); `sans-serif` 304.77px
+   matches Liberation Sans 306.83px (DejaVu Sans 342.30px). Blink resolves generics/default to its
+   Liberation metric-compatible faces (Times New Roman / Arial / Courier New), not fontconfig's DejaVu.
+   Registering the Liberation faces makes Broiler's widths match.
+2. **Fonts registered *after* the measurement pass.** In `RunSingleTest` the DomBridge pass
+   (`ExecuteScriptsWithDom`, which measures text for `offset*`/check-layout) ran **before**
+   `EnsureWptFontsLoaded`. The font adapter caches the typeface it resolves per family, so the first
+   measurement cached the bundled fallback (Vazirmatn, far wider) for `serif`/`sans-serif`, and the later
+   render reused the stale width. Moving the font load before the DomBridge pass fixes it.
+
+Effect: `css-backgrounds/background-clip/clip-content-box` went **75.3 % → 98.5 %** (the intro `<p>` now fits
+on one line — rendered text y 22–40 vs reference 22–41, right edge 981 vs 976 — instead of wrapping and
+pushing the `.view` box ~25 px down). **0 regressions** across the vendored css-backgrounds (39/61), css-align
+(19/28) and CSS2 (13/17) subsets (pass counts unchanged, average match up). The fixes do **not** flip pass
+counts on their own: the residual ~1.5 % is now pure glyph anti-aliasing + background-image resampling — a
+rasterizer-fidelity tail (Broiler's rasteriser vs Chromium's) that the ≤1 %-differing-pixels threshold sits
+just inside. Crossing it needs rasteriser-level parity (glyph AA + image resampling), a separate hard
+increment; the correct font *metrics* (advance widths + load order) are now in place as the foundation.
 
 ### Remaining failure landscape (after the merged clusters)
 

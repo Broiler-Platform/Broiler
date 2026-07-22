@@ -1453,6 +1453,19 @@ internal sealed partial class WptTestRunner
             };
         }
 
+        // Pre-load WPT fonts BEFORE any measurement. WPT test files reference fonts
+        // via root-relative URLs (e.g. @import "/fonts/ahem.css") that resolve to
+        // {wptRoot}/fonts/ on disk, and the CSS generic families resolve to the
+        // Liberation faces the reference Chromium uses. This MUST run before
+        // ExecuteScriptsWithDom below: the DomBridge pass measures text (offset*,
+        // check-layout), and the font adapter caches the typeface it resolves per
+        // family — if fonts are registered only afterwards, that first measurement
+        // caches the bundled fallback (Vazirmatn, far wider) for `serif`/`sans-serif`
+        // and the later render reuses the stale width, wrapping text to extra lines
+        // and shifting every downstream box (the css-backgrounds/background-clip tail).
+        if (wptRoot != null)
+            EnsureWptFontsLoaded(wptRoot);
+
         // Execute inline scripts via DomBridge.
         IReadOnlyList<LayoutAssertionFailure>? layoutAssertionFailures = null;
         try
@@ -1481,14 +1494,6 @@ internal sealed partial class WptTestRunner
 
         // Post-process HTML (strip scripts, clean up for rendering).
         html = HtmlPostProcessor.Process(html);
-
-        // Pre-load WPT fonts when wptRoot is known.  WPT test files reference
-        // fonts via root-relative URLs (e.g. @import "/fonts/ahem.css") that
-        // resolve to {wptRoot}/fonts/ on disk.  Registering known WPT fonts
-        // directly with the adapter guarantees CSS font-family references work
-        // even when the @font-face stylesheet import path resolution fails.
-        if (wptRoot != null)
-            EnsureWptFontsLoaded(wptRoot);
 
         // Derive the base URL from the test file so that relative sub-resource
         // paths (background images, stylesheets, etc.) resolve correctly.
@@ -1938,15 +1943,21 @@ internal sealed partial class WptTestRunner
         EnsureGenericFontsLoaded();
     }
 
-    // The reference generator's Chromium resolves the CSS generic families through
-    // fontconfig (monospace → DejaVu Sans Mono, serif → DejaVu Serif, sans-serif →
-    // DejaVu Sans). Broiler does not enumerate system fonts, so its generic-family
-    // fallback finds nothing and the backend renders a proportional default for
-    // `monospace` — text comes out far narrower than the reference (e.g. a
-    // monospace <th> at ~7px/char vs Chromium's ~9.6px). Register the same system
-    // fonts under the generic names so monospace text is actually fixed-width and
-    // matches the reference. First existing candidate wins; missing files are
-    // skipped so this is a no-op where the fonts are absent.
+    // The reference generator's headless Chromium resolves the CSS generic families
+    // (and the default/initial font — Blink's standard family) through Blink's own
+    // font preferences to the **Liberation** metric-compatible faces, NOT the system
+    // fontconfig defaults. Measured against the actual reference Chromium
+    // (chromium-1194): `serif` and the unstyled default both render at 274.97px for a
+    // 43-char probe — Liberation Serif is 276.38px (DejaVu Serif 349.52px is far off);
+    // `sans-serif` at 304.77px matches Liberation Sans 306.83px (DejaVu Sans 342.30px
+    // off). Broiler previously registered DejaVu here, so its default/serif/sans text
+    // came out ~25 % wider than the reference and wrapped to extra lines, shifting every
+    // downstream box and mismatching whole pages (e.g. css-backgrounds/background-clip,
+    // where the intro <p> wrapped an extra line and pushed the .view box ~25px down).
+    // Register the Liberation faces so widths, wrapping, and line positions match the
+    // reference. First existing candidate wins; missing files are skipped (no-op).
+    // Monospace maps to Liberation Mono (≈ DejaVu Mono in advance) — Chrome's separate
+    // 13px monospace-default-size quirk is orthogonal and not handled here.
     private static void EnsureGenericFontsLoaded()
     {
         if (_genericFontsLoaded)
@@ -1954,14 +1965,14 @@ internal sealed partial class WptTestRunner
         _genericFontsLoaded = true;
 
         LoadFirstAvailableAs("monospace",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf");
+            "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf");
         LoadFirstAvailableAs("serif",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf");
+            "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf");
         LoadFirstAvailableAs("sans-serif",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf");
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
     }
 
     private static void LoadFirstAvailableAs(string cssName, params string[] candidatePaths)
