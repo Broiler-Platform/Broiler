@@ -64,15 +64,7 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             try
             {
                 var source = PrepareSource(scripts[i]);
-                if (Profiler != null)
-                {
-                    Profiler.Measure($"inline-{i}", () => context.Eval(source));
-                }
-                else
-                {
-                    context.Eval(source);
-                }
-
+                RunMeasured($"inline-{i}", () => context.Eval(source));
                 MicroTasks.Drain();
             }
             catch (Exception ex)
@@ -222,11 +214,7 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             try
             {
                 var source = PrepareSource(scripts[i]);
-                if (Profiler != null)
-                    Profiler.Measure($"inline-{i}", () => context.Eval(source));
-                else
-                    context.Eval(source);
-
+                RunMeasured($"inline-{i}", () => context.Eval(source));
                 drain(bridge);
             }
             catch (Exception ex)
@@ -237,12 +225,12 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
         bridge.CurrentScriptIndex = -1;
 
         // Execute deferred scripts after all regular scripts (end-of-parsing for <script defer>).
-        foreach (var script in deferredScripts)
+        for (var i = 0; i < deferredScripts.Count; i++)
         {
             try
             {
-                var source = PrepareSource(script);
-                context.Eval(source);
+                var source = PrepareSource(deferredScripts[i]);
+                RunMeasured($"deferred-{i}", () => context.Eval(source));
                 drain(bridge);
             }
             catch (Exception ex)
@@ -261,8 +249,9 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             {
                 try
                 {
-                    moduleContext.RunScriptAsync(root.Source, root.BaseUrl ?? url ?? string.Empty, uniqueModuleID: root.Key)
-                        .GetAwaiter().GetResult();
+                    RunMeasured($"module-{root.Key}", () =>
+                        moduleContext.RunScriptAsync(root.Source, root.BaseUrl ?? url ?? string.Empty, uniqueModuleID: root.Key)
+                            .GetAwaiter().GetResult());
                     drain(bridge);
                 }
                 catch (Exception ex)
@@ -274,6 +263,21 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
 
         bridge.FireWindowLoadEvent();
         drain(bridge);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="work"/> (a single script/module evaluation), timing it through
+    /// <see cref="Profiler"/> when a hook is attached and running it directly otherwise. Every script the
+    /// engine executes — inline (<c>inline-{i}</c>), deferred (<c>deferred-{i}</c>) and engine-driven module
+    /// roots (<c>module-{key}</c>) — funnels through here so the profiling hook, when set, sees a complete
+    /// and consistent timeline rather than the inline scripts alone (Phase 8 item 4).
+    /// </summary>
+    private void RunMeasured(string label, Action work)
+    {
+        if (Profiler != null)
+            Profiler.Measure(label, work);
+        else
+            work();
     }
 
     /// <inheritdoc />
@@ -352,15 +356,7 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             try
             {
                 var source = PrepareSource(scripts[i]);
-                if (Profiler != null)
-                {
-                    Profiler.Measure($"inline-{i}", () => context.Eval(source));
-                }
-                else
-                {
-                    context.Eval(source);
-                }
-
+                RunMeasured($"inline-{i}", () => context.Eval(source));
                 MicroTasks.Drain();
             }
             catch (Exception ex)

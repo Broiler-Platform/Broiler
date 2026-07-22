@@ -946,4 +946,30 @@ Exit criteria:
   baseline (Acid3 runs through `CaptureService`/`ExecuteScriptsWithDom`, not `ScriptEngine`). With the shared
   pipeline in place, item 1's *"one execution pipeline shared by normal/detailed/typed/interactive entry
   points"* exit criterion is now satisfied.
+- **P8.7 (2026-07-22) — item 4: profiling is applied consistently across every script the engine runs.**
+  The `ScriptProfilingHook` attached to `ScriptEngine.Profiler` timed only the **inline** scripts: the render
+  loop wrapped `inline-{i}` evals in `Profiler.Measure`, but ran deferred scripts (`context.Eval`) and
+  engine-driven module roots (`moduleContext.RunScriptAsync`) straight through with no measurement, and the
+  DOM-less `Execute(scripts)`/`ExecuteDetailed(scripts)` paths each duplicated the same inline-only pattern.
+  A consumer that attached a hook therefore got a **misleading partial timeline** — deferred/module time was
+  invisible. Funneled every evaluation through one private `RunMeasured(label, work)` seam (times through the
+  hook when set, runs directly otherwise) and labelled each kind: `inline-{i}`, `deferred-{i}`, and
+  `module-{key}`. Now the hook, when set, sees the complete timeline in document order. Method-body only — no
+  public-surface change (the seam is private; `Profiler`/`ScriptProfilingHook` are unchanged), so no baseline
+  regeneration. New `ScriptProfilingConsistencyTests` (4) — the hook's **first real consumer** in the tree:
+  a page with inline+deferred scripts records `[inline-0, inline-1, deferred-0]`; the DOM-less path records
+  its inline entries; a throwing script is still recorded with `Succeeded=false` (complete timeline); and the
+  common no-hook case runs clean. 0 regressions (121/125 on the engine-exercising filter; the 4 failures are
+  the pre-existing bare-container `DomBridge_SerializeToHtml_*`/VisualViewport env failures).
+
+  **Item-4 decision — profiling stays, consistency delivered; host-diagnostics relocation deferred to item 6.**
+  Item 4's rule was *"apply profiling consistently **or** move it to host diagnostics if there are no real
+  consumers."* A tree sweep confirms **no production code or test sets `Profiler`, instantiates
+  `ScriptProfilingHook`, or reads `.Entries`** — the capability has no real consumers today. Full removal,
+  however, is a public-surface deletion that **cannot be adapted behind the v2 `IScriptEngine`/`IScriptProfiling`
+  adapter**, so per the phase's *"a public v3 is proposed only for changes which cannot be adapted behind v2"*
+  exit criterion it belongs with item 6's deliberate assembly/surface decision, not a mid-phase drive-by
+  deletion. This increment therefore delivers item 4's **consistency** branch in full (safe, internal) and
+  hands item 6 the explicit, documented choice: keep the now-consistent `IScriptProfiling` capability, or trim
+  it to host diagnostics in a v3 surface revision.
 
