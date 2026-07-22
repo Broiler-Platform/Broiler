@@ -892,3 +892,17 @@ Exit criteria:
   `AnchorSize` failures are the pre-existing bare-container geometry/zoom env failures, which use `Execute`,
   not `ExecuteInteractive`). No public-surface change (both fixes are method-body only).
 
+- **P8.4 (2026-07-22) — item 5: name the script-extraction contract for what it is.** The file
+  `IScriptExtractor.cs` contained **no `IScriptExtractor` interface** — it held `ScriptExtractionResult`
+  (the central type) plus `ScriptDescriptor`, `ScriptSourceKind`, `ModuleMap`/`ModuleMapEntry` and
+  `ModuleRoot`. The extraction itself is `ScriptExtractionService`, a **static** class, so there is no
+  instance to abstract and no consumer that would benefit from a restored interface. Per item 5's first
+  option, renamed the file to **`ScriptExtractionResult.cs`** (`git mv`, contents unchanged — pure move, no
+  API change). Also fixed a **dangling doc cross-reference**: `RenderingPipeline`'s summary pointed at
+  `<see cref="IScriptExtractor.ExtractAll"/>` — a type that does not exist — now
+  `ScriptExtractionService.ExtractAll` (the real static method; verified no `CS1574` broken-cref warning). And
+  corrected a misplaced doc comment in the file: the `ScriptExtractionResult` `<summary>` had drifted onto
+  `ModuleRoot` (a double-`<summary>`) while the class itself had none — moved it to the class and refreshed it
+  to cover the descriptors/module-map/graph/roots. Public-API snapshot + `ScriptDescriptor` suites green (no
+  surface change); `Broiler.Browser.Core` (which compiles `RenderingPipeline`) builds clean.
+

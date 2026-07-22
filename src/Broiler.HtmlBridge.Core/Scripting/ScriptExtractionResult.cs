@@ -78,11 +78,6 @@ public sealed class ModuleMap
 }
 
 /// <summary>
-/// Holds the result of extracting all scripts from an HTML page,
-/// separated into regular (inline / data-URI / external), deferred,
-/// and async scripts so that the engine can execute them in the correct order.
-/// </summary>
-/// <summary>
 /// An authorised top-level ES-module root (a <c>&lt;script type="module"&gt;</c> whose source passed CSP):
 /// its resolved module key, its already-decoded/fetched source, and the base URL its relative imports
 /// resolve against. This is the engine-driven counterpart of a linked <see cref="ScriptExtractionResult.ModuleScripts"/>
@@ -91,6 +86,12 @@ public sealed class ModuleMap
 /// </summary>
 public sealed record ModuleRoot(string Key, string Source, string? BaseUrl);
 
+/// <summary>
+/// Holds the result of extracting all scripts from an HTML page, separated into regular
+/// (inline / data-URI / external), deferred, and async scripts so the engine can execute them in the
+/// correct order — plus the metadata descriptors, the module map, the linked module graph and the
+/// authorised module roots (Phase 7 items 3 and 6).
+/// </summary>
 public sealed class ScriptExtractionResult(
     IReadOnlyList<string> scripts,
     IReadOnlyList<string> deferredScripts,
