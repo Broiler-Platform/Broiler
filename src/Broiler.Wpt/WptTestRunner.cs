@@ -2187,8 +2187,15 @@ internal sealed partial class WptTestRunner
                 }
 
                 if (!hadWork)
-                    break;
+                    return; // settled within the budget
             }
+
+            // Phase 8 item 3: the drain budget is exhausted while work is still queued (a runaway
+            // microtask/timer loop). Surface it explicitly instead of stopping silently.
+            RenderLogger.LogWarning(LogCategory.JavaScript, "WptTestRunner.DrainAsyncWork",
+                $"Async work did not settle within {DomBridge.AsyncDrainIterationLimit} drain iterations; " +
+                $"stopping with pending microtasks={microTasks.Count}, pendingTimers={bridge.HasPendingTimers}. " +
+                "This usually indicates a runaway microtask/timer loop.");
         }
 
         if (batchStyleInvalidations)

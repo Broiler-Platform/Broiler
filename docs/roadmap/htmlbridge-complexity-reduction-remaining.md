@@ -863,7 +863,14 @@ Exit criteria:
   a normal script leaves the flag `false`; a self-rescheduling zero-delay timer flags exhaustion (and still
   returns a rendered document rather than hanging). 0 regressions on the timer/async/`ScriptEngine`/event-loop
   suites (the 4 `DomBridge_SerializeToHtml_*`/`AnchorSize` failures are the pre-existing bare-container
-  geometry/zoom env failures, confirmed identical on the clean baseline). The two other drain loops
-  (`CaptureService.ExecuteScriptsWithDom`, `WptTestRunner`) carry the same silent-stop shape and are the
-  natural follow-up for this item.
+  geometry/zoom env failures, confirmed identical on the clean baseline).
+
+- **P8.2 (2026-07-22) — item 3 complete: the same explicit-diagnostic treatment applied to the other two
+  drain loops.** `CaptureService.ExecuteScriptsWithDom` (CLI capture) and `WptTestRunner` (WPT harness) each
+  carried a byte-identical silent-stop drain loop. Both now `return` on settle and, on budget exhaustion with
+  work still queued, log the same `RenderLogger.LogWarning` with the pending microtask/timer counts
+  (`"…did not settle within N drain iterations…"`). Behaviour-preserving for settling pages (the drain still
+  stops after 1000 iterations); the exhaustion is now diagnosable across **all three** drain sites. 0
+  regressions (`TimerAndAsyncTests` 25/25 on the CaptureService path; vendored css-anchor-position 29/35
+  unchanged on the WptTestRunner path). Item 3 is now fully delivered.
 
