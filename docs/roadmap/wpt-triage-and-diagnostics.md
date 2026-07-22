@@ -1374,7 +1374,25 @@ exposing them and threading half-leading spans `Broiler.HTML.Image.Compat` (metr
 (line-box baseline). It touches the vertical position of **every** run of text, including Ahem, so it needs
 full-corpus regression validation before landing (a wrong global baseline shift would regress far more than it
 fixes). Scoped here as its own increment; the finding redirects the "rasteriser parity" effort away from AA/gamma
-(already fine) to the vertical-metrics model, which is the real ceiling.
+(already fine) to the vertical-metrics model.
+
+**Correction — the vertical-metrics offset is `line-height`-specific and does NOT gate the text tail
+(2026-07-21).** Starting the metrics refactor, the first validation step re-measured the "HELLO" glyph at
+**`line-height: normal`** (what `clip-content-box` and virtually all failing text use) instead of the
+`line-height: 1` used in the diagnosis above. At normal line-height Broiler's baseline is **already aligned
+to within 1 px** of Chromium (Broiler left-stem y 15–56, Chromium 16–57 — a 0.016 em residual, ~0.26 px at
+21 px body text). The 4 px offset is **specific to explicit sub-natural line-heights** (`line-height: 1`,
+where the negative half-leading is dropped); at normal line-height the half-leading is ~`lineGap/2` and the
+error is sub-pixel. So the half-leading refactor fixes a **genuine but narrow** correctness bug (explicit
+sub-natural `line-height` baselines) with **essentially zero pass-count impact** on the vendored subsets,
+which are already baseline-aligned. The `clip-content-box` text tail (tops already match, 22 vs 22) is
+therefore **sub-pixel *horizontal* / glyph-shape rasteriser AA** (vertical strokes landing on adjacent
+columns), not the vertical baseline — the same irreducible glyph-rasteriser divergence documented above.
+The refactor was **not** carried out: a 3-submodule change (`Broiler.Graphics` `ILayoutFont`/`RFont`,
+`Broiler.HTML.Image(.Compat)` metrics, `Broiler.Layout` half-leading) that moves all text positioning and
+needs full-corpus validation is not worth its risk for a narrow bug that flips no known test. Net standing
+conclusion for the text tail: it is horizontal glyph-AA at ~1 %, unwinnable against a Chromium golden
+without rasteriser-level parity or an explicit per-test `<meta fuzzy>`.
 
 ### Remaining failure landscape (after the merged clusters)
 
