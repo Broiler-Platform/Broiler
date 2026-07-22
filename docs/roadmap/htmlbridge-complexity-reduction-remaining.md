@@ -927,4 +927,23 @@ Exit criteria:
   points"* exit criterion: consolidating `ScriptEngine`'s internal `Execute*`/`ExecuteInteractive` bodies
   (which currently duplicate the attach → run scripts → run deferred → run modules → drain sequence) onto a
   single shared pipeline — an internal refactor separate from this interface segregation.
+- **P8.6 (2026-07-22) — item 1 exit criterion met: one execution pipeline shared by every entry point.**
+  `ExecuteCore<T>` (render/typed) and `ExecuteInteractive` each carried a byte-for-byte copy of the
+  post-attach sequence — build the `<script>`-element index for `document.write`, eval the regular scripts,
+  eval the deferred scripts, run the authorised engine module roots, fire the window `load` event — differing
+  only in how async work is settled after each eval (the render path flushes timers to completion via
+  `DrainAsyncWork`; the interactive path drains microtasks only and leaves timers for the session to step).
+  Extracted the whole sequence into one private `RunPageScripts(...)` parameterised by an
+  `Action<IDomBridgeRuntime> drain` delegate — the render path passes `DrainAsyncWork`, the interactive path
+  passes `_ => MicroTasks.Drain()`. Both callers now attach, delegate to `RunPageScripts`, and return their
+  respective result. `ExecuteDetailed`/typed entry points already funnel through `ExecuteCore`, so all four
+  documented entry points (normal, detailed, typed, interactive) now share the single pipeline. Behaviour is
+  preserved: the interactive path additionally honours `Profiler` when set (previously it did not — a benign
+  additive change, `Profiler` is null by default). Regression-checked against a clean baseline: the interactive,
+  async-drain-diagnostic, capability-segregation and timer suites are green (107/111 in the engine-exercising
+  filter; the 4 failures are the pre-existing bare-container `DomBridge_SerializeToHtml_*` env failures,
+  identical on baseline), and the 6 Acid3 score/content failures reproduce byte-identically on the stashed
+  baseline (Acid3 runs through `CaptureService`/`ExecuteScriptsWithDom`, not `ScriptEngine`). With the shared
+  pipeline in place, item 1's *"one execution pipeline shared by normal/detailed/typed/interactive entry
+  points"* exit criterion is now satisfied.
 

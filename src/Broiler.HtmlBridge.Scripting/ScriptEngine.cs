@@ -170,89 +170,110 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             else
                 bridge.Attach(context, html);
 
-            // Track the corresponding <script> DOM element index so that
-            // document.write() can insert content at the correct position.
-            var scriptElements = new List<int>();
-            for (int idx = 0; idx < bridge.Elements.Count; idx++)
-            {
-                if (string.Equals(bridge.Elements[idx].TagName, "script", StringComparison.OrdinalIgnoreCase))
-                    scriptElements.Add(idx);
-            }
-
-            for (var i = 0; i < scripts.Count; i++)
-            {
-                if (i < scriptElements.Count)
-                    bridge.CurrentScriptIndex = scriptElements[i];
-                try
-                {
-                    var source = PrepareSource(scripts[i]);
-                    if (Profiler != null)
-                    {
-                        Profiler.Measure($"inline-{i}", () => context.Eval(source));
-                    }
-                    else
-                    {
-                        context.Eval(source);
-                    }
-
-                    DrainAsyncWork(bridge);
-                }
-                catch (Exception ex)
-                {
-                    RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Script inline-{i} failed: {ex.Message}", ex);
-                }
-            }
-            bridge.CurrentScriptIndex = -1;
-
-            // Execute deferred scripts after all regular scripts
-            // (simulates end-of-parsing for <script defer> tags).
-            foreach (var script in deferredScripts)
-            {
-                try
-                {
-                    var source = PrepareSource(script);
-                    context.Eval(source);
-                    DrainAsyncWork(bridge);
-                }
-                catch (Exception ex)
-                {
-                    RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Deferred script failed: {ex.Message}", ex);
-                }
-            }
-
-            // Engine-driven ES modules (Phase 7 item 6): modules are deferred, so run the authorised roots
-            // after the classic deferred scripts. Each root executes on the same realm the DOM is attached
-            // to, and the engine loads its transitive imports itself (CSP-gated) via BridgeModuleContext's
-            // resolution seams — no EsModuleLinker involved. Reached only when EngineModuleSupport.Available.
-            if (moduleContext != null)
-            {
-                foreach (var root in roots)
-                {
-                    try
-                    {
-                        moduleContext.RunScriptAsync(root.Source, root.BaseUrl ?? url ?? string.Empty, uniqueModuleID: root.Key)
-                            .GetAwaiter().GetResult();
-                        DrainAsyncWork(bridge);
-                    }
-                    catch (Exception ex)
-                    {
-                        RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Module root {root.Key} failed: {ex.Message}", ex);
-                    }
-                }
-            }
-
-            // Fire body onload event after all scripts have executed
-            // (simulates end-of-parsing / window load in browsers).
-            // This is critical for test harnesses like Acid3 that bootstrap
-            // the test runner via <body onload="update()">.
-            bridge.FireWindowLoadEvent();
-            DrainAsyncWork(bridge);
+            // The render/typed path flushes async work to completion after every step.
+            RunPageScripts(context, bridge, moduleContext, scripts, deferredScripts, url, roots,
+                DrainAsyncWork, "ScriptEngine.Execute");
             return createResult(bridge);
         }
         finally
         {
             Csp = previousCsp;
         }
+    }
+
+    /// <summary>
+    /// The single script-execution pipeline shared by the render/typed path (<see cref="ExecuteCore{T}"/>)
+    /// and the interactive path (<see cref="ExecuteInteractive(IReadOnlyList{string}, IReadOnlyList{string}, string, string?, IReadOnlyList{ModuleRoot})"/>).
+    /// On an already-attached <paramref name="bridge"/>/<paramref name="context"/> it runs, in document order:
+    /// the regular <paramref name="scripts"/> (tracking each one's <c>&lt;script&gt;</c> DOM element index for
+    /// <c>document.write</c> and applying the <see cref="Profiler"/> when set), the
+    /// <paramref name="deferredScripts"/> (end-of-parse for <c>defer</c>), and the authorised engine-driven
+    /// module <paramref name="roots"/> (Phase 7 item 6, only when <paramref name="moduleContext"/> is non-null),
+    /// then fires the window <c>load</c> event (critical for <c>&lt;body onload&gt;</c> harnesses like Acid3).
+    /// Async work is settled after every eval via <paramref name="drain"/> — the sole difference between the
+    /// two callers: the render path flushes timers to completion, while the interactive path drains only
+    /// microtasks and leaves timers for the session to step. Per-script failures are caught and logged under
+    /// <paramref name="logSource"/>; they do not abort the remaining scripts.
+    /// </summary>
+    private void RunPageScripts(
+        JSContext context,
+        IDomBridgeRuntime bridge,
+        BridgeModuleContext? moduleContext,
+        IReadOnlyList<string> scripts,
+        IReadOnlyList<string> deferredScripts,
+        string? url,
+        IReadOnlyList<ModuleRoot> roots,
+        Action<IDomBridgeRuntime> drain,
+        string logSource)
+    {
+        // Track the corresponding <script> DOM element index so that
+        // document.write() can insert content at the correct position.
+        var scriptElements = new List<int>();
+        for (int idx = 0; idx < bridge.Elements.Count; idx++)
+        {
+            if (string.Equals(bridge.Elements[idx].TagName, "script", StringComparison.OrdinalIgnoreCase))
+                scriptElements.Add(idx);
+        }
+
+        for (var i = 0; i < scripts.Count; i++)
+        {
+            if (i < scriptElements.Count)
+                bridge.CurrentScriptIndex = scriptElements[i];
+            try
+            {
+                var source = PrepareSource(scripts[i]);
+                if (Profiler != null)
+                    Profiler.Measure($"inline-{i}", () => context.Eval(source));
+                else
+                    context.Eval(source);
+
+                drain(bridge);
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogError(LogCategory.JavaScript, logSource, $"Script inline-{i} failed: {ex.Message}", ex);
+            }
+        }
+        bridge.CurrentScriptIndex = -1;
+
+        // Execute deferred scripts after all regular scripts (end-of-parsing for <script defer>).
+        foreach (var script in deferredScripts)
+        {
+            try
+            {
+                var source = PrepareSource(script);
+                context.Eval(source);
+                drain(bridge);
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogError(LogCategory.JavaScript, logSource, $"Deferred script failed: {ex.Message}", ex);
+            }
+        }
+
+        // Engine-driven ES modules (Phase 7 item 6): modules are deferred, so run the authorised roots
+        // after the classic deferred scripts. Each root executes on the same realm the DOM is attached to,
+        // and the engine loads its transitive imports itself (CSP-gated) via BridgeModuleContext's resolution
+        // seams — no EsModuleLinker involved. Reached only when EngineModuleSupport.Available.
+        if (moduleContext != null)
+        {
+            foreach (var root in roots)
+            {
+                try
+                {
+                    moduleContext.RunScriptAsync(root.Source, root.BaseUrl ?? url ?? string.Empty, uniqueModuleID: root.Key)
+                        .GetAwaiter().GetResult();
+                    drain(bridge);
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogError(LogCategory.JavaScript, logSource, $"Module root {root.Key} failed: {ex.Message}", ex);
+                }
+            }
+        }
+
+        bridge.FireWindowLoadEvent();
+        drain(bridge);
     }
 
     /// <inheritdoc />
@@ -296,66 +317,10 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             else
                 bridge.Attach(context, html);
 
-            // Track the corresponding <script> DOM element index so that
-            // document.write() can insert content at the correct position.
-            var scriptElements = new List<int>();
-            for (int idx = 0; idx < bridge.Elements.Count; idx++)
-            {
-                if (string.Equals(bridge.Elements[idx].TagName, "script", StringComparison.OrdinalIgnoreCase))
-                    scriptElements.Add(idx);
-            }
-
-            for (var i = 0; i < scripts.Count; i++)
-            {
-                if (i < scriptElements.Count)
-                    bridge.CurrentScriptIndex = scriptElements[i];
-                try
-                {
-                    var source = PrepareSource(scripts[i]);
-                    context.Eval(source);
-                    MicroTasks.Drain();
-                }
-                catch (Exception ex)
-                {
-                    RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Script inline-{i} failed: {ex.Message}", ex);
-                }
-            }
-            bridge.CurrentScriptIndex = -1;
-
-            foreach (var script in deferredScripts)
-            {
-                try
-                {
-                    var source = PrepareSource(script);
-                    context.Eval(source);
-                    MicroTasks.Drain();
-                }
-                catch (Exception ex)
-                {
-                    RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Deferred script failed: {ex.Message}", ex);
-                }
-            }
-
-            // Engine-driven ES modules (see ExecuteCore): run the authorised roots on the DOM-attached realm.
-            if (moduleContext != null)
-            {
-                foreach (var root in roots)
-                {
-                    try
-                    {
-                        moduleContext.RunScriptAsync(root.Source, root.BaseUrl ?? url ?? string.Empty, uniqueModuleID: root.Key)
-                            .GetAwaiter().GetResult();
-                        MicroTasks.Drain();
-                    }
-                    catch (Exception ex)
-                    {
-                        RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Module root {root.Key} failed: {ex.Message}", ex);
-                    }
-                }
-            }
-
-            bridge.FireWindowLoadEvent();
-            MicroTasks.Drain();
+            // Same pipeline as the render path, but the interactive session drains only microtasks and
+            // leaves pending timers for the caller to step through one batch at a time.
+            RunPageScripts(context, bridge, moduleContext, scripts, deferredScripts, url, roots,
+                _ => MicroTasks.Drain(), "ScriptEngine.ExecuteInteractive");
 
             return new InteractiveSession(context, bridge, MicroTasks);
         }
