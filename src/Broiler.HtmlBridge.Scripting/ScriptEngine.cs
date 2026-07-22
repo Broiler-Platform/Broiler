@@ -278,82 +278,98 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
         var useEngineModules = roots.Count > 0 && EngineModuleSupport.Available;
         var moduleContext = useEngineModules ? new BridgeModuleContext(Csp, url) : null;
 
-        // The JSContext is NOT disposed here – ownership transfers to the
-        // InteractiveSession which will dispose it when the caller is done.
+        // Ownership of the context + bridge transfers to the returned InteractiveSession, which
+        // disposes both. If setup throws before the session is built, the catch disposes them so a
+        // failed ExecuteInteractive never leaks a JS context or an event loop (Phase 8 item 2). The
+        // CSP is restored in the finally on every path.
         JSContext context = moduleContext ?? new JSContext();
-        RegisterRuntimeExtensions(context);
-        var bridge = _domBridgeFactory.Create();
-        bridge.Csp = Csp;
-        bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
-
-        if (!string.IsNullOrEmpty(url))
-            bridge.Attach(context, html, url);
-        else
-            bridge.Attach(context, html);
-
-        // Track the corresponding <script> DOM element index so that
-        // document.write() can insert content at the correct position.
-        var scriptElements = new List<int>();
-        for (int idx = 0; idx < bridge.Elements.Count; idx++)
+        IDomBridgeRuntime? bridge = null;
+        try
         {
-            if (string.Equals(bridge.Elements[idx].TagName, "script", StringComparison.OrdinalIgnoreCase))
-                scriptElements.Add(idx);
-        }
+            RegisterRuntimeExtensions(context);
+            bridge = _domBridgeFactory.Create();
+            bridge.Csp = Csp;
+            bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
 
-        for (var i = 0; i < scripts.Count; i++)
-        {
-            if (i < scriptElements.Count)
-                bridge.CurrentScriptIndex = scriptElements[i];
-            try
-            {
-                var source = PrepareSource(scripts[i]);
-                context.Eval(source);
-                MicroTasks.Drain();
-            }
-            catch (Exception ex)
-            {
-                RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Script inline-{i} failed: {ex.Message}", ex);
-            }
-        }
-        bridge.CurrentScriptIndex = -1;
+            if (!string.IsNullOrEmpty(url))
+                bridge.Attach(context, html, url);
+            else
+                bridge.Attach(context, html);
 
-        foreach (var script in deferredScripts)
-        {
-            try
+            // Track the corresponding <script> DOM element index so that
+            // document.write() can insert content at the correct position.
+            var scriptElements = new List<int>();
+            for (int idx = 0; idx < bridge.Elements.Count; idx++)
             {
-                var source = PrepareSource(script);
-                context.Eval(source);
-                MicroTasks.Drain();
+                if (string.Equals(bridge.Elements[idx].TagName, "script", StringComparison.OrdinalIgnoreCase))
+                    scriptElements.Add(idx);
             }
-            catch (Exception ex)
-            {
-                RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Deferred script failed: {ex.Message}", ex);
-            }
-        }
 
-        // Engine-driven ES modules (see ExecuteCore): run the authorised roots on the DOM-attached realm.
-        if (moduleContext != null)
-        {
-            foreach (var root in roots)
+            for (var i = 0; i < scripts.Count; i++)
             {
+                if (i < scriptElements.Count)
+                    bridge.CurrentScriptIndex = scriptElements[i];
                 try
                 {
-                    moduleContext.RunScriptAsync(root.Source, root.BaseUrl ?? url ?? string.Empty, uniqueModuleID: root.Key)
-                        .GetAwaiter().GetResult();
+                    var source = PrepareSource(scripts[i]);
+                    context.Eval(source);
                     MicroTasks.Drain();
                 }
                 catch (Exception ex)
                 {
-                    RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Module root {root.Key} failed: {ex.Message}", ex);
+                    RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Script inline-{i} failed: {ex.Message}", ex);
                 }
             }
+            bridge.CurrentScriptIndex = -1;
+
+            foreach (var script in deferredScripts)
+            {
+                try
+                {
+                    var source = PrepareSource(script);
+                    context.Eval(source);
+                    MicroTasks.Drain();
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Deferred script failed: {ex.Message}", ex);
+                }
+            }
+
+            // Engine-driven ES modules (see ExecuteCore): run the authorised roots on the DOM-attached realm.
+            if (moduleContext != null)
+            {
+                foreach (var root in roots)
+                {
+                    try
+                    {
+                        moduleContext.RunScriptAsync(root.Source, root.BaseUrl ?? url ?? string.Empty, uniqueModuleID: root.Key)
+                            .GetAwaiter().GetResult();
+                        MicroTasks.Drain();
+                    }
+                    catch (Exception ex)
+                    {
+                        RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Module root {root.Key} failed: {ex.Message}", ex);
+                    }
+                }
+            }
+
+            bridge.FireWindowLoadEvent();
+            MicroTasks.Drain();
+
+            return new InteractiveSession(context, bridge, MicroTasks);
         }
-
-        bridge.FireWindowLoadEvent();
-        MicroTasks.Drain();
-
-        Csp = previousCsp;
-        return new InteractiveSession(context, bridge, MicroTasks);
+        catch
+        {
+            // Failed construction must not leak the private event loop / context.
+            (bridge as IDisposable)?.Dispose();
+            context.Dispose();
+            throw;
+        }
+        finally
+        {
+            Csp = previousCsp;
+        }
     }
 
     /// <inheritdoc />

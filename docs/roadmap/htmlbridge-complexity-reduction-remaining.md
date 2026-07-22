@@ -874,3 +874,21 @@ Exit criteria:
   regressions (`TimerAndAsyncTests` 25/25 on the CaptureService path; vendored css-anchor-position 29/35
   unchanged on the WptTestRunner path). Item 3 is now fully delivered.
 
+- **P8.3 (2026-07-22) — item 2: every `InteractiveSession` owns a private event-loop/context lifetime, and
+  failed construction disposes it.** Two leaks fixed: **(1) session disposal leaked the event loop.**
+  `InteractiveSession.Dispose` disposed only the `JSContext`, never the bridge — but `DomBridge.Dispose`
+  (which tears down timers, listeners, observers and the layout view) is exactly what the session's comment
+  says the owner must call, and `DomBridge` explicitly does *not* dispose the borrowed context itself. So a
+  disposed session leaked its whole browser event loop. `Dispose` now tears the bridge down first
+  (`(_bridge as IDisposable)?.Dispose()` — `IDomBridgeRuntime` is not itself `IDisposable`) then the context,
+  idempotently. **(2) failed construction leaked both.** `ScriptEngine.ExecuteInteractive` created a
+  `JSContext` and a bridge, then ran attach/scripts/modules/`FireWindowLoadEvent` before building the session;
+  if any un-guarded step (e.g. `bridge.Attach`) threw, the context + bridge leaked. The setup is now wrapped
+  so a throw disposes the partially-built context and bridge before rethrowing, and the CSP is restored in a
+  `finally` on every path. New `InteractiveSessionLifetimeTests` (2, injecting a fake bridge/factory via the
+  `ScriptEngine(IDomBridgeRuntimeFactory)` ctor): disposing a session disposes its bridge (idempotently); a
+  bridge that throws on `Attach` makes `ExecuteInteractive` throw *and* dispose the bridge. 0 regressions
+  across the interactive/session-lifetime/`ScriptEngine` suites (67 pass; the same 4 `DomBridge_SerializeToHtml_*`/
+  `AnchorSize` failures are the pre-existing bare-container geometry/zoom env failures, which use `Execute`,
+  not `ExecuteInteractive`). No public-surface change (both fixes are method-body only).
+
