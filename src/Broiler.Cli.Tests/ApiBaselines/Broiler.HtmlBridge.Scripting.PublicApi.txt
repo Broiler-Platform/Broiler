@@ -3,9 +3,11 @@
 // regenerate with UPDATE_API_BASELINES=1 when the change is intentional.
 TYPE Broiler.HtmlBridge.IScriptEngine
   method Broiler.HtmlBridge.InteractiveSession ExecuteInteractive(System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String)
+  method Broiler.HtmlBridge.InteractiveSession ExecuteInteractive(System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleRoot>)
   method Broiler.HtmlBridge.Scripting.ScriptExecutionResult ExecuteDetailed(System.Collections.Generic.IReadOnlyList<System.String>)
   method System.Boolean Execute(System.Collections.Generic.IReadOnlyList<System.String>)
   method System.String Execute(System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String)
+  method System.String Execute(System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleRoot>)
   method System.String Execute(System.Collections.Generic.IReadOnlyList<System.String>, System.String)
   method System.String Execute(System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String)
   property Broiler.HtmlBridge.Scripting.ContentSecurityPolicy Csp { get; set; }
@@ -26,13 +28,18 @@ TYPE Broiler.HtmlBridge.ScriptEngine : Broiler.HtmlBridge.IScriptEngine, Broiler
   ctor ()
   ctor (Broiler.HtmlBridge.Dom.IDomBridgeRuntimeFactory)
   method Broiler.Dom.DomDocument ExecuteToDocument(System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String)
+  method Broiler.Dom.DomDocument ExecuteToDocument(System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleRoot>)
   method Broiler.HtmlBridge.InteractiveSession ExecuteInteractive(System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String)
+  method Broiler.HtmlBridge.InteractiveSession ExecuteInteractive(System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleRoot>)
   method Broiler.HtmlBridge.Scripting.ScriptExecutionResult ExecuteDetailed(System.Collections.Generic.IReadOnlyList<System.String>)
   method System.Boolean Execute(System.Collections.Generic.IReadOnlyList<System.String>)
   method System.String Execute(System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String)
+  method System.String Execute(System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleRoot>)
   method System.String Execute(System.Collections.Generic.IReadOnlyList<System.String>, System.String)
   method System.String Execute(System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.String)
   property Broiler.HtmlBridge.Scripting.ContentSecurityPolicy Csp { get; set; }
   property Broiler.HtmlBridge.Scripting.MicroTaskQueue MicroTasks { get; }
   property Broiler.HtmlBridge.Scripting.ScriptProfilingHook Profiler { get; set; }
   property System.Boolean StrictModeEnabled { get; set; }
+TYPE Broiler.HtmlBridge.Scripting.EngineModuleSupport
+  property System.Boolean Available { get; }

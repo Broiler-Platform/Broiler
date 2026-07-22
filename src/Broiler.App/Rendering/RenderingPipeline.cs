@@ -32,13 +32,16 @@ public sealed class RenderingPipeline(
             ? result.Scripts
             : result.Scripts.Concat(result.AsyncScripts).ToArray();
 
-        // Module scripts are deferred (Phase 7 item 6): run the linked module graph after the classic
-        // deferred scripts. ExtractAll returns the programs in dependency-first order, so running them in
-        // list order (appended after the classic deferred scripts) satisfies the graph's evaluation order.
-        var deferred = result.ModuleScripts.Count == 0
+        // ES modules (Phase 7 item 6). When the engine binds imports (EngineModuleSupport.Available), the
+        // authorised module roots run through the engine's own module machinery — carry them on PageContent
+        // and DO NOT append the linked strings. Otherwise fall back to the EsModuleLinker: run the linked
+        // module graph (dependency-first) after the classic deferred scripts.
+        var useEngineModules = result.ModuleRoots.Count > 0 && EngineModuleSupport.Available;
+        var deferred = useEngineModules || result.ModuleScripts.Count == 0
             ? result.DeferredScripts
             : result.DeferredScripts.Concat(result.ModuleScripts).ToArray();
-        return (normalisedUrl, new PageContent(html, executableScripts, normalisedUrl, deferred));
+        var moduleRoots = useEngineModules ? result.ModuleRoots : [];
+        return (normalisedUrl, new PageContent(html, executableScripts, normalisedUrl, deferred, moduleRoots));
     }
 
     /// <summary>
@@ -54,7 +57,7 @@ public sealed class RenderingPipeline(
     public InteractiveSession? ExecuteScriptsInteractive(PageContent content)
     {
         return scriptEngine.ExecuteInteractive(
-            content.Scripts, content.DeferredScripts, content.Html, content.Url);
+            content.Scripts, content.DeferredScripts, content.Html, content.Url, content.ModuleRoots);
     }
 
     public void Dispose() => pageLoader.Dispose();

@@ -1234,6 +1234,166 @@ pieces so the cluster can be closed incrementally:
 - [ ] **`try-tactic` flips** (`flip-block` / `flip-inline` / `flip-start`) — the other fallback
   mechanism (axis-mirroring tactics) distinct from named `@position-try` rules. Not yet modelled.
 
+### `position-area` percentage margin/padding under vertical writing modes (2026-07-21)
+
+Triaging the `css-anchor-position` `position-area` tail found the near-misses are **not** a shared
+geometry bug — the grid kernel (`Broiler.Layout.PositionAreaGrid`) and the engine's **native**
+placement (`CssBox.Anchor.ApplyPercentBoxPropsPlacement`) already produce spec-correct geometry,
+including resolving percentage margin/padding against the containing block's **inline** axis (CSS
+Writing Modes §7.4 — cell width for a horizontal CB, cell height for a vertical one). The remaining
+`position-area` failures are gated elsewhere: `position-area-anchor-partially-outside` (94.2 %) is a
+`testharness` results-table render (the partially-outside grid geometry itself is correct and pinned
+by `PositionAreaLiveGeometryTests`); `position-area-inline-container` (95.8 %) renders Ahem in the
+test (the font-load-ordering caveat, cluster 40); `position-area-percents-001` (98.8 %) is a
+pervasive ~1 px border/edge sub-pixel tail on the *native* path (its padding basis is already
+correct — verified via the render diff and a live probe), not a geometry defect; `anchor-size-css-zoom`
+is the externally-gated zoom renderer; and the two `position-area-scrolling-*` are dynamic scroll.
+
+**Fixed this session (main-repo `Broiler.HtmlBridge.Dom`):** the bridge's **baked** position-area
+fallback (`PositionArea.cs`, reached for boxes outside the MVP-native subset — `@position-try` /
+`anchor()` / `anchor-size()` / `auto`-or-unregistered anchors) resolved percentage margin/padding
+against the cell **width** unconditionally, over-sizing them in a `vertical-rl` containing block —
+the exact divergence `CssBox.Anchor.cs` already documented ("the bridge always used the width… which
+the bridge gets wrong"). It now uses the CB's inline-axis dimension (cell height for a vertical CB),
+matching the native path. Guard `PositionAreaLiveGeometryTests.BakedPositionArea_MarginPadding_ResolveAgainstContainingBlockInlineAxis`
+(10 % padding → 4 px against a 40 px vertical cell vs a larger width-basis value horizontally). No WPT
+score moves (the failing tests take the native path or are sub-pixel/font/dynamic-gated); 0 regressions
+on the vendored css-anchor-position subset (32/40, unchanged) and the anchor/position-area unit suites.
+
+### Vendored-subset near-miss sweep — font-metric fidelity is the dominant blocker (2026-07-21)
+
+A systematic pixel-level sweep of the highest-match failures across every vendored subset
+(css-anchor-position, css-align, css-backgrounds, CSS2) reached a decisive conclusion: **the underlying
+layout/paint is already correct; the residual near-misses are overwhelmingly gated on font/text-metric
+fidelity**, plus multicol column layout and image resampling — not on per-test geometry bugs. Six
+concrete investigations, each confirmed by rendered/reference/diff PNGs:
+
+- **`css-align/blocks/align-content-block-*` (91.2 %).** `align-content` on block containers is
+  **already correct** — an isolated probe of the `start`/`center`/`end` cases returns the exact
+  `data-offset-y` values (15/28/41). The tests fail because they lay the cases out in a `columns: 3`
+  **multicol** with `break-inside: avoid`; the pixel mismatch is multicol column balancing/fragmentation,
+  not alignment.
+- **`css-align/self-alignment/block-justify-self` (85.9 %).** Diff is dominated by **text/font**
+  anti-aliasing across the many label rows (`ApplyBlockJustifySelf` exists); only a few real justify-self
+  leaks remain, but the font-wide mismatch caps it well below 99 %.
+- **`css-backgrounds/background-clip/clip-{content,padding}-box*` (72–75 %).** The `background-clip`
+  itself is **correct** — a column scan confirms the photo clips exactly to the content box
+  (border 30 → padding 30 → photo, in both). The mismatch is that the intro `<p>` **wraps to an extra
+  line** because Broiler's text is wider than Chromium's, shifting the whole `.view` box ~25 px down so
+  every subsequent pixel mismatches. Pure font-width fallout.
+- **`CSS2/abspos/abspos-in-block-in-inline-in-relpos-inline` (94.8 %).** The abspos containing-block
+  resolution is **correct** — the green `width:100%` box is 100 px (the inline CB's width), matching the
+  reference. The residual is the top text (font) plus a ~18 px vertical offset of the colour bar driven by
+  the `<p>` paragraph height (font line-height) shifting the abspos static position.
+- **`css-anchor-position` position-area tail** (prior sweep, above): geometry correct; near-misses
+  font/sub-pixel/dynamic-gated.
+
+**Conclusion / highest-leverage next investment.** The single change that would unblock the most vendored
+near-misses at once is **font-metric fidelity in the headless/compat render backend** — Broiler's default
+text renders wider/taller than the Chromium-generated references (different fallback face + metrics), and
+that width/line-height delta cascades into wrapping, paragraph height, and every downstream box position.
+It is cross-cutting (touches `Broiler.Graphics`/`Broiler.HTML.Image` text measurement) and hard, but it is
+the true gate on the css-align/css-backgrounds/CSS2 text-adjacent tails and the Ahem font-load-ordering
+caveat (cluster 40). Secondary cross-cutting gates: **multicol** column layout/balancing (gates
+`align-content-block-*`, `anchor-position-multicol`) and **image resampling** fidelity (the
+`background-clip` texture tail once the font shift is removed). Per-test geometry/paint wins in the vendored
+subsets are effectively exhausted.
+
+### Font-metric fidelity — two root causes fixed (2026-07-21, main-repo runner)
+
+Acting on the conclusion above, the font-metric divergence turned out to be **two concrete, main-repo bugs
+in the WPT runner** (no submodule patch), both proven by direct measurement against the reference-generating
+Chromium (chromium-1194) and the Liberation/DejaVu TTF advance tables:
+
+1. **Wrong generic faces.** `EnsureGenericFontsLoaded` registered `serif`/`sans-serif`/`monospace` as
+   **DejaVu** on the theory that the reference Chromium resolves generics through system fontconfig. Measured
+   directly, the reference Chromium renders `serif` and the unstyled default at **274.97px** for a 43-char
+   probe — **Liberation Serif is 276.38px; DejaVu Serif is 349.52px** (27 % wider); `sans-serif` 304.77px
+   matches Liberation Sans 306.83px (DejaVu Sans 342.30px). Blink resolves generics/default to its
+   Liberation metric-compatible faces (Times New Roman / Arial / Courier New), not fontconfig's DejaVu.
+   Registering the Liberation faces makes Broiler's widths match.
+2. **Fonts registered *after* the measurement pass.** In `RunSingleTest` the DomBridge pass
+   (`ExecuteScriptsWithDom`, which measures text for `offset*`/check-layout) ran **before**
+   `EnsureWptFontsLoaded`. The font adapter caches the typeface it resolves per family, so the first
+   measurement cached the bundled fallback (Vazirmatn, far wider) for `serif`/`sans-serif`, and the later
+   render reused the stale width. Moving the font load before the DomBridge pass fixes it.
+
+Effect: `css-backgrounds/background-clip/clip-content-box` went **75.3 % → 98.5 %** (the intro `<p>` now fits
+on one line — rendered text y 22–40 vs reference 22–41, right edge 981 vs 976 — instead of wrapping and
+pushing the `.view` box ~25 px down). **0 regressions** across the vendored css-backgrounds (39/61), css-align
+(19/28) and CSS2 (13/17) subsets (pass counts unchanged, average match up). The fixes do **not** flip pass
+counts on their own: the residual ~1.5 % is now pure glyph anti-aliasing + background-image resampling — a
+rasterizer-fidelity tail (Broiler's rasteriser vs Chromium's) that the ≤1 %-differing-pixels threshold sits
+just inside. Crossing it needs rasteriser-level parity (glyph AA + image resampling), a separate hard
+increment; the correct font *metrics* (advance widths + load order) are now in place as the foundation.
+
+**Anti-aliasing-aware comparison — tried, does not cross the threshold (2026-07-21).** The obvious next lever
+was an AA-aware pixel diff (a faithful port of the `pixelmatch` edge-AA detection) as a post-failure fallback,
+so cross-rasteriser glyph/edge AA is not charged. Measured on `clip-content-box`: it correctly absorbs the
+clean-edged AA, taking the differing count **12139 → 8846 (1.54 % → 1.125 %)** — but still over the 1 %
+threshold, because 16 pt (~21 px) body text has 1–2 px glyph strokes whose edge pixels lack the 3-flat-neighbour
+neighbourhood `pixelmatch` requires (`hasManySiblings`), so thin-text edges are not classed as AA and remain
+charged. Across the vendored css-backgrounds / css-align / CSS2 subsets it flipped **zero** tests (all the
+text-heavy near-misses land at 1.0–1.2 % non-AA diff). Reverted — a scoring-semantics change with no
+demonstrated pass gain and unbounded false-pass surface is not worth shipping. The honest conclusion: for
+Broiler's methodology (compare against a **Chromium golden PNG**, not a Broiler-rendered `rel=match`), any test
+whose viewport carries a non-trivial amount of small real-font text is gated at ~1 % by glyph-rasteriser
+divergence and cannot be won without either (a) rasteriser-level glyph-AA parity with Chromium (a
+`Broiler.Graphics` text-rendering increment) or (b) a fuzzier scoring policy than the current strict 1 % —
+which would be gaming unless it mirrors an explicit per-test WPT `<meta name=fuzzy>`. Ahem-font tests are the
+exception (fixed-coverage glyphs), which is why WPT itself uses Ahem for layout tests.
+
+### Glyph-rasteriser tail is a vertical-metrics bug, not an AA/gamma bug (2026-07-21)
+
+Taking on the "rasteriser parity" increment (a) above, a controlled single-glyph comparison — the same
+`font-family: serif; font-size: 64px; line-height: 1` "HELLO" rendered in Broiler (`HtmlRender`) and the real
+reference Chromium (chromium-1194) — showed the divergence is **not** anti-aliasing quality or gamma: the
+horizontal stroke-edge AA already matches within ~5/255 (Chromium 61 vs Broiler 56 at the same edge column).
+It is **vertical glyph position**: Broiler's whole glyph sits **~4 px lower** (Chromium left-stem y 11–52,
+Broiler 15–56 — identical height, identical shape, shifted down). At 64 px that 4 px is ~6.25 % of the em; it
+scales to ~1 px at 16–21 px body text, and that 1-px vertical shift is exactly what makes every horizontal
+glyph feature straddle a different pixel row than the golden, producing the edge-delta tail (~74 % of
+`clip-content-box`'s residual is the intro text).
+
+Root cause — **three inconsistent vertical-metric models that none of which match Chromium's**:
+- The layout positions text words at the line-box top (`word.Top = cury`, `CssLayoutEngine`) and uses a
+  hard-coded `TypicalAscentRatio = 0.8` for baseline/line-box math and the `size × 1.16` line-height ratio
+  (`TrueTypeFontCompatFactory.GetMetrics`, `Broiler.HTML.Image.Compat`).
+- The glyph paint places the baseline at `point.Y + ttf.Ascender × scale` — the font's **real hhea ascender**
+  (Liberation Serif 1825/2048 em = 57 px at 64 px), with **no half-leading term**.
+- Chromium uses the font's real ascent/descent/lineGap with proper half-leading: for `line-height: 1` its
+  baseline = `top + ascent + (lineHeight − (ascent−descent))/2` = `57 + (64 − 70.9)/2` = **53.6 px** (measured
+  ~52), vs Broiler's `top + 57` = 57 px. The missing `halfLeading` (−3.45 px here) *is* the offset.
+
+The fix is a **line-box vertical-metrics unification**: plumb the font's real ascent/descent/lineGap into the
+baseline + line-box computation and add the CSS half-leading term, replacing the `0.8` / `1.16` approximations,
+so glyph baselines land where Chromium's do. It is **not a one-line change** — the metrics factory
+(`GetMetrics`) is handed a size-only `TrueTypeScaledFont` with no font handle, so the real ascent/descent are
+currently available *only* in the shaper (`ttf`), not at the layout/line-box site that positions the baseline;
+exposing them and threading half-leading spans `Broiler.HTML.Image.Compat` (metrics) + `Broiler.Layout`
+(line-box baseline). It touches the vertical position of **every** run of text, including Ahem, so it needs
+full-corpus regression validation before landing (a wrong global baseline shift would regress far more than it
+fixes). Scoped here as its own increment; the finding redirects the "rasteriser parity" effort away from AA/gamma
+(already fine) to the vertical-metrics model.
+
+**Correction — the vertical-metrics offset is `line-height`-specific and does NOT gate the text tail
+(2026-07-21).** Starting the metrics refactor, the first validation step re-measured the "HELLO" glyph at
+**`line-height: normal`** (what `clip-content-box` and virtually all failing text use) instead of the
+`line-height: 1` used in the diagnosis above. At normal line-height Broiler's baseline is **already aligned
+to within 1 px** of Chromium (Broiler left-stem y 15–56, Chromium 16–57 — a 0.016 em residual, ~0.26 px at
+21 px body text). The 4 px offset is **specific to explicit sub-natural line-heights** (`line-height: 1`,
+where the negative half-leading is dropped); at normal line-height the half-leading is ~`lineGap/2` and the
+error is sub-pixel. So the half-leading refactor fixes a **genuine but narrow** correctness bug (explicit
+sub-natural `line-height` baselines) with **essentially zero pass-count impact** on the vendored subsets,
+which are already baseline-aligned. The `clip-content-box` text tail (tops already match, 22 vs 22) is
+therefore **sub-pixel *horizontal* / glyph-shape rasteriser AA** (vertical strokes landing on adjacent
+columns), not the vertical baseline — the same irreducible glyph-rasteriser divergence documented above.
+The refactor was **not** carried out: a 3-submodule change (`Broiler.Graphics` `ILayoutFont`/`RFont`,
+`Broiler.HTML.Image(.Compat)` metrics, `Broiler.Layout` half-leading) that moves all text positioning and
+needs full-corpus validation is not worth its risk for a narrow bug that flips no known test. Net standing
+conclusion for the text tail: it is horizontal glyph-AA at ~1 %, unwinnable against a Chromium golden
+without rasteriser-level parity or an explicit per-test `<meta fuzzy>`.
+
 ### Remaining failure landscape (after the merged clusters)
 
 The tractable in-flow / parse / DOM wins are largely exhausted. What remains

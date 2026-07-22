@@ -82,13 +82,23 @@ public sealed class ModuleMap
 /// separated into regular (inline / data-URI / external), deferred,
 /// and async scripts so that the engine can execute them in the correct order.
 /// </summary>
+/// <summary>
+/// An authorised top-level ES-module root (a <c>&lt;script type="module"&gt;</c> whose source passed CSP):
+/// its resolved module key, its already-decoded/fetched source, and the base URL its relative imports
+/// resolve against. This is the engine-driven counterpart of a linked <see cref="ScriptExtractionResult.ModuleScripts"/>
+/// entry — a consumer that drives the JS engine's own module machinery runs each root (which pulls in its
+/// transitive imports itself) instead of evaluating pre-linked program strings.
+/// </summary>
+public sealed record ModuleRoot(string Key, string Source, string? BaseUrl);
+
 public sealed class ScriptExtractionResult(
     IReadOnlyList<string> scripts,
     IReadOnlyList<string> deferredScripts,
     IReadOnlyList<string> asyncScripts,
     IReadOnlyList<ScriptDescriptor>? descriptors = null,
     IReadOnlyList<string>? moduleScripts = null,
-    ModuleMap? moduleMap = null)
+    ModuleMap? moduleMap = null,
+    IReadOnlyList<ModuleRoot>? moduleRoots = null)
 {
     /// <summary>Regular scripts to execute in document order.</summary>
     public IReadOnlyList<string> Scripts { get; } = scripts;
@@ -119,4 +129,13 @@ public sealed class ScriptExtractionResult(
 
     /// <summary>The document's module map (Phase 7 item 6): every recognised module in document order.</summary>
     public ModuleMap ModuleMap { get; } = moduleMap ?? new ModuleMap();
+
+    /// <summary>
+    /// The authorised top-level module roots in document order (Phase 7 item 6). A consumer that drives the
+    /// JS engine's own module machinery (see <c>BridgeModuleContext</c>) runs these — each root loads its
+    /// own transitive imports — as the engine-driven alternative to evaluating the pre-linked
+    /// <see cref="ModuleScripts"/>. Populated alongside <see cref="ModuleScripts"/>; which one a host uses is
+    /// its choice (the engine path only when the engine binds imports).
+    /// </summary>
+    public IReadOnlyList<ModuleRoot> ModuleRoots { get; } = moduleRoots ?? [];
 }

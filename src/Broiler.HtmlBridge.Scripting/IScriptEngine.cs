@@ -44,6 +44,14 @@ public interface IScriptEngine
     string? Execute(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url);
 
     /// <summary>
+    /// As <see cref="Execute(IReadOnlyList{string}, IReadOnlyList{string}, string, string?)"/>, with the
+    /// document's authorised ES-module roots. When the engine binds imports (see <c>EngineModuleSupport</c>)
+    /// the roots run through the engine's own module machinery; otherwise they are ignored and any linked
+    /// module strings the caller placed in <paramref name="deferredScripts"/> run as before.
+    /// </summary>
+    string? Execute(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url, IReadOnlyList<ModuleRoot>? moduleRoots);
+
+    /// <summary>
     /// Execute scripts and return a detailed <see cref="ScriptExecutionResult"/>
     /// that includes per-script error messages and stack traces.
     /// </summary>
@@ -84,4 +92,10 @@ public interface IScriptEngine
     /// The caller must dispose the session when finished.
     /// </summary>
     InteractiveSession? ExecuteInteractive(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url);
+
+    /// <summary>
+    /// As <see cref="ExecuteInteractive(IReadOnlyList{string}, IReadOnlyList{string}, string, string?)"/>,
+    /// with the document's authorised ES-module roots for the engine-driven module path.
+    /// </summary>
+    InteractiveSession? ExecuteInteractive(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url, IReadOnlyList<ModuleRoot>? moduleRoots);
 }

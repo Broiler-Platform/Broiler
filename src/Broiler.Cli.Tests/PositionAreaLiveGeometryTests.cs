@@ -112,6 +112,57 @@ public sealed class PositionAreaLiveGeometryTests
     }
 
     [Fact]
+    public void BakedPositionArea_MarginPadding_ResolveAgainstContainingBlockInlineAxis()
+    {
+        // CSS Writing Modes §7.4 / CSS Box Model §3: percentage margins and padding
+        // resolve against the INLINE size of the containing block — the position-area
+        // cell's width for a horizontal-writing-mode CB, its height for a vertical one.
+        // The engine's native placement (CssBox.Anchor.ApplyPercentBoxPropsPlacement)
+        // already keys off the CB's writing mode; this pins the same behaviour on the
+        // bridge's *baked* fallback, which previously always used the cell width and so
+        // over-sized margin/padding in a vertical-rl container.
+        //
+        // The baked path is forced by position-try-fallbacks (which disqualifies the box
+        // from the MVP-native subset). Controlled cell: a borderless 200×100 CB with an
+        // anchor at [50,40]-[150,60]; position-area: bottom span-right selects a cell
+        // whose block-axis (physical height) extent is 40px, so 10% padding is 4px when
+        // the CB is vertical-rl (height basis) versus a larger width-basis value when
+        // horizontal.
+        const string html = @"<!DOCTYPE html><html><head><style>
+  @position-try --pt { top: 0; }
+  .cb { width: 200px; height: 100px; position: relative; }
+  .anchor { position: absolute; left: 50px; top: 40px; width: 100px; height: 20px; anchor-name: --foo; }
+  .anchored { position: absolute; position-anchor: --foo; position-area: bottom span-right; place-self: stretch; padding: 10%; position-try-fallbacks: --pt; }
+</style></head><body>
+  <div class='cb' style='writing-mode: vertical-rl'><div class='anchor'></div><div id='v' class='anchored'></div></div>
+  <div class='cb'><div class='anchor'></div><div id='h' class='anchored'></div></div>
+</body></html>";
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///pa-wm.html");
+        bridge.ResolveAnchorPositions();
+        var serialized = bridge.SerializeToHtml();
+
+        double BakedPadTop(string id)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(
+                serialized, $"<div id=\"{id}\"[^>]*style=\"([^\"]*)\"");
+            Assert.True(m.Success, $"#{id} baked style not found");
+            var p = System.Text.RegularExpressions.Regex.Match(m.Groups[1].Value, @"padding-top:\s*([\d.]+)px");
+            Assert.True(p.Success, $"#{id} baked padding-top not found in: {m.Groups[1].Value}");
+            return double.Parse(p.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        // Vertical CB: 10% padding resolves against the cell's 40px block-axis extent → 4px.
+        Assert.Equal(4.0, BakedPadTop("v"), 3);
+        // Horizontal CB: 10% padding resolves against the wider inline (width) axis, so it
+        // is strictly larger — the writing-mode sensitivity the fix introduces (previously
+        // both used the width and matched).
+        Assert.True(BakedPadTop("h") > BakedPadTop("v") + 1.0,
+            "horizontal-CB padding must exceed vertical-CB padding (inline-axis basis differs)");
+    }
+
+    [Fact]
     public void GetBoundingClientRect_LivePositionArea_AgreesWithOffsetGetters()
     {
         // getBoundingClientRect must report the same live position-area geometry as

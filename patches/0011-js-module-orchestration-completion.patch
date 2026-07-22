@@ -1,0 +1,387 @@
+From ba8a7dd05a23178826ed4db48171630044e26bae Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 21 Jul 2026 16:15:54 +0000
+Subject: [PATCH] Modules: run module init on a pumped loop and bind imports
+ without Clr
+
+Fixes the module-orchestration completion defect that left an engine-driven
+static import resolving to undefined even after the top-level-await codegen fix.
+Three coupled changes:
+
+1. Pump the whole init. RunScriptAsync/RunAsync now run their core under one
+   AsyncPump.Run loop on a worker thread (like JSContext.ExecuteAsync). A module
+   body compiled with top-level await suspends its async continuation onto the
+   ambient SynchronizationContext; on the default un-pumped context those
+   continuations never drain, so the body stalled at its first await (which every
+   static import desugars to).
+
+2. Remove the compile double-marshal. JSModule gains a direct CompileDirect hook
+   that InitAsync awaits instead of invoking the Compile JS function, which
+   marshalled the compile Task into a JS promise and re-awaited it
+   (Task -> IJSPromise -> Task). That round-trip re-posted the body's continuation
+   off the running loop.
+
+3. Bind imports without Clr. import()/require() converted their module
+   Task<JSValue> to a promise via JSEngine.ClrInterop.Marshal, which is only the
+   full DefaultClrInterop when the optional Broiler.JavaScript.Clr assembly is
+   loaded; otherwise the fallback returns undefined for a Task. Modules does not
+   reference Clr, so an imported binding silently resolved to undefined. Route
+   these through the engine-native JSValue.CreatePromiseFromTask (populated by the
+   always-referenced BuiltIns), so import value binding works with or without Clr.
+
+Adds EngineModuleImportBindingTests covering named/namespace/default imports,
+transitive chains, a diamond with a shared dependency evaluated once, and a
+top-level-await dependency. Full Broiler.JS suite stays green (only the
+pre-existing Intl/ICU-locale and doc-file env failures). Stacks on patch 0010.
+---
+ .../EngineModuleImportBindingTests.cs         | 109 ++++++++++++++++++
+ .../Broiler.JavaScript.Modules/JSModule.cs    |  17 +++
+ .../JSModuleContext.cs                        | 108 +++++++++++------
+ 3 files changed, 196 insertions(+), 38 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Modules.Tests/EngineModuleImportBindingTests.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Modules.Tests/EngineModuleImportBindingTests.cs b/Broiler.JS/Broiler.JavaScript.Modules.Tests/EngineModuleImportBindingTests.cs
+new file mode 100644
+index 00000000..b3df86f1
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Modules.Tests/EngineModuleImportBindingTests.cs
+@@ -0,0 +1,109 @@
++using System;
++using System.Collections.Generic;
++using System.IO;
++using System.Threading.Tasks;
++using Broiler.JavaScript.Modules;
++using Broiler.JavaScript.Runtime;
++using Xunit;
++
++namespace Broiler.JavaScript.Modules.Tests;
++
++/// <summary>
++/// Drives the engine's own ES-module machinery over an in-memory URL store (no filesystem, no Clr
++/// assembly) and asserts that a static import actually <em>binds its value</em> — not just that the
++/// dependency ran. This exercises the module-orchestration completion path: the whole init runs under one
++/// pumped <c>AsyncPump</c> loop, <c>InitAsync</c> awaits compilation directly (no Task→promise→Task
++/// double-marshal that stranded the body at its first top-level-await), and <c>import()</c> converts its
++/// module task to a promise through the engine-native factory rather than the Clr-only interop (whose
++/// fallback returned <c>undefined</c>). Before this, an imported binding resolved to <c>undefined</c>/0.
++/// </summary>
++public class EngineModuleImportBindingTests
++{
++    private sealed class UrlModuleContext(Dictionary<string, string> files) : JSModuleContext
++    {
++        protected override string Resolve(string dirPath, string relativePath)
++        {
++            if (Uri.TryCreate(relativePath, UriKind.Absolute, out var abs)) return abs.AbsoluteUri;
++            return Uri.TryCreate(new Uri(dirPath), relativePath, out var rel) ? rel.AbsoluteUri : null;
++        }
++        protected override string GetModuleDirectory(string fullPath) => fullPath;
++        protected override Task<string> ReadModuleSourceAsync(JSModule module) =>
++            Task.FromResult(files.TryGetValue(module.filePath, out var src)
++                ? src
++                : throw new FileNotFoundException(module.filePath));
++    }
++
++    private static async Task<double> RunMain(Dictionary<string, string> files, string main)
++    {
++        using var ctx = new UrlModuleContext(files);
++        await ctx.RunScriptAsync(main, "file:///app/main.js", uniqueModuleID: "file:///app/main.js");
++        return ctx.Eval("globalThis.result|0").DoubleValue;
++    }
++
++    [Fact]
++    public async Task Named_Import_Binds_Value()
++    {
++        var files = new Dictionary<string, string>
++        {
++            ["file:///app/lib/dep.js"] = "export const d = 7;\nexport function add(a,b){ return a+b; }",
++        };
++        Assert.Equal(12.0, await RunMain(files,
++            "import { d, add } from './lib/dep.js';\nglobalThis.result = add(d, 5);"));
++    }
++
++    [Fact]
++    public async Task Namespace_Import_Binds_Value()
++    {
++        var files = new Dictionary<string, string> { ["file:///app/lib/dep.js"] = "export const d = 7;" };
++        Assert.Equal(7.0, await RunMain(files,
++            "import * as ns from './lib/dep.js';\nglobalThis.result = ns.d;"));
++    }
++
++    [Fact]
++    public async Task Default_Import_Binds_Value()
++    {
++        var files = new Dictionary<string, string> { ["file:///app/lib/dep.js"] = "export default 41;" };
++        Assert.Equal(42.0, await RunMain(files,
++            "import v from './lib/dep.js';\nglobalThis.result = v + 1;"));
++    }
++
++    [Fact]
++    public async Task Transitive_Chain_Binds()
++    {
++        var files = new Dictionary<string, string>
++        {
++            ["file:///app/a.js"] = "export const a = 1;",
++            ["file:///app/b.js"] = "import { a } from './a.js';\nexport const b = a + 10;",
++        };
++        Assert.Equal(11.0, await RunMain(files,
++            "import { b } from './b.js';\nglobalThis.result = b;"));
++    }
++
++    [Fact]
++    public async Task Diamond_Shared_Dependency_Evaluated_Once()
++    {
++        var files = new Dictionary<string, string>
++        {
++            ["file:///app/shared.js"] = "globalThis.evalCount=(globalThis.evalCount||0)+1;\nexport const s = 5;",
++            ["file:///app/x.js"] = "import { s } from './shared.js';\nexport const x = s + 1;",
++            ["file:///app/y.js"] = "import { s } from './shared.js';\nexport const y = s + 2;",
++        };
++        using var ctx = new UrlModuleContext(files);
++        await ctx.RunScriptAsync(
++            "import { x } from './x.js';\nimport { y } from './y.js';\nglobalThis.result = x + y;",
++            "file:///app/main.js", uniqueModuleID: "file:///app/main.js");
++        Assert.Equal(13.0, ctx.Eval("globalThis.result|0").DoubleValue);
++        Assert.Equal(1.0, ctx.Eval("globalThis.evalCount|0").DoubleValue);
++    }
++
++    [Fact]
++    public async Task TopLevelAwait_In_Dependency_Completes()
++    {
++        var files = new Dictionary<string, string>
++        {
++            ["file:///app/dep.js"] = "export const v = await Promise.resolve(42);",
++        };
++        Assert.Equal(43.0, await RunMain(files,
++            "import { v } from './dep.js';\nglobalThis.result = v + 1;"));
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Modules/JSModule.cs b/Broiler.JS/Broiler.JavaScript.Modules/JSModule.cs
+index 386b9437..3cccd530 100644
+--- a/Broiler.JS/Broiler.JavaScript.Modules/JSModule.cs
++++ b/Broiler.JS/Broiler.JavaScript.Modules/JSModule.cs
+@@ -78,6 +78,17 @@ public partial class JSModule : JSObject
+     [JSExport("compile")]
+     public JSValue Compile { get; set; }
+ 
++    /// <summary>
++    /// Direct (non-marshalled) compile hook. When set, <see cref="InitAsync"/> awaits this .NET task
++    /// instead of invoking the <see cref="Compile"/> JS function, which would marshal the compile task
++    /// into a JS promise and re-await it (<c>Task → IJSPromise → Task</c>). That double-marshal re-posts
++    /// the module body's async continuation off the running event loop, so a body that suspends at a
++    /// top-level <c>await</c> (which every static <c>import</c> desugars to) settles at the first
++    /// suspension and never runs to completion — leaving the module's exports unbound. Awaiting the compile
++    /// task directly keeps the whole init on one pumped loop. Falls back to the JS-function path when null.
++    /// </summary>
++    internal Func<Task> CompileDirect { get; set; }
++
+     internal async Task InitAsync()
+     {
+         if (exports != null)
+@@ -85,6 +96,12 @@ public partial class JSModule : JSObject
+ 
+         exports = new JSObject();
+ 
++        if (CompileDirect != null)
++        {
++            await CompileDirect();
++            return;
++        }
++
+         var result = Compile.InvokeFunction(new Arguments(this));
+         if (result is IJSPromise promise)
+             await promise.Task;
+diff --git a/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs b/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
+index f96d86ae..3685c4dd 100644
+--- a/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
++++ b/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
+@@ -76,12 +76,12 @@ public class JSModuleContext : JSContext
+ 
+     protected string[] extensions = [".js"];
+ 
+-    /// <summary>
+-    /// Resolves an import specifier to a module key. The default is a filesystem/node_modules resolution.
+-    /// A host that loads modules over another scheme (e.g. a browser resolving URLs against a base and
+-    /// fetching them) overrides this to return its own key form (typically an absolute URL).
+-    /// </summary>
+-    protected virtual string Resolve(string dirPath, string relativePath)
++    /// <summary>
++    /// Resolves an import specifier to a module key. The default is a filesystem/node_modules resolution.
++    /// A host that loads modules over another scheme (e.g. a browser resolving URLs against a base and
++    /// fetching them) overrides this to return its own key form (typically an absolute URL).
++    /// </summary>
++    protected virtual string Resolve(string dirPath, string relativePath)
+     {
+         bool Exists(string folder, string file, out string path)
+         {
+@@ -183,6 +183,19 @@ public class JSModuleContext : JSContext
+         ];
+     }
+ 
++    /// <summary>
++    /// Converts a .NET <see cref="Task{JSValue}"/> into a JS promise using the engine-native promise
++    /// factory rather than <c>JSEngine.ClrInterop.Marshal</c>. The CLR interop is only the full
++    /// <see cref="DefaultClrInterop"/> when the optional <c>Broiler.JavaScript.Clr</c> assembly is loaded;
++    /// otherwise it is the fallback, whose <c>Marshal</c> returns <c>undefined</c> for a <see cref="Task"/>.
++    /// Modules does not reference Clr, so routing <c>import()</c>/<c>require()</c> module tasks through the
++    /// interop made an imported module resolve to <c>undefined</c> whenever Clr was absent — the exports
++    /// bound but their value was lost. This factory (the same one <see cref="DefaultClrInterop"/> uses for a
++    /// <c>Task&lt;JSValue&gt;</c>) is populated by the always-referenced BuiltIns assembly, so it works
++    /// regardless of Clr.
++    /// </summary>
++    private static JSValue TaskToPromise(Task<JSValue> task) => JSValue.CreatePromiseFromTask(task);
++
+     private static IDisposable CreateSynchronizationContext()
+     {
+         if (SynchronizationContext.Current == null)
+@@ -194,10 +207,13 @@ public class JSModuleContext : JSContext
+         return DisposableAction.Empty;
+     }
+ 
+-    public async Task<JSValue> RunAsync(string folder, string relativeFile, string[] paths = null)
+-    {
+-        using var sc = CreateSynchronizationContext();
++    public Task<JSValue> RunAsync(string folder, string relativeFile, string[] paths = null)
++        // As with RunScriptAsync: pump the whole module init on one AsyncPump loop so top-level-await
++        // module bodies run to completion instead of stalling on the default un-pumped context.
++        => Task.Run(() => AsyncPump.Run(() => RunCoreAsync(folder, relativeFile, paths)));
+ 
++    private async Task<JSValue> RunCoreAsync(string folder, string relativeFile, string[] paths)
++    {
+         CurrentPath = folder;
+         UpdatePaths(paths);
+ 
+@@ -219,10 +235,17 @@ public class JSModuleContext : JSContext
+     /// <param name="uniqueModuleID">Module ID if you want get this module later (in <see cref="ImportModule"/> or import in js)</param>
+     /// <returns>Module as JSObject</returns>
+     /// <exception cref="JSException"></exception>
+-    public async Task<JSValue> RunScriptAsync(string script, string moduleFolder, string[] paths = null, string uniqueModuleID = null)
++    public Task<JSValue> RunScriptAsync(string script, string moduleFolder, string[] paths = null, string uniqueModuleID = null)
++        // Run the whole module init under one pumped AsyncPump loop on a worker thread — exactly like
++        // JSContext.ExecuteAsync. A module body compiled with top-level await suspends its async
++        // continuation onto the ambient SynchronizationContext; on the default (un-pumped) context those
++        // continuations never drain, so the body stalls at its first await (which every static import is).
++        // The async-local current context flows across the Task.Run boundary, so engine state resolves on
++        // the worker thread.
++        => Task.Run(() => AsyncPump.Run(() => RunScriptCoreAsync(script, moduleFolder, paths, uniqueModuleID)));
++
++    private async Task<JSValue> RunScriptCoreAsync(string script, string moduleFolder, string[] paths, string uniqueModuleID)
+     {
+-        using var sc = CreateSynchronizationContext();
+-
+         CurrentPath = moduleFolder;
+         UpdatePaths(paths);
+         uniqueModuleID ??= Guid.NewGuid().ToString("N") + ".js";
+@@ -236,8 +259,7 @@ public class JSModuleContext : JSContext
+             if (!name.IsString)
+                 throw NewTypeError("import method's parameter must be a string");
+ 
+-            var result = LoadModuleAsync(dirPath, name.StringValue);
+-            return JSEngine.ClrInterop.Marshal(result);
++            return TaskToPromise(LoadModuleAsync(dirPath, name.StringValue));
+         });
+ 
+         newModule.Require = new JSFunction((in Arguments a) =>
+@@ -255,8 +277,16 @@ public class JSModuleContext : JSContext
+             var task = CompileModuleAsync(newModule);
+             return JSEngine.ClrInterop.Marshal(task);
+         });
++        // Prefer the direct (non-marshalled) compile path so a top-level-await body runs to completion on
++        // this pumped loop instead of settling at its first suspension behind a Task→promise→Task marshal.
++        newModule.CompileDirect = () => CompileModuleAsync(newModule);
+ 
+         await newModule.InitAsync();
++
++        var w = WaitTask;
++        if (w != null)
++            await w;
++
+         return newModule.Exports;
+     }
+ 
+@@ -302,7 +332,7 @@ public class JSModuleContext : JSContext
+         m = moduleCache.GetOrCreate(fullPath, () =>
+         {
+             var newModule = new JSModule(this, fullPath);
+-            var dirPath = GetModuleDirectory(fullPath);
++            var dirPath = GetModuleDirectory(fullPath);
+ 
+             newModule.Import = new JSFunction((in Arguments a) =>
+             {
+@@ -310,8 +340,7 @@ public class JSModuleContext : JSContext
+                 if (!name.IsString)
+                     throw NewTypeError("import method's parameter must be a string");
+ 
+-                var result = LoadModuleAsync(dirPath, name.StringValue);
+-                return JSEngine.ClrInterop.Marshal(result);
++                return TaskToPromise(LoadModuleAsync(dirPath, name.StringValue));
+             });
+ 
+             newModule.Require = new JSFunction((in Arguments a) =>
+@@ -329,6 +358,9 @@ public class JSModuleContext : JSContext
+                 var task = CompileModuleAsync(newModule);
+                 return JSEngine.ClrInterop.Marshal(task);
+             });
++            // Direct compile so a nested/transitive module's top-level-await body also runs to completion
++            // on the pumped loop rather than stalling behind the Task→promise→Task marshal.
++            newModule.CompileDirect = () => CompileModuleAsync(newModule);
+ 
+             return newModule;
+         });
+@@ -337,33 +369,33 @@ public class JSModuleContext : JSContext
+         return m.Exports;
+     }
+ 
+-    /// <summary>
+-    /// Returns the base directory a resolved module's own relative imports resolve against. The default is
+-    /// the filesystem directory of <paramref name="fullPath"/>; a URL-loading host overrides this to return
+-    /// the module URL's base so nested relative imports resolve as URLs rather than being mangled by
+-    /// filesystem path semantics.
+-    /// </summary>
+-    protected virtual string GetModuleDirectory(string fullPath) => Path.GetDirectoryName(fullPath);
+-
+-    /// <summary>
+-    /// Reads the source text of a resolved module whose <see cref="JSModule.Code"/> has not been supplied.
+-    /// The default reads the file at <see cref="JSModule.filePath"/>; a host that fetches modules over
+-    /// another transport (e.g. HTTP/data URLs under a content-security policy) overrides this.
+-    /// </summary>
+-    protected virtual async Task<string> ReadModuleSourceAsync(JSModule module)
+-    {
+-        using var reader = new StreamReader(module.filePath, Encoding.UTF8);
+-        return await reader.ReadToEndAsync();
+-    }
+-
++    /// <summary>
++    /// Returns the base directory a resolved module's own relative imports resolve against. The default is
++    /// the filesystem directory of <paramref name="fullPath"/>; a URL-loading host overrides this to return
++    /// the module URL's base so nested relative imports resolve as URLs rather than being mangled by
++    /// filesystem path semantics.
++    /// </summary>
++    protected virtual string GetModuleDirectory(string fullPath) => Path.GetDirectoryName(fullPath);
++
++    /// <summary>
++    /// Reads the source text of a resolved module whose <see cref="JSModule.Code"/> has not been supplied.
++    /// The default reads the file at <see cref="JSModule.filePath"/>; a host that fetches modules over
++    /// another transport (e.g. HTTP/data URLs under a content-security policy) overrides this.
++    /// </summary>
++    protected virtual async Task<string> ReadModuleSourceAsync(JSModule module)
++    {
++        using var reader = new StreamReader(module.filePath, Encoding.UTF8);
++        return await reader.ReadToEndAsync();
++    }
++
+     internal protected virtual async Task CompileModuleAsync(JSModule module)
+     {
+         // Console.WriteLine($"{DateTime.Now} - Compiling module {module.filePath}");
+         var filePath = module.filePath;
+ 
+-        // if this is a json file... then pad with module.exports =
++        // if this is a json file... then pad with module.exports =
+         if (module.Code == null)
+-            module.Code = await ReadModuleSourceAsync(module);
++            module.Code = await ReadModuleSourceAsync(module);
+ 
+         var code = module.Code;
+ 
+-- 
+2.43.0
+

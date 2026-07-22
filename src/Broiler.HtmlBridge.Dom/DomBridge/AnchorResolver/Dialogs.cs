@@ -224,22 +224,30 @@ public sealed partial class DomBridge
             var backdropBg = GetBackdropBackground(
                 dialog, isPopover ? "transparent" : "rgb(229, 229, 229)");
 
-            if (NativeBackdrop)
+            // Author ::backdrop position-try-fallbacks are not yet reproduced by the native
+            // ::backdrop box (it overlays author geometry from the cascade but does not run the
+            // position-try pass for a renderer-generated box). Route those through the synthesized
+            // <div> path, which resolves the fallback below; everything else goes native.
+            var backdropDecls = GetSyncedScopedEngine(dialog)
+                .GetCascadedDeclaredValues(dialog, "::backdrop");
+            var authorPositionTry = backdropDecls.ContainsKey("position-try-fallbacks") ||
+                backdropDecls.ContainsKey("position-try");
+
+            if (NativeBackdrop && !authorPositionTry)
             {
                 // Native ::backdrop: don't mutate the box tree with a synthesized <div>. Stamp the
                 // resolved backdrop background on the element and let the renderer generate the
-                // ::backdrop box natively (Broiler.HTML DomParser, patch 0011) as a top-layer box
-                // beneath the dialog. The resolved background already folds the UA modal/popover
-                // scrim default with any author `background` (which the renderer cannot decide
-                // without the modal/popover runtime state); the renderer overlays author ::backdrop
-                // *geometry* from the ::backdrop cascade. Author position-try-fallbacks on a
-                // ::backdrop are not yet carried natively (no corpus); the baked path below still
-                // handles them.
+                // ::backdrop box natively (Broiler.HTML DomParser, pinned) as a top-layer box beneath
+                // the dialog. The resolved background already folds the UA modal/popover scrim default
+                // with any author `background` (which the renderer cannot decide without the
+                // modal/popover runtime state); the renderer overlays author ::backdrop *geometry*
+                // from the ::backdrop cascade.
                 SetAttr(dialog, BackdropBgAttr, backdropBg);
             }
             else
             {
-                // Insert a backdrop div BEFORE the dialog.
+                // Insert a backdrop div BEFORE the dialog. Reached when native backdrop is disabled
+                // (rollback) or the author declared ::backdrop position-try-fallbacks (above).
                 // Use 'position: fixed' with explicit pixel viewport dimensions
                 // because the Broiler renderer cannot resolve opposing insets.
                 // These viewport-covering defaults materialise the ::backdrop UA
@@ -256,8 +264,6 @@ public sealed partial class DomBridge
                     ["background-color"] = backdropBg,
                 };
 
-                var backdropDecls = GetSyncedScopedEngine(dialog)
-                    .GetCascadedDeclaredValues(dialog, "::backdrop");
                 OverlayBackdropAuthorGeometry(backdropDecls, backdropStyle);
 
                 var backdrop = CreateBridgeElement("div");

@@ -277,14 +277,20 @@ public static partial class ScriptExtractionService
         // The loader resolves+fetches each transitive dependency (CSP-gated), dedups, orders the graph
         // dependency-first, and renders each module to a linked plain-JS program the existing evaluator
         // runs in order. A module whose syntax the scanner cannot transform falls back to running as-is.
+        var moduleRoots = new List<ModuleRoot>(moduleEntries.Count);
         if (moduleEntries.Count > 0)
         {
             var graph = ModuleGraphLoader.Load(moduleEntries,
                 (specifier, baseUrl) => ResolveDependencyModule(specifier, baseUrl, csp, pageUrl));
             moduleScripts.AddRange(graph.Programs);
+
+            // The same authorised roots, exposed for the engine-driven path (BridgeModuleContext), which runs
+            // each root through the JS engine's own module machinery instead of the linked strings above.
+            foreach (var entry in moduleEntries)
+                moduleRoots.Add(new ModuleRoot(entry.Key, entry.Source, entry.BaseUrl));
         }
 
-        return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts, descriptors, moduleScripts, moduleMap);
+        return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts, descriptors, moduleScripts, moduleMap, moduleRoots);
     }
 
     /// <summary>

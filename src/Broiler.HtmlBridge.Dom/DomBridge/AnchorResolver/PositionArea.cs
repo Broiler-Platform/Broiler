@@ -91,6 +91,24 @@ public sealed partial class DomBridge
                     double cellW = rect.Value.Width;
                     double cellH = rect.Value.Height;
 
+                    // Percentage margins and padding resolve against the *inline
+                    // size* of the containing block (CSS Writing Modes §7.4 / CSS
+                    // Box Model §3): the cell's width when the containing block is a
+                    // horizontal writing mode, its height when it is vertical. Insets
+                    // keep resolving against their own physical axis (top/bottom →
+                    // height, left/right → width) below — only margin/padding follow
+                    // the inline axis. The relevant writing mode is the containing
+                    // block's (the position-area cell inherits it), not the anchored
+                    // box's — WPT position-area-percents-001's `.vertical` cases key
+                    // off the container's writing-mode, not the box's.
+                    double marginPadBasis = cellW;
+                    {
+                        var cbForBasis = FindContainingBlockElement(element);
+                        if (cbForBasis != null && IsVerticalWritingMode(
+                                GetComputedProps(cbForBasis).GetValueOrDefault("writing-mode")))
+                            marginPadBasis = cellH;
+                    }
+
                     // Resolve any percentage insets within the cell.
                     // CSS spec: top/bottom % resolve against CB height,
                     // left/right % resolve against CB width.  For position-area
@@ -130,16 +148,17 @@ public sealed partial class DomBridge
                             insetLeft = ResolvePctOrPx(rawLeft2, cellW);
                     }
 
-                    // Resolve percentage margins against the cell width
-                    // (CSS spec: margin % always resolves against inline dimension).
+                    // Resolve percentage margins against the containing block's
+                    // inline size (marginPadBasis: cell width for horizontal WMs,
+                    // cell height for vertical ones).
                     double marginTop2 = ResolvePctOrPx(
-                        cssProps.GetValueOrDefault("margin-top") ?? "0", cellW);
+                        cssProps.GetValueOrDefault("margin-top") ?? "0", marginPadBasis);
                     double marginRight2 = ResolvePctOrPx(
-                        cssProps.GetValueOrDefault("margin-right") ?? "0", cellW);
+                        cssProps.GetValueOrDefault("margin-right") ?? "0", marginPadBasis);
                     double marginBottom2 = ResolvePctOrPx(
-                        cssProps.GetValueOrDefault("margin-bottom") ?? "0", cellW);
+                        cssProps.GetValueOrDefault("margin-bottom") ?? "0", marginPadBasis);
                     double marginLeft2 = ResolvePctOrPx(
-                        cssProps.GetValueOrDefault("margin-left") ?? "0", cellW);
+                        cssProps.GetValueOrDefault("margin-left") ?? "0", marginPadBasis);
 
                     // Resolve percentage margins from the 'margin' shorthand
                     string? marginShorthand = cssProps.GetValueOrDefault("margin");
@@ -150,21 +169,21 @@ public sealed partial class DomBridge
                         if (mp.Length > 0)
                         {
                             if (!cssProps.ContainsKey("margin-top"))
-                                marginTop2 = ResolvePctOrPx(mp[0], cellW);
+                                marginTop2 = ResolvePctOrPx(mp[0], marginPadBasis);
                             if (!cssProps.ContainsKey("margin-right"))
                                 marginRight2 = ResolvePctOrPx(
-                                    mp.Length > 1 ? mp[1] : mp[0], cellW);
+                                    mp.Length > 1 ? mp[1] : mp[0], marginPadBasis);
                             if (!cssProps.ContainsKey("margin-bottom"))
                                 marginBottom2 = ResolvePctOrPx(
-                                    mp.Length > 2 ? mp[2] : mp[0], cellW);
+                                    mp.Length > 2 ? mp[2] : mp[0], marginPadBasis);
                             if (!cssProps.ContainsKey("margin-left"))
                                 marginLeft2 = ResolvePctOrPx(
                                     mp.Length > 3 ? mp[3]
-                                        : (mp.Length > 1 ? mp[1] : mp[0]), cellW);
+                                        : (mp.Length > 1 ? mp[1] : mp[0]), marginPadBasis);
                         }
                     }
 
-                    // Resolve percentage padding against the cell width.
+                    // Resolve percentage padding against the same inline-size basis.
                     double padTop = 0, padRight = 0, padBottom = 0, padLeft = 0;
                     string? padShorthand = cssProps.GetValueOrDefault("padding");
                     if (padShorthand != null)
@@ -173,24 +192,24 @@ public sealed partial class DomBridge
                             StringSplitOptions.RemoveEmptyEntries);
                         if (pp.Length > 0)
                         {
-                            padTop = ResolvePctOrPx(pp[0], cellW);
+                            padTop = ResolvePctOrPx(pp[0], marginPadBasis);
                             padRight = ResolvePctOrPx(
-                                pp.Length > 1 ? pp[1] : pp[0], cellW);
+                                pp.Length > 1 ? pp[1] : pp[0], marginPadBasis);
                             padBottom = ResolvePctOrPx(
-                                pp.Length > 2 ? pp[2] : pp[0], cellW);
+                                pp.Length > 2 ? pp[2] : pp[0], marginPadBasis);
                             padLeft = ResolvePctOrPx(
                                 pp.Length > 3 ? pp[3]
-                                    : (pp.Length > 1 ? pp[1] : pp[0]), cellW);
+                                    : (pp.Length > 1 ? pp[1] : pp[0]), marginPadBasis);
                         }
                     }
                     if (cssProps.TryGetValue("padding-top", out var pt))
-                        padTop = ResolvePctOrPx(pt, cellW);
+                        padTop = ResolvePctOrPx(pt, marginPadBasis);
                     if (cssProps.TryGetValue("padding-right", out var pr))
-                        padRight = ResolvePctOrPx(pr, cellW);
+                        padRight = ResolvePctOrPx(pr, marginPadBasis);
                     if (cssProps.TryGetValue("padding-bottom", out var pb))
-                        padBottom = ResolvePctOrPx(pb, cellW);
+                        padBottom = ResolvePctOrPx(pb, marginPadBasis);
                     if (cssProps.TryGetValue("padding-left", out var pl))
-                        padLeft = ResolvePctOrPx(pl, cellW);
+                        padLeft = ResolvePctOrPx(pl, marginPadBasis);
 
                     // Resolve the element's box within the cell — the IMCB
                     // (inset-modified containing block), the used width/height
