@@ -6,26 +6,26 @@ migration is complete and merged (submodule patches `0004`–`0007` applied upst
 `Broiler.HtmlBridge.Rendering` project deletion outstanding (WPT-reftest-gated); Phase 7 items 1–5 are
 done, item 6's static import/export module graph is linked and executing (P7.17) with `import.meta` (P7.18),
 dynamic `import()` (P7.20) and live bindings (P7.22, made scope-accurate in P7.23) handled at the bridge
-layer, leaving item 6's engine-coupled tail (top-level-await-as-async with event-loop ordering). The
-`Broiler.JS` seam for driving the engine's own module machinery (patch `0008`, P7.19) **is now applied
-upstream** — the engine pointer is bumped to `3f0c7054` (which also carries the Phase-2 session-isolation
-guard, patch `0009`), so **all nine submodule patches `0001`–`0009` are applied upstream and pinned**. The
-top-level-await **codegen** bug that gated the engine-driven path (root-caused P7.21, proven P7.24) is
-**fixed by patch `0010` (P7.25)**, and the **module-orchestration completion** defect (un-pumped init loop +
-compile double-marshal + a Clr-only import-promise marshal that returned `undefined`) is **fixed by patch
-`0011` (P7.26)** — so the engine's own module machinery now **binds a static import's value** (named/
-namespace/default/transitive/diamond/TLA), both patches **full-`Broiler.JS`-suite-validated with zero
-regressions** (push 403 → ship unbumped, `0011` stacks on `0010`). The engine-coupled tail is therefore
-closed, and the **bridge is now wired to the engine module path, capability-gated** (P7.27): a
-`BridgeModuleContext : JSModuleContext` maps the `0008` seams to the host (URL/`data:` resolution + CSP fetch)
-and hosts the DOM in the module realm, `ScriptEngine` runs the authorised `ModuleRoots` through the engine
-when a timeout-guarded probe (`EngineModuleSupport.Available`) confirms the engine binds imports, and the
-`EsModuleLinker` is demoted to the fallback used otherwise. This is **CI-safe** — the pinned engine probes
-`false`, so the engine path is dormant and existing suites are unchanged; it activates automatically once
-`0010`/`0011` land upstream and the pointer bumps, at which point the linker (and `ModuleScripts` production)
-can be deleted. Remaining item-6 tail: the sub-document and CLI-capture paths still use the linker, and
-genuine event-loop ordering (vs the eager deferred-bucket run) is a follow-up. Phase 8 remains proposed.
-Per-phase detail: [remaining phases](htmlbridge-complexity-reduction-remaining.md).
+layer, and item 6's previously engine-coupled tail (driving the engine's own module machinery) is now
+**closed and active**. The `Broiler.JS` seam for driving the engine's own module machinery (patch `0008`,
+P7.19), the top-level-await **codegen** fix (patch `0010`, P7.25) and the **module-orchestration completion**
+fix (patch `0011`, P7.26) — plus the Phase-2 session-isolation guard (patch `0009`) — **are all applied
+upstream and pinned**: the engine pointer is now bumped to **`98b07636`**, so **all eleven submodule patches
+`0001`–`0011` are applied upstream and pinned** (0010 = `64fda04f`, 0011 = `98b07636`). With `0010`+`0011`
+pinned the engine's own module machinery **binds a static import's value** (named/namespace/default/
+transitive/diamond/TLA), all **full-`Broiler.JS`-suite-validated with zero regressions**. The **bridge is
+wired to the engine module path, capability-gated** (P7.27): a `BridgeModuleContext : JSModuleContext` maps
+the `0008` seams to the host (URL/`data:` resolution + CSP fetch) and hosts the DOM in the module realm,
+`ScriptEngine` runs the authorised `ModuleRoots` through the engine when a timeout-guarded probe
+(`EngineModuleSupport.Available`) confirms the engine binds imports, and the `EsModuleLinker` is demoted to
+the fallback used otherwise. **On the pinned engine the probe now returns `true`** (verified 2026-07-22 by
+building `Broiler.HtmlBridge.Scripting` against `98b07636` and running the probe), so the engine-driven path
+is the **active** path; the `~Module` `Broiler.Cli.Tests` (288) pass on it with zero failures. The
+`EsModuleLinker` (and `ModuleScripts` production) is now the dormant fallback, deletable once the sub-document
+and CLI-capture paths are migrated off it. Remaining item-6 tail: the sub-document and CLI-capture paths
+still use the linker, and genuine event-loop ordering (vs the eager deferred-bucket run) is a follow-up.
+Phase 8 remains proposed. Per-phase detail:
+[remaining phases](htmlbridge-complexity-reduction-remaining.md).
 
 Baseline date: 2026-07-13
 
@@ -267,7 +267,7 @@ external renderer to accept `viewportZoom` + cross-boundary scale plumbing, with
 `NativeZoom` deployment/env gate; and — as the last backdrop tail — sweeping the full WPT `::backdrop` reftest
 corpus under the WPT `NativeBackdrop` lever before it, too, flips on by default. Item 2's Phase-4 dict elimination is also sequenced here (anchor-resolver-entangled). |
 | 6 — remove Broiler.HtmlBridge.Rendering | **Native migration complete** | All three concerns delivered; submodule patches `0004`–`0007` applied upstream and the `Broiler.HTML` pointer pins them (`5c16c12`); the `HtmlPostProcessor` video/progress/meter/select fallbacks are dropped. Only the terminal `Broiler.HtmlBridge.Rendering` project deletion remains, gated on relocating the test-harness shims behind the WPT pixel reftest gate (not validatable in a bare container). |
-| 7 — isolate loading/security/browsing-context policy | **Items 1–5 complete; item 6 delivered at the bridge layer** | CSP split, script descriptors, one shared `UrlResolver`/`Origin`, external-stylesheet CSP and host-layer enforcement all landed (verified 2026-07-21). Item 6: the static import/export graph is linked+executed with `import.meta`, dynamic `import()` and scope-accurate live bindings — modules are not silently skipped. The engine-coupled tail is now closed: the host-resolution seam (patch `0008`) is applied upstream, the top-level-await **codegen** bug is **fixed by `0010`** (P7.25), and the **module-orchestration completion** defect is **fixed by `0011`** (P7.26) — so the engine module machinery now binds a static import's value (both patches full-suite-validated, pending push, `0011` stacks on `0010`). The **bridge is now wired to the engine module path, capability-gated** (P7.27, `BridgeModuleContext` + `EngineModuleSupport` probe): `ScriptEngine` runs the authorised `ModuleRoots` through the engine when it binds imports, else the demoted `EsModuleLinker` fallback — CI-safe (pinned engine probes `false`, path dormant), auto-activating once `0010`/`0011` land. Remaining tail: sub-document/CLI paths + real event-loop ordering. |
+| 7 — isolate loading/security/browsing-context policy | **Items 1–5 complete; item 6 engine path active** | CSP split, script descriptors, one shared `UrlResolver`/`Origin`, external-stylesheet CSP and host-layer enforcement all landed (verified 2026-07-21). Item 6: the static import/export graph is linked+executed with `import.meta`, dynamic `import()` and scope-accurate live bindings — modules are not silently skipped. The engine-coupled tail is **closed and active**: the host-resolution seam (patch `0008`), the top-level-await **codegen** fix (`0010`, P7.25) and the **module-orchestration completion** fix (`0011`, P7.26) are **all applied upstream and pinned** (`Broiler.JS` → `98b07636`), so the engine module machinery binds a static import's value (all full-suite-validated, zero regressions). The **bridge is wired to the engine module path, capability-gated** (P7.27, `BridgeModuleContext` + `EngineModuleSupport` probe): `ScriptEngine` runs the authorised `ModuleRoots` through the engine when it binds imports, else the demoted `EsModuleLinker` fallback. **On the pinned engine the probe now returns `true`** (verified 2026-07-22), so the engine-driven path is the active one; 288 `~Module` `Broiler.Cli.Tests` pass on it. Remaining tail: sub-document/CLI paths still use the linker + real event-loop ordering. |
 | 8 — simplify Core and Scripting | Proposed | Not started. See [remaining phases](htmlbridge-complexity-reduction-remaining.md). |
 
 The native dialog/backdrop track and the Phase 4 item-2 deletion scoping are

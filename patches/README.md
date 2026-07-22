@@ -20,13 +20,27 @@ from `HtmlPostProcessor`** now that the renderer handles these elements natively
 stacks on 0006** (they share `SetUniformBorder`/`ReadNumericAttribute`).
 
 Patches **0008 and 0009 are now also applied upstream** (verified 2026-07-21) — the
-`Broiler.JS` pointer is bumped from `3a8f302` to **`3f0c7054`**, whose history contains
+`Broiler.JS` pointer was bumped from `3a8f302` to **`3f0c7054`**, whose history contains
 `ffe8956e` *"JSModuleContext: host-overridable module resolution and source read"* (0008)
 and `3f0c7054` *"Integration tests: lock in simultaneous JSContext session isolation"*
-(0009). So patches **0001–0009 are applied upstream and pinned by the parent pointers**;
-the files here are retained for provenance.
+(0009).
 
-Patch **`0010` — PENDING (push 403)** — fixes the top-level-await **codegen** bug that
+**Patches `0010` and `0011` are now also applied upstream (verified 2026-07-22)** — the
+`Broiler.JS` pointer has since been bumped again from `3f0c7054` to **`98b07636`** (parent
+commit `71f3ce9` *"Update submodules"*), whose history contains `64fda04f`
+*"GeneratorRewriter: only seed the ScriptInfo box on first entry (fix TLA resume)"* (0010)
+and `98b07636` *"Modules: run module init on a pumped loop and bind imports without Clr"*
+(0011). **So all eleven patches `0001`–`0011` are applied upstream and pinned by the parent
+pointers**; the files here are retained for provenance. The direct consequence:
+`EngineModuleSupport.Available` — the bridge's timeout-guarded probe of whether the engine
+binds a static import — now returns **`true`** on the pinned engine (verified this session by
+building `Broiler.HtmlBridge.Scripting` against `98b07636` and running the probe), so the
+engine-driven ES-module path is the **active** path (the `EsModuleLinker` is now the dormant
+fallback used only if an un-patched engine is ever pinned). The 288 `~Module` `Broiler.Cli.Tests`
+pass on this active engine path with zero failures.
+
+Patch **`0010` — APPLIED** (pinned `98b07636`; push 403 at authoring, later applied upstream
+by a maintainer) — fixes the top-level-await **codegen** bug that
 §0008 root-caused. The generator box-load prologue re-seeded the persisted `ScriptInfo`
 box with a null body-local on **every** resume, so after a top-level-await resume any
 identifier/member access resolved through `scriptInfo.Value.Indices[…]` dereferenced null
@@ -34,13 +48,11 @@ identifier/member access resolved through `scriptInfo.Value.Indices[…]` derefe
 made the fault look receiver-shaped). Guarding the seed on `nextJump == 0` (first entry
 only) fixes it. **Validated against the full `Broiler.JS` suite — zero regressions** (only
 the pre-existing Intl/ICU-locale and doc-file env failures remain), and a new
-`TopLevelAwaitResumeTests` pins the corrected behaviour. Push returned **403**, so it ships
-here as `patches/0010-…` with the pointer **unbumped** (pinned `3f0c7054`). **No main-repo
-fallback is needed** — the bridge does not use the engine-driven TLA path (it uses its own
-`EsModuleLinker`), so nothing in the parent repo regresses without the patch. `0010` fixes
+`TopLevelAwaitResumeTests` pins the corrected behaviour. `0010` fixes
 the *codegen* blocker; the module-orchestration completion piece is patch **`0011`** below.
 
-Patch **`0011` — PENDING (push 403)** — the module-orchestration completion fix that lets the
+Patch **`0011` — APPLIED** (pinned `98b07636`, commit on top of `0010`; push 403 at
+authoring, later applied upstream) — the module-orchestration completion fix that lets the
 engine's own ES-module machinery **bind a static import's value** (with `0010` alone it no
 longer crashed but resolved to `undefined`/`0`). Three coupled changes in
 `Broiler.JavaScript.Modules`: (a) `RunScriptAsync`/`RunAsync` run the whole init under one
@@ -55,10 +67,11 @@ assembly is loaded, and its fallback returns `undefined` for a `Task`, which is 
 imported binding silently came back `undefined`. **Validated against the full `Broiler.JS`
 suite — zero regressions**, plus a new `EngineModuleImportBindingTests` (named/namespace/
 default imports, transitive chain, diamond shared-dep-evaluated-once, top-level-await
-dependency). Push **403** → ships as `patches/0011-…`, pointer **unbumped**, **stacks on
-`0010`**. **No main-repo fallback needed** — the bridge still uses its `EsModuleLinker`;
-wiring it to the now-working engine path (and retiring the linker) is the remaining,
-separately-scoped bridge task.
+dependency). **Now applied upstream** (pinned `98b07636`, stacked on `0010`). The bridge is
+wired to the engine path (P7.27, `BridgeModuleContext` + `EngineModuleSupport`); with `0011`
+pinned the probe is `true`, so the engine path is active and the `EsModuleLinker` is the
+dormant fallback (its removal, plus the sub-document/CLI paths and genuine event-loop
+ordering, is the remaining separately-scoped bridge task).
 
 | Patch | Target submodule | Pinned commit / status | Main-repo follow-up |
 |---|---|---|---|
@@ -69,10 +82,10 @@ separately-scoped bridge task.
 | 0005 — render `<video>` as a black inline-block replaced box (hide fallback) | `Broiler.HTML` | **applied** — pushed as `5561eb0`; contained in the pinned `5c16c12` | **Done** — the pinned renderer paints `<video>` natively, so `HtmlPostProcessor.ReplaceVideoWithPlaceholder` (Phase 6 concern 2) was dropped. |
 | 0006 — render `<progress>`/`<meter>` as a native track with proportional fill | `Broiler.HTML` | **applied** — pushed as `444cace`; contained in the pinned `5c16c12` | **Done** — the pinned renderer paints `<progress>`/`<meter>` natively, so `HtmlPostProcessor.ReplaceProgressLikeWithPlaceholder` was dropped (native coverage: `FormControlRenderTests.Meter_NativeRender_Follows_WritingMode_And_Direction`). |
 | 0007 — render `<select multiple>` as a native list box (both appearance modes) | `Broiler.HTML` | **applied** — pushed as `5c16c12` (the pinned pointer); **stacks on 0006** | **Done** — the pinned renderer paints `<select multiple>` natively (both `appearance:auto`/`none`), so `HtmlPostProcessor.ReplaceSelectMultipleWithPlaceholder` was dropped; the string-rewrite unit test was retired in favour of the WPT/Acid reftest gate. Reads the box's `Appearance` (the `appearance` box property landed in the main repo's `Broiler.Layout`). |
-| 0008 — `JSModuleContext`: host-overridable module resolution/source read | `Broiler.JS` | **applied** — `ffe8956e`; contained in the pinned `3f0c7054` | **Applied, still not wired** — Phase 7 item 6 tail. The seam now lives in the pinned engine, but the engine-driven path stays blocked below it by the top-level-await codegen bug (§0008), re-confirmed on `3f0c7054` (2026-07-21), so the bridge keeps its own `EsModuleLinker`. |
+| 0008 — `JSModuleContext`: host-overridable module resolution/source read | `Broiler.JS` | **applied** — `ffe8956e`; contained in the pinned `98b07636` | **Applied and wired** — Phase 7 item 6. The seam lives in the pinned engine; with the codegen (`0010`) and orchestration (`0011`) fixes also pinned, the bridge's `BridgeModuleContext` drives the engine module path (P7.27) and `EngineModuleSupport.Available` is `true`. |
 | 0009 — session-isolation regression tests | `Broiler.JS` | **applied** — `3f0c7054` (the pinned pointer) | **Test-only guard** — Phase 2. Locks in that two live `JSContext` instances are isolated (the property the bridge's "two simultaneous sessions" exit criterion relies on). No production change; the bridge-side criterion is also proven CI-green by `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`. |
-| 0010 — `GeneratorRewriter`: seed the `ScriptInfo` box on first entry only (fix TLA resume) | `Broiler.JS` | **PENDING** (push 403; pinned `3f0c7054` does not contain it) | **Fixes the §0008 codegen blocker** — Phase 7 item 6 tail. Top-level await now runs post-resume statements correctly (full-suite validated, zero regressions). **No main-repo follow-up** — the bridge does not use the engine-driven TLA path. Module *value* binding additionally needs `0011`. |
-| 0011 — `Modules`: pumped module init + Clr-independent import binding | `Broiler.JS` | **PENDING** (push 403; pinned `3f0c7054` does not contain it); **stacks on `0010`** | **Completes the engine-driven module path** — Phase 7 item 6 tail. A static import now binds its value (was `undefined`/`0`): pumped `AsyncPump.Run` init, `CompileDirect` (no compile double-marshal), and `import()` via `JSValue.CreatePromiseFromTask` instead of the Clr-only interop. Full-suite validated, zero regressions. **No main-repo follow-up** — remaining bridge task is to drive the engine path and retire `EsModuleLinker`. |
+| 0010 — `GeneratorRewriter`: seed the `ScriptInfo` box on first entry only (fix TLA resume) | `Broiler.JS` | **APPLIED** — `64fda04f`; contained in the pinned `98b07636` | **Fixes the §0008 codegen blocker** — Phase 7 item 6. Top-level await now runs post-resume statements correctly (full-suite validated, zero regressions). Module *value* binding additionally needs `0011` (also pinned). |
+| 0011 — `Modules`: pumped module init + Clr-independent import binding | `Broiler.JS` | **APPLIED** — `98b07636` (the pinned pointer); **stacks on `0010`** | **Completes the engine-driven module path** — Phase 7 item 6. A static import now binds its value (was `undefined`/`0`): pumped `AsyncPump.Run` init, `CompileDirect` (no compile double-marshal), and `import()` via `JSValue.CreatePromiseFromTask` instead of the Clr-only interop. Full-suite validated, zero regressions. With `0010`+`0011` pinned, `EngineModuleSupport.Available` is `true` and the bridge runs modules through the engine (P7.27); retiring `EsModuleLinker` + wiring sub-document/CLI + event-loop ordering is the remaining bridge task. |
 
 To apply a *future* patch (kept for reference):
 
@@ -441,7 +454,9 @@ CI-green in the parent by `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessio
 **Target:** `Broiler.JS`
 (`Broiler.JavaScript.LinqExpressions/LinqExpressions/GeneratorsV2/GeneratorRewriter.cs`, `+` a new
 `Broiler.JavaScript.Core.Tests/TopLevelAwaitResumeTests.cs`).
-**Status: PENDING** (push 403; pinned SHA `3f0c7054` does not contain it).
+**Status: APPLIED** (2026-07-22) — pushed as `64fda04f`; contained in the pinned `98b07636`. (Push 403 at
+authoring; a maintainer later applied it upstream and the parent pointer was bumped. Original authoring note
+preserved below.)
 **Depends on:** nothing (it fixes the codegen blocker §0008 root-caused; independent of `0008`'s seam).
 
 **What it does.** Fixes the top-level-await codegen bug from §0008. Every async function / generator body
@@ -516,7 +531,9 @@ engine path.
 
 **Target:** `Broiler.JS` (`Broiler.JavaScript.Modules/JSModule.cs`, `Broiler.JavaScript.Modules/JSModuleContext.cs`,
 `+` a new `Broiler.JavaScript.Modules.Tests/EngineModuleImportBindingTests.cs`).
-**Status: PENDING** (push 403; pinned SHA `3f0c7054` does not contain it).
+**Status: APPLIED** (2026-07-22) — pushed as `98b07636` (the pinned pointer); stacked on `0010`
+(`64fda04f`). (Push 403 at authoring; later applied upstream and the parent pointer bumped. Original
+authoring note preserved below.)
 **Depends on / stacks on:** **`0010`** (the codegen fix — without it a top-level-await body still NREs).
 
 **What it does.** With `0010` applied, an engine-driven static import no longer crashes but its value
