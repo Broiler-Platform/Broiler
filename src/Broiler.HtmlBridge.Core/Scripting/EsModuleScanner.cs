@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Broiler.HtmlBridge.Scripting;
+namespace Broiler.HtmlBridge.Internal.Scripting;
 
 /// <summary>
 /// A focused scanner (Phase 7 item 6) that finds a module's <b>top-level</b> static <c>import</c>/

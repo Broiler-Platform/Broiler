@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Broiler.HtmlBridge.Scripting;
 
-namespace Broiler.HtmlBridge.Scripting;
+namespace Broiler.HtmlBridge.Internal.Scripting;
 
 /// <summary>
 /// Builds and links a document's ES module graph (Phase 7 item 6). Starting from the document's

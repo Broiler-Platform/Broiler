@@ -26,9 +26,12 @@ and CLI-capture paths are migrated off it. Remaining item-6 tail: the sub-docume
 still use the linker, and genuine event-loop ordering (vs the eager deferred-bucket run) is a follow-up.
 Phase 8 is in delivery — items 1–5 delivered and item 6 decided (P8.1–P8.8; see the
 [assembly decision record](htmlbridge-assembly-decision.md)); of the record's `Core`-purity structural
-follow-ups, **F1 is done** (P8.9: `Broiler.HtmlBridge.Rendering` deleted, its lone internal
+follow-ups, **F1 and F2 are done** (P8.9: `Broiler.HtmlBridge.Rendering` deleted, its lone internal
 `HtmlPostProcessor` folded into `Dom` — the final assembly shape is now the three assemblies Core/Dom/
-Scripting), leaving F2/F3 (namespace-carve and `internal`-ize the `Core` mechanism). Per-phase detail:
+Scripting; P8.10: the scripting mechanism — module scanners/parsers/linker/loader + URL/CSP matching —
+carved from the top-level namespace into `Broiler.HtmlBridge.Internal.Scripting`, no public-API change),
+leaving only **F3** (`internal`-ize the two remaining public mechanism helpers; `ScriptExtractionService`
+stays public as host API). Per-phase detail:
 [remaining phases](htmlbridge-complexity-reduction-remaining.md).
 
 Baseline date: 2026-07-13

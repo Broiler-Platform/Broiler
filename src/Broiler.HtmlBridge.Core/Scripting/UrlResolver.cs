@@ -1,6 +1,6 @@
 using System;
 
-namespace Broiler.HtmlBridge.Scripting;
+namespace Broiler.HtmlBridge.Internal.Scripting;
 
 /// <summary>
 /// The one URL-resolution implementation shared by the CSP source matcher and external-script fetching

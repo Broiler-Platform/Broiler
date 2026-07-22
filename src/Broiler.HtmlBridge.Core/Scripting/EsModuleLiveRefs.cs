@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Broiler.HtmlBridge.Scripting;
+namespace Broiler.HtmlBridge.Internal.Scripting;
 
 /// <summary>
 /// Rewrites read-references of a module's <b>named</b> imports into live reads from the exporting module's

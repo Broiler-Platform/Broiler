@@ -1,6 +1,7 @@
 using Broiler.Dom.Html;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
+using Broiler.HtmlBridge.Internal.Scripting;
 using System;
 using System.Collections.Generic;
 using System.IO;

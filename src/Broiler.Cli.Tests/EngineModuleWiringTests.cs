@@ -1,6 +1,7 @@
 using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Scripting;
+using Broiler.HtmlBridge.Internal.Scripting;
 using Xunit;
 
 namespace Broiler.Cli.Tests;

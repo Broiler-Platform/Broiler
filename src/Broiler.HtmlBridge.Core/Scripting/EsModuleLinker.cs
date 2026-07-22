@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Broiler.HtmlBridge.Scripting;
+namespace Broiler.HtmlBridge.Internal.Scripting;
 
 /// <summary>
 /// Rewrites one module's source (Phase 7 item 6) into a plain-JavaScript program that a non-module

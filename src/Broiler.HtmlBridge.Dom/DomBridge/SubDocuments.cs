@@ -6,6 +6,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
+using Broiler.HtmlBridge.Internal.Scripting;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;

@@ -1,6 +1,7 @@
 using System;
+using Broiler.HtmlBridge.Scripting;
 
-namespace Broiler.HtmlBridge.Scripting;
+namespace Broiler.HtmlBridge.Internal.Scripting;
 
 /// <summary>
 /// URL/origin context for Content Security Policy source-expression matching (Phase 7 item 1, third

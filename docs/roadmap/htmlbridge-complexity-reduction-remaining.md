@@ -31,9 +31,11 @@ probe; 288 `~Module` `Broiler.Cli.Tests` pass on the active engine path), so the
 active and the `EsModuleLinker` is the dormant fallback. The last item-6 work is a **bridge application
 task** — migrate the sub-document (`ExecuteSubDocumentScripts`) and CLI-capture (`CaptureService`) paths off
 the linker onto the engine path, add genuine event-loop ordering, and then delete the `EsModuleLinker`.
-**Phase 8 in delivery — items 1–5 delivered, item 6 decided (P8.1–P8.8), and follow-up F1 done (P8.9:
-`Broiler.HtmlBridge.Rendering` dissolved into `Dom`). Remaining Phase 8 work is the `Core`-purity
-follow-ups F2–F3 sequenced in the [assembly decision record](htmlbridge-assembly-decision.md).**
+**Phase 8 in delivery — items 1–5 delivered, item 6 decided (P8.1–P8.8), and follow-ups F1 (P8.9:
+`Broiler.HtmlBridge.Rendering` dissolved into `Dom`) and F2 (P8.10: scripting mechanism carved into
+`Broiler.HtmlBridge.Internal.Scripting`) done. Remaining Phase 8 work is the single follow-up F3
+(`internal`-ize the two remaining public mechanism helpers) sequenced in the
+[assembly decision record](htmlbridge-assembly-decision.md).**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -1020,4 +1022,27 @@ Exit criteria:
   fail environmentally, per the repo's build notes), so F1 was validated by targeted baseline-vs-change
   comparison on the assembly- and consumer-relevant suites rather than the whole run. F2/F3 (the `Core`
   namespace-carve and `internal`-ization) remain.
+- **P8.10 (2026-07-22) — item 6 follow-up F2: carve the `Core` scripting mechanism into an internal
+  namespace.** The `Core`-purity exit criterion wants contracts/value objects kept apart from the regex
+  parsers, loaders and matchers they were grab-bagged with in the top-level `Broiler.HtmlBridge.Scripting`
+  namespace. F2 moves the mechanism into a new `Broiler.HtmlBridge.Internal.Scripting` namespace — one
+  assembly still (both `Dom` and `Scripting` share it, so splitting it into a fourth assembly is the
+  anti-goal), but with the boundary now visible and greppable. **Moved (7, all already `internal` → zero
+  public-API impact):** `EsModuleScanner`, `EsModuleSyntax`, `EsModuleLinker`, `EsModuleLiveRefs`,
+  `ModuleGraphLoader`, `UrlResolver`, `CspSourceMatching`. **Kept** in the top-level namespace: the value
+  objects/contracts (`ContentSecurityPolicy`, `MicroTaskQueue`, `PageContent`, `ScriptExecutionResult`,
+  `ScriptExtractionResult`, `ScriptProfilingHook`) and the `internal` origin-primitive `Origin` (a common
+  identifier — moving it risks false-positive `using` churn — that pairs with the value side). Implementation
+  refined the decision's type list via **consumer analysis**: the three currently-`public` mechanism-ish
+  types are deferred to F3, and crucially **`ScriptExtractionService` is host-facing public API** (`Broiler.App`
+  and `Broiler.Cli` call it), so it is *not* internal mechanism and will stay public — correcting the original
+  decision-3 enumeration that had listed it to move. Pure compile-time reorganization (no logic change):
+  cross-namespace `using`s were added where the split created new references, plus the two `Dom` and four
+  `Cli.Tests` files that consume the moved types via IVT. Verified: all eleven affected projects build clean;
+  the **public-API snapshot is unchanged** (only `internal` types moved), and the boundary-guard plus the
+  moved types' own suites (CSP-source-matching, URL-resolver, ES-module-graph, engine-module-wiring,
+  module-script-slice) are green — 69/69 on the targeted filter; no stale fully-qualified
+  `Broiler.HtmlBridge.Scripting.<moved-type>` references remain. **F3** — `internal`-ize `CspMetaDiscovery`
+  and `ModuleScriptWrapper` (public but consumed only by `Core` + tests) and move them into the internal
+  namespace, leaving `ScriptExtractionService` public — is the last remaining Phase 8 follow-up.
 

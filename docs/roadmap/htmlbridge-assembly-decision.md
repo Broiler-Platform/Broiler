@@ -128,8 +128,8 @@ separately-verified increments (full build + WPT/Acid baseline) rather than one 
 | Follow-up | Scope | Risk | Verifies |
 | --- | --- | --- | --- |
 | **F1 — delete `Rendering`, relocate `HtmlPostProcessor` → `Dom`** ✅ **done** | `git mv` 1 file; drop 3 `ProjectReference`s; add `Browser.Core` to `Dom` IVT; drop the empty `Rendering` public-API baseline + snapshot param | Low–med (build-graph of 3 apps + tests) | Full build + snapshot/boundary/HtmlPostProcessor green |
-| **F2 — namespace-carve `Core` mechanism** | Rename ~10 files' namespace to `…Internal.Scripting`; update usings | Low (namespace-only, no move) | Full build |
-| **F3 — `internal`-ize now-namespaced mechanism** | Flip `public`→`internal` where only `Dom`/`Scripting` (shared IVT) consume | Med (public-API baseline shifts; adaptable behind v2) | API snapshot + full build |
+| **F2 — namespace-carve `Core` mechanism** ✅ **done** | Move the 7 already-internal mechanism types to `Broiler.HtmlBridge.Internal.Scripting`; add cross-`using`s | Low (namespace-only, no logic change) | Full build + snapshot/boundary/mechanism suites green |
+| **F3 — `internal`-ize now-namespaced mechanism** | Flip `public`→`internal` where only `Dom`/`Scripting` (shared IVT) consume — the 3 public mechanism types (`CspMetaDiscovery`, `ModuleScriptWrapper`; **not** the host-facing `ScriptExtractionService`), then move them into the internal namespace too | Med (public-API baseline shifts; adaptable behind v2) | API snapshot + full build |
 
 Decisions **1** (three-assembly target) and **4** (keep profiling) are settled with no code change required.
 F1–F3 close the `Core`-purity exit criterion; until F2/F3 land, `Core` remains the documented shared kernel
@@ -154,3 +154,34 @@ failures pre-exist on baseline — the assertion is stale now that video renders
 `Cli.Tests` run is not a usable gate in a bare container (its network/graphics-parity/PDF classes crash or
 fail for environmental reasons), so F1 was validated by targeted baseline-vs-change comparison on the
 assembly- and consumer-relevant suites.
+
+### F2 delivered (2026-07-22)
+
+The scripting *mechanism* is carved out of the top-level `Broiler.HtmlBridge.Scripting` namespace into a new
+`Broiler.HtmlBridge.Internal.Scripting` namespace, making the contracts-vs-mechanism boundary greppable
+inside `Core` without splitting off a fourth assembly. Consumer analysis during implementation refined which
+types move:
+
+- **Moved (7, all already `internal` → zero public-API impact):** `EsModuleScanner`, `EsModuleSyntax`,
+  `EsModuleLinker`, `EsModuleLiveRefs`, `ModuleGraphLoader`, `UrlResolver`, `CspSourceMatching` — the module
+  scanners/parsers/linker/loader plus URL/CSP matching.
+- **Kept in `Broiler.HtmlBridge.Scripting`:** the value objects/contracts (`ContentSecurityPolicy`,
+  `MicroTaskQueue`, `PageContent`, `ScriptExecutionResult`, `ScriptExtractionResult`, `ScriptProfilingHook`)
+  and `Origin` — an `internal static` origin-serialization primitive the inventory loosely called a value
+  object; it is a common identifier (moving it risks false-positive `using` churn) and pairs conceptually
+  with the value side, so it stays.
+- **Deferred to F3:** the three `public` mechanism-ish types. Two (`CspMetaDiscovery`, `ModuleScriptWrapper`)
+  are public but consumed only by `Core` + tests, so F3 will `internal`-ize them and then move them. The
+  third, **`ScriptExtractionService`, is genuinely host-facing public API** — `Broiler.App` and `Broiler.Cli`
+  call it to extract scripts from HTML — so it is **not** internal mechanism and will **stay public** in a
+  public namespace, refining the original decision-3 enumeration which had listed it to move.
+
+Cross-namespace `using`s were added where the split created new references (stayed `Core` types referencing
+moved ones get `using …Internal.Scripting`; moved types referencing stayed value objects get
+`using …Scripting`), plus the two `Dom` files and four `Cli.Tests` files that consume the moved types via IVT.
+Pure compile-time reorganization — no logic changed. Verified: all eleven affected projects build clean
+(`Core`, `Dom`, `Scripting`, `Browser.Core`, `Cli`, `Cli.Tests`, `Wpt`, `Wpt.Tests`, `DevConsole`,
+`DevConsole.Tests`, `Engines.Baseline`); the public-API snapshot is **unchanged** (the move touched only
+`internal` types), and the boundary-guard plus the moved types' own suites (CSP-source-matching, URL-resolver,
+ES-module-graph, engine-module-wiring, module-script-slice) are green — 69/69 on the targeted filter. No
+stale fully-qualified `Broiler.HtmlBridge.Scripting.<moved-type>` references remain.
