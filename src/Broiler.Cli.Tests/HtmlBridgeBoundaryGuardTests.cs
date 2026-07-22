@@ -24,8 +24,15 @@ public class HtmlBridgeBoundaryGuardTests
     [Fact]
     public void IScriptEngine_Surface_Does_Not_Expose_Engine_Internal_Types()
     {
-        var exposedMembers = typeof(IScriptEngine)
-            .GetMembers(BindingFlags.Public | BindingFlags.Instance)
+        // Phase 8 item 1 split IScriptEngine into segregated capability interfaces
+        // (IScriptExecutor / IInteractiveScriptEngine / IScriptProfiling / IScriptEventLoop) that it now
+        // inherits. For interfaces, GetMembers does not flatten inherited members, so the guard must span
+        // IScriptEngine and every capability interface it aggregates to stay meaningful.
+        var surfaceTypes = new[] { typeof(IScriptEngine) }
+            .Concat(typeof(IScriptEngine).GetInterfaces());
+
+        var exposedMembers = surfaceTypes
+            .SelectMany(static t => t.GetMembers(BindingFlags.Public | BindingFlags.Instance))
             .Where(static member => member.MemberType is MemberTypes.Method or MemberTypes.Property)
             .Where(ExposesEngineInternalType)
             .Select(DescribeMember)

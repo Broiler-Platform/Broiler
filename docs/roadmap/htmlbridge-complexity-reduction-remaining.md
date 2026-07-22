@@ -906,3 +906,25 @@ Exit criteria:
   to cover the descriptors/module-map/graph/roots. Public-API snapshot + `ScriptDescriptor` suites green (no
   surface change); `Broiler.Browser.Core` (which compiles `RenderingPipeline`) builds clean.
 
+- **P8.5 (2026-07-22) — item 1: split `IScriptEngine` into segregated capability contracts, keep the old
+  interface as the v2 adapter.** The monolithic `IScriptEngine` mixed four unrelated capabilities.
+  Extracted them into narrow interfaces (`IScriptEngineCapabilities.cs`): **`IScriptExecutor`** (the five
+  `Execute` overloads + `ExecuteDetailed` + the `StrictModeEnabled`/`Csp` execution config),
+  **`IInteractiveScriptEngine`** (the two `ExecuteInteractive` overloads), **`IScriptProfiling`** (the
+  `Profiler` hook) and **`IScriptEventLoop`** (the `MicroTasks` queue). `IScriptEngine` is now an empty
+  aggregate that inherits all four — its effective surface is byte-identical, so it stays the v2
+  compatibility surface: every existing consumer and implementer is unaffected (each member is still
+  reachable through it), while a new consumer can depend on just the capability it uses. `ScriptEngine`
+  needed **no code change** (it already implements every member); `ITypedScriptEngine`/`RenderingPipeline`
+  are unchanged. Public-API baseline regenerated (the members move to the capability interfaces;
+  `ScriptEngine`'s own member list is unchanged — nothing dropped). The `HtmlBridgeBoundaryGuardTests`
+  no-internal-leak guard was widened to span `IScriptEngine` **and** its capability interfaces (interface
+  `GetMembers` does not flatten inherited members), so it stays meaningful post-split. New
+  `ScriptEngineCapabilitySegregationTests` (4): the aggregate inherits the four capabilities, the concrete
+  engine implements each, and a consumer can depend on just `IScriptExecutor`/`IScriptEventLoop`.
+  `Broiler.Browser.Core` (the `IScriptEngine` consumer) builds clean; engine behaviour suites green.
+  Remaining for the phase's *"one execution pipeline shared by normal/detailed/typed/interactive entry
+  points"* exit criterion: consolidating `ScriptEngine`'s internal `Execute*`/`ExecuteInteractive` bodies
+  (which currently duplicate the attach → run scripts → run deferred → run modules → drain sequence) onto a
+  single shared pipeline — an internal refactor separate from this interface segregation.
+
