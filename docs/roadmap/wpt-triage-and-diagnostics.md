@@ -1248,7 +1248,8 @@ by `PositionAreaLiveGeometryTests`); `position-area-inline-container` (95.8 %) r
 test (the font-load-ordering caveat, cluster 40); `position-area-percents-001` (98.8 %) is a
 pervasive ~1 px border/edge sub-pixel tail on the *native* path (its padding basis is already
 correct — verified via the render diff and a live probe), not a geometry defect; `anchor-size-css-zoom`
-is the externally-gated zoom renderer; and the two `position-area-scrolling-*` are dynamic scroll.
+**is now fixed (cluster 48, main-repo — it was an `anchor-size()` double-zoom bug, not externally
+gated)**; and the two `position-area-scrolling-*` are dynamic scroll.
 
 **Fixed this session (main-repo `Broiler.HtmlBridge.Dom`):** the bridge's **baked** position-area
 fallback (`PositionArea.cs`, reached for boxes outside the MVP-native subset — `@position-try` /
@@ -1260,6 +1261,39 @@ matching the native path. Guard `PositionAreaLiveGeometryTests.BakedPositionArea
 (10 % padding → 4 px against a 40 px vertical cell vs a larger width-basis value horizontally). No WPT
 score moves (the failing tests take the native path or are sub-pixel/font/dynamic-gated); 0 regressions
 on the vendored css-anchor-position subset (32/40, unchanged) and the anchor/position-area unit suites.
+
+### Post-cluster-48 sweep — remaining vendored failures triaged, and a list-marker paint gap (2026-07-22)
+
+After cluster 48 (`anchor-size()` double-zoom) landed, a fresh sweep of the vendored subsets confirmed the
+clean structural pixel wins are exhausted; each remaining failure was reproduced with `--render` and
+minimal repros and classified:
+
+- **`css-anchor-position/position-area-scrolling-001.tentative` (84.4 %) — dynamic, not static.** Broiler
+  renders only the gray anchor, all 9 cyan `position-area` boxes absent. Proven **not** a layout bug: a
+  minimal repro with the exact nested `overflow:hidden` scroller + 1000×1000 inner + all 9 `position-area`
+  values (no scripts) renders the 3×3 grid **correctly, matching the golden**. Removing only the inline
+  `promise_test` script from the real test also renders all 9. The boxes vanish only under the test's
+  dynamic sequence (`scrollable.scrollTo(40,60)` **then** `container.style.display:none→block` across
+  `requestAnimationFrame` ticks); `scrollTo` alone (boxes shift, stay visible) and the `display` toggle
+  alone (correct) do not trigger it — it is the combination. Root gap: position-area placement is a
+  one-shot render-prep bake that is **not re-resolved after a post-load scroll + reflow**, so the boxes
+  lose placement and collapse to a 0-size CB. This is the "dynamic scroll" architectural gap, not a
+  position-area geometry defect.
+- **`css-align/blocks/align-content-block-{002,004,006,008,010}` (91–95 %) — renders correctly; gated on
+  `offsetTop` + font/bullets.** `align-content` on block containers (`CssBox.ApplyBlockAlignContent`)
+  **does** apply the correct shift — instrumented `freeSpace=26`, `shift` applied for center/end/space-*
+  in the render path, and the `--render` output visually matches the golden's bar positions. The failures
+  are: (a) the **bridge `offsetTop`** used by `checkLayout` does not reflect the align-content shift, so the
+  `data-offset-y` assertions fail (diagnostic-only — the runner gates on pixels, not checkLayout); (b) the
+  ~5–8 % pixel residual is Ahem text AA + the list-item marker gap below. Not a block-align layout defect.
+- **List-item markers are built but never painted (candidate cluster).** `CssBox.CreateListItemBox`
+  (`Broiler.Layout`) builds and positions a `_listItemBox` (glyph/number, `Left = Location.X - width - 5`)
+  for every `display:list-item` element, but **no paint path emits it** — there is no `_listItemBox`
+  reference in the `Broiler.HTML` fragment/`PaintWalker` pipeline, and a minimal repro confirms a real
+  `<ul><li>`, a `display:list-item` `<div>`, and `list-style-type:decimal` all render **with no marker**.
+  This is a high-impact, broadly-visible gap (lists are ubiquitous; it also caps the `align-content-block`
+  tests). The marker box is already laid out in the main repo; wiring it into the fragment/paint IR is a
+  `Broiler.HTML` (submodule) change — the recommended next cluster.
 
 ### Vendored-subset near-miss sweep — font-metric fidelity is the dominant blocker (2026-07-21)
 
