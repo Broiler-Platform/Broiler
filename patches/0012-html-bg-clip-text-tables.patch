@@ -1,0 +1,61 @@
+From 9ed6e41c8735ff605eabf36aab76ddfb586b0d10 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 22 Jul 2026 12:40:05 +0000
+Subject: [PATCH] PaintWalker: propagate background-clip:text color into table
+ cell text
+
+PaintChildren routed table/inline-table boxes to PaintTableChildren without the
+bgClipTextColor propagated for background-clip:text, so a table with
+background-clip:text left its descendant cell text uncomposited (the background
+was not clipped to the glyphs). Thread bgClipTextColor through PaintTableChildren
+to its PaintFragment calls so table cell text is clipped like block/inline-block/
+float descendants. Verified on css-backgrounds/background-clip/clip-text-descendants:
+the <table> and <table transformed> rows now render purple like the other
+descendant types.
+---
+ .../Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
+index 1723699..ed09cfe 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
+@@ -260,7 +260,7 @@ internal static partial class PaintWalker
+         // through transparent areas.
+         if (fragment.Style.Display is "table" or "inline-table")
+         {
+-            PaintTableChildren(fragment, items, propagatedFrom, viewport);
++            PaintTableChildren(fragment, items, propagatedFrom, viewport, bgClipTextColor);
+             return;
+         }
+ 
+@@ -720,7 +720,7 @@ internal static partial class PaintWalker
+     /// Layers 2–3: column-group and column backgrounds.
+     /// Layers 4–6: row-group, row, and cell backgrounds (tree order).
+     /// </summary>
+-    private static void PaintTableChildren(Fragment table, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport = default)
++    private static void PaintTableChildren(Fragment table, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport = default, BColor? bgClipTextColor = null)
+     {
+         // Collect column/column-group fragments whose backgrounds will be
+         // emitted early (layers 2–3) so PaintFragment can skip them later.
+@@ -765,7 +765,7 @@ internal static partial class PaintWalker
+             else
+             {
+                 var skipBg = propagatedFrom ?? (earlyBgFragments != null && earlyBgFragments.Contains(child) ? child : null);
+-                PaintFragment(child, items, skipBg, viewport);
++                PaintFragment(child, items, skipBg, viewport, bgClipTextColor: bgClipTextColor);
+             }
+         }
+ 
+@@ -775,7 +775,7 @@ internal static partial class PaintWalker
+             foreach (var child in positioned)
+             {
+                 var skipBg = propagatedFrom ?? (earlyBgFragments != null && earlyBgFragments.Contains(child) ? child : null);
+-                PaintFragment(child, items, skipBg, viewport);
++                PaintFragment(child, items, skipBg, viewport, bgClipTextColor: bgClipTextColor);
+             }
+         }
+     }
+-- 
+2.43.0
+
