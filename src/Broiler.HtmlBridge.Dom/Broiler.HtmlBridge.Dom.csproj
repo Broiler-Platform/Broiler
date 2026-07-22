@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Broiler" />
+    <InternalsVisibleTo Include="Broiler.Browser.Core" />
     <InternalsVisibleTo Include="Broiler.Cli" />
     <InternalsVisibleTo Include="Broiler.Cli.Tests" />
     <InternalsVisibleTo Include="Broiler.Engines.Baseline" />

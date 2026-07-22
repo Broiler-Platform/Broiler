@@ -2,6 +2,12 @@ using System.Text.RegularExpressions;
 
 namespace Broiler.HtmlBridge;
 
+// Dom (unlike the old BCL-only Rendering assembly this moved from) transitively references the
+// `Broiler.Regex` namespace, whose `Regex` member is reachable through the enclosing `Broiler` namespace
+// and shadows the simple name `Regex` here. This in-namespace alias is resolved before the enclosing
+// namespace's members, so `Regex` keeps binding to the BCL type.
+using Regex = System.Text.RegularExpressions.Regex;
+
 /// <summary>
 /// Sanitises post-script-execution HTML before it is handed to the
 /// rendering surface.  The methods mirror the cleanup steps performed

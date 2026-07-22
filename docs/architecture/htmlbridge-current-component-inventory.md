@@ -26,7 +26,7 @@ number differ from a compiler symbol count.
 |---|---|---|---|---|
 | Broiler.HtmlBridge.Core | Contracts, script extraction/CSP, diagnostics and logging | 9 files, 1,175 lines | A nominal contract project also owns regex parsing, synchronous I/O, crypto/URL policy and global logging | Keep only contracts/value objects; move host policy/loading out |
 | Broiler.HtmlBridge.Dom | Browser DOM/CSSOM/Web API binding and runtime | 65 files, 27,436 lines | Almost all behavior is one partial DomBridge with hidden shared state | Small facade plus document services and feature binding modules |
-| Broiler.HtmlBridge.Rendering | Geometry adapter, HTML compatibility rewriting and canvas recording | 3 files, 1,003 lines | Three unrelated concerns grouped by historical convenience | Dissolve after routing each concern to its real owner |
+| Broiler.HtmlBridge.Rendering | **Dissolved (2026-07-22, Phase 8 F1 / P8.9)** — geometry provider and canvas recorder had already moved out in Phase 1; the last occupant, the internal `HtmlPostProcessor`, moved into `Broiler.HtmlBridge.Dom` and the assembly was deleted | — | — | Done — see [assembly decision record](../roadmap/htmlbridge-assembly-decision.md) |
 | Broiler.HtmlBridge.Scripting | JS execution and interactive orchestration | 5 files, 682 lines | Duplicated execution/lifetime paths and event-loop ownership split with Dom | One execution pipeline over a per-session browser event loop |
 
 ## Broiler.HtmlBridge.Core

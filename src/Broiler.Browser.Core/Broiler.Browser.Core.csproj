@@ -27,7 +27,6 @@
     <ProjectReference Include="..\..\Broiler.DOM\Broiler.Dom\Broiler.Dom.csproj" />
     <ProjectReference Include="..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
     <ProjectReference Include="..\Broiler.HtmlBridge.Scripting\Broiler.HtmlBridge.Scripting.csproj" />
-    <ProjectReference Include="..\Broiler.HtmlBridge.Rendering\Broiler.HtmlBridge.Rendering.csproj" />
   </ItemGroup>
 
   <ItemGroup>

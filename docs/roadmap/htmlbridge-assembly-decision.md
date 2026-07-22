@@ -127,10 +127,30 @@ separately-verified increments (full build + WPT/Acid baseline) rather than one 
 
 | Follow-up | Scope | Risk | Verifies |
 | --- | --- | --- | --- |
-| **F1 — delete `Rendering`, relocate `HtmlPostProcessor` → `Dom`** | `git mv` 1 file; drop 3 `ProjectReference`s; move IVT; no `.sln` | Low–med (build-graph of 3 apps + tests) | Full build + capture/WPT harness green |
+| **F1 — delete `Rendering`, relocate `HtmlPostProcessor` → `Dom`** ✅ **done** | `git mv` 1 file; drop 3 `ProjectReference`s; add `Browser.Core` to `Dom` IVT; drop the empty `Rendering` public-API baseline + snapshot param | Low–med (build-graph of 3 apps + tests) | Full build + snapshot/boundary/HtmlPostProcessor green |
 | **F2 — namespace-carve `Core` mechanism** | Rename ~10 files' namespace to `…Internal.Scripting`; update usings | Low (namespace-only, no move) | Full build |
 | **F3 — `internal`-ize now-namespaced mechanism** | Flip `public`→`internal` where only `Dom`/`Scripting` (shared IVT) consume | Med (public-API baseline shifts; adaptable behind v2) | API snapshot + full build |
 
 Decisions **1** (three-assembly target) and **4** (keep profiling) are settled with no code change required.
-F1–F3 close the `Core`-purity exit criterion; until they land, `Core` remains the documented shared kernel
+F1–F3 close the `Core`-purity exit criterion; until F2/F3 land, `Core` remains the documented shared kernel
 with the boundary recorded here.
+
+### F1 delivered (2026-07-22)
+
+`Broiler.HtmlBridge.Rendering` is deleted and its sole `internal static HtmlPostProcessor` moved into
+`Broiler.HtmlBridge.Dom` (co-located with the existing HTML parse/serialize helpers). The three consumers
+(`Browser.Core`, `Cli`, `Wpt`) drop their `Rendering` `ProjectReference` — each already reaches `Dom`
+transitively — and `Dom`'s `InternalsVisibleTo` gains `Broiler.Browser.Core` (the one grant `Rendering` had
+that `Dom` lacked). One relocation wrinkle: in the old BCL-only `Rendering` assembly the unqualified `Regex`
+bound to the BCL type, but `Dom` transitively references the `Broiler.Regex` namespace, whose `Regex` member
+is reachable through the enclosing `Broiler` namespace and shadows the simple name; an **in-namespace**
+`using Regex = System.Text.RegularExpressions.Regex;` alias (resolved before the enclosing namespace's
+members) restores the binding. The `Rendering` public-API baseline was empty (`HtmlPostProcessor` is
+internal), so it is removed along with the assembly's snapshot-test parameter — **no public surface is lost**,
+confirming decision 2. Verified: `Dom`/`Browser.Core`/`Wpt`/`Cli`/`Cli.Tests`/`Wpt.Tests` all build clean;
+the public-API snapshot (3 assemblies), boundary-guard and `HtmlPostProcessor` native-support suites are green
+against a clean baseline; `HtmlPostProcessor` behaviour is byte-identical (its 2 `<video>`-stripping test
+failures pre-exist on baseline — the assertion is stale now that video renders natively). The full 2297-test
+`Cli.Tests` run is not a usable gate in a bare container (its network/graphics-parity/PDF classes crash or
+fail for environmental reasons), so F1 was validated by targeted baseline-vs-change comparison on the
+assembly- and consumer-relevant suites.

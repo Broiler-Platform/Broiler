@@ -31,8 +31,9 @@ probe; 288 `~Module` `Broiler.Cli.Tests` pass on the active engine path), so the
 active and the `EsModuleLinker` is the dormant fallback. The last item-6 work is a **bridge application
 task** — migrate the sub-document (`ExecuteSubDocumentScripts`) and CLI-capture (`CaptureService`) paths off
 the linker onto the engine path, add genuine event-loop ordering, and then delete the `EsModuleLinker`.
-**Phase 8 in delivery — items 1–5 delivered, item 6 decided (P8.1–P8.8); the only remaining Phase 8 work is
-the `Core`-purity structural follow-ups F1–F3 sequenced in the [assembly decision record](htmlbridge-assembly-decision.md).**
+**Phase 8 in delivery — items 1–5 delivered, item 6 decided (P8.1–P8.8), and follow-up F1 done (P8.9:
+`Broiler.HtmlBridge.Rendering` dissolved into `Dom`). Remaining Phase 8 work is the `Core`-purity
+follow-ups F2–F3 sequenced in the [assembly decision record](htmlbridge-assembly-decision.md).**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -998,4 +999,25 @@ Exit criteria:
   **F2** (namespace-carve `Core`), **F3** (`internal`-ize the now-namespaced mechanism) — each a build-graph
   change best delivered as its own baseline-verified increment. Decisions 1 and 5 need no code; item 6's
   *decision* is complete.
+- **P8.9 (2026-07-22) — item 6 follow-up F1: `Broiler.HtmlBridge.Rendering` dissolved into `Dom`.** The
+  assembly-per-feature artifact — a whole project for one `internal static HtmlPostProcessor` (276-line regex
+  HTML post-processor) — is deleted and the type moved into `Broiler.HtmlBridge.Dom`, co-located with the
+  existing HTML parse/serialize helpers. The three consumers (`Browser.Core`, `Cli`, `Wpt`) drop their
+  `Rendering` `ProjectReference` (each already reaches `Dom` transitively — `Browser.Core → Scripting → Dom`,
+  `Cli → Dom`, `Wpt → Dom`), and `Dom`'s `InternalsVisibleTo` gains `Broiler.Browser.Core` (the one grant
+  `Rendering` had that `Dom` lacked). Relocation wrinkle: `Dom` transitively references the `Broiler.Regex`
+  namespace, whose `Regex` member is reachable through the enclosing `Broiler` namespace and shadowed the
+  unqualified `Regex` the post-processor used (it bound to the BCL type in the old BCL-only `Rendering`); an
+  **in-namespace** `using Regex = System.Text.RegularExpressions.Regex;` alias (resolved before enclosing-
+  namespace members) restores it. The `Rendering` public-API baseline was empty (`HtmlPostProcessor` is
+  internal), so it and its snapshot-test parameter are removed with **no public-surface loss** — confirming
+  the decision's claim that nothing public is dropped. The final assembly shape is now exactly the decided
+  three: `Core`, `Dom`, `Scripting`. Verified: all six affected projects build clean; the public-API snapshot
+  (3 assemblies), boundary-guard and `HtmlPostProcessor` native-support suites are green vs a clean baseline;
+  `HtmlPostProcessor` behaviour is byte-identical (its 2 pre-existing `<video>`-stripping test failures
+  reproduce on baseline — the assertion is stale now that `<video>` renders natively). The full 2297-test
+  `Cli.Tests` suite is not a usable gate in a bare container (network/graphics-parity/PDF classes crash or
+  fail environmentally, per the repo's build notes), so F1 was validated by targeted baseline-vs-change
+  comparison on the assembly- and consumer-relevant suites rather than the whole run. F2/F3 (the `Core`
+  namespace-carve and `internal`-ization) remain.
 

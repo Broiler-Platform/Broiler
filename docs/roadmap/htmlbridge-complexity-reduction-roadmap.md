@@ -25,8 +25,10 @@ is the **active** path; the `~Module` `Broiler.Cli.Tests` (288) pass on it with 
 and CLI-capture paths are migrated off it. Remaining item-6 tail: the sub-document and CLI-capture paths
 still use the linker, and genuine event-loop ordering (vs the eager deferred-bucket run) is a follow-up.
 Phase 8 is in delivery — items 1–5 delivered and item 6 decided (P8.1–P8.8; see the
-[assembly decision record](htmlbridge-assembly-decision.md)); the remaining work is the `Core`-purity
-structural follow-ups (F1–F3) sequenced in that record. Per-phase detail:
+[assembly decision record](htmlbridge-assembly-decision.md)); of the record's `Core`-purity structural
+follow-ups, **F1 is done** (P8.9: `Broiler.HtmlBridge.Rendering` deleted, its lone internal
+`HtmlPostProcessor` folded into `Dom` — the final assembly shape is now the three assemblies Core/Dom/
+Scripting), leaving F2/F3 (namespace-carve and `internal`-ize the `Core` mechanism). Per-phase detail:
 [remaining phases](htmlbridge-complexity-reduction-remaining.md).
 
 Baseline date: 2026-07-13
