@@ -39,3 +39,5 @@ TYPE Broiler.HtmlBridge.DomBridge+CheckLayoutAssertion : System.IEquatable<Broil
 TYPE Broiler.HtmlBridge.DomBridgeFactory : Broiler.HtmlBridge.Dom.IDomBridgeRuntimeFactory
   ctor ()
   method Broiler.HtmlBridge.Dom.IDomBridgeRuntime Create()
+TYPE Broiler.HtmlBridge.Scripting.EngineModuleSupport
+  property System.Boolean Available { get; }
