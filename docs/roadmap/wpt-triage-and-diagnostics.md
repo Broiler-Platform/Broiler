@@ -1343,6 +1343,39 @@ divergence and cannot be won without either (a) rasteriser-level glyph-AA parity
 which would be gaming unless it mirrors an explicit per-test WPT `<meta name=fuzzy>`. Ahem-font tests are the
 exception (fixed-coverage glyphs), which is why WPT itself uses Ahem for layout tests.
 
+### Glyph-rasteriser tail is a vertical-metrics bug, not an AA/gamma bug (2026-07-21)
+
+Taking on the "rasteriser parity" increment (a) above, a controlled single-glyph comparison — the same
+`font-family: serif; font-size: 64px; line-height: 1` "HELLO" rendered in Broiler (`HtmlRender`) and the real
+reference Chromium (chromium-1194) — showed the divergence is **not** anti-aliasing quality or gamma: the
+horizontal stroke-edge AA already matches within ~5/255 (Chromium 61 vs Broiler 56 at the same edge column).
+It is **vertical glyph position**: Broiler's whole glyph sits **~4 px lower** (Chromium left-stem y 11–52,
+Broiler 15–56 — identical height, identical shape, shifted down). At 64 px that 4 px is ~6.25 % of the em; it
+scales to ~1 px at 16–21 px body text, and that 1-px vertical shift is exactly what makes every horizontal
+glyph feature straddle a different pixel row than the golden, producing the edge-delta tail (~74 % of
+`clip-content-box`'s residual is the intro text).
+
+Root cause — **three inconsistent vertical-metric models that none of which match Chromium's**:
+- The layout positions text words at the line-box top (`word.Top = cury`, `CssLayoutEngine`) and uses a
+  hard-coded `TypicalAscentRatio = 0.8` for baseline/line-box math and the `size × 1.16` line-height ratio
+  (`TrueTypeFontCompatFactory.GetMetrics`, `Broiler.HTML.Image.Compat`).
+- The glyph paint places the baseline at `point.Y + ttf.Ascender × scale` — the font's **real hhea ascender**
+  (Liberation Serif 1825/2048 em = 57 px at 64 px), with **no half-leading term**.
+- Chromium uses the font's real ascent/descent/lineGap with proper half-leading: for `line-height: 1` its
+  baseline = `top + ascent + (lineHeight − (ascent−descent))/2` = `57 + (64 − 70.9)/2` = **53.6 px** (measured
+  ~52), vs Broiler's `top + 57` = 57 px. The missing `halfLeading` (−3.45 px here) *is* the offset.
+
+The fix is a **line-box vertical-metrics unification**: plumb the font's real ascent/descent/lineGap into the
+baseline + line-box computation and add the CSS half-leading term, replacing the `0.8` / `1.16` approximations,
+so glyph baselines land where Chromium's do. It is **not a one-line change** — the metrics factory
+(`GetMetrics`) is handed a size-only `TrueTypeScaledFont` with no font handle, so the real ascent/descent are
+currently available *only* in the shaper (`ttf`), not at the layout/line-box site that positions the baseline;
+exposing them and threading half-leading spans `Broiler.HTML.Image.Compat` (metrics) + `Broiler.Layout`
+(line-box baseline). It touches the vertical position of **every** run of text, including Ahem, so it needs
+full-corpus regression validation before landing (a wrong global baseline shift would regress far more than it
+fixes). Scoped here as its own increment; the finding redirects the "rasteriser parity" effort away from AA/gamma
+(already fine) to the vertical-metrics model, which is the real ceiling.
+
 ### Remaining failure landscape (after the merged clusters)
 
 The tractable in-flow / parse / DOM wins are largely exhausted. What remains
