@@ -1,4 +1,4 @@
-namespace Broiler.HtmlBridge.Scripting;
+namespace Broiler.HtmlBridge.Internal.Scripting;
 
 /// <summary>
 /// Wraps an inline <c>&lt;script type="module"&gt;</c> body so a plain-script evaluator runs it with the
@@ -15,7 +15,7 @@ namespace Broiler.HtmlBridge.Scripting;
 /// confidently transform (destructuring exports, top-level <c>await</c>) — the module then runs as-is and
 /// any unsupported construct surfaces its error at execution rather than being silently skipped.
 /// </remarks>
-public static class ModuleScriptWrapper
+internal static class ModuleScriptWrapper
 {
     /// <summary>Returns <paramref name="body"/> wrapped as a strict, self-scoped module IIFE.</summary>
     public static string WrapInlineModule(string body) =>

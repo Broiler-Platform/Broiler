@@ -31,10 +31,10 @@ probe; 288 `~Module` `Broiler.Cli.Tests` pass on the active engine path), so the
 active and the `EsModuleLinker` is the dormant fallback. The last item-6 work is a **bridge application
 task** — migrate the sub-document (`ExecuteSubDocumentScripts`) and CLI-capture (`CaptureService`) paths off
 the linker onto the engine path, add genuine event-loop ordering, and then delete the `EsModuleLinker`.
-**Phase 8 in delivery — items 1–5 delivered, item 6 decided (P8.1–P8.8), and follow-ups F1 (P8.9:
-`Broiler.HtmlBridge.Rendering` dissolved into `Dom`) and F2 (P8.10: scripting mechanism carved into
-`Broiler.HtmlBridge.Internal.Scripting`) done. Remaining Phase 8 work is the single follow-up F3
-(`internal`-ize the two remaining public mechanism helpers) sequenced in the
+**Phase 8 complete — items 1–5 delivered, item 6 decided (P8.1–P8.8), and all three structural follow-ups
+landed: F1 (P8.9: `Broiler.HtmlBridge.Rendering` dissolved into `Dom`), F2 (P8.10: scripting mechanism carved
+into `Broiler.HtmlBridge.Internal.Scripting`), and F3 (P8.11: the two remaining public mechanism helpers
+`internal`-ized into that namespace). The `Core`-purity exit criterion is met — see the
 [assembly decision record](htmlbridge-assembly-decision.md).**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
@@ -1045,4 +1045,21 @@ Exit criteria:
   `Broiler.HtmlBridge.Scripting.<moved-type>` references remain. **F3** — `internal`-ize `CspMetaDiscovery`
   and `ModuleScriptWrapper` (public but consumed only by `Core` + tests) and move them into the internal
   namespace, leaving `ScriptExtractionService` public — is the last remaining Phase 8 follow-up.
+- **P8.11 (2026-07-22) — item 6 follow-up F3: `internal`-ize the last two public mechanism helpers; `Core`-purity
+  closed.** `CspMetaDiscovery` (`FindPolicyContent`) and `ModuleScriptWrapper` (`WrapInlineModule`) were the
+  only `public` mechanism types left in `Core` after F2. A tree sweep confirmed both are consumed only by
+  `Core` and `Cli.Tests` (via IVT), so making them `internal` costs no real consumer; flipped `public`→`internal`
+  and moved both into `Broiler.HtmlBridge.Internal.Scripting` alongside the F2 mechanism. `ScriptExtractionService`
+  is deliberately **left `public`** — it is host-facing API (`Broiler.App`/`Broiler.Cli` call it), the one
+  extraction service that belongs on the public surface. The `Core` public-API baseline was regenerated with
+  `UPDATE_API_BASELINES=1`; the diff is **exactly** the two removed entries and nothing else. The two `Cli.Tests`
+  consumers gained the internal-namespace `using`. Verified: `Core`/`Cli.Tests` build clean; the public-API
+  snapshot (now reflecting the two removals), boundary-guard and mechanism suites are green — 80/80 on the
+  targeted filter. **End state:** `Core` presents a clean contracts-vs-mechanism split — value objects/contracts
+  in `Broiler.HtmlBridge.Scripting`, nine internal mechanism types in `Broiler.HtmlBridge.Internal.Scripting`,
+  `ScriptExtractionService` public, `RenderLogger` the sanctioned static diagnostics primitive. The `Core`-purity
+  exit criterion (*"Core contains contracts/value objects, not regex parsers, networking and mutable global
+  logging together"*) is met — separated by namespace within the one shared kernel (a fourth assembly being the
+  anti-goal since `Dom` and `Scripting` share the mechanism). **With F1–F3 delivered and all decisions settled,
+  Phase 8 item 6 is fully realized and Phase 8 is complete.**
 

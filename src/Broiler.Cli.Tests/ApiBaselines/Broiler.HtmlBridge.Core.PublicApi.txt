@@ -64,8 +64,6 @@ TYPE Broiler.HtmlBridge.Scripting.ContentSecurityPolicy
   method System.Void Parse(System.String)
   property System.Boolean AllowsEval { get; }
   property System.Boolean StrictDynamic { get; }
-TYPE Broiler.HtmlBridge.Scripting.CspMetaDiscovery
-  method System.String FindPolicyContent(System.String)
 TYPE Broiler.HtmlBridge.Scripting.MicroTaskQueue
   ctor ()
   method System.Collections.Generic.IReadOnlyList<System.Exception> Drain()
@@ -101,8 +99,6 @@ TYPE Broiler.HtmlBridge.Scripting.ModuleRoot : System.IEquatable<Broiler.HtmlBri
   property System.String BaseUrl { get; set; }
   property System.String Key { get; set; }
   property System.String Source { get; set; }
-TYPE Broiler.HtmlBridge.Scripting.ModuleScriptWrapper
-  method System.String WrapInlineModule(System.String)
 TYPE Broiler.HtmlBridge.Scripting.PageContent
   ctor (System.String, System.Collections.Generic.IReadOnlyList<System.String>, System.String, System.Collections.Generic.IReadOnlyList<System.String>, System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleRoot>)
   property System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.Scripting.ModuleRoot> ModuleRoots { get; }

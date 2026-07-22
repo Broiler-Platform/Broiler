@@ -25,14 +25,15 @@ is the **active** path; the `~Module` `Broiler.Cli.Tests` (288) pass on it with 
 and CLI-capture paths are migrated off it. Remaining item-6 tail: the sub-document and CLI-capture paths
 still use the linker, and genuine event-loop ordering (vs the eager deferred-bucket run) is a follow-up.
 Phase 8 is in delivery — items 1–5 delivered and item 6 decided (P8.1–P8.8; see the
-[assembly decision record](htmlbridge-assembly-decision.md)); of the record's `Core`-purity structural
-follow-ups, **F1 and F2 are done** (P8.9: `Broiler.HtmlBridge.Rendering` deleted, its lone internal
+[assembly decision record](htmlbridge-assembly-decision.md)); and the record's `Core`-purity structural
+follow-ups **F1–F3 are all delivered** (P8.9: `Broiler.HtmlBridge.Rendering` deleted, its lone internal
 `HtmlPostProcessor` folded into `Dom` — the final assembly shape is now the three assemblies Core/Dom/
-Scripting; P8.10: the scripting mechanism — module scanners/parsers/linker/loader + URL/CSP matching —
-carved from the top-level namespace into `Broiler.HtmlBridge.Internal.Scripting`, no public-API change),
-leaving only **F3** (`internal`-ize the two remaining public mechanism helpers; `ScriptExtractionService`
-stays public as host API). Per-phase detail:
-[remaining phases](htmlbridge-complexity-reduction-remaining.md).
+Scripting; P8.10: the scripting mechanism carved from the top-level namespace into
+`Broiler.HtmlBridge.Internal.Scripting`, no public-API change; P8.11: the two remaining public mechanism
+helpers `internal`-ized into that namespace, `ScriptExtractionService` kept public as host API). **Phase 8 is
+complete** — items 1–6 delivered/decided and every structural follow-up landed; the `Core`-purity exit
+criterion is met (contracts/value objects and internal mechanism separated by namespace within the one shared
+kernel). Per-phase detail: [remaining phases](htmlbridge-complexity-reduction-remaining.md).
 
 Baseline date: 2026-07-13
 

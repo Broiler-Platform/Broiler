@@ -1,5 +1,6 @@
 using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Scripting;
+using Broiler.HtmlBridge.Internal.Scripting;
 using Broiler.JavaScript.Engine;
 
 namespace Broiler.Cli.Tests;

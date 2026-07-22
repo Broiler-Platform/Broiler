@@ -2,7 +2,7 @@ using System;
 using System.Text.RegularExpressions;
 using Broiler.Dom.Html;
 
-namespace Broiler.HtmlBridge.Scripting;
+namespace Broiler.HtmlBridge.Internal.Scripting;
 
 /// <summary>
 /// Reads a named attribute value out of a raw HTML start-tag attribute string
@@ -39,7 +39,7 @@ internal static class HtmlAttributeReader
 /// <c>&lt;meta&gt;</c> inside a comment or a <c>&lt;script&gt;</c>/<c>&lt;style&gt;</c> raw-text body is
 /// correctly ignored, and a <c>&gt;</c> inside a quoted attribute value no longer truncates the tag.
 /// </remarks>
-public static class CspMetaDiscovery
+internal static class CspMetaDiscovery
 {
     /// <summary>
     /// Returns the directive string (the <c>content</c> value) of the first supported CSP
