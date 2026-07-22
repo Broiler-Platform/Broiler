@@ -57,6 +57,18 @@ internal static class FragmentTreeBuilder
                 lines.Add(BuildLineFragment(lineBox));
         }
 
+        // Emit the generated list-item marker (bullet / number). It is laid out on
+        // box.ListItemMarkerBox (not a member of box.Boxes), so nothing else paints
+        // it — build a dedicated line fragment for its glyph word at the marker's
+        // resolved position (already in absolute layout coordinates, like every
+        // other word). content-visibility:hidden suppresses generated content too.
+        if (!contentHidden && box.ListItemMarkerBox is { } markerBox && markerBox.Words.Count > 0)
+        {
+            var markerLine = BuildListMarkerLineFragment(markerBox);
+            if (markerLine != null)
+                (lines ??= []).Add(markerLine);
+        }
+
         // Phase 3: Capture background image handle for the new paint path
         object? bgImage = box.LoadedBackgroundImage;
 
@@ -247,6 +259,40 @@ internal static class FragmentTreeBuilder
             Height = maxB - minY,
             Baseline = 0,
             Inlines = inlines,
+        };
+    }
+
+    /// <summary>
+    /// Builds a one-inline line fragment for a generated list-item marker glyph.
+    /// The marker box carries a single word positioned in absolute layout
+    /// coordinates (to the left of the principal box), styled by inheritance from
+    /// the list item; emit it exactly like a normal inline word so PaintWalker
+    /// draws the bullet / number.
+    /// </summary>
+    private static LineFragment? BuildListMarkerLineFragment(CssBox markerBox)
+    {
+        var word = markerBox.Words[0];
+        var markerStyle = ComputedStyleBuilder.FromBox(markerBox);
+
+        var inline = new InlineFragment
+        {
+            X = (float)word.Left,
+            Y = (float)word.Top,
+            Width = (float)word.Width,
+            Height = (float)word.Height,
+            Text = word.Text,
+            Style = markerStyle,
+            FontHandle = markerBox.ActualFont,
+        };
+
+        return new LineFragment
+        {
+            X = (float)word.Left,
+            Y = (float)word.Top,
+            Width = (float)word.Width,
+            Height = (float)word.Height,
+            Baseline = 0,
+            Inlines = [inline],
         };
     }
 
