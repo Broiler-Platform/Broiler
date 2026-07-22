@@ -39,6 +39,17 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
     /// <inheritdoc />
     public MicroTaskQueue MicroTasks { get; } = new();
 
+    /// <summary>
+    /// Phase 8 item 3: diagnostic for async-drain-limit exhaustion. <see langword="true"/> when a
+    /// call to <see cref="DrainAsyncWork"/> ran out its iteration budget
+    /// (<see cref="DomBridgeRuntimeLimits.AsyncDrainIterationLimit"/>) while microtasks or timers were
+    /// still queued — i.e. the async work did not settle and draining stopped. This makes the former
+    /// silent stop observable (also logged as a warning). A fresh <see cref="ScriptEngine"/> per page
+    /// means this reflects whether that page's async work exhausted the budget. Stays
+    /// <see langword="false"/> when every drain settled normally.
+    /// </summary>
+    public bool AsyncDrainLimitExhausted { get; private set; }
+
     /// <inheritdoc />
     public bool Execute(IReadOnlyList<string> scripts)
     {
@@ -414,8 +425,18 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             }
 
             if (!hadWork)
-                break;
+                return; // settled — the queues drained within the budget
         }
+
+        // Phase 8 item 3: the iteration budget is exhausted while work is still queued (typically a
+        // runaway microtask/timer loop, e.g. a setTimeout/queueMicrotask that reschedules itself).
+        // Surface this explicitly instead of stopping silently: record it on the engine and log a
+        // warning with the pending counts so it is diagnosable rather than an invisible truncation.
+        AsyncDrainLimitExhausted = true;
+        RenderLogger.LogWarning(LogCategory.JavaScript, "ScriptEngine.DrainAsyncWork",
+            $"Async work did not settle within {DomBridgeRuntimeLimits.AsyncDrainIterationLimit} drain iterations; " +
+            $"stopping with pending microtasks={MicroTasks.Count}, pendingTimers={bridge.HasPendingTimers}. " +
+            "This usually indicates a runaway microtask/timer loop.");
     }
 
     /// <summary>

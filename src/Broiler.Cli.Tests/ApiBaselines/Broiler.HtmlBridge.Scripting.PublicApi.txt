@@ -40,6 +40,7 @@ TYPE Broiler.HtmlBridge.ScriptEngine : Broiler.HtmlBridge.IScriptEngine, Broiler
   property Broiler.HtmlBridge.Scripting.ContentSecurityPolicy Csp { get; set; }
   property Broiler.HtmlBridge.Scripting.MicroTaskQueue MicroTasks { get; }
   property Broiler.HtmlBridge.Scripting.ScriptProfilingHook Profiler { get; set; }
+  property System.Boolean AsyncDrainLimitExhausted { get; }
   property System.Boolean StrictModeEnabled { get; set; }
 TYPE Broiler.HtmlBridge.Scripting.EngineModuleSupport
   property System.Boolean Available { get; }

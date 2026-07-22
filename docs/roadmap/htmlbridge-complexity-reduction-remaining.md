@@ -846,3 +846,24 @@ Exit criteria:
   interactive entry points.
 - A public v3 is proposed only for changes which cannot be adapted behind v2.
 
+#### Delivered increments
+
+- **P8.1 (2026-07-22) — item 3: async-drain-limit exhaustion is an explicit diagnostic, not a silent
+  stop.** `ScriptEngine.DrainAsyncWork` settles queued microtasks and timers in a loop bounded by
+  `DomBridgeRuntimeLimits.AsyncDrainIterationLimit` (1000). When the queues did **not** settle within that
+  budget — a runaway loop, e.g. a self-rescheduling `setTimeout(fn, 0)` or a `queueMicrotask` that
+  re-enqueues itself — the `for` loop simply fell out and draining stopped **silently**, so a page that
+  never quiesced looked indistinguishable from one that did. Now the loop `return`s on settle (byte-identical
+  behaviour for the common case) and, on budget exhaustion with work still queued, records
+  `ScriptEngine.AsyncDrainLimitExhausted = true` and logs a warning with the pending microtask/timer counts.
+  A fresh `ScriptEngine` per page means the flag reflects whether that page's async work exhausted the budget.
+  Purely additive: the drain still stops after 1000 iterations (no hang, no behaviour change for settling
+  pages) — the exhaustion is now *observable* instead of invisible. Additive public surface (one get-only
+  property on `ScriptEngine`), Scripting public-API baseline regenerated. New `AsyncDrainDiagnosticTests` (2):
+  a normal script leaves the flag `false`; a self-rescheduling zero-delay timer flags exhaustion (and still
+  returns a rendered document rather than hanging). 0 regressions on the timer/async/`ScriptEngine`/event-loop
+  suites (the 4 `DomBridge_SerializeToHtml_*`/`AnchorSize` failures are the pre-existing bare-container
+  geometry/zoom env failures, confirmed identical on the clean baseline). The two other drain loops
+  (`CaptureService.ExecuteScriptsWithDom`, `WptTestRunner`) carry the same silent-stop shape and are the
+  natural follow-up for this item.
+
