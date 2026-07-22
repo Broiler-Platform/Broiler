@@ -31,7 +31,8 @@ probe; 288 `~Module` `Broiler.Cli.Tests` pass on the active engine path), so the
 active and the `EsModuleLinker` is the dormant fallback. The last item-6 work is a **bridge application
 task** — migrate the sub-document (`ExecuteSubDocumentScripts`) and CLI-capture (`CaptureService`) paths off
 the linker onto the engine path, add genuine event-loop ordering, and then delete the `EsModuleLinker`.
-**Phase 8 proposed.**
+**Phase 8 in delivery — items 1–5 delivered, item 6 decided (P8.1–P8.8); the only remaining Phase 8 work is
+the `Core`-purity structural follow-ups F1–F3 sequenced in the [assembly decision record](htmlbridge-assembly-decision.md).**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -972,4 +973,29 @@ Exit criteria:
   deletion. This increment therefore delivers item 4's **consistency** branch in full (safe, internal) and
   hands item 6 the explicit, documented choice: keep the now-consistent `IScriptProfiling` capability, or trim
   it to host diagnostics in a v3 surface revision.
+- **P8.8 (2026-07-22) — item 6: final-assembly decision recorded.** Item 6 asks to *decide* final assemblies
+  from dependency and deployment needs; delivered as a standalone decision record,
+  [htmlbridge-assembly-decision.md](htmlbridge-assembly-decision.md), grounded in a measured inventory (4
+  assemblies: `Core` 19 files, `Dom` 239, `Rendering` **1**, `Scripting` 8; the `ProjectReference` graph and
+  every consumer edge; and which `Core` types `Dom`/`Scripting` each pull). **Decisions:** (1) **three code
+  assemblies** — `Core` (shared kernel), `Dom` (Web API bindings), `Scripting` (host) — matching the
+  roadmap's *"Core, WebApi bindings, Scripting/Host"*; finer splits are rejected as assembly-per-feature with
+  no deployment payoff. (2) **Delete `Broiler.HtmlBridge.Rendering`** (a whole assembly for one `internal
+  static HtmlPostProcessor` regex rewriter) and relocate the post-processor into `Dom` — **not** `Core`, since
+  a regex rewriter is exactly what the Core exit criterion excludes; all three consumers already reach `Dom`
+  transitively, so no new edge is added. (3) **Close the `Core`-purity gap by namespace separation, not a
+  fourth assembly:** the module scanners/loaders/linker (`EsModuleScanner`, `ScriptExtractionService`,
+  `ModuleGraphLoader`, `UrlResolver`, `EsModuleLinker`, …) move under an explicit internal-scripting namespace
+  while contracts/value objects (`IDomBridgeRuntime`, `Origin`, `PageContent`, `ScriptExecutionResult`,
+  `ContentSecurityPolicy`, …) keep the top-level namespace — because both `Dom` and `Scripting` share the
+  mechanism, it cannot leave `Core` without a fourth shared assembly (the anti-goal). (4) The static
+  `RenderLogger` (mutable global logging the exit criterion names) **stays** as a sanctioned cross-cutting
+  diagnostics primitive — an injected `IRenderLog` would touch hundreds of sites for no deployment benefit.
+  (5) **Profiling stays** (resolving the P8.7-deferred call): its removal is a v2-unadaptable public-surface
+  deletion, and dropping one now-consistent, null-by-default, test-covered opt-in hook does not clear the
+  *"v3 only for changes which cannot be adapted behind v2"* bar. The physical moves that close the
+  `Core`-purity exit criterion are sequenced in the record as verified follow-ups **F1** (delete `Rendering`),
+  **F2** (namespace-carve `Core`), **F3** (`internal`-ize the now-namespaced mechanism) — each a build-graph
+  change best delivered as its own baseline-verified increment. Decisions 1 and 5 need no code; item 6's
+  *decision* is complete.
 
