@@ -1327,6 +1327,22 @@ rasterizer-fidelity tail (Broiler's rasteriser vs Chromium's) that the ≤1 %-di
 just inside. Crossing it needs rasteriser-level parity (glyph AA + image resampling), a separate hard
 increment; the correct font *metrics* (advance widths + load order) are now in place as the foundation.
 
+**Anti-aliasing-aware comparison — tried, does not cross the threshold (2026-07-21).** The obvious next lever
+was an AA-aware pixel diff (a faithful port of the `pixelmatch` edge-AA detection) as a post-failure fallback,
+so cross-rasteriser glyph/edge AA is not charged. Measured on `clip-content-box`: it correctly absorbs the
+clean-edged AA, taking the differing count **12139 → 8846 (1.54 % → 1.125 %)** — but still over the 1 %
+threshold, because 16 pt (~21 px) body text has 1–2 px glyph strokes whose edge pixels lack the 3-flat-neighbour
+neighbourhood `pixelmatch` requires (`hasManySiblings`), so thin-text edges are not classed as AA and remain
+charged. Across the vendored css-backgrounds / css-align / CSS2 subsets it flipped **zero** tests (all the
+text-heavy near-misses land at 1.0–1.2 % non-AA diff). Reverted — a scoring-semantics change with no
+demonstrated pass gain and unbounded false-pass surface is not worth shipping. The honest conclusion: for
+Broiler's methodology (compare against a **Chromium golden PNG**, not a Broiler-rendered `rel=match`), any test
+whose viewport carries a non-trivial amount of small real-font text is gated at ~1 % by glyph-rasteriser
+divergence and cannot be won without either (a) rasteriser-level glyph-AA parity with Chromium (a
+`Broiler.Graphics` text-rendering increment) or (b) a fuzzier scoring policy than the current strict 1 % —
+which would be gaming unless it mirrors an explicit per-test WPT `<meta name=fuzzy>`. Ahem-font tests are the
+exception (fixed-coverage glyphs), which is why WPT itself uses Ahem for layout tests.
+
 ### Remaining failure landscape (after the merged clusters)
 
 The tractable in-flow / parse / DOM wins are largely exhausted. What remains
