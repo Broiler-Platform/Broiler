@@ -1,0 +1,68 @@
+From 616c11ae51233d985b9e930bb1c8591d003961d7 Mon Sep 17 00:00:00 2001
+From: Claude <enrico.bartky@gmail.com>
+Date: Thu, 23 Jul 2026 20:13:09 +0000
+Subject: [PATCH] ILCodeGenerator: declare pooled compiler temps on demand in
+ VisitParameter
+
+A pooled scratch temp (#Temp<Type><id>) could reach VisitParameter before the
+block that declares it was visited by the IL generator, or after an out-of-order
+VariableParameters snapshot dropped it, throwing KeyNotFoundException and
+aborting the whole script compile (WPT '#TempJSValue... was not present in the
+dictionary' crash cluster). Declare the local on demand for #Temp-prefixed
+parameters: temps are keyed by reference so the on-demand local is the same one
+every later read/write resolves to, preserving value semantics regardless of
+visit order. The branch only runs on the path that already threw, so it cannot
+change a compilation that currently succeeds. Genuine user-variable resolution
+failures still surface via the original throwing indexer.
+---
+ .../ILCodeGenerator.VisitParameter.cs         | 27 +++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.VisitParameter.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.VisitParameter.cs
+index 63ce50c0..f2e02a6f 100644
+--- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.VisitParameter.cs
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.VisitParameter.cs
+@@ -47,6 +47,24 @@ public partial class ILCodeGenerator
+                 il.EmitNew(ScriptInfoBoxCtor);
+                 return true;
+             }
++            else if (IsCompilerTemp(yParameterExpression.Name))
++            {
++                // A pooled compiler scratch temp (e.g. "#TempJSValue123") can reach
++                // here undeclared: the block that lists it in its Variables is visited
++                // by the IL generator only when Visit descends into it, so a reference
++                // that is emitted before that block runs — or one whose declaring block
++                // was dropped by an out-of-order VariableParameters snapshot — finds no
++                // local yet. Temps are keyed by reference, so declaring the local now
++                // yields the very same local every later read/write of this temp
++                // resolves to (VisitBlock skips re-creating an already-present key),
++                // keeping value semantics intact regardless of visit order. Previously
++                // this fell through to the indexer below and threw KeyNotFoundException,
++                // aborting the entire script's compilation — the WPT
++                // "#TempJSValue… was not present in the dictionary" crash cluster. This
++                // branch only runs on the path that already failed, so it cannot change
++                // a compilation that currently succeeds.
++                v = variables.Create(yParameterExpression);
++            }
+             else
+             {
+                 v = variables[yParameterExpression];
+@@ -93,6 +111,15 @@ public partial class ILCodeGenerator
+         return true;
+     }
+ 
++    // Compiler-synthesized scratch temporaries are named "#Temp<Type><id>" by
++    // FastFunctionScope.GetTempVariable. The "#Temp" prefix is unreachable for a
++    // real JS binding (a source identifier cannot start with '#', and private
++    // names are "#name" without the "Temp" segment), so it precisely identifies a
++    // pooled temp whose local may be declared on demand without shadowing a user
++    // variable resolution failure — which must still surface.
++    private static bool IsCompilerTemp(string name)
++        => name is not null && name.StartsWith("#Temp", StringComparison.Ordinal);
++
+     private bool TryResolveVariableByName(string name, out Variable variable)
+     {
+         variable = null;
+-- 
+2.43.0
+

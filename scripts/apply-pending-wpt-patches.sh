@@ -21,9 +21,11 @@
 
 set -euo pipefail
 
-# Only 0012 is pending (its fix is not in the pinned Broiler.HTML pointer).
+# Patches whose fix is not in the pinned submodule pointer and could not be
+# pushed to the submodule remote (push 403 → captured under patches/).
 PENDING_PATCHES=(
   "Broiler.HTML|patches/0012-html-bg-clip-text-tables.patch"
+  "Broiler.JS|patches/0013-js-ilcodegen-declare-temp-fallback.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
