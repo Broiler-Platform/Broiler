@@ -1404,12 +1404,6 @@
       <BuildType Solution="Release-Linux|*" Project="Release" />
       <BuildType Solution="Release-Windows|*" Project="Release" />
     </Project>
-    <Project Path="src/Broiler.HtmlBridge.Rendering/Broiler.HtmlBridge.Rendering.csproj">
-      <BuildType Solution="Debug-Linux|*" Project="Debug" />
-      <BuildType Solution="Debug-Windows|*" Project="Debug" />
-      <BuildType Solution="Release-Linux|*" Project="Release" />
-      <BuildType Solution="Release-Windows|*" Project="Release" />
-    </Project>
     <Project Path="src/Broiler.HtmlBridge.Scripting/Broiler.HtmlBridge.Scripting.csproj">
       <BuildType Solution="Debug-Linux|*" Project="Debug" />
       <BuildType Solution="Debug-Windows|*" Project="Debug" />
