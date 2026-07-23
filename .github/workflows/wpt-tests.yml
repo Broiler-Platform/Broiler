@@ -172,6 +172,18 @@ jobs:
           path: ${{ env.REFERENCE_DIR }}
           key: wpt-refs-${{ env.CACHE_EPOCH }}-shard-${{ matrix.shard-index }}
 
+      # Apply any submodule fix that could not be pushed to its remote (push 403
+      # → captured under patches/) and is NOT yet in the pinned pointer, so the
+      # runner exercises it. Idempotent and scoped to the pending patch(es) only
+      # (currently just 0012); patches already contained in the pinned pointer
+      # (0013-0016) are detected as present and skipped, never re-applied. The
+      # build compiles submodule source in place, so patching the checked-out
+      # working tree before the build is sufficient — no pointer bump. Only
+      # Broiler's render is affected; Chromium reference generation is untouched.
+      - name: Apply pending submodule patches
+        shell: bash
+        run: bash scripts/apply-pending-wpt-patches.sh
+
       - name: Run WPT shard ${{ matrix.shard-index }}
         id: wpt
         shell: bash
