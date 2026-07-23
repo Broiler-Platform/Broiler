@@ -76,11 +76,29 @@ new tests pass; the module/sub-document/iframe suites are otherwise green (the o
 `HttpSubResourceTests` network cases + 1 `DomBridge_SerializeToHtml_*` — reproduce identically on a stashed
 clean baseline, i.e. pre-existing bare-container env failures).
 
-## Remaining increments (sequenced)
+## Increment 3 — add module support to CaptureService ✅ (2026-07-22)
 
-3. **Add module support to CaptureService (C).** Route module discovery/execution through the engine path
-   (now reachable via Dom). Additive — modules are dropped today — so it cannot regress existing capture; it
-   gives captured pages working modules.
+`CaptureService.ExecuteScriptsWithDom` (`Broiler.Cli`) had no module support: its regex extractor bucketed
+every `<script>` into `scripts`/`deferredScripts`, so a `type="module"` script was eval'd as a classic script,
+threw, and was dropped. Reachable now that the seam lives in Dom (Cli → Dom). Added a `TypeModuleAttrPattern`,
+routed `type="module"` scripts to a `moduleRoots` bucket (excluded from the classic buckets), and — when
+`moduleRoots` is non-empty **and** `EngineModuleSupport.Available` — built the capture context as a
+`BridgeModuleContext(csp, url)` instead of a plain `JSContext`, running the roots through `RunScriptAsync`
+after the deferred scripts (page URL as module base; per-root unique key). When the engine can't bind imports
+the context stays a plain `JSContext` and the roots are left unrun — same net effect as before (modules did
+not execute), minus the spurious syntax-error log.
+
+Additive and behavior-preserving for existing captures: for a page with no modules the `moduleRoots` bucket is
+empty, so the "nothing to run" guard, the context type, and the execution path are byte-identical to before; a
+corpus sweep confirmed **no** existing capture/Acid/WPT test uses `type="module"`. New `CaptureServiceModuleTests`
+(2): an inline module imports a value and mutates the captured DOM; a no-script page passes through untouched.
+Verified: `Broiler.Cli`/`Cli.Tests` build clean; a 729-test sweep over the capture consumers (Acid2/Acid3,
+capture, module, sub-document, iframe) shows only the 11 pre-existing bare-container env failures (6 Acid3
+score/CSS, 1 Acid2 image, 3 `HttpSubResource` network, 1 `SerializeToHtml`) — all module-unrelated and all
+previously confirmed on baseline.
+
+## Remaining increment
+
 4. **Retire the linker.** Once A/B always take the engine path and C is engine-driven, drop the `ModuleScripts`
    production (`ScriptExtractionService.ExtractAll` → `ModuleGraphLoader.Load` → `EsModuleLinker.Render`), the
    `ScriptExtractionResult.ModuleScripts` property (public-API removal, baseline regen), and delete
