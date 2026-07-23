@@ -32,7 +32,7 @@ internal static class TimerBinding
     }
 
     public static JSValue SetInterval(BrowserEventLoop loop, in Arguments a) =>
-        new JSNumber(loop.SetInterval(a.Length > 0 ? a[0] as JSFunction : null));
+        new JSNumber(loop.SetInterval(a.Length > 0 ? a[0] as JSFunction : null, ReadDelayMs(a)));
 
     public static JSValue ClearInterval(BrowserEventLoop loop, in Arguments a)
     {

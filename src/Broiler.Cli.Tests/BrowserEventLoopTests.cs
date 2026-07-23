@@ -123,6 +123,21 @@ public sealed class BrowserEventLoopTests
         Assert.Equal(1, runs);
     }
 
+    [Fact]
+    public void Fast_Interval_Ticks_By_Period_Before_A_Slower_Timeout()
+    {
+        // Genuine ordering: a setInterval(10) ticks at 10, 20, 30 before a setTimeout(35) fires — the
+        // interval is interleaved with the timeout by deadline, not merely once per drain step.
+        var loop = new BrowserEventLoop();
+        var order = new List<string>();
+        var id = loop.SetInterval(Counter(() => order.Add("tick")), 10);
+        loop.SetTimeout(Counter(() => { order.Add("timeout"); loop.ClearInterval(id); }), 35);
+
+        loop.DrainAll(null);
+
+        Assert.Equal(new[] { "tick", "tick", "tick", "timeout" }, order);
+    }
+
     // ------------------------------------------------------------------
     //  Animation frames & frame actions
     // ------------------------------------------------------------------

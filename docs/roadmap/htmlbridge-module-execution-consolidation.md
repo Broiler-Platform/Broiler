@@ -157,7 +157,20 @@ delivered as its own verified increments:
   microtask-checkpoint-after-each-task order are unchanged. New `BrowserEventLoopTests` pin deadline order and
   the FIFO tiebreak; the timer/async/Acid3 suites are green (the only failures are the pre-existing Acid3
   CSS/score env cases, none timer-order-related).
-- **Remaining.** Deadline-ordered **intervals** (they still tick once per step, ignoring their period);
-  interleaving deferred-script/module tasks with timer tasks on one ordered queue (they still run as fixed
-  phase buckets in `RunPageScripts` and the iframe/capture equivalents, drained to a fixed point between
-  phases); and module evaluation enqueued after its graph resolves rather than eagerly per bucket.
+- **EL-2 — deadline-ordered intervals ✅ (2026-07-22, P7.33).** `setTimeout` and `setInterval` were separate
+  queues: intervals ignored their period and fired **once per drain step**, so a fast interval could not tick
+  the right number of times before a slower timeout. Unified both into one deadline-ordered timer queue
+  (`_timers`, a shared id space — `clearTimeout`/`clearInterval` are now interchangeable, per spec). An
+  interval carries its period and reschedules to `Deadline + Period` after each tick; `TimerBinding` plumbs
+  the period through. `DrainStep` now advances the virtual clock to the **earliest** pending deadline and
+  fires just that deadline's due batch (in `(Deadline, Seq)` order), so `setInterval(10)` ticks at 10/20/30
+  before a `setTimeout(35)` fires — while a period-0 interval still fires once per step (its deadline doesn't
+  advance) and the runaway self-rescheduling cap is preserved (one group per step, bounded by `DrainAll`).
+  New `BrowserEventLoopTests.Fast_Interval_Ticks_By_Period_Before_A_Slower_Timeout` pins the interleaving; the
+  existing once-per-step/clear interval tests pass unchanged. Regression-checked: 58/58 timer/async tests,
+  3/3 animation tests, and `Acid3CssComplianceTests` (only its 1 pre-existing CSS failure) are green — for
+  deadline-0 timers (Acid3's `setTimeout(0)` pattern) the earliest-deadline batch *is* all deadline-0 timers,
+  identical to EL-1.
+- **Remaining.** Interleaving deferred-script/module tasks with timer tasks on one ordered queue (they still
+  run as fixed phase buckets in `RunPageScripts` and the iframe/capture equivalents, drained to a fixed point
+  between phases); and module evaluation enqueued after its graph resolves rather than eagerly per bucket.
