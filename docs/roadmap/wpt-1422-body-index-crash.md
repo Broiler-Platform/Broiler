@@ -1,0 +1,102 @@
+# WPT #1422 — `body-:0,0 — Index was outside the bounds of the array.` (top crash, 59 377 tests)
+
+Triage note for [issue #1422](https://github.com/Broiler-Platform/Broiler/issues/1422)'s
+dominant problem. Companion to `wpt-triage-and-diagnostics.md`; kept separate because
+the finding is that the crash is a **direct consequence of `patches/0013`**, which
+this repo's WPT CI applies to the `Broiler.JS` working tree via
+`scripts/apply-pending-wpt-patches.sh`.
+
+## Symptom
+
+The run's #1 problem is a single crash bucket gating **59 377** of 60 396 failures:
+
+```
+body-:0,0 — Index was outside the bounds of the array.
+```
+
+Decoding the signature (`Broiler.Wpt/ExceptionSignature.cs` builds `{frame} — {message}`):
+
+- **`body-:0,0`** is a stack frame, not part of the message. Every top-level
+  script/eval/program is compiled into a dynamic method named `body`
+  (`FastCompiler.cs:268` — `BExpression.Lambda<JSFunctionDelegate>("body", …)`; the
+  runtime method name comes from `FunctionName.FullName` = `"{Name}-{Location}:{Line},{Column}"`
+  ⇒ `body-:0,0` for `Name="body"`, null location, line/col 0). So the crash is in
+  **top-level program execution**, which is why its blast radius is essentially every
+  testharness-driven test (the ~1 000 non-crashing failures are reftests/manual/parse
+  failures that never reach script execution).
+- **`Index was outside the bounds of the array.`** is a runtime
+  `IndexOutOfRangeException` thrown *inside* that compiled `body` method.
+
+## Root cause — `patches/0013` converts a compile crash into a runtime crash
+
+The manifest history is conclusive (`tests/wpt-baseline/failed-tests.json`,
+`exceptionSignatures`):
+
+| Run (commit) | Top signature |
+|---|---|
+| `044a704` — before 0013 reached CI | `ILCodeGenerator.VisitParameter — The given key '#TempJSValue100032' was not present…` (issue #1419's **compile-time** `KeyNotFoundException`, fragmented per temp id) |
+| `65da1b3` — with 0013 applied | `body-:0,0 — Index was outside the bounds of the array.` × 59 377 (a **runtime** `IndexOutOfRangeException`) |
+
+The #1419 KeyNotFound buckets vanish and one unified runtime crash appears. Same
+tests, different failure mode.
+
+### Mechanism
+
+1. A pooled compiler scratch temp `#Temp<Type><id>` (minted by
+   `FastFunctionScope.GetTempVariable`, kept in the **function-level**
+   `TopScope.variableScopeList`) can reach the IL generator **undeclared** when it was
+   minted after its enclosing block's `VariableParameters` snapshot — the temp lives in
+   the function scope but appears in no block's variable list, so
+   `LambdaRewriter`'s `CollectBlockVariables` never registers it and no local is
+   declared for it. (This is the "out-of-order VariableParameters snapshot" that
+   `patches/0013` describes.)
+2. **Before 0013:** the undeclared reference hit the throwing `variables[exp]` indexer
+   in `ILCodeGenerator.VisitParameter` → `KeyNotFoundException` → the whole script's
+   compilation aborted (`ScriptError`, whole-page render failure). This was #1419.
+3. **After 0013:** `VisitParameter` no longer throws for `#Temp`-prefixed params — it
+   declares a local on demand (`variables.Create`). Compilation now **succeeds**, and
+   the `body` method runs far enough to execute the array access that the dropped temp
+   participates in. Top-level identifier/slot access resolves through
+   `ScriptInfo.Indices[constantSlot]` (`ScriptInfoBuilder.Index` →
+   `Expression.ArrayIndex(…Indices, Constant(index))`), where `Indices` is a
+   `KeyString[]` sized at compile time to `keyStrings.List.Count`
+   (`ScriptInfoBuilder.Build`). A dropped top-level temp desynchronizes slot
+   assignment from that finalized array length, so the emitted constant slot is
+   **out of bounds at runtime** → `IndexOutOfRangeException` in `body`.
+   (`JSValue` is a reference type, so a merely-uninitialized temp local would raise
+   `NullReferenceException`, not this — consistent with the fault being an array index,
+   not a null value.)
+
+### Secondary gap in 0013
+
+`patches/0013` patches only the **read** path (`ILCodeGenerator.VisitParameter`). The
+**store** path (`ILCodeGenerator.AssignParameter`, ~line 26) still falls through to the
+throwing `variables[exp]` indexer, so a dropped temp whose *first* emitted reference is
+a write is unhandled. (Empirically the observed temps are read-first, so this is latent
+rather than active, but it makes 0013 asymmetric.)
+
+## Net effect
+
+`patches/0013` does **not** reduce the WPT failure count for this cluster — it relabels
+#1419's compile-time crash as a runtime crash on the same ~59 k tests (its own
+validation was the 250 `Broiler.JavaScript.Compiler.Tests` unit tests, which do not
+exercise the drop; the crash needs the full sequential shard run, where the global
+`FastFunctionScope.id` reaches ~100 020–100 238 — cumulative session state that does
+not arise on an isolated render).
+
+## The real fix (needs the full WPT run to validate)
+
+The correct fix is at the **temp-registration layer in `Broiler.JS`**, not the IL
+generator's fallback: ensure a top-level `#Temp` is registered (and its
+`ScriptInfo.Indices` slot accounted for) in the block/scope that references it, so it is
+never dropped — i.e. take the `VariableParameters`/`CollectBlockVariables` snapshot
+after all temps for that scope exist, or register a late-minted temp into the enclosing
+`body` block. Candidate sites: `FastCompiler.cs` (body block assembly, lines ~222/249),
+`LambdaRewriter.VisitBlock`/`CollectBlockVariables`, and the destructuring-catch
+snapshot in `FastCompiler.VisitTryStatement.cs:88`. Any change must be validated against
+a full sharded WPT run (not just the compiler unit tests) because the failure is
+cumulative-state-dependent and did not reproduce on isolated renders in-sandbox.
+
+Until that lands, `patches/0013` should be understood as a partial mitigation (it clears
+the #1419 compile-abort so unrelated work on the same pages can proceed) rather than a
+fix for the crash cluster, which persists at runtime as this issue.
