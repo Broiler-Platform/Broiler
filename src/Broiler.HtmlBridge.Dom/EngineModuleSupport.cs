@@ -8,8 +8,10 @@ namespace Broiler.HtmlBridge.Scripting;
 /// One-time, cached probe for whether the underlying JS engine can actually drive ES modules end-to-end
 /// (a static import binds its value). This is true only once the engine carries the top-level-await codegen
 /// fix (submodule patch 0010) and the module-orchestration completion fix (patch 0011). On an engine
-/// without them a static import resolves to <c>undefined</c> or the module body stalls, so the bridge must
-/// keep its own <see cref="EsModuleLinker"/>.
+/// without them a static import resolves to <c>undefined</c> or the module body stalls. Since the
+/// string-rewriting linker fallback was retired (Phase 7 tail), the module-execution surfaces run modules
+/// only when this returns true; otherwise a page's <c>&lt;script type="module"&gt;</c> is left unrun rather
+/// than fed to a fallback.
 ///
 /// The probe runs a real module (a static <c>data:</c> import) through a <see cref="BridgeModuleContext"/>
 /// and checks the binding. It is guarded by a timeout because, on an un-patched engine, the module init can
@@ -35,7 +37,7 @@ public static class EngineModuleSupport
             if (!probe.Wait(ProbeTimeout))
             {
                 RenderLogger.LogDebug(LogCategory.JavaScript, nameof(EngineModuleSupport),
-                    "Engine module probe timed out; using EsModuleLinker fallback.");
+                    "Engine module probe timed out; ES modules will be left unrun.");
                 return false;
             }
 
@@ -43,13 +45,13 @@ public static class EngineModuleSupport
             RenderLogger.LogDebug(LogCategory.JavaScript, nameof(EngineModuleSupport),
                 supported
                     ? "Engine binds ES-module imports; using engine-driven module execution."
-                    : "Engine does not bind ES-module imports; using EsModuleLinker fallback.");
+                    : "Engine does not bind ES-module imports; ES modules will be left unrun.");
             return supported;
         }
         catch (Exception ex)
         {
             RenderLogger.LogDebug(LogCategory.JavaScript, nameof(EngineModuleSupport),
-                $"Engine module probe failed ({ex.GetType().Name}); using EsModuleLinker fallback.");
+                $"Engine module probe failed ({ex.GetType().Name}); ES modules will be left unrun.");
             return false;
         }
     }

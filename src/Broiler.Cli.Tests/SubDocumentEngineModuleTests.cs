@@ -10,8 +10,10 @@ namespace Broiler.Cli.Tests;
 /// module path when the page is engine-driven — i.e. the parent's JS context is a
 /// <see cref="BridgeModuleContext"/> and <see cref="EngineModuleSupport.Available"/> — exactly like the main
 /// page. Before this, <c>ExecuteSubDocumentScripts</c> always ran the linked <c>ModuleScripts</c> strings; now
-/// it prefers the engine's own module machinery on the authorised <c>ModuleRoots</c>, keeping the linker as
-/// the fallback for a non-module-context parent (verified by <see cref="Iframe_Module_Linker_Fallback_On_Plain_Context"/>).
+/// it runs the authorised <c>ModuleRoots</c> through the engine's own module machinery. The string-rewriting
+/// <c>EsModuleLinker</c> fallback was retired (Phase 7 tail), so a sub-document module needs an engine-driven
+/// parent (a <c>JSModuleContext</c>); under a plain-<c>JSContext</c> parent it is not executed — a documented
+/// limitation pinned by <see cref="Iframe_Module_Not_Run_Under_Plain_Context_Parent"/>.
 /// </summary>
 public sealed class SubDocumentEngineModuleTests
 {
@@ -50,16 +52,18 @@ public sealed class SubDocumentEngineModuleTests
     }
 
     [Fact]
-    public void Iframe_Module_Linker_Fallback_On_Plain_Context()
+    public void Iframe_Module_Not_Run_Under_Plain_Context_Parent()
     {
-        // A plain (non-module) JSContext parent must still run the iframe's module — via the EsModuleLinker
-        // fallback — so the migration does not regress the non-engine path.
+        // With the EsModuleLinker fallback retired, an iframe module needs an engine-driven (JSModuleContext)
+        // parent. Under a plain JSContext parent the module is not executed, so its DOM effect is absent.
+        // (This is the documented limitation of the engine-only module path.)
         using var context = new JSContext();
         var bridge = new DomBridge();
         bridge.Attach(context, FrameHost, "file:///host.html");
 
         context.Eval(SetSrcdocWithModule);
 
-        Assert.Equal("eng", context.Eval(ReadSubDocMarker).StringValue);
+        // The <div id="t"> exists but the module never ran, so no data-m attribute was written.
+        Assert.NotEqual("eng", context.Eval(ReadSubDocMarker).StringValue);
     }
 }

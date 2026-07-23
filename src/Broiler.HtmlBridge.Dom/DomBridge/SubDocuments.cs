@@ -336,7 +336,6 @@ public sealed partial class DomBridge
         if (extraction.Scripts.Count == 0 &&
             extraction.AsyncScripts.Count == 0 &&
             extraction.DeferredScripts.Count == 0 &&
-            extraction.ModuleScripts.Count == 0 &&
             extraction.ModuleRoots.Count == 0)
             return;
 
@@ -383,12 +382,13 @@ public sealed partial class DomBridge
                 }
             }
 
-            // Phase 7 tail: ES modules run last (they are deferred). When the page is engine-driven — its
-            // context is a JSModuleContext (a BridgeModuleContext) and the engine binds static imports — run
-            // the authorised roots through the engine's own module machinery, exactly like the main page
-            // (ScriptEngine.RunPageScripts). Otherwise fall back to the linked ModuleScripts strings that
-            // ExtractAll produced via EsModuleLinker. The gate mirrors surface A, so a non-module-context
-            // parent (e.g. the CLI capture path or a plain-JSContext test) is unaffected.
+            // Phase 7 tail: ES modules run last (they are deferred), through the engine's own module
+            // machinery — exactly like the main page (ScriptEngine.RunPageScripts). This needs a module
+            // realm, so it runs only when the sub-document shares an engine-driven parent context (a
+            // JSModuleContext / BridgeModuleContext) and the engine binds static imports. The string-rewriting
+            // EsModuleLinker fallback was retired, so a sub-document module under a plain-JSContext parent
+            // (no top-level modules on the host page) is not executed — a documented limitation of the
+            // engine-only module path.
             if (_jsContext is JSModuleContext subModuleContext
                 && EngineModuleSupport.Available
                 && extraction.ModuleRoots.Count > 0)
@@ -405,21 +405,6 @@ public sealed partial class DomBridge
                     {
                         RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ExecuteSubDocumentScripts",
                             $"Sub-document module root {root.Key} error: {ex.Message}", ex);
-                    }
-                }
-            }
-            else
-            {
-                foreach (var script in extraction.ModuleScripts)
-                {
-                    try
-                    {
-                        _jsContext.Eval(script);
-                    }
-                    catch (Exception ex)
-                    {
-                        RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ExecuteSubDocumentScripts",
-                            $"Sub-document module script error: {ex.Message}", ex);
                     }
                 }
             }

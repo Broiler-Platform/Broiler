@@ -97,14 +97,47 @@ capture, module, sub-document, iframe) shows only the 11 pre-existing bare-conta
 score/CSS, 1 Acid2 image, 3 `HttpSubResource` network, 1 `SerializeToHtml`) — all module-unrelated and all
 previously confirmed on baseline.
 
-## Remaining increment
+## Increment 4 — retire the linker ✅ (2026-07-22)
 
-4. **Retire the linker.** Once A/B always take the engine path and C is engine-driven, drop the `ModuleScripts`
-   production (`ScriptExtractionService.ExtractAll` → `ModuleGraphLoader.Load` → `EsModuleLinker.Render`), the
-   `ScriptExtractionResult.ModuleScripts` property (public-API removal, baseline regen), and delete
-   `EsModuleLinker`, `EsModuleScanner`, `EsModuleLiveRefs`, `ModuleGraphLoader`, `ModuleScriptWrapper`
-   (all in `Broiler.HtmlBridge.Internal.Scripting`). The `EngineModuleSupport` probe/gate can then be
-   simplified since the fallback is gone — a deliberate commit to the engine path, gated on the pinned engine.
+With all three surfaces on the engine path, the string-rewriting `EsModuleLinker` fallback is deleted. Changes:
+
+- **`ScriptExtractionService.ExtractAll`** no longer builds the linked graph: the authorised top-level modules
+  are collected directly as `ModuleRoot`s (the intermediate `ModuleGraphLoader.GraphModule` is gone), and the
+  `ModuleGraphLoader.Load` → `EsModuleLinker.Render` call and the `ResolveDependencyModule` dependency-fetch
+  helper are removed. `ModuleRoots` is the sole module-execution output.
+- **`ScriptExtractionResult.ModuleScripts`** (the linked-strings property) is removed — the one public-API
+  change; baseline regenerated, diff verified to be exactly the property + its constructor parameter and
+  nothing else.
+- **`RenderingPipeline`** drops the `DeferredScripts.Concat(ModuleScripts)` fallback and always passes
+  `ModuleRoots` (ScriptEngine gates on `EngineModuleSupport.Available`). **`SubDocuments`** (iframe) drops the
+  `ModuleScripts` else-branch.
+- **Deleted** (all in `Broiler.HtmlBridge.Internal.Scripting`): `EsModuleLinker`, `EsModuleScanner`,
+  `EsModuleLiveRefs`, `ModuleGraphLoader`, `ModuleScriptWrapper`, `EsModuleSyntax` — ~1,900 lines of
+  string-rewriting module-linking machinery. Doc comments/log messages that named the fallback were updated.
+
+**Documented behavior change.** With no fallback, a sub-document (iframe) module runs only under an
+engine-driven parent (a `JSModuleContext`); a module-bearing iframe on a *module-less* host page (whose
+context is a plain `JSContext`) is left unrun rather than linker-run. This is the trade-off of the engine-only
+path; on the pinned engine the main production paths (App render, CLI capture) give module-bearing pages an
+engine context, so the affected case is narrow.
+
+**Test changes.** `EsModuleGraphTests` (34 tests of the linker/graph machinery) deleted. `ModuleScriptSliceTests`
+rewritten to assert against `ModuleRoots`/`ModuleMap` instead of the removed `ModuleScripts`/`ModuleScriptWrapper`
+(the module-extraction contract it pins is unchanged). `EngineModuleWiringTests` simplified to the engine-only
+path. The increment-2 `Iframe_Module_Linker_Fallback_On_Plain_Context` became
+`Iframe_Module_Not_Run_Under_Plain_Context_Parent`, pinning the documented limitation.
+
+Verified: all projects build clean; the public-API snapshot (one removal), boundary-guard, and the module /
+sub-document / iframe / capture suites are green — 372/377 in the sweep, the 5 failures being pre-existing
+bare-container env failures (1 Acid3 image-capture, 3 `HttpSubResource` network, 1 `SerializeToHtml`), all
+module-unrelated.
+
+## Outcome
+
+All four increments delivered. Every script-execution surface (App render/interactive, iframes/sub-documents,
+CLI capture) now runs ES modules through the engine's own module machinery via `BridgeModuleContext`, gated by
+the `EngineModuleSupport` probe; the string-rewriting `EsModuleLinker` and its scanner/linker/loader/wrapper
+are gone. The Phase 7 item-6 tail's *"sub-document/CLI paths still use the linker"* item is closed.
 
 ## Out of scope here — genuine event-loop ordering
 

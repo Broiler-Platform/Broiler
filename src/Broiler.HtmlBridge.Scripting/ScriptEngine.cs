@@ -96,10 +96,9 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
     /// <summary>
     /// As <see cref="Execute(IReadOnlyList{string}, IReadOnlyList{string}, string, string?)"/>, with the
     /// document's authorised ES-module roots. When the engine binds imports (<see cref="EngineModuleSupport"/>),
-    /// the roots run through the engine's own module machinery on a <see cref="BridgeModuleContext"/>; the
-    /// caller must then NOT have pre-appended the linked <see cref="ScriptExtractionResult.ModuleScripts"/> to
-    /// <paramref name="deferredScripts"/>. When the engine does not, the roots are ignored and the linked
-    /// strings in <paramref name="deferredScripts"/> run as before.
+    /// the roots run through the engine's own module machinery on a <see cref="BridgeModuleContext"/> after the
+    /// <paramref name="deferredScripts"/>; otherwise they are left unrun (the string-rewriting linker fallback
+    /// was retired in the Phase 7 tail).
     /// </summary>
     public string? Execute(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url, IReadOnlyList<ModuleRoot>? moduleRoots)
         => ExecuteCore(scripts, deferredScripts, html, url, moduleRoots, static bridge => bridge.SerializeToHtml());
