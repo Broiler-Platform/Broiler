@@ -39,6 +39,17 @@ engine-driven ES-module path is the **active** path (the `EsModuleLinker` is now
 fallback used only if an un-patched engine is ever pinned). The 288 `~Module` `Broiler.Cli.Tests`
 pass on this active engine path with zero failures.
 
+**Pending patches are applied on the WPT CI run.** The WPT runner
+(`.github/workflows/wpt-tests.yml`) checks out submodules at their pinned pointers and does not,
+by itself, apply anything under `patches/`. To exercise a fix that is captured here but **not yet
+in the pinned pointer** (currently only **0012**), the `run` job invokes
+`scripts/apply-pending-wpt-patches.sh` after the recursive checkout and before the build. The
+script is **idempotent and scoped to the pending list only**: a patch already present in the
+checked-out tree (reverse-apply succeeds) is skipped, so it stops being applied automatically the
+moment a maintainer lands the fix upstream and the pointer is bumped. The build compiles submodule
+source in place, so patching the working tree is sufficient — no commit, no pointer bump; only
+Broiler's render is affected, not Chromium reference generation.
+
 Patch **`0010` — APPLIED** (pinned `98b07636`; push 403 at authoring, later applied upstream
 by a maintainer) — fixes the top-level-await **codegen** bug that
 §0008 root-caused. The generator box-load prologue re-seeded the persisted `ScriptInfo`
@@ -86,7 +97,7 @@ ordering, is the remaining separately-scoped bridge task).
 | 0009 — session-isolation regression tests | `Broiler.JS` | **applied** — `3f0c7054` (the pinned pointer) | **Test-only guard** — Phase 2. Locks in that two live `JSContext` instances are isolated (the property the bridge's "two simultaneous sessions" exit criterion relies on). No production change; the bridge-side criterion is also proven CI-green by `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`. |
 | 0010 — `GeneratorRewriter`: seed the `ScriptInfo` box on first entry only (fix TLA resume) | `Broiler.JS` | **APPLIED** — `64fda04f`; contained in the pinned `98b07636` | **Fixes the §0008 codegen blocker** — Phase 7 item 6. Top-level await now runs post-resume statements correctly (full-suite validated, zero regressions). Module *value* binding additionally needs `0011` (also pinned). |
 | 0011 — `Modules`: pumped module init + Clr-independent import binding | `Broiler.JS` | **APPLIED** — `98b07636` (the pinned pointer); **stacks on `0010`** | **Completes the engine-driven module path** — Phase 7 item 6. A static import now binds its value (was `undefined`/`0`): pumped `AsyncPump.Run` init, `CompileDirect` (no compile double-marshal), and `import()` via `JSValue.CreatePromiseFromTask` instead of the Clr-only interop. Full-suite validated, zero regressions. With `0010`+`0011` pinned, `EngineModuleSupport.Available` is `true` and the bridge runs modules through the engine (P7.27); retiring `EsModuleLinker` + wiring sub-document/CLI + event-loop ordering is the remaining bridge task. |
-| 0012 — `PaintWalker`: propagate `background-clip:text` color into table cell text | `Broiler.HTML` | **PENDING** (push 403; pinned `5c16c12` does not contain it) | **WPT cluster 50** — `PaintChildren` routed `table`/`inline-table` boxes to `PaintTableChildren` without the `bgClipTextColor`, so a `<table>` with `background-clip:text` left its cell text uncomposited (background not clipped to glyphs). Threads it through so table cell text is clipped like block/inline-block/float descendants (verified on `css-backgrounds/background-clip/clip-text-descendants`: the `<table>`/`<table transformed>` rows now render purple). **No main-repo fallback** — the fix is entirely in the `Broiler.HTML` paint layer. The reftest stays pixel-gated on orthogonal table-layout metrics + glyph AA, so it does not flip until the patch lands and those are addressed, but the specific clip bug is fixed. |
+| 0012 — `PaintWalker`: propagate `background-clip:text` color into table cell text | `Broiler.HTML` | **PENDING upstream** (push 403; pinned `5c16c12` does not contain it) — **applied on the WPT CI run** by `scripts/apply-pending-wpt-patches.sh` (idempotent; reverts to skip once a maintainer bumps the pointer) | **WPT cluster 50** — `PaintChildren` routed `table`/`inline-table` boxes to `PaintTableChildren` without the `bgClipTextColor`, so a `<table>` with `background-clip:text` left its cell text uncomposited (background not clipped to glyphs). Threads it through so table cell text is clipped like block/inline-block/float descendants (verified on `css-backgrounds/background-clip/clip-text-descendants`: the `<table>`/`<table transformed>` rows now render purple). **No main-repo fallback** — the fix is entirely in the `Broiler.HTML` paint layer. The reftest stays pixel-gated on orthogonal table-layout metrics + glyph AA, so it does not flip until the patch lands and those are addressed, but the specific clip bug is fixed. |
 
 To apply a *future* patch (kept for reference):
 
