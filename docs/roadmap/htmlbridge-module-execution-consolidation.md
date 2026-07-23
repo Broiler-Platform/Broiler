@@ -57,13 +57,27 @@ unchanged, so source consumers are unaffected. `BridgeModuleContext` is `interna
 Verified: all eleven affected projects build clean; **303/303** module + public-API-snapshot + boundary-guard
 tests pass. This unblocks surfaces **B** (Dom can now reach the seam) and **C** (Cli → Dom).
 
+## Increment 2 — migrate the iframe path onto the engine path ✅ (2026-07-22)
+
+In `ExecuteSubDocumentScripts` (`Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs`) the iframe module step now
+prefers the engine path: when the page is engine-driven — the shared `_jsContext` is a `JSModuleContext`
+(a `BridgeModuleContext`) **and** `EngineModuleSupport.Available` **and** `ModuleRoots` are present — it runs
+each authorised root through `RunScriptAsync` on that context (inside the existing
+`RunWithWindowContext(subWindow, …)` scope, so `document`/`window` resolve to the sub-window), exactly like
+`ScriptEngine.RunPageScripts`. Otherwise it falls back to eval'ing the linked `ModuleScripts` strings — so a
+non-module-context parent (the CLI-capture path, or a plain-`JSContext` test) is unchanged. The emptiness guard
+now also considers `ModuleRoots` (robust for when `ModuleScripts` is later deleted). This closes the one
+production `ModuleScripts` consumer that was not engine-gated.
+
+New `SubDocumentEngineModuleTests` (2) — the iframe module path had **no** execution coverage before: an
+iframe `srcdoc` module runs and mutates the sub-document DOM through the engine path when the parent is a
+`BridgeModuleContext`, and through the linker fallback on a plain `JSContext`. Verified regression-free: the
+new tests pass; the module/sub-document/iframe suites are otherwise green (the only failures — 3
+`HttpSubResourceTests` network cases + 1 `DomBridge_SerializeToHtml_*` — reproduce identically on a stashed
+clean baseline, i.e. pre-existing bare-container env failures).
+
 ## Remaining increments (sequenced)
 
-2. **Migrate the iframe path (B) onto the engine path.** In `ExecuteSubDocumentScripts`
-   (`Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs`), run `extraction.ModuleRoots` through a
-   `BridgeModuleContext` on the sub-window realm when `EngineModuleSupport.Available`, keeping the
-   `ModuleScripts`/linker branch as the fallback (mirroring surface A). Update the emptiness guard to consider
-   `ModuleRoots`. Verify against the sub-document module suite.
 3. **Add module support to CaptureService (C).** Route module discovery/execution through the engine path
    (now reachable via Dom). Additive — modules are dropped today — so it cannot regress existing capture; it
    gives captured pages working modules.
