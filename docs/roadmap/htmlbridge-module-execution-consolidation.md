@@ -141,10 +141,23 @@ are gone. The Phase 7 item-6 tail's *"sub-document/CLI paths still use the linke
 
 ## Out of scope here — genuine event-loop ordering
 
-The roadmap also lists "genuine event-loop ordering (vs the eager deferred-bucket run)". Today `RunPageScripts`
-(and the iframe/capture equivalents) run scripts → deferred → modules → load as **fixed phase buckets**,
-draining async work to a fixed point between phases via `DrainAsyncWork`; `BrowserEventLoop` fires timers as an
-unordered per-step snapshot with no deadline ordering. A spec-faithful loop (a single ordered task queue with
-per-task microtask checkpoints, deadline-ordered timers, module evaluation enqueued after graph resolution)
-is a **separate, larger `BrowserEventLoop` rework** — also a Phase-2 residual — and is tracked apart from the
-linker-retirement work above.
+The roadmap also lists "genuine event-loop ordering (vs the eager deferred-bucket run)". A spec-faithful loop
+(a single ordered task queue with per-task microtask checkpoints, deadline-ordered timers, module evaluation
+enqueued after graph resolution) is a **larger `BrowserEventLoop` rework** — also a Phase-2 residual —
+delivered as its own verified increments:
+
+- **EL-1 — deadline-ordered timeouts ✅ (2026-07-22, P7.32).** `BrowserEventLoop` fired timeouts as an
+  **unordered per-step snapshot** and discarded the delay entirely (`SetTimeout` took only a callback;
+  `TimerBinding` never read `a[1]`). Now the delay is plumbed through, each timeout carries a virtual
+  `Deadline` (`now + max(0, delay)`) and a monotonic registration `Seq`, and the per-step batch fires in
+  `(Deadline, Seq)` order against a virtual clock that advances as timers fire. So
+  `setTimeout(a, 100); setTimeout(b, 0)` runs `b` before `a` (previously arbitrary), while equal delays keep
+  FIFO. Bounded and behavior-preserving otherwise: the batch-per-step structure is kept, so the runaway
+  self-rescheduling-timer cap (`DrainAll` iteration limit / `AsyncDrainLimitExhausted`) and the
+  microtask-checkpoint-after-each-task order are unchanged. New `BrowserEventLoopTests` pin deadline order and
+  the FIFO tiebreak; the timer/async/Acid3 suites are green (the only failures are the pre-existing Acid3
+  CSS/score env cases, none timer-order-related).
+- **Remaining.** Deadline-ordered **intervals** (they still tick once per step, ignoring their period);
+  interleaving deferred-script/module tasks with timer tasks on one ordered queue (they still run as fixed
+  phase buckets in `RunPageScripts` and the iframe/capture equivalents, drained to a fixed point between
+  phases); and module evaluation enqueued after its graph resolves rather than eagerly per bucket.

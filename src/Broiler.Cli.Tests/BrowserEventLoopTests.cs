@@ -38,6 +38,37 @@ public sealed class BrowserEventLoopTests
     }
 
     [Fact]
+    public void Timeouts_Fire_In_Deadline_Order_Not_Registration_Order()
+    {
+        // Genuine event-loop timer ordering: an earlier-deadline timer fires first even when registered
+        // later. setTimeout(late, 100); setTimeout(early, 0); setTimeout(mid, 50) => early, mid, late.
+        var loop = new BrowserEventLoop();
+        var order = new List<string>();
+        loop.SetTimeout(Counter(() => order.Add("late")), 100);
+        loop.SetTimeout(Counter(() => order.Add("early")), 0);
+        loop.SetTimeout(Counter(() => order.Add("mid")), 50);
+
+        loop.DrainAll(null);
+
+        Assert.Equal(new[] { "early", "mid", "late" }, order);
+    }
+
+    [Fact]
+    public void Timeouts_With_Equal_Delay_Fire_In_Registration_Order_Fifo()
+    {
+        // Equal deadlines keep FIFO (registration) order — the tiebreak the HTML spec requires.
+        var loop = new BrowserEventLoop();
+        var order = new List<string>();
+        loop.SetTimeout(Counter(() => order.Add("first")), 0);
+        loop.SetTimeout(Counter(() => order.Add("second")), 0);
+        loop.SetTimeout(Counter(() => order.Add("third")), 0);
+
+        loop.DrainAll(null);
+
+        Assert.Equal(new[] { "first", "second", "third" }, order);
+    }
+
+    [Fact]
     public void SetTimeout_Allocates_An_Id_Even_Without_A_Callback()
     {
         var loop = new BrowserEventLoop();
