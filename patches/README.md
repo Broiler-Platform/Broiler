@@ -39,6 +39,18 @@ engine-driven ES-module path is the **active** path (the `EsModuleLinker` is now
 fallback used only if an un-patched engine is ever pinned). The 288 `~Module` `Broiler.Cli.Tests`
 pass on this active engine path with zero failures.
 
+**WPT `css/*` submodule fixes (`0013`–`0016`) are captured here and are already applied upstream
+(verified 2026-07-23).** These are the `css-text` / `css-backgrounds` / `css-conditional` triage
+fixes described in `docs/roadmap/wpt-triage-and-diagnostics.md` (clusters 38, 39, 41, 43). Each
+was authored when the `MaiRat/Broiler.*` push returned **403**, later applied upstream by a
+maintainer, and is now contained in the pinned submodule pointers — but the patch files were
+never added to this directory, so the roadmap referenced patch numbers (`0008`–`0010`, `0013`)
+that collided with the JS patches above. They are re-materialised here at the next free numbers
+`0013`–`0016` (in cluster order) from the introducing commits, and the roadmap references were
+reconciled to point at them. Each `merge-base --is-ancestor` check confirms the fix commit is an
+ancestor of the pinned pointer, so all four are **live on CI**; the files are retained for
+provenance only (no pointer bump, no main-repo fallback — every fix is entirely engine-side).
+
 Patch **`0010` — APPLIED** (pinned `98b07636`; push 403 at authoring, later applied upstream
 by a maintainer) — fixes the top-level-await **codegen** bug that
 §0008 root-caused. The generator box-load prologue re-seeded the persisted `ScriptInfo`
@@ -87,6 +99,10 @@ ordering, is the remaining separately-scoped bridge task).
 | 0010 — `GeneratorRewriter`: seed the `ScriptInfo` box on first entry only (fix TLA resume) | `Broiler.JS` | **APPLIED** — `64fda04f`; contained in the pinned `98b07636` | **Fixes the §0008 codegen blocker** — Phase 7 item 6. Top-level await now runs post-resume statements correctly (full-suite validated, zero regressions). Module *value* binding additionally needs `0011` (also pinned). |
 | 0011 — `Modules`: pumped module init + Clr-independent import binding | `Broiler.JS` | **APPLIED** — `98b07636` (the pinned pointer); **stacks on `0010`** | **Completes the engine-driven module path** — Phase 7 item 6. A static import now binds its value (was `undefined`/`0`): pumped `AsyncPump.Run` init, `CompileDirect` (no compile double-marshal), and `import()` via `JSValue.CreatePromiseFromTask` instead of the Clr-only interop. Full-suite validated, zero regressions. With `0010`+`0011` pinned, `EngineModuleSupport.Available` is `true` and the bridge runs modules through the engine (P7.27); retiring `EsModuleLinker` + wiring sub-document/CLI + event-loop ordering is the remaining bridge task. |
 | 0012 — `PaintWalker`: propagate `background-clip:text` color into table cell text | `Broiler.HTML` | **PENDING** (push 403; pinned `5c16c12` does not contain it) | **WPT cluster 50** — `PaintChildren` routed `table`/`inline-table` boxes to `PaintTableChildren` without the `bgClipTextColor`, so a `<table>` with `background-clip:text` left its cell text uncomposited (background not clipped to glyphs). Threads it through so table cell text is clipped like block/inline-block/float descendants (verified on `css-backgrounds/background-clip/clip-text-descendants`: the `<table>`/`<table transformed>` rows now render purple). **No main-repo fallback** — the fix is entirely in the `Broiler.HTML` paint layer. The reftest stays pixel-gated on orthogonal table-layout metrics + glyph AA, so it does not flip until the patch lands and those are addressed, but the specific clip bug is fixed. |
+| 0013 — `font` shorthand: parse white space around the size/line-height slash | `Broiler.CSS` | **applied** — `88adbf0` *"css: parse font shorthand with white space around the size/line-height slash"* (ancestor of the pinned `2aad88b`) | **WPT cluster 38** (`css-text`) — `font: 50px / 1 Ahem` tokenised the `/` on its own, so the size classifier read `50px` with no line-height and folded `/ 1 Ahem` into font-family (an unmatchable family → Ahem never loaded). Glues the slash back onto the size token (`NormalizeFontSlashTokens`) before classification. **No main-repo fallback** (font expansion is engine-side). Guard `CssStyleEngineTests.Font_Shorthand_Expands_With_Whitespace_Around_LineHeight_Slash`. |
+| 0014 — accept `text-align: justify-all` + the `text-align-last` property | `Broiler.CSS` | **applied** — `953cc07` *"Accept CSS Text 4 text-align:justify-all and the text-align-last property"* (ancestor of the pinned `2aad88b`) | **WPT cluster 39** (`css-text`) — the validator dropped `justify-all` and had no `text-align-last` at all. Adds `text-align:justify-all` acceptance + explicit `text-align-last` validation + inherited-set membership (the layout side landed in the main repo `Broiler.Layout`). `text-align-last` already survives the default-accept path on CI; this patch lights up the `justify-all` value. Guard `CssStyleEngineTests` `text-align-last` cases. |
+| 0015 — root-background gradient propagation + CSS Images 3 gradient line length | `Broiler.HTML` | **applied** — `058af9e` *"css-backgrounds: fix root-background gradient propagation and gradient line length"* (ancestor of the pinned `5c16c12`) | **WPT cluster 41** (`css-backgrounds`) — (1) `PaintWalker.EmitGradientLayers` sized an `auto` canvas tile from the paint area (viewport) instead of the source element's positioning area (§3.9), so one tile filled the canvas with no repeat; (2) `BCanvas.GetGradientEndpoints` used `max(W,H)/2` for the half-length, over-extending the gradient line on a non-square tile — replaced with CSS Images 3 §3.4.2 `abs(W·sin A) + abs(H·cos A)`. **No main-repo fallback** (both fixes are in the `Broiler.HTML` paint layer). |
+| 0016 — evaluate `@supports` feature queries (tri-state) instead of assuming support | `Broiler.CSS` | **applied** — `7de38a7` *"Evaluate @supports feature queries instead of assuming support"* (ancestor of the pinned `2aad88b`; builds on `0d0ef69` *"Reject @supports rules with an invalid <supports-condition>"*) | **WPT cluster 43** (`css-conditional`) — `@supports` evaluated every well-formed feature query optimistically, so `(color: rainbow)` etc. applied their `html{background:red}`. `SupportsConditionSyntax` now returns a tri-state (`Invalid`/`False`/`True`) resolved through a support oracle (`CssStyleEngine.IsFeatureQuerySupported`: recognised property + valid value), and the cascade applies the rule only when `True`. **No main-repo fallback** (the `@supports` gate is entirely engine-side). Guard `CssStyleEngineTests.Supports_Rule_Applies_Only_When_Condition_Evaluates_True`. |
 
 To apply a *future* patch (kept for reference):
 
@@ -584,3 +600,86 @@ and doc-file env failures as at `0010` — **zero regressions**.
 `EsModuleLinker`, so nothing in the parent repo depends on or regresses without this patch. Driving the
 now-working engine module path from the bridge (and retiring the `EsModuleLinker`) is the remaining Phase-7
 bridge task — application wiring, not a `Broiler.JS` gap.
+
+---
+
+## 0013 — `Broiler.CSS`: `font` shorthand with white space around the size/line-height slash
+
+**Target:** `Broiler.CSS` (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`, `+` a `Broiler.CSS.Dom.Tests` case).
+**Status: APPLIED** — `88adbf0` *"css: parse font shorthand with white space around the size/line-height
+slash"*, an ancestor of the pinned `Broiler.CSS` `2aad88b`. Full narrative: `wpt-triage-and-diagnostics.md`
+cluster 38.
+
+**What it does.** `font: 50px / 1 Ahem` (white space around the `size/line-height` slash) tokenised the `/`
+as its own token; the size classifier read `50px` as a size with no line-height and folded `/ 1 Ahem` into
+the font-family — an unmatchable family, so Ahem never loaded and every glyph fell back to a proportional
+font at ½ the advance. Fixed by gluing the slash back onto the size token (`NormalizeFontSlashTokens`)
+before classification. **No main-repo fallback** — `font` expansion is entirely engine-side. Guard
+`CssStyleEngineTests.Font_Shorthand_Expands_With_Whitespace_Around_LineHeight_Slash`.
+
+**Why it's a patch.** The `Broiler.CSS` push returned **403** at authoring, so per `CLAUDE.md` it was
+captured as a patch; a maintainer later applied it upstream and the pointer now contains it. Retained for
+provenance; the pointer is not re-bumped (it already pins a descendant).
+
+---
+
+## 0014 — `Broiler.CSS`: accept `text-align: justify-all` and the `text-align-last` property
+
+**Target:** `Broiler.CSS` (`Broiler.CSS.Dom/CssStyleEngine.Values.cs`, `CssStyleEngine.Computed.cs`, `+`
+`Broiler.CSS.Dom.Tests`). **Status: APPLIED** — `953cc07` *"Accept CSS Text 4 text-align:justify-all and
+the text-align-last property"*, an ancestor of the pinned `Broiler.CSS` `2aad88b`. Full narrative:
+`wpt-triage-and-diagnostics.md` cluster 39.
+
+**What it does.** The validator dropped `text-align: justify-all` as invalid and had no `text-align-last`
+property at all. Adds `text-align:justify-all` acceptance, explicit `text-align-last` validation (`auto |
+start | end | left | right | center | justify | match-parent`), and `text-align-last` inherited-set
+membership. The layout half (`CssBoxProperties.TextAlignLast` + `CssLayoutEngine.ApplyHorizontalAlignment`
+last-line resolution) landed directly in the main-repo `Broiler.Layout` and is already live; `text-align-last`
+also survives the pinned validator's default-accept path on CI, so this patch specifically lights up the
+`text-align:justify-all` value. **No main-repo fallback needed.**
+
+**Why it's a patch.** Push **403** at authoring; later applied upstream and pinned. Retained for provenance.
+
+---
+
+## 0015 — `Broiler.HTML`: root-background gradient propagation + CSS Images 3 gradient line length
+
+**Target:** `Broiler.HTML` (`Source/Broiler.HTML.Image/BCanvas.cs` and the `PaintWalker` gradient-layer
+path). **Status: APPLIED** — `058af9e` *"css-backgrounds: fix root-background gradient propagation and
+gradient line length"*, an ancestor of the pinned `Broiler.HTML` `5c16c12`. Full narrative:
+`wpt-triage-and-diagnostics.md` cluster 41.
+
+**What it does.** Two independent, spec-grounded fixes for a root `<html>` gradient that must propagate to
+the canvas as a repeated tile phased at the margin edge (CSS Backgrounds §14.2): **(1)** `EmitGradientLayers`
+sized an `auto` canvas tile from the paint area (the whole viewport) instead of the source element's
+background positioning area (§3.9), so one tile filled the canvas with no repeat — now the positioning area
+sizes the tile (ordinary element backgrounds are unaffected, positioning area ≡ paint area there); **(2)**
+`BCanvas.GetGradientEndpoints` took the half-length as `max(W,H)/2`, over-extending the gradient line on a
+non-square tile and compressing the visible colour run — replaced with the CSS Images 3 §3.4.2 length
+`abs(W·sin A) + abs(H·cos A)` (square tiles byte-identical). **No main-repo fallback** — both live in the
+`Broiler.HTML` paint layer.
+
+**Why it's a patch.** Push **403** at authoring; later applied upstream and pinned. Retained for provenance.
+
+---
+
+## 0016 — `Broiler.CSS`: evaluate `@supports` feature queries (tri-state) instead of assuming support
+
+**Target:** `Broiler.CSS` (`Broiler.CSS.Dom/SupportsConditionSyntax.cs`, `CssStyleEngine.Supports.cs`,
+`CssStyleEngine.cs`, `+` `Broiler.CSS.Dom.Tests`). **Status: APPLIED** — `7de38a7` *"Evaluate @supports
+feature queries instead of assuming support"* (builds on `0d0ef69` *"Reject @supports rules with an invalid
+<supports-condition>"*), an ancestor of the pinned `Broiler.CSS` `2aad88b`. Full narrative:
+`wpt-triage-and-diagnostics.md` cluster 43.
+
+**What it does.** `@supports` gated only on grammatical validity and evaluated the truth of every well-formed
+feature query **optimistically**, so `(color: rainbow)`, `(unknown: green)`, and the `<general-enclosed>`
+`(not (color: rainbow) or (color: green))` all counted as true and applied their inner `html{background:red}`.
+`SupportsConditionSyntax` now returns a tri-state (`Invalid`/`False`/`True`): a feature query `( <decl> )`
+resolves through a support oracle, a `<general-enclosed>` group is **false**, and `and`/`or`/`not` fold per
+the grammar. The oracle (`CssStyleEngine.IsFeatureQuerySupported`) accepts a query only when the property is
+recognised **and** the value is valid for it (a full `<color>` check rejects `rainbow`), preserving optimism
+for recognised properties Broiler may not fully render. **No main-repo fallback** — the gate is entirely
+engine-side (`CssStyleEngine.CollectFromRules`). Guard
+`CssStyleEngineTests.Supports_Rule_Applies_Only_When_Condition_Evaluates_True` (30 cases).
+
+**Why it's a patch.** Push **403** at authoring; later applied upstream and pinned. Retained for provenance.
