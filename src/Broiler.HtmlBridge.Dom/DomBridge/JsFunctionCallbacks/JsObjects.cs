@@ -43,22 +43,9 @@ public sealed partial class DomBridge
     // NormalizeInsertAdjacentPosition / GetInsertAdjacentTarget helpers) moved to the
     // InsertAdjacentBinding feature module (Phase 3 P3.56).
 
-    private JSValue JsJsObjectsGetContext134Core(DomElement element, in Arguments a)
-    {
-        if (a.Length == 0)
-            return JSNull.Value;
-        var contextType = a[0].ToString();
-        if (!string.Equals(contextType, "2d", StringComparison.OrdinalIgnoreCase))
-            return JSNull.Value;
-        if (!string.Equals(element.TagName, "canvas", StringComparison.OrdinalIgnoreCase))
-            return JSNull.Value;
-#if BROILER_CLI
-                            return JSNull.Value; // Canvas 2D context not available in CLI mode
-#else
-        return BuildCanvas2DContext(element);
-#endif
-    }
-
+    // canvas.getContext("2d") (and its BuildCanvas2DContext + JsUtilities…034…058Core drawing callbacks)
+    // moved to the CanvasBinding feature module (Phase 3 P3.64) — the last element-member callback in the
+    // mixed JsObjects.cs file, unblocked once Phase 6/P8.9 dissolved Broiler.HtmlBridge.Rendering into Dom.
 
     // <iframe> browsing-context accessors (contentDocument/contentWindow/getSVGDocument, src/srcdoc
     // setters) moved to the IframeElementBinding feature module (Phase 3 P3.55).

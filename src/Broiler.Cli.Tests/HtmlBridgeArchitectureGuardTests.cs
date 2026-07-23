@@ -79,15 +79,10 @@ public class HtmlBridgeArchitectureGuardTests
         Assert.DoesNotContain("Broiler.HTML.Image", reachable);
     }
 
-    // The geometry provider moved out of Broiler.HtmlBridge.Rendering into
-    // Broiler.HTML.Headless, so Rendering (which Dom still references for the canvas
-    // recorder) must itself no longer pull the renderer.
-    [Fact]
-    public void Bridge_Rendering_Project_Graph_Does_Not_Reach_Html_Image()
-    {
-        var reachable = TransitiveProjectReferences("Broiler.HtmlBridge.Rendering");
-        Assert.DoesNotContain("Broiler.HTML.Image", reachable);
-    }
+    // (The former Bridge_Rendering_Project_Graph_Does_Not_Reach_Html_Image guard was removed with the
+    // Broiler.HtmlBridge.Rendering project itself: Phase 6 / Phase 8 F1 (P8.9) dissolved that assembly into
+    // Broiler.HtmlBridge.Dom, so Bridge_Dom_Project_Graph_Does_Not_Reach_Html_Image above now covers the
+    // whole bridge Dom graph — including the former Rendering sources — in one check.)
 
     // The narrow layout read-model contract the bridge depends on lives in the canonical
     // Broiler.Layout, not in a bridge or renderer assembly.
@@ -252,10 +247,12 @@ public class HtmlBridgeArchitectureGuardTests
     public void No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit()
     {
         var root = FindRepositoryRoot();
+        // Broiler.HtmlBridge.Rendering was dissolved into Dom (Phase 6 / Phase 8 F1, P8.9), so the bridge is
+        // now the three code assemblies Core/Dom/Scripting.
         string[] bridgeDirs =
         [
             "src/Broiler.HtmlBridge.Core", "src/Broiler.HtmlBridge.Dom",
-            "src/Broiler.HtmlBridge.Rendering", "src/Broiler.HtmlBridge.Scripting",
+            "src/Broiler.HtmlBridge.Scripting",
         ];
 
         var offenders = new List<string>();

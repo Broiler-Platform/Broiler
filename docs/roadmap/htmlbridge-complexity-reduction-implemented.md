@@ -37,7 +37,7 @@ row.) Read each phase's own status entries for the specifics; the summary below 
 | 0 — stabilize the boundary / baseline | Baseline established | Recorded in [Phase 0 baseline](htmlbridge-phase0-baseline.md); no explicit completion assertion. |
 | 1 — repair the project graph | **Complete** | None — all five work items landed. |
 | 2 — document services & single state authority | **Complete** | The process-static per-element runtime tables are **fully de-globalized** to per-bridge instances — `PositionAreaResolutions` plus every `ElementRuntimeState` concern (FormControl, Scroll, StyleSheet, Document, Animation, Shadow, Dialog, and the InlineStyle-hub inline-style trio) done 2026-07-17; no process-static per-element table remains. **Simultaneous-session isolation is met** (verified 2026-07-21) — the engine already isolates two live `JSContext` instances (`[ThreadStatic]`+`AsyncLocal` current-context, realm-scoped `Eval`/`InvokeFunction`), so with the bridge de-globalized two simultaneous sessions do not see each other's state (`SessionIsolationTests`, patch 0009 — **now applied upstream**, pinned `Broiler.JS` `3f0c7054`; `DomBridgeSessionLifetimeTests.Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State`). The earlier "blocked below the bridge" note was outdated. |
-| 3 — feature modules | Bulk delivered | The mixed `JsObjects.cs` element-member callbacks file now holds a single callback — Canvas `getContext` (Phase-6-gated); every other element-member callback has been extracted (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63); `DomBridge.cs` facade within the 500–800-line target (701 lines, verified 2026-07-21), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. Work item 6 (externalize the embedded content-rendering polyfill JS as a versioned asset) is done — P3.53. All four exit criteria are met; the only element-member residue is the Phase-6-gated Canvas `getContext`/2D callbacks. |
+| 3 — feature modules | **Complete** | Every element-member callback is now a co-located feature module — the mixed `JsObjects.cs` element-member file holds **none** (SVG — P3.50; Element/geometry — P3.51; `<object>` sub-document accessors — P3.52; tree mutation — P3.58; on* reflectors — P3.59; form-control IDL — P3.60; `form.submit()` — P3.61; shadow-DOM binding — P3.62; `element.style` cssText setter — P3.63; **Canvas `getContext`/2D callbacks — P3.64**); `DomBridge.cs` facade within the 500–800-line target (701 lines, verified 2026-07-21), and the 750-line file-size ratchet is fully closed — every HtmlBridge production file is under the limit and the `OversizedFileExemptions` debt list is empty. Work item 6 (externalize the embedded content-rendering polyfill JS as a versioned asset) is done — P3.53. All four exit criteria are met; the last Phase-6-gated residue (Canvas) is closed. |
 | 4 — eliminate parallel DOM state | Bulk delivered | Item 2: the serialize-time **baked style is now a distinct per-element overlay store**, split off the script-observable inline-style dict (P4.14 increments 1–3: anchor cluster + animation/synthetic/zoom bake writers seamed, then backed by a tombstone-aware overlay merged only at serialization) — verified byte-identical incl. the WPT anchor-position pixel corpus. `InlineStyleRuntimeState.Style` no longer carries bakes. Remaining: full-corpus WPT/Acid CI gate. Item 4/5 canonical reuses done (P4.8–4.12, P4.16–4.19; the `ChildIndexOf` → canonical `IndexOfReference` follow-up landed 2026-07-20 now that `patches/0002` is pinned). `CloneDomElement` now delegates to canonical `CloneNode` (P4.20, verified byte-identical across ~14 clone suites). **Item 5 complete:** `Normalize` now delegates to canonical `DomNode.Normalize()` (P4.21) — the P4.15 blocker (bridge MutationObserver/Range/NodeIterator driven by a hand-rolled channel rather than canonical `DomDocument.Mutated`) was closed by the mutation-notification consolidation (steps 1–3): the primitives were cleaned so each logical op fires one canonical record, then MutationObserver/Range/NodeIterator were switched onto canonical `Mutated`, with a suppression scope for serialize/render/parse bakes. |
 | 5 — used-value behaviour into Layout | Bulk delivered; **in-scope terminal** | Anchor-track deletion complete through step 6. Feature (b) visual-viewport/zoom: read (CSSOM) **and** render (pixel) sides now validated on the engine used-value model (2026-07-19) — deleting the zoom bake is now only a *deployment* gate (enable `NativeZoom` at the external `CaptureService` renderer). The `patches/0001` viewport-zoom render plumbing **is now applied + pinned** (`Broiler.HTML` `9977672`), so the pinch render cutover (pass `visualViewport.scale` into the render, drop the bake) is **unblocked** — remaining as the one still-unwired main-repo follow-up, with the serialization bake as the active fallback. Feature (a) dialog/backdrop: native modal centering + modal box-chrome bake deletion landed; the native `::backdrop` box + top-layer paint cutover **landed 2026-07-21** — those submodule pieces are pinned, so `DomBridge.NativeTopLayer`/`NativeBackdrop` now default on (emulation retained only as a gated fallback for author position-try backdrops / WPT-lever / rollback), validated end-to-end by `NativeBackdropRenderTests`. The WPT `NativeBackdrop` lever alone stays default-off until its `::backdrop` reftest corpus is swept. See the [2026-07-19 reconciliation](#reconciliation-2026-07-19--features-a-and-b-driven-to-their-in-scope-terminal-state). |
 
@@ -1793,12 +1793,40 @@ Selectors-CSSOM / ComputedStyle / Acid3 / public-API-snapshot / architecture-gua
 `Lang_Matches_XmlLang_Ancestor` selector check fails identically on `origin/main`, unrelated to this change);
 `Broiler.HtmlBridge.Dom` builds clean.
 
+Status: **P3.64 completed** 2026-07-23 — the **Canvas `getContext("2d")` binding and its 2D context**, the
+last element-member callback still living in the mixed `JsObjects.cs` file, extracted into the co-located
+`Dom.Features.CanvasBinding` module. This was the one callback that could not be peeled out earlier: the
+context was tied to the standalone `Broiler.HtmlBridge.Rendering` project's `CanvasCommandRecorder`, and only
+Phase 6 (P6.1, which removed the unread command recorder and internalized `CanvasRenderingContext2D` into
+`Dom`) followed by Phase 8 F1 (P8.9, which dissolved `Rendering` into `Dom`) removed that coupling. With it
+gone, `getContext`, `BuildCanvas2DContext`, and the sixteen `JsUtilities…034…058Core` drawing callbacks
+(`setFillStyle`/`setStrokeStyle`/`setLineWidth`/`setFont`/`setGlobalAlpha`, `fillRect`/`strokeRect`/
+`clearRect`, `beginPath`/`moveTo`/`lineTo`/`arc`/`closePath`/`fill`/`stroke`, `fillText`/`strokeText`,
+`save`/`restore`, `measureText`) moved verbatim into `CanvasBinding`, reached through the neutral static
+`DomBridge.TryGetAttribute` — the binding needs **no host contract** (all logic is self-contained). The call
+site in `DomBridge/JsObjects.cs` is now `Dom.Features.CanvasBinding.Install(obj, element)`, matching the other
+element bindings. The `#if BROILER_CLI` guard is preserved verbatim (the CLI build still has no 2D context).
+Behaviour-preserving; no public-API change (internal callback relocation). Tests: the existing
+`CanvasContextBindingTests` (context is non-null, style round-trip, `save`/`restore` stack, drawing methods
+callable, non-`2d`/non-canvas → `null`) pass unchanged; the `Module`/`JsObject`/`ElementBinding`/`DomBinding`
+suites (269 tests) and the architecture-guard suite pass. **The mixed `JsObjects.cs` element-member callbacks
+file now holds no callbacks** — Phase 3's feature-module extraction is complete.
+
+*Housekeeping alongside P3.64:* the Phase-3 750-line ratchet had drifted open on `main` — `PositionArea.cs`
+had grown to 769 lines (writing-mode-aware margin/padding work), tripping
+`No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit`. Its cohesive scroll-container geometry cluster
+(`FindScrollContentWidth`/`Height`, `ComputeAnchorRelativeToContainer`, `FindNearestScrollContainer`,
+`IsDescendantOfElement`) was split into the sibling partial `PositionArea.ScrollGeometry.cs`, dropping the main
+file to 663 lines and re-closing the ratchet (debt list stays empty). The now-stale
+`Bridge_Rendering_Project_Graph_Does_Not_Reach_Html_Image` guard (which referenced the deleted
+`Broiler.HtmlBridge.Rendering.csproj`) was removed — `Bridge_Dom_Project_Graph_Does_Not_Reach_Html_Image` now
+covers the whole bridge-Dom graph, including the former `Rendering` sources.
+
 Still to come — each entangled with layout or rendering; the P3.7–P3.46 named-accessor / relocated-infra /
-shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template for
-any residual coupling: the last callback in the mixed `JsObjects.cs` element-member file is Canvas
-`getContext` (better done with Phase 6, which dissolves
-`Broiler.HtmlBridge.Rendering.CanvasCommandRecorder`); the DomBridge 500-800-line facade target is already met
-(682 lines).
+shared-write-hub / wide-explicit-host / no-host-static / state-owner / behaviour-owner pattern is the template
+that peeled out every element-member callback: the last one, Canvas `getContext`, was gated on Phase 6
+dissolving `Broiler.HtmlBridge.Rendering.CanvasCommandRecorder` and is now extracted (P3.64 — into
+`Dom.Features.CanvasBinding`); the DomBridge 500-800-line facade target is already met (682 lines).
 **Frames is done** (P3.13/P3.16/P3.17/P3.18 + the `<iframe>` element accessors P3.55); **SVG is done** (P3.50);
 **Element/geometry is done** (P3.51); **the `<object>` sub-document accessors are done** (P3.52); **the mixed
 `ElementInterfaces.cs` callbacks file is fully retired** (P3.53); **the HTMLElement global attribute reflectors
@@ -1807,9 +1835,10 @@ are done** (P3.54); **insertAdjacent\* is done** (P3.56); **the element-content 
 **the on\* event-handler reflectors are done** (P3.59); **the form-control IDL reflectors are done** (P3.60 —
 `value`/`checked`/`type`/`name`/`disabled`/`hidden`/`tabIndex`/`required`); **`form.submit()` is done** (P3.61);
 **the shadow-DOM `shadowRoot`/`attachShadow` binding is done** (P3.62); **the `element.style` cssText assignment
-setter is done** (P3.63 — into `StyleDeclarationBinding`). The mixed `JsObjects.cs` element-member callbacks file
-now holds a single callback — Canvas `getContext` (Phase-6-gated) — so every behaviour-preservingly-extractable
-callback has been peeled out.
+setter is done** (P3.63 — into `StyleDeclarationBinding`); **and the Canvas `getContext`/2D binding is done**
+(P3.64 — into `CanvasBinding`, unblocked once Phase 6/P8.9 dissolved `Broiler.HtmlBridge.Rendering`). The mixed
+`JsObjects.cs` element-member callbacks file now holds **no** callbacks — every behaviour-preservingly-extractable
+callback has been peeled out and Phase 3's feature-module extraction is complete.
 
 Goal: make each browser API understandable and testable without loading the
 entire DomBridge implementation.
