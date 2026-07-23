@@ -184,9 +184,17 @@ delivered as its own verified increments:
   capture. Regression-checked on the ScriptEngine render path: 335/339 (the 4 failures are the pre-existing
   `DomBridge_SerializeToHtml_*`/`AnchorSize` geometry env cases, none ordering-related); the module-binding and
   interactive suites are green.
-- **Remaining.** EL-3 is **scoped to the `ScriptEngine` render/interactive pipeline**; the CLI-capture path
-  (`CaptureService.ExecuteScriptsWithDom`) still drains timers between scripts — deliberately left for a
-  separate increment because verifying a capture-ordering change needs the full Acid3/capture suite, which is
-  slow/unstable in a bare container. The larger vision — one ordered queue interleaving deferred-script/module
-  *tasks* with timer *tasks* (rather than fixed phase buckets), with module evaluation enqueued after its graph
-  resolves — also remains.
+- **EL-3b — CLI-capture path ✅ (2026-07-22, P7.35).** Applied the same deferral to
+  `CaptureService.ExecuteScriptsWithDom`: the three inter-script drains (regular/deferred/module) now drain
+  **only microtasks**, and the existing post-load `DrainAsyncWork` drains the timer queue. So the capture path
+  matches the render path — timers fire, in deadline order, after all script execution. Verified directly
+  (the earlier concern about needing the full Acid3 suite): 40/40 CaptureService timer tests
+  (`TimerAndAsyncTests`, which run through `ExecuteScriptsWithDom`, plus the harness/async-drain suites);
+  `Acid3CssComplianceTests` unchanged (only its pre-existing `Border_Shorthand` failure); and — critically —
+  `Acid3Phase5Tests` scores **96, identical to before** (its `<body onload>` → `setTimeout` test harness is
+  scheduled at load, so it fires in the post-load drain exactly as it did). The 4 Phase-5 failures are the
+  same pre-existing score/NodeIterator env cases.
+- **Remaining.** The larger vision — one ordered queue interleaving deferred-script/module *tasks* with timer
+  *tasks* (rather than fixed phase buckets), with module evaluation enqueued after its graph resolves —
+  remains. Both the render and capture pipelines now share the same two-phase (microtask-checkpoint between
+  scripts, timer-drain after load) model, which is the foundation that a single task queue would generalise.

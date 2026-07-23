@@ -579,7 +579,10 @@ public class CaptureService
             try
             {
                 context.Eval(scripts[si]);
-                DrainAsyncWork(bridge, microTasks);
+                // Event-loop ordering (EL-3): only a microtask checkpoint between synchronous scripts; timers
+                // are deferred to the post-load drain below, so they fire (in deadline order) after all script
+                // execution rather than eagerly between scripts.
+                microTasks.Drain();
             }
             catch (Exception ex)
             {
@@ -595,7 +598,7 @@ public class CaptureService
             try
             {
                 context.Eval(script);
-                DrainAsyncWork(bridge, microTasks);
+                microTasks.Drain(); // microtask checkpoint only; timers deferred to the post-load drain (EL-3)
             }
             catch (Exception ex)
             {
@@ -615,7 +618,7 @@ public class CaptureService
                 {
                     moduleContext.RunScriptAsync(moduleRoots[mi], url, uniqueModuleID: $"{url}#capture-module-{mi}")
                         .GetAwaiter().GetResult();
-                    DrainAsyncWork(bridge, microTasks);
+                    microTasks.Drain(); // microtask checkpoint only; timers deferred to the post-load drain (EL-3)
                 }
                 catch (Exception ex)
                 {
