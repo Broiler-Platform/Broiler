@@ -171,6 +171,22 @@ delivered as its own verified increments:
   3/3 animation tests, and `Acid3CssComplianceTests` (only its 1 pre-existing CSS failure) are green — for
   deadline-0 timers (Acid3's `setTimeout(0)` pattern) the earliest-deadline batch *is* all deadline-0 timers,
   identical to EL-1.
-- **Remaining.** Interleaving deferred-script/module tasks with timer tasks on one ordered queue (they still
-  run as fixed phase buckets in `RunPageScripts` and the iframe/capture equivalents, drained to a fixed point
-  between phases); and module evaluation enqueued after its graph resolves rather than eagerly per bucket.
+- **EL-3 — timers deferred past the synchronous script phases ✅ (2026-07-22, P7.34).** `RunPageScripts`
+  (`ScriptEngine`, the App render/interactive pipeline) drained **microtasks *and* timers to a fixed point after
+  every script**, so a timer scheduled by an early script fired eagerly *between* scripts. Split the drain into
+  two seams: `interScriptDrain` runs after each regular/deferred/module eval and drains **only microtasks** (a
+  microtask checkpoint), and `finalDrain` runs once **after the window load event**. The render path passes a
+  full timer-draining `finalDrain`, so timers now fire — in deadline order (EL-1/EL-2) — *after* all
+  synchronous script execution (regular → deferred → modules → load), matching the HTML task model; the
+  interactive path drains microtasks in both seams (timers still left for the session to step, unchanged). New
+  `EventLoopOrderingTests` pin it: a timer scheduled in a regular script observes a marker a later **deferred**
+  script set (impossible under the old eager-between-scripts drain), and a timer's DOM effect still settles by
+  capture. Regression-checked on the ScriptEngine render path: 335/339 (the 4 failures are the pre-existing
+  `DomBridge_SerializeToHtml_*`/`AnchorSize` geometry env cases, none ordering-related); the module-binding and
+  interactive suites are green.
+- **Remaining.** EL-3 is **scoped to the `ScriptEngine` render/interactive pipeline**; the CLI-capture path
+  (`CaptureService.ExecuteScriptsWithDom`) still drains timers between scripts — deliberately left for a
+  separate increment because verifying a capture-ordering change needs the full Acid3/capture suite, which is
+  slow/unstable in a bare container. The larger vision — one ordered queue interleaving deferred-script/module
+  *tasks* with timer *tasks* (rather than fixed phase buckets), with module evaluation enqueued after its graph
+  resolves — also remains.

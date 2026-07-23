@@ -161,9 +161,12 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             else
                 bridge.Attach(context, html);
 
-            // The render/typed path flushes async work to completion after every step.
+            // Event-loop ordering (EL-3): run the synchronous script phases (regular → deferred → modules)
+            // with only microtask checkpoints between them, then — after the window load event — drain the
+            // timer queue to completion. So a timer scheduled by an early script fires after all script
+            // execution (in deadline order), not eagerly between scripts, matching the HTML task model.
             RunPageScripts(context, bridge, moduleContext, scripts, deferredScripts, url, roots,
-                DrainAsyncWork, "ScriptEngine.Execute");
+                _ => MicroTasks.Drain(), DrainAsyncWork, "ScriptEngine.Execute");
             return createResult(bridge);
         }
         finally
@@ -181,9 +184,12 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
     /// <paramref name="deferredScripts"/> (end-of-parse for <c>defer</c>), and the authorised engine-driven
     /// module <paramref name="roots"/> (Phase 7 item 6, only when <paramref name="moduleContext"/> is non-null),
     /// then fires the window <c>load</c> event (critical for <c>&lt;body onload&gt;</c> harnesses like Acid3).
-    /// Async work is settled after every eval via <paramref name="drain"/> — the sole difference between the
-    /// two callers: the render path flushes timers to completion, while the interactive path drains only
-    /// microtasks and leaves timers for the session to step. Per-script failures are caught and logged under
+    /// Async work is settled in two phases (EL-3 event-loop ordering): <paramref name="interScriptDrain"/> runs
+    /// after each eval and drains only microtasks (a microtask checkpoint), so timers are <em>not</em> fired
+    /// eagerly between synchronous scripts; <paramref name="finalDrain"/> runs once after the load event. The
+    /// render path passes a full timer-draining <c>finalDrain</c> (so timers fire, in deadline order, after all
+    /// script execution), while the interactive path drains only microtasks in both and leaves timers for the
+    /// session to step. Per-script failures are caught and logged under
     /// <paramref name="logSource"/>; they do not abort the remaining scripts.
     /// </summary>
     private void RunPageScripts(
@@ -194,7 +200,8 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
         IReadOnlyList<string> deferredScripts,
         string? url,
         IReadOnlyList<ModuleRoot> roots,
-        Action<IDomBridgeRuntime> drain,
+        Action<IDomBridgeRuntime> interScriptDrain,
+        Action<IDomBridgeRuntime> finalDrain,
         string logSource)
     {
         // Track the corresponding <script> DOM element index so that
@@ -214,7 +221,7 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             {
                 var source = PrepareSource(scripts[i]);
                 RunMeasured($"inline-{i}", () => context.Eval(source));
-                drain(bridge);
+                interScriptDrain(bridge);
             }
             catch (Exception ex)
             {
@@ -230,7 +237,7 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             {
                 var source = PrepareSource(deferredScripts[i]);
                 RunMeasured($"deferred-{i}", () => context.Eval(source));
-                drain(bridge);
+                interScriptDrain(bridge);
             }
             catch (Exception ex)
             {
@@ -251,7 +258,7 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
                     RunMeasured($"module-{root.Key}", () =>
                         moduleContext.RunScriptAsync(root.Source, root.BaseUrl ?? url ?? string.Empty, uniqueModuleID: root.Key)
                             .GetAwaiter().GetResult());
-                    drain(bridge);
+                    interScriptDrain(bridge);
                 }
                 catch (Exception ex)
                 {
@@ -261,7 +268,7 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
         }
 
         bridge.FireWindowLoadEvent();
-        drain(bridge);
+        finalDrain(bridge);
     }
 
     /// <summary>
@@ -320,10 +327,11 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             else
                 bridge.Attach(context, html);
 
-            // Same pipeline as the render path, but the interactive session drains only microtasks and
-            // leaves pending timers for the caller to step through one batch at a time.
+            // Same pipeline as the render path, but the interactive session drains only microtasks at every
+            // point (inter-script and final) and leaves pending timers for the caller to step through one
+            // batch at a time.
             RunPageScripts(context, bridge, moduleContext, scripts, deferredScripts, url, roots,
-                _ => MicroTasks.Drain(), "ScriptEngine.ExecuteInteractive");
+                _ => MicroTasks.Drain(), _ => MicroTasks.Drain(), "ScriptEngine.ExecuteInteractive");
 
             return new InteractiveSession(context, bridge, MicroTasks);
         }
