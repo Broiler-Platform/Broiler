@@ -554,10 +554,9 @@ public sealed partial class DomBridge
             new JSFunction((in a) => Dom.Features.SelectorsBinding.GetElementsByTagName(this, element, in a), "getElementsByTagName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // getContext(contextType) — for <canvas> elements
-        obj.FastAddValue((KeyString)"getContext",
-            new JSFunction((in a) => JsJsObjectsGetContext134Core(element, in a), "getContext", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        // getContext(contextType) — for <canvas> elements. Phase 3 P3.64: extracted into the co-located
+        // CanvasBinding feature module (unblocked once Phase 6/P8.9 dissolved Broiler.HtmlBridge.Rendering).
+        Dom.Features.CanvasBinding.Install(obj, element);
 
         // <iframe> browsing-context accessors (contentDocument/contentWindow/getSVGDocument, src/srcdoc
         // read/write, sandbox reflection) — Phase 3 P3.55: extracted into the co-located IframeElementBinding

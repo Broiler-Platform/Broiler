@@ -2,8 +2,8 @@ namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Script-observable state for the HTML5 Canvas 2D context that backs the
-/// <c>canvas.getContext("2d")</c> binding (see <c>BuildCanvas2DContext</c> and the
-/// <c>JsUtilities*</c> canvas callbacks). Internal to the Canvas binding.
+/// <c>canvas.getContext("2d")</c> binding (see the <c>CanvasBinding</c> feature module — Phase 3 P3.64 —
+/// which builds the context and its drawing callbacks). Internal to the Canvas binding.
 /// </summary>
 /// <remarks>
 /// <para>

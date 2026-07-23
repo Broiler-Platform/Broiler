@@ -1,10 +1,16 @@
 # HtmlBridge complexity-reduction — remaining phases
 
-Status: **Phase 6 native-rendering migration complete** (all three concerns delivered; submodule
-patches `0004`–`0007` applied upstream and the `Broiler.HTML` pointer bumped to `5c16c12`; the
-`HtmlPostProcessor` video/progress/meter/select fallbacks are dropped) — only the terminal
-`Broiler.HtmlBridge.Rendering` project deletion remains, gated on relocating the test-harness shims
-behind the WPT pixel reftest gate. **Phase 7 items 1–5 complete** (CSP split, script descriptors,
+Status: **Phases 6, 7 and 8 complete.** **Phase 6 native-rendering migration complete** (all three concerns
+delivered; submodule patches `0004`–`0007` applied upstream and the `Broiler.HTML` pointer bumped to `5c16c12`;
+the `HtmlPostProcessor` video/progress/meter/select fallbacks are dropped) — **and the terminal
+`Broiler.HtmlBridge.Rendering` project deletion is done** (Phase 8 F1 / P8.9: the assembly was dissolved into
+`Broiler.HtmlBridge.Dom`). **Phase 7 items 1–6 complete** — the item-6 module tail is closed: the engine module
+path is active, and the sub-document + CLI-capture surfaces were migrated onto it and the string-rewriting
+`EsModuleLinker` deleted (P7.28–P7.31), with deadline-ordered timer/interval event-loop ordering landed
+(P7.32–P7.35); see the [module-execution consolidation record](htmlbridge-module-execution-consolidation.md).
+The only Phase 7 residue is the larger single-ordered-task-queue `BrowserEventLoop` rework, scoped separately.
+(Phase 3's last residue, the Phase-6-gated Canvas `getContext` binding, is also now closed — P3.64.) **Phase 7
+items 1–5 complete** (CSP split, script descriptors,
 loader/`UrlResolver`/`Origin` consolidation, external-stylesheet CSP, and host-layer CSP enforcement) **and
 item 6's static import/export module graph linked and executing** (P7.17) **with `import.meta` (P7.18),
 dynamic `import()` (P7.20) and live bindings (P7.22, scope-accurate in P7.23) handled at the bridge layer**
@@ -28,9 +34,12 @@ TLA), full-suite-validated with zero regressions. The engine-coupled tail is the
 bridge is wired to the engine module path (P7.27): **on the pinned engine `EngineModuleSupport.Available`
 returns `true`** (verified 2026-07-22 — built `Broiler.HtmlBridge.Scripting` against `98b07636`, ran the
 probe; 288 `~Module` `Broiler.Cli.Tests` pass on the active engine path), so the engine-driven path is
-active and the `EsModuleLinker` is the dormant fallback. The last item-6 work is a **bridge application
-task** — migrate the sub-document (`ExecuteSubDocumentScripts`) and CLI-capture (`CaptureService`) paths off
-the linker onto the engine path, add genuine event-loop ordering, and then delete the `EsModuleLinker`.
+active. That last item-6 bridge-application task is now **done**: the sub-document
+(`ExecuteSubDocumentScripts`) and CLI-capture (`CaptureService`) paths were migrated off the linker onto the
+engine path and the `EsModuleLinker` (with its scanner/linker/loader/wrapper, ~1,900 lines) deleted
+(P7.28–P7.31), and deadline-ordered timer/interval event-loop ordering landed on both pipelines (P7.32–P7.35).
+The remaining Phase 7 residue is only the larger single-ordered-task-queue `BrowserEventLoop` rework, scoped
+separately.
 **Phase 8 complete — items 1–5 delivered, item 6 decided (P8.1–P8.8), and all three structural follow-ups
 landed: F1 (P8.9: `Broiler.HtmlBridge.Rendering` dissolved into `Dom`), F2 (P8.10: scripting mechanism carved
 into `Broiler.HtmlBridge.Internal.Scripting`), and F3 (P8.11: the two remaining public mechanism helpers
