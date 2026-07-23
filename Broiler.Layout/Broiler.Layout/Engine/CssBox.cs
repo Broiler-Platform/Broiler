@@ -95,6 +95,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
     protected bool _wordsSizeMeasured;
     private CssBox _listItemBox;
+
+    /// <summary>
+    /// The generated list-item marker box (bullet / number glyph) for a
+    /// <c>display:list-item</c> element, laid out by <see cref="CreateListItemBox"/>.
+    /// Exposed so the fragment builder can emit it into the paint tree — the marker
+    /// is not a member of <see cref="Boxes"/>, so it is otherwise never painted.
+    /// <see langword="null"/> when the element is not a list item or its
+    /// <c>list-style-type</c> is <c>none</c>.
+    /// </summary>
+    internal CssBox? ListItemMarkerBox => _listItemBox;
     private List<ILayoutImageLoader?>? _backgroundImageLoadHandlers;
     private bool _backgroundImagesInitialized;
 

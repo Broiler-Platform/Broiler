@@ -30,6 +30,5 @@
     <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
     <ProjectReference Include="..\Broiler.HtmlBridge.Core\Broiler.HtmlBridge.Core.csproj" />
     <ProjectReference Include="..\Broiler.HtmlBridge.Dom\Broiler.HtmlBridge.Dom.csproj" />
-    <ProjectReference Include="..\Broiler.HtmlBridge.Rendering\Broiler.HtmlBridge.Rendering.csproj" />
   </ItemGroup>
 </Project>

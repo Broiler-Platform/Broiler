@@ -6,6 +6,8 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
+using Broiler.HtmlBridge.Internal.Scripting;
+using Broiler.JavaScript.Modules;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;
@@ -334,7 +336,7 @@ public sealed partial class DomBridge
         if (extraction.Scripts.Count == 0 &&
             extraction.AsyncScripts.Count == 0 &&
             extraction.DeferredScripts.Count == 0 &&
-            extraction.ModuleScripts.Count == 0)
+            extraction.ModuleRoots.Count == 0)
             return;
 
         var subWindow = _subWindows.GetOrCreate(containerElement);
@@ -380,19 +382,30 @@ public sealed partial class DomBridge
                 }
             }
 
-            // Phase 7 item 6: the linked module graph, deferred, runs last in dependency-first order.
-            // ExtractAll resolves+links import/export; an unsupported module falls back to running as-is and
-            // surfaces its error here instead of being silently skipped.
-            foreach (var script in extraction.ModuleScripts)
+            // Phase 7 tail: ES modules run last (they are deferred), through the engine's own module
+            // machinery — exactly like the main page (ScriptEngine.RunPageScripts). This needs a module
+            // realm, so it runs only when the sub-document shares an engine-driven parent context (a
+            // JSModuleContext / BridgeModuleContext) and the engine binds static imports. The string-rewriting
+            // EsModuleLinker fallback was retired, so a sub-document module under a plain-JSContext parent
+            // (no top-level modules on the host page) is not executed — a documented limitation of the
+            // engine-only module path.
+            if (_jsContext is JSModuleContext subModuleContext
+                && EngineModuleSupport.Available
+                && extraction.ModuleRoots.Count > 0)
             {
-                try
+                var subBaseUrl = GetSubDocumentBaseUrl(containerElement);
+                foreach (var root in extraction.ModuleRoots)
                 {
-                    _jsContext.Eval(script);
-                }
-                catch (Exception ex)
-                {
-                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ExecuteSubDocumentScripts",
-                        $"Sub-document module script error: {ex.Message}", ex);
+                    try
+                    {
+                        subModuleContext.RunScriptAsync(root.Source, root.BaseUrl ?? subBaseUrl ?? string.Empty,
+                            uniqueModuleID: root.Key).GetAwaiter().GetResult();
+                    }
+                    catch (Exception ex)
+                    {
+                        RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ExecuteSubDocumentScripts",
+                            $"Sub-document module root {root.Key} error: {ex.Message}", ex);
+                    }
                 }
             }
         });

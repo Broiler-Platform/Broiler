@@ -38,6 +38,37 @@ public sealed class BrowserEventLoopTests
     }
 
     [Fact]
+    public void Timeouts_Fire_In_Deadline_Order_Not_Registration_Order()
+    {
+        // Genuine event-loop timer ordering: an earlier-deadline timer fires first even when registered
+        // later. setTimeout(late, 100); setTimeout(early, 0); setTimeout(mid, 50) => early, mid, late.
+        var loop = new BrowserEventLoop();
+        var order = new List<string>();
+        loop.SetTimeout(Counter(() => order.Add("late")), 100);
+        loop.SetTimeout(Counter(() => order.Add("early")), 0);
+        loop.SetTimeout(Counter(() => order.Add("mid")), 50);
+
+        loop.DrainAll(null);
+
+        Assert.Equal(new[] { "early", "mid", "late" }, order);
+    }
+
+    [Fact]
+    public void Timeouts_With_Equal_Delay_Fire_In_Registration_Order_Fifo()
+    {
+        // Equal deadlines keep FIFO (registration) order — the tiebreak the HTML spec requires.
+        var loop = new BrowserEventLoop();
+        var order = new List<string>();
+        loop.SetTimeout(Counter(() => order.Add("first")), 0);
+        loop.SetTimeout(Counter(() => order.Add("second")), 0);
+        loop.SetTimeout(Counter(() => order.Add("third")), 0);
+
+        loop.DrainAll(null);
+
+        Assert.Equal(new[] { "first", "second", "third" }, order);
+    }
+
+    [Fact]
     public void SetTimeout_Allocates_An_Id_Even_Without_A_Callback()
     {
         var loop = new BrowserEventLoop();
@@ -90,6 +121,21 @@ public sealed class BrowserEventLoopTests
         loop.DrainStep(null);
 
         Assert.Equal(1, runs);
+    }
+
+    [Fact]
+    public void Fast_Interval_Ticks_By_Period_Before_A_Slower_Timeout()
+    {
+        // Genuine ordering: a setInterval(10) ticks at 10, 20, 30 before a setTimeout(35) fires — the
+        // interval is interleaved with the timeout by deadline, not merely once per drain step.
+        var loop = new BrowserEventLoop();
+        var order = new List<string>();
+        var id = loop.SetInterval(Counter(() => order.Add("tick")), 10);
+        loop.SetTimeout(Counter(() => { order.Add("timeout"); loop.ClearInterval(id); }), 35);
+
+        loop.DrainAll(null);
+
+        Assert.Equal(new[] { "tick", "tick", "tick", "timeout" }, order);
     }
 
     // ------------------------------------------------------------------

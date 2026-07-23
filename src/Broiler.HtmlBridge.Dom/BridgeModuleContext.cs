@@ -14,11 +14,10 @@ namespace Broiler.HtmlBridge.Scripting;
 /// <c>DomBridge</c> to this context installs the DOM globals on the same realm the modules execute in, so
 /// a module can touch <c>document</c>/<c>window</c> exactly like a classic script.
 ///
-/// This is the engine-driven replacement for the string-rewriting <see cref="EsModuleLinker"/>. It is used
-/// only when the underlying engine actually binds static imports (see <see cref="EngineModuleSupport"/>);
-/// otherwise the bridge keeps the linker. Once the engine ships patches 0010/0011 (top-level-await codegen
-/// + module-orchestration completion) upstream and the submodule pointer is bumped, this becomes the sole
-/// module path and the linker can be deleted.
+/// This is the engine-driven module path. It is used only when the underlying engine actually binds static
+/// imports (see <see cref="EngineModuleSupport"/>); otherwise a page's modules are left unrun. It is the sole
+/// module path — the string-rewriting linker fallback was retired once the engine (patches 0010/0011:
+/// top-level-await codegen + module-orchestration completion) was pinned and every surface took this path.
 /// </summary>
 internal sealed class BridgeModuleContext : JSModuleContext
 {

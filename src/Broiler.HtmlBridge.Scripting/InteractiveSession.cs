@@ -91,11 +91,23 @@ public sealed class InteractiveSession : IDisposable
         return _bridge.SerializeToHtml();
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Disposes the session's private event-loop/context lifetime: the DOM bridge
+    /// (its timers, listeners, observers and layout view) is torn down first, then the
+    /// JS context. Deterministic and idempotent — a second call is a no-op.
+    /// </summary>
+    /// <remarks>
+    /// The bridge owns the browser event loop; <see cref="DomBridge.Dispose"/> only drops its
+    /// borrowed reference to the context, so the session must dispose the context itself. Tear the
+    /// bridge down before the context so any re-entrant teardown still sees a live realm.
+    /// <see cref="IDomBridgeRuntime"/> is not itself <see cref="IDisposable"/>, so the concrete
+    /// bridge is disposed through a cast (a null-safe no-op for a hypothetical non-disposable runtime).
+    /// </remarks>
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+        (_bridge as IDisposable)?.Dispose();
         _context.Dispose();
     }
 }

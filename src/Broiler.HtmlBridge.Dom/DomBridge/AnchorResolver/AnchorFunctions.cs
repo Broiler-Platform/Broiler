@@ -286,6 +286,16 @@ public sealed partial class DomBridge
         string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor") ??
                                  BakedInlineStyle(element).GetValueOrDefault("position-anchor");
 
+        // The anchor's registered geometry is in used (already-zoomed) pixels when it comes from the
+        // real layout box (TryGetAnchorLayoutBox / shared geometry). The resolved anchor-size() length
+        // is written as an author length on this positioned element, which is then re-scaled by the
+        // element's own used zoom (the DOM `zoom` bake). Divide the used size by that zoom so the value
+        // lands in the element's pre-zoom (CSS-px) frame and is not zoom-counted twice — matching the
+        // reference where a zoom:2 anchor's 200px width covers a zoom:2 positioned box. A no-op for the
+        // common unzoomed case (used zoom == 1). See css-anchor-position/anchor-size-css-zoom.
+        double usedZoom = GetUsedZoomForElement(element);
+        if (usedZoom <= 0) usedZoom = 1;
+
         string ResolveValue(string value)
         {
             return AnchorFunction.RewriteSize(value, r =>
@@ -297,7 +307,7 @@ public sealed partial class DomBridge
                 if (!anchorRegistry.TryGetValue(anchorName, out var anchor))
                     return "0px";
 
-                double result = AnchorGeometry.ResolveSize(r.Dimension, anchor.Width, anchor.Height);
+                double result = AnchorGeometry.ResolveSize(r.Dimension, anchor.Width, anchor.Height) / usedZoom;
 
                 return $"{result.ToString(CultureInfo.InvariantCulture)}px";
             });

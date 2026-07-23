@@ -11,23 +11,31 @@ dynamic `import()` (P7.20) and live bindings (P7.22, scope-accurate in P7.23) ha
 (exports + namespace live universally; named imports rewritten scope-accurately, falling back to a correct
 snapshot only for `class`/`with`/`eval` modules); the remaining item-6 tail is the genuinely engine-coupled
 part — top-level-await-as-async (with event-loop ordering). The `Broiler.JS` host-resolution seam for driving
-the engine's own module machinery (patch `0008`, P7.19) **is now applied upstream** — the engine pointer is
-bumped to `3f0c7054`, which also carries the Phase-2 session-isolation guard (patch `0009`), so **all nine
-submodule patches `0001`–`0009` are applied upstream and pinned**. The top-level-await **codegen** bug that
-gated the engine-driven path (root-caused P7.21, proven P7.24) is now **fixed by patch `0010` (P7.25)** — the
-generator box-load prologue re-seeded the persisted `ScriptInfo` box with a null body-local on every resume,
-clobbering its `Indices` key table, so any `Indices`-resolved identifier/member access after a TLA resume
-NRE'd; guarding the seed on `nextJump == 0` (first entry only) fixes it, **validated against the full
-`Broiler.JS` suite with zero regressions**. Patch `0010` push returned 403, so it ships unbumped (pinned
-`3f0c7054`). The **module-orchestration completion** defect is now **fixed by patch `0011` (P7.26)** — an
-un-pumped init loop, a `Task→IJSPromise→Task` compile double-marshal, and (the actual value loss) an
-`import()` promise built through the Clr-only interop whose fallback returns `undefined` for a `Task`; fixed
-by a pumped `AsyncPump.Run` init, a direct `CompileDirect` hook, and the engine-native
-`JSValue.CreatePromiseFromTask`. With `0010`+`0011` the engine's own module machinery **binds a static
-import's value** (named/namespace/default/transitive/diamond/TLA), full-suite-validated with zero
-regressions (`0011` stacks on `0010`, both ship unbumped after 403). The engine-coupled tail is closed; the
-last item-6 work is a **bridge application task** — drive the engine path from `DomBridge` and retire the
-`EsModuleLinker` (plus real event-loop ordering). **Phase 8 proposed.**
+the engine's own module machinery (patch `0008`, P7.19), the Phase-2 session-isolation guard (patch `0009`),
+the top-level-await **codegen** fix (patch `0010`, P7.25) and the **module-orchestration completion** fix
+(patch `0011`, P7.26) **are all applied upstream and pinned** — the engine pointer is now bumped to
+**`98b07636`** (0010 = `64fda04f`, 0011 = `98b07636`), so **all eleven submodule patches `0001`–`0011` are
+applied upstream and pinned**. The `0010` codegen bug (root-caused P7.21, proven P7.24): the generator
+box-load prologue re-seeded the persisted `ScriptInfo` box with a null body-local on every resume, clobbering
+its `Indices` key table, so any `Indices`-resolved identifier/member access after a TLA resume NRE'd; guarding
+the seed on `nextJump == 0` (first entry only) fixes it, **validated against the full `Broiler.JS` suite with
+zero regressions**. The `0011` module-orchestration defect — an un-pumped init loop, a `Task→IJSPromise→Task`
+compile double-marshal, and (the actual value loss) an `import()` promise built through the Clr-only interop
+whose fallback returns `undefined` for a `Task` — is fixed by a pumped `AsyncPump.Run` init, a direct
+`CompileDirect` hook, and the engine-native `JSValue.CreatePromiseFromTask`. With `0010`+`0011` pinned the
+engine's own module machinery **binds a static import's value** (named/namespace/default/transitive/diamond/
+TLA), full-suite-validated with zero regressions. The engine-coupled tail is therefore **closed**, and the
+bridge is wired to the engine module path (P7.27): **on the pinned engine `EngineModuleSupport.Available`
+returns `true`** (verified 2026-07-22 — built `Broiler.HtmlBridge.Scripting` against `98b07636`, ran the
+probe; 288 `~Module` `Broiler.Cli.Tests` pass on the active engine path), so the engine-driven path is
+active and the `EsModuleLinker` is the dormant fallback. The last item-6 work is a **bridge application
+task** — migrate the sub-document (`ExecuteSubDocumentScripts`) and CLI-capture (`CaptureService`) paths off
+the linker onto the engine path, add genuine event-loop ordering, and then delete the `EsModuleLinker`.
+**Phase 8 complete — items 1–5 delivered, item 6 decided (P8.1–P8.8), and all three structural follow-ups
+landed: F1 (P8.9: `Broiler.HtmlBridge.Rendering` dissolved into `Dom`), F2 (P8.10: scripting mechanism carved
+into `Broiler.HtmlBridge.Internal.Scripting`), and F3 (P8.11: the two remaining public mechanism helpers
+`internal`-ized into that namespace). The `Core`-purity exit criterion is met — see the
+[assembly decision record](htmlbridge-assembly-decision.md).**
 
 This document tracks the **not-yet-fully-delivered** phases of the HtmlBridge
 complexity-reduction program: removing `Broiler.HtmlBridge.Rendering` (Phase 6),
@@ -682,9 +690,9 @@ Exit criteria:
   **pre-existing** Intl/ICU-locale + doc-file env failures, confirmed identical on the pristine engine by
   baselining the stashed fix → **zero regressions** — plus a new `TopLevelAwaitResumeTests` (9) pinning the
   corrected behaviour (local read, member get/call/assign, member-on-awaited-value, sequential awaits,
-  constant-receiver survival, async-function + generator regression guards). Push returned **403** → ships as
-  `patches/0010-…` with the pointer **unbumped** (pinned `3f0c7054`); **no main-repo fallback needed** (the
-  bridge does not exercise the engine-driven TLA path). **Scope:** `0010` fixes the *codegen* blocker only;
+  constant-receiver survival, async-function + generator regression guards). Push returned **403** at
+  authoring → shipped as `patches/0010-…` with the pointer unbumped; **now applied upstream** (2026-07-22) as
+  `64fda04f`, contained in the pinned `Broiler.JS` `98b07636`. **Scope:** `0010` fixes the *codegen* blocker only;
   fully driving the engine's own module machinery so a static import *binds its value* additionally needs the
   separate **module-orchestration completion** fix (§0008: `CompileDirect` + one pumped `AsyncPump.Run` loop +
   `WaitTask` drain) — with `0010` alone, a static import no longer crashes but its value still resolves to
@@ -713,9 +721,11 @@ Exit criteria:
   (`add(d,5)==12`), namespace (`ns.d==7`), default (`v+1==42`), transitive (`b==11`), diamond
   (`x+y==13`/shared dep evaluated once) and TLA-dependency (`v+1==43`) — plus the pre-existing `Modules.Tests`
   (7) stay green; the **full `Broiler.JS` suite** carries only the same pre-existing Intl/ICU + doc-file env
-  failures as at `0010` → **zero regressions**. Push **403** → ships as `patches/0011-…`, pointer
-  **unbumped**, **stacks on `0010`**; no main-repo fallback (the bridge runs its own `EsModuleLinker`). Full
-  analysis in `patches/README.md` §0011.
+  failures as at `0010` → **zero regressions**. Push **403** at authoring → shipped as `patches/0011-…`,
+  **stacks on `0010`**; **now applied upstream** (2026-07-22) as `98b07636` (the pinned pointer). With
+  `0010`+`0011` pinned the bridge's `EngineModuleSupport.Available` probe returns `true`, so `DomBridge` runs
+  modules through the engine path (P7.27) and the `EsModuleLinker` is the dormant fallback. Full analysis in
+  `patches/README.md` §0011.
 
 - **P7.22 (2026-07-20) — item 6 tail: live bindings (bridge linker).** Replaced the linker's snapshot
   bindings with **live** ones. **Exports** are now published as **getters** on the exports object
@@ -754,21 +764,26 @@ Exit criteria:
   reads the local (which would fail if the analyzer wrongly rewrote it), plus the `class` snapshot fallback.
   All 34 `EsModuleGraph` + 50 module/CSP tests green; `internal` → no public-API change.
 
-- **Remaining for Phase 7 — item 6 tail (engine-coupled).** With P7.17/P7.18/P7.20/P7.22/P7.23 the static
+- **Remaining for Phase 7 — item 6 tail (bridge application).** With P7.17/P7.18/P7.20/P7.22/P7.23 the static
   import/export graph is linked and executed, `import.meta` is handled, dynamic `import()` is wired to the
   graph, and bindings are live (exports + namespace universally; named imports **scope-accurately**, falling
   back to a correct snapshot only for `class`/`with`/`eval` modules or template-interpolation reads) — all at
   the bridge layer. The genuinely engine-coupled residue was **top-level `await`** as genuinely async (the
   bridge transform is a synchronous IIFE, so a TLA module falls back), plus moving module ordering into the
   real browser **event loop** rather than the deferred-bucket approximation. That engine-coupled residue is
-  now **closed**: the host-resolution seam `0008` (P7.19) is applied upstream (pinned `Broiler.JS`
-  `3f0c7054`); the top-level-await **codegen** bug (root-caused P7.21, proven P7.24) is **fixed by patch
-  `0010` (P7.25)**; and the **module-orchestration completion** defect is **fixed by patch `0011` (P7.26)** —
-  so the engine's own module machinery now binds a static import's value (named/namespace/default/transitive/
-  diamond/TLA), both full-suite-validated with zero regressions, shipped unbumped after 403 (`0011` stacks on
-  `0010`). What remains for item 6 is therefore **not** an engine gap but a **bridge application task**: wire
-  `DomBridge` to drive the engine's module path (resolution seam + host CSP fetch), replace the synchronous
-  `EsModuleLinker` IIFE with genuine async module evaluation on the real event loop, and retire the linker.
+  now **closed and active**: the host-resolution seam `0008` (P7.19), the top-level-await **codegen** fix
+  (`0010`, P7.25) and the **module-orchestration completion** fix (`0011`, P7.26) are **all applied upstream
+  and pinned** (`Broiler.JS` → `98b07636`), so the engine's own module machinery binds a static import's value
+  (named/namespace/default/transitive/diamond/TLA), all full-suite-validated with zero regressions. **The
+  bridge's `EngineModuleSupport.Available` probe returns `true` on the pinned engine** (verified 2026-07-22),
+  so `DomBridge` runs the primary page's modules through the engine path (P7.27) and the `EsModuleLinker` is
+  the dormant fallback. What remains for item 6 is therefore purely a **bridge application task** on the two
+  non-primary paths: migrate the sub-document (`DomBridge.ExecuteSubDocumentScripts`) and CLI-capture
+  (`CaptureService`) module execution off the `EsModuleLinker` onto the engine path, add genuine async
+  module evaluation on the real event loop (vs the eager deferred-bucket run), and then delete the
+  `EsModuleLinker`. This is gated on the WPT/render harness (the sub-document module render path is
+  pixel-reftest-validated, not validatable in a bare container), so it is sequenced with the Phase 6
+  test-harness relocation rather than landed blind.
 
 - **P7.27 (2026-07-21) — item 6: `DomBridge` wired to the engine module path (capability-gated).** The bridge
   now drives the JS engine's own module machinery when the engine binds imports, with the `EsModuleLinker`
@@ -792,13 +807,20 @@ Exit criteria:
   import binds and mutates the DOM through the engine path. A new `EngineModuleWiringTests` drives a module
   page through `ScriptEngine` the way `RenderingPipeline` does and is green on **both** engine states. The
   `EsModuleLinker` (and `EsModuleScanner`/`EsModuleLiveRefs`/`ModuleGraphLoader`/`ModuleScriptWrapper` and the
-  `ModuleScripts` production) stay as the fallback — deletable once `0010`/`0011` land upstream and the
-  submodule pointer is bumped, at which point the probe is always `true`. Remaining tail: the sub-document
-  (`DomBridge.ExecuteSubDocumentScripts`) and CLI-capture (`CaptureService`) paths still use the linker, and
-  genuine event-loop ordering (vs the eager deferred-bucket run) is a follow-up.
+  `ModuleScripts` production) stay as the fallback.
 
-  Tracked here as the Phase 7 residue — now the sub-document/CLI paths and event-loop ordering on top of a
-  working, capability-gated bridge cutover.
+  **Update (2026-07-22): `0010`/`0011` are now applied upstream and the submodule pointer is bumped
+  (`Broiler.JS` → `98b07636`), so the probe is now `true` and the engine path is the active one for the
+  primary page.** Verified by building `Broiler.HtmlBridge.Scripting` against the pinned engine and running
+  the `EngineModuleSupport` probe (`Available == true`); the 288 `~Module` `Broiler.Cli.Tests` pass on the
+  active engine path. The `EsModuleLinker` and its supporting types are therefore now the **dormant** fallback
+  — deletable once the two remaining consumers are migrated. Remaining tail: the sub-document
+  (`DomBridge.ExecuteSubDocumentScripts`) and CLI-capture (`CaptureService`) paths still use the linker, and
+  genuine event-loop ordering (vs the eager deferred-bucket run) is a follow-up — both sequenced with the
+  Phase 6 test-harness relocation because the sub-document module render path is WPT-pixel-reftest-gated.
+
+  Tracked here as the Phase 7 residue — now just the sub-document/CLI paths and event-loop ordering on top of
+  a working, active, capability-gated bridge cutover.
 
 ### Phase 8 - simplify Core and Scripting, then reconsider assemblies
 
@@ -827,4 +849,217 @@ Exit criteria:
 - ScriptEngine has one execution pipeline shared by normal, detailed, typed and
   interactive entry points.
 - A public v3 is proposed only for changes which cannot be adapted behind v2.
+
+#### Delivered increments
+
+- **P8.1 (2026-07-22) — item 3: async-drain-limit exhaustion is an explicit diagnostic, not a silent
+  stop.** `ScriptEngine.DrainAsyncWork` settles queued microtasks and timers in a loop bounded by
+  `DomBridgeRuntimeLimits.AsyncDrainIterationLimit` (1000). When the queues did **not** settle within that
+  budget — a runaway loop, e.g. a self-rescheduling `setTimeout(fn, 0)` or a `queueMicrotask` that
+  re-enqueues itself — the `for` loop simply fell out and draining stopped **silently**, so a page that
+  never quiesced looked indistinguishable from one that did. Now the loop `return`s on settle (byte-identical
+  behaviour for the common case) and, on budget exhaustion with work still queued, records
+  `ScriptEngine.AsyncDrainLimitExhausted = true` and logs a warning with the pending microtask/timer counts.
+  A fresh `ScriptEngine` per page means the flag reflects whether that page's async work exhausted the budget.
+  Purely additive: the drain still stops after 1000 iterations (no hang, no behaviour change for settling
+  pages) — the exhaustion is now *observable* instead of invisible. Additive public surface (one get-only
+  property on `ScriptEngine`), Scripting public-API baseline regenerated. New `AsyncDrainDiagnosticTests` (2):
+  a normal script leaves the flag `false`; a self-rescheduling zero-delay timer flags exhaustion (and still
+  returns a rendered document rather than hanging). 0 regressions on the timer/async/`ScriptEngine`/event-loop
+  suites (the 4 `DomBridge_SerializeToHtml_*`/`AnchorSize` failures are the pre-existing bare-container
+  geometry/zoom env failures, confirmed identical on the clean baseline).
+
+- **P8.2 (2026-07-22) — item 3 complete: the same explicit-diagnostic treatment applied to the other two
+  drain loops.** `CaptureService.ExecuteScriptsWithDom` (CLI capture) and `WptTestRunner` (WPT harness) each
+  carried a byte-identical silent-stop drain loop. Both now `return` on settle and, on budget exhaustion with
+  work still queued, log the same `RenderLogger.LogWarning` with the pending microtask/timer counts
+  (`"…did not settle within N drain iterations…"`). Behaviour-preserving for settling pages (the drain still
+  stops after 1000 iterations); the exhaustion is now diagnosable across **all three** drain sites. 0
+  regressions (`TimerAndAsyncTests` 25/25 on the CaptureService path; vendored css-anchor-position 29/35
+  unchanged on the WptTestRunner path). Item 3 is now fully delivered.
+
+- **P8.3 (2026-07-22) — item 2: every `InteractiveSession` owns a private event-loop/context lifetime, and
+  failed construction disposes it.** Two leaks fixed: **(1) session disposal leaked the event loop.**
+  `InteractiveSession.Dispose` disposed only the `JSContext`, never the bridge — but `DomBridge.Dispose`
+  (which tears down timers, listeners, observers and the layout view) is exactly what the session's comment
+  says the owner must call, and `DomBridge` explicitly does *not* dispose the borrowed context itself. So a
+  disposed session leaked its whole browser event loop. `Dispose` now tears the bridge down first
+  (`(_bridge as IDisposable)?.Dispose()` — `IDomBridgeRuntime` is not itself `IDisposable`) then the context,
+  idempotently. **(2) failed construction leaked both.** `ScriptEngine.ExecuteInteractive` created a
+  `JSContext` and a bridge, then ran attach/scripts/modules/`FireWindowLoadEvent` before building the session;
+  if any un-guarded step (e.g. `bridge.Attach`) threw, the context + bridge leaked. The setup is now wrapped
+  so a throw disposes the partially-built context and bridge before rethrowing, and the CSP is restored in a
+  `finally` on every path. New `InteractiveSessionLifetimeTests` (2, injecting a fake bridge/factory via the
+  `ScriptEngine(IDomBridgeRuntimeFactory)` ctor): disposing a session disposes its bridge (idempotently); a
+  bridge that throws on `Attach` makes `ExecuteInteractive` throw *and* dispose the bridge. 0 regressions
+  across the interactive/session-lifetime/`ScriptEngine` suites (67 pass; the same 4 `DomBridge_SerializeToHtml_*`/
+  `AnchorSize` failures are the pre-existing bare-container geometry/zoom env failures, which use `Execute`,
+  not `ExecuteInteractive`). No public-surface change (both fixes are method-body only).
+
+- **P8.4 (2026-07-22) — item 5: name the script-extraction contract for what it is.** The file
+  `IScriptExtractor.cs` contained **no `IScriptExtractor` interface** — it held `ScriptExtractionResult`
+  (the central type) plus `ScriptDescriptor`, `ScriptSourceKind`, `ModuleMap`/`ModuleMapEntry` and
+  `ModuleRoot`. The extraction itself is `ScriptExtractionService`, a **static** class, so there is no
+  instance to abstract and no consumer that would benefit from a restored interface. Per item 5's first
+  option, renamed the file to **`ScriptExtractionResult.cs`** (`git mv`, contents unchanged — pure move, no
+  API change). Also fixed a **dangling doc cross-reference**: `RenderingPipeline`'s summary pointed at
+  `<see cref="IScriptExtractor.ExtractAll"/>` — a type that does not exist — now
+  `ScriptExtractionService.ExtractAll` (the real static method; verified no `CS1574` broken-cref warning). And
+  corrected a misplaced doc comment in the file: the `ScriptExtractionResult` `<summary>` had drifted onto
+  `ModuleRoot` (a double-`<summary>`) while the class itself had none — moved it to the class and refreshed it
+  to cover the descriptors/module-map/graph/roots. Public-API snapshot + `ScriptDescriptor` suites green (no
+  surface change); `Broiler.Browser.Core` (which compiles `RenderingPipeline`) builds clean.
+
+- **P8.5 (2026-07-22) — item 1: split `IScriptEngine` into segregated capability contracts, keep the old
+  interface as the v2 adapter.** The monolithic `IScriptEngine` mixed four unrelated capabilities.
+  Extracted them into narrow interfaces (`IScriptEngineCapabilities.cs`): **`IScriptExecutor`** (the five
+  `Execute` overloads + `ExecuteDetailed` + the `StrictModeEnabled`/`Csp` execution config),
+  **`IInteractiveScriptEngine`** (the two `ExecuteInteractive` overloads), **`IScriptProfiling`** (the
+  `Profiler` hook) and **`IScriptEventLoop`** (the `MicroTasks` queue). `IScriptEngine` is now an empty
+  aggregate that inherits all four — its effective surface is byte-identical, so it stays the v2
+  compatibility surface: every existing consumer and implementer is unaffected (each member is still
+  reachable through it), while a new consumer can depend on just the capability it uses. `ScriptEngine`
+  needed **no code change** (it already implements every member); `ITypedScriptEngine`/`RenderingPipeline`
+  are unchanged. Public-API baseline regenerated (the members move to the capability interfaces;
+  `ScriptEngine`'s own member list is unchanged — nothing dropped). The `HtmlBridgeBoundaryGuardTests`
+  no-internal-leak guard was widened to span `IScriptEngine` **and** its capability interfaces (interface
+  `GetMembers` does not flatten inherited members), so it stays meaningful post-split. New
+  `ScriptEngineCapabilitySegregationTests` (4): the aggregate inherits the four capabilities, the concrete
+  engine implements each, and a consumer can depend on just `IScriptExecutor`/`IScriptEventLoop`.
+  `Broiler.Browser.Core` (the `IScriptEngine` consumer) builds clean; engine behaviour suites green.
+  Remaining for the phase's *"one execution pipeline shared by normal/detailed/typed/interactive entry
+  points"* exit criterion: consolidating `ScriptEngine`'s internal `Execute*`/`ExecuteInteractive` bodies
+  (which currently duplicate the attach → run scripts → run deferred → run modules → drain sequence) onto a
+  single shared pipeline — an internal refactor separate from this interface segregation.
+- **P8.6 (2026-07-22) — item 1 exit criterion met: one execution pipeline shared by every entry point.**
+  `ExecuteCore<T>` (render/typed) and `ExecuteInteractive` each carried a byte-for-byte copy of the
+  post-attach sequence — build the `<script>`-element index for `document.write`, eval the regular scripts,
+  eval the deferred scripts, run the authorised engine module roots, fire the window `load` event — differing
+  only in how async work is settled after each eval (the render path flushes timers to completion via
+  `DrainAsyncWork`; the interactive path drains microtasks only and leaves timers for the session to step).
+  Extracted the whole sequence into one private `RunPageScripts(...)` parameterised by an
+  `Action<IDomBridgeRuntime> drain` delegate — the render path passes `DrainAsyncWork`, the interactive path
+  passes `_ => MicroTasks.Drain()`. Both callers now attach, delegate to `RunPageScripts`, and return their
+  respective result. `ExecuteDetailed`/typed entry points already funnel through `ExecuteCore`, so all four
+  documented entry points (normal, detailed, typed, interactive) now share the single pipeline. Behaviour is
+  preserved: the interactive path additionally honours `Profiler` when set (previously it did not — a benign
+  additive change, `Profiler` is null by default). Regression-checked against a clean baseline: the interactive,
+  async-drain-diagnostic, capability-segregation and timer suites are green (107/111 in the engine-exercising
+  filter; the 4 failures are the pre-existing bare-container `DomBridge_SerializeToHtml_*` env failures,
+  identical on baseline), and the 6 Acid3 score/content failures reproduce byte-identically on the stashed
+  baseline (Acid3 runs through `CaptureService`/`ExecuteScriptsWithDom`, not `ScriptEngine`). With the shared
+  pipeline in place, item 1's *"one execution pipeline shared by normal/detailed/typed/interactive entry
+  points"* exit criterion is now satisfied.
+- **P8.7 (2026-07-22) — item 4: profiling is applied consistently across every script the engine runs.**
+  The `ScriptProfilingHook` attached to `ScriptEngine.Profiler` timed only the **inline** scripts: the render
+  loop wrapped `inline-{i}` evals in `Profiler.Measure`, but ran deferred scripts (`context.Eval`) and
+  engine-driven module roots (`moduleContext.RunScriptAsync`) straight through with no measurement, and the
+  DOM-less `Execute(scripts)`/`ExecuteDetailed(scripts)` paths each duplicated the same inline-only pattern.
+  A consumer that attached a hook therefore got a **misleading partial timeline** — deferred/module time was
+  invisible. Funneled every evaluation through one private `RunMeasured(label, work)` seam (times through the
+  hook when set, runs directly otherwise) and labelled each kind: `inline-{i}`, `deferred-{i}`, and
+  `module-{key}`. Now the hook, when set, sees the complete timeline in document order. Method-body only — no
+  public-surface change (the seam is private; `Profiler`/`ScriptProfilingHook` are unchanged), so no baseline
+  regeneration. New `ScriptProfilingConsistencyTests` (4) — the hook's **first real consumer** in the tree:
+  a page with inline+deferred scripts records `[inline-0, inline-1, deferred-0]`; the DOM-less path records
+  its inline entries; a throwing script is still recorded with `Succeeded=false` (complete timeline); and the
+  common no-hook case runs clean. 0 regressions (121/125 on the engine-exercising filter; the 4 failures are
+  the pre-existing bare-container `DomBridge_SerializeToHtml_*`/VisualViewport env failures).
+
+  **Item-4 decision — profiling stays, consistency delivered; host-diagnostics relocation deferred to item 6.**
+  Item 4's rule was *"apply profiling consistently **or** move it to host diagnostics if there are no real
+  consumers."* A tree sweep confirms **no production code or test sets `Profiler`, instantiates
+  `ScriptProfilingHook`, or reads `.Entries`** — the capability has no real consumers today. Full removal,
+  however, is a public-surface deletion that **cannot be adapted behind the v2 `IScriptEngine`/`IScriptProfiling`
+  adapter**, so per the phase's *"a public v3 is proposed only for changes which cannot be adapted behind v2"*
+  exit criterion it belongs with item 6's deliberate assembly/surface decision, not a mid-phase drive-by
+  deletion. This increment therefore delivers item 4's **consistency** branch in full (safe, internal) and
+  hands item 6 the explicit, documented choice: keep the now-consistent `IScriptProfiling` capability, or trim
+  it to host diagnostics in a v3 surface revision.
+- **P8.8 (2026-07-22) — item 6: final-assembly decision recorded.** Item 6 asks to *decide* final assemblies
+  from dependency and deployment needs; delivered as a standalone decision record,
+  [htmlbridge-assembly-decision.md](htmlbridge-assembly-decision.md), grounded in a measured inventory (4
+  assemblies: `Core` 19 files, `Dom` 239, `Rendering` **1**, `Scripting` 8; the `ProjectReference` graph and
+  every consumer edge; and which `Core` types `Dom`/`Scripting` each pull). **Decisions:** (1) **three code
+  assemblies** — `Core` (shared kernel), `Dom` (Web API bindings), `Scripting` (host) — matching the
+  roadmap's *"Core, WebApi bindings, Scripting/Host"*; finer splits are rejected as assembly-per-feature with
+  no deployment payoff. (2) **Delete `Broiler.HtmlBridge.Rendering`** (a whole assembly for one `internal
+  static HtmlPostProcessor` regex rewriter) and relocate the post-processor into `Dom` — **not** `Core`, since
+  a regex rewriter is exactly what the Core exit criterion excludes; all three consumers already reach `Dom`
+  transitively, so no new edge is added. (3) **Close the `Core`-purity gap by namespace separation, not a
+  fourth assembly:** the module scanners/loaders/linker (`EsModuleScanner`, `ScriptExtractionService`,
+  `ModuleGraphLoader`, `UrlResolver`, `EsModuleLinker`, …) move under an explicit internal-scripting namespace
+  while contracts/value objects (`IDomBridgeRuntime`, `Origin`, `PageContent`, `ScriptExecutionResult`,
+  `ContentSecurityPolicy`, …) keep the top-level namespace — because both `Dom` and `Scripting` share the
+  mechanism, it cannot leave `Core` without a fourth shared assembly (the anti-goal). (4) The static
+  `RenderLogger` (mutable global logging the exit criterion names) **stays** as a sanctioned cross-cutting
+  diagnostics primitive — an injected `IRenderLog` would touch hundreds of sites for no deployment benefit.
+  (5) **Profiling stays** (resolving the P8.7-deferred call): its removal is a v2-unadaptable public-surface
+  deletion, and dropping one now-consistent, null-by-default, test-covered opt-in hook does not clear the
+  *"v3 only for changes which cannot be adapted behind v2"* bar. The physical moves that close the
+  `Core`-purity exit criterion are sequenced in the record as verified follow-ups **F1** (delete `Rendering`),
+  **F2** (namespace-carve `Core`), **F3** (`internal`-ize the now-namespaced mechanism) — each a build-graph
+  change best delivered as its own baseline-verified increment. Decisions 1 and 5 need no code; item 6's
+  *decision* is complete.
+- **P8.9 (2026-07-22) — item 6 follow-up F1: `Broiler.HtmlBridge.Rendering` dissolved into `Dom`.** The
+  assembly-per-feature artifact — a whole project for one `internal static HtmlPostProcessor` (276-line regex
+  HTML post-processor) — is deleted and the type moved into `Broiler.HtmlBridge.Dom`, co-located with the
+  existing HTML parse/serialize helpers. The three consumers (`Browser.Core`, `Cli`, `Wpt`) drop their
+  `Rendering` `ProjectReference` (each already reaches `Dom` transitively — `Browser.Core → Scripting → Dom`,
+  `Cli → Dom`, `Wpt → Dom`), and `Dom`'s `InternalsVisibleTo` gains `Broiler.Browser.Core` (the one grant
+  `Rendering` had that `Dom` lacked). Relocation wrinkle: `Dom` transitively references the `Broiler.Regex`
+  namespace, whose `Regex` member is reachable through the enclosing `Broiler` namespace and shadowed the
+  unqualified `Regex` the post-processor used (it bound to the BCL type in the old BCL-only `Rendering`); an
+  **in-namespace** `using Regex = System.Text.RegularExpressions.Regex;` alias (resolved before enclosing-
+  namespace members) restores it. The `Rendering` public-API baseline was empty (`HtmlPostProcessor` is
+  internal), so it and its snapshot-test parameter are removed with **no public-surface loss** — confirming
+  the decision's claim that nothing public is dropped. The final assembly shape is now exactly the decided
+  three: `Core`, `Dom`, `Scripting`. Verified: all six affected projects build clean; the public-API snapshot
+  (3 assemblies), boundary-guard and `HtmlPostProcessor` native-support suites are green vs a clean baseline;
+  `HtmlPostProcessor` behaviour is byte-identical (its 2 pre-existing `<video>`-stripping test failures
+  reproduce on baseline — the assertion is stale now that `<video>` renders natively). The full 2297-test
+  `Cli.Tests` suite is not a usable gate in a bare container (network/graphics-parity/PDF classes crash or
+  fail environmentally, per the repo's build notes), so F1 was validated by targeted baseline-vs-change
+  comparison on the assembly- and consumer-relevant suites rather than the whole run. F2/F3 (the `Core`
+  namespace-carve and `internal`-ization) remain.
+- **P8.10 (2026-07-22) — item 6 follow-up F2: carve the `Core` scripting mechanism into an internal
+  namespace.** The `Core`-purity exit criterion wants contracts/value objects kept apart from the regex
+  parsers, loaders and matchers they were grab-bagged with in the top-level `Broiler.HtmlBridge.Scripting`
+  namespace. F2 moves the mechanism into a new `Broiler.HtmlBridge.Internal.Scripting` namespace — one
+  assembly still (both `Dom` and `Scripting` share it, so splitting it into a fourth assembly is the
+  anti-goal), but with the boundary now visible and greppable. **Moved (7, all already `internal` → zero
+  public-API impact):** `EsModuleScanner`, `EsModuleSyntax`, `EsModuleLinker`, `EsModuleLiveRefs`,
+  `ModuleGraphLoader`, `UrlResolver`, `CspSourceMatching`. **Kept** in the top-level namespace: the value
+  objects/contracts (`ContentSecurityPolicy`, `MicroTaskQueue`, `PageContent`, `ScriptExecutionResult`,
+  `ScriptExtractionResult`, `ScriptProfilingHook`) and the `internal` origin-primitive `Origin` (a common
+  identifier — moving it risks false-positive `using` churn — that pairs with the value side). Implementation
+  refined the decision's type list via **consumer analysis**: the three currently-`public` mechanism-ish
+  types are deferred to F3, and crucially **`ScriptExtractionService` is host-facing public API** (`Broiler.App`
+  and `Broiler.Cli` call it), so it is *not* internal mechanism and will stay public — correcting the original
+  decision-3 enumeration that had listed it to move. Pure compile-time reorganization (no logic change):
+  cross-namespace `using`s were added where the split created new references, plus the two `Dom` and four
+  `Cli.Tests` files that consume the moved types via IVT. Verified: all eleven affected projects build clean;
+  the **public-API snapshot is unchanged** (only `internal` types moved), and the boundary-guard plus the
+  moved types' own suites (CSP-source-matching, URL-resolver, ES-module-graph, engine-module-wiring,
+  module-script-slice) are green — 69/69 on the targeted filter; no stale fully-qualified
+  `Broiler.HtmlBridge.Scripting.<moved-type>` references remain. **F3** — `internal`-ize `CspMetaDiscovery`
+  and `ModuleScriptWrapper` (public but consumed only by `Core` + tests) and move them into the internal
+  namespace, leaving `ScriptExtractionService` public — is the last remaining Phase 8 follow-up.
+- **P8.11 (2026-07-22) — item 6 follow-up F3: `internal`-ize the last two public mechanism helpers; `Core`-purity
+  closed.** `CspMetaDiscovery` (`FindPolicyContent`) and `ModuleScriptWrapper` (`WrapInlineModule`) were the
+  only `public` mechanism types left in `Core` after F2. A tree sweep confirmed both are consumed only by
+  `Core` and `Cli.Tests` (via IVT), so making them `internal` costs no real consumer; flipped `public`→`internal`
+  and moved both into `Broiler.HtmlBridge.Internal.Scripting` alongside the F2 mechanism. `ScriptExtractionService`
+  is deliberately **left `public`** — it is host-facing API (`Broiler.App`/`Broiler.Cli` call it), the one
+  extraction service that belongs on the public surface. The `Core` public-API baseline was regenerated with
+  `UPDATE_API_BASELINES=1`; the diff is **exactly** the two removed entries and nothing else. The two `Cli.Tests`
+  consumers gained the internal-namespace `using`. Verified: `Core`/`Cli.Tests` build clean; the public-API
+  snapshot (now reflecting the two removals), boundary-guard and mechanism suites are green — 80/80 on the
+  targeted filter. **End state:** `Core` presents a clean contracts-vs-mechanism split — value objects/contracts
+  in `Broiler.HtmlBridge.Scripting`, nine internal mechanism types in `Broiler.HtmlBridge.Internal.Scripting`,
+  `ScriptExtractionService` public, `RenderLogger` the sanctioned static diagnostics primitive. The `Core`-purity
+  exit criterion (*"Core contains contracts/value objects, not regex parsers, networking and mutable global
+  logging together"*) is met — separated by namespace within the one shared kernel (a fourth assembly being the
+  anti-goal since `Dom` and `Scripting` share the mechanism). **With F1–F3 delivered and all decisions settled,
+  Phase 8 item 6 is fully realized and Phase 8 is complete.**
 

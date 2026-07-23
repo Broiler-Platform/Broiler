@@ -18,7 +18,10 @@ namespace Broiler.HtmlBridge.Dom.Features;
 internal static class TimerBinding
 {
     public static JSValue SetTimeout(BrowserEventLoop loop, in Arguments a) =>
-        new JSNumber(loop.SetTimeout(a.Length > 0 ? a[0] as JSFunction : null));
+        new JSNumber(loop.SetTimeout(a.Length > 0 ? a[0] as JSFunction : null, ReadDelayMs(a)));
+
+    // The delay argument (a[1]) in ms; absent / NaN / negative are treated as 0 (the event loop clamps too).
+    private static double ReadDelayMs(in Arguments a) => a.Length > 1 ? a[1].DoubleValue : 0;
 
     public static JSValue ClearTimeout(BrowserEventLoop loop, in Arguments a)
     {
@@ -29,7 +32,7 @@ internal static class TimerBinding
     }
 
     public static JSValue SetInterval(BrowserEventLoop loop, in Arguments a) =>
-        new JSNumber(loop.SetInterval(a.Length > 0 ? a[0] as JSFunction : null));
+        new JSNumber(loop.SetInterval(a.Length > 0 ? a[0] as JSFunction : null, ReadDelayMs(a)));
 
     public static JSValue ClearInterval(BrowserEventLoop loop, in Arguments a)
     {

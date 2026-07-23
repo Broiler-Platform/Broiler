@@ -1,29 +1,29 @@
 using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Scripting;
-using Broiler.JavaScript.Engine;
 
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Phase 7 item 6 (first slice): the browser module map and inline-module execution. Covers
-/// <see cref="ScriptExtractionService.ExtractAll"/> populating <see cref="ModuleMap"/> /
-/// <see cref="ScriptExtractionResult.ModuleScripts"/>, and the module top-level semantics that
-/// <see cref="ModuleScriptWrapper.WrapInlineModule"/> reproduces for an import-free module.
+/// Phase 7 item 6 (module extraction): the browser module map and the authorised top-level module roots.
+/// Covers <see cref="ScriptExtractionService.ExtractAll"/> populating <see cref="ModuleMap"/> and
+/// <see cref="ScriptExtractionResult.ModuleRoots"/> — the sole module-execution input since the
+/// string-rewriting <c>EsModuleLinker</c> fallback was retired (Phase 7 tail): an executable module yields a
+/// <see cref="ModuleRoot"/> carrying its resolved source; a blocked/unresolvable module is mapped but yields
+/// no root.
 /// </summary>
 public sealed class ModuleScriptSliceTests
 {
     [Fact]
-    public void Inline_Module_Is_Recorded_Executable_And_Wrapped()
+    public void Inline_Module_Is_Recorded_Executable_And_Exposed_As_A_Root()
     {
         const string html =
             "<script>var a=1;</script>" +
             "<script type=\"module\">globalThis.x = 1;</script>";
         var result = ScriptExtractionService.ExtractAll(html);
 
-        // The inline module is executable (wrapped for module semantics) and mapped ...
-        Assert.Single(result.ModuleScripts);
-        Assert.Contains("use strict", result.ModuleScripts[0]);
-        Assert.Contains("globalThis.x = 1;", result.ModuleScripts[0]);
+        // The inline module is executable — exposed as a root carrying its raw source — and mapped ...
+        Assert.Single(result.ModuleRoots);
+        Assert.Equal("globalThis.x = 1;", result.ModuleRoots[0].Source);
 
         Assert.Equal(1, result.ModuleMap.Count);
         var entry = result.ModuleMap.Entries[0];
@@ -40,13 +40,13 @@ public sealed class ModuleScriptSliceTests
     }
 
     [Fact]
-    public void External_Module_With_Unresolvable_Url_Is_Mapped_But_Not_Executable()
+    public void External_Module_With_Unresolvable_Url_Is_Mapped_But_Not_A_Root()
     {
-        // No page URL → the relative src cannot be resolved/fetched → mapped but not executable.
+        // No page URL → the relative src cannot be resolved/fetched → mapped but not executable, no root.
         const string html = "<script type=\"module\" src=\"app.mjs\"></script>";
         var result = ScriptExtractionService.ExtractAll(html);
 
-        Assert.Empty(result.ModuleScripts);
+        Assert.Empty(result.ModuleRoots);
         Assert.Equal(1, result.ModuleMap.Count);
         var entry = result.ModuleMap.Entries[0];
         Assert.Equal(ScriptSourceKind.External, entry.Kind);
@@ -57,14 +57,14 @@ public sealed class ModuleScriptSliceTests
     }
 
     [Fact]
-    public void DataUri_Module_Is_Decoded_And_Executable()
+    public void DataUri_Module_Is_Decoded_And_Exposed_As_A_Root()
     {
-        // Phase 7 item 6 slice 2: a data: URI module is decoded through the same path as a classic data script.
+        // A data: URI module is decoded through the same path as a classic data script.
         const string html = "<script type=\"module\" src=\"data:text/javascript,globalThis.y%20%3D%202%3B\"></script>";
         var result = ScriptExtractionService.ExtractAll(html);
 
-        Assert.Single(result.ModuleScripts);
-        Assert.Contains("globalThis.y = 2;", result.ModuleScripts[0]);
+        Assert.Single(result.ModuleRoots);
+        Assert.Equal("globalThis.y = 2;", result.ModuleRoots[0].Source);
         var entry = result.ModuleMap.Entries[0];
         Assert.Equal(ScriptSourceKind.DataUri, entry.Kind);
         Assert.True(entry.IsExecutable);
@@ -72,9 +72,9 @@ public sealed class ModuleScriptSliceTests
     }
 
     [Fact]
-    public void External_File_Module_Is_Fetched_And_Executable()
+    public void External_File_Module_Is_Fetched_And_Exposed_As_A_Root()
     {
-        // Phase 7 item 6 slice 2: an external module resolvable to a local file is fetched and executable.
+        // An external module resolvable to a local file is fetched and exposed as a root.
         var dir = Path.Combine(Path.GetTempPath(), $"broiler-mod-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
         var modPath = Path.Combine(dir, "m.mjs");
@@ -84,8 +84,8 @@ public sealed class ModuleScriptSliceTests
             var pageUrl = new Uri(Path.Combine(dir, "index.html")).AbsoluteUri;
             var result = ScriptExtractionService.ExtractAll("<script type=\"module\" src=\"m.mjs\"></script>", pageUrl);
 
-            Assert.Single(result.ModuleScripts);
-            Assert.Contains("globalThis.z = 3;", result.ModuleScripts[0]);
+            Assert.Single(result.ModuleRoots);
+            Assert.Equal("globalThis.z = 3;", result.ModuleRoots[0].Source);
             var entry = result.ModuleMap.Entries[0];
             Assert.Equal(ScriptSourceKind.External, entry.Kind);
             Assert.True(entry.IsExecutable);
@@ -98,7 +98,7 @@ public sealed class ModuleScriptSliceTests
     }
 
     [Fact]
-    public void Repeated_Module_Url_Is_Fetched_And_Executed_Once_Module_Map_Dedup()
+    public void Repeated_Module_Url_Is_A_Single_Root_Module_Map_Dedup()
     {
         var dir = Path.Combine(Path.GetTempPath(), $"broiler-mod-{Guid.NewGuid():N}");
         Directory.CreateDirectory(dir);
@@ -111,8 +111,8 @@ public sealed class ModuleScriptSliceTests
                 "<script type=\"module\" src=\"m.mjs\"></script>";
             var result = ScriptExtractionService.ExtractAll(html, pageUrl);
 
-            // The module map holds the URL once and it is queued for execution once (evaluated once) ...
-            Assert.Single(result.ModuleScripts);
+            // The module map holds the URL once and it is exposed as a single root (evaluated once) ...
+            Assert.Single(result.ModuleRoots);
             Assert.Equal(1, result.ModuleMap.Count);
             // ... though both occurrences are still recorded in the per-element descriptor list.
             Assert.Equal(2, result.Descriptors.Count(d => d.IsModule));
@@ -124,51 +124,24 @@ public sealed class ModuleScriptSliceTests
     }
 
     [Fact]
-    public void Csp_Blocked_Inline_Module_Is_Mapped_But_Not_Executable()
+    public void Csp_Blocked_Inline_Module_Is_Mapped_But_Not_A_Root()
     {
         const string html =
             "<meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'none'\">" +
             "<script type=\"module\">globalThis.x = 1;</script>";
         var result = ScriptExtractionService.ExtractAll(html);
 
-        Assert.Empty(result.ModuleScripts);
+        Assert.Empty(result.ModuleRoots);
         Assert.Equal(1, result.ModuleMap.Count);
         Assert.False(result.ModuleMap.Entries[0].IsExecutable);
         Assert.Null(result.ModuleMap.Entries[0].Source);
     }
 
     [Fact]
-    public void Document_With_No_Modules_Has_An_Empty_Map()
+    public void Document_With_No_Modules_Has_An_Empty_Map_And_No_Roots()
     {
         var result = ScriptExtractionService.ExtractAll("<script>var a=1;</script>");
         Assert.Equal(0, result.ModuleMap.Count);
-        Assert.Empty(result.ModuleScripts);
-    }
-
-    // ── module top-level semantics reproduced by the wrapper ──
-
-    [Fact]
-    public void Wrapped_Module_Runs_Its_Body()
-    {
-        using var ctx = new JSContext();
-        ctx.Eval(ModuleScriptWrapper.WrapInlineModule("globalThis.__ran = 7;"));
-        Assert.Equal("7", ctx.Eval("globalThis.__ran").ToString());
-    }
-
-    [Fact]
-    public void Wrapped_Module_Top_Level_Declarations_Do_Not_Leak_To_Global()
-    {
-        using var ctx = new JSContext();
-        ctx.Eval(ModuleScriptWrapper.WrapInlineModule("var leaked = 42; function f() {}"));
-        Assert.Equal("undefined", ctx.Eval("typeof leaked").ToString());
-        Assert.Equal("undefined", ctx.Eval("typeof f").ToString());
-    }
-
-    [Fact]
-    public void Wrapped_Module_Top_Level_This_Is_Undefined_Strict()
-    {
-        using var ctx = new JSContext();
-        ctx.Eval(ModuleScriptWrapper.WrapInlineModule("globalThis.__thisUndef = (this === undefined);"));
-        Assert.Equal("true", ctx.Eval("globalThis.__thisUndef").ToString());
+        Assert.Empty(result.ModuleRoots);
     }
 }

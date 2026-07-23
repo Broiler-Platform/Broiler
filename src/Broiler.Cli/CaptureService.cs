@@ -204,6 +204,14 @@ public class CaptureService
         @"(?:^|\s)defer(?:\s|$|=)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>
+    /// Matches <c>type="module"</c> on a script tag (Phase 7 tail: capture runs modules through the engine
+    /// module path when available, instead of dropping them as classic-script syntax errors).
+    /// </summary>
+    private static readonly Regex TypeModuleAttrPattern = new(
+        @"\stype\s*=\s*(?:""\s*module\s*""|'\s*module\s*'|module(?:\s|$))",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static readonly Regex StylePattern = new(
         @"<style[^>]*>(?<content>[\s\S]*?)</style>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -443,11 +451,13 @@ public class CaptureService
     {
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
+        var moduleRoots = new List<string>();
         var csp = ContentSecurityPolicy.FromHtml(html);
         foreach (Match match in AnyScriptPattern.Matches(html))
         {
             var attrs = match.Groups["attrs"].Value;
             var isDefer = DeferAttrPattern.IsMatch(attrs);
+            var isModule = TypeModuleAttrPattern.IsMatch(attrs);
             var nonce = ContentSecurityPolicy.ExtractNonceFromAttributes(attrs);
             string? scriptContent = null;
 
@@ -487,7 +497,11 @@ public class CaptureService
 
             if (scriptContent == null) continue;
 
-            if (isDefer)
+            // <script type="module"> is deferred by definition; route it to the engine module path
+            // (run after the classic deferred scripts) rather than the classic buckets.
+            if (isModule)
+                moduleRoots.Add(scriptContent);
+            else if (isDefer)
                 deferredScripts.Add(scriptContent);
             else
                 scripts.Add(scriptContent);
@@ -496,11 +510,17 @@ public class CaptureService
         // No scripts to run: normally the raw HTML passes through untouched, but
         // a CSP style-src policy that blocks inline styles still has to be applied
         // to the rendered output, so fall through to build and re-serialize the DOM.
-        if (scripts.Count == 0 && deferredScripts.Count == 0 && (csp == null || !csp.AffectsStyles()))
+        if (scripts.Count == 0 && deferredScripts.Count == 0 && moduleRoots.Count == 0 &&
+            (csp == null || !csp.AffectsStyles()))
             return html;
 
+        // Run modules through the engine's own module machinery when it binds imports (as ScriptEngine
+        // does). Capture had no module support before — a type="module" script was eval'd as a classic
+        // script and threw — so this is additive; when the engine can't bind imports the context stays a
+        // plain JSContext and the modules are skipped (unchanged net effect: they did not execute).
+        var useEngineModules = moduleRoots.Count > 0 && EngineModuleSupport.Available;
         var microTasks = new MicroTaskQueue();
-        using var context = new JSContext();
+        using JSContext context = useEngineModules ? new BridgeModuleContext(csp, url) : new JSContext();
         RegisterRuntimeExtensions(context, microTasks, csp);
         var bridge = new DomBridge();
         bridge.Csp = csp;
@@ -541,8 +561,15 @@ public class CaptureService
                 }
 
                 if (!hadWork)
-                    break;
+                    return; // settled within the budget
             }
+
+            // Phase 8 item 3: the drain budget is exhausted while work is still queued (a runaway
+            // microtask/timer loop). Surface it explicitly instead of stopping silently.
+            RenderLogger.LogWarning(LogCategory.JavaScript, "CaptureService.DrainAsyncWork",
+                $"Async work did not settle within {DomBridge.AsyncDrainIterationLimit} drain iterations; " +
+                $"stopping with pending microtasks={microTasks.Count}, pendingTimers={bridge.HasPendingTimers}. " +
+                "This usually indicates a runaway microtask/timer loop.");
         }
 
         for (int si = 0; si < scripts.Count; si++)
@@ -552,7 +579,10 @@ public class CaptureService
             try
             {
                 context.Eval(scripts[si]);
-                DrainAsyncWork(bridge, microTasks);
+                // Event-loop ordering (EL-3): only a microtask checkpoint between synchronous scripts; timers
+                // are deferred to the post-load drain below, so they fire (in deadline order) after all script
+                // execution rather than eagerly between scripts.
+                microTasks.Drain();
             }
             catch (Exception ex)
             {
@@ -568,11 +598,32 @@ public class CaptureService
             try
             {
                 context.Eval(script);
-                DrainAsyncWork(bridge, microTasks);
+                microTasks.Drain(); // microtask checkpoint only; timers deferred to the post-load drain (EL-3)
             }
             catch (Exception ex)
             {
                 RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom", $"Deferred script error: {ex.Message}", ex);
+            }
+        }
+
+        // Execute ES modules (deferred by definition) last, through the engine module machinery on the
+        // BridgeModuleContext the DOM is attached to. Only when the engine binds imports (see the context
+        // setup above); otherwise moduleRoots is left unrun. The page URL is the module base for resolving
+        // relative imports; the key is made unique per root within this capture.
+        if (context is BridgeModuleContext moduleContext)
+        {
+            for (var mi = 0; mi < moduleRoots.Count; mi++)
+            {
+                try
+                {
+                    moduleContext.RunScriptAsync(moduleRoots[mi], url, uniqueModuleID: $"{url}#capture-module-{mi}")
+                        .GetAwaiter().GetResult();
+                    microTasks.Drain(); // microtask checkpoint only; timers deferred to the post-load drain (EL-3)
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom", $"Module script error: {ex.Message}", ex);
+                }
             }
         }
 

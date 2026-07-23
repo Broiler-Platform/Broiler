@@ -15,8 +15,8 @@ public sealed class RenderingPipeline(
     /// Load a page from <paramref name="url"/>, extract inline scripts,
     /// and return a <see cref="PageContent"/> ready for rendering.
     /// The normalised URL (with scheme) is included in the result tuple.
-    /// Uses <see cref="IScriptExtractor.ExtractAll"/> so that deferred and
-    /// external scripts are also captured, matching the CLI's behaviour.
+    /// Uses <see cref="Broiler.HtmlBridge.Scripting.ScriptExtractionService.ExtractAll"/> so that deferred
+    /// and external scripts are also captured, matching the CLI's behaviour.
     /// </summary>
     public async Task<(string NormalisedUrl, PageContent Content)> LoadPageAsync(
         string url,
@@ -32,16 +32,10 @@ public sealed class RenderingPipeline(
             ? result.Scripts
             : result.Scripts.Concat(result.AsyncScripts).ToArray();
 
-        // ES modules (Phase 7 item 6). When the engine binds imports (EngineModuleSupport.Available), the
-        // authorised module roots run through the engine's own module machinery — carry them on PageContent
-        // and DO NOT append the linked strings. Otherwise fall back to the EsModuleLinker: run the linked
-        // module graph (dependency-first) after the classic deferred scripts.
-        var useEngineModules = result.ModuleRoots.Count > 0 && EngineModuleSupport.Available;
-        var deferred = useEngineModules || result.ModuleScripts.Count == 0
-            ? result.DeferredScripts
-            : result.DeferredScripts.Concat(result.ModuleScripts).ToArray();
-        var moduleRoots = useEngineModules ? result.ModuleRoots : [];
-        return (normalisedUrl, new PageContent(html, executableScripts, normalisedUrl, deferred, moduleRoots));
+        // ES modules (Phase 7 item 6 / tail): the authorised module roots run through the engine's own module
+        // machinery when it binds imports (EngineModuleSupport.Available, gated inside ScriptEngine). The
+        // string-rewriting EsModuleLinker fallback was retired, so the roots are the sole module input.
+        return (normalisedUrl, new PageContent(html, executableScripts, normalisedUrl, result.DeferredScripts, result.ModuleRoots));
     }
 
     /// <summary>

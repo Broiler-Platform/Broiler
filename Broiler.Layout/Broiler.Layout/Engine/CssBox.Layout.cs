@@ -578,7 +578,20 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // and update the parent's Location, so compute it before
             // reading ParentBox.ClientTop.
             double marginCollapse = MarginTopCollapse(flowPrev);
-            double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + marginCollapse + flowPrevBottom;
+
+            // The static top is the parent's content top plus the in-flow advance
+            // past any preceding sibling. A block preceding sibling records an
+            // absolute ActualBottom, so its advance is (flowPrevBottom - baseTop);
+            // an inline/text preceding sibling records no block bottom
+            // (flowPrevBottom == 0), which must NOT drag the box above the parent's
+            // content top — clamp the advance to ≥ 0. This keeps a block-after-block
+            // static position byte-identical while fixing an abspos box that follows
+            // inline content in a nested block (e.g. `<div>text<div
+            // style="position:absolute"></div></div>`), which previously resolved to
+            // the containing block's top (y = 0) instead of its parent's content top.
+            double baseTop = ParentBox == null ? Location.Y : ParentBox.ClientTop;
+            double top = baseTop + marginCollapse
+                + (flowPrev != null ? Math.Max(0, flowPrevBottom - baseTop) : 0);
 
             // CSS2.1 §10.3.7 / §10.6.4: an out-of-flow box that was flowed
             // through an inline formatting context takes its *static* position

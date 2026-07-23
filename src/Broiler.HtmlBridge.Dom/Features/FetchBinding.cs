@@ -12,6 +12,7 @@ using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.HtmlBridge.Scripting;
+using Broiler.HtmlBridge.Internal.Scripting;
 
 namespace Broiler.HtmlBridge.Dom.Features;
 

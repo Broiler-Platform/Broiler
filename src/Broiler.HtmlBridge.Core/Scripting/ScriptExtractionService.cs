@@ -1,6 +1,7 @@
 using Broiler.Dom.Html;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
+using Broiler.HtmlBridge.Internal.Scripting;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -168,9 +169,8 @@ public static partial class ScriptExtractionService
         var deferredScripts = new List<string>();
         var asyncScripts = new List<string>();
         var descriptors = new List<ScriptDescriptor>();
-        var moduleScripts = new List<string>();
         var moduleMap = new ModuleMap();
-        var moduleEntries = new List<ModuleGraphLoader.GraphModule>();
+        var moduleRoots = new List<ModuleRoot>();
         var moduleEntryKeys = new HashSet<string>(StringComparer.Ordinal);
         var csp = ContentSecurityPolicy.FromHtml(html);
 
@@ -217,7 +217,7 @@ public static partial class ScriptExtractionService
                         };
                         var baseUrl = kind == ScriptSourceKind.Inline ? pageUrl : graphKey;
                         if (moduleEntryKeys.Add(graphKey))
-                            moduleEntries.Add(new ModuleGraphLoader.GraphModule(graphKey, moduleSource, baseUrl));
+                            moduleRoots.Add(new ModuleRoot(graphKey, moduleSource, baseUrl));
                     }
                 }
             }
@@ -273,53 +273,11 @@ public static partial class ScriptExtractionService
                 scripts.Add(scriptContent);
         }
 
-        // Phase 7 item 6: build and link the module graph from the authorised top-level module roots.
-        // The loader resolves+fetches each transitive dependency (CSP-gated), dedups, orders the graph
-        // dependency-first, and renders each module to a linked plain-JS program the existing evaluator
-        // runs in order. A module whose syntax the scanner cannot transform falls back to running as-is.
-        var moduleRoots = new List<ModuleRoot>(moduleEntries.Count);
-        if (moduleEntries.Count > 0)
-        {
-            var graph = ModuleGraphLoader.Load(moduleEntries,
-                (specifier, baseUrl) => ResolveDependencyModule(specifier, baseUrl, csp, pageUrl));
-            moduleScripts.AddRange(graph.Programs);
-
-            // The same authorised roots, exposed for the engine-driven path (BridgeModuleContext), which runs
-            // each root through the JS engine's own module machinery instead of the linked strings above.
-            foreach (var entry in moduleEntries)
-                moduleRoots.Add(new ModuleRoot(entry.Key, entry.Source, entry.BaseUrl));
-        }
-
-        return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts, descriptors, moduleScripts, moduleMap, moduleRoots);
-    }
-
-    /// <summary>
-    /// Resolves and fetches one module-graph dependency (Phase 7 item 6): a <c>data:</c> specifier is
-    /// decoded; anything else is resolved against the importing module's base URL and fetched via the same
-    /// authorised path as a classic external script. Every fetch is CSP-gated (<c>script-src</c>). Returns
-    /// the resolved absolute key + source, or <c>null</c> when unresolvable, empty, or blocked.
-    /// </summary>
-    private static (string Key, string Source)? ResolveDependencyModule(
-        string specifier, string? baseUrl, ContentSecurityPolicy? csp, string? pageUrl)
-    {
-        if (specifier.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-        {
-            if (csp != null && !csp.AllowsExternalScript(specifier, pageUrl, null))
-                return null;
-            var decoded = DecodeDataUri(specifier);
-            return string.IsNullOrEmpty(decoded) ? null : (specifier, decoded);
-        }
-
-        var resolved = UrlResolver.Resolve(specifier, baseUrl);
-        if (resolved == null)
-            return null;
-
-        var key = resolved.AbsoluteUri;
-        if (csp != null && !csp.AllowsExternalScript(key, pageUrl, null))
-            return null;
-
-        var source = FetchExternalScript(key, baseUrl);
-        return string.IsNullOrEmpty(source) ? null : (key, source);
+        // Phase 7 item 6 / tail: the authorised top-level module roots are the sole module-execution input.
+        // A consumer drives the JS engine's own module machinery (BridgeModuleContext) to run each root; the
+        // engine resolves+fetches its transitive imports itself (CSP-gated). The string-rewriting
+        // EsModuleLinker fallback was retired once every surface took the engine path.
+        return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts, descriptors, moduleMap, moduleRoots);
     }
 
     /// <summary>

@@ -38,8 +38,8 @@ public sealed record ScriptDescriptor(
 /// a synthetic <c>inline:{order}</c> id; module scripts with a <c>src</c> are keyed by URL. An authorised
 /// module carries its resolved body in <see cref="Source"/> with <see cref="IsExecutable"/> <c>true</c>; a
 /// module blocked by CSP or unresolvable has a <c>null</c> <see cref="Source"/> and is not executable. The
-/// map records the document's top-level module roots; the linked graph (roots + transitive dependencies)
-/// is in <see cref="ScriptExtractionResult.ModuleScripts"/>.
+/// map records the document's top-level module roots; the executable roots are in
+/// <see cref="ScriptExtractionResult.ModuleRoots"/>.
 /// </summary>
 public sealed record ModuleMapEntry(
     int DocumentOrder,
@@ -78,25 +78,25 @@ public sealed class ModuleMap
 }
 
 /// <summary>
-/// Holds the result of extracting all scripts from an HTML page,
-/// separated into regular (inline / data-URI / external), deferred,
-/// and async scripts so that the engine can execute them in the correct order.
-/// </summary>
-/// <summary>
 /// An authorised top-level ES-module root (a <c>&lt;script type="module"&gt;</c> whose source passed CSP):
 /// its resolved module key, its already-decoded/fetched source, and the base URL its relative imports
-/// resolve against. This is the engine-driven counterpart of a linked <see cref="ScriptExtractionResult.ModuleScripts"/>
-/// entry — a consumer that drives the JS engine's own module machinery runs each root (which pulls in its
-/// transitive imports itself) instead of evaluating pre-linked program strings.
+/// resolve against. A consumer drives the JS engine's own module machinery to run each root (which pulls in
+/// its transitive imports itself); this is the sole module-execution input since the string-rewriting
+/// <c>EsModuleLinker</c> fallback was retired (Phase 7 tail).
 /// </summary>
 public sealed record ModuleRoot(string Key, string Source, string? BaseUrl);
 
+/// <summary>
+/// Holds the result of extracting all scripts from an HTML page, separated into regular
+/// (inline / data-URI / external), deferred, and async scripts so the engine can execute them in the
+/// correct order — plus the metadata descriptors, the module map, the linked module graph and the
+/// authorised module roots (Phase 7 items 3 and 6).
+/// </summary>
 public sealed class ScriptExtractionResult(
     IReadOnlyList<string> scripts,
     IReadOnlyList<string> deferredScripts,
     IReadOnlyList<string> asyncScripts,
     IReadOnlyList<ScriptDescriptor>? descriptors = null,
-    IReadOnlyList<string>? moduleScripts = null,
     ModuleMap? moduleMap = null,
     IReadOnlyList<ModuleRoot>? moduleRoots = null)
 {
@@ -117,25 +117,15 @@ public sealed class ScriptExtractionResult(
     /// </summary>
     public IReadOnlyList<ScriptDescriptor> Descriptors { get; } = descriptors ?? [];
 
-    /// <summary>
-    /// The document's linked module graph (Phase 7 item 6) as executable programs in <b>dependency-first</b>
-    /// order — every module (each <c>&lt;script type="module"&gt;</c> root plus its transitively imported
-    /// dependencies) rewritten so its <c>import</c>/<c>export</c> statements read/write a shared runtime
-    /// registry, each in its own strict module scope. Module scripts are deferred, so a consumer runs these
-    /// after the classic <see cref="DeferredScripts"/>; running them in list order satisfies the graph's
-    /// evaluation order. A module whose syntax cannot be transformed runs as-is (fallback).
-    /// </summary>
-    public IReadOnlyList<string> ModuleScripts { get; } = moduleScripts ?? [];
-
     /// <summary>The document's module map (Phase 7 item 6): every recognised module in document order.</summary>
     public ModuleMap ModuleMap { get; } = moduleMap ?? new ModuleMap();
 
     /// <summary>
-    /// The authorised top-level module roots in document order (Phase 7 item 6). A consumer that drives the
-    /// JS engine's own module machinery (see <c>BridgeModuleContext</c>) runs these — each root loads its
-    /// own transitive imports — as the engine-driven alternative to evaluating the pre-linked
-    /// <see cref="ModuleScripts"/>. Populated alongside <see cref="ModuleScripts"/>; which one a host uses is
-    /// its choice (the engine path only when the engine binds imports).
+    /// The authorised top-level module roots in document order (Phase 7 item 6). A consumer drives the JS
+    /// engine's own module machinery (see <c>BridgeModuleContext</c>) to run these — each root loads its own
+    /// transitive imports — when the engine binds imports (<c>EngineModuleSupport.Available</c>). This is the
+    /// sole module-execution input since the string-rewriting <c>EsModuleLinker</c> fallback was retired
+    /// (Phase 7 tail).
     /// </summary>
     public IReadOnlyList<ModuleRoot> ModuleRoots { get; } = moduleRoots ?? [];
 }

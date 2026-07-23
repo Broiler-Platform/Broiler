@@ -14,11 +14,13 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class HtmlBridgePublicApiSnapshotTests
 {
+    // Broiler.HtmlBridge.Rendering was dissolved in Phase 8 item 6 follow-up F1 (its sole occupant, the
+    // internal HtmlPostProcessor, moved into Broiler.HtmlBridge.Dom). Its public surface was empty, so no
+    // baseline is lost; the three surviving assemblies are the final shape.
     public static IEnumerable<object[]> BridgeAssemblies =>
     [
         ["Broiler.HtmlBridge.Core"],
         ["Broiler.HtmlBridge.Dom"],
-        ["Broiler.HtmlBridge.Rendering"],
         ["Broiler.HtmlBridge.Scripting"],
     ];
 

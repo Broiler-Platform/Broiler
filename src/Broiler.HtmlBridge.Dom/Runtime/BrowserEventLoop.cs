@@ -26,8 +26,27 @@ namespace Broiler.HtmlBridge.Dom.Runtime;
 internal sealed class BrowserEventLoop
 {
     private int _timerIdCounter;
-    private readonly ConcurrentDictionary<int, JSFunction> _timeoutCallbacks = new();
-    private readonly ConcurrentDictionary<int, JSFunction> _intervalCallbacks = new();
+
+    /// <summary>
+    /// A queued timer — a one-shot <c>setTimeout</c> (<paramref name="Period"/> <c>null</c>) or a repeating
+    /// <c>setInterval</c> (<paramref name="Period"/> = its interval in ms). <paramref name="Deadline"/> is its
+    /// virtual firing time (ms on the loop's virtual clock — <c>now + max(0, delay)</c> at registration; an
+    /// interval reschedules to <c>Deadline + Period</c> after each tick), and <paramref name="Seq"/> a
+    /// monotonic registration counter for a FIFO tiebreak among equal deadlines. The drain fires timers in
+    /// <c>(Deadline, Seq)</c> order so an earlier-deadline timer runs first (HTML event-loop timer ordering) —
+    /// e.g. <c>setTimeout(a, 100); setTimeout(b, 0)</c> runs <c>b</c> before <c>a</c>, and a fast
+    /// <c>setInterval</c> ticks the right number of times before a slower <c>setTimeout</c>.
+    /// </summary>
+    private readonly record struct TimerEntry(double Deadline, long Seq, JSFunction Fn, double? Period);
+
+    private long _timerSeqCounter;
+    // The loop's virtual clock (ms). Advances to the earliest pending deadline as timers fire, so a timer
+    // scheduled by a callback is dated relative to the virtual "now" at that point. Not wall-clock: a
+    // synchronous drain has no real time, only the relative ordering of deadlines.
+    private double _virtualNowMs;
+    // One unified deadline-ordered queue for setTimeout and setInterval (they share an id space; clearTimeout
+    // and clearInterval are interchangeable per the HTML spec).
+    private readonly ConcurrentDictionary<int, TimerEntry> _timers = new();
     private readonly ConcurrentDictionary<int, byte> _clearedTimerIds = new();
     private int _rafIdCounter;
     private readonly ConcurrentDictionary<int, JSFunction> _rafCallbacks = new();
@@ -39,35 +58,47 @@ internal sealed class BrowserEventLoop
     // ------------------------------------------------------------------
 
     /// <summary>Registers a one-shot timeout, returning its id. The id is allocated even when
-    /// <paramref name="callback"/> is <c>null</c> (matching <c>setTimeout</c> with a non-function arg).</summary>
-    public int SetTimeout(JSFunction? callback)
+    /// <paramref name="callback"/> is <c>null</c> (matching <c>setTimeout</c> with a non-function arg).
+    /// <paramref name="delayMs"/> sets the timer's virtual deadline (<c>now + max(0, delay)</c>); it is
+    /// clamped to a non-negative finite value (a <c>NaN</c>/negative/absent delay is 0), so timeouts fire in
+    /// deadline order.</summary>
+    public int SetTimeout(JSFunction? callback, double delayMs = 0)
     {
         var id = Interlocked.Increment(ref _timerIdCounter);
         if (callback is not null)
-            _timeoutCallbacks[id] = callback;
+        {
+            var delay = double.IsNaN(delayMs) || delayMs < 0 ? 0 : delayMs;
+            var seq = Interlocked.Increment(ref _timerSeqCounter);
+            _timers[id] = new TimerEntry(_virtualNowMs + delay, seq, callback, Period: null);
+        }
         return id;
     }
 
     /// <summary>Cancels a timeout and marks its id cleared so an in-flight drain skips it.</summary>
-    public void ClearTimeout(int id)
-    {
-        _timeoutCallbacks.TryRemove(id, out _);
-        _clearedTimerIds[id] = 0;
-    }
+    public void ClearTimeout(int id) => CancelTimer(id);
 
-    /// <summary>Registers a repeating interval (one tick per drain step), returning its id.</summary>
-    public int SetInterval(JSFunction? callback)
+    /// <summary>Registers a repeating interval, returning its id. <paramref name="periodMs"/> is the tick
+    /// period (clamped to a non-negative finite value); the interval fires at <c>now + period</c> and then
+    /// every <c>period</c> ms on the virtual clock, in deadline order with the other timers.</summary>
+    public int SetInterval(JSFunction? callback, double periodMs = 0)
     {
         var id = Interlocked.Increment(ref _timerIdCounter);
         if (callback is not null)
-            _intervalCallbacks[id] = callback;
+        {
+            var period = double.IsNaN(periodMs) || periodMs < 0 ? 0 : periodMs;
+            var seq = Interlocked.Increment(ref _timerSeqCounter);
+            _timers[id] = new TimerEntry(_virtualNowMs + period, seq, callback, period);
+        }
         return id;
     }
 
-    /// <summary>Cancels an interval and marks its id cleared.</summary>
-    public void ClearInterval(int id)
+    /// <summary>Cancels an interval and marks its id cleared. Interchangeable with <see cref="ClearTimeout"/>
+    /// (both act on the shared timer id space).</summary>
+    public void ClearInterval(int id) => CancelTimer(id);
+
+    private void CancelTimer(int id)
     {
-        _intervalCallbacks.TryRemove(id, out _);
+        _timers.TryRemove(id, out _);
         _clearedTimerIds[id] = 0;
     }
 
@@ -91,9 +122,9 @@ internal sealed class BrowserEventLoop
     //  Drain
     // ------------------------------------------------------------------
 
-    /// <summary>Whether any timeout, interval, animation-frame callback or frame action is queued.</summary>
+    /// <summary>Whether any timer (timeout/interval), animation-frame callback or frame action is queued.</summary>
     public bool HasPendingWork =>
-        !_timeoutCallbacks.IsEmpty || !_intervalCallbacks.IsEmpty || !_rafCallbacks.IsEmpty || !_frameActions.IsEmpty;
+        !_timers.IsEmpty || !_rafCallbacks.IsEmpty || !_frameActions.IsEmpty;
 
     /// <summary>
     /// Runs pending work to a fixed point: repeatedly runs one batch (up to a safety cap) until no
@@ -131,26 +162,40 @@ internal sealed class BrowserEventLoop
             }
         }
 
-        var pending = new List<(int Id, JSFunction Fn)>();
-
         // ConcurrentDictionary.ToArray() takes a consistent snapshot even while other threads
         // register callbacks, and TryRemove drains only the entries we actually collected — so a
         // timer registered concurrently (or by a callback that runs during this drain) is carried to
         // the next step instead of being wiped by a blanket Clear().
 
-        // Collect timeout callbacks (one-shot: remove as collected)
-        foreach (var kv in _timeoutCallbacks.ToArray())
+        // Advance the virtual clock to the earliest pending timer deadline, then collect every timer due at
+        // that time (an interval that reschedules to the same instant, plus co-scheduled timers) in
+        // (deadline, seq) order. Firing only the earliest deadline group per step is what lets a fast
+        // setInterval tick the right number of times before a slower setTimeout: each step advances the
+        // clock by one deadline. A timer scheduled mid-step is carried to the next step, which — together
+        // with the one-group-per-step granularity — preserves the runaway self-rescheduling-timer cap of
+        // DrainAll (a setTimeout(fn, 0) that reschedules itself fires once per step, bounded by the cap).
+        var pending = new List<(int Id, TimerEntry Entry)>();
+        var earliest = double.PositiveInfinity;
+        var timerSnapshot = _timers.ToArray();
+        foreach (var kv in timerSnapshot)
         {
-            if (_timeoutCallbacks.TryRemove(kv.Key, out var fn) && !_clearedTimerIds.ContainsKey(kv.Key))
-                pending.Add((kv.Key, fn));
+            if (!_clearedTimerIds.ContainsKey(kv.Key) && kv.Value.Deadline < earliest)
+                earliest = kv.Value.Deadline;
         }
-
-        // Collect interval callbacks (execute once per step, keep registered)
-        var intervalSnapshot = new List<(int Id, JSFunction Fn)>();
-        foreach (var kv in _intervalCallbacks.ToArray())
+        if (!double.IsPositiveInfinity(earliest))
         {
-            if (!_clearedTimerIds.ContainsKey(kv.Key))
-                intervalSnapshot.Add((kv.Key, kv.Value));
+            if (earliest > _virtualNowMs) _virtualNowMs = earliest;
+            foreach (var kv in timerSnapshot)
+            {
+                if (kv.Value.Deadline <= _virtualNowMs && !_clearedTimerIds.ContainsKey(kv.Key)
+                    && _timers.TryRemove(kv.Key, out var entry))
+                    pending.Add((kv.Key, entry));
+            }
+            pending.Sort(static (x, y) =>
+            {
+                var byDeadline = x.Entry.Deadline.CompareTo(y.Entry.Deadline);
+                return byDeadline != 0 ? byDeadline : x.Entry.Seq.CompareTo(y.Entry.Seq);
+            });
         }
 
         // Collect rAF callbacks (one-shot: remove as collected)
@@ -168,25 +213,24 @@ internal sealed class BrowserEventLoop
                 frameActionSnapshot.Add(action);
         }
 
-        if (pending.Count == 0 && intervalSnapshot.Count == 0 && rafSnapshot.Count == 0 && frameActionSnapshot.Count == 0)
+        if (pending.Count == 0 && rafSnapshot.Count == 0 && frameActionSnapshot.Count == 0)
             return false;
 
-        // Execute timeout callbacks
-        foreach (var (id, fn) in pending)
+        // Execute the due timers in (deadline, seq) order. Each fires at most once this step; an interval is
+        // rescheduled for its next tick (Deadline + Period) for a later step unless it was cleared while
+        // running, so a self-rescheduling timer/interval ticks once per step (bounded by the DrainAll cap).
+        foreach (var (id, entry) in pending)
         {
             if (_clearedTimerIds.ContainsKey(id)) continue;
-            try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "BrowserEventLoop.DrainStep", $"setTimeout callback error: {ex.Message}", ex); }
+            try { entry.Fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
+            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "BrowserEventLoop.DrainStep", $"timer callback error: {ex.Message}", ex); }
             finally { RunTaskCheckpoint(); }
-        }
 
-        // Execute interval callbacks (one tick per step)
-        foreach (var (id, fn) in intervalSnapshot)
-        {
-            if (_clearedTimerIds.ContainsKey(id)) continue;
-            try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "BrowserEventLoop.DrainStep", $"setInterval callback error: {ex.Message}", ex); }
-            finally { RunTaskCheckpoint(); }
+            if (entry.Period is double period && !_clearedTimerIds.ContainsKey(id))
+            {
+                var nextSeq = Interlocked.Increment(ref _timerSeqCounter);
+                _timers[id] = new TimerEntry(entry.Deadline + period, nextSeq, entry.Fn, period);
+            }
         }
 
         // Execute rAF callbacks
@@ -211,12 +255,13 @@ internal sealed class BrowserEventLoop
     /// pending work is discarded, never run.</summary>
     public void Clear()
     {
-        _timeoutCallbacks.Clear();
-        _intervalCallbacks.Clear();
+        _timers.Clear();
         _clearedTimerIds.Clear();
         _rafCallbacks.Clear();
         _frameActions.Clear();
         _timerIdCounter = 0;
+        _timerSeqCounter = 0;
+        _virtualNowMs = 0;
         _rafIdCounter = 0;
         _frameActionIdCounter = 0;
     }

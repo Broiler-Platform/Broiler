@@ -1,4 +1,3 @@
-using System.Linq;
 using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Scripting;
 using Xunit;
@@ -34,20 +33,15 @@ public class EngineModuleWiringTests
     }
 
     [Fact]
-    public void Module_Import_Binds_And_Touches_Dom_Via_Active_Path()
+    public void Module_Import_Binds_And_Touches_Dom_Via_Engine_Path()
     {
         var extraction = ScriptExtractionService.ExtractAll(ModuleHtml, Url);
 
-        // Mirror RenderingPipeline's capability gate: when the engine binds imports, run the roots via the
-        // engine and keep the linked module strings out of the deferred bucket; otherwise fall back to the
-        // linker (linked strings appended to deferred, no roots).
-        var useEngine = extraction.ModuleRoots.Count > 0 && EngineModuleSupport.Available;
-        var deferred = useEngine
-            ? extraction.DeferredScripts
-            : extraction.DeferredScripts.Concat(extraction.ModuleScripts).ToArray();
-        var roots = useEngine ? extraction.ModuleRoots : null;
-
-        var output = new ScriptEngine().Execute(extraction.Scripts, deferred, ModuleHtml, Url, roots);
+        // The module roots are the sole module-execution input (the EsModuleLinker fallback was retired);
+        // ScriptEngine runs them through the engine's own machinery when it binds imports
+        // (EngineModuleSupport.Available), which it does on the pinned engine.
+        var output = new ScriptEngine().Execute(
+            extraction.Scripts, extraction.DeferredScripts, ModuleHtml, Url, extraction.ModuleRoots);
 
         Assert.NotNull(output);
         Assert.Contains("data-msg=\"wired\"", output);
