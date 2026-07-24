@@ -259,18 +259,18 @@ public sealed partial class DomBridge
 
         if (!string.IsNullOrWhiteSpace(animationShorthand))
         {
-            var parts = TokenizeAnimationShorthand(animationShorthand!);
+            var parts = CssAnimation.TokenizeShorthand(animationShorthand!);
             var durations = new List<double>();
 
             foreach (var part in parts)
             {
-                if (TryParseCssTime(part, out var sec))
+                if (CssAnimation.TryParseTime(part, out var sec))
                     durations.Add(sec);
-                else if (IsTimingFunction(part))
+                else if (CssAnimation.IsTimingFunction(part))
                     timingFunction = part;
                 else if (part is "none" or "forwards" or "backwards" or "both")
                     fillMode = part;
-                else if (name == null && !IsKnownAnimationKeyword(part))
+                else if (name == null && !CssAnimation.IsKnownKeyword(part))
                     name = part;
             }
 
@@ -282,7 +282,7 @@ public sealed partial class DomBridge
         if (!string.IsNullOrWhiteSpace(animationName))
             name = animationName;
         if (!string.IsNullOrWhiteSpace(animationDelay) &&
-            TryParseCssTime(animationDelay!, out var delayOverride))
+            CssAnimation.TryParseTime(animationDelay!, out var delayOverride))
             delaySec = delayOverride;
 
         if (string.IsNullOrEmpty(name) || durationSec <= 0)
@@ -420,83 +420,6 @@ public sealed partial class DomBridge
 
         return result;
     }
-
-    private static bool TryParseCssTime(string text, out double seconds)
-    {
-        seconds = 0;
-        var lower = text.Trim().ToLowerInvariant();
-
-        if (lower.EndsWith("ms"))
-        {
-            if (double.TryParse(lower.AsSpan(0, lower.Length - 2),
-                NumberStyles.Float, CultureInfo.InvariantCulture, out var ms))
-            {
-                seconds = ms / 1000.0;
-                return true;
-            }
-        }
-        else if (lower.EndsWith('s'))
-        {
-            if (double.TryParse(lower.AsSpan(0, lower.Length - 1),
-                NumberStyles.Float, CultureInfo.InvariantCulture, out var s))
-            {
-                seconds = s;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static IReadOnlyList<string> TokenizeAnimationShorthand(string shorthand)
-    {
-        var tokens = new List<string>();
-        var current = new StringBuilder();
-        var depth = 0;
-
-        foreach (var ch in shorthand.Trim())
-        {
-            if (char.IsWhiteSpace(ch) && depth == 0)
-            {
-                if (current.Length > 0)
-                {
-                    tokens.Add(current.ToString());
-                    current.Clear();
-                }
-
-                continue;
-            }
-
-            if (ch == '(')
-                depth++;
-            else if (ch == ')' && depth > 0)
-                depth--;
-
-            current.Append(ch);
-        }
-
-        if (current.Length > 0)
-            tokens.Add(current.ToString());
-
-        return tokens;
-    }
-
-    private static bool IsTimingFunction(string text) => text switch
-    {
-        "ease" or "linear" or "ease-in" or "ease-out" or "ease-in-out"
-            or "step-start" or "step-end" => true,
-        _ when text.StartsWith("steps(", StringComparison.OrdinalIgnoreCase) => true,
-        _ when text.StartsWith("cubic-bezier(", StringComparison.OrdinalIgnoreCase) => true,
-        _ => false,
-    };
-
-    private static bool IsKnownAnimationKeyword(string text) => text switch
-    {
-        "normal" or "reverse" or "alternate" or "alternate-reverse"
-            or "none" or "forwards" or "backwards" or "both"
-            or "running" or "paused" or "infinite" => true,
-        _ => false,
-    };
 
     // -----------------------------------------------------------------
     // Value interpolation

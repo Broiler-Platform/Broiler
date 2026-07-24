@@ -5,6 +5,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
+using Broiler.CSS;
 
 namespace Broiler.HtmlBridge;
 
@@ -74,16 +75,16 @@ public sealed partial class DomBridge
 
         double delaySec = 0;
         if (!string.IsNullOrWhiteSpace(animationDelay) &&
-            TryParseCssTime(animationDelay, out var delayOverride))
+            CssAnimation.TryParseTime(animationDelay, out var delayOverride))
         {
             delaySec = delayOverride;
         }
         else if (!string.IsNullOrWhiteSpace(animationShorthand))
         {
             var durations = new List<double>();
-            foreach (var part in TokenizeAnimationShorthand(animationShorthand))
+            foreach (var part in CssAnimation.TokenizeShorthand(animationShorthand))
             {
-                if (TryParseCssTime(part, out var seconds))
+                if (CssAnimation.TryParseTime(part, out var seconds))
                     durations.Add(seconds);
             }
 
