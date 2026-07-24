@@ -20,24 +20,32 @@
 # pointer bump.
 #
 # Each entry is "<submodule-dir>|<patch-file-relative-to-repo-root>".
+#
+# NOTE: PENDING_PATCHES is intentionally EMPTY — CI no longer applies any
+# submodule patches on top of the pinned pointers. The mechanism below is kept
+# intact so a future pending patch (one that cannot be pushed to its submodule
+# remote) can be re-enabled simply by adding its "<submodule-dir>|<patch>" entry
+# to the array; no other change is needed.
 
 set -euo pipefail
 
 # Patches whose fix is not in the pinned submodule pointer and could not be
 # pushed to the submodule remote (push 403 → captured under patches/).
-PENDING_PATCHES=(
-  "Broiler.HTML|patches/0012-html-bg-clip-text-tables.patch"
-  "Broiler.JS|patches/0013-js-ilcodegen-declare-temp-fallback.patch"
-  "Broiler.JS|patches/0014-js-ilcodegen-assignparameter-temp-fallback.patch"
-  "Broiler.JS|patches/0015-js-stable-temp-locals-and-late-snapshot.patch"
-  "Broiler.JS|patches/0016-js-stringmap-threadlocal-sentinel.patch"
-)
+# Empty by default — add entries here to have CI apply them again.
+PENDING_PATCHES=()
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 applied=0
 skipped=0
+
+# No pending patches configured: nothing to apply. (Guard the expansion below,
+# which would trip `set -u` on an empty array in older bash.)
+if [ "${#PENDING_PATCHES[@]}" -eq 0 ]; then
+  echo "Pending WPT patches: none configured — nothing to apply."
+  exit 0
+fi
 
 for entry in "${PENDING_PATCHES[@]}"; do
   submodule="${entry%%|*}"
