@@ -55,7 +55,7 @@ public sealed partial class DomBridge
         if (TryEvaluateMathLengthFunction(normalized, referenceElement, forLineHeight, percentageBasis, out result, forFontSize))
             return true;
 
-        var additiveOperatorIndex = FindTopLevelAdditiveOperator(normalized);
+        var additiveOperatorIndex = CssLengthParser.FindTopLevelAdditiveOperator(normalized);
         if (additiveOperatorIndex > 0)
         {
             if (!TryEvaluateCssLengthWithViewport(
@@ -175,7 +175,7 @@ public sealed partial class DomBridge
         if (!CssLengthParser.HasBalancedParens(contentValue))
             return false;
 
-        var parts = SplitTopLevelArguments(contentValue);
+        var parts = CssLengthParser.SplitTopLevelArguments(contentValue);
         if (parts.Count == 0)
             return false;
 
@@ -197,79 +197,6 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private static int FindTopLevelAdditiveOperator(string expression)
-    {
-        var depth = 0;
-        for (int i = expression.Length - 1; i >= 1; i--)
-        {
-            switch (expression[i])
-            {
-                case ')':
-                    depth++;
-                    break;
-                case '(':
-                    depth--;
-                    break;
-                case '+':
-                case '-':
-                    if (depth != 0)
-                        break;
-
-                    var leftIndex = i - 1;
-                    while (leftIndex >= 0 && char.IsWhiteSpace(expression[leftIndex]))
-                        leftIndex--;
-
-                    var rightIndex = i + 1;
-                    while (rightIndex < expression.Length && char.IsWhiteSpace(expression[rightIndex]))
-                        rightIndex++;
-
-                    if (leftIndex >= 0 &&
-                        rightIndex < expression.Length &&
-                        expression[leftIndex] != '(' &&
-                        expression[leftIndex] != ',' &&
-                        expression[leftIndex] != '+' &&
-                        expression[leftIndex] != '-')
-                    {
-                        return i;
-                    }
-                    break;
-            }
-        }
-
-        return -1;
-    }
-
-    private static List<string> SplitTopLevelArguments(string value)
-    {
-        var parts = new List<string>();
-        var depth = 0;
-        var start = 0;
-
-        for (int i = 0; i < value.Length; i++)
-        {
-            switch (value[i])
-            {
-                case '(':
-                    depth++;
-                    break;
-                case ')':
-                    depth--;
-                    if (depth < 0)
-                        return [];
-                    break;
-                case ',' when depth == 0:
-                    parts.Add(value[start..i].Trim());
-                    start = i + 1;
-                    break;
-            }
-        }
-
-        if (depth != 0)
-            return [];
-
-        parts.Add(value[start..].Trim());
-        return parts;
-    }
 
     private double ResolveContainingBlockReferenceLength(DomElement element, bool vertical)
     {
