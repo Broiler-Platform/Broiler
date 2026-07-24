@@ -69,21 +69,9 @@ internal static class NodeAccessorsBinding
     }
 
     public static JSValue GetNodeType(DomNode node, in Arguments a)
-    {
-        if (DomBridge.IsText(node))
-            return new JSNumber(3); // TEXT_NODE
-        if (DomBridge.IsComment(node))
-            return new JSNumber(8); // COMMENT_NODE
-        if (node is DomDocumentType)
-            return new JSNumber(10); // DOCUMENT_TYPE_NODE (canonical DomDocumentType)
-        if (node is DomDocumentFragment)
-            return new JSNumber(11); // DOCUMENT_FRAGMENT_NODE (canonical DomDocumentFragment)
-        if (node is DomDocument)
-            return new JSNumber(9); // DOCUMENT_NODE (canonical DomDocument — the document root)
-        if (node is not DomElement)
-            return new JSNumber(1); // canonical non-element char-data already handled above
-        return new JSNumber(1); // ELEMENT_NODE
-    }
+        // The canonical DomNodeType enum values ARE the DOM node-type constants
+        // (Element=1, Text=3, Comment=8, Document=9, DocumentType=10, DocumentFragment=11).
+        => new JSNumber((int)node.NodeType);
 
     public static JSValue GetNodeName(DomNode node, in Arguments a)
     {

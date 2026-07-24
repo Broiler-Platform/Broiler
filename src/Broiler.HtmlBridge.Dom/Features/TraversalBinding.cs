@@ -121,7 +121,7 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
     /// </summary>
     private int ApplyFilter(DomNode el, int whatToShow, JSFunction? filterFn)
     {
-        var nodeType = DomBridge.GetNodeType(el);
+        var nodeType = (int)el.NodeType;
         var showBit = nodeType switch
         {
             1 => 0x1,    // SHOW_ELEMENT

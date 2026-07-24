@@ -471,20 +471,6 @@ public sealed partial class DomBridge
         }
     }
 
-    /// <summary>
-    /// Returns the node type constant for a <see cref="DomElement"/>.
-    /// </summary>
-    internal static int GetNodeType(DomNode node)
-    {
-        if (IsText(node)) return 3; // TEXT_NODE
-        if (IsComment(node)) return 8;
-        if (node is DomDocumentType) return 10; // DOCUMENT_TYPE_NODE (canonical)
-        if (node is DomDocumentFragment) return 11; // DOCUMENT_FRAGMENT_NODE (canonical)
-        if (node is DomDocument) return 9; // DOCUMENT_NODE (canonical DomDocument — document root)
-        if (node is not DomElement) return 1;
-        return 1; // ELEMENT_NODE
-    }
-
     // classList / DOMTokenList moved to the Phase 3 ClassListBinding feature module
     // (Broiler.HtmlBridge.Dom.Features).
     // style / CSSStyleDeclaration (element.style, rule.style, getComputedStyle result) moved to the
