@@ -284,3 +284,61 @@ root cause.
   Until then, `0013`/`0014`/`0015` should be understood as compile-abort mitigations that keep the
   cluster in its (survivable, non-crashing-at-compile) runtime form, not as a resolution of the
   crash.
+
+## 2026-07-24 (later still) — root cause found and fixed as `patches/0016`
+
+The residual `body-:0,0 — Index was outside the bounds of the array.` crash was reproduced
+in-process and localised to a definite root cause, and fixed. It was **not** the dropped/aliased
+`#Temp` model of `0013`/`0014`/`0015` (those address a separate compile-time cluster).
+
+### Reproduction
+
+Running the C# WPT runner in-process (`--no-worker-isolation`) over a testharness-heavy corpus
+(`dom` + `html/dom` + `domparsing`, ~1053 tests in one process) reproduces the crash — the
+conformance-checkers "example" tests in the issue are JS-light **victims**, not the trigger, so they
+never accumulate the state; on CI the hash-sharded mix supplies the accumulation. An instrumented
+build showed **7312** poisoned key resolutions, every one:
+
+```
+[KEYSEAL] key 'Event' -> Indices[49501] sealedLen=0 nowCount=0 loc='vm.js'
+```
+
+i.e. a fresh script whose key `List` is **empty** (`nowCount=0`) resolving a key to a large,
+**constant, cumulative** index (49501), from `DomBridge.RegisterDocument`'s bootstrap `Eval`
+(a synchronous script → the `body` lambda; `ScriptInfo.FileName` defaults to `vm.js`).
+
+### Root cause — `StringMap<T>`'s shared mutable sentinel
+
+`Broiler.JavaScript.Storage/StringMap<T>.GetNode` returned a shared `static Node Empty` as its
+"not found" sentinel. On the **create** path an overflow return (`return ref Empty`) can hand that
+sentinel to `Put`/`Save`/`this[]=`, which does `node.State |= HasValue; node.Value = i` — writing a
+**cumulative index** into the shared static. Thereafter, for **every fresh map** (`storage == null`),
+`GetNode` returns that same polluted sentinel and `TryGetValue` reports a false hit with the stale
+value **for any key**, without ever comparing the key. That is why all 7312 hits show the identical
+index and an empty `List`.
+
+In the engine, `StringArray.GetOrAdd` (the per-script key table `_keyStrings`) is backed by this
+`StringMap`. A poisoned lookup returns the stale cumulative index instead of adding the key, so
+`List.Count` stays 0 while `KeyOfName` emits `ScriptInfo.Indices[49501]`. `ScriptInfoBuilder.Build`
+sizes `Indices` to `List.Count` (0), so the emitted constant index is out of bounds and throws
+`IndexOutOfRangeException` at runtime inside the `body` program lambda — the exact `body-:0,0`
+signature. It is cumulative (needs a big compilation to overflow and pollute the static), process-global
+(the static persists), and invisible to test262 (one process per test resets the static), matching every
+property of the cluster.
+
+### The fix (`patches/0016`)
+
+Make the sentinel `[ThreadStatic]` and reset it to a pristine node at each `GetNode` entry, so a stray
+create-path write can never be observed by a later read and there is no cross-thread race. No
+struct-layout change (StringMap is used widely, incl. hot paths).
+
+**Validation.** A deterministic regression test (`StorageTests.StringArray_FreshInstance_IsNotPoisonedByHeavyPriorInstance`)
+fills one `StringArray` past the overflow, then asserts a fresh one resolves keys from index 0 — it
+returns **86704** on the old code and **0** with the fix. All **250** `Broiler.JavaScript.Compiler.Tests`
+and **12** `Broiler.JavaScript.Storage.Tests` pass. Re-running the same 1053-test in-process WPT corpus
+with `0016` applied produces **0** poisoned lookups, **0** `Script execution failed`, and **0**
+`Index was outside the bounds of the array.` (was 7312 / thousands).
+
+`0016` ships as a pending patch (the `Broiler.JS` push is 403) applied on the WPT CI run after
+`0013`–`0015` (different files, no conflict). `0013`/`0014`/`0015` remain for the separate compile-time
+`#Temp` cluster; `0016` is the fix for this runtime `body-:0,0` crash.
