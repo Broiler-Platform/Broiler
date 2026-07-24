@@ -27,6 +27,7 @@ PENDING_PATCHES=(
   "Broiler.HTML|patches/0012-html-bg-clip-text-tables.patch"
   "Broiler.JS|patches/0013-js-ilcodegen-declare-temp-fallback.patch"
   "Broiler.JS|patches/0014-js-ilcodegen-assignparameter-temp-fallback.patch"
+  "Broiler.JS|patches/0015-js-stable-temp-locals-and-late-snapshot.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

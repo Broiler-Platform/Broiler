@@ -1,0 +1,107 @@
+From 2da56214ac0094c2287d8d8cd4ded574e4d2d47e Mon Sep 17 00:00:00 2001
+From: Claude <enrico.bartky@gmail.com>
+Date: Fri, 24 Jul 2026 06:21:21 +0000
+Subject: [PATCH] ILCodeGenerator/FastCompiler: declare pooled compiler temps
+ as stable function-lifetime locals; snapshot body temps after full
+ compilation
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Root-cause fix for the WPT `body-:0,0 — Index was outside the bounds of the
+array.` runtime crash cluster (#1422/#1425), the runtime successor of the
+#1419 `#TempJSValue… was not present in the dictionary` compile crash.
+
+Two coupled changes:
+
+1. FastCompiler.BuildProgram: move the body block's VariableParameters snapshot
+   to AFTER the trailing register/return statements are built. script.ToJSValue()
+   and JSContext.Register can mint pooled #Temp scratch locals; capturing right
+   after Visit(jScript) left such a late-minted temp in the function scope but in
+   no block's variable list, so it was dropped. VariableParameters here is a
+   superset of the earlier snapshot, so succeeding compilations are unchanged.
+
+2. ILCodeGenerator.VisitBlock: declare compiler temps (#Temp<Type><id>) as stable
+   function-lifetime locals instead of block-scoped pooled slots. FlattenVariables
+   does not hoist a temp out of a block nested inside a non-block expression
+   (try/finally, loop, conditional), so such a temp could be declared under a
+   transient tvs scope whose IL local is freed on block exit and reused by a later
+   sibling (ILWriter.TempVariable pooling) — aliasing another variable's slot when
+   the temp is referenced across the boundary. A stable local is never reused.
+
+Together these ensure every pooled temp is declared exactly once, up front, with a
+slot that is never dropped or aliased, keeping block-variable layout consistent for
+downstream rewrites. Value semantics are unchanged (a temp is assigned before each
+use). All 250 Broiler.JavaScript.Compiler.Tests pass.
+
+Depends on the #TempJSValue prefix helper (IsCompilerTemp) introduced in patch 0013.
+---
+ .../FastCompiler.cs                            | 15 ++++++++++++++-
+ .../Generator/ILCodeGenerator.VisitBlock.cs    | 18 ++++++++++++++++++
+ 2 files changed, 32 insertions(+), 1 deletion(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs b/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs
+index fa7d7e92..1db23c33 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs
+@@ -219,7 +219,6 @@ public partial class FastCompiler : AstMapVisitor<BExpression>
+             }
+         }
+ 
+-        vList.AddRange(fx.VariableParameters);
+         sList.AddRange(fx.InitList);
+ 
+         // register globals..
+@@ -246,6 +245,20 @@ public partial class FastCompiler : AstMapVisitor<BExpression>
+         sList.Add(BExpression.Return(l, script.ToJSValue()));
+         sList.Add(BExpression.Label(l, JSUndefinedBuilder.Value));
+ 
++        // Snapshot the function scope's variable parameters into the body block AFTER the
++        // whole body has been visited AND the trailing register/return statements above have
++        // been built (script.ToJSValue() and JSContext.Register can still mint pooled #Temp
++        // scratch locals via GetTempVariable). Capturing at the former position — right after
++        // Visit(jScript) — left any temp minted afterwards in the function scope but in NO
++        // block's variable list, so no local was declared for it up front: the
++        // "#TempJSValue… was not present in the dictionary" compile crash (#1419) and, once
++        // patches/0013+0014 declare it on demand mid-method instead, the desynchronised
++        // `body-:0,0 — Index was outside the bounds of the array.` runtime crash (#1422/#1425).
++        // VariableParameters here is a superset of the earlier snapshot, so a currently
++        // succeeding compilation is unchanged; only a would-be-dropped temp is now declared
++        // up front in the body block, in visit order.
++        vList.AddRange(fx.VariableParameters);
++
+         script = BExpression.Block(vList, BExpression.TryFinally(BExpression.Block(sList), JSContextStackBuilder.Pop(stackItem, lScope)));
+ 
+         if (jScript.IsAsync)
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.VisitBlock.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.VisitBlock.cs
+index 56ef1d62..87bf75b9 100644
+--- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.VisitBlock.cs
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.VisitBlock.cs
+@@ -12,6 +12,24 @@ public partial class ILCodeGenerator
+         {
+             if (variables.TryGetValue(p, out _))
+                 continue;
++            if (IsCompilerTemp(p.Name))
++            {
++                // A pooled compiler scratch temp (#Temp<Type><id>) can be referenced from a
++                // SIBLING block after the block that lists it has exited: FlattenVariables
++                // hoists variables only out of directly-nested child blocks, not out of blocks
++                // buried inside a non-block expression (try/finally, loop, conditional), so
++                // such a temp is declared here under this block's transient tvs scope. A
++                // tvs-scoped IL local is freed on block exit and REUSED by a later sibling's
++                // NewTemp of the same type (ILWriter.TempVariable pooling), so a later
++                // reference to the temp would then read/write another variable's slot — the
++                // indirect corruption behind the `body-:0,0 — Index was outside the bounds of
++                // the array.` runtime crash (#1422/#1425). Declare compiler temps as stable
++                // function-lifetime locals so their slot is never reused; value semantics are
++                // unchanged (a temp is assigned before each use), and every later read/write
++                // resolves to this same local. Non-temp block locals keep block scoping.
++                variables.Create(p);
++                continue;
++            }
+             variables.Create(p, tvs);
+         }
+         var expressions = yBlockExpression.FlattenExpressions;
+-- 
+2.43.0
+
