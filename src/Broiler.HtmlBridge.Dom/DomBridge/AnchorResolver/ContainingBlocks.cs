@@ -1,4 +1,5 @@
 using Broiler.Dom;
+using Broiler.CSS;
 
 namespace Broiler.HtmlBridge;
 
@@ -32,24 +33,11 @@ public sealed partial class DomBridge
             (pos == "relative" || pos == "absolute" || pos == "fixed" || pos == "sticky"))
             return true;
 
-        if (props.TryGetValue("transform", out var transform) &&
-            !string.Equals(transform, "none", StringComparison.OrdinalIgnoreCase) &&
-            !string.IsNullOrWhiteSpace(transform))
-            return true;
-
-        if (props.TryGetValue("contain", out var contain) &&
-            !string.IsNullOrWhiteSpace(contain))
-        {
-            var containLower = contain.ToLowerInvariant();
-            if (containLower.Contains("layout") || containLower.Contains("paint") ||
-                containLower.Contains("strict") || containLower.Contains("content"))
-                return true;
-        }
-
-        if (props.TryGetValue("will-change", out var willChange) &&
-            willChange.Contains("transform", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        return false;
+        // The transform/contain/will-change trio is the canonical Broiler.CSS predicate
+        // shared with the layout engine's native containing-block path.
+        return CssContainingBlock.CreatedByTransformContainOrWillChange(
+            props.GetValueOrDefault("transform"),
+            props.GetValueOrDefault("contain"),
+            props.GetValueOrDefault("will-change"));
     }
 }
