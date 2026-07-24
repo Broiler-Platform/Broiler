@@ -686,7 +686,7 @@ public sealed partial class DomBridge
     {
         var document = CreateBrowsingContextDocument();
 
-        var (parsedRoot, allElements, _) = BuildDocumentTree(html);
+        var (parsedRoot, _, allElements, _) = BuildDocumentTree(html);
 
         // parsedRoot is the <html> element itself (HtmlTreeBuilder returns it directly).
         // Append it as the sub-document's documentElement (a canonical DomDocument child).

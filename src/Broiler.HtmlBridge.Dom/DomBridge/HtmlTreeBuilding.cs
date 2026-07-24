@@ -15,10 +15,11 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Parses a full HTML document via the shared <see cref="HtmlDocumentParser"/> and returns the
-    /// canonical <c>&lt;html&gt;</c> root, the non-structural node registration list, and the title.
-    /// Replaces the retired <c>HtmlTreeBuilder.Build</c>.
+    /// canonical <c>&lt;html&gt;</c> root, the parsed <c>&lt;!DOCTYPE&gt;</c> node (or <c>null</c>),
+    /// the non-structural node registration list, and the title. Replaces the retired
+    /// <c>HtmlTreeBuilder.Build</c>.
     /// </summary>
-    internal static (DomElement DocumentElement, List<DomNode> AllElements, string Title) BuildDocumentTree(string html)
+    internal static (DomElement DocumentElement, DomDocumentType? DocumentType, List<DomNode> AllElements, string Title) BuildDocumentTree(string html)
     {
         var parsed = new HtmlDocumentParser().ParseDocument(html);
         var root = parsed.Document.DocumentElement ??
@@ -26,7 +27,7 @@ public sealed partial class DomBridge
 
         var allElements = new List<DomNode>();
         AppendParsedTreeNodes(root, structural: true, allElements);
-        return (root, allElements, parsed.Title);
+        return (root, parsed.Document.DocumentType, allElements, parsed.Title);
     }
 
     /// <summary>
