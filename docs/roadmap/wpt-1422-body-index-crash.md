@@ -227,3 +227,60 @@ harness files still compile — and its flip of the cluster must be confirmed on
 WPT/test262 CI, where the triggering corpus script and the accumulated in-process state exist.
 Both changes are strict supersets/hardenings that cannot change a compilation that currently
 succeeds, so landing them is safe even ahead of that confirmation.
+
+## 2026-07-24 (later) — recurs as [issue #1428](https://github.com/Broiler-Platform/Broiler/issues/1428): `0015` confirmed **not** a fix
+
+The next top-30 report ([#1428](https://github.com/Broiler-Platform/Broiler/issues/1428)) still
+leads with the identical signature — `body-:0,0 — Index was outside the bounds of the array.` —
+now gating **59 282** tests (was 59 311 in #1425). This is the confirmation run the `0015` note
+above said was still required, and it is **negative**: `patches/0015` does **not** resolve the
+crash cluster.
+
+### The evidence is conclusive — `0015` was applied on the failing run
+
+The report's run is [`30072567162`](https://github.com/Broiler-Platform/Broiler/actions/runs/30072567162)
+(`head_sha f88905d`, the #1426 merge). `patches/0015` landed as `57bcab7` (06:23), which is an
+ancestor of `f88905d` (06:31), and `scripts/apply-pending-wpt-patches.sh` at `f88905d` already
+lists all of `0012`/`0013`/`0014`/`0015`. Every one of the eight sharded `run (N)` jobs records
+step 8 **"Apply pending submodule patches" → success** before its shard executed. So the full
+pending set — including the `0015` root-cause changes to `FastCompiler.BuildProgram` and
+`ILCodeGenerator.VisitBlock` — was live on the `Broiler.JS` working tree for this run, and the
+crash still gated ~59 k tests. `0013`/`0014`/`0015` are therefore all confirmed **non-fixes** at
+the WPT layer, not merely "unconfirmed."
+
+### What this rules in
+
+Both `0015` mechanisms (late body-temp snapshot; stable function-lifetime temp locals) are real
+and correct hardenings, but neither is the operative cause — so the dropped/aliased-temp model,
+while it explained the #1419→#1422 compile→runtime transition, does **not** account for the
+residual runtime `IndexOutOfRangeException`. The fault survives the two fixes that would eliminate
+a dropped or slot-reused `#Temp`, so the remaining candidates named above (closure-capture /
+`Closures` layout, the arguments array, or a generator/spill slot indexed off cumulative
+in-process state) move to the front: the corruption is downstream of temp *registration*, in a
+runtime array whose index is desynchronised by process-global accumulation
+(`FastFunctionScope.id` reaching ~100 020), not by a per-compile temp drop.
+
+### Why test262 stays green (and does not validate a WPT-layer fix)
+
+The task note that "test262 js CI Runner successful runs" is consistent with — and predicted by —
+the process-isolation analysis above: `run_test262.py` spawns one process per test, resetting
+every process-global static (`FastFunctionScope.id`, the compiler pools) between tests, so the
+cumulative-state fault cannot manifest there regardless of whether it is fixed. test262 green is
+therefore a **non-regression** signal for the JS engine, **not** confirmation that the WPT
+`body-:0,0` cluster is resolved. The two runners disagree precisely because one accumulates
+in-process state and the other does not — which is itself the strongest available pointer at the
+root cause.
+
+### Status
+
+- `Broiler.JS` submodule pointer advanced to its `origin/main` head `1aa46f21` (the test262
+  failed-testcase CI update; no engine-source change). Pending patches `0012`–`0015` re-verified
+  to apply cleanly on top and remain wired on the WPT CI run via
+  `scripts/apply-pending-wpt-patches.sh`.
+- The real fix is still open and, on the evidence here, is **not** the dropped-temp model that
+  `0013`/`0014`/`0015` address. It requires reproduction on the full sequential in-process shard
+  run (or an in-process harness that accumulates `FastFunctionScope.id` past ~100 020 against the
+  actual triggering corpus script) to localise the runtime array whose index goes out of bounds.
+  Until then, `0013`/`0014`/`0015` should be understood as compile-abort mitigations that keep the
+  cluster in its (survivable, non-crashing-at-compile) runtime form, not as a resolution of the
+  crash.

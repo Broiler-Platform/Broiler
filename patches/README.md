@@ -42,13 +42,33 @@ pass on this active engine path with zero failures.
 **Pending patches are applied on the WPT CI run.** The WPT runner
 (`.github/workflows/wpt-tests.yml`) checks out submodules at their pinned pointers and does not,
 by itself, apply anything under `patches/`. To exercise a fix that is captured here but **not yet
-in the pinned pointer** (currently **0012**, **0013** and **0014**), the `run` job invokes
+in the pinned pointer** (currently **0012**, **0013**, **0014** and **0015**), the `run` job invokes
 `scripts/apply-pending-wpt-patches.sh` after the recursive checkout and before the build. The
 script is **idempotent and scoped to the pending list only**: a patch already present in the
 checked-out tree (reverse-apply succeeds) is skipped, so it stops being applied automatically the
 moment a maintainer lands the fix upstream and the pointer is bumped. The build compiles submodule
 source in place, so patching the working tree is sufficient — no commit, no pointer bump; only
 Broiler's render is affected, not Chromium reference generation.
+
+**Submodule pointers (2026-07-24).** The `Broiler.JS` pointer is advanced to its `origin/main`
+head **`1aa46f21`** (the `ci: update test262 failed testcase list [skip ci]` commit — a CI-metadata
+update on top of `98b07636`, **no engine-source change**). The four pending patches above were
+re-verified this session to apply cleanly on top of the current submodule trees (`Broiler.JS`
+`1aa46f21`, `Broiler.HTML` `5c16c121`); the parent build compiles them in place with **0 errors**
+and all **250** `Broiler.JavaScript.Compiler.Tests` pass. The `Broiler.JS` push remains **403**
+(remote outside session scope), so `0013`/`0014`/`0015` stay pending patches applied on the WPT CI
+run, not pointer commits.
+
+**CI evidence that `0013`/`0014`/`0015` do not fix the `body-:0,0` crash ([#1428](https://github.com/Broiler-Platform/Broiler/issues/1428)).**
+WPT run [`30072567162`](https://github.com/Broiler-Platform/Broiler/actions/runs/30072567162)
+(`head_sha f88905d`) applied the **entire** pending set — every sharded `run (N)` job records step
+"Apply pending submodule patches → success" — yet its top problem is still
+`body-:0,0 — Index was outside the bounds of the array.` gating **59 282** tests. So the
+dropped/aliased-`#Temp` model that `0013`/`0014`/`0015` address is **not** the operative cause of
+the residual runtime fault; test262 stays green only because it runs one process per test (resetting
+the process-global `FastFunctionScope.id`), so it cannot manifest this cumulative-state crash and
+does not validate a WPT-layer fix. Full analysis: `docs/roadmap/wpt-1422-body-index-crash.md`
+(§ *2026-07-24 (later) — recurs as issue #1428*).
 
 Patch **`0010` — APPLIED** (pinned `98b07636`; push 403 at authoring, later applied upstream
 by a maintainer) — fixes the top-level-await **codegen** bug that
