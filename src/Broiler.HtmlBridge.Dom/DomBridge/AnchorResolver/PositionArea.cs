@@ -121,14 +121,11 @@ public sealed partial class DomBridge
                             StringSplitOptions.RemoveEmptyEntries);
                         if (insetParts.Length > 0)
                         {
-                            insetTop = ResolvePctOrPx(insetParts[0], cellH);
-                            insetRight = ResolvePctOrPx(
-                                insetParts.Length > 1 ? insetParts[1] : insetParts[0], cellW);
-                            insetBottom = ResolvePctOrPx(
-                                insetParts.Length > 2 ? insetParts[2] : insetParts[0], cellH);
-                            insetLeft = ResolvePctOrPx(
-                                insetParts.Length > 3 ? insetParts[3]
-                                    : (insetParts.Length > 1 ? insetParts[1] : insetParts[0]), cellW);
+                            var (t, r, b, l) = CssBoxShorthand.SelectTrbl(insetParts);
+                            insetTop = ResolvePctOrPx(t, cellH);
+                            insetRight = ResolvePctOrPx(r, cellW);
+                            insetBottom = ResolvePctOrPx(b, cellH);
+                            insetLeft = ResolvePctOrPx(l, cellW);
                         }
                     }
                     else
@@ -168,18 +165,15 @@ public sealed partial class DomBridge
                             StringSplitOptions.RemoveEmptyEntries);
                         if (mp.Length > 0)
                         {
+                            var (t, r, b, l) = CssBoxShorthand.SelectTrbl(mp);
                             if (!cssProps.ContainsKey("margin-top"))
-                                marginTop2 = ResolvePctOrPx(mp[0], marginPadBasis);
+                                marginTop2 = ResolvePctOrPx(t, marginPadBasis);
                             if (!cssProps.ContainsKey("margin-right"))
-                                marginRight2 = ResolvePctOrPx(
-                                    mp.Length > 1 ? mp[1] : mp[0], marginPadBasis);
+                                marginRight2 = ResolvePctOrPx(r, marginPadBasis);
                             if (!cssProps.ContainsKey("margin-bottom"))
-                                marginBottom2 = ResolvePctOrPx(
-                                    mp.Length > 2 ? mp[2] : mp[0], marginPadBasis);
+                                marginBottom2 = ResolvePctOrPx(b, marginPadBasis);
                             if (!cssProps.ContainsKey("margin-left"))
-                                marginLeft2 = ResolvePctOrPx(
-                                    mp.Length > 3 ? mp[3]
-                                        : (mp.Length > 1 ? mp[1] : mp[0]), marginPadBasis);
+                                marginLeft2 = ResolvePctOrPx(l, marginPadBasis);
                         }
                     }
 
@@ -192,14 +186,11 @@ public sealed partial class DomBridge
                             StringSplitOptions.RemoveEmptyEntries);
                         if (pp.Length > 0)
                         {
-                            padTop = ResolvePctOrPx(pp[0], marginPadBasis);
-                            padRight = ResolvePctOrPx(
-                                pp.Length > 1 ? pp[1] : pp[0], marginPadBasis);
-                            padBottom = ResolvePctOrPx(
-                                pp.Length > 2 ? pp[2] : pp[0], marginPadBasis);
-                            padLeft = ResolvePctOrPx(
-                                pp.Length > 3 ? pp[3]
-                                    : (pp.Length > 1 ? pp[1] : pp[0]), marginPadBasis);
+                            var (t, r, b, l) = CssBoxShorthand.SelectTrbl(pp);
+                            padTop = ResolvePctOrPx(t, marginPadBasis);
+                            padRight = ResolvePctOrPx(r, marginPadBasis);
+                            padBottom = ResolvePctOrPx(b, marginPadBasis);
+                            padLeft = ResolvePctOrPx(l, marginPadBasis);
                         }
                     }
                     if (cssProps.TryGetValue("padding-top", out var pt))

@@ -74,15 +74,16 @@ public sealed partial class DomBridge
         if (cssProps.TryGetValue("border-width", out var bwVal) && bwVal != null)
         {
             var parts = bwVal.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            int idx = sideProperty switch
+            var (top, right, bottom, left) = CssBoxShorthand.SelectTrbl(parts);
+            var token = sideProperty switch
             {
-                "border-top-width" => 0,
-                "border-right-width" => parts.Length > 1 ? 1 : 0,
-                "border-bottom-width" => parts.Length > 2 ? 2 : 0,
-                "border-left-width" => parts.Length > 3 ? 3 : (parts.Length > 1 ? 1 : 0),
-                _ => 0
+                "border-top-width" => top,
+                "border-right-width" => right,
+                "border-bottom-width" => bottom,
+                "border-left-width" => left,
+                _ => top
             };
-            return ResolveBorderKeywordOrPx(parts[idx]);
+            return ResolveBorderKeywordOrPx(token);
         }
 
         // Fall back to the border shorthand (e.g. "solid")
