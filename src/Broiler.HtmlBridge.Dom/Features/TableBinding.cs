@@ -5,6 +5,7 @@ using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 using Broiler.Dom;
+using Broiler.Dom.Html;
 
 namespace Broiler.HtmlBridge.Dom.Features;
 
@@ -146,7 +147,7 @@ internal sealed class TableBinding(ITableHost host)
         if (a.Length == 0)
             return JSUndefined.Value;
         var index = (int)a[0].DoubleValue;
-        var rows = DomBridge.CollectTableRows(element);
+        var rows = HtmlElementQueries.CollectTableRows(element);
         if (index < 0)
             index = rows.Count + index;
         if (index >= 0 && index < rows.Count)
@@ -200,7 +201,7 @@ internal sealed class TableBinding(ITableHost host)
             tableEl = DomBridge.ParentEl(tableEl);
         if (tableEl == null || !string.Equals(tableEl.TagName, "table", StringComparison.OrdinalIgnoreCase))
             return new JSNumber(-1);
-        var rows = DomBridge.CollectTableRows(tableEl);
+        var rows = HtmlElementQueries.CollectTableRows(tableEl);
         return new JSNumber(rows.IndexOf(element));
     }
 
@@ -284,7 +285,7 @@ internal sealed class TableBinding(ITableHost host)
 
     private JSObject BuildTableRows(DomElement table)
     {
-        var rows = DomBridge.CollectTableRows(table);
+        var rows = HtmlElementQueries.CollectTableRows(table);
         var jsRows = new List<JSValue>();
         foreach (var r in rows)
             jsRows.Add(_host.ToJSObject(r));
@@ -296,7 +297,7 @@ internal sealed class TableBinding(ITableHost host)
     {
         var tr = _host.CreateElement("tr");
 
-        var allRows = DomBridge.CollectTableRows(table);
+        var allRows = HtmlElementQueries.CollectTableRows(table);
         if (allRows.Count == 0 || index == -1 || index == allRows.Count)
         {
             // Find the last section to append to, or create a tbody

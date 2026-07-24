@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Runtime;
 using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
+using Broiler.Dom.Html;
 
 namespace Broiler.HtmlBridge;
 
@@ -231,7 +232,7 @@ public sealed partial class DomBridge
         if (table == null || !string.Equals(table.TagName, "table", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        var rows = CollectTableRows(table);
+        var rows = HtmlElementQueries.CollectTableRows(table);
         var rowIndex = rows.FindIndex(candidate => ReferenceEquals(candidate, row));
         if (rowIndex < 0)
             return false;
