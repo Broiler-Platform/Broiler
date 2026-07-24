@@ -135,3 +135,49 @@ the indirect runtime array fault above (that needs the root-cause drop preventio
 Until that lands, `patches/0013` + `0014` should be understood as a partial mitigation
 (they clear the #1419/#1422 compile-abort surface so unrelated work on the same pages can
 proceed) rather than a fix for the crash cluster, which persists at runtime as this issue.
+
+## 2026-07-24 — recurs as [issue #1425](https://github.com/Broiler-Platform/Broiler/issues/1425)'s #1 problem
+
+The 2026-07-24 WPT top-30 report ([#1425](https://github.com/Broiler-Platform/Broiler/issues/1425))
+leads with the identical signature — `body-:0,0 — Index was outside the bounds of the array.`
+— now gating **59 311** tests (was 59 377 in #1422). Same cluster, same runtime
+`IndexOutOfRangeException` in the top-level `body` program lambda; the small drift in count
+is unrelated churn elsewhere in the corpus, not a change in this fault. No new root cause:
+this is #1422 persisting, exactly as the "Net effect" section predicts — `patches/0013`+`0014`
+are applied to the `Broiler.JS` working tree on the WPT CI run (via
+`scripts/apply-pending-wpt-patches.sh`), so the cluster is in its **runtime** form rather than
+the pre-0013 **compile-abort** form.
+
+### New in-sandbox result — the drop does not reproduce on isolated temp-heavy constructs
+
+To narrow the "remaining candidates" search above, the two on-demand fallback branches
+(`ILCodeGenerator.VisitParameter` / `AssignParameter`, the *only* code paths that execute
+when a `#Temp` was dropped) were instrumented with a counter and driven through a 36-case
+battery of the highest-temp-density constructs compiled in isolation, one fresh `JSContext`
+each:
+
+- array/object/nested **destructuring `catch`** bindings (incl. holes, rest, defaults, and
+  nested-in-function forms) — the `FastCompiler.VisitTryStatement.cs:88` snapshot candidate;
+- `try/finally` (the `VisitFinallyBlock` `#Temp`), `switch`, `with`, labelled `continue`;
+- `for-of` / `for-of` with array & object patterns, spread in array/object/call, object &
+  array rest;
+- classes with instance/static **private fields**, **private methods**, and accessors (the
+  member-init temps that motivated the `CreateFunction.cs:311-316` after-`InitMembers`
+  snapshot);
+- template / tagged-template literals, optional chaining, generators, `async`.
+
+**Result: zero on-demand temp declarations across all 36** (the only non-clean entry was the
+expected top-level-`using` syntax error, unrelated). This positively **corroborates** the
+"cumulative-state-dependent" conclusion: none of these constructs drops a temp on a single
+isolated compile, so the drop is not a property of the construct alone — it emerges from
+pooled-temp reuse interacting with block-variable snapshots only over a long sequential run
+(where the global `FastFunctionScope.id` reaches ~100 020). It also means the destructuring-
+`catch` snapshot at `VisitTryStatement.cs:88`, though a genuine order-of-snapshot asymmetry of
+the same class as the already-fixed `CreateFunction` site, is **not** by itself the reproducer
+— so a speculative reorder there is not landed here (it would be unvalidated and could perturb
+delicate catch/completion semantics without demonstrably moving the cluster). The all-250
+`Broiler.JavaScript.Compiler.Tests` remain green with `0013`+`0014` applied.
+
+**Status for #1425:** no code change beyond the already-pending patches; the actionable fix
+remains the root-cause drop-prevention described under "The real fix", which requires the full
+sharded WPT corpus (absent from the session container) to reproduce and validate.
