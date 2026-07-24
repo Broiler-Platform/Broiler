@@ -250,7 +250,7 @@ public sealed partial class DomBridge
 
     private Dictionary<string, string> BuildSpecifiedStyleMap(DomElement element, string? pseudoElement = null)
     {
-        pseudoElement = NormalizePseudoElement(pseudoElement);
+        pseudoElement = CssStyleEngine.NormalizePseudoElement(pseudoElement);
         var specified = new Dictionary<string, string>(
             GetSyncedScopedEngine(element).GetCascadedDeclaredValues(element, pseudoElement),
             StringComparer.OrdinalIgnoreCase);
@@ -266,27 +266,6 @@ public sealed partial class DomBridge
         return specified;
     }
 
-    private static string? NormalizePseudoElement(string? pseudoElement)
-    {
-        if (string.IsNullOrWhiteSpace(pseudoElement))
-            return null;
-
-        pseudoElement = pseudoElement.Trim();
-        if (pseudoElement.Equals("::before", StringComparison.OrdinalIgnoreCase) ||
-            pseudoElement.Equals(":before", StringComparison.OrdinalIgnoreCase))
-            return "::before";
-        if (pseudoElement.Equals("::after", StringComparison.OrdinalIgnoreCase) ||
-            pseudoElement.Equals(":after", StringComparison.OrdinalIgnoreCase))
-            return "::after";
-        if (pseudoElement.Equals("::first-line", StringComparison.OrdinalIgnoreCase) ||
-            pseudoElement.Equals(":first-line", StringComparison.OrdinalIgnoreCase))
-            return "::first-line";
-        if (pseudoElement.Equals("::first-letter", StringComparison.OrdinalIgnoreCase) ||
-            pseudoElement.Equals(":first-letter", StringComparison.OrdinalIgnoreCase))
-            return "::first-letter";
-
-        return null;
-    }
 
     private static bool IsSelectListBox(DomElement element) => GetSelectVisibleRowCount(element) > 1;
 
