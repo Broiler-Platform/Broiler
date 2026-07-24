@@ -1,8 +1,8 @@
-using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;
 
@@ -11,29 +11,15 @@ namespace Broiler.HtmlBridge;
 /// under the 750-line guard: the cohesive DOM element/qualified-name validation cluster together
 /// with the JS-side constructor globals it validates against — the <c>DOMException</c> constructor
 /// (and the C# helper that throws it), plus the <c>Node</c> and <c>SVGLength</c> constant carriers.
-/// Pure partial-class relocation — no signature, accessibility, or logic change.
+/// The spec name-validation algorithm itself now lives in the canonical
+/// <see cref="DomNameValidation"/> (Broiler.Dom); the bridge only marshals the thrown
+/// <see cref="DomException"/> into a JavaScript <c>DOMException</c>.
 /// </summary>
 public sealed partial class DomBridge
 {
     // ------------------------------------------------------------------
     //  Element name validation
     // ------------------------------------------------------------------
-
-    /// <summary>
-    /// Regex for valid XML Name: must start with a Unicode letter or underscore,
-    /// followed by Unicode letters, digits, hyphens, underscores, or dots.
-    /// Uses Unicode categories per XML 1.0 §2.3 to accept non-ASCII characters
-    /// such as U+212A (Kelvin sign).
-    /// Colons are NOT allowed (use <see cref="ValidXmlQualifiedNamePattern"/> for qualified names).
-    /// </summary>
-    private static readonly System.Text.RegularExpressions.Regex ValidXmlNamePattern = ValidXmlNamePatternRegex();
-
-    /// <summary>
-    /// Regex for valid XML QName: either a simple name or prefix:localName
-    /// where both prefix and localName are valid XML names (no colons).
-    /// Uses Unicode categories per XML 1.0 §2.3.
-    /// </summary>
-    private static readonly System.Text.RegularExpressions.Regex ValidXmlQualifiedNamePattern = ValidXmlQualifiedNamePatternRegex();
 
     /// <summary>
     /// Throws a proper <c>DOMException</c> with the given name/code via the JS-registered constructor.
@@ -55,84 +41,37 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Validates an element/doctype name per the XML spec.
-    /// Throws a DOMException with INVALID_CHARACTER_ERR (code 5) for invalid names.
+    /// Validates an element/doctype name per the XML spec, marshalling a canonical
+    /// <see cref="DomException"/> (InvalidCharacterError) into a JavaScript <c>DOMException</c>.
+    /// The validation algorithm is owned by <see cref="DomNameValidation.ValidateElementName"/>.
     /// </summary>
     internal static void ValidateElementName(string name, JSContext context)
     {
-        if (string.IsNullOrEmpty(name) || name.Contains('\0') || !ValidXmlNamePattern.IsMatch(name))
+        try
         {
-            ThrowDOMException(context,
-                $"Failed to execute 'createElement': The tag name provided ('{name}') is not a valid name.",
-                "InvalidCharacterError");
+            DomNameValidation.ValidateElementName(name);
+        }
+        catch (DomException ex)
+        {
+            ThrowDOMException(context, ex.Message, ex.Name);
         }
     }
 
     /// <summary>
-    /// Validates a qualified name and namespace per the Namespaces in XML spec.
-    /// Throws a DOMException with NAMESPACE_ERR (code 14) for namespace violations.
+    /// Validates a qualified name and namespace per the Namespaces in XML spec, marshalling a
+    /// canonical <see cref="DomException"/> (NamespaceError / InvalidCharacterError) into a
+    /// JavaScript <c>DOMException</c>. The validation algorithm is owned by
+    /// <see cref="DomNameValidation.ValidateQualifiedName"/>.
     /// </summary>
     internal static void ValidateQualifiedName(string qualifiedName, string? ns, JSContext context)
     {
-        // Check for empty prefix (e.g., ":div") first — this is a NamespaceError
-        if (!string.IsNullOrEmpty(qualifiedName) && qualifiedName.StartsWith(':'))
+        try
         {
-            ThrowDOMException(context,
-                $"Failed to execute 'createElementNS': The qualified name provided ('{qualifiedName}') has an empty prefix.",
-                "NamespaceError");
+            DomNameValidation.ValidateQualifiedName(qualifiedName, ns);
         }
-
-        // Check for trailing colon (e.g., "a:") — empty local name is a NamespaceError
-        if (!string.IsNullOrEmpty(qualifiedName) && qualifiedName.EndsWith(':'))
+        catch (DomException ex)
         {
-            ThrowDOMException(context,
-                $"Failed to execute 'createElementNS': The qualified name provided ('{qualifiedName}') has an empty local name.",
-                "NamespaceError");
-        }
-
-        // Validate the name characters (allows optional single colon for prefix:localName)
-        if (string.IsNullOrEmpty(qualifiedName) || !ValidXmlQualifiedNamePattern.IsMatch(qualifiedName))
-        {
-            ThrowDOMException(context,
-                $"Failed to execute 'createElementNS': The qualified name provided ('{qualifiedName}') is not a valid name.",
-                "InvalidCharacterError");
-        }
-
-        var colonIndex = qualifiedName.IndexOf(':');
-        if (colonIndex >= 0)
-        {
-            // Prefixed name: namespace must not be null
-            if (string.IsNullOrEmpty(ns))
-            {
-                ThrowDOMException(context,
-                    $"Failed to execute 'createElementNS': The namespace URI provided is empty for qualified name '{qualifiedName}'.",
-                    "NamespaceError");
-            }
-
-            var prefix = qualifiedName[..colonIndex];
-            // "xml" prefix must be the XML namespace
-            if (prefix == "xml" && ns != "http://www.w3.org/XML/1998/namespace")
-            {
-                ThrowDOMException(context,
-                    $"Failed to execute 'createElementNS': The namespace URI for prefix 'xml' is invalid.",
-                    "NamespaceError");
-            }
-
-            // "xmlns" prefix must be the XMLNS namespace
-            if (prefix == "xmlns" && ns != "http://www.w3.org/2000/xmlns/")
-            {
-                ThrowDOMException(context,
-                    $"Failed to execute 'createElementNS': The namespace URI for prefix 'xmlns' is invalid.",
-                    "NamespaceError");
-            }
-
-            // Non-"xmlns" prefix must not use the XMLNS namespace
-            if (prefix != "xmlns" && ns == "http://www.w3.org/2000/xmlns/")
-            {
-                ThrowDOMException(context,
-                    $"Failed to execute 'createElementNS': The XMLNS namespace URI may only be used with prefix 'xmlns'.",
-                    "NamespaceError");
-            }
+            ThrowDOMException(context, ex.Message, ex.Name);
         }
     }
 
@@ -278,9 +217,4 @@ public sealed partial class DomBridge
             SVGLength.SVG_LENGTHTYPE_PC = 10;
         ");
     }
-
-    [GeneratedRegex(@"^[\p{L}_][\p{L}\p{N}_.\-]*$", RegexOptions.Compiled)]
-    private static partial System.Text.RegularExpressions.Regex ValidXmlNamePatternRegex();
-    [GeneratedRegex(@"^[\p{L}_][\p{L}\p{N}_.\-]*(?::[\p{L}_][\p{L}\p{N}_.\-]*)?$", RegexOptions.Compiled)]
-    private static partial System.Text.RegularExpressions.Regex ValidXmlQualifiedNamePatternRegex();
 }
