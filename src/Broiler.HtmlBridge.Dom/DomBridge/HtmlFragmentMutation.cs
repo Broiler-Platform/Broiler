@@ -7,6 +7,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.HtmlBridge.Logging;
 using Broiler.Dom;
+using Broiler.Dom.Html;
 
 namespace Broiler.HtmlBridge;
 
@@ -259,7 +260,9 @@ public sealed partial class DomBridge
         container = null!;
 
         var contextTag = contextElement.TagName.ToLowerInvariant();
-        if (IsVoidHtmlElementTag(contextTag))
+        // Void elements have no children, so they cannot host an innerHTML fragment.
+        // Canonical membership set lives in Broiler.Dom.Html (shared with the parser/serializer).
+        if (HtmlSerializer.VoidElements.Contains(contextTag))
             return false;
 
         var (fragment, _) = BuildFragmentTree(html, contextTag);
@@ -281,8 +284,4 @@ public sealed partial class DomBridge
 
         return null;
     }
-
-    private static bool IsVoidHtmlElementTag(string tag) => tag is
-        "area" or "base" or "br" or "col" or "embed" or "hr" or "img" or
-        "input" or "link" or "meta" or "param" or "source" or "track" or "wbr";
 }
