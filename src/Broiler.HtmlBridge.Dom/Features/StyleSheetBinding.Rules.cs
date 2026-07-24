@@ -559,11 +559,11 @@ internal static partial class StyleSheetBinding
             if (parts.Length == 2)
             {
                 prefix = parts[0];
-                namespaceUri = ExtractNamespaceUri(parts[1]);
+                namespaceUri = CssomRuleMetadata.ExtractNamespaceUri(parts[1]);
             }
             else if (parts.Length == 1)
             {
-                namespaceUri = ExtractNamespaceUri(parts[0]);
+                namespaceUri = CssomRuleMetadata.ExtractNamespaceUri(parts[0]);
             }
 
             ruleObj.FastAddValue((KeyString)"namespaceURI", new JSString(namespaceUri), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -625,32 +625,6 @@ internal static partial class StyleSheetBinding
     }
 
     /// <summary>Extracts a namespace URI from a quoted string or <c>url(...)</c> token.</summary>
-    private static string ExtractNamespaceUri(string uriPart)
-    {
-        uriPart = uriPart.Trim();
-
-        if (uriPart.StartsWith("url(", StringComparison.OrdinalIgnoreCase))
-        {
-            var openParen = uriPart.IndexOf('(');
-            var closeParen = uriPart.LastIndexOf(')');
-            if (openParen >= 0 && closeParen > openParen)
-            {
-                return uriPart.Substring(openParen + 1, closeParen - openParen - 1)
-                    .Trim()
-                    .Trim('"', '\'');
-            }
-        }
-
-        if (uriPart.Length > 1 && (uriPart[0] == '"' || uriPart[0] == '\''))
-        {
-            var quote = uriPart[0];
-            var closingQuote = uriPart.LastIndexOf(quote);
-            if (closingQuote > 0)
-                return uriPart[1..closingQuote];
-        }
-
-        return uriPart;
-    }
 
     private static string UnquoteCssPropertyRuleDescriptor(string value)
     {
