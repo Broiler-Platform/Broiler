@@ -1,0 +1,66 @@
+From 446da3cfaa23fb9bed6e0d33dd2ce366dd9fe05e Mon Sep 17 00:00:00 2001
+From: Claude <enrico.bartky@gmail.com>
+Date: Fri, 24 Jul 2026 04:33:53 +0000
+Subject: [PATCH] ILCodeGenerator: declare pooled compiler temps on demand in
+ AssignParameter
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Store-path counterpart to the read-path fallback added for the WPT #1419 crash
+cluster in VisitParameter. A pooled scratch temp (#Temp<Type><id>) can reach the
+assignment site undeclared when the block that lists it in its Variables was not
+visited by the IL generator before this write (an out-of-order VariableParameters
+snapshot). AssignParameter previously handled only a closure-by-name match and
+otherwise hit the throwing variables[exp] indexer, so a temp whose *first* emitted
+reference is a write still threw KeyNotFoundException and aborted the whole
+script's compilation — the asymmetry the read-only VisitParameter fix left open.
+
+Declare the local on demand for #Temp-prefixed parameters (same guard and keyed-
+by-reference reasoning as VisitParameter): the on-demand local is the identical
+one every later read/write of that temp resolves to. The branch only runs on the
+path that already threw, so it cannot change a compilation that currently
+succeeds; genuine user-variable resolution failures still surface via the
+original throwing indexer. All 250 Broiler.JavaScript.Compiler.Tests pass.
+---
+ .../ILCodeGenerator.AssignParameter.cs        | 24 ++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.AssignParameter.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.AssignParameter.cs
+index 38faac12..11aa763d 100644
+--- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.AssignParameter.cs
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Generator/ILCodeGenerator.AssignParameter.cs
+@@ -23,7 +23,29 @@ public partial class ILCodeGenerator
+             if (TryResolveClosureByName(yParameterExpression.Name, out var closure))
+                 return Assign(closure, exp, savedIndex);
+ 
+-            varInfo = variables[yParameterExpression];
++            if (IsCompilerTemp(yParameterExpression.Name))
++            {
++                // Store-path counterpart to the read-path fallback in VisitParameter: a
++                // pooled compiler scratch temp (#Temp<Type><id>) can reach the assignment
++                // undeclared when the block that lists it in its Variables was not visited
++                // by the IL generator before this write (an out-of-order VariableParameters
++                // snapshot). Declare the local on demand — temps are keyed by reference, so
++                // the on-demand local is the identical one every later read/write of this
++                // temp resolves to (VisitParameter's TryGetValue and VisitBlock both find
++                // the already-present key), keeping value semantics intact regardless of
++                // visit order. Without this, a temp whose *first* emitted reference is a
++                // write still fell through to the throwing indexer below and aborted the
++                // whole script's compilation with KeyNotFoundException — the asymmetry that
++                // the read-only VisitParameter fix left open. This branch only runs on the
++                // path that already threw, so it cannot change a compilation that currently
++                // succeeds; genuine user-variable resolution failures still surface via the
++                // original throwing indexer (guarded to the unreachable "#Temp" prefix).
++                varInfo = variables.Create(yParameterExpression);
++            }
++            else
++            {
++                varInfo = variables[yParameterExpression];
++            }
+         }
+ 
+         il.Comment($"save {varInfo.Name}");
+-- 
+2.43.0
+
