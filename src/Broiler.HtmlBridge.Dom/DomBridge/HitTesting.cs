@@ -3,6 +3,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
 using Broiler.Dom.Html;
+using Broiler.CSS;
 
 namespace Broiler.HtmlBridge;
 
@@ -154,7 +155,7 @@ public sealed partial class DomBridge
         if (markerExtent <= 0)
             return false;
 
-        var isVertical = IsVerticalWritingMode(props.GetValueOrDefault("writing-mode"));
+        var isVertical = CssWritingMode.IsVertical(props.GetValueOrDefault("writing-mode"));
         if (isVertical)
         {
             rect = (Left, Top - markerExtent, Width, Height + markerExtent);
@@ -262,7 +263,7 @@ public sealed partial class DomBridge
             return false;
 
         var tableProps = GetComputedProps(table);
-        var isVertical = IsVerticalWritingMode(tableProps.GetValueOrDefault("writing-mode"));
+        var isVertical = CssWritingMode.IsVertical(tableProps.GetValueOrDefault("writing-mode"));
         var isRtl = string.Equals(tableProps.GetValueOrDefault("direction"), "rtl", StringComparison.OrdinalIgnoreCase);
         var visualCellIndex = isRtl ? Math.Max(0, columnCount - 1 - cellIndex) : cellIndex;
 

@@ -303,12 +303,6 @@ public sealed partial class DomBridge
         return isMultiple ? 4 : 1;
     }
 
-    private static bool IsVerticalWritingMode(string? writingMode)
-    {
-        var normalized = writingMode?.Trim().ToLowerInvariant();
-        return normalized is "vertical-rl" or "vertical-lr" or "sideways-rl" or "sideways-lr";
-    }
-
     /// <summary>
     /// Raw author <em>source</em> text for a style element — its canonical text-node
     /// children, or a cached/fetched linked stylesheet — <em>without</em> any CSSOM

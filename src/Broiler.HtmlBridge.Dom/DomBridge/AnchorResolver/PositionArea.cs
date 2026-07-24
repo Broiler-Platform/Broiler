@@ -104,7 +104,7 @@ public sealed partial class DomBridge
                     double marginPadBasis = cellW;
                     {
                         var cbForBasis = FindContainingBlockElement(element);
-                        if (cbForBasis != null && IsVerticalWritingMode(
+                        if (cbForBasis != null && CssWritingMode.IsVertical(
                                 GetComputedProps(cbForBasis).GetValueOrDefault("writing-mode")))
                             marginPadBasis = cellH;
                     }

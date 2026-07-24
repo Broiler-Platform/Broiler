@@ -1,5 +1,6 @@
 using Broiler.Dom.Html;
 using Broiler.Dom;
+using Broiler.CSS;
 
 namespace Broiler.HtmlBridge;
 
@@ -284,7 +285,7 @@ public sealed partial class DomBridge
         var height = props.GetValueOrDefault("height");
         var writingMode = props.GetValueOrDefault("writing-mode") ?? "horizontal-tb";
         var direction = props.GetValueOrDefault("direction") ?? "ltr";
-        var vertical = IsVerticalWritingMode(writingMode);
+        var vertical = CssWritingMode.IsVertical(writingMode);
         var reverseInline = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
         var ratio = ResolveProgressLikeValueRatio(element, tag);
 
