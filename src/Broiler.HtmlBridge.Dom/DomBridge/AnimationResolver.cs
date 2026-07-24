@@ -407,7 +407,8 @@ public sealed partial class DomBridge
                     float localProgress = (progress - intervalStart) / (intervalEnd - intervalStart);
 
                     // Apply per-interval timing function (steps, cubic-bezier, etc.).
-                    localProgress = (float)ApplyTimingFunction(localProgress, timingFunction);
+                    // Easing evaluation is owned by the canonical Broiler.CSS CssEasing.
+                    localProgress = (float)CssEasing.Evaluate(localProgress, timingFunction);
 
                     // Try color interpolation for background-color, color, etc.
                     var interpolated = TryInterpolateValue(
