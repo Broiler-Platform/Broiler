@@ -84,6 +84,34 @@ exercise the drop; the crash needs the full sequential shard run, where the glob
 `FastFunctionScope.id` reaches ~100 020–100 238 — cumulative session state that does
 not arise on an isolated render).
 
+## Hypotheses tested in-sandbox (narrows the search)
+
+The exact runtime array-index site could not be reproduced on an isolated render
+(the fault is cumulative-state dependent — the global `FastFunctionScope.id` reaches
+~100 020 only after a long sequential run). But three tractable candidates were
+checked directly and **refuted**, so a maintainer with the full corpus can skip them:
+
+- **The dropped temp's own value is not the array fault.** `JSValue` is an
+  `abstract class` (reference type), so an undeclared/never-written `#TempJSValue`
+  local reads as `null`; using it would raise `NullReferenceException`, not
+  `IndexOutOfRangeException`. The array fault is therefore an **indirect** corruption
+  downstream of the dropped temp, not the temp load itself.
+- **`ScriptInfo.Indices[]` slot overflow — refuted.** Top-level identifier access
+  emits an unbounded `ScriptInfo.Indices[constSlot]` (`ScriptInfoBuilder.Index`),
+  and the array is frozen to `_keyStrings.List.Count` at `ScriptInfoBuilder.Build`
+  (`FastCompiler.cs`). Instrumenting the compiler to compare the key count at `Build`
+  vs at the end of `BuildProgram` across a battery of scripts (top-level function
+  declarations, destructuring catch, classes, getters/setters) showed **no growth
+  after `Build`** — so no slot index exceeds the sized array from this path.
+- **`KeyStrings.entries` capacity overflow — refuted.** The global metadata array is
+  grown under `PublicationLock` (`Math.Max(len*2, id+1)`) and every read
+  (`GetMetadata`/`GetNameString`) is bounds-checked (`id < snapshot.Length ? … : default`),
+  so it never throws `IndexOutOfRange` regardless of how high the id climbs.
+
+Remaining candidates for the indirect array fault (unverified): the closure-capture
+array / `Closures` layout, the arguments array, or a generator/spill slot — reachable
+only once compilation proceeds past the dropped temp (which `0013`/`0014` now allow).
+
 ## The real fix (needs the full WPT run to validate)
 
 The correct fix is at the **temp-registration layer in `Broiler.JS`**, not the IL
@@ -97,6 +125,13 @@ snapshot in `FastCompiler.VisitTryStatement.cs:88`. Any change must be validated
 a full sharded WPT run (not just the compiler unit tests) because the failure is
 cumulative-state-dependent and did not reproduce on isolated renders in-sandbox.
 
-Until that lands, `patches/0013` should be understood as a partial mitigation (it clears
-the #1419 compile-abort so unrelated work on the same pages can proceed) rather than a
-fix for the crash cluster, which persists at runtime as this issue.
+`patches/0014` completes `0013`'s IL-generator fallback by mirroring the on-demand
+`variables.Create` on the **store** path (`AssignParameter`), so a dropped `#Temp` whose
+first emitted reference is a write no longer aborts compilation with
+`KeyNotFoundException` either. This is a symmetry/robustness completion of 0013's
+approach — it removes the remaining compile-abort surface but does not by itself resolve
+the indirect runtime array fault above (that needs the root-cause drop prevention).
+
+Until that lands, `patches/0013` + `0014` should be understood as a partial mitigation
+(they clear the #1419/#1422 compile-abort surface so unrelated work on the same pages can
+proceed) rather than a fix for the crash cluster, which persists at runtime as this issue.
