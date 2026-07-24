@@ -178,6 +178,52 @@ the same class as the already-fixed `CreateFunction` site, is **not** by itself 
 delicate catch/completion semantics without demonstrably moving the cluster). The all-250
 `Broiler.JavaScript.Compiler.Tests` remain green with `0013`+`0014` applied.
 
-**Status for #1425:** no code change beyond the already-pending patches; the actionable fix
-remains the root-cause drop-prevention described under "The real fix", which requires the full
-sharded WPT corpus (absent from the session container) to reproduce and validate.
+**Status for #1425:** the root-cause drop-prevention described under "The real fix" is now
+implemented as **`patches/0015`** (see below).
+
+## 2026-07-24 — root-cause fix landed as `patches/0015`
+
+`patches/0013`+`0014` are a **reactive** fallback: they let compilation proceed past a dropped
+`#Temp` (declaring it on demand) but do not stop the temp from being dropped, and #1425 shows
+the runtime `body-:0,0 — Index was outside the bounds of the array.` crash persisting on the
+CI run that has them applied. `patches/0015` removes the two mechanisms that produce the
+dropped/aliased temp in the first place.
+
+### The two mechanisms (confirmed by source, narrowed by in-sandbox instrumentation)
+
+1. **Late-minted top-level temp → in no block (`FastCompiler.BuildProgram`).** The body block's
+   `vList.AddRange(fx.VariableParameters)` ran *right after* `Visit(jScript)`. But the trailing
+   statements built afterwards — `BExpression.Return(l, script.ToJSValue())` and the per-global
+   `JSContext.Register` calls — can still mint pooled `#Temp` locals via `GetTempVariable`. Any
+   temp minted in that window lived in the function scope but in **no** block's variable list, so
+   the IL generator declared no local for it up front (→ #1419 `KeyNotFound`; → #1422/#1425 once
+   0013/0014 declare it mid-method instead). **Fix:** take the snapshot *after* those statements
+   are built. It is a superset of the old snapshot, so a succeeding compile is unchanged.
+
+2. **Temp declared in a nested block → slot freed and reused (`ILCodeGenerator.VisitBlock`).**
+   `BBlockExpression.FlattenVariables` hoists variables only out of *directly-nested child*
+   blocks, **not** out of a block buried inside a non-block expression (`try/finally`, loop,
+   conditional). A `#Temp` that lands in such a block is declared under that block's transient
+   `tvs` scope; on block exit its IL local is freed and — via `ILWriter.TempVariable`'s
+   `IsBusy`-flag pool (`New`/`Dispose`) — **reused** by a later sibling's `NewTemp` of the same
+   type. A later reference to the temp then reads/writes another variable's slot: an **indirect**
+   corruption (not the temp's own null value), exactly the array-index-shaped runtime fault the
+   §0014 note could not localise. **Fix:** declare compiler temps as stable **function-lifetime**
+   locals (`variables.Create(p)` rather than `variables.Create(p, tvs)`), so their slot is never
+   reused. Value semantics are unchanged — a temp is always assigned before each use.
+
+### Why it is validated for non-regression but not reproduced here
+
+The crash is specific to the WPT runner's **in-process, sequential** execution (thousands of
+compilations sharing static `FastFunctionScope.id`, which climbs to ~100 020). The test262 runner
+spawns **one process per test** (`run_test262.py`: `subprocess.Popen([... "--script-host" ...])`),
+so its `id` resets each test — which is why it "works like a charm" and never shows this cluster.
+In-sandbox the fault did not reproduce under **any** available lever: a 36-construct temp-density
+battery (0 on-demand fallbacks), compiling `testharness.js` / `testharnessreport.js` /
+`testdriver.js` (all clean), a 3000-iteration in-process stress that pushed `id` well past 100 k
+(0 drops), and per-block instrumentation (0 temps ever declared below the root block for available
+scripts). So `0015` is validated **for non-regression** — all 250 compiler tests pass and the
+harness files still compile — and its flip of the cluster must be confirmed on the sharded
+WPT/test262 CI, where the triggering corpus script and the accumulated in-process state exist.
+Both changes are strict supersets/hardenings that cannot change a compilation that currently
+succeeds, so landing them is safe even ahead of that confirmation.
