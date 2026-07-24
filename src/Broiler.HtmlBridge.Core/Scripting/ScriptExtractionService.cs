@@ -36,48 +36,6 @@ public static partial class ScriptExtractionService
     /// </summary>
     private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
 
-    /// <summary>One discovered <c>&lt;script&gt;</c>: its parsed attributes and its raw body text.</summary>
-    private readonly record struct ScriptTagInfo(IReadOnlyDictionary<string, string> Attributes, string RawContent);
-
-    /// <summary>
-    /// Enumerates every <c>&lt;script&gt;</c> element in document order via the shared tokenizer, pairing
-    /// each start tag with its raw (never entity-decoded) body text. Because <c>&lt;script&gt;</c> is a
-    /// raw-text element, a start tag is followed by its character content and then its end tag; an
-    /// unterminated final script yields its content to end-of-input (matching parser behaviour).
-    /// </summary>
-    private static IEnumerable<ScriptTagInfo> EnumerateScriptTags(string html)
-    {
-        HtmlToken? open = null;
-        var content = new StringBuilder();
-
-        foreach (var token in new HtmlTokenizer().Tokenize(html))
-        {
-            if (open != null)
-            {
-                if (token.Type == TokenType.Character)
-                {
-                    content.Append(token.Data);
-                    continue;
-                }
-
-                // Any non-character token (the </script> end tag) closes the current script.
-                yield return new ScriptTagInfo(open.Attributes, content.ToString());
-                open = null;
-                content.Clear();
-            }
-
-            if (token.Type == TokenType.StartTag &&
-                string.Equals(token.Name, "script", StringComparison.OrdinalIgnoreCase))
-            {
-                open = token;
-                content.Clear();
-            }
-        }
-
-        if (open != null)
-            yield return new ScriptTagInfo(open.Attributes, content.ToString());
-    }
-
     private static string? GetNonce(IReadOnlyDictionary<string, string> attrs) =>
         attrs.TryGetValue("nonce", out var nonce) ? nonce : null;
 
@@ -125,7 +83,7 @@ public static partial class ScriptExtractionService
         var scripts = new List<string>();
         var csp = ContentSecurityPolicy.FromHtml(html);
 
-        foreach (var tag in EnumerateScriptTags(html))
+        foreach (var tag in HtmlScriptScanner.EnumerateScripts(html))
         {
             var nonce = GetNonce(tag.Attributes);
 
@@ -175,7 +133,7 @@ public static partial class ScriptExtractionService
         var csp = ContentSecurityPolicy.FromHtml(html);
 
         var documentOrder = 0;
-        foreach (var tag in EnumerateScriptTags(html))
+        foreach (var tag in HtmlScriptScanner.EnumerateScripts(html))
         {
             var nonce = GetNonce(tag.Attributes);
             var isModule = IsModule(tag.Attributes);
