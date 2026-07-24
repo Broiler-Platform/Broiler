@@ -270,18 +270,4 @@ public sealed partial class DomBridge
         return true;
     }
 
-    private static DomElement? FindFirstElementByTag(DomElement root, string tag)
-    {
-        foreach (var child in ChildElements(root))
-        {
-            if (!IsText(child) && string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase))
-                return child;
-
-            var match = FindFirstElementByTag(child, tag);
-            if (match != null)
-                return match;
-        }
-
-        return null;
-    }
 }
