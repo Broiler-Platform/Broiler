@@ -227,3 +227,118 @@ harness files still compile — and its flip of the cluster must be confirmed on
 WPT/test262 CI, where the triggering corpus script and the accumulated in-process state exist.
 Both changes are strict supersets/hardenings that cannot change a compilation that currently
 succeeds, so landing them is safe even ahead of that confirmation.
+
+## 2026-07-24 (later) — recurs as [issue #1428](https://github.com/Broiler-Platform/Broiler/issues/1428): `0015` confirmed **not** a fix
+
+The next top-30 report ([#1428](https://github.com/Broiler-Platform/Broiler/issues/1428)) still
+leads with the identical signature — `body-:0,0 — Index was outside the bounds of the array.` —
+now gating **59 282** tests (was 59 311 in #1425). This is the confirmation run the `0015` note
+above said was still required, and it is **negative**: `patches/0015` does **not** resolve the
+crash cluster.
+
+### The evidence is conclusive — `0015` was applied on the failing run
+
+The report's run is [`30072567162`](https://github.com/Broiler-Platform/Broiler/actions/runs/30072567162)
+(`head_sha f88905d`, the #1426 merge). `patches/0015` landed as `57bcab7` (06:23), which is an
+ancestor of `f88905d` (06:31), and `scripts/apply-pending-wpt-patches.sh` at `f88905d` already
+lists all of `0012`/`0013`/`0014`/`0015`. Every one of the eight sharded `run (N)` jobs records
+step 8 **"Apply pending submodule patches" → success** before its shard executed. So the full
+pending set — including the `0015` root-cause changes to `FastCompiler.BuildProgram` and
+`ILCodeGenerator.VisitBlock` — was live on the `Broiler.JS` working tree for this run, and the
+crash still gated ~59 k tests. `0013`/`0014`/`0015` are therefore all confirmed **non-fixes** at
+the WPT layer, not merely "unconfirmed."
+
+### What this rules in
+
+Both `0015` mechanisms (late body-temp snapshot; stable function-lifetime temp locals) are real
+and correct hardenings, but neither is the operative cause — so the dropped/aliased-temp model,
+while it explained the #1419→#1422 compile→runtime transition, does **not** account for the
+residual runtime `IndexOutOfRangeException`. The fault survives the two fixes that would eliminate
+a dropped or slot-reused `#Temp`, so the remaining candidates named above (closure-capture /
+`Closures` layout, the arguments array, or a generator/spill slot indexed off cumulative
+in-process state) move to the front: the corruption is downstream of temp *registration*, in a
+runtime array whose index is desynchronised by process-global accumulation
+(`FastFunctionScope.id` reaching ~100 020), not by a per-compile temp drop.
+
+### Why test262 stays green (and does not validate a WPT-layer fix)
+
+The task note that "test262 js CI Runner successful runs" is consistent with — and predicted by —
+the process-isolation analysis above: `run_test262.py` spawns one process per test, resetting
+every process-global static (`FastFunctionScope.id`, the compiler pools) between tests, so the
+cumulative-state fault cannot manifest there regardless of whether it is fixed. test262 green is
+therefore a **non-regression** signal for the JS engine, **not** confirmation that the WPT
+`body-:0,0` cluster is resolved. The two runners disagree precisely because one accumulates
+in-process state and the other does not — which is itself the strongest available pointer at the
+root cause.
+
+### Status
+
+- `Broiler.JS` submodule pointer advanced to its `origin/main` head `1aa46f21` (the test262
+  failed-testcase CI update; no engine-source change). Pending patches `0012`–`0015` re-verified
+  to apply cleanly on top and remain wired on the WPT CI run via
+  `scripts/apply-pending-wpt-patches.sh`.
+- The real fix is still open and, on the evidence here, is **not** the dropped-temp model that
+  `0013`/`0014`/`0015` address. It requires reproduction on the full sequential in-process shard
+  run (or an in-process harness that accumulates `FastFunctionScope.id` past ~100 020 against the
+  actual triggering corpus script) to localise the runtime array whose index goes out of bounds.
+  Until then, `0013`/`0014`/`0015` should be understood as compile-abort mitigations that keep the
+  cluster in its (survivable, non-crashing-at-compile) runtime form, not as a resolution of the
+  crash.
+
+## 2026-07-24 (later still) — root cause found and fixed as `patches/0016`
+
+The residual `body-:0,0 — Index was outside the bounds of the array.` crash was reproduced
+in-process and localised to a definite root cause, and fixed. It was **not** the dropped/aliased
+`#Temp` model of `0013`/`0014`/`0015` (those address a separate compile-time cluster).
+
+### Reproduction
+
+Running the C# WPT runner in-process (`--no-worker-isolation`) over a testharness-heavy corpus
+(`dom` + `html/dom` + `domparsing`, ~1053 tests in one process) reproduces the crash — the
+conformance-checkers "example" tests in the issue are JS-light **victims**, not the trigger, so they
+never accumulate the state; on CI the hash-sharded mix supplies the accumulation. An instrumented
+build showed **7312** poisoned key resolutions, every one:
+
+```
+[KEYSEAL] key 'Event' -> Indices[49501] sealedLen=0 nowCount=0 loc='vm.js'
+```
+
+i.e. a fresh script whose key `List` is **empty** (`nowCount=0`) resolving a key to a large,
+**constant, cumulative** index (49501), from `DomBridge.RegisterDocument`'s bootstrap `Eval`
+(a synchronous script → the `body` lambda; `ScriptInfo.FileName` defaults to `vm.js`).
+
+### Root cause — `StringMap<T>`'s shared mutable sentinel
+
+`Broiler.JavaScript.Storage/StringMap<T>.GetNode` returned a shared `static Node Empty` as its
+"not found" sentinel. On the **create** path an overflow return (`return ref Empty`) can hand that
+sentinel to `Put`/`Save`/`this[]=`, which does `node.State |= HasValue; node.Value = i` — writing a
+**cumulative index** into the shared static. Thereafter, for **every fresh map** (`storage == null`),
+`GetNode` returns that same polluted sentinel and `TryGetValue` reports a false hit with the stale
+value **for any key**, without ever comparing the key. That is why all 7312 hits show the identical
+index and an empty `List`.
+
+In the engine, `StringArray.GetOrAdd` (the per-script key table `_keyStrings`) is backed by this
+`StringMap`. A poisoned lookup returns the stale cumulative index instead of adding the key, so
+`List.Count` stays 0 while `KeyOfName` emits `ScriptInfo.Indices[49501]`. `ScriptInfoBuilder.Build`
+sizes `Indices` to `List.Count` (0), so the emitted constant index is out of bounds and throws
+`IndexOutOfRangeException` at runtime inside the `body` program lambda — the exact `body-:0,0`
+signature. It is cumulative (needs a big compilation to overflow and pollute the static), process-global
+(the static persists), and invisible to test262 (one process per test resets the static), matching every
+property of the cluster.
+
+### The fix (`patches/0016`)
+
+Make the sentinel `[ThreadStatic]` and reset it to a pristine node at each `GetNode` entry, so a stray
+create-path write can never be observed by a later read and there is no cross-thread race. No
+struct-layout change (StringMap is used widely, incl. hot paths).
+
+**Validation.** A deterministic regression test (`StorageTests.StringArray_FreshInstance_IsNotPoisonedByHeavyPriorInstance`)
+fills one `StringArray` past the overflow, then asserts a fresh one resolves keys from index 0 — it
+returns **86704** on the old code and **0** with the fix. All **250** `Broiler.JavaScript.Compiler.Tests`
+and **12** `Broiler.JavaScript.Storage.Tests` pass. Re-running the same 1053-test in-process WPT corpus
+with `0016` applied produces **0** poisoned lookups, **0** `Script execution failed`, and **0**
+`Index was outside the bounds of the array.` (was 7312 / thousands).
+
+`0016` ships as a pending patch (the `Broiler.JS` push is 403) applied on the WPT CI run after
+`0013`–`0015` (different files, no conflict). `0013`/`0014`/`0015` remain for the separate compile-time
+`#Temp` cluster; `0016` is the fix for this runtime `body-:0,0` crash.

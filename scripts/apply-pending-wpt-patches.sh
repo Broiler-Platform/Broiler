@@ -6,10 +6,12 @@
 # still exercised on CI, which otherwise runs strictly against the pinned
 # submodule pointers.
 #
-# Scope: ONLY the patches listed in PENDING_PATCHES below. Patches whose fix is
-# already contained in the pinned submodule pointer (e.g. 0013-0016) are NOT
-# listed here — they are live on CI through the pointer and must not be
-# re-applied (a second application would conflict).
+# Scope: ONLY the patches listed in PENDING_PATCHES below. A patch whose fix is
+# already contained in the pinned submodule pointer is NOT listed here — it is
+# live on CI through the pointer and must not be re-applied. The idempotence
+# guard below also means a listed patch stops being applied automatically once a
+# maintainer lands it upstream and bumps the pointer (its reverse-apply check
+# then succeeds and it is skipped).
 #
 # Idempotent: a patch already present in the checked-out tree (reverse-apply
 # succeeds) is skipped, so this stays correct after a maintainer applies the
@@ -28,6 +30,7 @@ PENDING_PATCHES=(
   "Broiler.JS|patches/0013-js-ilcodegen-declare-temp-fallback.patch"
   "Broiler.JS|patches/0014-js-ilcodegen-assignparameter-temp-fallback.patch"
   "Broiler.JS|patches/0015-js-stable-temp-locals-and-late-snapshot.patch"
+  "Broiler.JS|patches/0016-js-stringmap-threadlocal-sentinel.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

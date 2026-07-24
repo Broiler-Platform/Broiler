@@ -1,0 +1,109 @@
+From d5a28695138f4df945db963b09e21a7ede563d09 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 24 Jul 2026 08:16:32 +0000
+Subject: [PATCH] StringMap: make the not-found sentinel thread-local and reset
+ per lookup (fix #1428 body-:0,0 IndexOutOfRange)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+StringMap<T>'s GetNode returned a shared mutable `static Node Empty` as its
+"not found" sentinel. On the create path an overflow return could hand that
+sentinel to Put/Save/the indexer, which wrote a (large, cumulative) value into
+it. Afterwards every fresh map (storage==null) returned the same sentinel, and
+TryGetValue reported a false hit with the stale value for ANY key — without ever
+matching the key.
+
+In the engine that poisoned key resolution across the whole process: a fresh
+script's _keyStrings.GetOrAdd returned the leaked cumulative index while its key
+List stayed empty, so ScriptInfo.Indices (sized to List.Count) was emitted with
+an out-of-bounds constant index and threw IndexOutOfRangeException at runtime in
+the top-level `body` lambda — WPT signature `body-:0,0 — Index was outside the
+bounds of the array.`, gating ~59k tests. It only surfaced in the long
+in-process WPT run (the pollution needs a big compilation to overflow, then
+persists in the static), never in the per-process test262 runner.
+
+Fix: make `Empty` [ThreadStatic] and reset it to a pristine node at each GetNode
+entry, so a stray create-path write can never be observed by a later read and
+there is no cross-thread race. No struct-layout change.
+
+Regression test (StorageTests): fill one StringArray past the overflow, then
+assert a fresh StringArray resolves keys from index 0 with a growing List. The
+test returns 86704 on the old code and 0 with the fix.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ .../StorageTests.cs                           | 23 +++++++++++++++++++
+ .../Broiler.JavaScript.Storage/StringMap.cs   | 17 +++++++++++++-
+ 2 files changed, 39 insertions(+), 1 deletion(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Storage.Tests/StorageTests.cs b/Broiler.JS/Broiler.JavaScript.Storage.Tests/StorageTests.cs
+index 70c142f8..af89e764 100644
+--- a/Broiler.JS/Broiler.JavaScript.Storage.Tests/StorageTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Storage.Tests/StorageTests.cs
+@@ -153,4 +153,27 @@ public class StorageTests
+         Assert.Equal(ElementKind.Dictionary, elements.Kind);
+         Assert.False(elements.HasDefaultDescriptors);
+     }
++
++    // Regression for issue #1428: StringMap's "not found" sentinel node was a
++    // shared mutable static. A create-path overflow could hand that sentinel to
++    // a caller that wrote a (large, cumulative) value into it; afterwards a fresh
++    // map (storage==null) returned the sentinel and reported a false hit with the
++    // stale value for ANY key, without ever matching it. In the engine that made
++    // a new script's key resolve to a stale index while its key List stayed
++    // empty, so ScriptInfo.Indices (sized to List.Count) was indexed out of
++    // bounds at runtime. Fill one StringArray heavily to exercise the overflow,
++    // then assert a fresh StringArray is fully independent.
++    [Fact]
++    public void StringArray_FreshInstance_IsNotPoisonedByHeavyPriorInstance()
++    {
++        var heavy = new StringArray();
++        for (int i = 0; i < 200_000; i++)
++            heavy.GetOrAdd(new StringSpan("heavy_key_" + i));
++
++        var fresh = new StringArray();
++        Assert.Equal(0u, fresh.GetOrAdd(new StringSpan("alpha")));
++        Assert.Equal(1u, fresh.GetOrAdd(new StringSpan("beta")));
++        Assert.Equal(0u, fresh.GetOrAdd(new StringSpan("alpha"))); // stable, no re-add
++        Assert.Equal(2, fresh.List.Count);
++    }
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Storage/StringMap.cs b/Broiler.JS/Broiler.JavaScript.Storage/StringMap.cs
+index e2ea0dc1..f2c37e83 100644
+--- a/Broiler.JS/Broiler.JavaScript.Storage/StringMap.cs
++++ b/Broiler.JS/Broiler.JavaScript.Storage/StringMap.cs
+@@ -21,7 +21,19 @@ public struct StringMap<T>
+         HasValue = 4
+     }
+ 
+-    static Node Empty = new();
++    // The "not found" sentinel returned by ref from GetNode. It MUST stay
++    // pristine (State=Empty), but create-path overflow returns can hand it to a
++    // caller (Put/Save/indexer) that writes a value into it. A shared static
++    // therefore leaks that stale value into every later lookup — on a fresh map
++    // (storage==null) GetNode returns this sentinel and TryGetValue reports a
++    // false hit with the stale value, without ever matching the key. Over a long
++    // in-process run this poisons every subsequent compilation's key resolution
++    // (issue #1428: a fresh script's Indices is sized to List.Count but a key
++    // resolves to the leaked cumulative index -> IndexOutOfRange in the body
++    // lambda). Make it [ThreadStatic] (no cross-thread races) and reset it to a
++    // pristine node at each GetNode entry so a stray write can never persist.
++    [ThreadStatic]
++    private static Node Empty;
+ 
+     struct Node
+     {
+@@ -163,6 +175,9 @@ public struct StringMap<T>
+ 
+     private ref Node GetNode(in HashedString originalKey, bool create = false)
+     {
++        // Reset the sentinel so a value written into it by a prior create-path
++        // overflow return cannot be observed as a false hit by this lookup.
++        Empty = default;
+         ref var node = ref Empty;
+ 
+         if (storage == null)
+-- 
+2.43.0
+
