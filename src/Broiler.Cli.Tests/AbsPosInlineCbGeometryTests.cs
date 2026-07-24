@@ -7,7 +7,7 @@ namespace Broiler.Cli.Tests;
 
 /// <summary>
 /// RF-BRIDGE-1b Track 3.1 — abspos-in-inline-CB placement (see
-/// <c>docs/roadmap/htmlbridge-blocked-items-completion-roadmap.md</c> §3.1).
+/// <c>docs/architecture/htmlbridge.md#layout-and-geometry</c>).
 ///
 /// An absolutely-positioned element whose containing block is an <em>inline</em> box
 /// (a <c>position:relative</c> span) must be placed at its <c>top</c>/<c>left</c> insets

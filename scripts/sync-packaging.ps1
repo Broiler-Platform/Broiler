@@ -5,9 +5,9 @@
     and wire each component's Directory.Build.props to import the local copy.
 
 .DESCRIPTION
-    Implements Phase 1 of the NuGet packaging roadmap
-    (docs/roadmap/nuget-packaging-roadmap.md). Each component is self-contained
-    (decision D0): it carries its own eng/Broiler.Packaging.props and eng/icon.png
+    Implements the vendoring design tracked by the release and distribution
+    work in docs/ROADMAP.md. Each component is self-contained: it carries its
+    own eng/Broiler.Packaging.props and eng/icon.png
     so it builds and packs standalone -- important because the in-tree components
     are slated to become submodules.
 

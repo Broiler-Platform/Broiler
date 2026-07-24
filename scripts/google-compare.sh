@@ -19,7 +19,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-OUTPUT_DIR="$REPO_ROOT/docs/google-compliance"
+OUTPUT_DIR="$REPO_ROOT/artifacts/google-compliance"
 SKIP_REFERENCE=false
 URL="https://www.google.com"
 
@@ -43,7 +43,7 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --skip-reference  Skip Chromium reference rendering (use existing reference)"
-            echo "  --output-dir      Output directory (default: docs/google-compliance/)"
+            echo "  --output-dir      Output directory (default: artifacts/google-compliance/)"
             echo "  --url             URL to render (default: https://www.google.com)"
             echo "  -h, --help        Show this help message"
             exit 0

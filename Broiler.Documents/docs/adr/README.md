@@ -1,12 +1,12 @@
 # Broiler.Documents ADR Index
 
-ADRs 0001-0005 close the Phase 0 ("Charter, ADRs, and the model-placement
-decision") requirement from `docs/roadmap/broiler-documents-component.md` §9 for
-the document-formats component. All are accepted for Phase 1 scaffolding and may
-be superseded only by later ADRs. The model-placement decision is mirrored on the
-UI side by `Broiler.UI/docs/adr/0018-richedit-document-model-promotion.md`.
-ADR 0006 freezes the model-side projection, grammar, mapping, and edit-scope
-decisions for the public Formatting Codes roadmap.
+ADRs 0001-0005 define the document-format component, model ownership, codec
+contract, safety policy, and first RTF subset. The model-placement decision is
+mirrored on the UI side by
+`Broiler.UI/docs/adr/0018-richedit-document-model-promotion.md`. ADR 0006 freezes
+the model-side Formatting Codes projection, grammar, mapping, and edit scope.
+Accepted and partially superseded records remain here for traceability; current
+follow-up work is in [the component roadmap](../roadmap.md).
 
 | ADR | Topic |
 |---|---|

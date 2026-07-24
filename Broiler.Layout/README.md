@@ -8,8 +8,11 @@ Broiler.HTML through internal compatibility boundaries.
 
 This is first-preview software. The API, layout behavior, and integration boundaries may
 change without compatibility guarantees. Substantial implementation work was AI-assisted.
-The component is **not human-approved for preview use** while
-[HUMAN_REVIEW.md](HUMAN_REVIEW.md) remains `PENDING`.
+The recorded [human review](HUMAN_REVIEW.md) approved a specific 2026-07-01
+revision with conditions. The component has changed substantially since that
+revision, so the approval must not be treated as covering current source or a
+broader release. Re-review and hardening work is tracked in the
+[current roadmap](docs/roadmap.md).
 
 Broiler.Layout is an independent Broiler component. Its integration with Broiler.HTML
 inherits architectural context from HTML Renderer, but it must not be represented as an
@@ -21,10 +24,11 @@ The public seam consists of the host abstractions (`ILayoutEnvironment`, `ILayou
 and `ILayoutImageLoader`), their value types, and the renderer-neutral HTML metadata
 types used to construct a layout input. The concrete box tree and layout algorithms
 remain internal. Layout consumes only `Broiler.CSS`, `Broiler.CSS.Dom`, `Broiler.Dom`,
-and the BCL; painting, resource acquisition, HTML parsing, and platform UI remain in
-their owning assemblies.
+the backend-neutral `Broiler.Graphics` primitive layer, and the BCL; painting,
+resource acquisition, HTML parsing, and platform UI remain in their owning
+assemblies.
 
-Seven assemblies have deliberate access to the internal box tree:
+Ten assemblies have deliberate access to internal layout state:
 
 | Friend assembly | Compatibility need |
 |---|---|
@@ -35,6 +39,9 @@ Seven assemblies have deliberate access to the internal box tree:
 | `Broiler.Cli.Tests` | Characterizes renderer integration and internal box state during the preview compatibility window. |
 | `Broiler.DevConsole.Tests` | Characterizes diagnostic snapshots with constructed boxes. |
 | `Broiler.Layout.Tests` | Exercises the internal layout kernel directly. |
+| `Broiler.Wpt` | Enables scoped native anchor placement around final WPT renders. |
+| `Broiler.HTML.Headless` | Produces the live geometry snapshot through `ILayoutView`. |
+| `Broiler.HtmlBridge.Dom` | Supplies the visual-viewport scale around geometry snapshots. |
 
 Facade and application assemblies must consume owned projections instead of traversing
 the internal tree. In particular, `Broiler.HTML.Image` delegates canvas-background

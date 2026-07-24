@@ -14,8 +14,8 @@ that model. In practice the model types (`RichTextDocument`, `RichTextParagraph`
 have no `Broiler.UI` dependency. They sit in a UI assembly only for historical
 packaging reasons.
 
-The document-formats roadmap (`docs/roadmap/broiler-documents-component.md`) adds
-RTF (then HTML/Markdown) as codecs that decode to and encode from this exact
+The document-formats proposal that became `Broiler.Documents` adds RTF (then
+HTML/Markdown) as codecs that decode to and encode from this exact
 model. RTF import/export is a headless concern — a CLI converter, server, the
 clipboard, or a print path must not have to reference `Broiler.UI` to parse a
 `.rtf` file. The new component's ADR 0002 chose **Path A: promote the model**.

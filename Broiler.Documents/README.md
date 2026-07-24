@@ -52,7 +52,7 @@ Matching headless test projects live beside each runtime project.
 
 ## Records
 
-- [Phase 0 Record](docs/phase-0.md)
+- [Current roadmap](docs/roadmap.md)
 - [ADR Index](docs/adr/README.md)
   - [ADR 0001: Component Topology And Consumption Policy](docs/adr/0001-component-topology-and-consumption-policy.md)
   - [ADR 0002: Document Model Ownership And Promotion (Path A)](docs/adr/0002-document-model-ownership-and-promotion.md)

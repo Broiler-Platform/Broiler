@@ -4,7 +4,7 @@ namespace Broiler.Layout;
 /// Lightweight descriptor of the source HTML element a layout box was built
 /// from: its tag name, self-closing flag, and attribute bag. Relocated from the
 /// renderer into <c>Broiler.Layout</c> with the layout code (see
-/// <c>docs/roadmap/broiler-layout-component.md</c> §2.1). The attribute bag is
+/// <c>Broiler.Layout/docs/roadmap.md</c>). The attribute bag is
 /// exposed read-only; controlled mutations go through <see cref="SetAttribute"/>.
 /// </summary>
 public sealed class HtmlTag

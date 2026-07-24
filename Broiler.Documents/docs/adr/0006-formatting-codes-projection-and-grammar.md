@@ -101,7 +101,7 @@ They do not change the canonical sample above or the rules in this ADR.
 
 ## Follow-up
 
-Phase 1 publishes the complete version-1 grammar beside projector tests,
-including canonical output for every supported `InlineStyle` and
-`ParagraphStyle` field, escape cases, empty paragraphs, Unicode, and mapping
-boundaries.
+Implemented: the complete version-1 grammar is published in
+[`Broiler.Documents.FormatCodes/GRAMMAR.md`](../../Broiler.Documents.FormatCodes/GRAMMAR.md)
+beside projector tests covering supported style fields, escapes, empty
+paragraphs, Unicode, and mapping boundaries.

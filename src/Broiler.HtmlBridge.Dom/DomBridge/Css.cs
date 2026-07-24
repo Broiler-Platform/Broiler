@@ -58,7 +58,7 @@ public sealed partial class DomBridge
     // were removed here (Milestone 1.1). They had no production callers; consumers
     // use the shared Broiler.CSS parser (`CssParser` / `CssStyleRule` /
     // `CssDeclarationBlock.GetPropertyValue`) and `CssSelectorParser.CalculateSpecificity`
-    // directly. See docs/architecture/htmlbridge-engine-boundaries.md.
+    // directly. See docs/architecture/htmlbridge.md#canonical-owners-and-bridge-responsibilities.
 
     /// <summary>
     /// Clears any CSS-derived compatibility values left in the element's inline style

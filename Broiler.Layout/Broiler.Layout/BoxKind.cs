@@ -5,7 +5,7 @@ namespace Broiler.Layout;
 /// during style resolution. Layout code uses this enum instead of checking
 /// tag names directly, decoupling layout from the DOM. Relocated from the
 /// renderer's IR into <c>Broiler.Layout</c> with the layout code (see
-/// <c>docs/roadmap/broiler-layout-component.md</c> §2.1).
+/// <c>Broiler.Layout/docs/roadmap.md</c>).
 /// </summary>
 public enum BoxKind
 {

@@ -11,7 +11,7 @@ namespace Broiler.Layout;
 /// <remarks>
 /// This is the single seam that replaces layout's current direct use of
 /// <c>RGraphics</c>, <c>RFont</c>, <c>RImage</c> and <c>IHtmlContainerInt</c>
-/// (see <c>docs/roadmap/broiler-layout-component.md</c> §4). It deliberately
+/// (see <c>Broiler.Layout/docs/roadmap.md</c>). It deliberately
 /// exposes a narrow layout-metrics surface rather than the full renderer
 /// adapter/container, and uses only BCL geometry primitives so
 /// <c>Broiler.Layout</c> stays free of any graphics backend.

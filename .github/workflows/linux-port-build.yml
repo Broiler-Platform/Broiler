@@ -12,7 +12,7 @@ on:
       - 'src/Broiler.Browser.Linux/**'
       - 'src/Broiler.Writer/**'
       - 'src/Broiler.Writer.Linux/**'
-      - 'docs/roadmap/linux-*.md'
+      - 'docs/ROADMAP.md'
   push:
     branches:
       - main
@@ -25,7 +25,7 @@ on:
       - 'src/Broiler.Browser.Linux/**'
       - 'src/Broiler.Writer/**'
       - 'src/Broiler.Writer.Linux/**'
-      - 'docs/roadmap/linux-*.md'
+      - 'docs/ROADMAP.md'
 
 env:
   DOTNET_NOLOGO: 'true'

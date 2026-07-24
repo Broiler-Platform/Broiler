@@ -1,6 +1,6 @@
 # Broiler.Documents.Markdown Conformance
 
-Status: Phase 6 Markdown codec, delivered 2026-07-07.
+Status: Delivered 2026-07-07.
 
 `Broiler.Documents.Markdown` maps a CommonMark-oriented subset through the same
 `DocumentCodec` contract as RTF and HTML. It has no DOM, UI, OS, or third-party

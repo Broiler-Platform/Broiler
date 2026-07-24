@@ -1,7 +1,7 @@
 name: NuGet Packages
 
 # Packs the Broiler component libraries into NuGet packages and (on a release
-# tag) publishes them. See docs/roadmap/nuget-packaging-roadmap.md.
+# tag) publishes them. See docs/ROADMAP.md#release-and-distribution.
 #
 #   * Any push / manual run  -> pack + upload artifact (no publish).
 #   * Tag  nuget-v*          -> pack, then publish to GitHub Packages (preview

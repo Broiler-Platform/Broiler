@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 
-Status: Accepted for Phase 1 scaffolding; must be validated before Phase 6
+Status: Accepted; validated by the Media Foundation session implementation
 
 ## Context
 
@@ -44,6 +44,6 @@ for the initial Windows implementation.
   windowing backend.
 - Windows-only code is isolated to the Media Foundation implementation project.
 - Abstraction assemblies remain HWND-free and Media-Foundation-free.
-- Phase 6 tests must cover resize, teardown, target destruction, cancellation,
-  callback disconnection, and use-after-destroy prevention.
+- Media Foundation session tests cover resize, teardown, target destruction,
+  cancellation, callback disconnection, and use-after-destroy prevention.
 

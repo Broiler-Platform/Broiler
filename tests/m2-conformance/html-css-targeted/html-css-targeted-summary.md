@@ -1,9 +1,9 @@
 # HTML/CSS targeted conformance
 
-This file is the focused **Milestone 2 / W4** HTML/CSS signal of record for
-the engines standards roadmap. It keeps the targeted HTML/CSS compliance gate
-small, reproducible, and tied directly to the roadmap work that closed the
-highest-value WPT, Acid, selector, and real-page parity slices.
+This file is a focused HTML/CSS conformance signal. It keeps the targeted gate
+small and reproducible while broader standards and test-infrastructure work is
+tracked in the
+[root roadmap](../../../docs/ROADMAP.md#standards-and-test-infrastructure).
 
 ## Current published result
 
@@ -26,15 +26,12 @@ highest-value WPT, Acid, selector, and real-page parity slices.
 - `Broiler.Cli.Tests.Acid3CssSelectorRegressionTests`
 - `Broiler.Cli.Tests.SelectorsLevel4SpecificityTests`
 
-These suites cover the W4 deliverables called out by the roadmap:
-
-- the WPT-derived CSS/custom-property and selector slices from
-  [`docs/roadmap/wpt-failure-triage.md`](../../../docs/roadmap/wpt-failure-triage.md)
-- the focused Acid3 and selector regressions tied to
-  [`docs/roadmap/acid3-compliance.md`](../../../docs/roadmap/acid3-compliance.md)
-  and [`docs/roadmap/acid-test-triage.md`](../../../docs/roadmap/acid-test-triage.md)
-- the real-page Google Search parity sanity gate from
-  [`docs/roadmap/google-search-compliance.md`](../../../docs/roadmap/google-search-compliance.md)
+These suites cover WPT-derived CSS/custom-property and selector slices,
+focused Acid3 regressions, and a Google Search real-page parity sanity gate.
+Open engine-specific work belongs in the
+[CSS](../../../Broiler.CSS/docs/roadmap.md),
+[HTML](../../../Broiler.HTML/docs/roadmap.md), or
+[layout](../../../Broiler.Layout/docs/roadmap.md) roadmap.
 
 ## Reproducing the signal
 

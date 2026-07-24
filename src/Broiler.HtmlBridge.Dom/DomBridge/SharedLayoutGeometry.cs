@@ -24,7 +24,7 @@ public sealed partial class DomBridge
     // LayoutMetrics estimators that this flag used to gate a fallback to are deleted, so the
     // flag is now vestigial (retained only because the cutover tests still reference it) and
     // toggling it no longer changes behaviour.
-    // See docs/roadmap/htmlbridge-blocked-items-completion-roadmap.md milestone 2.4.
+    // See docs/architecture/htmlbridge.md#layout-and-geometry.
     internal static bool UseSharedGeometryExclusively = true;
 
     // Phase 1 (project-graph repair): the concrete renderer-backed layout view

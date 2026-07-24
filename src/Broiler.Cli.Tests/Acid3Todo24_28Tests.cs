@@ -3,7 +3,8 @@ using Broiler.HTML.Image;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Tests for Acid3 compliance TODOs 24–28 from docs/roadmap/acid3-compliance.md §11.5.
+/// Regression tests for completed Acid3 compliance items 24–28. Current
+/// standards work is tracked in docs/ROADMAP.md#standards-and-test-infrastructure.
 /// </summary>
 public class Acid3Todo24_28Tests
 {

@@ -62,14 +62,9 @@ security-critical, or safety-critical use.
 - Each license supplies the covered software on an “AS IS” basis, without warranties or
   conditions.
 
-Current implementation and compliance work is tracked in the
-[public-preview roadmap](docs/roadmap/public-preview-roadmap.md),
-[application installation and update roadmap](docs/roadmap/application-installation-and-update-roadmap.md),
-[engine standards roadmap](docs/roadmap/engines-standards-and-performance-roadmap.md),
-[refactor gap register](docs/roadmap/refactor-gap.md),
-[DOM plan](docs/roadmap/broiler-dom-component.md),
-[CSS plan](docs/roadmap/broiler-css-component.md), and
-[layout plan](docs/roadmap/broiler-layout-component.md).
+Current cross-repository work is tracked in the
+[root roadmap](docs/ROADMAP.md). The [documentation index](docs/README.md)
+links the current architecture notes and component-owned roadmaps.
 
 ## Human review status
 
@@ -186,7 +181,8 @@ Platform-specific backends ship as their own packages (`*.Windows`, `*.Linux`,
 `Broiler.Media.Video.MediaFoundation`).
 
 Packaging is built from a single vendored `eng/Broiler.Packaging.props` per
-component; see [docs/roadmap/nuget-packaging-roadmap.md](docs/roadmap/nuget-packaging-roadmap.md)
+component; see the
+[release and distribution roadmap](docs/ROADMAP.md#release-and-distribution)
 and [CHANGELOG.md](CHANGELOG.md). Public release is gated on the per-component
 `HUMAN_REVIEW.md` records.
 

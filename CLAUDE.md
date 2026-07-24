@@ -8,9 +8,10 @@ workflow changes.
 This container's repo baseline is snapshotted when the environment is
 provisioned, and `main` here is **force-rewritten** as each change lands (its
 history churns rather than growing linearly). So a freshly-designated task
-branch can be based on a commit `main` no longer contains — files it added (the
-`docs/roadmap/*` files, prior work) are then **missing locally**, and a doc the
-task references will look like it "doesn't exist." The `SessionStart` hook warns
+branch can be based on a commit `main` no longer contains — files it added
+(including current roadmap or component documentation) are then **missing
+locally**, and a doc the task references will look like it "doesn't exist."
+The `SessionStart` hook warns
 when it detects this (a `war:` line: HEAD has *diverged* from `origin/main`).
 
 Before starting work, reconcile — and let what the branch carries decide how:
@@ -100,8 +101,9 @@ something to attempt from inside the container.
 - WPT runner: `dotnet run --project src/Broiler.Wpt -- --wpt-dir tests/wpt
   --reference-dir tests/wpt/references [--subset <path>] [--failure-images <dir>]`.
   Pixel pass threshold is 99% match (≤1% differing pixels).
-- WPT triage status and per-cluster history:
-  `docs/roadmap/wpt-triage-and-diagnostics.md`.
+- Current cross-component WPT work:
+  `docs/ROADMAP.md#standards-and-test-infrastructure`. Generated results live
+  under `tests/html/wpt-results` and `tests/css/wpt-results`.
 - Some `Broiler.Cli.Tests` (PDF conversion) and some `Wpt_*_MatchesReference`
   tests can fail in a bare container for environmental reasons (missing
   `Broiler.Pdf` app, font differences) — baseline before attributing a failure

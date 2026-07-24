@@ -33,7 +33,7 @@ internal static class Program
     {
         bool verify = args.Any(static argument => string.Equals(argument, "--verify", StringComparison.Ordinal));
         string baselineDirectory = ReadOption(args, "--baseline-dir") ??
-            Path.Combine(FindRepositoryRoot(), "docs", "testing", "baselines", "browser-webassembly-phase0");
+            Path.Combine(FindRepositoryRoot(), "tests", "browser-wasm-phase0", "baselines");
 
         GeneratedBaseline generated = GenerateBaseline();
         if (verify)

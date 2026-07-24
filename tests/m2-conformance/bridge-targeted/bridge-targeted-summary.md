@@ -1,9 +1,10 @@
 # Bridge DOM/Web targeted conformance
 
-This file is the focused **Milestone 2 / W5** `Broiler.HtmlBridge` signal of
-record for the engines standards roadmap. It keeps the targeted Bridge
-DOM/event/CSSOM/microtask gate small, reproducible, and tied directly to the
-roadmap work that closed the remaining M2 HtmlBridge compliance gaps.
+This file is a focused `Broiler.HtmlBridge` conformance signal. It keeps the
+DOM/event/CSSOM/microtask gate small and reproducible. Current ownership and
+remaining integration work are documented in the
+[HtmlBridge architecture](../../../docs/architecture/htmlbridge.md) and
+[root roadmap](../../../docs/ROADMAP.md#htmlbridge-runtime).
 
 ## Current published result
 
@@ -26,11 +27,9 @@ roadmap work that closed the remaining M2 HtmlBridge compliance gaps.
 - `Broiler.Cli.Tests.ScriptEngineExecuteTests.ScriptEngine_Execute_Runs_Microtasks_Between_Deferred_Scripts`
 - `Broiler.Cli.Tests.ScriptEngineExecuteTests.InteractiveSession_Step_Runs_Microtasks_Between_Timer_Tasks`
 
-These suites cover the W5 deliverables called out by the roadmap:
+These suites cover:
 
-- DOM event dispatch auditing from
-  [`docs/roadmap/engines-standards-and-performance-roadmap.md`](../../../docs/roadmap/engines-standards-and-performance-roadmap.md)
-  section 7.3 (`capture` / target / bubble, `composedPath()`, passive
+- DOM event dispatch (`capture` / target / bubble, `composedPath()`, passive
   listeners, legacy aliases, modern constructors, and edge-case dispatch)
 - CSSOM and `getComputedStyle()` compliance slices exercised by
   `SelectorsAndCssomTests`

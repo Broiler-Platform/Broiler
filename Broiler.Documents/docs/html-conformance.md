@@ -1,6 +1,6 @@
 # Broiler.Documents.Html Conformance
 
-Status: Phase 6 first HTML codec, delivered 2026-07-07.
+Status: Delivered 2026-07-07.
 
 `Broiler.Documents.Html` maps HTML documents or fragments through the same
 `DocumentCodec` contract as RTF. It uses `Broiler.Dom.Html.HtmlDocumentParser`
@@ -71,4 +71,5 @@ serialized from the model.
 - Relative links are currently dropped; only absolute `http`, `https`, and
   `mailto` links are retained.
 - Writer output is semantic model HTML, not a preservation of source markup.
-- Markdown and DOCX codecs remain future scope.
+- Markdown and DOCX are implemented as peer codecs. Their format-specific
+  coverage is documented separately; this HTML codec does not delegate to them.

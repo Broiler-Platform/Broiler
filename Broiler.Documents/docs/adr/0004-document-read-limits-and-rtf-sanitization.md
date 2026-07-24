@@ -3,6 +3,11 @@
 **Status:** Accepted for Phase 1 scaffolding; revisit before API freeze
 **Date:** 2026-07-05
 
+> **Implementation note:** The default skip policy is implemented. The public
+> `DecodeEmbeddedObjects` option is not yet connected to an image-import path;
+> resolving or removing that misleading option is tracked in
+> [the current roadmap](../roadmap.md).
+
 ## Context
 
 RTF is a historically heavy exploit and denial-of-service surface: deeply nested

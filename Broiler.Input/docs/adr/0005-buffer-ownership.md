@@ -3,6 +3,10 @@
 **Status:** Approved for Phase 1  
 **Date:** 2026-07-02
 
+> **Implementation update:** Camera frames and microphone packets are copied
+> into disposable owned leases before delivery. See [camera.md](../camera.md)
+> and [microphone.md](../microphone.md).
+
 ## Context
 
 Keyboard and mouse events are small value payloads. Camera frames and microphone

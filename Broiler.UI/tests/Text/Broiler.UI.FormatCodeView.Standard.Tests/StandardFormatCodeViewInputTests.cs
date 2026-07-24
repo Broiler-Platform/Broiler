@@ -1,4 +1,5 @@
 using Broiler.Graphics;
+using Broiler.Input;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Text;
 
@@ -54,6 +55,75 @@ public sealed class StandardFormatCodeViewInputTests
         Assert.Equal(FormatCodeProperty.Bold, edit?.Token?.EditDescriptor?.Property);
         Assert.IsType<ApplyFormatCodeInlineIntent>(edit?.Intent);
     }
+
+    [Fact]
+    public void Backspace_Windows_Text_Event_Does_Not_Insert_U0008()
+    {
+        using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
+            new BSize(320, 100),
+            FormatCodeViewStandardHarness.Project("ab"));
+        scene.View.IsEditable = true;
+        scene.Session.SetFocus(scene.View);
+        scene.View.SetSelection(2, 2);
+        var edits = new List<FormatCodeEditRequestedEventArgs>();
+        scene.View.EditRequested += (_, args) => edits.Add(args);
+
+        Assert.True(scene.Route.Dispatch(FormatCodeViewStandardHarness.Key(
+            "Backspace", BVirtualKey.Back)));
+        Assert.False(scene.Route.Dispatch(new TextInputEvent(
+            FormatCodeViewStandardHarness.Header("wm-char"),
+            "\b",
+            InputEventSource.Synthetic)));
+
+        ReplaceFormatCodeTextIntent edit = Assert.IsType<ReplaceFormatCodeTextIntent>(
+            Assert.Single(edits).Intent);
+        Assert.Empty(edit.Text);
+    }
+
+    [Fact]
+    public void Committed_Text_Filters_Control_Characters()
+    {
+        using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
+            new BSize(320, 100),
+            FormatCodeViewStandardHarness.Project("ab"));
+        scene.View.IsEditable = true;
+        scene.Session.SetFocus(scene.View);
+        scene.View.SetSelection(1, 1);
+        FormatCodeEditRequestedEventArgs? edit = null;
+        scene.View.EditRequested += (_, args) => edit = args;
+
+        Assert.True(scene.Route.Dispatch(new TextInputEvent(
+            FormatCodeViewStandardHarness.Header("text"),
+            "x\b\ty\r\n",
+            InputEventSource.Synthetic)));
+
+        ReplaceFormatCodeTextIntent intent = Assert.IsType<ReplaceFormatCodeTextIntent>(
+            edit?.Intent);
+        Assert.Equal("xy", intent.Text);
+    }
+
+    [Fact]
+    public void Committed_Ime_Text_Filters_Control_Characters()
+    {
+        using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
+            new BSize(320, 100),
+            FormatCodeViewStandardHarness.Project("ab"));
+        scene.View.IsEditable = true;
+        scene.Session.SetFocus(scene.View);
+        scene.View.SetSelection(1, 1);
+        FormatCodeEditRequestedEventArgs? edit = null;
+        scene.View.EditRequested += (_, args) => edit = args;
+
+        Assert.True(scene.Route.Dispatch(new TextCompositionEvent(
+            FormatCodeViewStandardHarness.Header("ime"),
+            "x\by",
+            TextCompositionState.Committed)));
+
+        ReplaceFormatCodeTextIntent intent = Assert.IsType<ReplaceFormatCodeTextIntent>(
+            edit?.Intent);
+        Assert.Equal("xy", intent.Text);
+    }
+
     [Fact]
     public void Pointer_Click_Requests_Typed_Navigation_And_Drag_Selects()
     {

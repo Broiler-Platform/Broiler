@@ -3,6 +3,12 @@
 **Status:** Approved for RichEdit Phase 1  
 **Date:** 2026-07-04
 
+> **Placement update:** ADR 0018 moved the document model to
+> `Broiler.Documents.Model` and HTML interchange to
+> `Broiler.Documents.Html`. The shipped rich clipboard integration is the
+> optional `Broiler.UI.RichEdit.Rtf` adapter; core RichEdit remains codec- and
+> DOM-free.
+
 ## Context
 
 RichEdit must support copy/cut/paste with a guaranteed plain-text path and an

@@ -15,8 +15,8 @@
 
 ## Context
 
-The RichEdit roadmap (`docs/roadmap/broiler-ui-rich-edit-control.md`) proposes a
-formatted, multi-paragraph editor as a control family distinct from `UiEdit`.
+The RichEdit proposal established a formatted, multi-paragraph editor as a
+control family distinct from `UiEdit`.
 Before any kernel code is written, Phase 0 must fix the name, the public classes,
 the assembly set, the dependency direction, whether `Broiler.DOM` may be
 referenced by core UI assemblies, and where simple multi-line plain text belongs.

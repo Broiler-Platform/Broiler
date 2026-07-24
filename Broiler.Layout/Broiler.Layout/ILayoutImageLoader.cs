@@ -7,7 +7,7 @@ namespace Broiler.Layout;
 /// <see cref="ILayoutEnvironment.CreateImageLoader"/>; the loaded image is an
 /// opaque handle (<see cref="Image"/>) the host understands. Lets layout request
 /// image loading and read intrinsic geometry without binding to a graphics
-/// backend (see <c>docs/roadmap/broiler-layout-component.md</c> §2.2, §4).
+/// backend (see <c>Broiler.Layout/docs/roadmap.md</c>).
 /// </summary>
 public interface ILayoutImageLoader : IDisposable
 {

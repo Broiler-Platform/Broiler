@@ -8,7 +8,7 @@ namespace Broiler.Layout.Engine;
 /// in-flow-sibling resolution, inline-content and whitespace checks). Split out
 /// of <c>DomUtils</c> — which also holds renderer-only serialization — so this
 /// pure <see cref="CssBox"/>-tree logic can travel with the layout code into
-/// <c>Broiler.Layout</c> (see <c>docs/roadmap/broiler-layout-component.md</c> §2.1).
+/// <c>Broiler.Layout</c> (see <c>Broiler.Layout/docs/roadmap.md</c>).
 /// </summary>
 internal static class LayoutBoxUtils
 {

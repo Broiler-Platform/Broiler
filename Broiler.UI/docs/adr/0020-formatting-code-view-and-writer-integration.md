@@ -83,6 +83,7 @@ tracked independently and does not block the read-only semantic projector.
 
 ## Follow-up
 
-Phase 2 must add render-list, hit-test, keyboard, accessibility, and
-desktop/WebAssembly integration tests. The Writer release checklist must verify
-that toggling the pane preserves document identity and undo/redo history.
+Implemented for the shipped structured editor: render-list, hit-test, keyboard,
+accessibility, desktop/WebAssembly integration, and document/undo preservation
+tests exist. Advanced textual source editing remains an explicit roadmap
+go/no-go decision.

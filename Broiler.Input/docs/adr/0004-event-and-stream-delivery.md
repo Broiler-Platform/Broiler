@@ -3,6 +3,10 @@
 **Status:** Approved for Phase 1  
 **Date:** 2026-07-02
 
+> **Implementation update:** Camera and microphone now use bounded delivery with
+> owned disposable leases. Their current contracts are documented in
+> [camera.md](../camera.md) and [microphone.md](../microphone.md).
+
 ## Context
 
 Discrete devices such as keyboards and mice have small ordered transitions.

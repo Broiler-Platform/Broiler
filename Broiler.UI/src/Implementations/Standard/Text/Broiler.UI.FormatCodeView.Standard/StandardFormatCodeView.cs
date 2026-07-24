@@ -175,7 +175,7 @@ public sealed class StandardFormatCodeView : UiFormatCodeView, IStandardThemedCo
             UiInputEventKind.PointerButton => HandlePointerButton(input),
             UiInputEventKind.PointerMove => HandlePointerMove(input),
             UiInputEventKind.PointerWheel => HandleWheel(input),
-            UiInputEventKind.TextInput => RequestTextReplacement(input.Text ?? string.Empty),
+            UiInputEventKind.TextInput => InsertCommittedText(input.Text ?? string.Empty),
             UiInputEventKind.TextComposition => HandleTextComposition(input),
             UiInputEventKind.KeyboardKey => HandleKeyboard(input),
             _ => false,
@@ -301,7 +301,13 @@ public sealed class StandardFormatCodeView : UiFormatCodeView, IStandardThemedCo
         _compositionText = string.Empty;
         Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
         return state != TextCompositionState.Committed ||
-            RequestTextReplacement(input.Text ?? string.Empty);
+            InsertCommittedText(input.Text ?? string.Empty);
+    }
+
+    private bool InsertCommittedText(string text)
+    {
+        text = SanitizeCommittedText(text);
+        return text.Length > 0 && RequestTextReplacement(text);
     }
 
     private void DrawPendingTokens(BRenderList list)
@@ -922,6 +928,21 @@ public sealed class StandardFormatCodeView : UiFormatCodeView, IStandardThemedCo
         input.NativeKeyCode == nativeKeyCode ||
         string.Equals(input.KeyName, name, StringComparison.OrdinalIgnoreCase) ||
         string.Equals(input.KeyName, "VirtualKey:" + nativeKeyCode.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+
+    private static string SanitizeCommittedText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        var builder = new System.Text.StringBuilder(text.Length);
+        foreach (char character in text)
+        {
+            if (!char.IsControl(character))
+                builder.Append(character);
+        }
+
+        return builder.ToString();
+    }
 
     private static double ClampDesired(double desired, double available) =>
         double.IsInfinity(available) ? desired : Math.Min(desired, Math.Max(0, available));

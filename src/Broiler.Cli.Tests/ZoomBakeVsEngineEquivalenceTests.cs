@@ -19,8 +19,8 @@ namespace Broiler.Cli.Tests;
 /// mis-scaled (e.g. <c>width:50%</c> of a 200px CB under <c>zoom:2</c> is <c>offsetWidth</c> 100, not the
 /// bake's 50): the <c>*_ReadIsEngineUsedValue</c> cases pin the exact value.</item>
 /// </list>
-/// (The render-side bake still runs for capture/WPT serialization; deleting it is the separate render-flip,
-/// gated on render-side validation — see <c>docs/roadmap/zoom-native-cutover.md</c>.)
+/// (The render-side bake still runs for capture/WPT serialization; deleting it is a separate
+/// render flip gated by <c>docs/ROADMAP.md#htmlbridge-runtime</c>.)
 /// </summary>
 [Xunit.Collection("SharedGeometryStatics")]
 public sealed class ZoomBakeVsEngineEquivalenceTests

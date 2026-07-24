@@ -4,9 +4,8 @@ using System.Text;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Shared helpers for the HtmlBridge complexity-reduction Phase 0 (P0.2) architecture
-/// and public-API-surface guards. See
-/// <c>docs/roadmap/htmlbridge-complexity-reduction-roadmap.md</c>.
+/// Shared helpers for HtmlBridge architecture and public-API-surface guards.
+/// See <c>docs/architecture/htmlbridge.md#dependency-and-ownership-rules</c>.
 /// </summary>
 internal static class RepoPaths
 {

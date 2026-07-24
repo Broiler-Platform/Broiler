@@ -1,17 +1,11 @@
 # Broiler.UI ADR Index
 
-ADRs 0001-0012 close the Phase 0 requirement from
-`docs/roadmap/broiler-ui-component.md` section 20. ADRs 0013-0017 close the
-Phase 0 ("Charter and ADRs") requirement from
-`docs/roadmap/broiler-ui-rich-edit-control.md` section 9 for the RichEdit control
-family. ADR 0018 records the RichEdit document-model promotion for the
-`Broiler.Documents` component (`docs/roadmap/broiler-documents-component.md`),
-superseding the model *placement* in ADRs 0013 and 0014. ADR 0019 records the
-approved filesystem taxonomy for the Broiler.UI directory-structure refactor.
-ADR 0020 freezes the control-family and Writer-integration decisions for the
-public Formatting Codes roadmap.
-All are approved for their respective Phase 1 scaffolding and may be superseded
-only by later ADRs.
+These records define the core UI architecture, RichEdit family, document-model
+promotion, filesystem topology, and Formatting Codes view. ADR 0018 supersedes
+the model *placement* in ADRs 0013 and 0014; their remaining design decisions
+still apply. Accepted and partially superseded records are retained for
+traceability. Current follow-up work is in
+[the component roadmap](../roadmap.md).
 
 | ADR | Topic |
 |---|---|

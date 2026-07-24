@@ -5,8 +5,8 @@
 
 ## Context
 
-The document-formats roadmap (`docs/roadmap/broiler-documents-component.md`)
-proposes reading and writing rich-text interchange formats — RTF first, then
+The document-formats proposal that established this component covers reading and
+writing rich-text interchange formats — RTF first, then
 HTML/Markdown/DOCX — in Broiler. A document format is not new *data*: its decoded
 form is the rich-text document model that RichEdit Phases 1-4 already built
 (`RichTextDocument`, `RichTextParagraph`, `InlineStyle`, `ParagraphStyle`,

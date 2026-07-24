@@ -1,8 +1,10 @@
 # Broiler.Input ADR Index
 
-These ADRs close the Phase 0 requirement from
-`docs/roadmap/broiler-input-component.md` section 15 for the Windows
-keyboard/mouse-first component slice.
+These records define the component topology and the initial Windows
+keyboard/mouse contracts. Later camera, microphone, and Linux implementations
+preserve the same dependency direction. Initial decisions remain for
+traceability; current follow-up work is in
+[the component roadmap](../roadmap.md).
 
 | ADR | Topic |
 |---|---|

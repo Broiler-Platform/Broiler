@@ -5,9 +5,8 @@ using Broiler.HtmlBridge.Dom;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Phase 0 ("Lock the boundary and baseline") of the HtmlBridge DOM/CSS
-/// promotion roadmap
-/// (<c>docs/roadmap/htmlbridge-dom-css-promotion-roadmap.md</c>).
+/// Guards the HtmlBridge DOM/CSS ownership boundary described in
+/// <c>docs/architecture/htmlbridge.md#canonical-owners-and-bridge-responsibilities</c>.
 ///
 /// These tests freeze the remaining allowed <c>Broiler.HtmlBridge</c>
 /// compatibility seams and guard the canonical DOM/CSS components against
@@ -16,8 +15,8 @@ namespace Broiler.Cli.Tests;
 /// the promotion PR slices land.
 ///
 /// The intended removal boundary for every seam below is
-/// <c>htmlbridge-public-surface/v2</c>; see the architecture note
-/// <c>docs/architecture/htmlbridge-engine-boundaries.md</c> for the seam
+/// <c>htmlbridge-public-surface/v2</c>; see
+/// <c>docs/architecture/htmlbridge.md#public-v2-seam</c> for the seam
 /// inventory, caller catalog, and ownership rationale.
 /// </summary>
 public sealed class HtmlBridgePromotionPhaseZeroTests

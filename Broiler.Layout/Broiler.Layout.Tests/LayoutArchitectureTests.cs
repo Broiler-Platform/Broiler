@@ -5,7 +5,7 @@ namespace Broiler.Layout.Tests;
 
 /// <summary>
 /// Freezes the <c>Broiler.Layout</c> dependency boundary for the layout extraction
-/// (see <c>docs/roadmap/broiler-layout-component.md</c> §3, §7). The component may
+/// (see <c>Broiler.Layout/docs/roadmap.md</c>). The component may
 /// reference only <c>Broiler.CSS</c>, <c>Broiler.CSS.Dom</c>, <c>Broiler.Dom</c>,
 /// the backend-agnostic <c>Broiler.Graphics</c> primitive layer (color/font
 /// metrics — <c>BColor</c>, <c>ILayoutFont</c>; no concrete rasterizer), and the

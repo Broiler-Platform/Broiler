@@ -48,9 +48,9 @@ and reference no implementation, no Graphics/HTML, and no native/Media Foundatio
 | Audio | RIFF/WAVE PCM | ✅ | — | streaming; 8/16/24/32-bit PCM + IEEE float | `.Audio.Managed` |
 | Video | MP4 (H.264/AAC) | ✅ | — | Windows-only, direct `IMFMediaEngine` presentation to an HWND | `.Video.MediaFoundation` |
 
-GIF/WebP encode, additional audio codecs (MP3/AAC/Vorbis/Opus/FLAC), and non-Media-Foundation
-video providers are future work; the stack reports a deterministic capability error for
-formats it does not support rather than a misleading placeholder.
+Additional audio codecs (MP3/AAC/Vorbis/Opus/FLAC) and non-Media-Foundation
+video providers are future work; the stack reports a deterministic capability
+error for formats it does not support rather than a misleading placeholder.
 
 ## Selecting and using a codec
 
@@ -83,8 +83,9 @@ image/video dimensions and pixel/frame counts, audio channels/sample-rate/durati
 and time, queued/decoded memory) and use checked arithmetic for dimensions, strides, and
 allocation sizes. Malformed data produces a bounded `MediaException` carrying a `MediaError`
 (codec id and byte offset where safe) — never unbounded allocation, hangs, silent partial
-success, or arbitrary exception leakage. See [ADR 0002](docs/adr/0002-buffer-ownership-and-limits.md)
-for buffer ownership and limits, and the roadmap's security section for the full list.
+success, or arbitrary exception leakage. See
+[ADR 0002](docs/adr/0002-buffer-ownership-and-limits.md) for buffer ownership
+and limits.
 
 ## Packaging
 
@@ -96,12 +97,5 @@ platform-neutral.
 
 ## Design records
 
-- [Phase 0 Record](docs/phase-0.md) · [Graphics Image API Inventory](docs/api/graphics-image-api-inventory.md) · [Image Baseline Record](docs/baselines/image-baseline-record.md)
-- ADRs: [0001 Topology & consumption](docs/adr/0001-component-topology-and-consumption-policy.md) ·
-  [0002 Buffer ownership & limits](docs/adr/0002-buffer-ownership-and-limits.md) ·
-  [0003 Image pixel & alpha format](docs/adr/0003-image-pixel-and-alpha-format.md) ·
-  [0004 Compatibility window](docs/adr/0004-compatibility-window.md) ·
-  [0005 Windows Media Foundation borrowed HWND](docs/adr/0005-windows-media-foundation-borrowed-hwnd.md)
-
-The full component plan and phase-by-phase status live in
-[`docs/roadmap/broiler-media-component.md`](../docs/roadmap/broiler-media-component.md).
+- [Current roadmap](docs/roadmap.md)
+- [ADR index](docs/adr/README.md)

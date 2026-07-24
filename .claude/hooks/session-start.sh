@@ -134,7 +134,7 @@ check_branch_base() {
   log "war: this branch has DIVERGED from the latest origin/main — its base is"
   log "     not in main's current history. origin/main was likely force-rewritten"
   log "     after this container was provisioned, so files/work it added (e.g."
-  log "     docs/roadmap/*) may be MISSING here. Reconcile before working:"
+  log "     current documentation) may be MISSING here. Reconcile before working:"
   log "       git fetch origin main"
   log "     then, if this branch has no commits of its own beyond the shared base"
   log "     (${base}), recreate it from main keeping the name:"

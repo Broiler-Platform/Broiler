@@ -9,7 +9,7 @@
     <RootNamespace>Broiler.Input.Contract.Tests</RootNamespace>
     <AssemblyName>Broiler.Input.Contract.Tests</AssemblyName>
     <IsPackable>false</IsPackable>
-    <Description>Package-free contract test runner for Broiler.Input Phase 1.</Description>
+    <Description>Package-free contract test runner for Broiler.Input.</Description>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -33,7 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\docs\phase1\api-baseline.txt" Link="api-baseline.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\docs\api-baseline.txt" Link="api-baseline.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

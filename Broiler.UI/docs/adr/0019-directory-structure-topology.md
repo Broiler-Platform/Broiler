@@ -3,6 +3,9 @@
 **Status:** Approved for directory-refactor Phase 1  
 **Date:** 2026-07-09
 
+> **Implementation update:** The approved `src/`, `tests/`, `samples/`, `docs/`,
+> and `eng/` topology is implemented and enforced by `UiTopologyTests`.
+
 ## Context
 
 The `Broiler.UI` component now contains the root runtime, shared Standard
@@ -89,7 +92,6 @@ families.
 
 ## Follow-up
 
-Phase 1 may reorganize solution folders without moving projects. Later phases
-may move runtime projects, tests, and samples in separate path-only changes.
-After the filesystem move is stable, topology validation should make misplaced
-new projects fail in CI.
+Completed: solution folders and project directories use the approved topology,
+and topology validation rejects misplaced projects and invalid dependency
+direction.

@@ -3,9 +3,9 @@ using Broiler.HTML.Image;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Acid3 CSS compliance tests — targeted CSS unit tests for properties
-/// and features used by the Acid3 test suite, as recommended in
-/// docs/roadmap/acid3-compliance.md §6.2.
+/// Acid3 CSS compliance tests — targeted CSS unit tests for properties and
+/// features used by the Acid3 test suite. Current cross-component standards
+/// work is tracked in docs/ROADMAP.md#standards-and-test-infrastructure.
 /// </summary>
 public class Acid3CssComplianceTests
 {
@@ -891,7 +891,7 @@ document.getElementById('result').textContent = 'words=' + words;
 
     // ═══════════════════════════════════════════════════════════════════════
     // New tests for remaining Acid3 compliance TODO items
-    // Ref: docs/roadmap/acid3-compliance.md §5 Prioritized TODO List
+    // Retained regression from the completed Acid3 compliance campaign.
     // ═══════════════════════════════════════════════════════════════════════
 
     // ────────────── CSS Error Recovery (CSS2.1 §4.1.8) ──────────────
