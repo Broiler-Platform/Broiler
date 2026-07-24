@@ -14,10 +14,14 @@ own ``wpt-results.json``. This script combines those shard reports to produce:
 * ``--biggest-issue-md`` — a Markdown body for a *second*, severity-focused
   issue that lists only the run's few biggest problems, ranked by blast radius:
   incomplete shards first (a whole slice went unmeasured), then crashes (one bug
-  gating many tests), then the worst pixel mismatches. Each crash names an example
-  gated test and the issue spells out the ``--render`` command to reproduce a
-  listed test, so every entry points at its cause. This is the "what hurt most
-  this run" companion to the frequency-ranked ``--issue-md`` view.
+  gating many tests), then the worst pixel mismatches. A pixel mismatch counts as
+  a "low percent match" problem only when it renders below the low-match
+  threshold (50% by default); when too few mismatches clear that bar to fill the
+  issue, the threshold is widened in 10-point steps until it does (or nothing
+  more can be found). Each crash names an example gated test and the issue spells
+  out the ``--render`` command to reproduce a listed test, so every entry points
+  at its cause. This is the "what hurt most this run" companion to the
+  frequency-ranked ``--issue-md`` view.
 
 When ``--merge-into`` names an existing manifest, the run's failures are folded
 into it *by scope* instead of replacing it: entries for tests this run actually
@@ -57,8 +61,16 @@ DEFAULT_BIGGEST_PROBLEM_LIMIT = 3
 # A pixel mismatch counts as a "low percent match" big problem only when the
 # rendered output matches the reference by less than this percentage — i.e. the
 # render is substantially wrong, not merely off by a hair (the pass threshold is
-# 99%). Runs where every mismatch is a near-miss surface no low-match problem.
+# 99%). This is only the *starting* cut-off: when too few mismatches fall below
+# it to fill the issue, it is widened (see below).
 DEFAULT_LOW_MATCH_THRESHOLD = 50.0
+# When the sub-threshold mismatches — together with the incomplete-shard and
+# crash entries — don't fill the biggest-problems issue to its limit, the
+# low-match threshold is widened by this many percentage points and the ranking
+# retried, repeating up to the ceiling. So a run whose only mismatches are near
+# misses still surfaces its worst renders instead of an empty severity issue.
+LOW_MATCH_THRESHOLD_STEP = 10.0
+LOW_MATCH_THRESHOLD_CEILING = 100.0
 
 
 def _bucket_directory(relative_path: str) -> str:
@@ -244,6 +256,54 @@ def _rank_biggest_problems(
             selected_indices.append(index)
 
     return [ordered[index] for index in sorted(selected_indices)]
+
+
+def _rank_biggest_problems_escalating(
+    incomplete_shards: list[dict],
+    exception_signatures: Counter[str],
+    exception_examples: dict[str, list[str]],
+    low_match_tests: list[dict],
+    limit: int,
+    low_match_threshold: float,
+) -> tuple[list[dict], float]:
+    """Rank the biggest problems, widening the low-match threshold until the
+    issue is full.
+
+    ``_rank_biggest_problems`` only counts a pixel mismatch as a "low percent
+    match" problem when its render matched the reference by *less than* the
+    threshold. When those sub-threshold mismatches — together with the
+    incomplete-shard and crash entries — don't reach ``limit`` biggest problems,
+    the threshold is raised by ``LOW_MATCH_THRESHOLD_STEP`` points and the ranking
+    retried, repeating until the list reaches ``limit``, the threshold hits
+    ``LOW_MATCH_THRESHOLD_CEILING``, or widening it further would admit no
+    additional mismatch (every candidate is already below the cut-off).
+
+    Returns the ranked problems and the threshold actually used, so the issue
+    text can report the real cut-off rather than the (possibly stricter) start.
+    """
+    threshold = float(low_match_threshold)
+    # The closest-matching candidate mismatch. Once the threshold clears it, a
+    # wider band would capture nothing new, so escalating past it is pointless.
+    highest_match = max(
+        (test["matchPercent"] for test in low_match_tests), default=None
+    )
+    while True:
+        problems = _rank_biggest_problems(
+            incomplete_shards,
+            exception_signatures,
+            exception_examples,
+            low_match_tests,
+            limit,
+            threshold,
+        )
+        if (
+            len(problems) >= limit
+            or threshold >= LOW_MATCH_THRESHOLD_CEILING
+            or highest_match is None
+            or threshold > highest_match
+        ):
+            return problems, threshold
+        threshold = min(threshold + LOW_MATCH_THRESHOLD_STEP, LOW_MATCH_THRESHOLD_CEILING)
 
 
 def merge(
@@ -440,7 +500,7 @@ def merge(
         key=lambda group: (-group["count"], group["family"]),
     )[:problem_limit]
 
-    biggest_problems = _rank_biggest_problems(
+    biggest_problems, effective_low_match_threshold = _rank_biggest_problems_escalating(
         incomplete_shards,
         exception_signature_counter,
         exception_examples,
@@ -466,7 +526,7 @@ def merge(
         "exceptionSignatures": exception_signature_counter.most_common(problem_limit),
         "failureFamilies": top_families,
         "biggestProblemLimit": biggest_problem_limit,
-        "lowMatchThreshold": low_match_threshold,
+        "lowMatchThreshold": effective_low_match_threshold,
         "biggestProblems": biggest_problems,
         "results": failures,
     }

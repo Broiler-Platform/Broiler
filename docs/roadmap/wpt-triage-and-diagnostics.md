@@ -1877,8 +1877,17 @@ files a **second, severity-focused issue** listing the run's few biggest problem
   - **tier 1 — crashes**, one entry per `triage.exceptionSignatures` signature,
     ordered by the number of tests it gated (one throw → many failures → one fix).
   - **tier 2 — low percent matches**, one entry per `triage.lowestMatchTests` case
-    below `--low-match-threshold` (default 50%): the render is substantially wrong,
-    not a near-miss. The 99% pass threshold means anything this low is a gross error.
+    below the low-match threshold (starting at `--low-match-threshold`, default 50%):
+    the render is substantially wrong, not a near-miss. The 99% pass threshold means
+    anything this low is a gross error.
+- **The low-match threshold widens to fill the issue** (`_rank_biggest_problems_escalating`):
+  the 50% start is only the *first* cut-off. When the sub-threshold mismatches — plus the
+  incomplete-shard and crash entries — don't reach `--biggest-problem-limit` problems, the
+  threshold is raised by 10 points and the ranking retried, repeating until the issue fills,
+  the threshold hits 100%, or a wider band would admit no further mismatch (every candidate
+  is already below the cut-off). So a run whose only failures are near-miss mismatches now
+  surfaces its worst renders instead of an empty severity issue, and the issue text reports
+  the widened cut-off actually used (`merged["lowMatchThreshold"]`).
 - **Selection is diversity-first**: the worst entry of each distinct kind is taken
   before a second slot is spent on a kind already shown, then leftover slots fill by
   next-worst overall. So the top-3 spans *incomplete shard + crash + low match* when
@@ -1887,13 +1896,18 @@ files a **second, severity-focused issue** listing the run's few biggest problem
 - **Output**: merged `biggestProblems` (`{kind, tier, severity, impact, title, detail}`)
   + `--biggest-issue-md` renders the second issue body; the CLI emits
   `create_biggest_issue` / `biggest_problem_count` step outputs. `wpt-tests.yml`'s
-  report job creates the issue only when there is at least one big problem (a run whose
-  only failures are near-miss mismatches files the primary issue but not this one). The
-  count is bounded by `--biggest-problem-limit` (workflow input `biggest_problems_limit`,
-  default 3).
+  report job creates the issue only when there is at least one big problem (a run with no
+  crash, no incomplete shard, and no pixel mismatch at all files the primary issue but not
+  this one). The count is bounded by `--biggest-problem-limit` (workflow input
+  `biggest_problems_limit`, default 3).
 - **Tests** (`test_merge_wpt_shards.py`): `test_ranks_biggest_problems_by_blast_radius`,
   `test_biggest_problems_are_diversity_first`, `test_biggest_problem_limit_bounds_the_list`,
-  `test_cli_emits_biggest_issue_outputs`, `test_no_biggest_issue_when_only_near_miss_mismatches`,
+  `test_cli_emits_biggest_issue_outputs`, `test_biggest_issue_widens_threshold_to_surface_near_miss`,
+  `test_no_biggest_issue_when_no_severity_signals`,
+  `test_low_match_threshold_widens_in_steps_until_issue_is_full`,
+  `test_low_match_threshold_not_widened_when_start_already_fills_issue`,
+  `test_low_match_threshold_stops_widening_when_nothing_left_to_find`,
+  `test_low_match_threshold_widens_to_ceiling_for_near_miss`,
   `test_cli_rejects_out_of_range_low_match_threshold`.
 
 ---

@@ -544,6 +544,88 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertEqual(2, len(merged["biggestProblems"]))
             self.assertEqual([9, 4], [p["impact"] for p in merged["biggestProblems"]])
 
+    def _low_match_report(self, root: Path, name: str, shard_index: int, matches: list[float]) -> None:
+        (root / name).write_text(
+            json.dumps(
+                {
+                    "summary": {"passed": 0, "failed": len(matches), "skipped": 0, "total": len(matches)},
+                    "shard": {"index": shard_index, "count": 8},
+                    "triage": {
+                        "lowestMatchTests": [
+                            {
+                                "testPath": f"css/a/m{i}.html",
+                                "matchPercent": match,
+                                "category": "PixelMismatch",
+                                "subCategory": "MissingContent",
+                            }
+                            for i, match in enumerate(matches)
+                        ]
+                    },
+                    "results": [self._failure(f"css/a/m{i}.html", "PixelMismatch", "MissingContent") for i in range(len(matches))],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def test_low_match_threshold_widens_in_steps_until_issue_is_full(self) -> None:
+        # Mismatches at 45/55/65%, no crashes or incomplete shards, limit 2. At the
+        # 50% start only 45% qualifies (1 < 2), so the threshold steps to 60% where
+        # 45% and 55% both qualify and the issue fills. It stops there — it does not
+        # keep climbing to grab 65%.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._low_match_report(shard_dir, "shard-0.json", 0, [45.0, 55.0, 65.0])
+
+            merged = MODULE.merge(shard_dir, biggest_problem_limit=2, low_match_threshold=50.0)
+
+            self.assertEqual(60.0, merged["lowMatchThreshold"])
+            biggest = merged["biggestProblems"]
+            self.assertEqual(2, len(biggest))
+            self.assertEqual(["LowMatch", "LowMatch"], [p["kind"] for p in biggest])
+            self.assertEqual([45.0, 55.0], sorted(p["matchPercent"] for p in biggest))
+
+            markdown = MODULE.render_biggest_problems_markdown(merged, None)
+            self.assertIn("< 60% match", markdown)
+
+    def test_low_match_threshold_not_widened_when_start_already_fills_issue(self) -> None:
+        # Two sub-50% mismatches with limit 2: the issue is already full at the
+        # start, so the threshold is left at 50% (a 70% mismatch stays hidden).
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._low_match_report(shard_dir, "shard-0.json", 0, [20.0, 30.0, 70.0])
+
+            merged = MODULE.merge(shard_dir, biggest_problem_limit=2, low_match_threshold=50.0)
+
+            self.assertEqual(50.0, merged["lowMatchThreshold"])
+            self.assertEqual(2, len(merged["biggestProblems"]))
+            self.assertEqual([20.0, 30.0], sorted(p["matchPercent"] for p in merged["biggestProblems"]))
+
+    def test_low_match_threshold_stops_widening_when_nothing_left_to_find(self) -> None:
+        # A single 30% mismatch with limit 3: the issue can never fill, but every
+        # candidate is already below the 50% start, so widening would add nothing
+        # and the threshold is left at 50% rather than climbing to the ceiling.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._low_match_report(shard_dir, "shard-0.json", 0, [30.0])
+
+            merged = MODULE.merge(shard_dir, biggest_problem_limit=3, low_match_threshold=50.0)
+
+            self.assertEqual(50.0, merged["lowMatchThreshold"])
+            self.assertEqual(1, len(merged["biggestProblems"]))
+
+    def test_low_match_threshold_widens_to_ceiling_for_near_miss(self) -> None:
+        # Only a 96% near-miss with limit 3: the threshold climbs 50→60→…→100,
+        # capping at the ceiling, and surfaces the mismatch there.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._low_match_report(shard_dir, "shard-0.json", 0, [96.0])
+
+            merged = MODULE.merge(shard_dir, biggest_problem_limit=3, low_match_threshold=50.0)
+
+            self.assertEqual(100.0, merged["lowMatchThreshold"])
+            self.assertEqual(1, len(merged["biggestProblems"]))
+            self.assertEqual("LowMatch", merged["biggestProblems"][0]["kind"])
+
     def test_cli_emits_biggest_issue_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             shard_dir = Path(temp)
@@ -585,10 +667,15 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertIn("biggest_problem_count=1", outputs)
             self.assertIn("Crash gating 7 test(s)", biggest_md.read_text(encoding="utf-8"))
 
-    def test_no_biggest_issue_when_only_near_miss_mismatches(self) -> None:
+    def test_biggest_issue_widens_threshold_to_surface_near_miss(self) -> None:
+        # Only a single near-miss mismatch (97.5%), no crash, no incomplete shard.
+        # At the 50% start it clears no bar, but the threshold is widened in
+        # 10-point steps until the mismatch surfaces, so the second issue is still
+        # filed instead of silently swallowing the run's only severe signal.
         with tempfile.TemporaryDirectory() as temp:
             shard_dir = Path(temp)
             github_output = shard_dir / "github-output.txt"
+            biggest_md = shard_dir / "biggest.md"
             (shard_dir / "shard-0.json").write_text(
                 json.dumps(
                     {
@@ -617,6 +704,8 @@ class MergeWptShardsTests(unittest.TestCase):
                     str(SCRIPT_PATH),
                     "--shard-dir",
                     temp,
+                    "--biggest-issue-md",
+                    str(biggest_md),
                     "--github-output",
                     str(github_output),
                 ],
@@ -627,7 +716,51 @@ class MergeWptShardsTests(unittest.TestCase):
 
             self.assertEqual(0, result.returncode, result.stderr)
             outputs = github_output.read_text(encoding="utf-8")
-            # No crash, no incomplete shard, only a near-miss match → no second issue.
+            # The widened threshold captures the near-miss → second issue is filed.
+            self.assertIn("create_biggest_issue=true", outputs)
+            self.assertIn("biggest_problem_count=1", outputs)
+            self.assertIn("create_issue=true", outputs)
+            # The issue text reports the widened cut-off (100%), not the 50% start.
+            markdown = biggest_md.read_text(encoding="utf-8")
+            self.assertIn("< 100% match", markdown)
+            self.assertIn("97.5% match — css/a/x.html", markdown)
+
+    def test_no_biggest_issue_when_no_severity_signals(self) -> None:
+        # A plain failure with no crash, no incomplete shard, and no pixel
+        # mismatch at all: widening the threshold has nothing to find, so no
+        # second issue is filed.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            github_output = shard_dir / "github-output.txt"
+            (shard_dir / "shard-0.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 1, "failed": 1, "skipped": 0, "total": 2},
+                        "shard": {"index": 0, "count": 8},
+                        "results": [self._failure("css/a/x.html", "RenderingError")],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self._write_status(shard_dir, shard_index=0, exit_code=1)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_PATH),
+                    "--shard-dir",
+                    temp,
+                    "--github-output",
+                    str(github_output),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            outputs = github_output.read_text(encoding="utf-8")
+            # Nothing to widen into → no second issue.
             self.assertIn("create_biggest_issue=false", outputs)
             self.assertIn("biggest_problem_count=0", outputs)
             # The run still failed, so the primary (most-common) issue is still filed.
