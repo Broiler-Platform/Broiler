@@ -7,6 +7,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.HtmlBridge.Logging;
 using Broiler.Dom;
+using Broiler.CSS;
 using System.Globalization;
 
 namespace Broiler.HtmlBridge;
@@ -46,7 +47,7 @@ public sealed partial class DomBridge
         while (normalized.Length >= 2 &&
                normalized[0] == '(' &&
                normalized[^1] == ')' &&
-               HasBalancedParens(normalized[1..^1]))
+               CssLengthParser.HasBalancedParens(normalized[1..^1]))
         {
             normalized = normalized[1..^1].Trim();
         }
@@ -162,7 +163,7 @@ public sealed partial class DomBridge
         if (StartsWithFunction(value, "calc"))
         {
             var content = value[5..^1];
-            return HasBalancedParens(content) &&
+            return CssLengthParser.HasBalancedParens(content) &&
                    TryEvaluateCssLengthWithViewport(content, referenceElement, forLineHeight, percentageBasis, out result, forFontSize);
         }
 
@@ -171,7 +172,7 @@ public sealed partial class DomBridge
 
         var isMax = StartsWithFunction(value, "max");
         var contentValue = value[4..^1];
-        if (!HasBalancedParens(contentValue))
+        if (!CssLengthParser.HasBalancedParens(contentValue))
             return false;
 
         var parts = SplitTopLevelArguments(contentValue);

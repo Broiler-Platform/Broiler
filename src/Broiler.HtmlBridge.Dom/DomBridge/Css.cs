@@ -478,7 +478,7 @@ public sealed partial class DomBridge
     {
         if (string.IsNullOrWhiteSpace(value)) return double.NaN;
 
-        var v = NormalizeSingleValueLengthFunction(value).Trim().ToLowerInvariant();
+        var v = CssLengthParser.NormalizeSingleValueLengthFunction(value).Trim().ToLowerInvariant();
         if (viewportHeight > 0 && v.EndsWith("vh"))
         {
             if (double.TryParse(v[..^2], NumberStyles.Float,
@@ -580,72 +580,6 @@ public sealed partial class DomBridge
             CultureInfo.InvariantCulture, out var raw))
             return raw;
         return double.NaN;
-    }
-
-    private static string NormalizeSingleValueLengthFunction(string value)
-    {
-        var current = value.Trim();
-        while (TryUnwrapSingleValueFunction(current, "calc", out var inner) ||
-               TryUnwrapSingleValueFunction(current, "max", out inner) ||
-               TryUnwrapSingleValueFunction(current, "min", out inner))
-        {
-            current = inner.Trim();
-        }
-
-        while (current.Length >= 2 && current[0] == '(' && current[^1] == ')' && HasBalancedParens(current[1..^1]))
-            current = current[1..^1].Trim();
-
-        return current;
-    }
-
-    private static bool TryUnwrapSingleValueFunction(string value, string functionName, out string inner)
-    {
-        inner = string.Empty;
-        if (!value.StartsWith(functionName + "(", StringComparison.OrdinalIgnoreCase) || value[^1] != ')')
-            return false;
-
-        var content = value[(functionName.Length + 1)..^1];
-        if (!HasBalancedParens(content))
-            return false;
-
-        var depth = 0;
-        foreach (var ch in content)
-        {
-            switch (ch)
-            {
-                case '(':
-                    depth++;
-                    break;
-                case ')':
-                    depth--;
-                    break;
-                case ',' when depth == 0:
-                    return false;
-            }
-        }
-
-        inner = content;
-        return true;
-    }
-
-    private static bool HasBalancedParens(string value)
-    {
-        var depth = 0;
-        foreach (var ch in value)
-        {
-            if (ch == '(')
-            {
-                depth++;
-            }
-            else if (ch == ')')
-            {
-                depth--;
-                if (depth < 0)
-                    return false;
-            }
-        }
-
-        return depth == 0;
     }
 
     /// <summary>
