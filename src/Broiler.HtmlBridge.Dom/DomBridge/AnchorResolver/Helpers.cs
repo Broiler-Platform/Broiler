@@ -1,4 +1,5 @@
 using System.Globalization;
+using Broiler.CSS;
 
 namespace Broiler.HtmlBridge;
 
@@ -56,9 +57,10 @@ public sealed partial class DomBridge
     /// <summary>
     /// Resolves a CSS border-width value from cascaded properties.
     /// Checks the individual property (e.g. "border-left-width") first,
-    /// then falls back to the "border" shorthand.  The CSS keywords
-    /// "thin", "medium", and "thick" are mapped to 1, 3, and 4 px
-    /// respectively to match <see cref="CssValueParser.GetActualBorderWidth"/>.
+    /// then falls back to the "border" shorthand. The CSS <c>thin</c>/<c>medium</c>/<c>thick</c>
+    /// keywords are resolved through the canonical
+    /// <see cref="CssLengthParser.GetActualBorderWidth"/> (1/3/5 px), the single source
+    /// of truth shared with the layout engine — the bridge no longer carries its own copy.
     /// </summary>
     private static double ResolveBorderWidth(
         Dictionary<string, string> cssProps,
@@ -86,19 +88,18 @@ public sealed partial class DomBridge
         // Fall back to the border shorthand (e.g. "solid")
         if (cssProps.TryGetValue(shorthandProperty, out var shortVal) && shortVal != null)
         {
-            // If the shorthand contains an explicit width, use it; otherwise
-            // the shorthand implies "medium" (3px).
+            // If the shorthand carries an explicit width or width keyword, use it.
             foreach (var part in shortVal.Split(' ', StringSplitOptions.RemoveEmptyEntries))
             {
                 var px = TryParsePx(part);
                 if (px.HasValue)
                     return px.Value;
-                if (part.Equals("thin", StringComparison.OrdinalIgnoreCase))
-                    return 1;
-                if (part.Equals("thick", StringComparison.OrdinalIgnoreCase))
-                    return 4;
+                if (part.Equals("thin", StringComparison.OrdinalIgnoreCase) ||
+                    part.Equals("medium", StringComparison.OrdinalIgnoreCase) ||
+                    part.Equals("thick", StringComparison.OrdinalIgnoreCase))
+                    return ResolveBorderKeywordOrPx(part);
             }
-            // "border: solid" (style only, no width) → medium = 3px
+            // "border: solid" (style only, no width) → the initial width keyword, medium.
             bool hasStyle = false;
             foreach (var part in shortVal.Split(' ', StringSplitOptions.RemoveEmptyEntries))
             {
@@ -116,17 +117,25 @@ public sealed partial class DomBridge
                 }
             }
             if (hasStyle)
-                return 3; // medium
+                return ResolveBorderKeywordOrPx("medium");
         }
 
         return 0;
     }
-    /// <summary>Converts a CSS border-width keyword or pixel value to a number.</summary>
+
+    /// <summary>
+    /// Converts a CSS border-width keyword or pixel value to a number. The
+    /// <c>thin</c>/<c>medium</c>/<c>thick</c> keywords defer to the canonical
+    /// <see cref="CssLengthParser.GetActualBorderWidth"/> (1/3/5 px); other values are
+    /// treated as pixel lengths (this anchor path is font-free, so em lengths are not resolved).
+    /// </summary>
     private static double ResolveBorderKeywordOrPx(string value)
     {
-        if (value.Equals("thin", StringComparison.OrdinalIgnoreCase)) return 1;
-        if (value.Equals("medium", StringComparison.OrdinalIgnoreCase)) return 3;
-        if (value.Equals("thick", StringComparison.OrdinalIgnoreCase)) return 4;
-        return TryParsePx(value) ?? 0;
+        var v = value.Trim();
+        if (v.Equals("thin", StringComparison.OrdinalIgnoreCase) ||
+            v.Equals("medium", StringComparison.OrdinalIgnoreCase) ||
+            v.Equals("thick", StringComparison.OrdinalIgnoreCase))
+            return CssLengthParser.GetActualBorderWidth(v.ToLowerInvariant(), 0);
+        return TryParsePx(v) ?? 0;
     }
 }
