@@ -146,7 +146,7 @@ internal static partial class StyleSheetBinding
                     var descriptors = DomBridge.ParseStyle(CssSerializer.Serialize(((CssAtRule)rule).Declarations ?? new CssDeclarationBlock([])));
                     var propertyName = ((CssAtRule)rule).Prelude;
                     var syntax = descriptors.TryGetValue("syntax", out var syntaxValue)
-                        ? UnquoteCssPropertyRuleDescriptor(syntaxValue)
+                        ? CssomRuleMetadata.UnquoteDescriptor(syntaxValue)
                         : "*";
                     var inherits = !descriptors.TryGetValue("inherits", out var inheritsValue)
                         || !string.Equals(inheritsValue, "false", StringComparison.OrdinalIgnoreCase);
@@ -430,7 +430,7 @@ internal static partial class StyleSheetBinding
                 var descriptorsText = trimmedRuleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                 var descriptors = DomBridge.ParseStyle(descriptorsText);
                 var syntax = descriptors.TryGetValue("syntax", out var syntaxValue)
-                    ? UnquoteCssPropertyRuleDescriptor(syntaxValue)
+                    ? CssomRuleMetadata.UnquoteDescriptor(syntaxValue)
                     : "*";
                 var inherits = !descriptors.TryGetValue("inherits", out var inheritsValue)
                     || !string.Equals(inheritsValue, "false", StringComparison.OrdinalIgnoreCase);
@@ -624,18 +624,4 @@ internal static partial class StyleSheetBinding
         return ruleObj;
     }
 
-    /// <summary>Extracts a namespace URI from a quoted string or <c>url(...)</c> token.</summary>
-
-    private static string UnquoteCssPropertyRuleDescriptor(string value)
-    {
-        value = value.Trim();
-        if (value.Length >= 2 && (value[0] == '"' || value[0] == '\'') && value[^1] == value[0])
-            return value[1..^1];
-
-        return value;
-    }
-
-    private static string EscapeCssPropertyRuleSyntax(string syntax) =>
-        syntax.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
 }
