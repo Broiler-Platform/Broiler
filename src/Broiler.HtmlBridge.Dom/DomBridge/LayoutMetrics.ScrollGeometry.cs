@@ -273,18 +273,21 @@ public sealed partial class DomBridge
     {
         var normalizedAlignment = NormalizeScrollIntoViewAlignment(alignment, "start");
         var offset = offsetOverride ?? OffsetWithinAncestorPreferShared(element, scrollContainer, vertical);
-        var targetSize = vertical ? GetBorderBoxHeight(GetComputedProps(element), element) : GetBorderBoxWidth(GetComputedProps(element), element);
+        var targetSize = GetScrollIntoViewTargetSize(element, vertical);
+        var viewportSize = viewportSizeOverride ?? (vertical
+            ? GetClientHeightForDomElement(scrollContainer, IsDocumentElement(scrollContainer))
+            : GetClientWidthForDomElement(scrollContainer, IsDocumentElement(scrollContainer)));
+        // scroll-margin is <length> only (no percentages); scroll-padding is
+        // <length-percentage> resolved against the scrollport size on the same axis
+        // (CSS Scroll Snap 1 §5.1/§5.2).
         var (marginStart, marginStartOwner) = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-top" : "scroll-margin-left");
         var (marginEnd, marginEndOwner) = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-bottom" : "scroll-margin-right");
-        var (paddingStart, paddingStartOwner) = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-top" : "scroll-padding-left");
-        var (paddingEnd, paddingEndOwner) = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-bottom" : "scroll-padding-right");
+        var (paddingStart, paddingStartOwner) = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-top" : "scroll-padding-left", viewportSize);
+        var (paddingEnd, paddingEndOwner) = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-bottom" : "scroll-padding-right", viewportSize);
         marginStart = ConvertInsetToScrollContainerCoordinates(marginStart, marginStartOwner, scrollContainer);
         marginEnd = ConvertInsetToScrollContainerCoordinates(marginEnd, marginEndOwner, scrollContainer);
         paddingStart = ConvertInsetToScrollContainerCoordinates(paddingStart, paddingStartOwner, scrollContainer);
         paddingEnd = ConvertInsetToScrollContainerCoordinates(paddingEnd, paddingEndOwner, scrollContainer);
-        var viewportSize = viewportSizeOverride ?? (vertical
-            ? GetClientHeightForDomElement(scrollContainer, IsDocumentElement(scrollContainer))
-            : GetClientWidthForDomElement(scrollContainer, IsDocumentElement(scrollContainer)));
         var currentScroll = currentScrollOverride ?? GetElementScrollOffset(scrollContainer, vertical);
         var physicalCurrentScroll = coordinateSpaceIsPhysical
             ? currentScroll
@@ -337,6 +340,32 @@ public sealed partial class DomBridge
         return currentScroll;
     }
 
+    /// <summary>
+    /// The border-box extent of a <c>scrollIntoView</c> / scroll-snap target along the axis,
+    /// preferring the real laid-out box from the shared geometry snapshot and falling back to
+    /// the computed-style reconstruction only when the element has no box.
+    ///
+    /// <para>The style reconstruction sums <c>height</c> + padding + border-width as declared,
+    /// so it silently drops anything it cannot parse as a length — notably the
+    /// <c>thin</c>/<c>medium</c>/<c>thick</c> border-width keywords. That under-measured the
+    /// target by exactly the border width and shifted every end/center alignment by the same
+    /// amount (issue #1439: css-scroll-snap/scroll-snap-root-002's
+    /// <c>border-bottom: solid orange thick</c> pushed its 5px stripe off the bottom edge).
+    /// The snapshot already carries the used border box, which needs no reconstruction.</para>
+    ///
+    /// <para>Both paths report the element's own unzoomed CSS pixels, so this preserves the
+    /// existing zoom convention at the call site (the size is used unconverted, unlike the
+    /// insets, which pass through <see cref="ConvertInsetToScrollContainerCoordinates"/>).</para>
+    /// </summary>
+    private double GetScrollIntoViewTargetSize(DomElement element, bool vertical)
+    {
+        if (TrySharedBorderBoxExtent(element, vertical, out var sharedExtent) && double.IsFinite(sharedExtent))
+            return sharedExtent;
+
+        var props = GetComputedProps(element);
+        return vertical ? GetBorderBoxHeight(props, element) : GetBorderBoxWidth(props, element);
+    }
+
     private double ConvertPhysicalScrollPosition(DomElement scrollContainer,
         bool vertical, double physicalPosition, bool coordinateSpaceIsPhysical)
         => coordinateSpaceIsPhysical
@@ -373,14 +402,64 @@ public sealed partial class DomBridge
             : (minLeft < 0 ? maxLeft - minLeft : maxLeft);
     }
 
-    private (double Value, DomElement Owner) ResolveScrollIntoViewInset(DomElement element, string propertyName)
+    /// <summary>
+    /// Resolves one <c>scroll-margin-*</c> / <c>scroll-padding-*</c> longhand on
+    /// <paramref name="element"/> to pixels, falling back to the corresponding 1-to-4-value
+    /// box shorthand (<c>scroll-margin</c> / <c>scroll-padding</c>) when the longhand is
+    /// absent.
+    ///
+    /// <para>The shorthand fallback is what makes <c>scroll-padding: 25%</c> and
+    /// <c>scroll-margin: 25vh</c> take effect: the style engine keeps these shorthands as
+    /// declared rather than expanding them into longhands, so reading only the longhand
+    /// yielded 0 and <c>scrollIntoView</c> ignored both insets entirely (issue #1439).</para>
+    ///
+    /// <para><paramref name="percentageBasis"/> is the scrollport size along the axis, used
+    /// for <c>scroll-padding</c>'s percentages (CSS Scroll Snap 1 §5.2). It is left null for
+    /// <c>scroll-margin</c>, which takes <c>&lt;length&gt;</c> only.</para>
+    /// </summary>
+    private (double Value, DomElement Owner) ResolveScrollIntoViewInset(
+        DomElement element, string propertyName, double? percentageBasis = null)
     {
         var props = GetComputedProps(element);
         var value = props.GetValueOrDefault(propertyName);
         if (string.Equals(value, "inherit", StringComparison.OrdinalIgnoreCase) && ParentEl(element) != null)
-            return ResolveScrollIntoViewInset(ParentEl(element), propertyName);
+            return ResolveScrollIntoViewInset(ParentEl(element), propertyName, percentageBasis);
 
-        return (ParseCssLengthToPixelsWithViewport(value, element), element);
+        if (string.IsNullOrWhiteSpace(value))
+            value = ResolveScrollInsetFromShorthand(props, propertyName);
+
+        return (ParseCssLengthToPixelsWithViewport(value, element, percentageBasis: percentageBasis), element);
+    }
+
+    /// <summary>
+    /// Picks the side named by <paramref name="longhandName"/> out of the matching
+    /// <c>scroll-margin</c>/<c>scroll-padding</c> box shorthand in <paramref name="props"/>,
+    /// or null when the shorthand is absent. Logical (<c>-block</c>/<c>-inline</c>) shorthands
+    /// are not consulted — only the physical four-side form.
+    /// </summary>
+    private static string? ResolveScrollInsetFromShorthand(
+        Dictionary<string, string> props, string longhandName)
+    {
+        var lastDash = longhandName.LastIndexOf('-');
+        if (lastDash <= 0)
+            return null;
+
+        var shorthandName = longhandName[..lastDash];
+        var side = longhandName[(lastDash + 1)..];
+        var shorthand = props.GetValueOrDefault(shorthandName);
+        if (string.IsNullOrWhiteSpace(shorthand))
+            return null;
+
+        var parts = shorthand.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var (top, right, bottom, left) = CssBoxShorthand.SelectTrbl(parts);
+        return side switch
+        {
+            "top" => top,
+            "right" => right,
+            "bottom" => bottom,
+            "left" => left,
+            _ => null,
+        };
     }
 
     private double ConvertInsetToScrollContainerCoordinates(double inset, DomElement insetOwner, DomElement scrollContainer)
