@@ -76,19 +76,9 @@ public sealed partial class DomBridge
     /// <summary>
     /// Recursively collects text content from a node and its descendants.
     /// </summary>
-    internal static void CollectTextContent(DomNode node, StringBuilder sb)
-    {
-        if (IsText(node))
-        {
-            sb.Append(BridgeText(node));
-            return;
-        }
-        // RF-BRIDGE-1c Phase F (F3c part 2c): walk raw ChildNodes so direct text children are
-        // aggregated (comment children contribute nothing — not IsText, no element children).
-        // Behaviour-preserving on today's homogeneous tree where every child is an element.
-        foreach (var child in node.ChildNodes)
-            CollectTextContent(child, sb);
-    }
+    internal static void CollectTextContent(DomNode node, StringBuilder sb) =>
+        // Descendant-text aggregation is canonical DOM data-model logic (DomNode.TextContent).
+        sb.Append(node.TextContent);
 
     /// <summary>
     /// Returns the MIME type for a given file extension.
