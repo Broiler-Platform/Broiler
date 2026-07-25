@@ -7,6 +7,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.HtmlBridge.Logging;
 using Broiler.Dom;
+using Broiler.CSS;
 using System.Globalization;
 
 namespace Broiler.HtmlBridge;
@@ -291,7 +292,7 @@ public sealed partial class DomBridge
             if (IsViewportBodyElement(current, documentElement) || !HasAssociatedLayoutBox(current))
                 continue;
 
-            if (HasOverflowClipping(GetComputedProps(current)))
+            if (CssOverflow.ClipsOverflow(GetComputedProps(current)))
                 return current;
         }
 

@@ -1,4 +1,5 @@
 using Broiler.Dom;
+using Broiler.CSS;
 
 namespace Broiler.HtmlBridge;
 
@@ -95,7 +96,7 @@ public sealed partial class DomBridge
             if (!IsText(parent))
             {
                 var props = GetComputedProps(parent);
-                if (HasOverflowClipping(props))
+                if (CssOverflow.ClipsOverflow(props))
                     return parent;
             }
             parent = ParentEl(parent);

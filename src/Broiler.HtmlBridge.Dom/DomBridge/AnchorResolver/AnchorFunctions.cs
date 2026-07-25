@@ -204,7 +204,7 @@ public sealed partial class DomBridge
         for (var el = ParentEl(anchorEl); el != null; el = ParentEl(el))
         {
             var props = GetComputedProps(el);
-            if (!HasOverflowClipping(props))
+            if (!CssOverflow.ClipsOverflow(props))
             {
                 // A sticky box below the next scroller pins the anchor to it;
                 // remember that until we reach the scroller itself.

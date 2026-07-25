@@ -7,6 +7,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.HtmlBridge.Logging;
 using Broiler.Dom;
+using Broiler.CSS;
 using System.Globalization;
 
 namespace Broiler.HtmlBridge;
@@ -47,7 +48,7 @@ public sealed partial class DomBridge
         var props = GetComputedProps(element);
         var specifiedZoom = props.GetValueOrDefault("zoom");
         var parentZoom = ParentEl(element) != null ? GetUsedZoomForElement(ParentEl(element)) : RootUsedZoomBase();
-        return ResolveSpecifiedZoom(specifiedZoom, parentZoom);
+        return CssZoom.ResolveUsed(specifiedZoom, parentZoom);
     }
 
     /// <summary>
@@ -61,21 +62,6 @@ public sealed partial class DomBridge
     private double RootUsedZoomBase() =>
         NativeVisualViewport && HasActiveVisualViewport() ? GetVisualViewportScale() : 1.0;
 
-    private static double ResolveSpecifiedZoom(string? specifiedZoom, double parentZoom)
-    {
-        if (string.IsNullOrWhiteSpace(specifiedZoom) ||
-            specifiedZoom.Equals("inherit", StringComparison.OrdinalIgnoreCase) ||
-            specifiedZoom.Equals("normal", StringComparison.OrdinalIgnoreCase))
-        {
-            return parentZoom;
-        }
-
-        if (double.TryParse(specifiedZoom, NumberStyles.Float,
-            CultureInfo.InvariantCulture, out var zoom) && zoom > 0)
-            return parentZoom * zoom;
-
-        return parentZoom;
-    }
 
     private double GetTransformScale(DomElement element)
     {
