@@ -355,10 +355,10 @@ public sealed partial class DomBridge
                         boxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase) &&
                         !hasPercentBoxProps)
                     {
-                        double bdrL = ResolveBorderWidth(cssProps, "border-left-width", "border");
-                        double bdrR = ResolveBorderWidth(cssProps, "border-right-width", "border");
-                        double bdrT = ResolveBorderWidth(cssProps, "border-top-width", "border");
-                        double bdrB = ResolveBorderWidth(cssProps, "border-bottom-width", "border");
+                        double bdrL = CssBorderWidth.Resolve(cssProps, "border-left-width", "border");
+                        double bdrR = CssBorderWidth.Resolve(cssProps, "border-right-width", "border");
+                        double bdrT = CssBorderWidth.Resolve(cssProps, "border-top-width", "border");
+                        double bdrB = CssBorderWidth.Resolve(cssProps, "border-bottom-width", "border");
 
                         // border-box → content-box: subtract border + padding per axis
                         // (canonical Broiler.Layout used-value math, Phase 5 item 3).
