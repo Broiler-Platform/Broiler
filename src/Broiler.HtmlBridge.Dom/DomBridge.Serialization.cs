@@ -287,7 +287,7 @@ public sealed partial class DomBridge
         var direction = props.GetValueOrDefault("direction") ?? "ltr";
         var vertical = CssWritingMode.IsVertical(writingMode);
         var reverseInline = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
-        var ratio = ResolveProgressLikeValueRatio(element, tag);
+        var ratio = HtmlElementQueries.ResolveProgressLikeValueRatio(element, tag);
 
         BakedInlineStyle(element)["display"] = "inline-block";
         BakedInlineStyle(element)["box-sizing"] = "border-box";
@@ -331,30 +331,7 @@ public sealed partial class DomBridge
         element.AppendChild(fill);
     }
 
-    private static double ResolveProgressLikeValueRatio(DomElement element, string tag)
-    {
-        var min = tag == "meter" ? ReadNumericAttribute(element, "min", 0) : 0;
-        var max = ReadNumericAttribute(element, "max", 1);
-        if (max <= min)
-            max = min + 1;
 
-        var value = ReadNumericAttribute(element, "value", min);
-        return Math.Clamp((value - min) / (max - min), 0, 1);
-    }
-
-    private static double ReadNumericAttribute(DomElement element, string attributeName, double fallback)
-    {
-        if (!TryGetAttribute(element, attributeName, out var rawValue) || string.IsNullOrWhiteSpace(rawValue))
-            return fallback;
-
-        return double.TryParse(
-            rawValue,
-            System.Globalization.NumberStyles.Float,
-            System.Globalization.CultureInfo.InvariantCulture,
-            out var parsed)
-            ? parsed
-            : fallback;
-    }
 
     private static double ReadPixelLength(string? rawValue, double fallback)
     {
