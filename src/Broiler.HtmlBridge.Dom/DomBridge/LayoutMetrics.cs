@@ -379,11 +379,19 @@ public sealed partial class DomBridge
             ? Math.Max(0, paddingBox.Bottom - contentBox.Bottom)
             : Math.Max(0, paddingBox.Right - contentBox.Right);
 
+        // Trailing margins only extend the *viewport's* scrolling area (see
+        // GetScrollableOverflowEndMargin). Percentage margins resolve against the containing
+        // block's inline size, for which the scroll container's content width is the basis.
+        var includeEndMargins = IsViewportElementForMetrics(element);
+        var marginPercentageBasis = (double)contentBox.Width;
+
         foreach (var descendant in EnumerateRenderedDescendants(element))
         {
             if (!TryGetSharedLayoutGeometry(descendant, out var childBox))
                 continue;
-            var childEnd = vertical ? childBox.BorderBox.Bottom : childBox.BorderBox.Right;
+            double childEnd = vertical ? childBox.BorderBox.Bottom : childBox.BorderBox.Right;
+            if (includeEndMargins)
+                childEnd += GetScrollableOverflowEndMargin(descendant, vertical, marginPercentageBasis);
             max = Math.Max(max, (childEnd - origin) + endPadding);
         }
 
@@ -392,6 +400,48 @@ public sealed partial class DomBridge
         // zoomed descendant's larger baked extent still counts as overflow.
         extent = UnzoomSharedExtent(max, element);
         return true;
+    }
+
+    /// <summary>
+    /// The end-edge (bottom / right) margin of <paramref name="descendant"/> that extends the
+    /// <em>viewport's</em> scrolling area past the descendant's border box.
+    ///
+    /// <para>The document's scrolling area is its total layout height, which runs to the end of
+    /// the last block's margin box — a trailing <c>margin-bottom</c> below the last block is
+    /// scrollable. Unioning border boxes alone truncated the document by exactly that margin
+    /// and clamped every programmatic scroll to a max that was too small (issue #1439:
+    /// css-scroll-snap/scroll-snap-root-001 must scroll to 998.4px, but the missing
+    /// <c>#target { margin-bottom: 120vh }</c> capped the document at 636.4px).</para>
+    ///
+    /// <para><b>This is deliberately restricted to the viewport.</b> For an ordinary element
+    /// scroll container, a child's margin does not by itself create scrollable overflow — an
+    /// auto-sized box grows to fit its children's margins, and a margin that collapses out of
+    /// it is not content the box can scroll to. <c>Wpt_CssomView_AutoSized_ScrollMetrics_Do_Not
+    /// _Report_MarginOnly_Overflow</c> pins that: margins alone must leave
+    /// <c>scrollHeight == clientHeight</c>. Applying this to every scroll container broke it.</para>
+    ///
+    /// <para>Only positive margins extend the area: a negative margin pulls content back toward
+    /// the origin and never adds scrollable space. The caller takes a <c>max</c> over all
+    /// descendants, so a margin that collapses up through several ancestors is counted once at
+    /// whichever box carries it rather than accumulating.</para>
+    /// </summary>
+    private double GetScrollableOverflowEndMargin(DomElement descendant, bool vertical, double percentageBasis)
+    {
+        var props = GetComputedProps(descendant);
+
+        // position: fixed boxes are anchored to the viewport, not to the scroll container's
+        // content, so they contribute no scrollable overflow at all (and neither do their
+        // margins). The border-box union above predates this helper and still includes them;
+        // this only avoids *growing* that pre-existing behaviour.
+        if (string.Equals(props.GetValueOrDefault("position"), "fixed", StringComparison.OrdinalIgnoreCase))
+            return 0;
+
+        var margin = ParseCssLengthToPixelsWithViewport(
+            props.GetValueOrDefault(vertical ? "margin-bottom" : "margin-right"),
+            descendant,
+            percentageBasis: percentageBasis);
+
+        return double.IsFinite(margin) ? Math.Max(0, margin) : 0;
     }
 
     /// <summary>

@@ -220,6 +220,18 @@ public sealed partial class DomBridge
             nextTop = Math.Clamp(nextTop, minTop, maxTop);
         }
 
+        // A mandatory snap container must come to rest on a snap position after any scroll,
+        // so this is applied to the result of every scrolling entry point rather than to any
+        // one of them (CSS Scroll Snap 1 §2). A non-snapping container is unchanged.
+        //
+        // This runs even under `clamp: false` (window.scrollTo/scrollBy and the element
+        // scroll/scrollTo/scrollBy bindings), which is deliberate: snapping is a property of
+        // the container, not of the API used to reach it, and a snap position is by definition
+        // inside the scrollable range. Callers that opt out of clamping still get no clamping
+        // on an ordinary scroll container — only on one that asked to snap.
+        nextLeft = ResolveScrollSnapPosition(element, vertical: false, nextLeft);
+        nextTop = ResolveScrollSnapPosition(element, vertical: true, nextTop);
+
         return (nextLeft, nextTop);
     }
 
@@ -498,13 +510,25 @@ public sealed partial class DomBridge
         return axisValue;
     }
 
+    /// <summary>
+    /// Whether a root-propagated <c>overflow</c> value makes the viewport non-scrollable.
+    /// Only <c>clip</c> does: it suppresses the scroll container entirely (CSS Overflow 3
+    /// §3.3), so the scrollport has no scroll offset to set.
+    /// <para><c>overflow: hidden</c> does <em>not</em> belong here. It still establishes a
+    /// scroll container — it only removes the <em>user-interaction</em> affordance, while
+    /// programmatic scrolling (<c>scrollTop</c>/<c>scrollLeft</c>, <c>scrollTo</c>,
+    /// <c>scrollIntoView</c>) keeps working. Treating it as non-scrollable pinned every such
+    /// document at offset 0, which silently broke the very common WPT reftest idiom
+    /// <c>:root { overflow: hidden; /* hide scrollbars for reftest analysis */ }</c> on any
+    /// test that also scrolls (issue #1439: css-scroll-snap/scroll-snap-root-001 and -002
+    /// both rendered their unscrolled red FAIL block).</para>
+    /// </summary>
     private static bool DisablesRootScrolling(string? overflowValue)
     {
         if (string.IsNullOrWhiteSpace(overflowValue))
             return false;
 
-        var normalized = overflowValue.Trim().ToLowerInvariant();
-        return normalized.Contains("hidden") || normalized.Contains("clip");
+        return overflowValue.Trim().ToLowerInvariant().Contains("clip");
     }
 
     private static bool EnablesScrollingBox(string? overflowValue)

@@ -2371,6 +2371,14 @@ input {
     for (const match of document.querySelectorAll('.target')) {
       match.scrollIntoView({ block: 'start', inline: 'start' });
     }
+    // This fixture measures the zoom x scroll-inset math *inside* the nested
+    // scrollers. Its content also overflows the 320x240 viewport, so
+    // scrollIntoView legitimately continues outward and scrolls the document as
+    // well: the root is a scroll container even under overflow: hidden, which
+    // only removes the user-interaction affordance (CSS Overflow 3 SS3.3). That
+    // viewport scroll is incidental to what is being compared and the reference
+    // does not model it, so it is reset to keep the comparison on the containers.
+    document.documentElement.scrollTo(0, 0);
   </script>
 </body>
 </html>";
@@ -2458,6 +2466,14 @@ input {
     for (const match of document.querySelectorAll('.target')) {
       match.scrollIntoView({ block: 'start', inline: 'start' });
     }
+    // This fixture measures the zoom x scroll-inset math *inside* the nested
+    // scrollers. Its content also overflows the 320x240 viewport, so
+    // scrollIntoView legitimately continues outward and scrolls the document as
+    // well: the root is a scroll container even under overflow: hidden, which
+    // only removes the user-interaction affordance (CSS Overflow 3 SS3.3). That
+    // viewport scroll is incidental to what is being compared and the reference
+    // does not model it, so it is reset to keep the comparison on the containers.
+    document.documentElement.scrollTo(0, 0);
   </script>
 </body>
 </html>";
@@ -2975,6 +2991,14 @@ input {
     for (const match of document.querySelectorAll('.target')) {
       match.scrollIntoView();
     }
+    // This fixture measures the zoom x scroll-inset math *inside* the nested
+    // scrollers. Its content also overflows the 320x240 viewport, so
+    // scrollIntoView legitimately continues outward and scrolls the document as
+    // well: the root is a scroll container even under overflow: hidden, which
+    // only removes the user-interaction affordance (CSS Overflow 3 SS3.3). That
+    // viewport scroll is incidental to what is being compared and the reference
+    // does not model it, so it is reset to keep the comparison on the containers.
+    document.documentElement.scrollTo(0, 0);
   </script>
 </body>
 </html>";
@@ -3075,6 +3099,14 @@ input {
     for (const match of document.querySelectorAll('.target')) {
       match.scrollIntoView();
     }
+    // This fixture measures the zoom x scroll-inset math *inside* the nested
+    // scrollers. Its content also overflows the 320x240 viewport, so
+    // scrollIntoView legitimately continues outward and scrolls the document as
+    // well: the root is a scroll container even under overflow: hidden, which
+    // only removes the user-interaction affordance (CSS Overflow 3 SS3.3). That
+    // viewport scroll is incidental to what is being compared and the reference
+    // does not model it, so it is reset to keep the comparison on the containers.
+    document.documentElement.scrollTo(0, 0);
   </script>
 </body>
 </html>";
