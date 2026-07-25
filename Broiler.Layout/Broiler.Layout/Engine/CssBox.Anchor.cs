@@ -262,20 +262,23 @@ partial class CssBox
     /// <summary>
     /// Font-free used border width for one side: <c>0</c> when the border style is
     /// absent/<c>none</c>; otherwise the CSS <c>thin</c>/<c>medium</c>/<c>thick</c>
-    /// keywords map to <c>1</c>/<c>3</c>/<c>4</c> px (default <c>medium</c>) and a
-    /// pixel length is taken as-is. Mirrors the bridge's <c>ResolveBorderWidth</c> and
-    /// <c>CssLengthParser.GetActualBorderWidth</c> so the native and baked paths agree.
+    /// keywords are resolved through the canonical
+    /// <see cref="CssLengthParser.GetActualBorderWidth"/> (1/3/5 px, default <c>medium</c>)
+    /// and a pixel length is taken as-is. The keyword widths are the single source of
+    /// truth shared with the bridge anchor resolver so the native and baked paths agree.
     /// </summary>
     private double NativeBorderPx(string? width, string? style)
     {
         if (string.IsNullOrEmpty(style) || string.Equals(style, "none", StringComparison.OrdinalIgnoreCase))
             return 0;
         var w = width?.Trim();
-        if (string.IsNullOrEmpty(w) || string.Equals(w, "medium", StringComparison.OrdinalIgnoreCase))
-            return 3;
-        if (string.Equals(w, "thin", StringComparison.OrdinalIgnoreCase)) return 1;
-        if (string.Equals(w, "thick", StringComparison.OrdinalIgnoreCase)) return 4;
-        return ParsePxOnly(w) ?? 3;
+        if (string.IsNullOrEmpty(w) ||
+            string.Equals(w, "medium", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(w, "thin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(w, "thick", StringComparison.OrdinalIgnoreCase))
+            return CssLengthParser.GetActualBorderWidth(
+                string.IsNullOrEmpty(w) ? "medium" : w.ToLowerInvariant(), 0);
+        return ParsePxOnly(w) ?? CssLengthParser.GetActualBorderWidth("medium", 0);
     }
 
     /// <summary>Font-free used padding for one side: a pixel length (or bare number),

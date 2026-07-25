@@ -76,19 +76,9 @@ public sealed partial class DomBridge
     /// <summary>
     /// Recursively collects text content from a node and its descendants.
     /// </summary>
-    internal static void CollectTextContent(DomNode node, StringBuilder sb)
-    {
-        if (IsText(node))
-        {
-            sb.Append(BridgeText(node));
-            return;
-        }
-        // RF-BRIDGE-1c Phase F (F3c part 2c): walk raw ChildNodes so direct text children are
-        // aggregated (comment children contribute nothing — not IsText, no element children).
-        // Behaviour-preserving on today's homogeneous tree where every child is an element.
-        foreach (var child in node.ChildNodes)
-            CollectTextContent(child, sb);
-    }
+    internal static void CollectTextContent(DomNode node, StringBuilder sb) =>
+        // Descendant-text aggregation is canonical DOM data-model logic (DomNode.TextContent).
+        sb.Append(node.TextContent);
 
     /// <summary>
     /// Returns the MIME type for a given file extension.
@@ -368,65 +358,6 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Collects all &lt;tr&gt; elements in a table in HTMLTableElement.rows spec order:
-    /// 1. thead rows, 2. tbody rows + direct tr children (in tree order), 3. tfoot rows. Neutral
-    /// tree helper shared by the <c>TableBinding</c> feature module and hit testing.
-    /// </summary>
-    internal static List<DomElement> CollectTableRows(DomElement table)
-    {
-        var rows = new List<DomElement>();
-        // 1. All tr children of thead elements (in tree order)
-        foreach (var child in ChildElements(table))
-        {
-            if (string.Equals(child.TagName, "thead", StringComparison.OrdinalIgnoreCase))
-                foreach (var c in ChildElements(child))
-                    if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
-                        rows.Add(c);
-        }
-        // 2. Direct tr children of the table, or tr children of tbody elements (in tree order)
-        foreach (var child in ChildElements(table))
-        {
-            var ctag = child.TagName.ToLowerInvariant();
-            if (ctag == "tr")
-                rows.Add(child);
-            else if (ctag == "tbody")
-                foreach (var c in ChildElements(child))
-                    if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
-                        rows.Add(c);
-        }
-        // 3. All tr children of tfoot elements (in tree order)
-        foreach (var child in ChildElements(table))
-        {
-            if (string.Equals(child.TagName, "tfoot", StringComparison.OrdinalIgnoreCase))
-                foreach (var c in ChildElements(child))
-                    if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
-                        rows.Add(c);
-        }
-        return rows;
-    }
-
-    /// <summary>
-    /// Collects form control elements (input, select, textarea, button) from a form.
-    /// </summary>
-    internal static List<DomElement> CollectFormControls(DomElement form)
-    {
-        var controls = new List<DomElement>();
-        CollectFormControlsRecursive(form, controls);
-        return controls;
-    }
-
-    private static void CollectFormControlsRecursive(DomElement parent, List<DomElement> controls)
-    {
-        foreach (var child in ChildElements(parent))
-        {
-            var ctag = child.TagName.ToLowerInvariant();
-            if (ctag == "input" || ctag == "select" || ctag == "textarea" || ctag == "button")
-                controls.Add(child);
-            CollectFormControlsRecursive(child, controls);
-        }
-    }
-
-    /// <summary>
     /// Recursively unchecks all radio inputs with the given name within the scope,
     /// except for the specified element. Used for radio button mutual exclusion.
     /// </summary>
@@ -469,20 +400,6 @@ public sealed partial class DomBridge
             if (tagName == "*" || string.Equals(element.TagName, tagName, StringComparison.OrdinalIgnoreCase))
                 results.Add(bridge.ToJSObject(element));
         }
-    }
-
-    /// <summary>
-    /// Returns the node type constant for a <see cref="DomElement"/>.
-    /// </summary>
-    internal static int GetNodeType(DomNode node)
-    {
-        if (IsText(node)) return 3; // TEXT_NODE
-        if (IsComment(node)) return 8;
-        if (node is DomDocumentType) return 10; // DOCUMENT_TYPE_NODE (canonical)
-        if (node is DomDocumentFragment) return 11; // DOCUMENT_FRAGMENT_NODE (canonical)
-        if (node is DomDocument) return 9; // DOCUMENT_NODE (canonical DomDocument — document root)
-        if (node is not DomElement) return 1;
-        return 1; // ELEMENT_NODE
     }
 
     // classList / DOMTokenList moved to the Phase 3 ClassListBinding feature module

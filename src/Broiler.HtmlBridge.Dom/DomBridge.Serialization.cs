@@ -1,5 +1,6 @@
 using Broiler.Dom.Html;
 using Broiler.Dom;
+using Broiler.CSS;
 
 namespace Broiler.HtmlBridge;
 
@@ -210,7 +211,7 @@ public sealed partial class DomBridge
 
         var props = GetComputedProps(element);
         var specifiedZoom = props.GetValueOrDefault("zoom");
-        var usedZoom = ResolveSpecifiedZoom(specifiedZoom, parentZoom);
+        var usedZoom = CssZoom.ResolveUsed(specifiedZoom, parentZoom);
 
         if (Math.Abs(usedZoom - 1.0) > ZoomSerializationEpsilon)
         {
@@ -239,7 +240,7 @@ public sealed partial class DomBridge
             if (!pseudoProps.TryGetValue(property, out var value) || string.IsNullOrWhiteSpace(value))
                 continue;
 
-            if (TryScaleSerializableCssValue(value, usedZoom, out var scaled))
+            if (CssLengthScaler.TryScaleValue(value, usedZoom, out var scaled))
                 declarations.Add($"{property}: {scaled} !important");
         }
 
@@ -284,9 +285,9 @@ public sealed partial class DomBridge
         var height = props.GetValueOrDefault("height");
         var writingMode = props.GetValueOrDefault("writing-mode") ?? "horizontal-tb";
         var direction = props.GetValueOrDefault("direction") ?? "ltr";
-        var vertical = IsVerticalWritingMode(writingMode);
+        var vertical = CssWritingMode.IsVertical(writingMode);
         var reverseInline = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
-        var ratio = ResolveProgressLikeValueRatio(element, tag);
+        var ratio = HtmlElementQueries.ResolveProgressLikeValueRatio(element, tag);
 
         BakedInlineStyle(element)["display"] = "inline-block";
         BakedInlineStyle(element)["box-sizing"] = "border-box";
@@ -330,30 +331,7 @@ public sealed partial class DomBridge
         element.AppendChild(fill);
     }
 
-    private static double ResolveProgressLikeValueRatio(DomElement element, string tag)
-    {
-        var min = tag == "meter" ? ReadNumericAttribute(element, "min", 0) : 0;
-        var max = ReadNumericAttribute(element, "max", 1);
-        if (max <= min)
-            max = min + 1;
 
-        var value = ReadNumericAttribute(element, "value", min);
-        return Math.Clamp((value - min) / (max - min), 0, 1);
-    }
-
-    private static double ReadNumericAttribute(DomElement element, string attributeName, double fallback)
-    {
-        if (!TryGetAttribute(element, attributeName, out var rawValue) || string.IsNullOrWhiteSpace(rawValue))
-            return fallback;
-
-        return double.TryParse(
-            rawValue,
-            System.Globalization.NumberStyles.Float,
-            System.Globalization.CultureInfo.InvariantCulture,
-            out var parsed)
-            ? parsed
-            : fallback;
-    }
 
     private static double ReadPixelLength(string? rawValue, double fallback)
     {
@@ -380,7 +358,7 @@ public sealed partial class DomBridge
 
         var props = GetComputedProps(element);
         var specifiedZoom = props.GetValueOrDefault("zoom");
-        var usedZoom = ResolveSpecifiedZoom(specifiedZoom, parentZoom);
+        var usedZoom = CssZoom.ResolveUsed(specifiedZoom, parentZoom);
 
         var willScale = Math.Abs(usedZoom - 1.0) > ZoomSerializationEpsilon;
         var willSvg = ShouldApplySvgSerializationAttributes(element);
@@ -391,7 +369,7 @@ public sealed partial class DomBridge
                 if (!TryGetZoomSerializableValue(element, props, property, out var value))
                     continue;
 
-                if (TryScaleSerializableCssValue(value, usedZoom, out var scaled))
+                if (CssLengthScaler.TryScaleValue(value, usedZoom, out var scaled))
                     BakedInlineStyle(element)[property] = scaled;
             }
 
@@ -483,64 +461,6 @@ public sealed partial class DomBridge
         "column-width", "column-height", "column-gap"
     ];
 
-    private static bool TryScaleSerializableCssValue(string value, double factor, out string scaled)
-    {
-        scaled = string.Empty;
-        var trimmed = value.Trim();
-        if (trimmed.Length == 0 ||
-            trimmed.Equals("auto", StringComparison.OrdinalIgnoreCase) ||
-            trimmed.Equals("none", StringComparison.OrdinalIgnoreCase) ||
-            trimmed.Equals("normal", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        if (TryScaleLengthToken(trimmed, factor, out scaled))
-            return true;
-
-        var parts = trimmed.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length is 2 or 3 or 4)
-        {
-            var scaledParts = new string[parts.Length];
-            for (var i = 0; i < parts.Length; i++)
-            {
-                if (!TryScaleLengthToken(parts[i], factor, out scaledParts[i]))
-                    return false;
-            }
-
-            scaled = string.Join(" ", scaledParts);
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryScaleLengthToken(string token, double factor, out string scaled)
-    {
-        scaled = string.Empty;
-        var trimmed = token.Trim();
-        if (trimmed.Length == 0)
-            return false;
-
-        ReadOnlySpan<string> units = ["px", "pt", "em", "rem"];
-        foreach (var unit in units)
-        {
-            if (!trimmed.EndsWith(unit, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var numericPart = trimmed[..^unit.Length];
-            if (!double.TryParse(numericPart, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var number))
-            {
-                return false;
-            }
-
-            scaled = $"{(number * factor).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}{unit}";
-            return true;
-        }
-
-        return false;
-    }
 
     // RF-BRIDGE-1c Phase F (F3c part 2c): the serialization adapter is over canonical DomNode so
     // text/comment children serialize once construction flips to DomText/DomComment. GetKind keys

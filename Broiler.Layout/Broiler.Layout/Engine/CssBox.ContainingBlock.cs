@@ -111,25 +111,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// by the caller), so the two paths agree. Consulted by
     /// <see cref="FindPositionedContainingBlock"/> only under the native-anchor lever.
     /// </summary>
-    internal bool EstablishesNonPositionAbsPosContainingBlock()
-    {
-        if (!string.IsNullOrWhiteSpace(Transform)
-            && !string.Equals(Transform, "none", System.StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        if (!string.IsNullOrWhiteSpace(Contain))
-        {
-            var c = Contain.ToLowerInvariant();
-            if (c.Contains("layout") || c.Contains("paint") || c.Contains("strict") || c.Contains("content"))
-                return true;
-        }
-
-        if (!string.IsNullOrWhiteSpace(WillChange)
-            && WillChange.Contains("transform", System.StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        return false;
-    }
+    internal bool EstablishesNonPositionAbsPosContainingBlock() =>
+        CssContainingBlock.CreatedByTransformContainOrWillChange(Transform, Contain, WillChange);
 
     /// <summary>
     /// RF-BRIDGE-1b Track 3.2: the viewport a <c>position:fixed</c> descendant of this

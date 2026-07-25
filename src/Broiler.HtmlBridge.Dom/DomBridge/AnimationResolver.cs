@@ -259,18 +259,18 @@ public sealed partial class DomBridge
 
         if (!string.IsNullOrWhiteSpace(animationShorthand))
         {
-            var parts = TokenizeAnimationShorthand(animationShorthand!);
+            var parts = CssAnimation.TokenizeShorthand(animationShorthand!);
             var durations = new List<double>();
 
             foreach (var part in parts)
             {
-                if (TryParseCssTime(part, out var sec))
+                if (CssAnimation.TryParseTime(part, out var sec))
                     durations.Add(sec);
-                else if (IsTimingFunction(part))
+                else if (CssAnimation.IsTimingFunction(part))
                     timingFunction = part;
                 else if (part is "none" or "forwards" or "backwards" or "both")
                     fillMode = part;
-                else if (name == null && !IsKnownAnimationKeyword(part))
+                else if (name == null && !CssAnimation.IsKnownKeyword(part))
                     name = part;
             }
 
@@ -282,7 +282,7 @@ public sealed partial class DomBridge
         if (!string.IsNullOrWhiteSpace(animationName))
             name = animationName;
         if (!string.IsNullOrWhiteSpace(animationDelay) &&
-            TryParseCssTime(animationDelay!, out var delayOverride))
+            CssAnimation.TryParseTime(animationDelay!, out var delayOverride))
             delaySec = delayOverride;
 
         if (string.IsNullOrEmpty(name) || durationSec <= 0)
@@ -407,7 +407,8 @@ public sealed partial class DomBridge
                     float localProgress = (progress - intervalStart) / (intervalEnd - intervalStart);
 
                     // Apply per-interval timing function (steps, cubic-bezier, etc.).
-                    localProgress = (float)ApplyTimingFunction(localProgress, timingFunction);
+                    // Easing evaluation is owned by the canonical Broiler.CSS CssEasing.
+                    localProgress = (float)CssEasing.Evaluate(localProgress, timingFunction);
 
                     // Try color interpolation for background-color, color, etc.
                     var interpolated = TryInterpolateValue(
@@ -420,90 +421,9 @@ public sealed partial class DomBridge
         return result;
     }
 
-    private static bool TryParseCssTime(string text, out double seconds)
-    {
-        seconds = 0;
-        var lower = text.Trim().ToLowerInvariant();
-
-        if (lower.EndsWith("ms"))
-        {
-            if (double.TryParse(lower.AsSpan(0, lower.Length - 2),
-                NumberStyles.Float, CultureInfo.InvariantCulture, out var ms))
-            {
-                seconds = ms / 1000.0;
-                return true;
-            }
-        }
-        else if (lower.EndsWith('s'))
-        {
-            if (double.TryParse(lower.AsSpan(0, lower.Length - 1),
-                NumberStyles.Float, CultureInfo.InvariantCulture, out var s))
-            {
-                seconds = s;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static IReadOnlyList<string> TokenizeAnimationShorthand(string shorthand)
-    {
-        var tokens = new List<string>();
-        var current = new StringBuilder();
-        var depth = 0;
-
-        foreach (var ch in shorthand.Trim())
-        {
-            if (char.IsWhiteSpace(ch) && depth == 0)
-            {
-                if (current.Length > 0)
-                {
-                    tokens.Add(current.ToString());
-                    current.Clear();
-                }
-
-                continue;
-            }
-
-            if (ch == '(')
-                depth++;
-            else if (ch == ')' && depth > 0)
-                depth--;
-
-            current.Append(ch);
-        }
-
-        if (current.Length > 0)
-            tokens.Add(current.ToString());
-
-        return tokens;
-    }
-
-    private static bool IsTimingFunction(string text) => text switch
-    {
-        "ease" or "linear" or "ease-in" or "ease-out" or "ease-in-out"
-            or "step-start" or "step-end" => true,
-        _ when text.StartsWith("steps(", StringComparison.OrdinalIgnoreCase) => true,
-        _ when text.StartsWith("cubic-bezier(", StringComparison.OrdinalIgnoreCase) => true,
-        _ => false,
-    };
-
-    private static bool IsKnownAnimationKeyword(string text) => text switch
-    {
-        "normal" or "reverse" or "alternate" or "alternate-reverse"
-            or "none" or "forwards" or "backwards" or "both"
-            or "running" or "paused" or "infinite" => true,
-        _ => false,
-    };
-
     // -----------------------------------------------------------------
     // Value interpolation
     // -----------------------------------------------------------------
-
-    private static readonly System.Text.RegularExpressions.Regex RgbPattern = RgbPatternRegex();
-
-    private static readonly System.Text.RegularExpressions.Regex RgbaPattern = RgbaPatternRegex();
 
     /// <summary>
     /// Attempts to interpolate between two CSS values at the given progress.
@@ -512,19 +432,20 @@ public sealed partial class DomBridge
     /// </summary>
     private string TryInterpolateValue(DomElement element, string prop, string fromValue, string toValue, float progress)
     {
-        // Try color interpolation for color-related properties.
+        // Try color interpolation for color-related properties. Color parsing (hex,
+        // rgb/rgba, hsl/hsla, and the full named-color table) is owned by the shared
+        // Broiler.CSS value parser; the bridge only interpolates the parsed channels.
         if (IsColorProperty(prop))
         {
-            if (TryParseRgbColor(fromValue, out int fr, out int fg, out int fb, out double fa) &&
-                TryParseRgbColor(toValue, out int tr, out int tg, out int tb, out double ta))
+            if (CssValueParser.TryParseColor(fromValue, out var fromColor) &&
+                CssValueParser.TryParseColor(toValue, out var toColor))
             {
-                int r = (int)Math.Round(fr + (tr - fr) * progress);
-                int g = (int)Math.Round(fg + (tg - fg) * progress);
-                int b = (int)Math.Round(fb + (tb - fb) * progress);
-                r = Math.Clamp(r, 0, 255);
-                g = Math.Clamp(g, 0, 255);
-                b = Math.Clamp(b, 0, 255);
+                int r = Math.Clamp((int)Math.Round(fromColor.Red + (toColor.Red - fromColor.Red) * progress), 0, 255);
+                int g = Math.Clamp((int)Math.Round(fromColor.Green + (toColor.Green - fromColor.Green) * progress), 0, 255);
+                int b = Math.Clamp((int)Math.Round(fromColor.Blue + (toColor.Blue - fromColor.Blue) * progress), 0, 255);
 
+                double fa = fromColor.Alpha / 255.0;
+                double ta = toColor.Alpha / 255.0;
                 if (Math.Abs(fa - 1.0) < 0.001 && Math.Abs(ta - 1.0) < 0.001)
                     return $"rgb({r}, {g}, {b})";
 
@@ -597,48 +518,4 @@ public sealed partial class DomBridge
         _ => false,
     };
 
-    private static bool TryParseRgbColor(string value, out int r, out int g, out int b, out double a)
-    {
-        r = g = b = 0;
-        a = 1.0;
-
-        var m = RgbaPattern.Match(value);
-        if (m.Success)
-        {
-            r = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
-            g = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
-            b = int.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture);
-            if (m.Groups[4].Success)
-                a = double.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture);
-            return true;
-        }
-
-        // Try named colors
-        return TryParseNamedColor(value, out r, out g, out b);
-    }
-
-    private static bool TryParseNamedColor(string name, out int r, out int g, out int b)
-    {
-        r = g = b = 0;
-        switch (name.Trim().ToLowerInvariant())
-        {
-            case "red": r = 255; return true;
-            case "green": g = 128; return true;
-            case "blue": b = 255; return true;
-            case "white": r = g = b = 255; return true;
-            case "black": return true;
-            case "yellow": r = 255; g = 255; return true;
-            case "cyan" or "aqua": g = 255; b = 255; return true;
-            case "magenta" or "fuchsia": r = 255; b = 255; return true;
-            case "lime": g = 255; return true;
-            case "orange": r = 255; g = 165; return true;
-            case "transparent": return true;
-            default: return false;
-        }
-    }
-
-    [GeneratedRegex(@"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial System.Text.RegularExpressions.Regex RgbPatternRegex();
-    [GeneratedRegex(@"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
-    private static partial System.Text.RegularExpressions.Regex RgbaPatternRegex();
 }

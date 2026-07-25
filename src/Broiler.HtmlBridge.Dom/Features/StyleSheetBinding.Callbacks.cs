@@ -157,7 +157,7 @@ internal static partial class StyleSheetBinding
     {
         var serialized = new List<string>
                         {
-                            $"syntax: \"{EscapeCssPropertyRuleSyntax(syntax)}\"",
+                            $"syntax: \"{CssomRuleMetadata.EscapeDescriptorString(syntax)}\"",
                             $"inherits: {(inherits ? "true" : "false")}"};
         if (!string.IsNullOrEmpty(initialValue))
             serialized.Add($"initial-value: {initialValue}");

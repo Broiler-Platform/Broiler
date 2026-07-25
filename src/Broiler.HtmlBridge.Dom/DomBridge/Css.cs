@@ -250,7 +250,7 @@ public sealed partial class DomBridge
 
     private Dictionary<string, string> BuildSpecifiedStyleMap(DomElement element, string? pseudoElement = null)
     {
-        pseudoElement = NormalizePseudoElement(pseudoElement);
+        pseudoElement = CssStyleEngine.NormalizePseudoElement(pseudoElement);
         var specified = new Dictionary<string, string>(
             GetSyncedScopedEngine(element).GetCascadedDeclaredValues(element, pseudoElement),
             StringComparer.OrdinalIgnoreCase);
@@ -266,27 +266,6 @@ public sealed partial class DomBridge
         return specified;
     }
 
-    private static string? NormalizePseudoElement(string? pseudoElement)
-    {
-        if (string.IsNullOrWhiteSpace(pseudoElement))
-            return null;
-
-        pseudoElement = pseudoElement.Trim();
-        if (pseudoElement.Equals("::before", StringComparison.OrdinalIgnoreCase) ||
-            pseudoElement.Equals(":before", StringComparison.OrdinalIgnoreCase))
-            return "::before";
-        if (pseudoElement.Equals("::after", StringComparison.OrdinalIgnoreCase) ||
-            pseudoElement.Equals(":after", StringComparison.OrdinalIgnoreCase))
-            return "::after";
-        if (pseudoElement.Equals("::first-line", StringComparison.OrdinalIgnoreCase) ||
-            pseudoElement.Equals(":first-line", StringComparison.OrdinalIgnoreCase))
-            return "::first-line";
-        if (pseudoElement.Equals("::first-letter", StringComparison.OrdinalIgnoreCase) ||
-            pseudoElement.Equals(":first-letter", StringComparison.OrdinalIgnoreCase))
-            return "::first-letter";
-
-        return null;
-    }
 
     private static bool IsSelectListBox(DomElement element) => GetSelectVisibleRowCount(element) > 1;
 
@@ -301,12 +280,6 @@ public sealed partial class DomBridge
         }
 
         return isMultiple ? 4 : 1;
-    }
-
-    private static bool IsVerticalWritingMode(string? writingMode)
-    {
-        var normalized = writingMode?.Trim().ToLowerInvariant();
-        return normalized is "vertical-rl" or "vertical-lr" or "sideways-rl" or "sideways-lr";
     }
 
     /// <summary>
@@ -470,183 +443,13 @@ public sealed partial class DomBridge
         => CssStyleEngine.ExpandShorthands(computed);
 
     /// <summary>
-    /// Parses a CSS length value (e.g. "0", "100px", "1em") to pixels.
-    /// Returns -1 if the value cannot be parsed.
-    /// Default font size for em conversion is 16px.
+    /// Parses a CSS length value (e.g. "0", "100px", "1em") to pixels, returning
+    /// <see cref="double.NaN"/> when it cannot be parsed. Font-free approximation
+    /// (1em = 16px default); the algorithm is owned by the canonical
+    /// <see cref="CssLengthParser.ParseToPixels"/>.
     /// </summary>
-    internal static double ParseCssLengthToPixels(string value, int viewportWidth = 0, int viewportHeight = 0)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return double.NaN;
-
-        var v = NormalizeSingleValueLengthFunction(value).Trim().ToLowerInvariant();
-        if (viewportHeight > 0 && v.EndsWith("vh"))
-        {
-            if (double.TryParse(v[..^2], NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var vh))
-            {
-                return (vh / 100.0) * viewportHeight;
-            }
-
-            return double.NaN;
-        }
-
-        if (viewportWidth > 0 && v.EndsWith("vw"))
-        {
-            if (double.TryParse(v[..^2], NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var vw))
-            {
-                return (vw / 100.0) * viewportWidth;
-            }
-
-            return double.NaN;
-        }
-
-        var viewportMin = Math.Min(viewportWidth, viewportHeight);
-        if (viewportMin > 0 && v.EndsWith("vmin"))
-        {
-            if (double.TryParse(v[..^4], NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var vmin))
-            {
-                return (vmin / 100.0) * viewportMin;
-            }
-
-            return double.NaN;
-        }
-
-        var viewportMax = Math.Max(viewportWidth, viewportHeight);
-        if (viewportMax > 0 && v.EndsWith("vmax"))
-        {
-            if (double.TryParse(v[..^4], NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var vmax))
-            {
-                return (vmax / 100.0) * viewportMax;
-            }
-
-            return double.NaN;
-        }
-
-        if (v.EndsWith("px"))
-        {
-            if (double.TryParse(v[..^2], NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var px))
-                return px;
-            return double.NaN;
-        }
-        if (v.EndsWith("em") || v.EndsWith("rem"))
-        {
-            var numStr = v.EndsWith("rem") ? v[..^3] : v[..^2];
-            if (double.TryParse(numStr, NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var em))
-                return em * 16.0; // 1em = 16px default
-            return double.NaN;
-        }
-        if (v.EndsWith("ex"))
-        {
-            if (double.TryParse(v[..^2], NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var ex))
-                return ex * 8.0; // Match the core parser's 1ex ≈ 0.5em approximation at 16px.
-            return double.NaN;
-        }
-        if (v.EndsWith("ch"))
-        {
-            if (double.TryParse(v[..^2], NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var ch))
-                return ch * 8.0; // Approximate 1ch as 8px for a 16px monospace glyph advance.
-            return double.NaN;
-        }
-        if (v.EndsWith("ic"))
-        {
-            if (double.TryParse(v[..^2], NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var ic))
-                return ic * 16.0; // Approximate 1ic as 1em for the current focused Phase 3 slice.
-            return double.NaN;
-        }
-        if (v.EndsWith("rlh"))
-        {
-            if (double.TryParse(v[..^3], NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var rlh))
-                return rlh * 19.2; // Approximate 1rlh as the default 16px root line-height × 1.2.
-            return double.NaN;
-        }
-        if (v.EndsWith("lh"))
-        {
-            if (double.TryParse(v[..^2], NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var lh))
-                return lh * 19.2; // Approximate 1lh as the default 16px line-height × 1.2.
-            return double.NaN;
-        }
-        // Plain number (treat as pixels)
-        if (double.TryParse(v, NumberStyles.Float,
-            CultureInfo.InvariantCulture, out var raw))
-            return raw;
-        return double.NaN;
-    }
-
-    private static string NormalizeSingleValueLengthFunction(string value)
-    {
-        var current = value.Trim();
-        while (TryUnwrapSingleValueFunction(current, "calc", out var inner) ||
-               TryUnwrapSingleValueFunction(current, "max", out inner) ||
-               TryUnwrapSingleValueFunction(current, "min", out inner))
-        {
-            current = inner.Trim();
-        }
-
-        while (current.Length >= 2 && current[0] == '(' && current[^1] == ')' && HasBalancedParens(current[1..^1]))
-            current = current[1..^1].Trim();
-
-        return current;
-    }
-
-    private static bool TryUnwrapSingleValueFunction(string value, string functionName, out string inner)
-    {
-        inner = string.Empty;
-        if (!value.StartsWith(functionName + "(", StringComparison.OrdinalIgnoreCase) || value[^1] != ')')
-            return false;
-
-        var content = value[(functionName.Length + 1)..^1];
-        if (!HasBalancedParens(content))
-            return false;
-
-        var depth = 0;
-        foreach (var ch in content)
-        {
-            switch (ch)
-            {
-                case '(':
-                    depth++;
-                    break;
-                case ')':
-                    depth--;
-                    break;
-                case ',' when depth == 0:
-                    return false;
-            }
-        }
-
-        inner = content;
-        return true;
-    }
-
-    private static bool HasBalancedParens(string value)
-    {
-        var depth = 0;
-        foreach (var ch in value)
-        {
-            if (ch == '(')
-            {
-                depth++;
-            }
-            else if (ch == ')')
-            {
-                depth--;
-                if (depth < 0)
-                    return false;
-            }
-        }
-
-        return depth == 0;
-    }
+    internal static double ParseCssLengthToPixels(string value, int viewportWidth = 0, int viewportHeight = 0) =>
+        CssLengthParser.ParseToPixels(value, viewportWidth, viewportHeight);
 
     /// <summary>
     /// Determines the viewport width and height for media query evaluation

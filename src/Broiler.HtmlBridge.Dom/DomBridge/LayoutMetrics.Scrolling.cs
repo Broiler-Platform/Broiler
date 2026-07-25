@@ -9,6 +9,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Dom.Runtime;
 using Broiler.Dom;
+using Broiler.CSS;
 using System.Globalization;
 
 namespace Broiler.HtmlBridge;
@@ -159,7 +160,7 @@ public sealed partial class DomBridge
         var props = GetComputedProps(scrollContainer);
         var writingMode = props.GetValueOrDefault("writing-mode")?.Trim().ToLowerInvariant();
         var direction = props.GetValueOrDefault("direction");
-        bool isVerticalWritingMode = IsVerticalWritingMode(writingMode);
+        bool isVerticalWritingMode = CssWritingMode.IsVertical(writingMode);
         bool isRtl = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
 
         var horizontal = ResolvePhysicalAxisAlignment(
@@ -525,7 +526,7 @@ public sealed partial class DomBridge
         var writingMode = props.GetValueOrDefault("writing-mode")?.Trim().ToLowerInvariant();
         var direction = props.GetValueOrDefault("direction");
         var isRtl = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
-        var isVertical = IsVerticalWritingMode(writingMode);
+        var isVertical = CssWritingMode.IsVertical(writingMode);
         var usesNegativeLeft = (isVertical && writingMode?.EndsWith("-rl", StringComparison.Ordinal) == true)
             || (string.Equals(writingMode, "horizontal-tb", StringComparison.OrdinalIgnoreCase) && isRtl);
         var usesNegativeTop = isVertical && isRtl;
@@ -540,7 +541,7 @@ public sealed partial class DomBridge
     private bool CanProgrammaticallyScrollSelectListBox(DomElement element, bool vertical)
     {
         var props = GetComputedProps(element);
-        bool verticalWritingMode = IsVerticalWritingMode(props.GetValueOrDefault("writing-mode"));
+        bool verticalWritingMode = CssWritingMode.IsVertical(props.GetValueOrDefault("writing-mode"));
         bool blockAxisIsVertical = !verticalWritingMode;
         if (vertical != blockAxisIsVertical)
             return false;
@@ -559,7 +560,7 @@ public sealed partial class DomBridge
         }
 
         var props = GetComputedProps(element);
-        bool verticalWritingMode = IsVerticalWritingMode(props.GetValueOrDefault("writing-mode"));
+        bool verticalWritingMode = CssWritingMode.IsVertical(props.GetValueOrDefault("writing-mode"));
         int optionCount = Math.Max(1, CountSelectOptions(element));
         double rowExtent = Math.Max(16, ResolveLineHeightForElement(element));
         double clientInlineExtent = verticalWritingMode

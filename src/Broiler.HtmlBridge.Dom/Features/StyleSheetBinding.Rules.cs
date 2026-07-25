@@ -146,7 +146,7 @@ internal static partial class StyleSheetBinding
                     var descriptors = DomBridge.ParseStyle(CssSerializer.Serialize(((CssAtRule)rule).Declarations ?? new CssDeclarationBlock([])));
                     var propertyName = ((CssAtRule)rule).Prelude;
                     var syntax = descriptors.TryGetValue("syntax", out var syntaxValue)
-                        ? UnquoteCssPropertyRuleDescriptor(syntaxValue)
+                        ? CssomRuleMetadata.UnquoteDescriptor(syntaxValue)
                         : "*";
                     var inherits = !descriptors.TryGetValue("inherits", out var inheritsValue)
                         || !string.Equals(inheritsValue, "false", StringComparison.OrdinalIgnoreCase);
@@ -430,7 +430,7 @@ internal static partial class StyleSheetBinding
                 var descriptorsText = trimmedRuleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                 var descriptors = DomBridge.ParseStyle(descriptorsText);
                 var syntax = descriptors.TryGetValue("syntax", out var syntaxValue)
-                    ? UnquoteCssPropertyRuleDescriptor(syntaxValue)
+                    ? CssomRuleMetadata.UnquoteDescriptor(syntaxValue)
                     : "*";
                 var inherits = !descriptors.TryGetValue("inherits", out var inheritsValue)
                     || !string.Equals(inheritsValue, "false", StringComparison.OrdinalIgnoreCase);
@@ -559,11 +559,11 @@ internal static partial class StyleSheetBinding
             if (parts.Length == 2)
             {
                 prefix = parts[0];
-                namespaceUri = ExtractNamespaceUri(parts[1]);
+                namespaceUri = CssomRuleMetadata.ExtractNamespaceUri(parts[1]);
             }
             else if (parts.Length == 1)
             {
-                namespaceUri = ExtractNamespaceUri(parts[0]);
+                namespaceUri = CssomRuleMetadata.ExtractNamespaceUri(parts[0]);
             }
 
             ruleObj.FastAddValue((KeyString)"namespaceURI", new JSString(namespaceUri), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -624,44 +624,4 @@ internal static partial class StyleSheetBinding
         return ruleObj;
     }
 
-    /// <summary>Extracts a namespace URI from a quoted string or <c>url(...)</c> token.</summary>
-    private static string ExtractNamespaceUri(string uriPart)
-    {
-        uriPart = uriPart.Trim();
-
-        if (uriPart.StartsWith("url(", StringComparison.OrdinalIgnoreCase))
-        {
-            var openParen = uriPart.IndexOf('(');
-            var closeParen = uriPart.LastIndexOf(')');
-            if (openParen >= 0 && closeParen > openParen)
-            {
-                return uriPart.Substring(openParen + 1, closeParen - openParen - 1)
-                    .Trim()
-                    .Trim('"', '\'');
-            }
-        }
-
-        if (uriPart.Length > 1 && (uriPart[0] == '"' || uriPart[0] == '\''))
-        {
-            var quote = uriPart[0];
-            var closingQuote = uriPart.LastIndexOf(quote);
-            if (closingQuote > 0)
-                return uriPart[1..closingQuote];
-        }
-
-        return uriPart;
-    }
-
-    private static string UnquoteCssPropertyRuleDescriptor(string value)
-    {
-        value = value.Trim();
-        if (value.Length >= 2 && (value[0] == '"' || value[0] == '\'') && value[^1] == value[0])
-            return value[1..^1];
-
-        return value;
-    }
-
-    private static string EscapeCssPropertyRuleSyntax(string syntax) =>
-        syntax.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
 }

@@ -5,6 +5,7 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.Dom;
+using Broiler.Dom.Html;
 
 namespace Broiler.HtmlBridge.Dom.Features;
 
@@ -35,7 +36,7 @@ internal sealed class FormBinding(IFormHost host)
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         // length — alias for elements.length
         obj.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => new JSNumber(DomBridge.CollectFormControls(element).Count), "get length"),
+            new JSFunction((in _) => new JSNumber(HtmlElementQueries.CollectFormControls(element).Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         // action (read/write)
         obj.FastAddProperty((KeyString)"action",
@@ -46,7 +47,7 @@ internal sealed class FormBinding(IFormHost host)
 
     private JSObject BuildElementsCollection(DomElement form)
     {
-        var controls = DomBridge.CollectFormControls(form);
+        var controls = HtmlElementQueries.CollectFormControls(form);
 
         // FormElementsCollection returns null for missing named properties (per
         // HTMLFormControlsCollection spec behaviour).
@@ -56,7 +57,7 @@ internal sealed class FormBinding(IFormHost host)
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
         collection.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => new JSNumber(DomBridge.CollectFormControls(form).Count), "get length"),
+            new JSFunction((in _) => new JSNumber(HtmlElementQueries.CollectFormControls(form).Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return collection;
@@ -122,7 +123,7 @@ internal sealed class FormBinding(IFormHost host)
             var prop = key.Value.ToString();
             if (!string.IsNullOrEmpty(prop))
             {
-                var controls = DomBridge.CollectFormControls(form);
+                var controls = HtmlElementQueries.CollectFormControls(form);
                 foreach (var ctrl in controls)
                 {
                     if (ctrl.GetAttribute("name") is { } name &&

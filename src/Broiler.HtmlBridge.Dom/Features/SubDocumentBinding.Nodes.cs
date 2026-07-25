@@ -65,7 +65,7 @@ internal sealed partial class SubDocumentBinding
         var fragment = a[0].ToString();
         // Parse DOCTYPE if present
         var doctype = _host.ParseDocType(fragment);
-        var (parsedDoc, _, _) = DomBridge.BuildDocumentTree(fragment);
+        var (parsedDoc, _, _, _) = DomBridge.BuildDocumentTree(fragment);
         if (docRoot.ChildNodes.Count == 0)
         {
             if (doctype != null)

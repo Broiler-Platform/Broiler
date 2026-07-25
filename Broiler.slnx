@@ -932,7 +932,31 @@
       <BuildType Solution="Release-Linux|*" Project="Release" />
       <BuildType Solution="Release-Windows|*" Project="Release" />
     </Project>
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Portable.Tests/Broiler.JavaScript.Portable.Tests.csproj">
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Release" />
+      <BuildType Solution="Release-Windows|*" Project="Release" />
+    </Project>
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Feature.Sample/Broiler.JavaScript.Feature.Sample.csproj">
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Release" />
+      <BuildType Solution="Release-Windows|*" Project="Release" />
+    </Project>
     <Project Path="Broiler.JS/Broiler.JS/OtherTests/JIntPerfTests/JIntPerfTests.csproj">
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Release" />
+      <BuildType Solution="Release-Windows|*" Project="Release" />
+    </Project>
+    <Project Path="Broiler.JS/Broiler.JS/samples/Broiler.JavaScript.NativeAotSample/Broiler.JavaScript.NativeAotSample.csproj">
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Release" />
+      <BuildType Solution="Release-Windows|*" Project="Release" />
+    </Project>
+    <Project Path="Broiler.JS/Broiler.JS/samples/Broiler.JavaScript.StartupHost/Broiler.JavaScript.StartupHost.csproj">
       <BuildType Solution="Debug-Linux|*" Project="Debug" />
       <BuildType Solution="Debug-Windows|*" Project="Debug" />
       <BuildType Solution="Release-Linux|*" Project="Release" />
@@ -1237,6 +1261,12 @@
       <BuildType Solution="Release-Linux|*" Project="Release" />
       <BuildType Solution="Release-Windows|*" Project="Release" />
     </Project>
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Minimal/Broiler.JavaScript.Minimal.csproj">
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Release" />
+      <BuildType Solution="Release-Windows|*" Project="Release" />
+    </Project>
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.ModuleExtensions/Broiler.JavaScript.ModuleExtensions.csproj">
       <BuildType Solution="Debug-Linux|*" Project="Debug" />
       <BuildType Solution="Debug-Windows|*" Project="Debug" />
@@ -1250,6 +1280,18 @@
       <BuildType Solution="Release-Windows|*" Project="Release" />
     </Project>
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Parser/Broiler.JavaScript.Parser.csproj">
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Release" />
+      <BuildType Solution="Release-Windows|*" Project="Release" />
+    </Project>
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Portable/Broiler.JavaScript.Portable.csproj">
+      <BuildType Solution="Debug-Linux|*" Project="Debug" />
+      <BuildType Solution="Debug-Windows|*" Project="Debug" />
+      <BuildType Solution="Release-Linux|*" Project="Release" />
+      <BuildType Solution="Release-Windows|*" Project="Release" />
+    </Project>
+    <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Portable.Compiler/Broiler.JavaScript.Portable.Compiler.csproj">
       <BuildType Solution="Debug-Linux|*" Project="Debug" />
       <BuildType Solution="Debug-Windows|*" Project="Debug" />
       <BuildType Solution="Release-Linux|*" Project="Release" />
@@ -1399,12 +1441,6 @@
       <BuildType Solution="Release-Windows|*" Project="Release" />
     </Project>
     <Project Path="src/Broiler.HtmlBridge.Dom/Broiler.HtmlBridge.Dom.csproj">
-      <BuildType Solution="Debug-Linux|*" Project="Debug" />
-      <BuildType Solution="Debug-Windows|*" Project="Debug" />
-      <BuildType Solution="Release-Linux|*" Project="Release" />
-      <BuildType Solution="Release-Windows|*" Project="Release" />
-    </Project>
-    <Project Path="src/Broiler.HtmlBridge.Rendering/Broiler.HtmlBridge.Rendering.csproj">
       <BuildType Solution="Debug-Linux|*" Project="Debug" />
       <BuildType Solution="Debug-Windows|*" Project="Debug" />
       <BuildType Solution="Release-Linux|*" Project="Release" />

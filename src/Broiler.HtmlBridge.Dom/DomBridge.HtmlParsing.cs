@@ -41,12 +41,6 @@ public sealed partial class DomBridge
         // layout view (and its renderer container) so geometry is document-scoped.
         DisposeLayoutView();
 
-        // Parse DOCTYPE from the HTML and add it as the document's first child (before <html>,
-        // which is (re)appended below — canonical DomDocument requires doctype-before-element).
-        var doctype = ParseDocType(html);
-        if (doctype != null)
-            _document.AppendChild(doctype);
-
         // Publish the document's quirks mode for the render that follows on this
         // thread. Layout (which on the HTML-string path holds no back-reference to
         // the document) reads it while sizing the root/body boxes for the
@@ -55,8 +49,13 @@ public sealed partial class DomBridge
         Layout.DocumentModeContext.CurrentQuirksMode =
             Layout.DocumentModeContext.IsQuirksHtml(html);
 
-        // Use WHATWG-aligned tokeniser & tree builder (shared HtmlDocumentParser).
-        var (docElement, allElements, title) = BuildDocumentTree(html);
+        // Use WHATWG-aligned tokeniser & tree builder (shared HtmlDocumentParser). The parser
+        // now also yields the canonical <!DOCTYPE> node (name + PUBLIC/SYSTEM identifiers), so the
+        // bridge no longer re-parses it with its own regex. Add it as the document's first child
+        // (before <html>, appended below — canonical DomDocument requires doctype-before-element).
+        var (docElement, doctype, allElements, title) = BuildDocumentTree(html);
+        if (doctype != null)
+            _document.AppendChild(doctype);
         Title = title;
         ClearChildren(DocumentElement);
         // RF-BRIDGE-1c Phase F (F3c part 2d): reparent ALL children (raw ChildNodes) so any

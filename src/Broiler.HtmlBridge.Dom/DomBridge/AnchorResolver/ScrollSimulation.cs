@@ -1,5 +1,6 @@
 using System.Globalization;
 using Broiler.Dom;
+using Broiler.CSS;
 
 namespace Broiler.HtmlBridge;
 
@@ -41,7 +42,7 @@ public sealed partial class DomBridge
                 // document scrolling element (<html>) which is implicitly
                 // clipped by the viewport.
                 var props = GetComputedProps(el);
-                bool clips = HasOverflowClipping(props);
+                bool clips = CssOverflow.ClipsOverflow(props);
                 bool isDocScrollingElement =
                     string.Equals(el.TagName, "html", StringComparison.OrdinalIgnoreCase);
 
@@ -84,26 +85,4 @@ public sealed partial class DomBridge
 
     private double GetScrollSimulationScaleFactor() => HasActiveVisualViewport() ? GetVisualViewportScale() : 1;
 
-    private static bool HasOverflowClipping(Dictionary<string, string> props)
-    {
-        if (props.TryGetValue("overflow", out var ov))
-        {
-            var val = ov.Trim().ToLowerInvariant();
-            if (val.Contains("hidden") || val.Contains("scroll") || val.Contains("auto") || val.Contains("clip"))
-                return true;
-        }
-        if (props.TryGetValue("overflow-x", out var ovx))
-        {
-            var val = ovx.Trim().ToLowerInvariant();
-            if (val.Contains("hidden") || val.Contains("scroll") || val.Contains("auto") || val.Contains("clip"))
-                return true;
-        }
-        if (props.TryGetValue("overflow-y", out var ovy))
-        {
-            var val = ovy.Trim().ToLowerInvariant();
-            if (val.Contains("hidden") || val.Contains("scroll") || val.Contains("auto") || val.Contains("clip"))
-                return true;
-        }
-        return false;
-    }
 }
