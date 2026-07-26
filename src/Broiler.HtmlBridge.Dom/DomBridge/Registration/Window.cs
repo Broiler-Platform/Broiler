@@ -151,25 +151,13 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"scrollTo", new JSFunction((in a) => Dom.Features.WindowScrollBinding.ScrollTo(this, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"scrollBy", new JSFunction((in a) => Dom.Features.WindowScrollBinding.ScrollBy(this, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         // window addEventListener / removeEventListener / dispatchEvent, co-located in the
-        // WindowEventTargetBinding feature module (Phase 3).
-        //
-        // Mirrored onto the global object as well. In a browser `window` IS the global object,
-        // so the idiomatic bare `addEventListener("load", …)` registers a window listener; here
-        // the two are distinct objects, so a bare call resolved to nothing and threw a
-        // ReferenceError that aborted the *whole* script — not merely a listener that never
-        // fired. This is the same global/window split the bare `onload = fn` shim in
-        // FireWindowLoadEvent documents, and the same mirroring `screen`/`frames` below already
-        // do. The identical JSFunction instances are shared between the two objects, so a
-        // listener added bare can be removed through `window` and vice versa.
-        var addEventListenerFn = new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.AddEventListener(this, in a), "addEventListener", 3);
-        var removeEventListenerFn = new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 3);
-        var dispatchEventFn = new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.DispatchEvent(this, in a), "dispatchEvent", 1);
-        window.FastAddValue((KeyString)"addEventListener", addEventListenerFn, JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"removeEventListener", removeEventListenerFn, JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"dispatchEvent", dispatchEventFn, JSPropertyAttributes.EnumerableConfigurableValue);
-        context["addEventListener"] = addEventListenerFn;
-        context["removeEventListener"] = removeEventListenerFn;
-        context["dispatchEvent"] = dispatchEventFn;
+        // WindowEventTargetBinding feature module (Phase 3). These reach the global object — so
+        // the idiomatic unqualified `addEventListener("load", …)` registers a window listener,
+        // as it does in a browser — through MirrorWindowMembersOntoGlobal, which shares the
+        // identical function objects so the two spellings address one listener store.
+        window.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.AddEventListener(this, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"dispatchEvent", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.DispatchEvent(this, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         _messaging.RegisterWindowMessaging(window);
 
