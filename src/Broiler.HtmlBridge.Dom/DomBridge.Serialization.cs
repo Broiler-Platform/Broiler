@@ -182,6 +182,10 @@ public sealed partial class DomBridge
         RemoveRenderCommentNodes(root);
         ApplyCssomStyleSheetMutations(root);
         ApplyMetaColorScheme(root);
+        // A running view transition activates conditional rules and then paints its pseudo tree;
+        // the type rules must bake before the tree is captured so the "new" snapshot reflects them.
+        ApplyActiveViewTransitionTypeRules(root);
+        ApplyViewTransitionPseudoTree(root);
         // Zoom baking is applied by the callers (GetRenderDocument/SerializeToHtml) before this,
         // so it can be reverted on the geometry-snapshot path; pseudo/progress below depend on
         // the baked sizes and must run after it.
