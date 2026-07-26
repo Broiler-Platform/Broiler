@@ -63,23 +63,6 @@ public sealed partial class DomBridge
         NativeVisualViewport && HasActiveVisualViewport() ? GetVisualViewportScale() : 1.0;
 
 
-    private double GetTransformScale(DomElement element)
-    {
-        var transform = GetElementTransformValue(element);
-        if (string.IsNullOrWhiteSpace(transform))
-            return 1;
-
-        var match = GetTransformScaleRegex().Match(transform);
-        if (match.Success &&
-            double.TryParse(match.Groups["value"].Value, NumberStyles.Float,
-                CultureInfo.InvariantCulture, out double scale))
-        {
-            return scale;
-        }
-
-        return 1;
-    }
-
     private string? GetElementTransformValue(DomElement element)
     {
         var props = GetComputedProps(element);
@@ -342,8 +325,6 @@ public sealed partial class DomBridge
     // CreateSvgLengthValue moved to the SvgElementBinding feature module (Phase 3 P3.50) — its only
     // consumer (the SVGAnimatedLength stub) moved there too.
 
-    [GeneratedRegex(@"scale\(\s*(?<value>[-+]?[0-9]*\.?[0-9]+)\s*\)", RegexOptions.IgnoreCase, "de-DE")]
-    private static partial System.Text.RegularExpressions.Regex GetTransformScaleRegex();
     [GeneratedRegex(@"[Mm]\s*(?<x>[-+]?[0-9]*\.?[0-9]+)(?:[\s,]+(?<y>[-+]?[0-9]*\.?[0-9]+))", RegexOptions.CultureInvariant)]
     private static partial System.Text.RegularExpressions.Regex TryResolveSvgTextPathStartRegex();
 }
