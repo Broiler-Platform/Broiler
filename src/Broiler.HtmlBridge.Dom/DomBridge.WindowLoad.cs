@@ -38,6 +38,8 @@ public sealed partial class DomBridge
 
         _jsContext["frames"] = BuildWindowFramesArray();
 
+        FireDomContentLoadedEvent();
+
         var htmlEl = Elements.FirstOrDefault(e =>
             string.Equals(e.TagName, "html", StringComparison.OrdinalIgnoreCase));
         if (htmlEl != null)
@@ -109,6 +111,46 @@ public sealed partial class DomBridge
         {
             RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
                 $"Error firing window load event: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Fires <c>DOMContentLoaded</c> at the document, then at the window. Nothing dispatched
+    /// this event at all, so <c>document.addEventListener("DOMContentLoaded", …)</c> — one of
+    /// the two idiomatic ways a page defers work until the DOM is ready — silently never ran.
+    /// <para>
+    /// It fires here, at the head of the load sequence, because the bridge has already run
+    /// every synchronous script by the time this is called: that is the point at which parsing
+    /// is finished, which is what the event means. Per DOM the event bubbles from the document
+    /// to the window, but the window is a separate listener store with its own dispatch path
+    /// here, so the two are dispatched explicitly rather than by propagation. Both are wrapped
+    /// so a throwing listener cannot abort the rest of the load sequence, matching how the
+    /// window <c>load</c> dispatch below is guarded.
+    /// </para>
+    /// </summary>
+    private void FireDomContentLoadedEvent()
+    {
+        try
+        {
+            var evt = new JSObject();
+            evt.FastAddValue((KeyString)"type", new JSString("DOMContentLoaded"), JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue((KeyString)"bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+            DispatchEventOnElement(_document, evt);
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireDomContentLoadedEvent",
+                $"Error firing document DOMContentLoaded listeners: {ex.Message}", ex);
+        }
+
+        try
+        {
+            DispatchWindowEvent("DOMContentLoaded", bubbles: true);
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireDomContentLoadedEvent",
+                $"Error firing window DOMContentLoaded listeners: {ex.Message}", ex);
         }
     }
 

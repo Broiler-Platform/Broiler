@@ -17,10 +17,17 @@ internal static class ChildNodeBinding
 {
     public static JSValue Remove(IChildNodeHost host, DomNode element, in Arguments _)
     {
-        // Capture the parent up front: ParentEl(node) is computed from the canonical ParentNode, and
-        // the removal detaches it — reading ParentEl(element) after would return null (→ NRE in
+        // Capture the parent up front: it is computed from the canonical ParentNode, and the
+        // removal detaches it — reading it after would return null (→ NRE in
         // InvalidateStyleScope). Mirrors the removeChild path, which holds the parent independently.
-        var parent = DomBridge.ParentEl(element);
+        //
+        // The parent is a DomNode, not a DomElement: the document element's parent is the
+        // DomDocument, so narrowing to an element here made `document.documentElement.remove()`
+        // a silent no-op and the removed page kept rendering (WPT html/rendering
+        // Document-documentElement-remove-clears-content). The tree helpers below all take a
+        // DomNode parent already; only style-scope invalidation needs an element anchor, and a
+        // document parent has no style scope to invalidate.
+        var parent = element.ParentNode;
         if (parent != null)
         {
             var idx = DomBridge.ChildIndexOf(parent, element);
@@ -29,7 +36,8 @@ internal static class ChildNodeBinding
                 host.NotifyNodeIteratorPreRemoval(element);
                 DomBridge.RemoveNthChild(parent, idx);
                 DomBridge.SetParent(element, null);
-                host.InvalidateStyleScope(parent);
+                if (parent is DomElement parentElement)
+                    host.InvalidateStyleScope(parentElement);
                 host.NotifyChildRemoved(parent, element, idx);
             }
         }

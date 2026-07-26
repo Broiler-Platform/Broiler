@@ -1,0 +1,127 @@
+From 0eb0da9c7af96e922027ad3f52535da46270c86c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 26 Jul 2026 12:27:13 +0000
+Subject: [PATCH] GraphicsAdapter: rasterise translate/uniform-scale CSS
+ transforms
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Any non-identity CSS transform (translate, scale, rotate) made the transformed
+element's content vanish entirely in the headless raster pipeline. SaveTransformLayer
+unconditionally incremented _activeCompatLayerDepth, which flips CanUseRaster off, so
+every draw enclosed by the transform routed to the compat backend instead of the
+raster canvas; with the stub compat backend used for BBitmap rendering, that content
+was simply never drawn. Only identity transforms — which BCanvas can already express —
+survived.
+
+Give SaveTransformLayer the same raster-vs-compat split the opacity/blend layers use.
+BCanvas.TrySaveTransform folds a translation + uniform scale (the common
+translate()/scale() cases, transform-origin honoured) into the canvas's
+scale/translation, saving the prior state so RestoreTransformLayer reverses it via the
+shared _rasterLayerStack. Rotation, skew and non-uniform scale are not expressible on
+this canvas's point mapping (p -> p*scale + translation), so TrySaveTransform rejects
+them without touching state and the caller still falls back to the compat backend.
+
+Transformed content now rasterises instead of disappearing: verified translate(),
+scale(0.5), a self-scaled box and scaled text all render, and the
+css-view-transitions/small-scale reference (a scale(0.5) ancestor) paints its green
+square where before it was blank. No regression across the rendering suites
+(NativeBackdrop layer compositing, RenderingPipeline, CssRendering, Svg, Acid3).
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ .../Adapters/GraphicsAdapter.cs               | 19 +++++++++
+ Source/Broiler.HTML.Image/BCanvas.cs          | 40 +++++++++++++++++++
+ 2 files changed, 59 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs b/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
+index 0401860..393e40b 100644
+--- a/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
++++ b/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
+@@ -331,12 +331,31 @@ internal sealed class GraphicsAdapter : RGraphics
+ 
+     public override void SaveTransformLayer(float[] matrix, float originX, float originY)
+     {
++        // Prefer the raster canvas for translate/uniform-scale transforms — the common
++        // translate()/scale() cases. Routing those to the compat backend (as the fall-through does)
++        // makes CanUseRaster false for every enclosed draw; with a stub compat backend the
++        // transformed content then vanishes entirely. Rotation/skew/non-uniform scale are not
++        // expressible on the raster canvas and still fall back.
++        bool useRaster = _rasterCanvas is not null
++            && _activeCompatLayerDepth == 0
++            && _rasterCanvas.TrySaveTransform(matrix, originX, originY);
++        _rasterLayerStack.Push(useRaster);
++        if (useRaster)
++            return;
++
+         _activeCompatLayerDepth++;
+         ApplyCanvasOperation(canvas => _canvasCompat.SaveTransformLayer(canvas, matrix, originX, originY));
+     }
+ 
+     public override void RestoreTransformLayer()
+     {
++        bool usedRaster = _rasterLayerStack.Count > 0 && _rasterLayerStack.Pop();
++        if (usedRaster)
++        {
++            _rasterCanvas!.Restore();
++            return;
++        }
++
+         ApplyCanvasOperation(CompatCanvasOperations.Restore);
+         _activeCompatLayerDepth = Math.Max(0, _activeCompatLayerDepth - 1);
+     }
+diff --git a/Source/Broiler.HTML.Image/BCanvas.cs b/Source/Broiler.HTML.Image/BCanvas.cs
+index 0f41979..4f50bb0 100644
+--- a/Source/Broiler.HTML.Image/BCanvas.cs
++++ b/Source/Broiler.HTML.Image/BCanvas.cs
+@@ -36,6 +36,46 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+     /// draws map point -> point*scale + translation. Uniform-only; byte-identical at scale 1.</summary>
+     public void Scale(float scale) => _scale *= scale;
+ 
++    /// <summary>
++    /// Applies a CSS 2D transform (matrix <c>[a,b,c,d,e,f]</c> about origin
++    /// <paramref name="originX"/>/<paramref name="originY"/>) to the raster state, saving the prior
++    /// state so <see cref="Restore"/> reverses it. Returns <c>false</c> — without touching state —
++    /// when the matrix is not expressible on this canvas, which maps a point only as
++    /// <c>p*scale + translation</c>: rotation, skew and non-uniform scale are rejected so the caller
++    /// can route those to the fuller compat backend. Translation and uniform scale (the common
++    /// <c>translate()</c>/<c>scale()</c> cases) are folded into <see cref="_scale"/>/<see cref="_translation"/>
++    /// so transformed content actually rasterises instead of vanishing when the compat backend is a stub.
++    /// </summary>
++    public bool TrySaveTransform(float[] matrix, float originX, float originY)
++    {
++        if (matrix is null || matrix.Length < 6)
++            return false;
++
++        float a = matrix[0], b = matrix[1], c = matrix[2], d = matrix[3], e = matrix[4], f = matrix[5];
++
++        // Only translation + uniform scale survive this canvas's point mapping. b/c carry
++        // rotation/skew; a != d is a non-uniform scale.
++        const float epsilon = 1e-4f;
++        if (MathF.Abs(b) > epsilon || MathF.Abs(c) > epsilon || MathF.Abs(a - d) > epsilon)
++            return false;
++
++        float scale = a;
++
++        // Transform-origin applies to the whole transform: p' = scale*(p - origin) + origin + (e,f).
++        float localTranslateX = originX * (1f - scale) + e;
++        float localTranslateY = originY * (1f - scale) + f;
++
++        // Compose ahead of the existing surface mapping (p -> p*_scale + _translation): a child point p
++        // becomes (scale*p + localTranslate) which the surface then maps, giving
++        // p*(scale*_scale) + (localTranslate*_scale + _translation).
++        Save();
++        _translation = new PointF(
++            localTranslateX * _scale + _translation.X,
++            localTranslateY * _scale + _translation.Y);
++        _scale *= scale;
++        return true;
++    }
++
+     public void Clear(BColor color)
+     {
+         CurrentTarget.ErasePixels(color);
+-- 
+2.43.0
+

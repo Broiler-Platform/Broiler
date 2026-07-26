@@ -151,7 +151,10 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"scrollTo", new JSFunction((in a) => Dom.Features.WindowScrollBinding.ScrollTo(this, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"scrollBy", new JSFunction((in a) => Dom.Features.WindowScrollBinding.ScrollBy(this, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         // window addEventListener / removeEventListener / dispatchEvent, co-located in the
-        // WindowEventTargetBinding feature module (Phase 3).
+        // WindowEventTargetBinding feature module (Phase 3). These reach the global object — so
+        // the idiomatic unqualified `addEventListener("load", …)` registers a window listener,
+        // as it does in a browser — through MirrorWindowMembersOntoGlobal, which shares the
+        // identical function objects so the two spellings address one listener store.
         window.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.AddEventListener(this, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"dispatchEvent", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.DispatchEvent(this, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);

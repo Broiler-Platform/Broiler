@@ -21,9 +21,13 @@ internal static class MatchMediaBinding
 {
     public static JSValue MatchMedia(IMatchMediaHost host, in Arguments a)
     {
+        // An empty query parses to an empty media-query list, which is equivalent
+        // to `all` and therefore matches — the evaluator handles that itself, so
+        // the empty string is passed straight through rather than short-circuited.
         var query = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var matches = !string.IsNullOrEmpty(query)
-            && CssStyleEngine.MatchesMediaQuery(query, new CssEnvironment(host.ViewportWidth, host.ViewportHeight));
+        var matches = CssStyleEngine.MatchesMediaQuery(
+            query,
+            new CssEnvironment(host.ViewportWidth, host.ViewportHeight));
 
         var result = new JSObject();
         result.FastAddValue((KeyString)"matches", matches ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);

@@ -30,11 +30,17 @@ public sealed partial class DomBridge
         // The serialize transforms/zoom bakes mutate the live tree; suppress observer delivery so
         // they neither deliver spurious records nor re-enter script synchronously mid-serialize.
         using var mutationSuppression = SuppressMutationDelivery();
+
+        var root = RenderedDocumentElement;
+        if (root is null)
+            return EmptyDocumentHtml;
+
         if (ZoomBakeActive)
-            ApplyZoomSerializationStyles(DocumentElement, 1.0);
-        ApplySerializationTransforms();
+            ApplyZoomSerializationStyles(root, 1.0);
+        ApplySerializationTransforms(root);
+        ApplyViewTransitionRendering(root);
         return HtmlSerializer.Serialize(
-            DocumentElement,
+            root,
             CreateSerializationAdapter(),
             new HtmlSerializationOptions(
                 IncludeHtmlDoctype: true,
@@ -42,6 +48,31 @@ public sealed partial class DomBridge
                 EncodeTextNodes: false,
                 NewLineAfterDoctype: true));
     }
+
+    /// <summary>
+    /// The document's current element child — what the canvas actually renders — or
+    /// <c>null</c> once the document has none.
+    /// <para>
+    /// <see cref="DocumentElement"/> is captured when the bridge is constructed and never
+    /// tracks tree mutation, so after <c>document.documentElement.remove()</c> it still
+    /// points at the now-detached <c>&lt;html&gt;</c>. Serializing that subtree kept
+    /// rendering the removed document's background and text, where the spec leaves a
+    /// document with no element child and therefore nothing to paint (WPT
+    /// <c>html/rendering/…/Document-documentElement-remove-clears-content</c>: a red
+    /// <c>&lt;html&gt;</c> that removes itself on load must end up blank). Reading the live
+    /// tree here also picks up a <em>replaced</em> document element, which the captured
+    /// field would likewise have missed.
+    /// </para>
+    /// </summary>
+    private DomElement? RenderedDocumentElement => GetDocumentElement(_document);
+
+    /// <summary>
+    /// Serialization of a document with no element child: the doctype alone, matching the
+    /// blank reference these tests compare against. The doctype is unconditional here for
+    /// the same reason <see cref="HtmlSerializationOptions.IncludeHtmlDoctype"/> is set on
+    /// the normal path.
+    /// </summary>
+    private const string EmptyDocumentHtml = "<!DOCTYPE html>\n";
 
     /// <summary>
     /// Returns the canonical document prepared for direct renderer consumption.
@@ -54,15 +85,26 @@ public sealed partial class DomBridge
         // ReflectRenderState + transforms bake style/value attributes onto the live tree; suppress
         // observer delivery so they neither deliver spurious records nor re-enter script mid-bake.
         using var mutationSuppression = SuppressMutationDelivery();
+
+        // Nothing to bake or reflect once the document has no element child; the renderer
+        // gets the empty document and paints the bare canvas (see RenderedDocumentElement).
+        var root = RenderedDocumentElement;
+        if (root is null)
+            return _document;
+
         // Zoom baking runs per call (not part of the run-once guarded transforms); it is idempotent
         // once baked (the `zoom` property is stripped), so repeat calls on the render path are no-ops.
         // Must run before the guarded pseudo/progress transforms, which depend on the baked sizes. The
         // geometry-snapshot path enables NativeZoom (so ZoomBakeActive is false) and never bakes, so it
         // needs no revert — the live document stays pristine.
         if (ZoomBakeActive)
-            ApplyZoomSerializationStyles(DocumentElement, 1.0);
-        ApplySerializationTransforms();
-        ReflectRenderState(DocumentElement);
+            ApplyZoomSerializationStyles(root, 1.0);
+        ApplySerializationTransforms(root);
+        // The view-transition pseudo tree bakes onto existing elements (the active-type rules) and
+        // appends new boxes; run it before ReflectRenderState so both reach the render document's
+        // style attributes.
+        ApplyViewTransitionRendering(root);
+        ReflectRenderState(root);
         return _document;
     }
 
@@ -136,18 +178,126 @@ public sealed partial class DomBridge
 
     private string SerializeChildrenToHtml(DomElement element) => string.Concat(ChildElements(element).Select(SerializeElementToHtml));
 
-    private void ApplySerializationTransforms()
+    private void ApplySerializationTransforms(DomElement root)
     {
         if (_serializationTransformsApplied)
             return;
 
         _serializationTransformsApplied = true;
-        RemoveRenderCommentNodes(DocumentElement);
+        RemoveRenderCommentNodes(root);
+        ApplyCssomStyleSheetMutations(root);
+        ApplyMetaColorScheme(root);
         // Zoom baking is applied by the callers (GetRenderDocument/SerializeToHtml) before this,
         // so it can be reverted on the geometry-snapshot path; pseudo/progress below depend on
         // the baked sizes and must run after it.
-        ApplyZoomPseudoSerializationOverrides();
-        ApplyProgressLikeSerializationPlaceholders(DocumentElement);
+        ApplyZoomPseudoSerializationOverrides(root);
+        ApplyProgressLikeSerializationPlaceholders(root);
+    }
+
+    /// <summary>
+    /// Reflects an <c>&lt;meta name="color-scheme"&gt;</c> onto the root element's used
+    /// <c>color-scheme</c> so the canvas backdrop honours it (WPT
+    /// <c>html/semantics/…/meta-color-scheme-*</c>, <c>css/mediaqueries/prefers-color-scheme-*-with-meta-*</c>).
+    /// <para>
+    /// HTML §4.2.5.3 makes the meta a page-level default for the root's color scheme, which the
+    /// renderer already turns into the dark UA canvas (<c>rgb(18,18,18)</c>) when it reads a
+    /// <c>color-scheme</c> of <c>dark</c> off the <c>&lt;html&gt;</c> box. Nothing translated the
+    /// meta into that property, so <c>&lt;meta name=color-scheme content=dark&gt;</c> painted the
+    /// default light canvas while an equivalent <c>:root { color-scheme: dark }</c> painted dark.
+    /// </para>
+    /// <para>
+    /// Author CSS wins: the meta is applied only when the root declares no <c>color-scheme</c> of
+    /// its own, so <c>:root { color-scheme: light }</c> beside <c>&lt;meta … content=dark&gt;</c>
+    /// stays light. The first meta in tree order with a non-empty <c>content</c> and no
+    /// <c>http-equiv</c> supplies the value; the renderer's own token parsing then selects dark or
+    /// light (an unrecognised value contributes neither and falls back to light, matching the
+    /// invalid-value cases in the spec's test suite). Written to the baked overlay, so it reaches
+    /// the renderer and the serialized <c>style=</c> without polluting the script-observable inline
+    /// style.
+    /// </para>
+    /// </summary>
+    private void ApplyMetaColorScheme(DomElement root)
+    {
+        var metaValue = FindMetaColorScheme(root);
+        if (metaValue is null)
+            return;
+
+        // Author color-scheme on the root takes precedence over the meta default. Read the
+        // cascaded declared value (not the used value), so an explicit author declaration of any
+        // kind suppresses the meta while an absent one lets it through.
+        if (BuildSpecifiedStyleMap(root).TryGetValue("color-scheme", out var declared) &&
+            !string.IsNullOrWhiteSpace(declared))
+        {
+            return;
+        }
+
+        BakedInlineStyle(root)["color-scheme"] = metaValue;
+    }
+
+    /// <summary>
+    /// The <c>content</c> of the first <c>&lt;meta name="color-scheme"&gt;</c> in tree order that
+    /// has a non-empty <c>content</c> and no <c>http-equiv</c>, or <c>null</c> when there is none.
+    /// </summary>
+    private static string? FindMetaColorScheme(DomElement root)
+    {
+        foreach (var element in root.Descendants().OfType<DomElement>())
+        {
+            if (!element.TagName.Equals("meta", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (HasAttr(element, "http-equiv"))
+                continue;
+            if (!TryGetAttribute(element, "name", out var name) ||
+                !name.Trim().Equals("color-scheme", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (TryGetAttribute(element, "content", out var content) &&
+                !string.IsNullOrWhiteSpace(content))
+            {
+                return content.Trim();
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Bakes CSSOM rule-model mutations into the render-bound document. Script
+    /// <c>insertRule</c>/<c>deleteRule</c> mutates the shared rule list held in the
+    /// style element's runtime state — never its text node — so the serialized HTML
+    /// handed to the renderer still carried the original author text and the mutation
+    /// was invisible to layout and paint, while <c>getComputedStyle</c> (which reads
+    /// the model through <see cref="GetStyleElementCssText"/>) already observed it.
+    /// A script that styles the page purely through the CSSOM therefore rendered as
+    /// if it had never run — the WPT <c>css/cssom</c> insertRule family. Replacing the
+    /// text node with the serialized model closes that gap, so the renderer and the
+    /// CSSOM agree on one stylesheet.
+    /// <para>
+    /// Runs inside <see cref="ApplySerializationTransforms"/>, with mutation delivery
+    /// suppressed by its callers, so the rewrite delivers no observer records. It is
+    /// idempotent: the text it writes reparses to the same rules, and the reparse
+    /// clears <see cref="StyleSheetRuntimeState.RulesMutated"/>, so a second pass is a
+    /// no-op. JS-visible <c>innerHTML</c>/<c>outerHTML</c> serialize without the
+    /// transforms and still expose the author text.
+    /// </para>
+    /// <para>
+    /// Only <c>&lt;style&gt;</c> elements are baked. A mutated <c>&lt;link rel=stylesheet&gt;</c>
+    /// has no text node to carry the model — inlining it into a <c>&lt;style&gt;</c> would
+    /// silently re-base its relative <c>url()</c>s onto the document — so those
+    /// mutations stay renderer-invisible until linked sheets are modelled properly.
+    /// </para>
+    /// </summary>
+    private void ApplyCssomStyleSheetMutations(DomElement element)
+    {
+        if (!IsText(element) &&
+            element.TagName.Equals("style", StringComparison.OrdinalIgnoreCase) &&
+            StyleSheetStateFor(element).RulesMutated)
+        {
+            // Read the effective text before rewriting: GetStyleElementCssText compares
+            // the element's current source text against the model's parse source, and
+            // would discard the mutations if the text node had already been replaced.
+            SetElementTextContent(element, GetStyleElementCssText(element));
+        }
+
+        foreach (var child in ChildElements(element))
+            ApplyCssomStyleSheetMutations(child);
     }
 
     /// <summary>
@@ -181,18 +331,18 @@ public sealed partial class DomBridge
         }
     }
 
-    private void ApplyZoomPseudoSerializationOverrides()
+    private void ApplyZoomPseudoSerializationOverrides(DomElement root)
     {
         var rules = new List<string>();
         int pseudoIndex = 0;
-        CollectZoomPseudoSerializationOverrides(DocumentElement, 1.0, rules, ref pseudoIndex);
+        CollectZoomPseudoSerializationOverrides(root, 1.0, rules, ref pseudoIndex);
         if (rules.Count == 0)
             return;
 
         var styleElement = CreateBridgeElement("style");
         SetElementTextContent(styleElement, string.Join(Environment.NewLine, rules));
 
-        var head = FindFirstElementByTagName(DocumentElement, "head");
+        var head = FindFirstElementByTagName(root, "head");
         if (head != null)
         {
             SetParent(styleElement, head);
@@ -200,8 +350,8 @@ public sealed partial class DomBridge
             return;
         }
 
-        SetParent(styleElement, DocumentElement);
-        InsertChildAt(DocumentElement, 0, styleElement);
+        SetParent(styleElement, root);
+        InsertChildAt(root, 0, styleElement);
     }
 
     private void CollectZoomPseudoSerializationOverrides(DomElement element, double parentZoom, List<string> rules, ref int pseudoIndex)

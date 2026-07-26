@@ -531,8 +531,12 @@ public sealed partial class DomBridge
     {
         var (Left, Top, Width, Height) = ComputeUnzoomedLayoutRect(element);
         var zoom = GetUsedZoomForElement(element);
-        var transformScale = GetTransformScale(element);
-        return (Left, Top, Width * zoom * transformScale, Height * zoom * transformScale);
+
+        // getBoundingClientRect returns the VISUAL rect: the element's border box after every
+        // CSS transform on it and its ancestors (offsetWidth/offset* stay the untransformed layout
+        // box and read the snapshot directly). Apply the own+ancestor transform chain to the box
+        // corners; an untransformed chain returns the box unchanged, byte-identical to before.
+        return ApplyTransformChain(element, (Left, Top, Width * zoom, Height * zoom));
     }
 
     private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)

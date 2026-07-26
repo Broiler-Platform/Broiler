@@ -50,6 +50,11 @@ public sealed partial class DomBridge
 
         // document.createEvent(type) — DOM Events Level 3 (Phase 3: co-located LegacyEventBinding module)
         document.FastAddValue((KeyString)"createEvent", new JSFunction(Dom.Features.LegacyEventBinding.Create, "createEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.startViewTransition(updateCallback | { update, types }) — CSS View Transitions
+        // (see DomBridge.ViewTransition.cs). Runs the callback and returns a resolved ViewTransition;
+        // the pseudo tree is baked at serialize time.
+        document.FastAddValue((KeyString)"startViewTransition", new JSFunction((in a) => StartViewTransition(in a), "startViewTransition", 1), JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     private void RegisterDocumentWriting(JSObject document)
