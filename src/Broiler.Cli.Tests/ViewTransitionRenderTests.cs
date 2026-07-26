@@ -269,6 +269,46 @@ public class ViewTransitionRenderTests
             $"blended pixel was {px.R},{px.G},{px.B}");
     }
 
+    // WPT css/css-view-transitions/auto-name: `view-transition-name: auto` generates a unique name
+    // per element (css-view-transitions-2), so an auto-named element IS captured rather than treated
+    // as `none`. The callback swaps the two items' positions; the snapshots freeze at the old
+    // geometry over the author backdrop, which is only present because the elements were captured.
+    [Fact]
+    public void Auto_Name_Elements_Are_Captured()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  body { background: white; margin: 0; }
+  .item { width: 100px; height: 100px; view-transition-name: auto; position: absolute; top: 0; }
+  #a { background: green; left: 0; }
+  #b { background: yellow; left: 100px; }
+  body.done #a { left: 100px; }
+  body.done #b { left: 0; }
+  html::view-transition-new(*) { animation: unset; opacity: 1; }
+  html::view-transition-old(*) { animation: unset; opacity: 0; }
+  html::view-transition-group(root) { animation: unset; opacity: 0; }
+  html::view-transition { background: rebeccapurple; }
+  :root { view-transition-name: none; }
+</style>
+<div class=item id=a></div>
+<div class=item id=b></div>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition(() => document.body.classList.add('done'));");
+
+        // Each item's new snapshot sits at its OLD position (green left, yellow right) — the live
+        // elements have since swapped, so this proves the frozen capture, not the live page.
+        var green = bitmap.GetPixel(50, 50);
+        Assert.True(green is { R: 0, G: 128, B: 0 }, $"green was {green.R},{green.G},{green.B}");
+        var yellow = bitmap.GetPixel(150, 50);
+        Assert.True(yellow is { R: 255, G: 255, B: 0 }, $"yellow was {yellow.R},{yellow.G},{yellow.B}");
+        // The rebeccapurple ::view-transition backdrop only exists because the items were captured.
+        var backdrop = bitmap.GetPixel(50, 150);
+        Assert.True(backdrop is { R: 102, G: 51, B: 153 }, $"backdrop was {backdrop.R},{backdrop.G},{backdrop.B}");
+    }
+
     // WPT css/css-view-transitions/nothing-captured: like the above, nothing is captured, but there
     // is NO keep-alive animation on the root pseudo, so the empty transition finishes before the
     // screenshot and `::view-transition { background: red }` must never paint — the page stays as-is.

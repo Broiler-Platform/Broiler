@@ -54,6 +54,12 @@ public sealed partial class DomBridge
         /// before the update callback ran, keyed by <c>view-transition-name</c>. The group is
         /// positioned at this start geometry, which the reftests freeze it at.</summary>
         public Dictionary<string, NamedSnapshot> OldCaptures { get; } = new(System.StringComparer.Ordinal);
+
+        /// <summary>Generated used values for elements whose <c>view-transition-name</c> is
+        /// <c>auto</c>/<c>match-element</c> (css-view-transitions-2). Keyed by element identity so the
+        /// same element resolves to the same name across the old and new captures — the two snapshots
+        /// must pair into one group — and stays stable for the transition's lifetime.</summary>
+        public Dictionary<DomElement, string> AutoNames { get; } = new();
     }
 
     private readonly record struct NamedSnapshot(
@@ -243,14 +249,14 @@ public sealed partial class DomBridge
         foreach (var element in DocumentElement.Descendants().OfType<DomElement>())
         {
             var style = UsedStyleForCapture(element);
-            var name = style.GetValueOrDefault("view-transition-name");
-            if (IsNoneName(name) || string.Equals(name!.Trim(), "root", System.StringComparison.Ordinal))
+            var name = ResolveUsedViewTransitionName(element, style.GetValueOrDefault("view-transition-name"));
+            if (name is null || string.Equals(name, "root", System.StringComparison.Ordinal))
                 continue;
 
             var (l, t, w, h) = GetBoundingClientRectForDomElement(element, isRoot: false);
             // Snapshot the old content now, before the update callback mutates (or removes) the
             // element — the "old" image must show its pre-callback state.
-            state.OldCaptures[name.Trim()] = new NamedSnapshot(l, t, w, h,
+            state.OldCaptures[name] = new NamedSnapshot(l, t, w, h,
                 style.GetValueOrDefault("background-color") ?? "transparent",
                 BuildViewTransitionSnapshotContent(element));
         }
@@ -527,12 +533,12 @@ public sealed partial class DomBridge
         foreach (var element in root.Descendants().OfType<DomElement>())
         {
             var style = UsedStyleForCapture(element);
-            var name = style.GetValueOrDefault("view-transition-name");
-            if (IsNoneName(name) || string.Equals(name!.Trim(), "root", System.StringComparison.Ordinal))
+            var name = ResolveUsedViewTransitionName(element, style.GetValueOrDefault("view-transition-name"));
+            if (name is null || string.Equals(name, "root", System.StringComparison.Ordinal))
                 continue;
 
             var (l, t, w, h) = GetBoundingClientRectForDomElement(element, isRoot: false);
-            AddNew(name.Trim(), new NamedSnapshot(l, t, w, h,
+            AddNew(name, new NamedSnapshot(l, t, w, h,
                 style.GetValueOrDefault("background-color") ?? "transparent",
                 BuildViewTransitionSnapshotContent(element)));
         }
@@ -579,8 +585,45 @@ public sealed partial class DomBridge
     private static bool IsNoneName(string? name) =>
         string.IsNullOrWhiteSpace(name) ||
         string.Equals(name.Trim(), "none", System.StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(name.Trim(), "normal", System.StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(name.Trim(), "auto", System.StringComparison.OrdinalIgnoreCase);
+        string.Equals(name.Trim(), "normal", System.StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Resolves the used <c>view-transition-name</c> for <paramref name="element"/> per
+    /// css-view-transitions-2: <c>none</c>/absent → null (not captured); a <c>&lt;custom-ident&gt;</c>
+    /// → itself; <c>auto</c>/<c>match-element</c> → a generated name that is unique per element and
+    /// stable for the transition (so the old and new captures pair into one group). <c>auto</c> on an
+    /// element with an id derives from that id (elements sharing an id share the name).
+    /// </summary>
+    private string? ResolveUsedViewTransitionName(DomElement element, string? rawName)
+    {
+        if (IsNoneName(rawName))
+            return null;
+
+        var trimmed = rawName!.Trim();
+        if (trimmed.Equals("auto", System.StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("match-element", System.StringComparison.OrdinalIgnoreCase))
+            return GenerateAutoViewTransitionName(element, trimmed);
+
+        return trimmed;
+    }
+
+    private string GenerateAutoViewTransitionName(DomElement element, string keyword)
+    {
+        var map = _activeViewTransition!.AutoNames;
+        if (map.TryGetValue(element, out var existing))
+            return existing;
+
+        // auto with an id → a stable id-derived name (two elements with the same id resolve equal, as
+        // the spec requires); auto without an id, and match-element → a unique per-element name. The
+        // "-ua-" prefix mirrors the spec's generated-name convention and cannot collide with a
+        // <custom-ident> (which may not start with two dashes but may not be "-ua-…" either here).
+        var id = element.Id;
+        var generated = keyword.Equals("auto", System.StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(id)
+            ? "-ua-id-" + id
+            : "-ua-el-" + (map.Count + 1);
+        map[element] = generated;
+        return generated;
+    }
 
     private static bool IsExplicitNoneName(string? name) =>
         name is not null && string.Equals(name.Trim(), "none", System.StringComparison.OrdinalIgnoreCase);
