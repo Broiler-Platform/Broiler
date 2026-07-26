@@ -230,6 +230,14 @@ public sealed partial class DomBridge
             // <div> path, which resolves the fallback below; everything else goes native.
             var backdropDecls = GetSyncedScopedEngine(dialog)
                 .GetCascadedDeclaredValues(dialog, "::backdrop");
+
+            // A ::backdrop cascaded to `display: none` is not generated at all — e.g. an @container
+            // query switches it off (WPT css-conditional container-queries/dialog-backdrop-remove,
+            // top-layer-dialog-backdrop). Skip both the native marker and the synthesized <div>.
+            if (backdropDecls.TryGetValue("display", out var backdropDisplay) &&
+                backdropDisplay.Trim().Equals("none", StringComparison.OrdinalIgnoreCase))
+                continue;
+
             var authorPositionTry = backdropDecls.ContainsKey("position-try-fallbacks") ||
                 backdropDecls.ContainsKey("position-try");
 
