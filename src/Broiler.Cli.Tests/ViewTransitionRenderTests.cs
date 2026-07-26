@@ -166,6 +166,109 @@ public class ViewTransitionRenderTests
         Assert.True(corner is { R: 0, G: 0, B: 255 }, $"corner was {corner.R},{corner.G},{corner.B}");
     }
 
+    // WPT css/css-view-transitions/new-content-captures-*: the ::view-transition-new snapshot shows
+    // the captured element's actual content, not a blank fill. Here the named element holds a child
+    // box; the new snapshot must paint both the element's background and the cloned child.
+    [Fact]
+    public void New_Snapshot_Captures_The_Elements_Content()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  body { background: white; }
+  .target { background: blue; width: 100px; height: 100px; position: absolute; top: 0; left: 0; view-transition-name: target; }
+  .inner { background: yellow; width: 40px; height: 40px; }
+  html::view-transition-new(target) { animation: unset; opacity: 1; }
+  html::view-transition-old(target) { animation: unset; opacity: 0; }
+  html::view-transition-group(root) { animation: unset; opacity: 0; }
+  html::view-transition { background: lightpink; }
+</style>
+<div class=target><div class=inner></div></div>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition();");
+
+        // The cloned child (yellow) is captured at the snapshot's top-left …
+        var inner = bitmap.GetPixel(15, 15);
+        Assert.True(inner is { R: 255, G: 255, B: 0 }, $"inner was {inner.R},{inner.G},{inner.B}");
+        // … over the element's own blue background elsewhere within the 100×100 snapshot …
+        var body = bitmap.GetPixel(70, 70);
+        Assert.True(body is { R: 0, G: 0, B: 255 }, $"body was {body.R},{body.G},{body.B}");
+        // … on the lightpink ::view-transition backdrop.
+        var backdrop = bitmap.GetPixel(150, 150);
+        Assert.True(backdrop is { R: 255, G: 182, B: 193 }, $"backdrop was {backdrop.R},{backdrop.G},{backdrop.B}");
+    }
+
+    // WPT css/css-view-transitions/new-content-captures-spans + inline-element-size: text content is
+    // captured and painted with the element's baked font/color, not dropped. Uses a colour scan so
+    // it does not depend on exact font metrics.
+    [Fact]
+    public void Snapshot_Captures_Text_With_The_Elements_Font_And_Color()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  body { background: white; }
+  .t { color: red; font-size: 50px; background: lightgreen; position: absolute; top: 0; left: 0; view-transition-name: t; }
+  html::view-transition-new(t) { animation: unset; opacity: 1; }
+  html::view-transition-old(t) { animation: unset; opacity: 0; }
+  html::view-transition-group(root) { animation: unset; opacity: 0; }
+  html::view-transition { background: lightpink; }
+</style>
+<div class=t>W</div>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition();");
+
+        // Red text glyph pixels appear in the snapshot's top-left region (the "W" in the baked color).
+        var foundRedText = false;
+        for (var y = 0; y < 60 && !foundRedText; y++)
+            for (var x = 0; x < 60 && !foundRedText; x++)
+            {
+                var px = bitmap.GetPixel(x, y);
+                if (px is { R: > 150, G: < 110, B: < 110 })
+                    foundRedText = true;
+            }
+        Assert.True(foundRedText, "expected red text glyph pixels in the captured snapshot");
+
+        // The backdrop is the author lightpink.
+        var backdrop = bitmap.GetPixel(150, 150);
+        Assert.True(backdrop is { R: 255, G: 182, B: 193 }, $"backdrop was {backdrop.R},{backdrop.G},{backdrop.B}");
+    }
+
+    // WPT css/css-view-transitions/new-content-captures-opacity: the captured element's own opacity
+    // rides on the snapshot content, so it composites over the backdrop rather than over an opaque
+    // snapshot fill — a half-opaque red box reads as pink over white, never solid red.
+    [Fact]
+    public void Snapshot_Composites_The_Elements_Opacity_Over_The_Backdrop()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  body { background: white; }
+  .box { background: lightblue; width: 100px; height: 100px; position: absolute; top: 0; left: 0; opacity: 0.5; view-transition-name: e1; }
+  .box.dst { background: red; }
+  html::view-transition-new(e1) { animation: unset; opacity: 1; }
+  html::view-transition-old(e1) { animation: unset; opacity: 0; }
+  html::view-transition-group(root) { animation: unset; opacity: 0; }
+  html::view-transition { background: white; }
+</style>
+<div class=box></div>
+</html>
+""";
+        using var bitmap = Render(html,
+            "document.startViewTransition(() => { document.querySelector('.box').classList.add('dst'); });");
+
+        // Red at 0.5 opacity over white ≈ (255,128,128): strong red, but green/blue lifted well off 0
+        // (an opaque snapshot fill would leave them near 0).
+        var px = bitmap.GetPixel(50, 50);
+        Assert.True(px.R > 220 && px.G is > 90 and < 170 && px.B is > 90 and < 170,
+            $"blended pixel was {px.R},{px.G},{px.B}");
+    }
+
     // WPT css/css-view-transitions/nothing-captured: like the above, nothing is captured, but there
     // is NO keep-alive animation on the root pseudo, so the empty transition finishes before the
     // screenshot and `::view-transition { background: red }` must never paint — the page stays as-is.

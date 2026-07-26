@@ -56,7 +56,12 @@ public sealed partial class DomBridge
         public Dictionary<string, NamedSnapshot> OldCaptures { get; } = new(System.StringComparer.Ordinal);
     }
 
-    private readonly record struct NamedSnapshot(double Left, double Top, double Width, double Height, string BackgroundColor);
+    private readonly record struct NamedSnapshot(
+        double Left, double Top, double Width, double Height, string BackgroundColor,
+        // A detached box reproducing the element's painted border box (computed paint style baked
+        // inline + a clone of its content), or null for the implicit root capture (never shown as a
+        // content snapshot in the reftests) and for a name present on only one side.
+        DomElement? Content = null);
 
     // :active-view-transition-type( a, b, … ) anywhere in a selector.
     private static readonly System.Text.RegularExpressions.Regex ActiveViewTransitionType =
@@ -243,8 +248,11 @@ public sealed partial class DomBridge
                 continue;
 
             var (l, t, w, h) = GetBoundingClientRectForDomElement(element, isRoot: false);
+            // Snapshot the old content now, before the update callback mutates (or removes) the
+            // element — the "old" image must show its pre-callback state.
             state.OldCaptures[name.Trim()] = new NamedSnapshot(l, t, w, h,
-                style.GetValueOrDefault("background-color") ?? "transparent");
+                style.GetValueOrDefault("background-color") ?? "transparent",
+                BuildViewTransitionSnapshotContent(element));
         }
     }
 
@@ -336,13 +344,18 @@ public sealed partial class DomBridge
                 ("width", Px(groupW)), ("height", Px(groupH)), ("overflow", "hidden")),
                 LookupPseudo(pseudoRules, "group", capture));
 
-            // Snapshot boxes are stacked top-left within the group: old under new.
+            // Snapshot boxes are stacked top-left within the group: old under new. Each box is a
+            // transparent positioned container carrying the author ::view-transition-old/-new
+            // declarations (e.g. the pinned opacity); the captured content box inside it carries the
+            // element's own paint (background, opacity, text) so an element's opacity composites over
+            // the backdrop rather than over an opaque snapshot fill.
             if (capture.HasOld)
             {
                 var oldBox = CreateStyledBox(BaseStyle(
                     ("position", "absolute"), ("left", "0"), ("top", "0"),
-                    ("width", Px(capture.OldWidth)), ("height", Px(capture.OldHeight)),
-                    ("background-color", capture.OldBackground)), LookupPseudo(pseudoRules, "old", capture));
+                    ("width", Px(capture.OldWidth)), ("height", Px(capture.OldHeight))),
+                    LookupPseudo(pseudoRules, "old", capture));
+                AttachSnapshotPaint(oldBox, capture.OldContent, capture.OldBackground);
                 AppendBridgeChild(group, oldBox);
             }
 
@@ -350,8 +363,9 @@ public sealed partial class DomBridge
             {
                 var newBox = CreateStyledBox(BaseStyle(
                     ("position", "absolute"), ("left", "0"), ("top", "0"),
-                    ("width", Px(capture.NewWidth)), ("height", Px(capture.NewHeight)),
-                    ("background-color", capture.NewBackground)), LookupPseudo(pseudoRules, "new", capture));
+                    ("width", Px(capture.NewWidth)), ("height", Px(capture.NewHeight))),
+                    LookupPseudo(pseudoRules, "new", capture));
+                AttachSnapshotPaint(newBox, capture.NewContent, capture.NewBackground);
                 AppendBridgeChild(group, newBox);
             }
 
@@ -391,11 +405,101 @@ public sealed partial class DomBridge
         parent.AppendChild(child);
     }
 
+    /// <summary>Fills a snapshot box: appends its captured content box (which carries the element's
+    /// baked paint and cloned content) when present, else falls back to a flat background fill (the
+    /// implicit root capture and one-sided names, which have no content box).</summary>
+    private void AttachSnapshotPaint(DomElement box, DomElement? content, string fallbackBackground)
+    {
+        if (content is not null)
+            AppendBridgeChild(box, content);
+        else
+            InlineStyle(box)["background-color"] = fallbackBackground;
+    }
+
+    // The paint- and text-affecting computed properties baked onto a snapshot's content box so it
+    // renders like the captured element once re-parented under the overlay, where the element's
+    // original ancestors and matched author selectors no longer apply. Deliberately excludes
+    // geometry (position/inset/margin/width/height) — the group and box size the snapshot from the
+    // captured rect and place the content at 0,0 — and view-transition-name (to avoid re-capturing
+    // the clone).
+    private static readonly string[] SnapshotPaintProperties =
+    {
+        "background-color", "background-image", "background-repeat", "background-position",
+        "background-size", "background-clip", "background-origin", "background-attachment",
+        "color", "opacity",
+        "font-family", "font-size", "font-style", "font-weight", "font-variant", "font-stretch",
+        "line-height", "letter-spacing", "word-spacing",
+        "text-align", "text-transform", "text-indent", "text-shadow",
+        "text-decoration-line", "text-decoration-color", "text-decoration-style",
+        "white-space", "word-break", "overflow-wrap", "direction", "writing-mode",
+        "border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
+        "border-top-style", "border-right-style", "border-bottom-style", "border-left-style",
+        "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
+        "border-top-left-radius", "border-top-right-radius",
+        "border-bottom-left-radius", "border-bottom-right-radius",
+        "box-shadow",
+        "padding-top", "padding-right", "padding-bottom", "padding-left",
+        "visibility",
+    };
+
+    /// <summary>
+    /// Builds a detached box reproducing <paramref name="element"/>'s painted border box for a
+    /// view-transition snapshot: the element's paint/text computed values baked inline (so it paints
+    /// identically once re-parented under the overlay) plus a deep clone of its content, so the
+    /// snapshot shows the element's text/children rather than a blank fill. Sized to the enclosing
+    /// snapshot box (100%); positioning, insets, margins, and the outer width/height come from the
+    /// captured geometry on that box, not from the element's own computed values.
+    /// </summary>
+    private DomElement BuildViewTransitionSnapshotContent(DomElement element)
+    {
+        var used = UsedStyleForCapture(element);
+
+        var content = CreateBridgeElement("div");
+        SetAttr(content, "data-broiler-view-transition-content", "");
+        var inline = InlineStyle(content);
+        inline["position"] = "absolute";
+        inline["left"] = "0";
+        inline["top"] = "0";
+        inline["width"] = "100%";
+        inline["height"] = "100%";
+        inline["box-sizing"] = "border-box";
+
+        foreach (var property in SnapshotPaintProperties)
+            if (used.TryGetValue(property, out var value) && !string.IsNullOrWhiteSpace(value))
+                inline[property] = value;
+
+        // Clone the element's content verbatim (text and any descendants) so the snapshot paints it.
+        foreach (var child in element.ChildNodes.ToArray())
+        {
+            var clone = child.CloneNode(deep: true);
+            StripCapturedIdentifiers(clone);
+            content.AppendChild(clone);
+        }
+
+        return content;
+    }
+
+    /// <summary>Strips identity/capture markers from a cloned snapshot subtree: <c>id</c> (so the
+    /// clone does not duplicate a live element's id) and any inline <c>view-transition-name</c> (so a
+    /// re-serialize cannot capture the clone as a named element).</summary>
+    private void StripCapturedIdentifiers(DomNode node)
+    {
+        if (node is DomElement element)
+        {
+            if (element.HasAttribute("id"))
+                element.RemoveAttribute("id");
+            InlineStyle(element).Remove("view-transition-name");
+        }
+
+        foreach (var child in node.ChildNodes.ToArray())
+            StripCapturedIdentifiers(child);
+    }
+
     private readonly record struct ViewTransitionCapture(
         string Name,
         double GroupLeft, double GroupTop,
-        bool HasOld, double OldWidth, double OldHeight, string OldBackground,
-        bool HasNew, double NewWidth, double NewHeight, string NewBackground);
+        bool HasOld, double OldWidth, double OldHeight, string OldBackground, DomElement? OldContent,
+        bool HasNew, double NewWidth, double NewHeight, string NewBackground, DomElement? NewContent);
 
     /// <summary>
     /// The captured names, each pairing the "old" snapshot (from before the update callback) with the
@@ -428,7 +532,9 @@ public sealed partial class DomBridge
                 continue;
 
             var (l, t, w, h) = GetBoundingClientRectForDomElement(element, isRoot: false);
-            AddNew(name.Trim(), new NamedSnapshot(l, t, w, h, style.GetValueOrDefault("background-color") ?? "transparent"));
+            AddNew(name.Trim(), new NamedSnapshot(l, t, w, h,
+                style.GetValueOrDefault("background-color") ?? "transparent",
+                BuildViewTransitionSnapshotContent(element)));
         }
 
         var oldCaptures = _activeViewTransition!.OldCaptures;
@@ -445,8 +551,8 @@ public sealed partial class DomBridge
             var anchor = hasOld ? old : @new; // group start geometry
             captures.Add(new ViewTransitionCapture(
                 name, anchor.Left, anchor.Top,
-                hasOld, old.Width, old.Height, old.BackgroundColor,
-                hasNew, @new.Width, @new.Height, @new.BackgroundColor));
+                hasOld, old.Width, old.Height, old.BackgroundColor, old.Content,
+                hasNew, @new.Width, @new.Height, @new.BackgroundColor, @new.Content));
         }
 
         return captures;
