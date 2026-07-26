@@ -208,6 +208,43 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
         cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
+
+        // The containing block is a vertical writing-mode box the BROILER_VERTICAL_FLOW prototype is
+        // currently laying out in a *logical* horizontal frame (InVerticalFrameLayout), transposing to
+        // physical only in a later post-pass (see CssBox.WritingMode ApplyVerticalWritingModeFlow). The
+        // guard is the frame-layout flag, not just WillBeVerticalTransposed(): a vertical box whose
+        // physical Size is already set (e.g. the native anchor-placement pass) must NOT be un-swapped.
+        if (InVerticalFrameLayout && cb.WillBeVerticalTransposed())
+        {
+            // In the logical frame cb.Size.Width is the logical inline extent (physically its height),
+            // and — because the prototype reuses the horizontal layout code by swapping the box's
+            // width/height — its `Width`/`Height` CSS strings are swapped too (physical width is
+            // `Height`). Absolutely positioned insets/sizes resolve in *physical* coordinates and the
+            // abspos box is left untransposed, so use the physical extents — otherwise left/right and
+            // top/bottom resolve against the swapped axis (WPT css-writing-modes
+            // abs-pos-non-replaced-v{lr,rl}-*). The origin above is already physical (a rotation root
+            // keeps its own physical Location).
+
+            // Physical height = the logical inline extent (Size.Width), which resolves top-down.
+            cbPadHeight = cb.Size.Width - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+
+            // Physical width = the logical block extent (ActualBottom − Location.Y). Abspos children
+            // are placed before the CB's block size resolves, so that is usually still 0 here; fall
+            // back to the CB's definite specified physical width — which the prototype's swap stores
+            // in `Height`.
+            cbPadWidth = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+            if (cbPadWidth <= 0
+                && cb.Height != CssConstants.Auto && !string.IsNullOrEmpty(cb.Height) && !cb.Height.Contains('%'))
+            {
+                double cssPhysicalWidth = CssLengthParser.ParseLength(cb.Height, 0, cb.GetEmHeight());
+                double candidate = cb.ResolveSpecifiedWidthToBorderBox(cssPhysicalWidth)
+                    - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                if (candidate > cbPadWidth)
+                    cbPadWidth = candidate;
+            }
+            return;
+        }
+
         cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
         cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
 
