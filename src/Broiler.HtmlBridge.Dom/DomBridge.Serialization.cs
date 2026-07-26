@@ -181,11 +181,76 @@ public sealed partial class DomBridge
         _serializationTransformsApplied = true;
         RemoveRenderCommentNodes(root);
         ApplyCssomStyleSheetMutations(root);
+        ApplyMetaColorScheme(root);
         // Zoom baking is applied by the callers (GetRenderDocument/SerializeToHtml) before this,
         // so it can be reverted on the geometry-snapshot path; pseudo/progress below depend on
         // the baked sizes and must run after it.
         ApplyZoomPseudoSerializationOverrides(root);
         ApplyProgressLikeSerializationPlaceholders(root);
+    }
+
+    /// <summary>
+    /// Reflects an <c>&lt;meta name="color-scheme"&gt;</c> onto the root element's used
+    /// <c>color-scheme</c> so the canvas backdrop honours it (WPT
+    /// <c>html/semantics/…/meta-color-scheme-*</c>, <c>css/mediaqueries/prefers-color-scheme-*-with-meta-*</c>).
+    /// <para>
+    /// HTML §4.2.5.3 makes the meta a page-level default for the root's color scheme, which the
+    /// renderer already turns into the dark UA canvas (<c>rgb(18,18,18)</c>) when it reads a
+    /// <c>color-scheme</c> of <c>dark</c> off the <c>&lt;html&gt;</c> box. Nothing translated the
+    /// meta into that property, so <c>&lt;meta name=color-scheme content=dark&gt;</c> painted the
+    /// default light canvas while an equivalent <c>:root { color-scheme: dark }</c> painted dark.
+    /// </para>
+    /// <para>
+    /// Author CSS wins: the meta is applied only when the root declares no <c>color-scheme</c> of
+    /// its own, so <c>:root { color-scheme: light }</c> beside <c>&lt;meta … content=dark&gt;</c>
+    /// stays light. The first meta in tree order with a non-empty <c>content</c> and no
+    /// <c>http-equiv</c> supplies the value; the renderer's own token parsing then selects dark or
+    /// light (an unrecognised value contributes neither and falls back to light, matching the
+    /// invalid-value cases in the spec's test suite). Written to the baked overlay, so it reaches
+    /// the renderer and the serialized <c>style=</c> without polluting the script-observable inline
+    /// style.
+    /// </para>
+    /// </summary>
+    private void ApplyMetaColorScheme(DomElement root)
+    {
+        var metaValue = FindMetaColorScheme(root);
+        if (metaValue is null)
+            return;
+
+        // Author color-scheme on the root takes precedence over the meta default. Read the
+        // cascaded declared value (not the used value), so an explicit author declaration of any
+        // kind suppresses the meta while an absent one lets it through.
+        if (BuildSpecifiedStyleMap(root).TryGetValue("color-scheme", out var declared) &&
+            !string.IsNullOrWhiteSpace(declared))
+        {
+            return;
+        }
+
+        BakedInlineStyle(root)["color-scheme"] = metaValue;
+    }
+
+    /// <summary>
+    /// The <c>content</c> of the first <c>&lt;meta name="color-scheme"&gt;</c> in tree order that
+    /// has a non-empty <c>content</c> and no <c>http-equiv</c>, or <c>null</c> when there is none.
+    /// </summary>
+    private static string? FindMetaColorScheme(DomElement root)
+    {
+        foreach (var element in root.Descendants().OfType<DomElement>())
+        {
+            if (!element.TagName.Equals("meta", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (HasAttr(element, "http-equiv"))
+                continue;
+            if (!TryGetAttribute(element, "name", out var name) ||
+                !name.Trim().Equals("color-scheme", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (TryGetAttribute(element, "content", out var content) &&
+                !string.IsNullOrWhiteSpace(content))
+            {
+                return content.Trim();
+            }
+        }
+        return null;
     }
 
     /// <summary>
