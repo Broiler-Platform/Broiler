@@ -1986,6 +1986,58 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void StyleSheet_InsertRule_Reaches_The_Rendered_Document()
+    {
+        // insertRule()/deleteRule() mutate the shared rule model, not the <style>
+        // element's text node, so the serialized document handed to the renderer used
+        // to still carry the original author text — a page styled purely through the
+        // CSSOM rendered as if the script had never run, even though getComputedStyle
+        // already agreed with the model (WPT css/cssom insertRule family). The
+        // serialization transforms now bake the model back into the element.
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.first { color: red; }
+.doomed { color: orange; }
+</style>
+</head><body>
+<div class=""first"">text</div>
+<script>
+document.styleSheets[0].insertRule('.second { color: blue; }', 2);
+document.styleSheets[0].deleteRule(1);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(".second", result);
+        Assert.Contains("blue", result);
+        Assert.Contains(".first", result);
+        Assert.DoesNotContain(".doomed", result);
+    }
+
+    [Fact]
+    public void StyleSheet_Without_Cssom_Mutation_Keeps_Its_Author_Text()
+    {
+        // The bake is gated on the mutated flag: an untouched stylesheet must serialize
+        // byte-for-byte as authored, comments and formatting included, rather than being
+        // round-tripped through the rule model.
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+/* keep me */
+.first { color: red; }
+</style>
+</head><body>
+<div class=""first"">text</div>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("/* keep me */", result);
+    }
+
+    [Fact]
     public void Cursor_Property_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>

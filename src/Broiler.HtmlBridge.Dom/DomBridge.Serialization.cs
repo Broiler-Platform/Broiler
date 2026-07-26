@@ -143,11 +143,54 @@ public sealed partial class DomBridge
 
         _serializationTransformsApplied = true;
         RemoveRenderCommentNodes(DocumentElement);
+        ApplyCssomStyleSheetMutations(DocumentElement);
         // Zoom baking is applied by the callers (GetRenderDocument/SerializeToHtml) before this,
         // so it can be reverted on the geometry-snapshot path; pseudo/progress below depend on
         // the baked sizes and must run after it.
         ApplyZoomPseudoSerializationOverrides();
         ApplyProgressLikeSerializationPlaceholders(DocumentElement);
+    }
+
+    /// <summary>
+    /// Bakes CSSOM rule-model mutations into the render-bound document. Script
+    /// <c>insertRule</c>/<c>deleteRule</c> mutates the shared rule list held in the
+    /// style element's runtime state — never its text node — so the serialized HTML
+    /// handed to the renderer still carried the original author text and the mutation
+    /// was invisible to layout and paint, while <c>getComputedStyle</c> (which reads
+    /// the model through <see cref="GetStyleElementCssText"/>) already observed it.
+    /// A script that styles the page purely through the CSSOM therefore rendered as
+    /// if it had never run — the WPT <c>css/cssom</c> insertRule family. Replacing the
+    /// text node with the serialized model closes that gap, so the renderer and the
+    /// CSSOM agree on one stylesheet.
+    /// <para>
+    /// Runs inside <see cref="ApplySerializationTransforms"/>, with mutation delivery
+    /// suppressed by its callers, so the rewrite delivers no observer records. It is
+    /// idempotent: the text it writes reparses to the same rules, and the reparse
+    /// clears <see cref="StyleSheetRuntimeState.RulesMutated"/>, so a second pass is a
+    /// no-op. JS-visible <c>innerHTML</c>/<c>outerHTML</c> serialize without the
+    /// transforms and still expose the author text.
+    /// </para>
+    /// <para>
+    /// Only <c>&lt;style&gt;</c> elements are baked. A mutated <c>&lt;link rel=stylesheet&gt;</c>
+    /// has no text node to carry the model — inlining it into a <c>&lt;style&gt;</c> would
+    /// silently re-base its relative <c>url()</c>s onto the document — so those
+    /// mutations stay renderer-invisible until linked sheets are modelled properly.
+    /// </para>
+    /// </summary>
+    private void ApplyCssomStyleSheetMutations(DomElement element)
+    {
+        if (!IsText(element) &&
+            element.TagName.Equals("style", StringComparison.OrdinalIgnoreCase) &&
+            StyleSheetStateFor(element).RulesMutated)
+        {
+            // Read the effective text before rewriting: GetStyleElementCssText compares
+            // the element's current source text against the model's parse source, and
+            // would discard the mutations if the text node had already been replaced.
+            SetElementTextContent(element, GetStyleElementCssText(element));
+        }
+
+        foreach (var child in ChildElements(element))
+            ApplyCssomStyleSheetMutations(child);
     }
 
     /// <summary>
