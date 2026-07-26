@@ -39,10 +39,20 @@ public sealed partial class DomBridge : IDialogHost
     void IDialogHost.SetPopoverOpen(DomElement element, bool open)
     {
         if (open)
+        {
             DialogStateFor(element).PopoverOpen.Set(true);
+            // A fresh show clears any leftover "transitioning out" mark: if the element is now
+            // transitioning `overlay` at all, it is transitioning *in*.
+            DialogStateFor(element).PopoverTransitioningOut.Remove();
+        }
         else
+        {
             DialogStateFor(element).PopoverOpen.Remove();
+        }
     }
+
+    void IDialogHost.MarkPopoverOverlayTransitioningOut(DomElement element) =>
+        DialogStateFor(element).PopoverTransitioningOut.Set(true);
 
     string IDialogHost.GetReturnValue(DomElement element) =>
         FormControlStateFor(element).ReturnValue.TryGet(out var rv) && rv is string s

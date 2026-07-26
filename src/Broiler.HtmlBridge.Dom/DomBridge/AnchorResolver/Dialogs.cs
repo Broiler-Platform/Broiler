@@ -174,6 +174,11 @@ public sealed partial class DomBridge
             if (!(DialogStateFor(el).PopoverOpen.TryGet(out var open) && open is true))
                 continue;
 
+            // An open popover whose `overlay` is transitioning in is not in the top layer yet — leave
+            // it in normal flow (no UA fixed-positioning, no top-layer marker).
+            if (PopoverHeldOutByOverlayTransitionIn(el))
+                continue;
+
             var props = GetComputedProps(el);
             bool alreadyPositioned = props.TryGetValue("position", out var pos) &&
                 (pos == "fixed" || pos == "absolute");
@@ -432,7 +437,10 @@ public sealed partial class DomBridge
     {
         if (ParentEl(element) != null &&
             DialogStateFor(element).PopoverOpen.TryGet(out var open) &&
-            open is true)
+            open is true &&
+            // A popover held out of the top layer while `overlay` transitions in generates no
+            // ::backdrop (the backdrop belongs to the top layer).
+            !PopoverHeldOutByOverlayTransitionIn(element))
         {
             results.Add((element, ParentEl(element), true));
         }
@@ -445,20 +453,23 @@ public sealed partial class DomBridge
     // layer because its `overlay` is being transitioned out with
     // `transition-behavior: allow-discrete`. A static render snapshots
     // mid-transition, so such a popover (and its ::backdrop) stays rendered.
-    private bool PopoverKeepsOverlayOnHide(DomElement element)
+    private bool PopoverKeepsOverlayOnHide(DomElement element) =>
+        HasDiscreteOverlayTransition(element);
+
+    // Whether the element declares a discrete transition of the `overlay` property:
+    // `transition-behavior: allow-discrete` (required for a discrete property to transition at all)
+    // plus `overlay` (or `all`) in the transitioned-property list. Both may appear folded into the
+    // `transition` shorthand. This is the setup an `overlay` transition — in either direction — needs.
+    private bool HasDiscreteOverlayTransition(DomElement element)
     {
         var props = GetComputedProps(element);
 
-        // allow-discrete is required for a discrete property like `overlay` to
-        // participate in a transition at all. It lives on transition-behavior;
-        // tolerate it also appearing folded into a `transition` shorthand.
         string behavior =
             props.GetValueOrDefault("transition-behavior", string.Empty) + " " +
             props.GetValueOrDefault("transition", string.Empty);
         if (behavior.IndexOf("allow-discrete", StringComparison.OrdinalIgnoreCase) < 0)
             return false;
 
-        // The transitioned property list must include `overlay` (or `all`).
         string transitioned =
             props.GetValueOrDefault("transition-property", string.Empty) + " " +
             props.GetValueOrDefault("transition", string.Empty);
@@ -470,5 +481,18 @@ public sealed partial class DomBridge
         }
 
         return false;
+    }
+
+    // CSS Position §overlay: a popover shown while its `overlay` transitions *in*
+    // (`transition-behavior: allow-discrete`, `overlay`/`all` transitioned) is NOT yet in the top
+    // layer — with the usual `step-end`/duration the discrete `overlay` holds `none` for the
+    // transition, so the element (and its ::backdrop) render in normal flow, not the top layer, until
+    // it finishes (WPT css/css-position/overlay/overlay-transition-in-rendering, -backdrop-entry).
+    // A popover transitioning *out* (marked on hide) is excluded — it stays in the top layer.
+    private bool PopoverHeldOutByOverlayTransitionIn(DomElement element)
+    {
+        if (DialogStateFor(element).PopoverTransitioningOut.TryGet(out var out_) && out_ is true)
+            return false;
+        return HasDiscreteOverlayTransition(element);
     }
 }

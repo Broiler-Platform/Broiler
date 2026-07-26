@@ -99,7 +99,9 @@ internal sealed class DialogBinding(IDialogHost host)
         // `transition-behavior: allow-discrete` keeps it in the top layer for the duration of the
         // transition. A static render snapshots mid-transition, so the popover (and its ::backdrop)
         // must stay rendered — leave the flag set. Without such a transition it hides immediately.
-        if (!_host.PopoverKeepsOverlayOnHide(element))
+        if (_host.PopoverKeepsOverlayOnHide(element))
+            _host.MarkPopoverOverlayTransitioningOut(element);
+        else
             _host.SetPopoverOpen(element, false);
         _host.InvalidateStyleScope(element);
         return JSUndefined.Value;
