@@ -138,4 +138,54 @@ public class ViewTransitionRenderTests
         var corner = bitmap.GetPixel(150, 150);
         Assert.True(corner is { R: 255, G: 255, B: 255 }, $"corner was {corner.R},{corner.G},{corner.B}");
     }
+
+    // WPT css/css-view-transitions/no-named-elements: nothing is captured (`:root` is
+    // `view-transition-name: none` and no other element is named), but the author pins the
+    // ::view-transition root open with `animation: no-op 300s`, so its blue overlay fills the
+    // viewport over the red body. Reference is an all-blue page.
+    [Fact]
+    public void Empty_Transition_With_Kept_Alive_Root_Paints_The_Overlay()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  body { background: red; }
+  :root { view-transition-name: none; }
+  @keyframes no-op { from { opacity: 1; } to { opacity: 1; } }
+  :root::view-transition { width: 100%; height: 100%; background: blue; animation: no-op 300s; }
+</style>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition();");
+
+        // The blue ::view-transition overlay covers the whole viewport (the red body is behind it).
+        var center = bitmap.GetPixel(100, 100);
+        Assert.True(center is { R: 0, G: 0, B: 255 }, $"center was {center.R},{center.G},{center.B}");
+        var corner = bitmap.GetPixel(180, 20);
+        Assert.True(corner is { R: 0, G: 0, B: 255 }, $"corner was {corner.R},{corner.G},{corner.B}");
+    }
+
+    // WPT css/css-view-transitions/nothing-captured: like the above, nothing is captured, but there
+    // is NO keep-alive animation on the root pseudo, so the empty transition finishes before the
+    // screenshot and `::view-transition { background: red }` must never paint — the page stays as-is.
+    [Fact]
+    public void Empty_Transition_Without_Kept_Alive_Root_Stays_Hidden()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  body { background: white; }
+  :root { view-transition-name: none; }
+  html::view-transition { background: red; }
+</style>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition();");
+
+        // No overlay: the red ::view-transition must not show, so the page stays white.
+        var center = bitmap.GetPixel(100, 100);
+        Assert.True(center is { R: 255, G: 255, B: 255 }, $"center was {center.R},{center.G},{center.B}");
+    }
 }

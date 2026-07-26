@@ -305,7 +305,18 @@ public sealed partial class DomBridge
     {
         var pseudoRules = CollectViewTransitionPseudoDeclarations(root);
         var captures = CollectViewTransitionCaptures(root);
-        if (captures.Count == 0)
+
+        // A view transition that captured nothing (no element carries a used
+        // view-transition-name — e.g. `:root { view-transition-name: none }` with no other
+        // named element) finishes immediately, so its ::view-transition tree is already gone by
+        // the reftests' screenshot time and the root overlay must not paint — UNLESS an author
+        // animation on the bare ::view-transition pins it open. WPT `no-named-elements` freezes it
+        // with `::view-transition { animation: no-op 300s }` and its reference is the blue overlay
+        // filling the viewport; `nothing-captured` has no such animation, so its
+        // `::view-transition { background: red }` must stay hidden. Approximate that timing
+        // distinction here: with no captures, bake the (group-less) overlay only when the root
+        // pseudo was kept alive, otherwise skip so the page renders unmodified.
+        if (captures.Count == 0 && !HasRootOverlayKeepAliveAnimation(pseudoRules))
             return;
 
         var overlay = CreateStyledBox(BaseStyle(
@@ -522,6 +533,54 @@ public sealed partial class DomBridge
         Merge("*");
         Merge(capture.Value.Name);
         return merged;
+    }
+
+    /// <summary>
+    /// Whether the author kept the bare <c>::view-transition</c> root overlay alive with an
+    /// animation. Only consulted when the transition captured nothing: an empty transition
+    /// finishes at once (its pseudo tree gone by screenshot time), so the overlay paints only when
+    /// an author animation on the root pseudo pins it open — the difference between WPT
+    /// <c>no-named-elements</c> (blue overlay, <c>animation: no-op 300s</c>) and
+    /// <c>nothing-captured</c> (red overlay, no animation, must stay hidden).
+    /// </summary>
+    private static bool HasRootOverlayKeepAliveAnimation(
+        Dictionary<string, Dictionary<string, string>> pseudoRules)
+    {
+        // The bare ::view-transition bucket is keyed "<kind>|<argument>" with both empty (see
+        // CollectViewTransitionPseudoDeclarations), i.e. "|".
+        if (!pseudoRules.TryGetValue("|", out var rootDeclarations))
+            return false;
+
+        if (rootDeclarations.TryGetValue("animation", out var shorthand) && !IsInertAnimationValue(shorthand))
+            return true;
+        if (rootDeclarations.TryGetValue("animation-name", out var name) && !IsInertAnimationValue(name))
+            return true;
+        if (rootDeclarations.TryGetValue("animation-duration", out var duration) && !IsInertAnimationDuration(duration))
+            return true;
+        return false;
+    }
+
+    /// <summary>An <c>animation</c>/<c>animation-name</c> value that starts no animation
+    /// (absent, <c>none</c>, or a CSS-wide keyword).</summary>
+    private static bool IsInertAnimationValue(string value)
+    {
+        var v = value.Trim();
+        return v.Length == 0 ||
+            v.Equals("none", System.StringComparison.OrdinalIgnoreCase) ||
+            v.Equals("unset", System.StringComparison.OrdinalIgnoreCase) ||
+            v.Equals("initial", System.StringComparison.OrdinalIgnoreCase) ||
+            v.Equals("inherit", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>An <c>animation-duration</c> value that leaves the animation zero-length (so it
+    /// does not keep the overlay alive).</summary>
+    private static bool IsInertAnimationDuration(string value)
+    {
+        var v = value.Trim();
+        return v.Length == 0 || v == "0" ||
+            v.Equals("0s", System.StringComparison.OrdinalIgnoreCase) ||
+            v.Equals("0ms", System.StringComparison.OrdinalIgnoreCase) ||
+            IsInertAnimationValue(v);
     }
 
     /// <summary>Author style rules (selector text + declarations) across every <c>&lt;style&gt;</c>
