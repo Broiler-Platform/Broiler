@@ -18,28 +18,45 @@ namespace Broiler.HtmlBridge;
 /// <para>
 /// A live browser animates that pseudo tree. WPT reftests instead pause the animations and pin the
 /// old/new opacities so the screenshot is a deterministic still (e.g. the new snapshot at
-/// <c>opacity:1</c> over an author-coloured <c>::view-transition</c> backdrop). This partial
-/// reproduces that still: it runs the callback synchronously, applies the
-/// <c>:active-view-transition-type()</c> conditional rules that a transition activates, and — at
-/// serialize time, alongside the other pseudo-element bakes — materialises the
-/// <c>::view-transition</c> overlay tree as real positioned boxes the renderer already knows how to
-/// paint. The animation timeline itself is out of scope; the tests that need it are the ones that
+/// <c>opacity:1</c> over an author-coloured <c>::view-transition</c> backdrop, at the outgoing
+/// element's position). This partial reproduces that still: it snapshots each named element's
+/// geometry before the callback (the "old" capture) and after (the "new"), applies the
+/// <c>:active-view-transition-type()</c> conditional rules a transition activates, and materialises
+/// the <c>::view-transition</c> overlay tree as real positioned boxes the renderer already knows how
+/// to paint. The animation timeline itself is out of scope; the tests that need it are the ones that
 /// screenshot mid-animation with unpinned timing.
+/// </para>
+/// <para>
+/// The pseudo-tree bake is deliberately <em>not</em> folded into the run-once
+/// <c>ApplySerializationTransforms</c> pass: capturing the old geometry probes layout during the
+/// script, which builds a render-document snapshot and would otherwise consume that run-once budget
+/// (and bake the overlay from the pre-callback state). Instead <see cref="ApplyViewTransitionRendering"/>
+/// runs from the serialize/render entry points after those transforms, skips geometry-snapshot passes
+/// (<see cref="_layoutGeometryPassActive"/>), and carries its own once-guard.
 /// </para>
 /// </summary>
 public sealed partial class DomBridge
 {
-    /// <summary>The active view transition, or <c>null</c> when none is running. A transition stays
-    /// active from <c>startViewTransition()</c> through the terminal render (these documents render
-    /// once), which is when the pseudo tree is baked.</summary>
+    /// <summary>The active view transition, or <c>null</c> when none is running.</summary>
     private ViewTransitionState? _activeViewTransition;
+
+    /// <summary>Whether the <c>::view-transition</c> pseudo tree has been baked for this render.
+    /// Reset on reparse alongside <c>_serializationTransformsApplied</c>.</summary>
+    private bool _viewTransitionBaked;
 
     private sealed class ViewTransitionState
     {
         /// <summary>The transition's active types (the <c>types</c> option), matched by
         /// <c>:active-view-transition-type()</c>.</summary>
         public HashSet<string> Types { get; } = new(System.StringComparer.Ordinal);
+
+        /// <summary>The "old" capture: geometry and background of each named element as it stood
+        /// before the update callback ran, keyed by <c>view-transition-name</c>. The group is
+        /// positioned at this start geometry, which the reftests freeze it at.</summary>
+        public Dictionary<string, NamedSnapshot> OldCaptures { get; } = new(System.StringComparer.Ordinal);
     }
+
+    private readonly record struct NamedSnapshot(double Left, double Top, double Width, double Height, string BackgroundColor);
 
     // :active-view-transition-type( a, b, … ) anywhere in a selector.
     private static readonly System.Text.RegularExpressions.Regex ActiveViewTransitionType =
@@ -51,13 +68,16 @@ public sealed partial class DomBridge
     private static readonly System.Text.RegularExpressions.Regex ViewTransitionPseudo =
         new(@"::view-transition(?:-(group|image-pair|old|new))?\s*(?:\(\s*([^)]*)\s*\))?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
+    // ── JS API ──────────────────────────────────────────────────────────────
+
     /// <summary>
     /// <c>document.startViewTransition(updateCallback)</c> /
-    /// <c>document.startViewTransition({ update, types })</c>. Records the active transition and its
-    /// types, runs the update callback synchronously (its DOM mutation is the "new" state the
-    /// screenshot captures), and returns a <c>ViewTransition</c> whose <c>ready</c>/<c>finished</c>/
-    /// <c>updateCallbackDone</c> promises are already resolved — the reftests gate their screenshot
-    /// on <c>ready</c>, so resolving synchronously lets that fire once the new DOM is in place.
+    /// <c>document.startViewTransition({ update, types })</c>. Snapshots the old state, records the
+    /// active transition and its types, runs the update callback synchronously (its DOM mutation is
+    /// the "new" state the screenshot captures), and returns a <c>ViewTransition</c> whose
+    /// <c>ready</c>/<c>finished</c>/<c>updateCallbackDone</c> promises are already resolved — the
+    /// reftests gate their screenshot on <c>ready</c>, so resolving synchronously lets that fire once
+    /// the new DOM is in place.
     /// </summary>
     internal JSValue StartViewTransition(in Arguments a)
     {
@@ -80,6 +100,23 @@ public sealed partial class DomBridge
 
         _activeViewTransition = state;
 
+        // The type activates immediately, for the whole transition including the old capture (WPT
+        // view-transition-types-match-early: it activates "before tag discovery"). Bake its rules
+        // now so the old snapshot reflects them, then snapshot the old state before the callback
+        // mutates the DOM. Both are best-effort: a probe this early must never abort the call, and
+        // the pseudo-tree bake is still deferred to serialize time (the geometry probe here runs a
+        // render snapshot but ApplyViewTransitionRendering skips geometry passes).
+        try
+        {
+            ApplyActiveViewTransitionTypeRules(DocumentElement);
+            CaptureOldViewTransitionState(state);
+        }
+        catch (System.Exception ex)
+        {
+            RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.startViewTransition",
+                $"Old view-transition capture failed: {ex.Message}", ex);
+        }
+
         if (updateCallback is not null)
         {
             try
@@ -97,7 +134,7 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Reads the <c>types</c> option — a JS array/iterable of strings — into
-    /// <paramref name="types"/>. Absent or non-array values contribute nothing.</summary>
+    /// <paramref name="into"/>. Absent or non-array values contribute nothing.</summary>
     private static void CollectViewTransitionTypes(JSValue? types, HashSet<string> into)
     {
         if (types is not JSObject arrayLike)
@@ -168,16 +205,58 @@ public sealed partial class DomBridge
     // ── Serialize-time rendering ────────────────────────────────────────────
 
     /// <summary>
+    /// Renders a running view transition: applies the <c>:active-view-transition-type()</c> rules it
+    /// activates and materialises the <c>::view-transition</c> pseudo tree. Invoked from the
+    /// serialize/render entry points after the run-once serialization transforms, so its own layout
+    /// probes (already spent capturing the old state) cannot swallow it. Skips geometry-snapshot
+    /// passes so a mid-script <c>getBoundingClientRect()</c> never bakes the overlay, and carries its
+    /// own once-guard so repeated serialize calls stay idempotent. A no-op when no transition runs.
+    /// </summary>
+    private void ApplyViewTransitionRendering(DomElement root)
+    {
+        if (_activeViewTransition is null || _viewTransitionBaked || _layoutGeometryPassActive)
+            return;
+
+        _viewTransitionBaked = true;
+        ApplyActiveViewTransitionTypeRules(root);
+        ApplyViewTransitionPseudoTree(root);
+    }
+
+    /// <summary>Records the geometry and background of every element with a used
+    /// <c>view-transition-name</c> (plus the implicit root) as it stands now — the "old" snapshot
+    /// captured before the update callback runs.</summary>
+    private void CaptureOldViewTransitionState(ViewTransitionState state)
+    {
+        var rootStyle = UsedStyleForCapture(DocumentElement);
+        if (!IsExplicitNoneName(rootStyle.GetValueOrDefault("view-transition-name")))
+        {
+            var (l, t, w, h) = GetBoundingClientRectForDomElement(DocumentElement, isRoot: true);
+            state.OldCaptures["root"] = new NamedSnapshot(l, t, w, h,
+                rootStyle.GetValueOrDefault("background-color") ?? "transparent");
+        }
+
+        foreach (var element in DocumentElement.Descendants().OfType<DomElement>())
+        {
+            var style = UsedStyleForCapture(element);
+            var name = style.GetValueOrDefault("view-transition-name");
+            if (IsNoneName(name) || string.Equals(name!.Trim(), "root", System.StringComparison.Ordinal))
+                continue;
+
+            var (l, t, w, h) = GetBoundingClientRectForDomElement(element, isRoot: false);
+            state.OldCaptures[name.Trim()] = new NamedSnapshot(l, t, w, h,
+                style.GetValueOrDefault("background-color") ?? "transparent");
+        }
+    }
+
+    /// <summary>
     /// Applies the author rules a running transition activates
     /// (<c>:active-view-transition-type(type)</c>) to the live DOM, so the "new" snapshot the pseudo
     /// tree captures reflects them. For every active type, a rule selecting through that pseudo is
-    /// re-matched with the pseudo stripped out and its declarations baked onto the matched elements
-    /// (e.g. <c>html:active-view-transition-type(t) #x { … }</c> bakes onto <c>#x</c> while the
-    /// transition of type <c>t</c> is active). A no-op when no transition is active.
+    /// re-matched with the pseudo stripped out and its declarations baked onto the matched elements.
     /// </summary>
     private void ApplyActiveViewTransitionTypeRules(DomElement root)
     {
-        if (_activeViewTransition is null || _activeViewTransition.Types.Count == 0)
+        if (_activeViewTransition!.Types.Count == 0)
             return;
 
         foreach (var (selectorText, declarations) in EnumerateAuthorStyleRules(root))
@@ -216,56 +295,83 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Materialises the <c>::view-transition</c> pseudo tree as real positioned boxes. For each
-    /// element carrying a used <c>view-transition-name</c> (plus the document root's implicit
-    /// <c>root</c> name), a group box is placed at the element's border-box geometry holding an
-    /// old and a new snapshot box; author <c>::view-transition*</c> declarations are applied to the
-    /// corresponding boxes. The whole tree hangs off an overlay box painted above the page (author
-    /// <c>::view-transition</c> declarations, e.g. a backdrop colour), reproducing the paused still
-    /// the reftests screenshot. A no-op when no transition is active.
+    /// Materialises the <c>::view-transition</c> pseudo tree as real positioned boxes. Each captured
+    /// name gets a group box at its old geometry (the frozen animation start) holding old and new
+    /// snapshot boxes; author <c>::view-transition*</c> declarations are applied to the corresponding
+    /// boxes. The whole tree hangs off an overlay painted above the page (author
+    /// <c>::view-transition</c> declarations, e.g. a backdrop colour).
     /// </summary>
     private void ApplyViewTransitionPseudoTree(DomElement root)
     {
-        if (_activeViewTransition is null)
-            return;
-
         var pseudoRules = CollectViewTransitionPseudoDeclarations(root);
         var captures = CollectViewTransitionCaptures(root);
         if (captures.Count == 0)
             return;
 
-        var overlay = CreateBridgeElement("div");
+        var overlay = CreateStyledBox(BaseStyle(
+            ("position", "fixed"), ("left", "0"), ("top", "0"),
+            ("width", "100vw"), ("height", "100vh"),
+            ("z-index", "2147483646"), ("pointer-events", "none")), LookupPseudo(pseudoRules, "", null));
         SetAttr(overlay, "data-broiler-view-transition", "");
-        SetAttr(overlay, "style", ComposeStyle(
-            "position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; z-index: 2147483646; pointer-events: none",
-            LookupPseudo(pseudoRules, "", null)));
 
         foreach (var capture in captures)
         {
-            var group = CreateBridgeElement("div");
-            SetAttr(group, "style", ComposeStyle(
-                $"position: absolute; left: {Px(capture.Left)}; top: {Px(capture.Top)}; " +
-                $"width: {Px(capture.Width)}; height: {Px(capture.Height)}; overflow: hidden",
-                LookupPseudo(pseudoRules, "group", capture)));
+            // The group animates old→new geometry; the reftests freeze it at the start, so it sits at
+            // the old geometry when the element existed before the transition, else the new.
+            var groupW = capture.HasOld ? capture.OldWidth : capture.NewWidth;
+            var groupH = capture.HasOld ? capture.OldHeight : capture.NewHeight;
+            var group = CreateStyledBox(BaseStyle(
+                ("position", "absolute"), ("left", Px(capture.GroupLeft)), ("top", Px(capture.GroupTop)),
+                ("width", Px(groupW)), ("height", Px(groupH)), ("overflow", "hidden")),
+                LookupPseudo(pseudoRules, "group", capture));
 
-            var oldBox = CreateBridgeElement("div");
-            SetAttr(oldBox, "style", ComposeStyle(
-                $"position: absolute; left: 0; top: 0; width: {Px(capture.Width)}; height: {Px(capture.Height)}; " +
-                $"background-color: {capture.BackgroundColor}",
-                LookupPseudo(pseudoRules, "old", capture)));
+            // Snapshot boxes are stacked top-left within the group: old under new.
+            if (capture.HasOld)
+            {
+                var oldBox = CreateStyledBox(BaseStyle(
+                    ("position", "absolute"), ("left", "0"), ("top", "0"),
+                    ("width", Px(capture.OldWidth)), ("height", Px(capture.OldHeight)),
+                    ("background-color", capture.OldBackground)), LookupPseudo(pseudoRules, "old", capture));
+                AppendBridgeChild(group, oldBox);
+            }
 
-            var newBox = CreateBridgeElement("div");
-            SetAttr(newBox, "style", ComposeStyle(
-                $"position: absolute; left: 0; top: 0; width: {Px(capture.Width)}; height: {Px(capture.Height)}; " +
-                $"background-color: {capture.BackgroundColor}",
-                LookupPseudo(pseudoRules, "new", capture)));
+            if (capture.HasNew)
+            {
+                var newBox = CreateStyledBox(BaseStyle(
+                    ("position", "absolute"), ("left", "0"), ("top", "0"),
+                    ("width", Px(capture.NewWidth)), ("height", Px(capture.NewHeight)),
+                    ("background-color", capture.NewBackground)), LookupPseudo(pseudoRules, "new", capture));
+                AppendBridgeChild(group, newBox);
+            }
 
-            AppendBridgeChild(group, oldBox);
-            AppendBridgeChild(group, newBox);
             AppendBridgeChild(overlay, group);
         }
 
         AppendBridgeChild(root, overlay);
+    }
+
+    private static Dictionary<string, string> BaseStyle(params (string Key, string Value)[] entries)
+    {
+        var style = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in entries)
+            style[key] = value;
+        return style;
+    }
+
+    /// <summary>Creates a bridge <c>&lt;div&gt;</c> whose inline style is <paramref name="baseStyle"/>
+    /// with the pseudo-element's author declarations layered on top (author values win). Stored in the
+    /// inline-style dict, not the attribute, so it survives <c>ReflectRenderState</c> on the render
+    /// path and serializes normally.</summary>
+    private DomElement CreateStyledBox(Dictionary<string, string> baseStyle, Dictionary<string, string> pseudoDeclarations)
+    {
+        foreach (var (key, value) in pseudoDeclarations)
+            baseStyle[key] = value;
+
+        var box = CreateBridgeElement("div");
+        var inline = InlineStyle(box);
+        foreach (var (key, value) in baseStyle)
+            inline[key] = value;
+        return box;
     }
 
     private void AppendBridgeChild(DomElement parent, DomElement child)
@@ -275,23 +381,32 @@ public sealed partial class DomBridge
     }
 
     private readonly record struct ViewTransitionCapture(
-        string Name, double Left, double Top, double Width, double Height, string BackgroundColor);
+        string Name,
+        double GroupLeft, double GroupTop,
+        bool HasOld, double OldWidth, double OldHeight, string OldBackground,
+        bool HasNew, double NewWidth, double NewHeight, string NewBackground);
 
-    /// <summary>The captured elements: the document root (name <c>root</c>) unless it opts out with
-    /// <c>view-transition-name: none</c>, then every element with a used <c>view-transition-name</c>,
-    /// in document order.</summary>
+    /// <summary>
+    /// The captured names, each pairing the "old" snapshot (from before the update callback) with the
+    /// "new" one (the element as it stands now), in old-then-new document order. Names appearing only
+    /// on one side keep just that snapshot; the group is placed at the old geometry when present.
+    /// </summary>
     private List<ViewTransitionCapture> CollectViewTransitionCaptures(DomElement root)
     {
-        var captures = new List<ViewTransitionCapture>();
+        var newCaptures = new Dictionary<string, NamedSnapshot>(System.StringComparer.Ordinal);
+        var order = new List<string>();
 
-        // The document element is captured as `root` by default; only an explicit
-        // `view-transition-name: none` opts it out.
+        void AddNew(string name, NamedSnapshot snapshot)
+        {
+            if (newCaptures.TryAdd(name, snapshot))
+                order.Add(name);
+        }
+
         var rootStyle = UsedStyleForCapture(root);
         if (!IsExplicitNoneName(rootStyle.GetValueOrDefault("view-transition-name")))
         {
             var (l, t, w, h) = GetBoundingClientRectForDomElement(root, isRoot: true);
-            captures.Add(new ViewTransitionCapture("root", l, t, w, h,
-                rootStyle.GetValueOrDefault("background-color") ?? "transparent"));
+            AddNew("root", new NamedSnapshot(l, t, w, h, rootStyle.GetValueOrDefault("background-color") ?? "transparent"));
         }
 
         foreach (var element in root.Descendants().OfType<DomElement>())
@@ -302,8 +417,25 @@ public sealed partial class DomBridge
                 continue;
 
             var (l, t, w, h) = GetBoundingClientRectForDomElement(element, isRoot: false);
-            captures.Add(new ViewTransitionCapture(name.Trim(), l, t, w, h,
-                style.GetValueOrDefault("background-color") ?? "transparent"));
+            AddNew(name.Trim(), new NamedSnapshot(l, t, w, h, style.GetValueOrDefault("background-color") ?? "transparent"));
+        }
+
+        var oldCaptures = _activeViewTransition!.OldCaptures;
+        // Names present in the old state but gone from the new keep their old-only snapshot.
+        foreach (var name in oldCaptures.Keys)
+            if (!newCaptures.ContainsKey(name))
+                order.Add(name);
+
+        var captures = new List<ViewTransitionCapture>(order.Count);
+        foreach (var name in order)
+        {
+            var hasOld = oldCaptures.TryGetValue(name, out var old);
+            var hasNew = newCaptures.TryGetValue(name, out var @new);
+            var anchor = hasOld ? old : @new; // group start geometry
+            captures.Add(new ViewTransitionCapture(
+                name, anchor.Left, anchor.Top,
+                hasOld, old.Width, old.Height, old.BackgroundColor,
+                hasNew, @new.Width, @new.Height, @new.BackgroundColor));
         }
 
         return captures;
@@ -312,8 +444,8 @@ public sealed partial class DomBridge
     /// <summary>The element's used style for capture purposes: its computed style with the
     /// serialize-time baked overlay layered on top. The overlay carries the
     /// <c>:active-view-transition-type()</c> declarations applied just before this runs — which the
-    /// computed-style engine has not re-cascaded yet — so they must be read from the overlay
-    /// directly (e.g. a freshly baked <c>view-transition-name</c> or <c>background</c>).</summary>
+    /// computed-style engine has not re-cascaded yet — so they must be read from the overlay directly
+    /// (e.g. a freshly baked <c>view-transition-name</c> or <c>background</c>).</summary>
     private Dictionary<string, string> UsedStyleForCapture(DomElement element)
     {
         var used = BuildComputedStyleMap(element);
@@ -367,9 +499,8 @@ public sealed partial class DomBridge
     }
 
     /// <summary>The declarations that apply to a pseudo of <paramref name="kind"/> for a given
-    /// capture, merging the universal (<c>*</c>) and name-specific (and, for groups, class) buckets
-    /// in cascade order (specific wins). <paramref name="capture"/> is <c>null</c> for the bare
-    /// overlay pseudo.</summary>
+    /// capture, merging the universal (<c>*</c>) and name-specific buckets in cascade order (specific
+    /// wins). <paramref name="capture"/> is <c>null</c> for the bare overlay pseudo.</summary>
     private static Dictionary<string, string> LookupPseudo(
         Dictionary<string, Dictionary<string, string>> pseudoRules, string kind, ViewTransitionCapture? capture)
     {
@@ -422,14 +553,4 @@ public sealed partial class DomBridge
 
     private static string Px(double value) =>
         value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "px";
-
-    /// <summary>Appends the pseudo-element's author declarations after the base layout style, so
-    /// author values (opacity, background, display:none, …) win.</summary>
-    private static string ComposeStyle(string baseStyle, Dictionary<string, string> declarations)
-    {
-        if (declarations.Count == 0)
-            return baseStyle;
-        var extra = string.Join("; ", declarations.Select(kv => $"{kv.Key}: {kv.Value}"));
-        return $"{baseStyle}; {extra}";
-    }
 }

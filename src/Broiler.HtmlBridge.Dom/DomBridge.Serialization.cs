@@ -38,6 +38,7 @@ public sealed partial class DomBridge
         if (ZoomBakeActive)
             ApplyZoomSerializationStyles(root, 1.0);
         ApplySerializationTransforms(root);
+        ApplyViewTransitionRendering(root);
         return HtmlSerializer.Serialize(
             root,
             CreateSerializationAdapter(),
@@ -99,6 +100,10 @@ public sealed partial class DomBridge
         if (ZoomBakeActive)
             ApplyZoomSerializationStyles(root, 1.0);
         ApplySerializationTransforms(root);
+        // The view-transition pseudo tree bakes onto existing elements (the active-type rules) and
+        // appends new boxes; run it before ReflectRenderState so both reach the render document's
+        // style attributes.
+        ApplyViewTransitionRendering(root);
         ReflectRenderState(root);
         return _document;
     }
@@ -182,10 +187,6 @@ public sealed partial class DomBridge
         RemoveRenderCommentNodes(root);
         ApplyCssomStyleSheetMutations(root);
         ApplyMetaColorScheme(root);
-        // A running view transition activates conditional rules and then paints its pseudo tree;
-        // the type rules must bake before the tree is captured so the "new" snapshot reflects them.
-        ApplyActiveViewTransitionTypeRules(root);
-        ApplyViewTransitionPseudoTree(root);
         // Zoom baking is applied by the callers (GetRenderDocument/SerializeToHtml) before this,
         // so it can be reverted on the geometry-snapshot path; pseudo/progress below depend on
         // the baked sizes and must run after it.

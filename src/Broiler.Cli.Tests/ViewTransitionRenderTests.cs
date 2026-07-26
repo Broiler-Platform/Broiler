@@ -93,6 +93,43 @@ public class ViewTransitionRenderTests
     }
 
     [Fact]
+    public void Group_Sits_At_The_Old_Elements_Geometry()
+    {
+        // WPT old-content-is-empty-div: the "shared" name moves from #empty (left:50px) to #target
+        // (left:200px, green) across the callback. The group animates from the old geometry and is
+        // frozen there, so the new (green) snapshot paints at the OLD position (50), not 200.
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  div { contain: paint; width: 100px; height: 100px; position: absolute; top: 50px; }
+  #empty { left: 50px; }
+  #target { left: 200px; background: green; }
+  html::view-transition-new(shared) { animation: unset; opacity: 1; }
+  html::view-transition-old(shared) { animation: unset; opacity: 1; }
+  html::view-transition-group(root) { animation: unset; opacity: 0; }
+  html::view-transition { background: lightpink; }
+</style>
+<div id=empty></div>
+<div id=target></div>
+</html>
+""";
+        using var bitmap = Render(html,
+            "document.getElementById('empty').style.viewTransitionName = 'shared';" +
+            "document.startViewTransition(() => {" +
+            "  document.getElementById('empty').style.viewTransitionName = '';" +
+            "  document.getElementById('target').style.viewTransitionName = 'shared';" +
+            "});");
+
+        // Green at the OLD position (~x=90, inside 50..150), lightpink at the new position (~x=240).
+        var atOld = bitmap.GetPixel(90, 90);
+        Assert.True(atOld is { R: 0, G: 128, B: 0 }, $"old-pos was {atOld.R},{atOld.G},{atOld.B}");
+
+        var atNew = bitmap.GetPixel(240, 90);
+        Assert.True(atNew is { R: 255, G: 182, B: 193 }, $"new-pos was {atNew.R},{atNew.G},{atNew.B}");
+    }
+
+    [Fact]
     public void No_Transition_Leaves_The_Page_Untouched()
     {
         // Without a transition the pseudo tree is never baked, so nothing paints a backdrop.
