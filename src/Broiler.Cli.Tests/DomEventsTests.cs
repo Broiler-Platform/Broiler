@@ -1327,4 +1327,97 @@ document.getElementById('result').textContent = val;
 
         Assert.Contains("doStuff()", result);
     }
+
+    // ──────────────────── Load lifecycle on the global object ────────────────────
+
+    [Fact]
+    public void Bare_AddEventListener_Registers_On_The_Window()
+    {
+        // In a browser `window` IS the global object, so the idiomatic bare
+        // addEventListener("load", …) is a window registration. The two are distinct
+        // objects here, so the bare name resolved to nothing and threw a ReferenceError
+        // that aborted the whole script — the marker below never ran either. Mirroring the
+        // window EventTarget methods onto the global fixes both.
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result"">never-ran</div>
+<script>
+addEventListener('load', function() {
+  document.getElementById('result').textContent = 'load-fired';
+});
+document.getElementById('result').textContent = 'script-completed';
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("load-fired", result);
+        Assert.DoesNotContain("never-ran", result);
+    }
+
+    [Fact]
+    public void Bare_And_Window_Listener_Registrations_Share_One_Store()
+    {
+        // The same JSFunction instances back both objects, so a listener added bare must be
+        // removable through `window` — otherwise the two spellings would silently maintain
+        // separate listener sets.
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result"">not-fired</div>
+<script>
+function handler() { document.getElementById('result').textContent = 'fired'; }
+addEventListener('load', handler);
+window.removeEventListener('load', handler);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("not-fired", result);
+    }
+
+    [Fact]
+    public void DomContentLoaded_Fires_On_Document_And_Window()
+    {
+        // Nothing dispatched DOMContentLoaded at all, so both spellings silently never ran.
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var seen = [];
+document.addEventListener('DOMContentLoaded', function() { seen.push('document'); });
+window.addEventListener('DOMContentLoaded', function() { seen.push('window'); });
+addEventListener('load', function() {
+  document.getElementById('result').textContent = seen.join(',');
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("document,window", result);
+    }
+
+    [Fact]
+    public void DocumentElement_Remove_Clears_The_Rendered_Document()
+    {
+        // .remove() resolved the parent as an element, and the document element's parent is
+        // the document — so removing it was a silent no-op and the removed page kept
+        // rendering. Serialization also read a DocumentElement captured at construction, which
+        // would have re-serialized the detached subtree even once the removal worked (WPT
+        // html/rendering/…/Document-documentElement-remove-clears-content).
+        var html = @"<!DOCTYPE html>
+<html style=""background-color: red""><body>
+<p>content which should not be displayed</p>
+<script>
+addEventListener('load', function() { document.documentElement.remove(); });
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.DoesNotContain("should not be displayed", result);
+        Assert.DoesNotContain("red", result);
+        Assert.Contains("<!DOCTYPE html>", result);
+    }
 }

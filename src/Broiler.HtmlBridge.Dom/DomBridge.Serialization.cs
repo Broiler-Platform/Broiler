@@ -30,11 +30,16 @@ public sealed partial class DomBridge
         // The serialize transforms/zoom bakes mutate the live tree; suppress observer delivery so
         // they neither deliver spurious records nor re-enter script synchronously mid-serialize.
         using var mutationSuppression = SuppressMutationDelivery();
+
+        var root = RenderedDocumentElement;
+        if (root is null)
+            return EmptyDocumentHtml;
+
         if (ZoomBakeActive)
-            ApplyZoomSerializationStyles(DocumentElement, 1.0);
-        ApplySerializationTransforms();
+            ApplyZoomSerializationStyles(root, 1.0);
+        ApplySerializationTransforms(root);
         return HtmlSerializer.Serialize(
-            DocumentElement,
+            root,
             CreateSerializationAdapter(),
             new HtmlSerializationOptions(
                 IncludeHtmlDoctype: true,
@@ -42,6 +47,31 @@ public sealed partial class DomBridge
                 EncodeTextNodes: false,
                 NewLineAfterDoctype: true));
     }
+
+    /// <summary>
+    /// The document's current element child — what the canvas actually renders — or
+    /// <c>null</c> once the document has none.
+    /// <para>
+    /// <see cref="DocumentElement"/> is captured when the bridge is constructed and never
+    /// tracks tree mutation, so after <c>document.documentElement.remove()</c> it still
+    /// points at the now-detached <c>&lt;html&gt;</c>. Serializing that subtree kept
+    /// rendering the removed document's background and text, where the spec leaves a
+    /// document with no element child and therefore nothing to paint (WPT
+    /// <c>html/rendering/…/Document-documentElement-remove-clears-content</c>: a red
+    /// <c>&lt;html&gt;</c> that removes itself on load must end up blank). Reading the live
+    /// tree here also picks up a <em>replaced</em> document element, which the captured
+    /// field would likewise have missed.
+    /// </para>
+    /// </summary>
+    private DomElement? RenderedDocumentElement => GetDocumentElement(_document);
+
+    /// <summary>
+    /// Serialization of a document with no element child: the doctype alone, matching the
+    /// blank reference these tests compare against. The doctype is unconditional here for
+    /// the same reason <see cref="HtmlSerializationOptions.IncludeHtmlDoctype"/> is set on
+    /// the normal path.
+    /// </summary>
+    private const string EmptyDocumentHtml = "<!DOCTYPE html>\n";
 
     /// <summary>
     /// Returns the canonical document prepared for direct renderer consumption.
@@ -54,15 +84,22 @@ public sealed partial class DomBridge
         // ReflectRenderState + transforms bake style/value attributes onto the live tree; suppress
         // observer delivery so they neither deliver spurious records nor re-enter script mid-bake.
         using var mutationSuppression = SuppressMutationDelivery();
+
+        // Nothing to bake or reflect once the document has no element child; the renderer
+        // gets the empty document and paints the bare canvas (see RenderedDocumentElement).
+        var root = RenderedDocumentElement;
+        if (root is null)
+            return _document;
+
         // Zoom baking runs per call (not part of the run-once guarded transforms); it is idempotent
         // once baked (the `zoom` property is stripped), so repeat calls on the render path are no-ops.
         // Must run before the guarded pseudo/progress transforms, which depend on the baked sizes. The
         // geometry-snapshot path enables NativeZoom (so ZoomBakeActive is false) and never bakes, so it
         // needs no revert — the live document stays pristine.
         if (ZoomBakeActive)
-            ApplyZoomSerializationStyles(DocumentElement, 1.0);
-        ApplySerializationTransforms();
-        ReflectRenderState(DocumentElement);
+            ApplyZoomSerializationStyles(root, 1.0);
+        ApplySerializationTransforms(root);
+        ReflectRenderState(root);
         return _document;
     }
 
@@ -136,19 +173,19 @@ public sealed partial class DomBridge
 
     private string SerializeChildrenToHtml(DomElement element) => string.Concat(ChildElements(element).Select(SerializeElementToHtml));
 
-    private void ApplySerializationTransforms()
+    private void ApplySerializationTransforms(DomElement root)
     {
         if (_serializationTransformsApplied)
             return;
 
         _serializationTransformsApplied = true;
-        RemoveRenderCommentNodes(DocumentElement);
-        ApplyCssomStyleSheetMutations(DocumentElement);
+        RemoveRenderCommentNodes(root);
+        ApplyCssomStyleSheetMutations(root);
         // Zoom baking is applied by the callers (GetRenderDocument/SerializeToHtml) before this,
         // so it can be reverted on the geometry-snapshot path; pseudo/progress below depend on
         // the baked sizes and must run after it.
-        ApplyZoomPseudoSerializationOverrides();
-        ApplyProgressLikeSerializationPlaceholders(DocumentElement);
+        ApplyZoomPseudoSerializationOverrides(root);
+        ApplyProgressLikeSerializationPlaceholders(root);
     }
 
     /// <summary>
@@ -224,18 +261,18 @@ public sealed partial class DomBridge
         }
     }
 
-    private void ApplyZoomPseudoSerializationOverrides()
+    private void ApplyZoomPseudoSerializationOverrides(DomElement root)
     {
         var rules = new List<string>();
         int pseudoIndex = 0;
-        CollectZoomPseudoSerializationOverrides(DocumentElement, 1.0, rules, ref pseudoIndex);
+        CollectZoomPseudoSerializationOverrides(root, 1.0, rules, ref pseudoIndex);
         if (rules.Count == 0)
             return;
 
         var styleElement = CreateBridgeElement("style");
         SetElementTextContent(styleElement, string.Join(Environment.NewLine, rules));
 
-        var head = FindFirstElementByTagName(DocumentElement, "head");
+        var head = FindFirstElementByTagName(root, "head");
         if (head != null)
         {
             SetParent(styleElement, head);
@@ -243,8 +280,8 @@ public sealed partial class DomBridge
             return;
         }
 
-        SetParent(styleElement, DocumentElement);
-        InsertChildAt(DocumentElement, 0, styleElement);
+        SetParent(styleElement, root);
+        InsertChildAt(root, 0, styleElement);
     }
 
     private void CollectZoomPseudoSerializationOverrides(DomElement element, double parentZoom, List<string> rules, ref int pseudoIndex)
