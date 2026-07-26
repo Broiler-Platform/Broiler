@@ -59,4 +59,95 @@ public class NativeBackdropRenderTests
         Assert.Equal(200, corner.G);
         Assert.Equal(3, corner.B);
     }
+
+    // @container support lives in the Broiler.CSS submodule (patches/0021), which is not in the pinned
+    // pointer, so these end-to-end tests self-skip until the patch lands. Probing keeps them green on
+    // the pinned engine yet exercising the real fix once it is applied. The engine-level behaviour is
+    // covered directly by the submodule's own CssStyleEngineContainerQueryTests (in the same patch).
+    private static bool ContainerQueriesSupported()
+    {
+        const string html = """
+<!DOCTYPE html><html><head><style>
+  #c { container-type: inline-size; width: 100px; }
+  #t { width: 10px; height: 10px; background: red; }
+  @container (min-width: 50px) { #t { background: rgb(0, 128, 0); } }
+</style></head><body><div id="c"><div id="t"></div></div></body></html>
+""";
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 20, 20);
+        var px = bitmap.GetPixel(2, 2);
+        return px is { R: 0, G: 128, B: 0 };
+    }
+
+    // WPT css/css-conditional/container-queries/dialog-backdrop-remove: a dialog is its own size
+    // container, and `@container (width > 1px)` switches its ::backdrop to display:none, so the red
+    // backdrop must not paint — the page stays green.
+    [Fact]
+    public void ContainerQuery_Hides_Dialog_Backdrop()
+    {
+        if (!ContainerQueriesSupported())
+            return; // @container patch (0021) not applied to the pinned submodule; see note above.
+
+        const string html = """
+<!DOCTYPE html>
+<html><head><style>
+  html { overflow: hidden; background: green; }
+  dialog { container-type: size; width: 100px; height: 100px; visibility: hidden; }
+  dialog::backdrop { display: block; background-color: red; }
+  @container (width > 1px) { dialog::backdrop { display: none; } }
+</style></head>
+<body><dialog id="dialog"></dialog></body></html>
+""";
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        context.Eval("document.getElementById('dialog').showModal();");
+        bridge.ResolveAnchorPositions();
+
+        var serialized = bridge.SerializeToHtml();
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(serialized, 200, 200);
+
+        // No red backdrop anywhere: the @container rule hid it, so the green page shows through.
+        foreach (var (x, y) in new[] { (5, 5), (100, 100), (195, 195) })
+        {
+            var px = bitmap.GetPixel(x, y);
+            Assert.True(px is { R: 0, G: 128, B: 0 }, $"({x},{y}) was {px.R},{px.G},{px.B}");
+        }
+    }
+
+    // WPT css/css-conditional/container-queries/top-layer-dialog-backdrop: the ::backdrop and the
+    // dialog depend on an ancestor size container narrowed to 100px, so `@container (max-width: 200px)`
+    // hides both — the page stays green.
+    [Fact]
+    public void ContainerQuery_On_Ancestor_Hides_Backdrop_And_Dialog()
+    {
+        if (!ContainerQueriesSupported())
+            return; // @container patch (0021) not applied to the pinned submodule; see note above.
+
+        const string html = """
+<!DOCTYPE html>
+<html><head><style>
+  html { background: green; }
+  #container { container-type: inline-size; }
+  @container (max-width: 200px) {
+    ::backdrop { display: none; }
+    #dialog { visibility: hidden; }
+  }
+</style></head>
+<body><div id="container"><dialog id="dialog"></dialog></div></body></html>
+""";
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        context.Eval("document.getElementById('dialog').showModal(); document.getElementById('container').style.width = '100px';");
+        bridge.ResolveAnchorPositions();
+
+        var serialized = bridge.SerializeToHtml();
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(serialized, 200, 200);
+
+        foreach (var (x, y) in new[] { (5, 5), (100, 100), (195, 195) })
+        {
+            var px = bitmap.GetPixel(x, y);
+            Assert.True(px is { R: 0, G: 128, B: 0 }, $"({x},{y}) was {px.R},{px.G},{px.B}");
+        }
+    }
 }

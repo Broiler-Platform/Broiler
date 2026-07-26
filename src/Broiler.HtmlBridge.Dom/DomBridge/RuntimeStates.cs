@@ -114,11 +114,19 @@ internal sealed class DialogRuntimeState
     // set so its ::backdrop still renders for the snapshot.
     public RuntimeValue<bool> PopoverOpen { get; } = new();
 
+    // CSS Position §overlay: set when hidePopover() left the element in the top layer because its
+    // `overlay` is transitioning out (see PopoverOpen note); cleared on the next showPopover(). It
+    // distinguishes an element whose `overlay` is transitioning *out* (still in the top layer) from
+    // one whose `overlay` is transitioning *in* on show (held *out* of the top layer until it
+    // finishes) — both have PopoverOpen set and the same transition declarations.
+    public RuntimeValue<bool> PopoverTransitioningOut { get; } = new();
+
     public void CopyTo(DialogRuntimeState target)
     {
         Modal.CopyTo(target.Modal);
         TopLayerOrder.CopyTo(target.TopLayerOrder);
         PopoverOpen.CopyTo(target.PopoverOpen);
+        PopoverTransitioningOut.CopyTo(target.PopoverTransitioningOut);
     }
 }
 

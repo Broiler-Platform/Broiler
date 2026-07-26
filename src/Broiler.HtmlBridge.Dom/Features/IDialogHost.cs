@@ -42,4 +42,9 @@ internal interface IDialogHost
     /// <summary>Whether a hiding popover must stay in the top layer (mid-transition overlay per
     /// CSS Position §overlay) — a renderer decision.</summary>
     bool PopoverKeepsOverlayOnHide(DomElement element);
+
+    /// <summary>Records that <c>hidePopover()</c> left the element in the top layer because its
+    /// <c>overlay</c> is transitioning out, so the show-time "held out of the top layer while
+    /// <c>overlay</c> transitions in" rule does not misfire on it (CSS Position §overlay).</summary>
+    void MarkPopoverOverlayTransitioningOut(DomElement element);
 }
