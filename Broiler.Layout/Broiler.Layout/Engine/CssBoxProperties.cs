@@ -25,6 +25,7 @@ internal abstract partial class CssBoxProperties
     private string _outlineWidth = "medium";
     private string _outlineStyle = "none";
     private string _outlineOffset = "0";
+    private string _overflowClipMargin = "0px";
     private string _bottom = "auto";
     private string _color = "black";
     private string _cornerRadius = "0";
@@ -109,6 +110,7 @@ internal abstract partial class CssBoxProperties
     private double _actualBorderRightWidth = double.NaN;
     private double _actualOutlineWidth = double.NaN;
     private double _actualOutlineOffset = double.NaN;
+    private double _actualOverflowClipMargin = double.NaN;
     private BColor _actualOutlineColor = BColor.Empty;
     private double _actualMaxWidth = double.NaN;
     private double _actualMinWidth = double.NaN;
@@ -309,6 +311,49 @@ internal abstract partial class CssBoxProperties
                     : ApplyZoomToLength(OutlineOffset, CssLengthParser.ParseLength(OutlineOffset, 0, GetEmHeight()));
 
             return _actualOutlineOffset;
+        }
+    }
+
+    /// <summary>
+    /// CSS Overflow §4: the <c>overflow-clip-margin</c> property. Expands the
+    /// overflow clip edge outward by a <c>&lt;length [0,∞]&gt;</c> for boxes that
+    /// clip without scrolling (<c>overflow: clip</c> or paint containment). A
+    /// leading <c>&lt;visual-box&gt;</c> keyword (content-/padding-/border-box) is
+    /// accepted and ignored here — the clip base stays the padding box.
+    /// </summary>
+    public string OverflowClipMargin
+    {
+        get => _overflowClipMargin;
+        set { _overflowClipMargin = value; _actualOverflowClipMargin = double.NaN; }
+    }
+
+    /// <summary>Used overflow-clip-margin in px (outward clip-edge expansion; never negative).</summary>
+    public double ActualOverflowClipMargin
+    {
+        get
+        {
+            if (double.IsNaN(_actualOverflowClipMargin))
+            {
+                // Drop an optional leading <visual-box> keyword and keep the length token.
+                var token = _overflowClipMargin;
+                if (!string.IsNullOrEmpty(token))
+                {
+                    foreach (var part in token.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        if (part.Length > 0 && (char.IsDigit(part[0]) || part[0] is '.' or '+' or '-'))
+                        {
+                            token = part;
+                            break;
+                        }
+                }
+
+                var px = string.IsNullOrEmpty(token)
+                    ? 0
+                    // Paint-only used length; absolute × EffectiveZoom, em rides the font. Clamp to ≥0 per grammar.
+                    : ApplyZoomToLength(token, CssLengthParser.ParseLength(token, 0, GetEmHeight()));
+                _actualOverflowClipMargin = Math.Max(0, px);
+            }
+
+            return _actualOverflowClipMargin;
         }
     }
 

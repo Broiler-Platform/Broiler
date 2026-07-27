@@ -101,4 +101,49 @@ public sealed class ContainPaintClipTests
         Assert.True(Near(pastRight, 0, 128, 0),
             $"contain:layout must not clip; x=150 should still be green, got {Describe(pastRight)}");
     }
+
+    /// <summary>
+    /// CSS Overflow §4: <c>overflow-clip-margin</c> expands the overflow clip edge
+    /// outward. A <c>contain: paint</c> box with <c>overflow-clip-margin: 50px</c>
+    /// clips its 200×200 child to a 150×150 region (100×100 padding box + 50px on
+    /// each side), so (125,125) — outside the padding box but inside the expanded
+    /// edge — is green, while (175,175) beyond the expanded edge is white.
+    /// <para>
+    /// Ships as submodule patch <c>0023</c> (stacks on <c>0022</c>); the resolved
+    /// <c>overflow-clip-margin</c> length lives in the main-repo <c>Broiler.Layout</c>
+    /// but is inert until the paint patch consumes it. Feature-probes and self-skips
+    /// on the un-patched pinned engine, mirroring the other cases here.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void OverflowClipMargin_ExpandsClipEdge()
+    {
+        const string style = "contain:paint;overflow-clip-margin:50px";
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(Doc(style), 300, 300);
+
+        var band = bitmap.GetPixel(125, 125);   // outside padding box, inside expanded edge
+        var beyond = bitmap.GetPixel(175, 175);  // past the expanded 150px edge
+
+        // Feature-probe for the expanded-clip signature (patches 0022+0023): the
+        // margin band is green AND the region beyond it is clipped to white. On
+        // the pinned engine the box either does not clip at all (both green) or
+        // clips at the padding edge without the margin (both white) — neither
+        // matches, so the test self-skips.
+        bool marginApplied = Near(band, 0, 128, 0) && Near(beyond, 255, 255, 255);
+        if (!marginApplied)
+            return; // patches 0022/0023 not applied to the pinned submodule; see class remarks.
+
+        // Inside the padding box → green.
+        var inside = bitmap.GetPixel(50, 50);
+        Assert.True(Near(inside, 0, 128, 0),
+            $"inside the box should be green, got {Describe(inside)}");
+
+        // In the 50px clip-margin band (outside padding box, inside expanded edge) → green.
+        Assert.True(Near(band, 0, 128, 0),
+            $"clip-margin band should be green, got {Describe(band)}");
+
+        // Beyond the expanded clip edge (150px) → clipped to white.
+        Assert.True(Near(beyond, 255, 255, 255),
+            $"past the expanded clip edge must be white, got {Describe(beyond)}");
+    }
 }

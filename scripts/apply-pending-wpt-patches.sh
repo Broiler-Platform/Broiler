@@ -33,6 +33,7 @@ set -euo pipefail
 # Empty by default — add entries here to have CI apply them again.
 PENDING_PATCHES=(
   "Broiler.HTML|patches/0022-html-paint-contain-clip.patch"
+  "Broiler.HTML|patches/0023-html-overflow-clip-margin.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
