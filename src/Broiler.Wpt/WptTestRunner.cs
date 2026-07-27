@@ -435,8 +435,17 @@ internal sealed partial class WptTestRunner
   }
   if (typeof async_test === 'undefined') {
     window.async_test = function(func, name) {
-      var t = { step: function(f){try{f();}catch(e){}}, done: function(){}, step_func: function(f){return f;}, step_func_done: function(f){return f;}, step_timeout: function(f,d){try{f();}catch(e){}} };
-      if (func) { try { func(t); } catch(e) {} }
+      // Reference-matching (defer) mode: the reference generator does not load
+      // testharness.js, so `async_test` is undefined there and calling it throws,
+      // aborting the rest of the script before any test body mutates the DOM.
+      // Mirror that here — return an inert handle and do NOT run the body — so
+      // DOM-mutating assertions (e.g. HTMLLinkElement-disabled toggling <link
+      // disabled> on, which never gets reverted because onload doesn't fire) do
+      // not advance the captured DOM past the reference point. Matches the `test`
+      // and `promise_test` stubs, which likewise leave bodies un-run in this mode.
+      var defer = window.__broilerDeferPromiseTests;
+      var t = { step: function(f){ if(!defer){try{f();}catch(e){}} }, done: function(){}, step_func: function(f){return f;}, step_func_done: function(f){return f;}, step_timeout: function(f,d){ if(!defer){try{f();}catch(e){}} } };
+      if (func && !defer) { try { func(t); } catch(e) {} }
       return t;
     };
   }

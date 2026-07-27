@@ -3644,6 +3644,46 @@ input {
     }
 
     [Fact]
+    public void Wpt_Harness_AsyncTest_Bodies_Do_Not_Run_In_Defer_Mode()
+    {
+        // Regression: the reference generator does not load testharness.js, so
+        // `async_test` is undefined there and the script aborts at its call —
+        // the body never mutates the DOM before the screenshot. The runner's
+        // stub must mirror that in reference-matching (defer) mode. Previously
+        // the async_test stub ran its body unconditionally, so an async_test
+        // that flips `<link disabled>` on (HTMLLinkElement-disabled-00{1,2,4,5})
+        // applied the green sheet — with no onload to revert it — leaving a
+        // green render against a white reference (0.0% MissingContent).
+        var testHtml = @"<!DOCTYPE html>
+<script src=""/resources/testharness.js""></script>
+<link rel=""stylesheet"" disabled href=""data:text/css,html { background: green }"">
+<script>
+  const link = document.querySelector(""link[disabled]"");
+  async_test(function(t) {
+    // Enabling the sheet here must NOT reach the render in defer mode.
+    link.disabled = false;
+  }, ""async_test body must not run in defer mode"");
+</script>";
+        // Empty document → default white background, matching the reference the
+        // Chromium generator produces (the disabled sheet never applies).
+        var referenceHtml = @"<!DOCTYPE html><html></html>";
+
+        var previousDefer = WptTestRunner.DeferPromiseTests;
+        WptTestRunner.DeferPromiseTests = true;
+        try
+        {
+            var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-async-test-defer");
+            Assert.True(result.Passed,
+                "In defer mode the async_test body must not run, so <link disabled> " +
+                $"stays disabled and the page stays white. Match={result.MatchPercent:F1}% Message={result.Message}");
+        }
+        finally
+        {
+            WptTestRunner.DeferPromiseTests = previousDefer;
+        }
+    }
+
+    [Fact]
     public void Wpt_Harness_CustomElements_Can_Upgrade_Parsed_ShadowTree_Nodes()
     {
         var testHtml = @"<!DOCTYPE html>
