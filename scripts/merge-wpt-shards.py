@@ -117,6 +117,16 @@ def _iter_shard_statuses(shard_dir: Path):
             yield path, data
 
 
+def _format_incomplete_shard(status: dict) -> str:
+    """Human-readable label for an incomplete shard. A numeric exit code means the
+    shard crashed after running; the ``"missing"`` sentinel means it uploaded
+    nothing at all (its job was cancelled before the collect/upload steps)."""
+    exit_code = status["exitCode"]
+    if exit_code == "missing":
+        return f"shard {status['shardIndex']} (no report uploaded)"
+    return f"shard {status['shardIndex']} (exit {exit_code})"
+
+
 def _problem_identity(result: dict) -> tuple[str, str, str | None]:
     """Return a stable key and label for a failure root-cause group."""
     category = str(result.get("category") or "Unknown")
@@ -169,9 +179,7 @@ def _rank_biggest_problems(
 
     if incomplete_shards:
         shards = sorted(incomplete_shards, key=lambda status: status["shardIndex"])
-        listing = ", ".join(
-            f"shard {status['shardIndex']} (exit {status['exitCode']})" for status in shards
-        )
+        listing = ", ".join(_format_incomplete_shard(status) for status in shards)
         problems.append(
             {
                 "kind": "IncompleteShards",
@@ -311,6 +319,7 @@ def merge(
     problem_limit: int = DEFAULT_PROBLEM_LIMIT,
     biggest_problem_limit: int = DEFAULT_BIGGEST_PROBLEM_LIMIT,
     low_match_threshold: float = DEFAULT_LOW_MATCH_THRESHOLD,
+    expected_shard_indexes: set[int] | None = None,
 ) -> dict:
     passed = failed = skipped = total = 0
     shard_count = 0
@@ -452,16 +461,50 @@ def merge(
             if len(family_group["examples"]) < PROBLEM_EXAMPLE_LIMIT:
                 family_group["examples"].append(relative_path)
 
-    incomplete_shards = []
+    # Exit code left behind by each shard that got far enough to run the
+    # "Collect shard result" step (index -> exit code).
+    shard_exit_codes: dict[int, int] = {}
     for _path, status in _iter_shard_statuses(shard_dir):
         try:
             shard_index = int(status["shardIndex"])
             exit_code = int(status["exitCode"])
         except (TypeError, ValueError):
             continue
-        if exit_code == 0 or shard_index in reported_shard_indexes:
+        shard_exit_codes[shard_index] = exit_code
+
+    # A shard is incomplete when it produced no conclusive report. There are two
+    # ways that happens, and the second one used to be invisible:
+    #   1. it left a status file with a non-zero exit — it crashed after the run
+    #      step but the runner still ran the always() collect step; or
+    #   2. it was dispatched (its index is in expected_shard_indexes) but produced
+    #      neither a report nor a status file. Its job was cancelled mid-run — e.g.
+    #      it hit the job timeout-minutes — so the always() collect/upload steps
+    #      never ran and its whole slice silently vanished from the artifacts.
+    #
+    # Case 2 is the important one: the merged pass/fail/skip/total counts are a raw
+    # SUM over the shards that uploaded, so a vanished shard drops ~1/N of every
+    # count with no indication. That is why the "skipped" total is not comparable
+    # between runs — a run that merges 6 of 8 shards reports ~6/8 of the skips a
+    # full 8-shard merge would. Flagging the missing shard makes the shortfall
+    # visible (incomplete_shard_count > 0 → the issue and summary say so) instead
+    # of silently under-counting.
+    candidate_indexes = set(shard_exit_codes)
+    if expected_shard_indexes is not None:
+        candidate_indexes |= set(expected_shard_indexes)
+
+    incomplete_shards = []
+    for shard_index in sorted(candidate_indexes):
+        if shard_index in reported_shard_indexes:
             continue
-        incomplete_shards.append({"shardIndex": shard_index, "exitCode": exit_code})
+        exit_code = shard_exit_codes.get(shard_index)
+        # A clean exit with no report is odd but not an incomplete run; leave it.
+        if exit_code == 0:
+            continue
+        incomplete_shards.append(
+            # A dispatched shard that left no status file at all never uploaded
+            # anything — record it as "missing" rather than a numeric exit code.
+            {"shardIndex": shard_index, "exitCode": exit_code if exit_code is not None else "missing"}
+        )
 
     if incomplete_shards:
         incomplete_shards.sort(key=lambda status: status["shardIndex"])
@@ -472,7 +515,7 @@ def merge(
             "subCategory": None,
             "count": len(incomplete_shards),
             "examples": [
-                f"shard {status['shardIndex']} (exit {status['exitCode']})"
+                _format_incomplete_shard(status)
                 for status in incomplete_shards[:PROBLEM_EXAMPLE_LIMIT]
             ],
         }
@@ -787,6 +830,13 @@ def main() -> int:
         help="A pixel match below this percent counts as a 'low percent match' big "
         f"problem (default: {DEFAULT_LOW_MATCH_THRESHOLD:g})",
     )
+    parser.add_argument(
+        "--expected-shards",
+        help="Comma-separated shard indexes this run dispatched (e.g. '0,1,2,3,4,5,6,7'). "
+        "Any expected shard that uploaded neither a report nor a status file is "
+        "flagged incomplete, so a shard whose job was cancelled mid-run (its slice "
+        "silently missing from the merged totals) is surfaced instead of dropped.",
+    )
     parser.add_argument("--run-url", default=os.environ.get("WPT_RUN_URL"), help="Workflow run URL for the issue footer")
     parser.add_argument("--github-output", type=Path, help="Path to $GITHUB_OUTPUT for step outputs")
     args = parser.parse_args()
@@ -798,11 +848,21 @@ def main() -> int:
     if not 0 <= args.low_match_threshold <= 100:
         parser.error("--low-match-threshold must be between 0 and 100")
 
+    expected_shard_indexes: set[int] | None = None
+    if args.expected_shards is not None:
+        try:
+            expected_shard_indexes = {
+                int(token) for token in args.expected_shards.split(",") if token.strip() != ""
+            }
+        except ValueError:
+            parser.error("--expected-shards must be a comma-separated list of integers")
+
     merged = merge(
         args.shard_dir,
         args.problem_limit,
         args.biggest_problem_limit,
         args.low_match_threshold,
+        expected_shard_indexes=expected_shard_indexes,
     )
 
     if args.merge_into:
