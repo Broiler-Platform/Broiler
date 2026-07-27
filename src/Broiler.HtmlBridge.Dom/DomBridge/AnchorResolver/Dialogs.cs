@@ -495,4 +495,21 @@ public sealed partial class DomBridge
             return false;
         return HasDiscreteOverlayTransition(element);
     }
+
+    // CSS Position 4 §overlay: the computed value of the UA-controlled `overlay` property.
+    // A top-layer element (open popover / modal dialog) computes to `auto`; everything else to
+    // `none`. While an `overlay` discrete transition runs *in* (allow-discrete holds the
+    // before-change `none` for the transition's duration), getComputedStyle observes `none` until
+    // it finishes — WPT css/css-position/overlay/overlay-transition-finished reads this
+    // synchronously right after showPopover() to confirm the transition started.
+    internal string ComputeOverlayValue(DomElement element)
+    {
+        if (PopoverHeldOutByOverlayTransitionIn(element))
+            return "none";
+
+        bool inTopLayer =
+            (DialogStateFor(element).Modal.TryGet(out var modal) && modal is true) ||
+            (DialogStateFor(element).PopoverOpen.TryGet(out var open) && open is true);
+        return inTopLayer ? "auto" : "none";
+    }
 }

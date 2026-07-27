@@ -238,8 +238,22 @@ public sealed partial class DomBridge
 
     // The getComputedStyle result object is built by the Phase 3 (P3.14) StyleDeclarationBinding
     // feature module; the bridge still produces the engine-cascaded computed map here.
-    private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null) =>
-        Dom.Features.StyleDeclarationBinding.BuildComputedDeclaration(BuildComputedStyleMap(element, pseudoElement));
+    private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null)
+    {
+        var map = BuildComputedStyleMap(element, pseudoElement);
+        // `overlay` (CSS Position 4) is UA-controlled — it is not in the author cascade, so the
+        // engine map never carries it. Surface its computed value for getComputedStyle here (copying
+        // first so a memoised engine map is never mutated). Pseudo-elements never enter the top layer.
+        if (element != null && pseudoElement == null)
+        {
+            map = new Dictionary<string, string>(map, StringComparer.OrdinalIgnoreCase)
+            {
+                ["overlay"] = ComputeOverlayValue(element),
+            };
+        }
+
+        return Dom.Features.StyleDeclarationBinding.BuildComputedDeclaration(map);
+    }
 
     private Dictionary<string, string> BuildComputedStyleMap(DomElement? element, string? pseudoElement = null)
     {
