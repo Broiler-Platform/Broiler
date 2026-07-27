@@ -217,8 +217,13 @@ jobs:
             ARGS+=(--subset "$SUBSET")
           fi
           if [ "$RERUN_FAILED" = "true" ]; then
-            # Incremental: rerun only previously-failed tests, reusing cached refs.
-            ARGS+=(--rerun-json "$FAILED_TESTS_FILE" --skip-reference-generation)
+            # Incremental: rerun only the previously-failed tests. Reference
+            # generation is NOT skipped — run-wpt-tests.sh restricts it to just the
+            # rerun set (fast, and it guarantees those tests have references).
+            # Skipping generation here relied on a cached reference set that is not
+            # reliably present, which skipped every reran test as "missing
+            # reference image" and made the run meaningless.
+            ARGS+=(--rerun-json "$FAILED_TESTS_FILE")
           fi
           EXIT=0
           bash scripts/run-wpt-tests.sh "${ARGS[@]}" || EXIT=$?

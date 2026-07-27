@@ -13,6 +13,7 @@ const {
     isBrowserClosedError,
     isNonTestFile,
     isWptHarnessScript,
+    loadRerunTestPaths,
     parsePositiveIntegerEnv,
     requiresJavaScript,
     resolveRootRelativeResource,
@@ -182,5 +183,40 @@ test('positive integer env parsing falls back for invalid values', () => {
         } else {
             process.env[name] = original;
         }
+    }
+});
+
+test('loadRerunTestPaths collects manifest relative paths, testPath fallback', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'broiler-wpt-rerun-'));
+    try {
+        const manifest = path.join(dir, 'failed-tests.json');
+        fs.writeFileSync(manifest, JSON.stringify({
+            results: [
+                { relativeTestPath: 'css/a/one.html', passed: false, skipped: false },
+                { relativeTestPath: 'html/b/two.xht', passed: false, skipped: false },
+                { testPath: 'css/c/three.html' },        // fallback when no relativeTestPath
+                { relativeTestPath: '', passed: false },  // ignored: empty
+                'not-an-object',                          // ignored: not a dict
+            ],
+        }));
+
+        const paths = loadRerunTestPaths(manifest);
+        assert.deepEqual(
+            [...paths].sort(),
+            ['css/a/one.html', 'css/c/three.html', 'html/b/two.xht'],
+        );
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('loadRerunTestPaths rejects a manifest without a results array', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'broiler-wpt-rerun-bad-'));
+    try {
+        const manifest = path.join(dir, 'bad.json');
+        fs.writeFileSync(manifest, JSON.stringify({ summary: {} }));
+        assert.throws(() => loadRerunTestPaths(manifest), /no top-level 'results' array/);
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
     }
 });

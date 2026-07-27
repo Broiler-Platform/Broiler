@@ -116,9 +116,15 @@ fi
 
 # Incremental rerun arguments for the C# runner.
 RERUN_ARGS=()
+# Incremental rerun arguments for the reference generator. When a rerun manifest
+# is given, generation is restricted to exactly the tests being re-run (fast, and
+# — crucially — it guarantees those tests have references rather than relying on a
+# cached set that may be absent, which otherwise skips every reran test).
+REF_RERUN_ARGS=()
 if [[ -n "$RERUN_JSON" ]]; then
     RERUN_ARGS=(--rerun-json "$RERUN_JSON")
     [[ -n "$RERUN_KIND" ]] && RERUN_ARGS+=(--rerun-kind "$RERUN_KIND")
+    REF_RERUN_ARGS=(--rerun-json "$RERUN_JSON")
 fi
 
 NON_JS_ARGS=()
@@ -269,7 +275,7 @@ elif command -v npx &>/dev/null; then
                     if ! NODE_PATH="$REPO_ROOT/tests/wpt/node_modules" \
                         node "$SCRIPT_DIR/generate-wpt-references.js" \
                         "$MATCH_DIR" "$REFERENCE_DIR" --concurrency 8 --base-dir "$WPT_DIR" \
-                        "${SHARD_ARGS[@]}" "${NON_JS_ARGS[@]}" 2>&1; then
+                        "${SHARD_ARGS[@]}" "${REF_RERUN_ARGS[@]}" "${NON_JS_ARGS[@]}" 2>&1; then
                         echo "  ✗ Reference generation failed for $MATCH_DIR" >&2
                         REF_GEN_OK=false
                     fi
@@ -284,7 +290,7 @@ elif command -v npx &>/dev/null; then
         if ! NODE_PATH="$REPO_ROOT/tests/wpt/node_modules" \
             node "$SCRIPT_DIR/generate-wpt-references.js" \
             "$TEST_DIR" "$REFERENCE_DIR" --concurrency 8 \
-            "${SHARD_ARGS[@]}" "${NON_JS_ARGS[@]}" 2>&1; then
+            "${SHARD_ARGS[@]}" "${REF_RERUN_ARGS[@]}" "${NON_JS_ARGS[@]}" 2>&1; then
             REF_GEN_OK=false
         fi
     fi

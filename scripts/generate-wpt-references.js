@@ -250,6 +250,36 @@ function isBrowserClosedError(error) {
     return /browser (?:has been )?closed|target page, context or browser has been closed|browser disconnected/i.test(message);
 }
 
+/**
+ * Load the set of forward-slash relative test paths named in a prior JSON report
+ * (the incremental-rerun manifest). Used to restrict reference generation to the
+ * tests an incremental run will actually re-execute, so references exist for
+ * exactly that set — the C# runner's `--rerun-json` filters the same manifest, so
+ * the two stay in lock-step.
+ *
+ * Every entry in the failed-tests manifest is a rerun candidate, so all paths are
+ * taken. `relativeTestPath` (already forward-slash, relative to the WPT root) is
+ * preferred; `testPath` is a fallback. Returns a Set of normalised relative paths.
+ */
+function loadRerunTestPaths(rerunJson) {
+    const data = JSON.parse(fs.readFileSync(rerunJson, 'utf8'));
+    const results = data && Array.isArray(data.results) ? data.results : null;
+    if (!results) {
+        throw new Error(`rerun report ${rerunJson} has no top-level 'results' array`);
+    }
+    const paths = new Set();
+    for (const result of results) {
+        if (!result || typeof result !== 'object') {
+            continue;
+        }
+        const raw = result.relativeTestPath || result.testPath;
+        if (typeof raw === 'string' && raw.trim() !== '') {
+            paths.add(raw.split(path.sep).join('/').replace(/\\/g, '/'));
+        }
+    }
+    return paths;
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -261,6 +291,7 @@ async function main(args = process.argv.slice(2)) {
     let shardCount = 1;
     let shardIndex = ALL_SHARDS;
     let nonJsOnly = false;
+    let rerunJson = null;
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--concurrency' && i + 1 < args.length) {
@@ -271,6 +302,8 @@ async function main(args = process.argv.slice(2)) {
             shardCount = parseInt(args[++i], 10);
         } else if (args[i] === '--shard-index' && i + 1 < args.length) {
             shardIndex = parseInt(args[++i], 10);
+        } else if (args[i] === '--rerun-json' && i + 1 < args.length) {
+            rerunJson = args[++i];
         } else if (args[i] === '--non-js') {
             nonJsOnly = true;
         } else if (!testDir) {
@@ -316,6 +349,28 @@ async function main(args = process.argv.slice(2)) {
         testFiles = testFiles.filter((testFile) =>
             !requiresJavaScript(fs.readFileSync(testFile, 'utf8')));
         console.log(`Non-JS mode: selected ${testFiles.length} files; skipped ${beforeFilter - testFiles.length} JavaScript-dependent files`);
+    }
+
+    // Incremental rerun: restrict generation to the tests named in the prior
+    // manifest, matching the C# runner's own `--rerun-json` filter. Applied before
+    // sharding (like the runner) so shard N still generates exactly the rerun tests
+    // it will execute. This is what makes an incremental run correct: without it
+    // the run reused a cached reference set that may be absent, so every reran test
+    // was skipped as "missing reference image".
+    if (rerunJson) {
+        let rerunPaths;
+        try {
+            rerunPaths = loadRerunTestPaths(rerunJson);
+        } catch (error) {
+            console.error(`Error: ${error.message}`);
+            process.exit(1);
+        }
+        const beforeRerun = testFiles.length;
+        testFiles = testFiles.filter((testFile) => {
+            const relative = path.relative(baseDir, testFile).split(path.sep).join('/');
+            return rerunPaths.has(relative);
+        });
+        console.log(`Rerun mode: selected ${testFiles.length} of ${beforeRerun} files present in ${rerunJson}`);
     }
 
     // When sharding, keep only the files assigned to this shard by the same
@@ -524,6 +579,7 @@ module.exports = {
     isWptHarnessScript,
     main,
     isBrowserClosedError,
+    loadRerunTestPaths,
     parsePositiveIntegerEnv,
     requiresJavaScript,
     resolveRootRelativeResource,
