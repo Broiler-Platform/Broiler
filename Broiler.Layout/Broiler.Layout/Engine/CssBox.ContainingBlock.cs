@@ -268,6 +268,37 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (candidate > cbPadHeight)
                 cbPadHeight = candidate;
         }
+
+        // Same collapse, but the CB is itself an absolutely-positioned box with an *auto* height
+        // sized by its own insets (both top and bottom set) — so the definite-height branch above
+        // does not apply. Its used block size is CB-of-CB height − its top/bottom insets, and that is
+        // determinate even though ActualBottom has not settled: derive the padding-box height from it.
+        // Recurses up the abspos chain until a definite- or viewport-sized ancestor is reached (each
+        // step drops to the definite/ICB branch), fixing nested `position:absolute; inset:0` boxes,
+        // which otherwise collapse to zero height (WPT css-view-transitions nested tests).
+        if (cbPadHeight <= 0
+            && (cb.Position == CssConstants.Absolute || cb.Position == CssConstants.Fixed)
+            && (string.IsNullOrEmpty(cb.Height) || cb.Height == CssConstants.Auto)
+            && cb.Top is not (null or CssConstants.Auto)
+            && cb.Bottom is not (null or CssConstants.Auto))
+        {
+            var cbCb = cb.FindPositionedContainingBlock();
+            if (!ReferenceEquals(cbCb, cb))
+            {
+                cb.GetAbsoluteContainingBlockPaddingBox(cbCb, out _, out _, out _, out double cbCbPadHeight);
+                if (cbCbPadHeight > 0)
+                {
+                    double cbTop = cb.ParseUsedLength(cb.Top, cbCbPadHeight);
+                    double cbBottom = cb.ParseUsedLength(cb.Bottom, cbCbPadHeight);
+                    double candidate = cbCbPadHeight - cbTop - cbBottom
+                        - cb.ActualMarginTop - cb.ActualMarginBottom
+                        - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+
+                    if (candidate > cbPadHeight)
+                        cbPadHeight = candidate;
+                }
+            }
+        }
     }
 
     /// <summary>
