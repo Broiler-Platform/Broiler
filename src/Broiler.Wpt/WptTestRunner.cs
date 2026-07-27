@@ -2038,6 +2038,10 @@ internal sealed partial class WptTestRunner
             testDir = Path.GetDirectoryName(localPath);
         }
 
+        // Inline linked stylesheets so the DomBridge passes that re-parse <style> source (view
+        // transitions, animations) see them, not just the render-time cascade. Cascade-neutral.
+        html = InlineLinkedStylesheets(html, testDir, wptRoot);
+
         bool needsStubs = false;
 
         foreach (Match match in ScriptTagPattern.Matches(html))
@@ -2272,6 +2276,44 @@ internal sealed partial class WptTestRunner
                 // Best-effort only — some globals may not exist for a given page.
             }
         }
+    }
+
+    private static readonly Regex LinkStylesheetTagPattern = new(
+        @"<link\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex LinkRelStylesheetPattern = new(
+        @"\brel\s*=\s*[""']?\s*stylesheet\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex LinkHrefPattern = new(
+        @"\bhref\s*=\s*[""']([^""']+)[""']", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Inlines local <c>&lt;link rel="stylesheet" href="…"&gt;</c> rules as an equivalent
+    /// <c>&lt;style&gt;</c> element at the link's position. The cascade already loads linked
+    /// stylesheets through the renderer's stylesheet-load handler, so inlining leaves the rendered
+    /// cascade unchanged (same rules, same order); its purpose is to make the rules visible to the
+    /// DomBridge passes that re-parse <c>&lt;style&gt;</c> source — view transitions (the
+    /// <c>::view-transition*</c> pseudo tree and <c>view-transition-group</c> nesting) and animation
+    /// snapshots — which otherwise only see inline <c>&lt;style&gt;</c> content. Links that do not
+    /// resolve to a readable local file are left untouched.
+    /// </summary>
+    private static string InlineLinkedStylesheets(string html, string? testDir, string? wptRoot)
+    {
+        return LinkStylesheetTagPattern.Replace(html, match =>
+        {
+            var tag = match.Value;
+            if (!LinkRelStylesheetPattern.IsMatch(tag))
+                return tag;
+
+            var href = LinkHrefPattern.Match(tag);
+            if (!href.Success)
+                return tag;
+
+            var local = ResolveExternalScriptPath(href.Groups[1].Value, testDir, wptRoot);
+            if (local == null || !File.Exists(local))
+                return tag;
+
+            try { return "<style>" + File.ReadAllText(local) + "</style>"; }
+            catch { return tag; }
+        });
     }
 
     private static string? ResolveExternalScriptPath(string src, string? testDir, string? wptRoot)

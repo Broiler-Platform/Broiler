@@ -83,7 +83,7 @@ public sealed partial class DomBridge
     // name/class/`*` argument. The leading originating selector (html / :root / *) is ignored: the
     // pseudo tree always originates from the document element.
     private static readonly System.Text.RegularExpressions.Regex ViewTransitionPseudo =
-        new(@"::view-transition(?:-(group|image-pair|old|new))?\s*(?:\(\s*([^)]*)\s*\))?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+        new(@"::view-transition(?:-(group-children|group|image-pair|old|new))?\s*(?:\(\s*([^)]*)\s*\))?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
     // ── JS API ──────────────────────────────────────────────────────────────
 
@@ -230,14 +230,21 @@ public sealed partial class DomBridge
     /// invokes the callback (e.g. the reftest's <c>takeScreenshot</c>) and chains.</summary>
     private JSObject FinishedThenable()
     {
-        var thenable = new JSObject();
-        JSValue Then(in Arguments args)
-        {
-            // The transition is finished: the ::view-transition tree is gone by the time anything
-            // this promise schedules observes the page.
-            _activeViewTransition = null;
+        // reftest-wait is removed by the reftest's takeScreenshot(). If the finished callback is the
+        // one that removes it, the screenshot is being taken from `finished` — the transition is over
+        // and the still must be the plain final DOM, so clear the active transition (the serialize-time
+        // bake becomes a no-op; WPT element-stops-grouping-after-animation). If the callback only did
+        // cleanup and left reftest-wait pending (the screenshot comes later from a `ready` chain — WPT
+        // css-view-transitions-2 nested tests via compute-test.js), keep the transition so the pseudo
+        // tree still bakes.
+        bool ScreenshotPending() =>
+            (GetAttr(DocumentElement, "class") ?? string.Empty)
+                .Contains("reftest-wait", System.StringComparison.Ordinal);
 
-            if (args.Length > 0 && args[0] is JSFunction cb)
+        void RunAndMaybeFinish(JSFunction? cb)
+        {
+            bool waitBefore = ScreenshotPending();
+            if (cb is not null)
             {
                 try { cb.InvokeFunction(new Arguments(cb, JSUndefined.Value)); }
                 catch (System.Exception ex)
@@ -246,12 +253,20 @@ public sealed partial class DomBridge
                         $"View transition finished callback threw: {ex.Message}", ex);
                 }
             }
+            if (waitBefore && !ScreenshotPending())
+                _activeViewTransition = null;
+        }
+
+        var thenable = new JSObject();
+        JSValue Then(in Arguments args)
+        {
+            RunAndMaybeFinish(args.Length > 0 ? args[0] as JSFunction : null);
             return thenable;
         }
         thenable.FastAddValue((KeyString)"then", new JSFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         thenable.FastAddValue((KeyString)"catch", new JSFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         thenable.FastAddValue((KeyString)"finally",
-            new JSFunction((in a) => { _activeViewTransition = null; if (a.Length > 0 && a[0] is JSFunction cb) { try { cb.InvokeFunction(new Arguments(cb)); } catch { } } return thenable; }, "finally", 1),
+            new JSFunction((in a) => { RunAndMaybeFinish(a.Length > 0 ? a[0] as JSFunction : null); return thenable; }, "finally", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         return thenable;
     }
@@ -363,6 +378,68 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// The used <c>view-transition-group</c> (css-view-transitions-2) of an element — the last
+    /// author declaration whose selector matches. It is not part of the computed-style projection,
+    /// so it is read directly from the matched author rules. Returns <c>null</c> for the initial
+    /// value (absent / <c>normal</c>), i.e. a top-level group.
+    /// </summary>
+    private string? ResolveViewTransitionGroupValue(DomElement element, DomElement root)
+    {
+        string? value = null;
+        foreach (var (selectorText, declarations) in EnumerateAuthorStyleRules(root))
+        {
+            var declared = declarations.Declarations
+                .LastOrDefault(d => d.Name.Equals("view-transition-group", System.StringComparison.OrdinalIgnoreCase));
+            if (declared is null)
+                continue;
+            if (MatchesSelector(element, selectorText, null))
+                value = declared.Value.Text.Trim();
+        }
+
+        if (string.IsNullOrEmpty(value)
+            || value.Equals("normal", System.StringComparison.OrdinalIgnoreCase)
+            || value.Equals("none", System.StringComparison.OrdinalIgnoreCase))
+            return null;
+        return value;
+    }
+
+    /// <summary>
+    /// The parent group name a captured element's group nests under (css-view-transitions-2
+    /// <c>view-transition-group</c>): a <c>&lt;custom-ident&gt;</c> nests under the group of that
+    /// name; <c>nearest</c> under the nearest ancestor captured element's group. Returns <c>null</c>
+    /// (a top-level group) for the initial value, <c>contain</c> (not modelled), or an unresolved
+    /// target — so anything not understood degrades to today's flat layout.
+    /// </summary>
+    private string? ResolveGroupParentName(
+        DomElement element, string name, IReadOnlyDictionary<string, DomElement> elementByName, DomElement root)
+    {
+        var value = ResolveViewTransitionGroupValue(element, root);
+        if (value is null)
+            return null;
+
+        if (value.Equals("nearest", System.StringComparison.OrdinalIgnoreCase))
+        {
+            for (var p = element.ParentNode; p != null; p = p.ParentNode)
+            {
+                if (p is not DomElement ancestor)
+                    continue;
+                var ancestorName = ResolveUsedViewTransitionName(
+                    ancestor, UsedStyleForCapture(ancestor).GetValueOrDefault("view-transition-name"));
+                if (ancestorName is not null && !string.Equals(ancestorName, name, System.StringComparison.Ordinal)
+                    && (ancestorName == "root" || elementByName.ContainsKey(ancestorName)))
+                    return ancestorName;
+            }
+            return null;
+        }
+
+        if (value.Equals("contain", System.StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        // An explicit <custom-ident>: nest under that group when it is itself captured.
+        return elementByName.ContainsKey(value) || value == "root" ? value : null;
+    }
+
+    /// <summary>
     /// Materialises the <c>::view-transition</c> pseudo tree as real positioned boxes. Each captured
     /// name gets a group box at its old geometry (the frozen animation start) holding old and new
     /// snapshot boxes; author <c>::view-transition*</c> declarations are applied to the corresponding
@@ -393,6 +470,20 @@ public sealed partial class DomBridge
             ("z-index", "2147483646"), ("pointer-events", "none")), LookupPseudo(pseudoRules, "", null));
         SetAttr(overlay, "data-broiler-view-transition", "");
 
+        // Map each captured (non-root) name to its new-side element, so a group's
+        // `view-transition-group` (and the ancestry `nearest` walks) can be resolved.
+        var elementByName = new Dictionary<string, DomElement>(System.StringComparer.Ordinal);
+        foreach (var element in root.Descendants().OfType<DomElement>())
+        {
+            var elementName = ResolveUsedViewTransitionName(
+                element, UsedStyleForCapture(element).GetValueOrDefault("view-transition-name"));
+            if (elementName is not null && elementName != "root" && !elementByName.ContainsKey(elementName))
+                elementByName[elementName] = element;
+        }
+
+        // Pass 1: build every group box (with its old/new snapshots), keyed by name.
+        var groupByName = new Dictionary<string, DomElement>(System.StringComparer.Ordinal);
+        var captureByName = new Dictionary<string, ViewTransitionCapture>(System.StringComparer.Ordinal);
         foreach (var capture in captures)
         {
             // The group animates old→new geometry; the reftests freeze it at the start, so it sits at
@@ -437,7 +528,41 @@ public sealed partial class DomBridge
                 AppendBridgeChild(group, newBox);
             }
 
-            AppendBridgeChild(overlay, group);
+            groupByName[capture.Name] = group;
+            captureByName[capture.Name] = capture;
+        }
+
+        // Pass 2: parent each group. css-view-transitions-2 `view-transition-group` nests a group
+        // under another group's `::view-transition-group-children` wrapper (so its background can
+        // inherit down the nesting); the default (`normal`) keeps the group directly under the
+        // overlay — today's flat layout, so untouched for the common case.
+        var childrenWrapperByName = new Dictionary<string, DomElement>(System.StringComparer.Ordinal);
+        foreach (var capture in captures)
+        {
+            var group = groupByName[capture.Name];
+            var parentName = elementByName.TryGetValue(capture.Name, out var el)
+                ? ResolveGroupParentName(el, capture.Name, elementByName, root)
+                : null;
+
+            if (parentName is not null && groupByName.TryGetValue(parentName, out var parentGroup))
+            {
+                if (!childrenWrapperByName.TryGetValue(parentName, out var wrapper))
+                {
+                    var parentContext = captureByName.TryGetValue(parentName, out var pc) ? (ViewTransitionCapture?)pc : null;
+                    wrapper = CreateStyledBox(BaseStyle(
+                        ("position", "absolute"), ("left", "0"), ("top", "0"),
+                        ("width", "100%"), ("height", "100%")),
+                        LookupPseudo(pseudoRules, "group-children", parentContext));
+                    SetAttr(wrapper, "data-broiler-view-transition-group-children", "");
+                    AppendBridgeChild(parentGroup, wrapper);
+                    childrenWrapperByName[parentName] = wrapper;
+                }
+                AppendBridgeChild(wrapper, group);
+            }
+            else
+            {
+                AppendBridgeChild(overlay, group);
+            }
         }
 
         AppendBridgeChild(root, overlay);

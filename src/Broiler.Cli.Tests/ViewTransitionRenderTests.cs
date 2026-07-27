@@ -179,10 +179,13 @@ public class ViewTransitionRenderTests
 <div id="target"></div>
 </html>
 """;
-        // Realizing `finished` (its .then) marks the transition over; the callback is a no-op here
-        // (the harness's Render screenshots after all script runs, no takeScreenshot needed).
+        // The transition is treated as finished only when the finished callback itself takes the
+        // screenshot (removes reftest-wait) — mirroring `finished.then(takeScreenshot)`. A mere
+        // cleanup callback that leaves reftest-wait pending keeps the tree (see the nested-groups
+        // tests, which screenshot from ready and only clean up from finished).
         using var bitmap = Render(html,
-            "document.startViewTransition().finished.then(() => {});");
+            "document.startViewTransition().finished.then(" +
+            "() => document.documentElement.classList.remove('reftest-wait'));");
 
         // Final DOM: the green target on the white canvas — no pink ::view-transition backdrop.
         var square = bitmap.GetPixel(40, 40);
@@ -190,6 +193,40 @@ public class ViewTransitionRenderTests
 
         var canvas = bitmap.GetPixel(150, 150);
         Assert.True(canvas is { R: 255, G: 255, B: 255 }, $"canvas was {canvas.R},{canvas.G},{canvas.B}");
+    }
+
+    // WPT css/css-view-transitions/nested/nearest-direct.tentative: css-view-transitions-2 nested
+    // groups. The `.test` element's group has `view-transition-group: nearest`, so it nests under its
+    // nearest ancestor captured group (`green`) rather than sitting flat under the overlay. The green
+    // group is green; its `::view-transition-group-children` wrapper and the nested test group both
+    // `background: inherit`, so the whole thing resolves to green (the reference is an all-green page).
+    // Without nesting the test group inherits the red overlay and paints red on top.
+    [Fact]
+    public void NestedGroup_Nearest_InheritsThroughParentGroup()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  ::view-transition, ::view-transition-group(*), div { background: red; inset: 0; position: absolute; }
+  .green { view-transition-name: green; }
+  .test { view-transition-name: test; }
+  .nearest-ref { view-transition-group: nearest; }
+  ::view-transition-group(green) { background: green; }
+  ::view-transition-group-children(*) { background: inherit; }
+  ::view-transition-group(test) { background: inherit; }
+  ::view-transition-image-pair(*), ::view-transition-old(*), ::view-transition-new(*) { display: none; }
+</style>
+<body>
+  <div class="green"><div><div class="test nearest-ref"></div></div></div>
+</body>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition(() => {}).ready.then(() => {});");
+
+        // The nested test group inherits green through its parent group's children wrapper.
+        Assert.True(bitmap.GetPixel(40, 40) is { R: 0, G: 128, B: 0 }, "top-left should be green");
+        Assert.True(bitmap.GetPixel(150, 150) is { R: 0, G: 128, B: 0 }, "center should be green");
     }
 
     [Fact]
