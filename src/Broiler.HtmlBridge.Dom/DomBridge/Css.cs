@@ -159,12 +159,19 @@ public sealed partial class DomBridge
     /// <see cref="SnapshotChildren"/> walk guarded — Descendants snapshots the real child list, so the
     /// LegacyChildList projection overflow cannot occur here) instead of the hand-rolled recursion.
     /// </summary>
-    private static void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
+    private void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
     {
         foreach (var element in root.Descendants().OfType<DomElement>())
         {
-            if (string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase) || IsExternalStylesheet(element))
-                styleElements.Add(element);
+            if (!(string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase) || IsExternalStylesheet(element)))
+                continue;
+
+            // A disabled sheet (CSSOM CSSStyleSheet.disabled, or a <link disabled> content
+            // attribute) does not contribute to the cascade — CSSOM §2.3.
+            if (IsStyleSheetDisabled(element))
+                continue;
+
+            styleElements.Add(element);
         }
     }
 
