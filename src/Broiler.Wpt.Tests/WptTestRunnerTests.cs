@@ -3684,6 +3684,48 @@ input {
     }
 
     [Fact]
+    public void Wpt_Harness_Test_Call_Aborts_Remaining_Script_In_Defer_Mode()
+    {
+        // Regression: the reference generator has `test` undefined, so a test() call
+        // throws and aborts the rest of that <script> block before any code after it
+        // runs. The interpolation-testcommon.js `create_tests()` helper calls test()
+        // and then removes the container of test boxes; a no-op test() stub let that
+        // removal run, blanking our render against a reference that still shows the
+        // boxes (the css transform/gradient interpolation family, 0.0% MissingContent).
+        // In defer mode test() must throw so the post-call removal never runs.
+        var testHtml = @"<!DOCTYPE html>
+<style>.box { width: 120px; height: 120px; background: green; }</style>
+<script src=""/resources/testharness.js""></script>
+<div id=""c""></div>
+<script>
+  var box = document.createElement('div');
+  box.className = 'box';
+  document.getElementById('c').appendChild(box);
+  test(function() {}, 't');
+  // Reached only if test() did NOT throw — the reference (test undefined) never gets here.
+  document.getElementById('c').remove();
+</script>";
+        // The box survives because test() aborts the block before the remove().
+        var referenceHtml = @"<!DOCTYPE html>
+<style>.box { width: 120px; height: 120px; background: green; }</style>
+<div id=""c""><div class=""box""></div></div>";
+
+        var previousDefer = WptTestRunner.DeferPromiseTests;
+        WptTestRunner.DeferPromiseTests = true;
+        try
+        {
+            var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-test-aborts-defer");
+            Assert.True(result.Passed,
+                "In defer mode a test() call must throw and abort the rest of the block, so the " +
+                $"post-call container.remove() never runs and the box survives. Match={result.MatchPercent:F1}% Message={result.Message}");
+        }
+        finally
+        {
+            WptTestRunner.DeferPromiseTests = previousDefer;
+        }
+    }
+
+    [Fact]
     public void Wpt_Harness_CustomElements_Can_Upgrade_Parsed_ShadowTree_Nodes()
     {
         var testHtml = @"<!DOCTYPE html>
