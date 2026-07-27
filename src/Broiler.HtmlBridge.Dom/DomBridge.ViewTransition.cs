@@ -435,7 +435,11 @@ public sealed partial class DomBridge
         if (value.Equals("contain", System.StringComparison.OrdinalIgnoreCase))
             return null;
 
-        // An explicit <custom-ident>: nest under that group when it is itself captured.
+        // An explicit <custom-ident>: nest under that group when it is itself captured. A group
+        // cannot reference its own name (css-view-transitions-2: a self-reference is invalid and the
+        // group falls back to the flat `normal` layout) — WPT compute-explicit-name-self.
+        if (string.Equals(value, name, System.StringComparison.Ordinal))
+            return null;
         return elementByName.ContainsKey(value) || value == "root" ? value : null;
     }
 

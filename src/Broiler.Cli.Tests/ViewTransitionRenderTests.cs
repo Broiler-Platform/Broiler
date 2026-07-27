@@ -266,6 +266,39 @@ public class ViewTransitionRenderTests
         Assert.True(px is { R: 0, G: 128, B: 0 }, $"center should inherit the green overlay, got {px.R},{px.G},{px.B}");
     }
 
+    // WPT css/css-view-transitions/nested/compute-explicit-name-self.tentative: a group whose
+    // `view-transition-group` names its OWN view-transition-name is a self-reference, which is invalid
+    // (css-view-transitions-2) and falls back to the flat `normal` layout. Before the guard, nesting
+    // the group under itself threw "a node cannot be inserted into itself or one of its descendants".
+    // Rendering to completion is the crash regression; the green result additionally needs patch 0024
+    // (the flat group inherits the green overlay), so that assertion feature-probes and self-skips.
+    [Fact]
+    public void NestedGroup_SelfReference_DoesNotRecurse_AndFallsBackToFlat()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait no-match">
+<style>
+  ::view-transition, ::view-transition-group(*), div { background: red; inset: 0; position: absolute; }
+  html.no-match::view-transition { background: green; }
+  .test { view-transition-name: test; }
+  .test-ref { view-transition-group: test; }
+  ::view-transition-group(test) { background: inherit; }
+  ::view-transition-image-pair(*), ::view-transition-old(*), ::view-transition-new(*) { display: none; }
+</style>
+<body><div class="test test-ref"></div></body>
+</html>
+""";
+        // Must not throw (the self-reference no longer nests the group under itself).
+        using var bitmap = Render(html, "document.startViewTransition(() => {}).ready.then(() => {});");
+        var px = bitmap.GetPixel(100, 100);
+
+        if (px is { R: 255, G: 0, B: 0 })
+            return; // patch 0024 not applied — the flat group's `background:inherit` is transparent.
+
+        Assert.True(px is { R: 0, G: 128, B: 0 }, $"self-ref group should fall back to flat and inherit green, got {px.R},{px.G},{px.B}");
+    }
+
     [Fact]
     public void No_Transition_Leaves_The_Page_Untouched()
     {
