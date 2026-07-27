@@ -985,6 +985,23 @@ internal static class CssLayoutEngine
             curx += box.ActualWidth - (curx - startX);
             line.Rectangles.Add(box, new RectangleF((float)startX, (float)startY, (float)box.ActualWidth, (float)box.ActualHeight));
         }
+        else if (box.IsInline && box != blockbox && !line.Rectangles.ContainsKey(box)
+            && !InlineBoxHasInFlowContent(box))
+        {
+            // CSS Inline Layout §3 (invisible line boxes): an inline box whose only content
+            // is out of flow — or which is empty — advances the inline cursor by nothing, so
+            // the branch above (which pads a partially-filled inline out to its ActualWidth)
+            // never records it and its position defaults to the document origin. Record its
+            // line position on Location rather than as a line rectangle: a rectangle would make
+            // the (otherwise empty, invisible) line box count as content and gain strut height,
+            // shifting following blocks. Location leaves the line invisible while still giving
+            // the box a real origin for getBoundingClientRect and, crucially, for an absolutely
+            // positioned descendant that uses this inline as its containing block (which reads
+            // Location when the inline has no line rectangles). WPT
+            // css/css-inline/empty-span-scroll: an empty relative <span> holds the
+            // scrollIntoView target, which must land on the line, not at the origin.
+            box.Location = new PointF((float)startX, (float)startY);
+        }
 
         // handle box that is only a whitespace
         if (box.Text.Length > 0 && box.Text.Span.IsWhiteSpace() && !box.IsImage && box.IsInline && box.Boxes.Count == 0 && box.Words.Count == 0)
@@ -1013,6 +1030,29 @@ internal static class CssLayoutEngine
         }
 
         box.LastHostingLineBox = line;
+    }
+
+    /// <summary>
+    /// True when an inline box contributes in-flow content to its line — its own words,
+    /// or an in-flow child box (a nested inline, an inline-block, or a block-in-inline).
+    /// Children that are out of flow (<c>display:none</c>, floated, or absolutely/fixed
+    /// positioned) do not count: an inline whose only content is such a child is an empty
+    /// (invisible) line box that still occupies a zero-width position on its line.
+    /// </summary>
+    private static bool InlineBoxHasInFlowContent(CssBox box)
+    {
+        if (box.Words.Count > 0)
+            return true;
+
+        foreach (var child in box.Boxes)
+        {
+            if (child.Display == CssConstants.None
+                || child.Float != CssConstants.None
+                || child.Position is CssConstants.Absolute or CssConstants.Fixed)
+                continue;
+            return true;
+        }
+        return false;
     }
 
     /// <summary>
