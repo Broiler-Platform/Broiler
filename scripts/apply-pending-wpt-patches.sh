@@ -34,6 +34,7 @@ set -euo pipefail
 PENDING_PATCHES=(
   "Broiler.HTML|patches/0022-html-paint-contain-clip.patch"
   "Broiler.HTML|patches/0023-html-overflow-clip-margin.patch"
+  "Broiler.CSS|patches/0024-css-background-shorthand-css-wide-keyword.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

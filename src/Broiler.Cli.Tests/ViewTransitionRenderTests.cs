@@ -229,6 +229,43 @@ public class ViewTransitionRenderTests
         Assert.True(bitmap.GetPixel(150, 150) is { R: 0, G: 128, B: 0 }, "center should be green");
     }
 
+    // WPT css/css-view-transitions/nested/normal-goes-up.tentative: `view-transition-group: normal`
+    // keeps the group flat, directly under the overlay (as if it had no group). With `html.no-match`
+    // making the ::view-transition backdrop green, the flat `test` group's `background: inherit` must
+    // inherit that green overlay — unlike the nearest/explicit cases there is no green group behind it
+    // to fall back on. This exercises the `background: inherit` shorthand (Broiler.CSS patch 0024) and
+    // the chained-inherit resolution together, so it feature-probes and self-skips on the un-patched
+    // engine (where `background: inherit` stays transparent and the red root shows through).
+    [Fact]
+    public void NestedGroup_Normal_InheritsTheOverlayBackground()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait no-match">
+<style>
+  ::view-transition, ::view-transition-group(*), div { background: red; inset: 0; position: absolute; }
+  html.no-match::view-transition { background: green; }
+  .test { view-transition-name: test; }
+  .normal-ref { view-transition-group: normal; }
+  ::view-transition-group(test) { background: inherit; }
+  ::view-transition-image-pair(*), ::view-transition-old(*), ::view-transition-new(*) { display: none; }
+</style>
+<body>
+  <div><div><div class="test normal-ref"></div></div></div>
+</body>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition(() => {}).ready.then(() => {});");
+        var px = bitmap.GetPixel(100, 100);
+
+        // Self-skip on the un-patched engine: `background: inherit` is transparent there, so the flat
+        // test group does not cover the red root.
+        if (px is { R: 255, G: 0, B: 0 })
+            return;
+
+        Assert.True(px is { R: 0, G: 128, B: 0 }, $"center should inherit the green overlay, got {px.R},{px.G},{px.B}");
+    }
+
     [Fact]
     public void No_Transition_Leaves_The_Page_Untouched()
     {

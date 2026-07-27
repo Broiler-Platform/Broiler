@@ -667,6 +667,13 @@ internal abstract partial class CssBoxProperties
         get => ResolveCssVariables(_backgroundColor);
         set
         {
+            // CSS2.1 §6.2.1: `inherit` resolves to the parent's computed value. Fold it into the
+            // parent's already-cascaded BackgroundColor here (like FontSize) so a chain of
+            // `background-color: inherit` boxes each inherits the resolved colour — otherwise the
+            // literal `inherit` reaches GetActualColor, which folds an unrecognised value to opaque
+            // black (WPT css-view-transitions nested tests inherit a colour through group wrappers).
+            if (value != null && value.Equals("inherit", StringComparison.OrdinalIgnoreCase) && GetParent() is { } bgParent)
+                value = bgParent.BackgroundColor;
             _backgroundColor = value;
             _actualBackgroundColor = BColor.Empty;
         }
