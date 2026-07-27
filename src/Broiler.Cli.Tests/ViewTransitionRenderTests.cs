@@ -64,6 +64,38 @@ public class ViewTransitionRenderTests
         Assert.True(square is { R: 0, G: 128, B: 0 }, $"square was {square.R},{square.G},{square.B}");
     }
 
+    // WPT css/css-view-transitions/active-view-transition-pseudo-class-match: the bare
+    // :active-view-transition pseudo-class (css-view-transitions-2) matches whenever any transition
+    // is active — with no `types` argument, unlike :active-view-transition-type(). Here it turns
+    // #target green and names it, so it is captured and its snapshot paints a green square on the
+    // lightpink backdrop. Reference is one green square.
+    [Fact]
+    public void BareActiveViewTransition_PseudoClass_Applies_During_Any_Transition()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<style>
+  html:active-view-transition #target { background: green; view-transition-name: target; }
+  #target { background: red; width: 100px; height: 100px; }
+  html::view-transition-new(target) { animation: unset; opacity: 0; }
+  html::view-transition-old(target) { animation: unset; opacity: 1; }
+  html::view-transition-group(root) { display: none; }
+  html::view-transition { background: lightpink; }
+</style>
+<div id="target"></div>
+</html>
+""";
+        // No types passed — the bare pseudo-class must still activate.
+        using var bitmap = Render(html, "document.startViewTransition();");
+
+        var square = bitmap.GetPixel(40, 40);
+        Assert.True(square is { R: 0, G: 128, B: 0 }, $"square was {square.R},{square.G},{square.B}");
+
+        var backdrop = bitmap.GetPixel(150, 150);
+        Assert.True(backdrop is { R: 255, G: 182, B: 193 }, $"backdrop was {backdrop.R},{backdrop.G},{backdrop.B}");
+    }
+
     [Fact]
     public void Ready_Promise_Resolves_So_The_Screenshot_Fires()
     {

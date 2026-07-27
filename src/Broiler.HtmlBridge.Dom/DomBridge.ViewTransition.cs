@@ -73,6 +73,12 @@ public sealed partial class DomBridge
     private static readonly System.Text.RegularExpressions.Regex ActiveViewTransitionType =
         new(@":active-view-transition-type\(\s*([^)]*)\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
+    // The bare :active-view-transition pseudo-class (css-view-transitions-2) — matches the document
+    // element whenever a view transition is active, regardless of type. The negative lookahead keeps
+    // it from also matching the :active-view-transition-type(…) functional form handled above.
+    private static readonly System.Text.RegularExpressions.Regex ActiveViewTransitionBare =
+        new(@":active-view-transition(?!-type)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
     // html::view-transition[-group|-image-pair|-old|-new]( name ) — the pseudo and its optional
     // name/class/`*` argument. The leading originating selector (html / :root / *) is ignored: the
     // pseudo tree always originates from the document element.
@@ -263,27 +269,38 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Applies the author rules a running transition activates
-    /// (<c>:active-view-transition-type(type)</c>) to the live DOM, so the "new" snapshot the pseudo
-    /// tree captures reflects them. For every active type, a rule selecting through that pseudo is
-    /// re-matched with the pseudo stripped out and its declarations baked onto the matched elements.
+    /// Applies the author rules a running transition activates to the live DOM, so the "new" snapshot
+    /// the pseudo tree captures reflects them. Two selector forms are handled (css-view-transitions-2):
+    /// <c>:active-view-transition-type(type)</c>, gated on the transition's active types, and the bare
+    /// <c>:active-view-transition</c> pseudo-class, which matches whenever any transition is active.
+    /// Each matching rule is re-matched with the pseudo stripped out and its declarations baked onto
+    /// the matched elements.
     /// </summary>
     private void ApplyActiveViewTransitionTypeRules(DomElement root)
     {
-        if (_activeViewTransition!.Types.Count == 0)
-            return;
-
         foreach (var (selectorText, declarations) in EnumerateAuthorStyleRules(root))
         {
-            var match = ActiveViewTransitionType.Match(selectorText);
-            if (!match.Success)
+            string stripped;
+
+            var typeMatch = ActiveViewTransitionType.Match(selectorText);
+            if (typeMatch.Success)
+            {
+                if (!AnyTypeActive(typeMatch.Groups[1].Value, _activeViewTransition!.Types))
+                    continue;
+                stripped = ActiveViewTransitionType.Replace(selectorText, string.Empty).Trim();
+            }
+            else if (ActiveViewTransitionBare.IsMatch(selectorText))
+            {
+                // The bare pseudo-class is active for the whole transition, whatever its types.
+                stripped = ActiveViewTransitionBare.Replace(selectorText, string.Empty).Trim();
+            }
+            else
+            {
                 continue;
-            if (!AnyTypeActive(match.Groups[1].Value, _activeViewTransition.Types))
-                continue;
+            }
 
             // Strip the pseudo-class; an empty resulting compound (the pseudo stood alone on the
             // originating element) selects the document element itself.
-            var stripped = ActiveViewTransitionType.Replace(selectorText, string.Empty).Trim();
             if (stripped.Length == 0)
                 stripped = "html";
 
