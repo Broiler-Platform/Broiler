@@ -174,7 +174,12 @@ public sealed partial class DomBridge
     {
         var transition = new JSObject();
         transition.FastAddValue((KeyString)"ready", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
-        transition.FastAddValue((KeyString)"finished", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
+        // `finished` resolving means the transition is over: the ::view-transition tree has been
+        // removed and the DOM is back to its plain final state. A reftest that screenshots from
+        // finished (rather than ready) therefore expects the final DOM, not the pseudo tree — so
+        // realizing this thenable clears the active transition, and the serialize-time bake becomes
+        // a no-op (WPT element-stops-grouping-after-animation).
+        transition.FastAddValue((KeyString)"finished", FinishedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
         transition.FastAddValue((KeyString)"updateCallbackDone", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
 
         var typesArray = new JavaScript.BuiltIns.Array.JSArray();
@@ -215,6 +220,38 @@ public sealed partial class DomBridge
         thenable.FastAddValue((KeyString)"catch", new JSFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         thenable.FastAddValue((KeyString)"finally",
             new JSFunction((in a) => { if (a.Length > 0 && a[0] is JSFunction cb) { try { cb.InvokeFunction(new Arguments(cb)); } catch { } } return thenable; }, "finally", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        return thenable;
+    }
+
+    /// <summary>The <c>finished</c> promise as an already-resolved thenable that first marks the
+    /// transition complete — clearing <see cref="_activeViewTransition"/> so the serialize-time pseudo
+    /// tree bake is skipped and the plain final DOM renders — then, like <see cref="ResolvedThenable"/>,
+    /// invokes the callback (e.g. the reftest's <c>takeScreenshot</c>) and chains.</summary>
+    private JSObject FinishedThenable()
+    {
+        var thenable = new JSObject();
+        JSValue Then(in Arguments args)
+        {
+            // The transition is finished: the ::view-transition tree is gone by the time anything
+            // this promise schedules observes the page.
+            _activeViewTransition = null;
+
+            if (args.Length > 0 && args[0] is JSFunction cb)
+            {
+                try { cb.InvokeFunction(new Arguments(cb, JSUndefined.Value)); }
+                catch (System.Exception ex)
+                {
+                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.viewTransition.finished.then",
+                        $"View transition finished callback threw: {ex.Message}", ex);
+                }
+            }
+            return thenable;
+        }
+        thenable.FastAddValue((KeyString)"then", new JSFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"catch", new JSFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"finally",
+            new JSFunction((in a) => { _activeViewTransition = null; if (a.Length > 0 && a[0] is JSFunction cb) { try { cb.InvokeFunction(new Arguments(cb)); } catch { } } return thenable; }, "finally", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         return thenable;
     }

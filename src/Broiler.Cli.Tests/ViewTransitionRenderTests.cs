@@ -161,6 +161,37 @@ public class ViewTransitionRenderTests
         Assert.True(atNew is { R: 255, G: 182, B: 193 }, $"new-pos was {atNew.R},{atNew.G},{atNew.B}");
     }
 
+    // WPT css/css-view-transitions/element-stops-grouping-after-animation: the reftest screenshots
+    // from the `finished` promise, not `ready`. `finished` resolving means the transition is over —
+    // the ::view-transition tree is gone and the DOM is back to its plain final state — so the
+    // screenshot must show the final DOM (a green square on white), not the pseudo tree's pink
+    // backdrop. Realizing the finished thenable clears the active transition so the bake is skipped.
+    [Fact]
+    public void Finished_Promise_Renders_The_Final_Dom_Not_The_Pseudo_Tree()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  #target { background: green; width: 100px; height: 100px; view-transition-name: target; }
+  html::view-transition { background: pink; }
+</style>
+<div id="target"></div>
+</html>
+""";
+        // Realizing `finished` (its .then) marks the transition over; the callback is a no-op here
+        // (the harness's Render screenshots after all script runs, no takeScreenshot needed).
+        using var bitmap = Render(html,
+            "document.startViewTransition().finished.then(() => {});");
+
+        // Final DOM: the green target on the white canvas — no pink ::view-transition backdrop.
+        var square = bitmap.GetPixel(40, 40);
+        Assert.True(square is { R: 0, G: 128, B: 0 }, $"square was {square.R},{square.G},{square.B}");
+
+        var canvas = bitmap.GetPixel(150, 150);
+        Assert.True(canvas is { R: 255, G: 255, B: 255 }, $"canvas was {canvas.R},{canvas.G},{canvas.B}");
+    }
+
     [Fact]
     public void No_Transition_Leaves_The_Page_Untouched()
     {
