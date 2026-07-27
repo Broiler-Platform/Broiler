@@ -345,8 +345,16 @@ public sealed partial class DomBridge
             // the old geometry when the element existed before the transition, else the new.
             var groupW = capture.HasOld ? capture.OldWidth : capture.NewWidth;
             var groupH = capture.HasOld ? capture.OldHeight : capture.NewHeight;
+            // The captured position is carried by the group's transform — its UA style, per spec, is
+            // `position: absolute; inset: 0` with a transform translating to the snapshot's location.
+            // Keeping left/top at 0 lets an author `::view-transition-group(name)` rule that sets
+            // `top`/`left`/`inset` compose additively with the captured translation rather than
+            // replacing it (WPT content-with-clip offsets a group by `top: -50vh` to cancel a
+            // `top: 50vh` on the captured element; overriding a captured `top` outright would push the
+            // snapshot off-screen). An author `transform` still overrides the placement, as it should.
             var group = CreateStyledBox(BaseStyle(
-                ("position", "absolute"), ("left", Px(capture.GroupLeft)), ("top", Px(capture.GroupTop)),
+                ("position", "absolute"), ("left", "0"), ("top", "0"),
+                ("transform", $"translate({Px(capture.GroupLeft)}, {Px(capture.GroupTop)})"),
                 ("width", Px(groupW)), ("height", Px(groupH)), ("overflow", "hidden")),
                 LookupPseudo(pseudoRules, "group", capture));
 

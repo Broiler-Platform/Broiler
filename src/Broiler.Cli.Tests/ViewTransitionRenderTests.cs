@@ -331,4 +331,42 @@ public class ViewTransitionRenderTests
         var center = bitmap.GetPixel(100, 100);
         Assert.True(center is { R: 255, G: 255, B: 255 }, $"center was {center.R},{center.G},{center.B}");
     }
+
+    // WPT css/css-view-transitions/content-with-clip pattern: an author
+    // ::view-transition-group(name) rule offsets a group to cancel a shift on the captured
+    // element. The group is placed by a transform carrying the captured position (per spec its
+    // UA style is `inset: 0` + a translate), so an author `top`/`left` composes additively with
+    // the capture instead of replacing it. Here #target sits at top:100px and the group rule
+    // applies top:-100px, so the green snapshot must land back at the top (net 0), not at -100px
+    // (off-screen). Before the fix the captured top was written to the group's own `top`, which
+    // the author rule overrode outright — pushing the snapshot off-screen.
+    [Fact]
+    public void Author_Group_Offset_Composes_With_The_Captured_Position()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  body { margin: 0; }
+  #target { background: green; width: 100px; height: 100px; position: relative; top: 100px;
+            view-transition-name: target; }
+  html::view-transition-group(root) { display: none; }
+  html::view-transition-new(target) { animation: unset; opacity: 1; }
+  html::view-transition-old(target) { animation: unset; opacity: 1; }
+  html::view-transition-group(target) { animation: unset; top: -100px; }
+  html::view-transition { background: lightpink; }
+</style>
+<div id="target"></div>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition(() => {});");
+
+        // Net top is 0 (captured 100 via transform + author -100): green fills y 0..100.
+        var atTop = bitmap.GetPixel(40, 40);
+        Assert.True(atTop is { R: 0, G: 128, B: 0 }, $"top was {atTop.R},{atTop.G},{atTop.B}");
+
+        // Below the square is the lightpink backdrop, not green (the group did not stay at 100).
+        var below = bitmap.GetPixel(40, 150);
+        Assert.True(below is { R: 255, G: 182, B: 193 }, $"below was {below.R},{below.G},{below.B}");
+    }
 }
