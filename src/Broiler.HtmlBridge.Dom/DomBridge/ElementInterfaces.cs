@@ -125,6 +125,12 @@ public sealed partial class DomBridge
         // IElementGeometryHost contract (DomBridge.ElementGeometryHost.cs).
         Dom.Features.ElementGeometryBinding.Install(this, obj, element);
 
+        // Web Animations: element.animate(keyframes, options) bakes the animation's snapshot-time
+        // value so animation-driven property changes render (see DomBridge.WebAnimations).
+        obj.FastAddValue((KeyString)"animate",
+            new JSFunction((in a) => ElementAnimate(element, in a), "animate", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // SVG DOM interfaces — SVGAnimatedLength/Rect stubs, SVGTextContentElement text metrics, the
         // SVGSVGElement animation timeline and the SMIL animation-element no-ops (Phase 3 P3.50:
         // extracted into the co-located SvgElementBinding feature module).
