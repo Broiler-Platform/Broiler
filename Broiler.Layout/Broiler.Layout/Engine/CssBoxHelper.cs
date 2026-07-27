@@ -533,6 +533,25 @@ internal static class CssBoxHelper
     }
 
     /// <summary>
+    /// Computes the horizontal offset applied by <c>position: relative</c>.
+    /// CSS2.1 §9.4.3: <c>left</c> takes precedence over <c>right</c> (in LTR).
+    /// Returns 0 if the element is not relatively positioned or has no offset.
+    /// </summary>
+    internal static double GetRelativeOffsetX(CssBoxProperties box)
+    {
+        bool hasLeft = box.Left != null && box.Left != CssConstants.Auto;
+        bool hasRight = box.Right != null && box.Right != CssConstants.Auto;
+
+        if (hasLeft)
+            return CssLengthParser.ParseLength(box.Left, box.Size.Width, box.GetEmHeight());
+
+        if (hasRight)
+            return -CssLengthParser.ParseLength(box.Right, box.Size.Width, box.GetEmHeight());
+
+        return 0;
+    }
+
+    /// <summary>
     /// Collects all float boxes in the same block formatting context that
     /// precede <paramref name="box"/> in the DOM tree. This includes floats
     /// nested inside non-BFC siblings (e.g., floated <c>li</c> elements

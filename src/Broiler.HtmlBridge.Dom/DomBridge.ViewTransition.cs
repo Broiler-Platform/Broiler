@@ -73,11 +73,17 @@ public sealed partial class DomBridge
     private static readonly System.Text.RegularExpressions.Regex ActiveViewTransitionType =
         new(@":active-view-transition-type\(\s*([^)]*)\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
+    // The bare :active-view-transition pseudo-class (css-view-transitions-2) — matches the document
+    // element whenever a view transition is active, regardless of type. The negative lookahead keeps
+    // it from also matching the :active-view-transition-type(…) functional form handled above.
+    private static readonly System.Text.RegularExpressions.Regex ActiveViewTransitionBare =
+        new(@":active-view-transition(?!-type)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
     // html::view-transition[-group|-image-pair|-old|-new]( name ) — the pseudo and its optional
     // name/class/`*` argument. The leading originating selector (html / :root / *) is ignored: the
     // pseudo tree always originates from the document element.
     private static readonly System.Text.RegularExpressions.Regex ViewTransitionPseudo =
-        new(@"::view-transition(?:-(group|image-pair|old|new))?\s*(?:\(\s*([^)]*)\s*\))?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+        new(@"::view-transition(?:-(group-children|group|image-pair|old|new))?\s*(?:\(\s*([^)]*)\s*\))?\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
     // ── JS API ──────────────────────────────────────────────────────────────
 
@@ -168,7 +174,12 @@ public sealed partial class DomBridge
     {
         var transition = new JSObject();
         transition.FastAddValue((KeyString)"ready", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
-        transition.FastAddValue((KeyString)"finished", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
+        // `finished` resolving means the transition is over: the ::view-transition tree has been
+        // removed and the DOM is back to its plain final state. A reftest that screenshots from
+        // finished (rather than ready) therefore expects the final DOM, not the pseudo tree — so
+        // realizing this thenable clears the active transition, and the serialize-time bake becomes
+        // a no-op (WPT element-stops-grouping-after-animation).
+        transition.FastAddValue((KeyString)"finished", FinishedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
         transition.FastAddValue((KeyString)"updateCallbackDone", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
 
         var typesArray = new JavaScript.BuiltIns.Array.JSArray();
@@ -209,6 +220,53 @@ public sealed partial class DomBridge
         thenable.FastAddValue((KeyString)"catch", new JSFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         thenable.FastAddValue((KeyString)"finally",
             new JSFunction((in a) => { if (a.Length > 0 && a[0] is JSFunction cb) { try { cb.InvokeFunction(new Arguments(cb)); } catch { } } return thenable; }, "finally", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        return thenable;
+    }
+
+    /// <summary>The <c>finished</c> promise as an already-resolved thenable that first marks the
+    /// transition complete — clearing <see cref="_activeViewTransition"/> so the serialize-time pseudo
+    /// tree bake is skipped and the plain final DOM renders — then, like <see cref="ResolvedThenable"/>,
+    /// invokes the callback (e.g. the reftest's <c>takeScreenshot</c>) and chains.</summary>
+    private JSObject FinishedThenable()
+    {
+        // reftest-wait is removed by the reftest's takeScreenshot(). If the finished callback is the
+        // one that removes it, the screenshot is being taken from `finished` — the transition is over
+        // and the still must be the plain final DOM, so clear the active transition (the serialize-time
+        // bake becomes a no-op; WPT element-stops-grouping-after-animation). If the callback only did
+        // cleanup and left reftest-wait pending (the screenshot comes later from a `ready` chain — WPT
+        // css-view-transitions-2 nested tests via compute-test.js), keep the transition so the pseudo
+        // tree still bakes.
+        bool ScreenshotPending() =>
+            (GetAttr(DocumentElement, "class") ?? string.Empty)
+                .Contains("reftest-wait", System.StringComparison.Ordinal);
+
+        void RunAndMaybeFinish(JSFunction? cb)
+        {
+            bool waitBefore = ScreenshotPending();
+            if (cb is not null)
+            {
+                try { cb.InvokeFunction(new Arguments(cb, JSUndefined.Value)); }
+                catch (System.Exception ex)
+                {
+                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.viewTransition.finished.then",
+                        $"View transition finished callback threw: {ex.Message}", ex);
+                }
+            }
+            if (waitBefore && !ScreenshotPending())
+                _activeViewTransition = null;
+        }
+
+        var thenable = new JSObject();
+        JSValue Then(in Arguments args)
+        {
+            RunAndMaybeFinish(args.Length > 0 ? args[0] as JSFunction : null);
+            return thenable;
+        }
+        thenable.FastAddValue((KeyString)"then", new JSFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"catch", new JSFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"finally",
+            new JSFunction((in a) => { RunAndMaybeFinish(a.Length > 0 ? a[0] as JSFunction : null); return thenable; }, "finally", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         return thenable;
     }
@@ -263,27 +321,38 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Applies the author rules a running transition activates
-    /// (<c>:active-view-transition-type(type)</c>) to the live DOM, so the "new" snapshot the pseudo
-    /// tree captures reflects them. For every active type, a rule selecting through that pseudo is
-    /// re-matched with the pseudo stripped out and its declarations baked onto the matched elements.
+    /// Applies the author rules a running transition activates to the live DOM, so the "new" snapshot
+    /// the pseudo tree captures reflects them. Two selector forms are handled (css-view-transitions-2):
+    /// <c>:active-view-transition-type(type)</c>, gated on the transition's active types, and the bare
+    /// <c>:active-view-transition</c> pseudo-class, which matches whenever any transition is active.
+    /// Each matching rule is re-matched with the pseudo stripped out and its declarations baked onto
+    /// the matched elements.
     /// </summary>
     private void ApplyActiveViewTransitionTypeRules(DomElement root)
     {
-        if (_activeViewTransition!.Types.Count == 0)
-            return;
-
         foreach (var (selectorText, declarations) in EnumerateAuthorStyleRules(root))
         {
-            var match = ActiveViewTransitionType.Match(selectorText);
-            if (!match.Success)
+            string stripped;
+
+            var typeMatch = ActiveViewTransitionType.Match(selectorText);
+            if (typeMatch.Success)
+            {
+                if (!AnyTypeActive(typeMatch.Groups[1].Value, _activeViewTransition!.Types))
+                    continue;
+                stripped = ActiveViewTransitionType.Replace(selectorText, string.Empty).Trim();
+            }
+            else if (ActiveViewTransitionBare.IsMatch(selectorText))
+            {
+                // The bare pseudo-class is active for the whole transition, whatever its types.
+                stripped = ActiveViewTransitionBare.Replace(selectorText, string.Empty).Trim();
+            }
+            else
+            {
                 continue;
-            if (!AnyTypeActive(match.Groups[1].Value, _activeViewTransition.Types))
-                continue;
+            }
 
             // Strip the pseudo-class; an empty resulting compound (the pseudo stood alone on the
             // originating element) selects the document element itself.
-            var stripped = ActiveViewTransitionType.Replace(selectorText, string.Empty).Trim();
             if (stripped.Length == 0)
                 stripped = "html";
 
@@ -306,6 +375,72 @@ public sealed partial class DomBridge
                 return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// The used <c>view-transition-group</c> (css-view-transitions-2) of an element — the last
+    /// author declaration whose selector matches. It is not part of the computed-style projection,
+    /// so it is read directly from the matched author rules. Returns <c>null</c> for the initial
+    /// value (absent / <c>normal</c>), i.e. a top-level group.
+    /// </summary>
+    private string? ResolveViewTransitionGroupValue(DomElement element, DomElement root)
+    {
+        string? value = null;
+        foreach (var (selectorText, declarations) in EnumerateAuthorStyleRules(root))
+        {
+            var declared = declarations.Declarations
+                .LastOrDefault(d => d.Name.Equals("view-transition-group", System.StringComparison.OrdinalIgnoreCase));
+            if (declared is null)
+                continue;
+            if (MatchesSelector(element, selectorText, null))
+                value = declared.Value.Text.Trim();
+        }
+
+        if (string.IsNullOrEmpty(value)
+            || value.Equals("normal", System.StringComparison.OrdinalIgnoreCase)
+            || value.Equals("none", System.StringComparison.OrdinalIgnoreCase))
+            return null;
+        return value;
+    }
+
+    /// <summary>
+    /// The parent group name a captured element's group nests under (css-view-transitions-2
+    /// <c>view-transition-group</c>): a <c>&lt;custom-ident&gt;</c> nests under the group of that
+    /// name; <c>nearest</c> under the nearest ancestor captured element's group. Returns <c>null</c>
+    /// (a top-level group) for the initial value, <c>contain</c> (not modelled), or an unresolved
+    /// target — so anything not understood degrades to today's flat layout.
+    /// </summary>
+    private string? ResolveGroupParentName(
+        DomElement element, string name, IReadOnlyDictionary<string, DomElement> elementByName, DomElement root)
+    {
+        var value = ResolveViewTransitionGroupValue(element, root);
+        if (value is null)
+            return null;
+
+        if (value.Equals("nearest", System.StringComparison.OrdinalIgnoreCase))
+        {
+            for (var p = element.ParentNode; p != null; p = p.ParentNode)
+            {
+                if (p is not DomElement ancestor)
+                    continue;
+                var ancestorName = ResolveUsedViewTransitionName(
+                    ancestor, UsedStyleForCapture(ancestor).GetValueOrDefault("view-transition-name"));
+                if (ancestorName is not null && !string.Equals(ancestorName, name, System.StringComparison.Ordinal)
+                    && (ancestorName == "root" || elementByName.ContainsKey(ancestorName)))
+                    return ancestorName;
+            }
+            return null;
+        }
+
+        if (value.Equals("contain", System.StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        // An explicit <custom-ident>: nest under that group when it is itself captured. A group
+        // cannot reference its own name (css-view-transitions-2: a self-reference is invalid and the
+        // group falls back to the flat `normal` layout) — WPT compute-explicit-name-self.
+        if (string.Equals(value, name, System.StringComparison.Ordinal))
+            return null;
+        return elementByName.ContainsKey(value) || value == "root" ? value : null;
     }
 
     /// <summary>
@@ -339,14 +474,36 @@ public sealed partial class DomBridge
             ("z-index", "2147483646"), ("pointer-events", "none")), LookupPseudo(pseudoRules, "", null));
         SetAttr(overlay, "data-broiler-view-transition", "");
 
+        // Map each captured (non-root) name to its new-side element, so a group's
+        // `view-transition-group` (and the ancestry `nearest` walks) can be resolved.
+        var elementByName = new Dictionary<string, DomElement>(System.StringComparer.Ordinal);
+        foreach (var element in root.Descendants().OfType<DomElement>())
+        {
+            var elementName = ResolveUsedViewTransitionName(
+                element, UsedStyleForCapture(element).GetValueOrDefault("view-transition-name"));
+            if (elementName is not null && elementName != "root" && !elementByName.ContainsKey(elementName))
+                elementByName[elementName] = element;
+        }
+
+        // Pass 1: build every group box (with its old/new snapshots), keyed by name.
+        var groupByName = new Dictionary<string, DomElement>(System.StringComparer.Ordinal);
+        var captureByName = new Dictionary<string, ViewTransitionCapture>(System.StringComparer.Ordinal);
         foreach (var capture in captures)
         {
             // The group animates old→new geometry; the reftests freeze it at the start, so it sits at
             // the old geometry when the element existed before the transition, else the new.
             var groupW = capture.HasOld ? capture.OldWidth : capture.NewWidth;
             var groupH = capture.HasOld ? capture.OldHeight : capture.NewHeight;
+            // The captured position is carried by the group's transform — its UA style, per spec, is
+            // `position: absolute; inset: 0` with a transform translating to the snapshot's location.
+            // Keeping left/top at 0 lets an author `::view-transition-group(name)` rule that sets
+            // `top`/`left`/`inset` compose additively with the captured translation rather than
+            // replacing it (WPT content-with-clip offsets a group by `top: -50vh` to cancel a
+            // `top: 50vh` on the captured element; overriding a captured `top` outright would push the
+            // snapshot off-screen). An author `transform` still overrides the placement, as it should.
             var group = CreateStyledBox(BaseStyle(
-                ("position", "absolute"), ("left", Px(capture.GroupLeft)), ("top", Px(capture.GroupTop)),
+                ("position", "absolute"), ("left", "0"), ("top", "0"),
+                ("transform", $"translate({Px(capture.GroupLeft)}, {Px(capture.GroupTop)})"),
                 ("width", Px(groupW)), ("height", Px(groupH)), ("overflow", "hidden")),
                 LookupPseudo(pseudoRules, "group", capture));
 
@@ -375,7 +532,41 @@ public sealed partial class DomBridge
                 AppendBridgeChild(group, newBox);
             }
 
-            AppendBridgeChild(overlay, group);
+            groupByName[capture.Name] = group;
+            captureByName[capture.Name] = capture;
+        }
+
+        // Pass 2: parent each group. css-view-transitions-2 `view-transition-group` nests a group
+        // under another group's `::view-transition-group-children` wrapper (so its background can
+        // inherit down the nesting); the default (`normal`) keeps the group directly under the
+        // overlay — today's flat layout, so untouched for the common case.
+        var childrenWrapperByName = new Dictionary<string, DomElement>(System.StringComparer.Ordinal);
+        foreach (var capture in captures)
+        {
+            var group = groupByName[capture.Name];
+            var parentName = elementByName.TryGetValue(capture.Name, out var el)
+                ? ResolveGroupParentName(el, capture.Name, elementByName, root)
+                : null;
+
+            if (parentName is not null && groupByName.TryGetValue(parentName, out var parentGroup))
+            {
+                if (!childrenWrapperByName.TryGetValue(parentName, out var wrapper))
+                {
+                    var parentContext = captureByName.TryGetValue(parentName, out var pc) ? (ViewTransitionCapture?)pc : null;
+                    wrapper = CreateStyledBox(BaseStyle(
+                        ("position", "absolute"), ("left", "0"), ("top", "0"),
+                        ("width", "100%"), ("height", "100%")),
+                        LookupPseudo(pseudoRules, "group-children", parentContext));
+                    SetAttr(wrapper, "data-broiler-view-transition-group-children", "");
+                    AppendBridgeChild(parentGroup, wrapper);
+                    childrenWrapperByName[parentName] = wrapper;
+                }
+                AppendBridgeChild(wrapper, group);
+            }
+            else
+            {
+                AppendBridgeChild(overlay, group);
+            }
         }
 
         AppendBridgeChild(root, overlay);

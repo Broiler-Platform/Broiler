@@ -151,6 +151,13 @@ public sealed class ComputedStyle
     public string Contain { get; init; } = "none";
 
     /// <summary>
+    /// CSS Overflow §4: used <c>overflow-clip-margin</c> in px (≥0). Expands the
+    /// overflow clip edge outward for boxes that clip without scrolling
+    /// (<c>overflow: clip</c> or paint containment); ignored for scroll containers.
+    /// </summary>
+    public double OverflowClipMargin { get; init; }
+
+    /// <summary>
     /// CSS Color Adjust Module Level 1: the <c>color-scheme</c> property.
     /// Used by canvas background painting (CSS Color Adjust §2.3): when the
     /// root's used color scheme is <c>dark</c>, the canvas is painted the UA

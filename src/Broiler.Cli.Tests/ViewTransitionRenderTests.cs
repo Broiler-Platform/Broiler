@@ -64,6 +64,38 @@ public class ViewTransitionRenderTests
         Assert.True(square is { R: 0, G: 128, B: 0 }, $"square was {square.R},{square.G},{square.B}");
     }
 
+    // WPT css/css-view-transitions/active-view-transition-pseudo-class-match: the bare
+    // :active-view-transition pseudo-class (css-view-transitions-2) matches whenever any transition
+    // is active — with no `types` argument, unlike :active-view-transition-type(). Here it turns
+    // #target green and names it, so it is captured and its snapshot paints a green square on the
+    // lightpink backdrop. Reference is one green square.
+    [Fact]
+    public void BareActiveViewTransition_PseudoClass_Applies_During_Any_Transition()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<style>
+  html:active-view-transition #target { background: green; view-transition-name: target; }
+  #target { background: red; width: 100px; height: 100px; }
+  html::view-transition-new(target) { animation: unset; opacity: 0; }
+  html::view-transition-old(target) { animation: unset; opacity: 1; }
+  html::view-transition-group(root) { display: none; }
+  html::view-transition { background: lightpink; }
+</style>
+<div id="target"></div>
+</html>
+""";
+        // No types passed — the bare pseudo-class must still activate.
+        using var bitmap = Render(html, "document.startViewTransition();");
+
+        var square = bitmap.GetPixel(40, 40);
+        Assert.True(square is { R: 0, G: 128, B: 0 }, $"square was {square.R},{square.G},{square.B}");
+
+        var backdrop = bitmap.GetPixel(150, 150);
+        Assert.True(backdrop is { R: 255, G: 182, B: 193 }, $"backdrop was {backdrop.R},{backdrop.G},{backdrop.B}");
+    }
+
     [Fact]
     public void Ready_Promise_Resolves_So_The_Screenshot_Fires()
     {
@@ -127,6 +159,144 @@ public class ViewTransitionRenderTests
 
         var atNew = bitmap.GetPixel(240, 90);
         Assert.True(atNew is { R: 255, G: 182, B: 193 }, $"new-pos was {atNew.R},{atNew.G},{atNew.B}");
+    }
+
+    // WPT css/css-view-transitions/element-stops-grouping-after-animation: the reftest screenshots
+    // from the `finished` promise, not `ready`. `finished` resolving means the transition is over —
+    // the ::view-transition tree is gone and the DOM is back to its plain final state — so the
+    // screenshot must show the final DOM (a green square on white), not the pseudo tree's pink
+    // backdrop. Realizing the finished thenable clears the active transition so the bake is skipped.
+    [Fact]
+    public void Finished_Promise_Renders_The_Final_Dom_Not_The_Pseudo_Tree()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  #target { background: green; width: 100px; height: 100px; view-transition-name: target; }
+  html::view-transition { background: pink; }
+</style>
+<div id="target"></div>
+</html>
+""";
+        // The transition is treated as finished only when the finished callback itself takes the
+        // screenshot (removes reftest-wait) — mirroring `finished.then(takeScreenshot)`. A mere
+        // cleanup callback that leaves reftest-wait pending keeps the tree (see the nested-groups
+        // tests, which screenshot from ready and only clean up from finished).
+        using var bitmap = Render(html,
+            "document.startViewTransition().finished.then(" +
+            "() => document.documentElement.classList.remove('reftest-wait'));");
+
+        // Final DOM: the green target on the white canvas — no pink ::view-transition backdrop.
+        var square = bitmap.GetPixel(40, 40);
+        Assert.True(square is { R: 0, G: 128, B: 0 }, $"square was {square.R},{square.G},{square.B}");
+
+        var canvas = bitmap.GetPixel(150, 150);
+        Assert.True(canvas is { R: 255, G: 255, B: 255 }, $"canvas was {canvas.R},{canvas.G},{canvas.B}");
+    }
+
+    // WPT css/css-view-transitions/nested/nearest-direct.tentative: css-view-transitions-2 nested
+    // groups. The `.test` element's group has `view-transition-group: nearest`, so it nests under its
+    // nearest ancestor captured group (`green`) rather than sitting flat under the overlay. The green
+    // group is green; its `::view-transition-group-children` wrapper and the nested test group both
+    // `background: inherit`, so the whole thing resolves to green (the reference is an all-green page).
+    // Without nesting the test group inherits the red overlay and paints red on top.
+    [Fact]
+    public void NestedGroup_Nearest_InheritsThroughParentGroup()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  ::view-transition, ::view-transition-group(*), div { background: red; inset: 0; position: absolute; }
+  .green { view-transition-name: green; }
+  .test { view-transition-name: test; }
+  .nearest-ref { view-transition-group: nearest; }
+  ::view-transition-group(green) { background: green; }
+  ::view-transition-group-children(*) { background: inherit; }
+  ::view-transition-group(test) { background: inherit; }
+  ::view-transition-image-pair(*), ::view-transition-old(*), ::view-transition-new(*) { display: none; }
+</style>
+<body>
+  <div class="green"><div><div class="test nearest-ref"></div></div></div>
+</body>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition(() => {}).ready.then(() => {});");
+
+        // The nested test group inherits green through its parent group's children wrapper.
+        Assert.True(bitmap.GetPixel(40, 40) is { R: 0, G: 128, B: 0 }, "top-left should be green");
+        Assert.True(bitmap.GetPixel(150, 150) is { R: 0, G: 128, B: 0 }, "center should be green");
+    }
+
+    // WPT css/css-view-transitions/nested/normal-goes-up.tentative: `view-transition-group: normal`
+    // keeps the group flat, directly under the overlay (as if it had no group). With `html.no-match`
+    // making the ::view-transition backdrop green, the flat `test` group's `background: inherit` must
+    // inherit that green overlay — unlike the nearest/explicit cases there is no green group behind it
+    // to fall back on. This exercises the `background: inherit` shorthand (Broiler.CSS patch 0024) and
+    // the chained-inherit resolution together, so it feature-probes and self-skips on the un-patched
+    // engine (where `background: inherit` stays transparent and the red root shows through).
+    [Fact]
+    public void NestedGroup_Normal_InheritsTheOverlayBackground()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait no-match">
+<style>
+  ::view-transition, ::view-transition-group(*), div { background: red; inset: 0; position: absolute; }
+  html.no-match::view-transition { background: green; }
+  .test { view-transition-name: test; }
+  .normal-ref { view-transition-group: normal; }
+  ::view-transition-group(test) { background: inherit; }
+  ::view-transition-image-pair(*), ::view-transition-old(*), ::view-transition-new(*) { display: none; }
+</style>
+<body>
+  <div><div><div class="test normal-ref"></div></div></div>
+</body>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition(() => {}).ready.then(() => {});");
+        var px = bitmap.GetPixel(100, 100);
+
+        // Self-skip on the un-patched engine: `background: inherit` is transparent there, so the flat
+        // test group does not cover the red root.
+        if (px is { R: 255, G: 0, B: 0 })
+            return;
+
+        Assert.True(px is { R: 0, G: 128, B: 0 }, $"center should inherit the green overlay, got {px.R},{px.G},{px.B}");
+    }
+
+    // WPT css/css-view-transitions/nested/compute-explicit-name-self.tentative: a group whose
+    // `view-transition-group` names its OWN view-transition-name is a self-reference, which is invalid
+    // (css-view-transitions-2) and falls back to the flat `normal` layout. Before the guard, nesting
+    // the group under itself threw "a node cannot be inserted into itself or one of its descendants".
+    // Rendering to completion is the crash regression; the green result additionally needs patch 0024
+    // (the flat group inherits the green overlay), so that assertion feature-probes and self-skips.
+    [Fact]
+    public void NestedGroup_SelfReference_DoesNotRecurse_AndFallsBackToFlat()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait no-match">
+<style>
+  ::view-transition, ::view-transition-group(*), div { background: red; inset: 0; position: absolute; }
+  html.no-match::view-transition { background: green; }
+  .test { view-transition-name: test; }
+  .test-ref { view-transition-group: test; }
+  ::view-transition-group(test) { background: inherit; }
+  ::view-transition-image-pair(*), ::view-transition-old(*), ::view-transition-new(*) { display: none; }
+</style>
+<body><div class="test test-ref"></div></body>
+</html>
+""";
+        // Must not throw (the self-reference no longer nests the group under itself).
+        using var bitmap = Render(html, "document.startViewTransition(() => {}).ready.then(() => {});");
+        var px = bitmap.GetPixel(100, 100);
+
+        if (px is { R: 255, G: 0, B: 0 })
+            return; // patch 0024 not applied — the flat group's `background:inherit` is transparent.
+
+        Assert.True(px is { R: 0, G: 128, B: 0 }, $"self-ref group should fall back to flat and inherit green, got {px.R},{px.G},{px.B}");
     }
 
     [Fact]
@@ -330,5 +500,43 @@ public class ViewTransitionRenderTests
         // No overlay: the red ::view-transition must not show, so the page stays white.
         var center = bitmap.GetPixel(100, 100);
         Assert.True(center is { R: 255, G: 255, B: 255 }, $"center was {center.R},{center.G},{center.B}");
+    }
+
+    // WPT css/css-view-transitions/content-with-clip pattern: an author
+    // ::view-transition-group(name) rule offsets a group to cancel a shift on the captured
+    // element. The group is placed by a transform carrying the captured position (per spec its
+    // UA style is `inset: 0` + a translate), so an author `top`/`left` composes additively with
+    // the capture instead of replacing it. Here #target sits at top:100px and the group rule
+    // applies top:-100px, so the green snapshot must land back at the top (net 0), not at -100px
+    // (off-screen). Before the fix the captured top was written to the group's own `top`, which
+    // the author rule overrode outright — pushing the snapshot off-screen.
+    [Fact]
+    public void Author_Group_Offset_Composes_With_The_Captured_Position()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  body { margin: 0; }
+  #target { background: green; width: 100px; height: 100px; position: relative; top: 100px;
+            view-transition-name: target; }
+  html::view-transition-group(root) { display: none; }
+  html::view-transition-new(target) { animation: unset; opacity: 1; }
+  html::view-transition-old(target) { animation: unset; opacity: 1; }
+  html::view-transition-group(target) { animation: unset; top: -100px; }
+  html::view-transition { background: lightpink; }
+</style>
+<div id="target"></div>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition(() => {});");
+
+        // Net top is 0 (captured 100 via transform + author -100): green fills y 0..100.
+        var atTop = bitmap.GetPixel(40, 40);
+        Assert.True(atTop is { R: 0, G: 128, B: 0 }, $"top was {atTop.R},{atTop.G},{atTop.B}");
+
+        // Below the square is the lightpink backdrop, not green (the group did not stay at 100).
+        var below = bitmap.GetPixel(40, 150);
+        Assert.True(below is { R: 255, G: 182, B: 193 }, $"below was {below.R},{below.G},{below.B}");
     }
 }

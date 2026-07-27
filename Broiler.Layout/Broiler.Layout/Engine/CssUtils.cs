@@ -151,6 +151,7 @@ internal static partial class CssUtils
             "grid-auto-rows" => cssBox.GridAutoRows,
             "grid-auto-columns" => cssBox.GridAutoColumns,
             "contain" => cssBox.Contain,
+            "overflow-clip-margin" => cssBox.OverflowClipMargin,
             "content-visibility" => cssBox.ContentVisibility,
             "color-scheme" => cssBox.ColorScheme,
             _ => null,
@@ -389,6 +390,9 @@ internal static partial class CssUtils
                 break;
             case "contain":
                 cssBox.Contain = value;
+                break;
+            case "overflow-clip-margin":
+                cssBox.OverflowClipMargin = value;
                 break;
             case "content-visibility":
                 cssBox.ContentVisibility = value;

@@ -1324,6 +1324,27 @@ internal static class CssLayoutEngine
 
         maxRight = Math.Max(maxRight, ibBorderLeft + physicalBoxWidth);
         maxbottom = Math.Max(maxbottom, b.ActualBottom + b.ActualMarginBottom);
+
+        // CSS2.1 §9.4.3: position:relative shifts the box (and its subtree) visually
+        // without affecting flow. FlowInlineBlock positions the inline-block from the
+        // in-flow line position above (overwriting any offset the box's own layout
+        // applied), so re-apply the relative offset here — after flow advancement and
+        // the line rectangle were computed from the in-flow position. Applied to the
+        // box subtree (OffsetLeft/Top) and to the line's own rectangle copy so paint
+        // and getBoundingClientRect agree. Block-level boxes get this from
+        // CssBox.ApplyRelativePositionOffset; inline-blocks never run that path.
+        if (b.Position == CssConstants.Relative)
+        {
+            double rdx = CssBoxHelper.GetRelativeOffsetX(b);
+            double rdy = CssBoxHelper.GetRelativeOffsetY(b);
+            if (rdx != 0)
+                b.OffsetLeft(rdx);
+            if (rdy != 0)
+                b.OffsetTop(rdy);
+            if ((rdx != 0 || rdy != 0) && line.Rectangles.TryGetValue(b, out var ibRect))
+                line.Rectangles[b] = new RectangleF(
+                    (float)(ibRect.X + rdx), (float)(ibRect.Y + rdy), ibRect.Width, ibRect.Height);
+        }
     }
 
     /// <summary>

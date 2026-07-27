@@ -162,6 +162,7 @@ internal static class ComputedStyleBuilder
             BackgroundClip = box.BackgroundClip,
             ClipPath = box.ClipPath,
             Contain = box.Contain,
+            OverflowClipMargin = box.ActualOverflowClipMargin,
             ContentVisibility = box.ContentVisibility,
             ColorScheme = box.ColorScheme,
             Transform = box.Transform,
