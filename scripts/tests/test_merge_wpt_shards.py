@@ -457,6 +457,11 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertIn("top 3 biggest problem(s)", markdown)
             self.assertIn("1 shard(s) did not complete", markdown)
             self.assertIn("shard 7 (exit 134)", markdown)
+            # The incomplete-shard entry is actionable: it names the exact rerun
+            # (shard_index) and explains a "no report uploaded" shard is usually a
+            # transient runner eviction rather than a code regression.
+            self.assertIn("set shard_index=7", markdown)
+            self.assertIn("transient CI-runner eviction", markdown)
             self.assertIn("Crash gating 12 test(s)", markdown)
             self.assertIn("Foo.Bar — boom", markdown)
             self.assertIn("3.2% match — css/a/broken.html", markdown)
