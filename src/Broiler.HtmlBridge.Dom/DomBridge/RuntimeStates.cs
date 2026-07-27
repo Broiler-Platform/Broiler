@@ -175,8 +175,21 @@ internal sealed class StyleSheetRuntimeState
     /// </summary>
     public bool RulesMutated { get; set; }
 
+    /// <summary>
+    /// The script-set CSSOM <c>disabled</c> flag (<c>CSSStyleSheet.disabled</c>), or
+    /// <c>null</c> when script has not set it. When <c>null</c> the effective disabled
+    /// state falls back to the element's <c>disabled</c> content attribute (only a
+    /// <c>&lt;link&gt;</c> has one). A disabled sheet neither applies to the cascade nor,
+    /// for a <c>&lt;link&gt;</c>, appears in <c>document.styleSheets</c> — CSSOM §2.3 /
+    /// HTML §4.2.4 (<c>&lt;link disabled&gt;</c>).
+    /// </summary>
+    public bool? DisabledOverride { get; set; }
+
     // The rule list is deep-copied (a fresh List) so the clone's insertRule/deleteRule do not
-    // mutate the source sheet; the source text / mutated flag are copied verbatim.
+    // mutate the source sheet; the source text / mutated flag are copied verbatim. The
+    // script-set DisabledOverride is deliberately NOT copied: a clone re-derives its disabled
+    // state from its own `disabled` content attribute (HTMLLinkElement-disabled: the
+    // "explicitly enabled" state does not persist on clones).
     public void CopyTo(StyleSheetRuntimeState target)
     {
         FetchedCss.CopyTo(target.FetchedCss);

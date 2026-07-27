@@ -159,12 +159,19 @@ public sealed partial class DomBridge
     /// <see cref="SnapshotChildren"/> walk guarded — Descendants snapshots the real child list, so the
     /// LegacyChildList projection overflow cannot occur here) instead of the hand-rolled recursion.
     /// </summary>
-    private static void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
+    private void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
     {
         foreach (var element in root.Descendants().OfType<DomElement>())
         {
-            if (string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase) || IsExternalStylesheet(element))
-                styleElements.Add(element);
+            if (!(string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase) || IsExternalStylesheet(element)))
+                continue;
+
+            // A disabled sheet (CSSOM CSSStyleSheet.disabled, or a <link disabled> content
+            // attribute) does not contribute to the cascade — CSSOM §2.3.
+            if (IsStyleSheetDisabled(element))
+                continue;
+
+            styleElements.Add(element);
         }
     }
 
@@ -231,8 +238,22 @@ public sealed partial class DomBridge
 
     // The getComputedStyle result object is built by the Phase 3 (P3.14) StyleDeclarationBinding
     // feature module; the bridge still produces the engine-cascaded computed map here.
-    private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null) =>
-        Dom.Features.StyleDeclarationBinding.BuildComputedDeclaration(BuildComputedStyleMap(element, pseudoElement));
+    private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null)
+    {
+        var map = BuildComputedStyleMap(element, pseudoElement);
+        // `overlay` (CSS Position 4) is UA-controlled — it is not in the author cascade, so the
+        // engine map never carries it. Surface its computed value for getComputedStyle here (copying
+        // first so a memoised engine map is never mutated). Pseudo-elements never enter the top layer.
+        if (element != null && pseudoElement == null)
+        {
+            map = new Dictionary<string, string>(map, StringComparer.OrdinalIgnoreCase)
+            {
+                ["overlay"] = ComputeOverlayValue(element),
+            };
+        }
+
+        return Dom.Features.StyleDeclarationBinding.BuildComputedDeclaration(map);
+    }
 
     private Dictionary<string, string> BuildComputedStyleMap(DomElement? element, string? pseudoElement = null)
     {

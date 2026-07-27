@@ -120,11 +120,24 @@ def _iter_shard_statuses(shard_dir: Path):
 def _format_incomplete_shard(status: dict) -> str:
     """Human-readable label for an incomplete shard. A numeric exit code means the
     shard crashed after running; the ``"missing"`` sentinel means it uploaded
-    nothing at all (its job was cancelled before the collect/upload steps)."""
+    nothing at all — its runner was lost before the ``if: always()`` collect/upload
+    steps could run (typically a spot-runner shutdown signal, i.e. the WPT step ends
+    with ``exit code 143`` / "The runner has received a shutdown signal"), so the
+    whole slice went unmeasured rather than crashing on a specific test."""
     exit_code = status["exitCode"]
     if exit_code == "missing":
         return f"shard {status['shardIndex']} (no report uploaded)"
     return f"shard {status['shardIndex']} (exit {exit_code})"
+
+
+def _incomplete_shard_recovery_hint(shards: list[dict]) -> str:
+    """Actionable recovery guidance for the incomplete-shard report entry: which
+    ``shard_index`` values to re-dispatch the workflow with. A single missing shard
+    is a direct ``shard_index=N``; several are re-dispatched one per index."""
+    indexes = [str(status["shardIndex"]) for status in shards]
+    if len(indexes) == 1:
+        return f"set shard_index={indexes[0]}"
+    return "re-dispatch once per shard, setting shard_index to " + ", ".join(indexes)
 
 
 def _problem_identity(result: dict) -> tuple[str, str, str | None]:
@@ -189,7 +202,12 @@ def _rank_biggest_problems(
                 "title": f"{len(shards)} shard(s) did not complete",
                 "detail": (
                     "A whole shard's tests are unaccounted for — the pass/fail of that "
-                    f"slice is unknown. {listing}."
+                    f"slice is unknown. {listing}. A shard reported as \"no report "
+                    "uploaded\" is usually a transient CI-runner eviction (the runner "
+                    "received a shutdown signal before its upload step ran), not a test "
+                    "regression, so its slice can be remeasured without a code change: "
+                    f"re-run the WPT Tests workflow and {_incomplete_shard_recovery_hint(shards)} "
+                    "(cached references make the rerun fast)."
                 ),
             }
         )

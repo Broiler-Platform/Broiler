@@ -1,4 +1,5 @@
 using Broiler.JavaScript.BuiltIns.Null;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.Runtime;
@@ -39,13 +40,52 @@ public sealed partial class DomBridge
     /// <summary>Collects all style elements in the sub-tree. Phase 4 item 4/5: reuses canonical
     /// <see cref="DomNode.Descendants"/> (document-order, level-snapshotted against concurrent mutation)
     /// instead of a hand-rolled depth-first recursion over the live child list.</summary>
-    private static void CollectStyleElements(DomNode root, List<DomElement> results)
+    private void CollectStyleElements(DomNode root, List<DomElement> results)
     {
         foreach (var element in root.Descendants().OfType<DomElement>())
         {
-            if (string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase) || IsExternalStylesheet(element))
-                results.Add(element);
+            if (!(string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase) || IsExternalStylesheet(element)))
+                continue;
+
+            // A disabled <link> has no associated CSS style sheet, so it is absent from
+            // document.styleSheets (HTML §4.2.4 <link disabled>). A <style> whose sheet was
+            // disabled via CSSOM (CSSStyleSheet.disabled) still appears in the collection —
+            // only its rules stop applying — so it is not filtered here.
+            if (IsStyleSheetDisabled(element) &&
+                string.Equals(element.TagName, "link", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            results.Add(element);
         }
+    }
+
+    /// <summary>
+    /// The effective CSSOM <c>disabled</c> state of a <c>&lt;style&gt;</c>/<c>&lt;link&gt;</c>
+    /// stylesheet: the script-set <c>CSSStyleSheet.disabled</c> flag when present, otherwise
+    /// the element's <c>disabled</c> content attribute (only a <c>&lt;link&gt;</c> carries one —
+    /// <c>HTMLLinkElement.disabled</c> reflects it). A disabled sheet does not apply to the
+    /// cascade (CSSOM §2.3).
+    /// </summary>
+    private bool IsStyleSheetDisabled(DomElement element)
+    {
+        var state = StyleSheetStateFor(element);
+        if (state.DisabledOverride is bool overridden)
+            return overridden;
+
+        return string.Equals(element.TagName, "link", StringComparison.OrdinalIgnoreCase)
+            && HasAttr(element, "disabled");
+    }
+
+    /// <summary>
+    /// Sets the script-driven <c>CSSStyleSheet.disabled</c> flag on a stylesheet element and
+    /// re-runs the cascade so a newly (un)disabled sheet (dis)appears from computed style.
+    /// Does not touch the <c>disabled</c> content attribute — that is only reflected by
+    /// <c>HTMLLinkElement.disabled</c>, not by <c>CSSStyleSheet.disabled</c>.
+    /// </summary>
+    private void SetStyleSheetDisabledFlag(DomElement element, bool value)
+    {
+        StyleSheetStateFor(element).DisabledOverride = value;
+        InvalidateStyleScope(element);
     }
 
     /// <summary>
@@ -80,6 +120,14 @@ public sealed partial class DomBridge
         // href — null for inline stylesheets
         sheet.FastAddProperty((KeyString)"href", NullFunction("get href"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // disabled — CSSOM StyleSheet.disabled. A true value prevents the sheet from
+        // applying (CSSOM §2.3). Getting reads the effective state (script flag, else the
+        // <link disabled> content attribute); setting stores the script flag and re-cascades.
+        sheet.FastAddProperty((KeyString)"disabled",
+            new JSFunction((in _) => IsStyleSheetDisabled(styleElement) ? JSBoolean.True : JSBoolean.False, "get disabled"),
+            new JSFunction((in a) => { SetStyleSheetDisabledFlag(styleElement, a.Length > 0 && a[0].BooleanValue); return JSUndefined.Value; }, "set disabled"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // Internal rules storage for this stylesheet — the single shared, mutable
         // Broiler.CSS rule model held in the element's runtime state (Phase 6 store
