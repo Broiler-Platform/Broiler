@@ -405,35 +405,32 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// The parent group name a captured element's group nests under (css-view-transitions-2
-    /// <c>view-transition-group</c>): a <c>&lt;custom-ident&gt;</c> nests under the group of that
-    /// name; <c>nearest</c> under the nearest ancestor captured element's group. Returns <c>null</c>
-    /// (a top-level group) for the initial value, <c>contain</c> (not modelled), or an unresolved
-    /// target — so anything not understood degrades to today's flat layout.
+    /// <c>view-transition-group</c>):
+    /// <list type="bullet">
+    /// <item>a <c>&lt;custom-ident&gt;</c> nests under the group of that name (self-reference and
+    /// unresolved names fall back to the flat layout);</item>
+    /// <item><c>nearest</c> under the nearest ancestor captured element's group;</item>
+    /// <item><c>normal</c> (the initial value) and <c>contain</c> nest under the nearest ancestor
+    /// that is a <em>containing</em> group — a captured element whose own <c>view-transition-group</c>
+    /// is <c>contain</c>.</item>
+    /// </list>
+    /// Returns <c>null</c> (a top-level group directly under <c>::view-transition</c>) when nothing
+    /// resolves, so the flat VT1 layout is the default.
     /// </summary>
     private string? ResolveGroupParentName(
         DomElement element, string name, IReadOnlyDictionary<string, DomElement> elementByName, DomElement root)
     {
         var value = ResolveViewTransitionGroupValue(element, root);
-        if (value is null)
-            return null;
 
-        if (value.Equals("nearest", System.StringComparison.OrdinalIgnoreCase))
-        {
-            for (var p = element.ParentNode; p != null; p = p.ParentNode)
-            {
-                if (p is not DomElement ancestor)
-                    continue;
-                var ancestorName = ResolveUsedViewTransitionName(
-                    ancestor, UsedStyleForCapture(ancestor).GetValueOrDefault("view-transition-name"));
-                if (ancestorName is not null && !string.Equals(ancestorName, name, System.StringComparison.Ordinal)
-                    && (ancestorName == "root" || elementByName.ContainsKey(ancestorName)))
-                    return ancestorName;
-            }
-            return null;
-        }
+        if (value is not null && value.Equals("nearest", System.StringComparison.OrdinalIgnoreCase))
+            return NearestCapturedAncestorName(element, name, elementByName, root, requireContain: false);
 
-        if (value.Equals("contain", System.StringComparison.OrdinalIgnoreCase))
-            return null;
+        // normal (null) and contain both nest under the nearest *containing* ancestor group — an
+        // ancestor whose used view-transition-group is `contain`. `contain` additionally makes this
+        // element a container for its own descendants (handled when they resolve their parent). With
+        // no containing ancestor the group stays flat (the VT1 default).
+        if (value is null || value.Equals("contain", System.StringComparison.OrdinalIgnoreCase))
+            return NearestCapturedAncestorName(element, name, elementByName, root, requireContain: true);
 
         // An explicit <custom-ident>: nest under that group when it is itself captured. A group
         // cannot reference its own name (css-view-transitions-2: a self-reference is invalid and the
@@ -441,6 +438,39 @@ public sealed partial class DomBridge
         if (string.Equals(value, name, System.StringComparison.Ordinal))
             return null;
         return elementByName.ContainsKey(value) || value == "root" ? value : null;
+    }
+
+    /// <summary>
+    /// Walks the ancestor chain for the nearest captured element with a view-transition-name.
+    /// When <paramref name="requireContain"/> is set, only an ancestor whose own
+    /// <c>view-transition-group</c> is <c>contain</c> qualifies (the containing-group parent for
+    /// <c>normal</c>/<c>contain</c> children); otherwise any captured ancestor qualifies (the
+    /// <c>nearest</c> keyword). Returns <c>null</c> when no ancestor qualifies.
+    /// </summary>
+    private string? NearestCapturedAncestorName(
+        DomElement element, string name, IReadOnlyDictionary<string, DomElement> elementByName,
+        DomElement root, bool requireContain)
+    {
+        for (var p = element.ParentNode; p != null; p = p.ParentNode)
+        {
+            if (p is not DomElement ancestor)
+                continue;
+            var ancestorName = ResolveUsedViewTransitionName(
+                ancestor, UsedStyleForCapture(ancestor).GetValueOrDefault("view-transition-name"));
+            if (ancestorName is null || string.Equals(ancestorName, name, System.StringComparison.Ordinal)
+                || !(ancestorName == "root" || elementByName.ContainsKey(ancestorName)))
+                continue;
+
+            if (requireContain)
+            {
+                var ancestorGroup = ResolveViewTransitionGroupValue(ancestor, root);
+                if (ancestorGroup is null || !ancestorGroup.Equals("contain", System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+            }
+
+            return ancestorName;
+        }
+        return null;
     }
 
     /// <summary>
@@ -924,12 +954,19 @@ public sealed partial class DomBridge
     }
 
     /// <summary>Author style rules (selector text + declarations) across every <c>&lt;style&gt;</c>
-    /// in the tree, in document order.</summary>
+    /// and external-stylesheet <c>&lt;link rel="stylesheet"&gt;</c> in the tree, in document order.
+    /// External links are included because the <c>::view-transition-*</c> pseudo rules and the
+    /// <c>view-transition-group</c> values — which are read from the raw author rules here rather than
+    /// through computed style — routinely live in a linked stylesheet (the WPT
+    /// <c>css-view-transitions-2 nested</c> tests keep the entire pseudo tree styling in
+    /// <c>resources/*.css</c>). A disabled sheet contributes nothing (CSSOM §2.3).</summary>
     private IEnumerable<(string SelectorText, CssDeclarationBlock Declarations)> EnumerateAuthorStyleRules(DomElement root)
     {
         foreach (var styleEl in root.Descendants().OfType<DomElement>())
         {
-            if (!styleEl.TagName.Equals("style", System.StringComparison.OrdinalIgnoreCase))
+            if (!(styleEl.TagName.Equals("style", System.StringComparison.OrdinalIgnoreCase)
+                    || IsExternalStylesheet(styleEl))
+                || IsStyleSheetDisabled(styleEl))
                 continue;
 
             var source = GetStyleElementSourceText(styleEl);
