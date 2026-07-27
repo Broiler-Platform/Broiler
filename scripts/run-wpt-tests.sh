@@ -122,6 +122,21 @@ RERUN_ARGS=()
 # cached set that may be absent, which otherwise skips every reran test).
 REF_RERUN_ARGS=()
 if [[ -n "$RERUN_JSON" ]]; then
+    # Normalize the manifest to an absolute path before it is handed to either
+    # consumer. The reference generator runs from "$REPO_ROOT/tests/wpt" (a
+    # pushd, further down) while the C# runner runs from the invocation
+    # directory, so a *relative* --rerun-json — e.g. the CI default
+    # tests/wpt-baseline/failed-tests.json — would resolve against two different
+    # working directories: the generator opens tests/wpt/tests/wpt-baseline/…
+    # and dies with ENOENT before any reference is produced. Resolving here (the
+    # invocation cwd, before any pushd) points both at the same file.
+    if [[ "$RERUN_JSON" != /* ]]; then
+        RERUN_JSON="$PWD/$RERUN_JSON"
+    fi
+    if [[ ! -f "$RERUN_JSON" ]]; then
+        echo "  ✗ Rerun manifest not found: $RERUN_JSON" >&2
+        exit 1
+    fi
     RERUN_ARGS=(--rerun-json "$RERUN_JSON")
     [[ -n "$RERUN_KIND" ]] && RERUN_ARGS+=(--rerun-kind "$RERUN_KIND")
     REF_RERUN_ARGS=(--rerun-json "$RERUN_JSON")
