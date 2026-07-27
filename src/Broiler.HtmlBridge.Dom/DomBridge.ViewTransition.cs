@@ -531,10 +531,21 @@ public sealed partial class DomBridge
             // replacing it (WPT content-with-clip offsets a group by `top: -50vh` to cancel a
             // `top: 50vh` on the captured element; overriding a captured `top` outright would push the
             // snapshot off-screen). An author `transform` still overrides the placement, as it should.
+            // The snapshot clips to the border box only when the captured element itself establishes a
+            // clip (non-visible overflow, contain:paint, a clip-path). A default overflow:visible
+            // element must instead show its ink overflow — content its descendants paint outside the
+            // box, e.g. an absolutely-positioned child above the box (WPT
+            // capture-with-offscreen-child-translated). Root and old-only/unknown captures keep the
+            // clip (viewport / prior behaviour).
+            bool clipsContent = true;
+            if (capture.Name != "root" && elementByName.TryGetValue(capture.Name, out var capturedElement))
+                clipsContent = CapturedElementClipsContent(UsedStyleForCapture(capturedElement));
+
             var group = CreateStyledBox(BaseStyle(
                 ("position", "absolute"), ("left", "0"), ("top", "0"),
                 ("transform", $"translate({Px(capture.GroupLeft)}, {Px(capture.GroupTop)})"),
-                ("width", Px(groupW)), ("height", Px(groupH)), ("overflow", "hidden")),
+                ("width", Px(groupW)), ("height", Px(groupH)),
+                ("overflow", clipsContent ? "hidden" : "visible")),
                 LookupPseudo(pseudoRules, "group", capture));
 
             // Snapshot boxes are stacked top-left within the group: old under new. Each box is a
@@ -721,6 +732,33 @@ public sealed partial class DomBridge
         foreach (var child in node.ChildNodes.ToArray())
             StripCapturedIdentifiers(child);
     }
+
+    /// <summary>
+    /// Whether the captured element establishes a paint clip on its descendants — a non-visible
+    /// <c>overflow</c>, <c>contain: paint/content/strict</c>, or a <c>clip-path</c>. Such an element's
+    /// view-transition snapshot clips to the border box; a default <c>overflow: visible</c> element's
+    /// snapshot instead shows its ink overflow (WPT capture-with-offscreen-child-translated).
+    /// </summary>
+    private static bool CapturedElementClipsContent(Dictionary<string, string> style)
+    {
+        var overflow = style.GetValueOrDefault("overflow", "visible");
+        if (!IsVisibleOverflow(style.GetValueOrDefault("overflow-x", overflow))
+            || !IsVisibleOverflow(style.GetValueOrDefault("overflow-y", overflow)))
+            return true;
+
+        var contain = style.GetValueOrDefault("contain", string.Empty);
+        if (contain.Contains("paint", System.StringComparison.OrdinalIgnoreCase)
+            || contain.Contains("content", System.StringComparison.OrdinalIgnoreCase)
+            || contain.Contains("strict", System.StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var clipPath = style.GetValueOrDefault("clip-path", "none");
+        return !string.IsNullOrWhiteSpace(clipPath)
+            && !clipPath.Equals("none", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsVisibleOverflow(string value) =>
+        string.IsNullOrWhiteSpace(value) || value.Trim().Equals("visible", System.StringComparison.OrdinalIgnoreCase);
 
     private readonly record struct ViewTransitionCapture(
         string Name,
