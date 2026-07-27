@@ -187,6 +187,7 @@ public sealed partial class DomBridge
         RemoveRenderCommentNodes(root);
         ApplyCssomStyleSheetMutations(root);
         InlineStyleSheetImports(root);
+        ApplyBaseHrefToStyleUrls(root);
         ApplyMetaColorScheme(root);
         // Zoom baking is applied by the callers (GetRenderDocument/SerializeToHtml) before this,
         // so it can be reverted on the geometry-snapshot path; pseudo/progress below depend on
