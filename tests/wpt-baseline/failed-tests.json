@@ -5,71 +5,291 @@
     "skipped": 0,
     "total": 20651
   },
-  "shardCount": 0,
+  "shardCount": 8,
   "problemLimit": 10,
-  "incompleteShards": [
-    {
-      "shardIndex": 0,
-      "exitCode": 1
-    },
-    {
-      "shardIndex": 1,
-      "exitCode": 1
-    },
-    {
-      "shardIndex": 2,
-      "exitCode": 1
-    },
-    {
-      "shardIndex": 3,
-      "exitCode": 1
-    },
-    {
-      "shardIndex": 4,
-      "exitCode": 1
-    },
-    {
-      "shardIndex": 5,
-      "exitCode": 1
-    },
-    {
-      "shardIndex": 6,
-      "exitCode": 1
-    },
-    {
-      "shardIndex": 7,
-      "exitCode": 1
-    }
-  ],
+  "incompleteShards": [],
   "topProblems": [
     {
-      "key": "ShardProcessError",
-      "label": "Shard process failure",
-      "category": "ShardProcessError",
-      "subCategory": null,
-      "count": 8,
+      "key": "PixelMismatch:MissingContent",
+      "label": "PixelMismatch / MissingContent",
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent",
+      "count": 15058,
       "examples": [
-        "shard 0 (exit 1)",
-        "shard 1 (exit 1)",
-        "shard 2 (exit 1)"
+        "accname/name/comp_tooltip.html",
+        "appmanifest/icons-member/icons-member-cors-fail-manual.sub.html",
+        "appmanifest/id-member/id-member-manifest-update-manual-v2.html"
+      ]
+    },
+    {
+      "key": "PixelMismatch:ReferenceOverlayExposed",
+      "label": "PixelMismatch / ReferenceOverlayExposed",
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed",
+      "count": 2858,
+      "examples": [
+        "css/compositing/Blending_in_a_group_with_filter.html",
+        "css/compositing/mix-blend-mode/mix-blend-mode-blended-element-with-transparent-pixels.html",
+        "css/css-anchor-position/position-anchor-normal-pseudo-element-implicit-002.html"
+      ]
+    },
+    {
+      "key": "PixelMismatch:ColorShift",
+      "label": "PixelMismatch / ColorShift",
+      "category": "PixelMismatch",
+      "subCategory": "ColorShift",
+      "count": 1537,
+      "examples": [
+        "conformance-checkers/html-aria/accessible-name-updates/706.html",
+        "content-security-policy/blob/self-doesnt-match-blob.sub.html",
+        "content-security-policy/child-src/child-src-blocked.sub.html"
+      ]
+    },
+    {
+      "key": "PixelMismatch:LayoutShift",
+      "label": "PixelMismatch / LayoutShift",
+      "category": "PixelMismatch",
+      "subCategory": "LayoutShift",
+      "count": 991,
+      "examples": [
+        "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
+        "css/compositing/mix-blend-mode/mix-blend-mode-parent-with-text.html",
+        "css/css-backgrounds/animations/background-color-animation-with-blur.html"
+      ]
+    },
+    {
+      "key": "Timeout",
+      "label": "Timeout",
+      "category": "Timeout",
+      "subCategory": null,
+      "count": 84,
+      "examples": [
+        "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
+        "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html",
+        "css/CSS2/cascade-import/cascade-import-005.xht"
+      ]
+    },
+    {
+      "key": "PixelMismatch:SubpixelAntiAliasing",
+      "label": "PixelMismatch / SubpixelAntiAliasing",
+      "category": "PixelMismatch",
+      "subCategory": "SubpixelAntiAliasing",
+      "count": 50,
+      "examples": [
+        "css/css-anchor-position/anchor-center-safe-rtl.html",
+        "css/css-color/t422-rgba-func-whitespace-b.xht",
+        "css/css-contain/contain-layout-ignored-cases-no-principal-box-001.html"
       ]
     }
   ],
-  "topFailingDirectories": [],
-  "failuresByCategory": [],
+  "topFailingDirectories": [
+    [
+      "css/CSS2",
+      3172
+    ],
+    [
+      "html/canvas",
+      1825
+    ],
+    [
+      "css/css-grid",
+      1169
+    ],
+    [
+      "css/css-text",
+      856
+    ],
+    [
+      "css/css-writing-modes",
+      834
+    ],
+    [
+      "css/css-flexbox",
+      828
+    ],
+    [
+      "css/css-break",
+      811
+    ],
+    [
+      "css/css-transforms",
+      571
+    ],
+    [
+      "html/semantics",
+      543
+    ],
+    [
+      "conformance-checkers/html-svg",
+      515
+    ]
+  ],
+  "failuresByCategory": [
+    [
+      "PixelMismatch",
+      20494
+    ],
+    [
+      "Timeout",
+      84
+    ]
+  ],
   "droppedDeclarations": [],
   "exceptionSignatures": [],
-  "failureFamilies": [],
+  "failureFamilies": [
+    {
+      "family": "html/editing/dnd/selection/{N}.xhtml",
+      "count": 146,
+      "categories": {
+        "PixelMismatch": 146
+      },
+      "examples": [
+        "html/editing/dnd/selection/001.xhtml",
+        "html/editing/dnd/selection/009.xhtml",
+        "html/editing/dnd/selection/012.xhtml"
+      ]
+    },
+    {
+      "family": "css/CSS2/tables/table-anonymous-objects-{N}.xht",
+      "count": 118,
+      "categories": {
+        "PixelMismatch": 118
+      },
+      "examples": [
+        "css/CSS2/tables/table-anonymous-objects-023.xht",
+        "css/CSS2/tables/table-anonymous-objects-034.xht",
+        "css/CSS2/tables/table-anonymous-objects-056.xht"
+      ]
+    },
+    {
+      "family": "css/css-text/i18n/css{N}-text-line-break-baspglwj-{N}.html",
+      "count": 113,
+      "categories": {
+        "PixelMismatch": 113
+      },
+      "examples": [
+        "css/css-text/i18n/css3-text-line-break-baspglwj-008.html",
+        "css/css-text/i18n/css3-text-line-break-baspglwj-022.html",
+        "css/css-text/i18n/css3-text-line-break-baspglwj-035.html"
+      ]
+    },
+    {
+      "family": "css/css-break/out-of-flow-in-multicolumn-{N}.html",
+      "count": 109,
+      "categories": {
+        "PixelMismatch": 109
+      },
+      "examples": [
+        "css/css-break/out-of-flow-in-multicolumn-002.html",
+        "css/css-break/out-of-flow-in-multicolumn-015.html",
+        "css/css-break/out-of-flow-in-multicolumn-020.html"
+      ]
+    },
+    {
+      "family": "css/CSS2/backgrounds/background-{N}.xht",
+      "count": 97,
+      "categories": {
+        "PixelMismatch": 97
+      },
+      "examples": [
+        "css/CSS2/backgrounds/background-011.xht",
+        "css/CSS2/backgrounds/background-019.xht",
+        "css/CSS2/backgrounds/background-046.xht"
+      ]
+    },
+    {
+      "family": "css/CSS2/tables/border-conflict-style-{N}.xht",
+      "count": 88,
+      "categories": {
+        "PixelMismatch": 88
+      },
+      "examples": [
+        "css/CSS2/tables/border-conflict-style-003.xht",
+        "css/CSS2/tables/border-conflict-style-014.xht",
+        "css/CSS2/tables/border-conflict-style-021.xht"
+      ]
+    },
+    {
+      "family": "css/css-writing-modes/abs-pos-non-replaced-vlr-{N}.xht",
+      "count": 83,
+      "categories": {
+        "PixelMismatch": 83
+      },
+      "examples": [
+        "css/css-writing-modes/abs-pos-non-replaced-vlr-027.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-vlr-049.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-vlr-063.xht"
+      ]
+    },
+    {
+      "family": "html-ruby-extensions/html-ruby-{N}.html",
+      "count": 83,
+      "categories": {
+        "PixelMismatch": 83
+      },
+      "examples": [
+        "html-ruby-extensions/html-ruby-001.html",
+        "html-ruby-extensions/html-ruby-009.html",
+        "html-ruby-extensions/html-ruby-016.html"
+      ]
+    },
+    {
+      "family": "css/css-writing-modes/abs-pos-non-replaced-vrl-{N}.xht",
+      "count": 81,
+      "categories": {
+        "PixelMismatch": 81
+      },
+      "examples": [
+        "css/css-writing-modes/abs-pos-non-replaced-vrl-012.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-vrl-034.xht",
+        "css/css-writing-modes/abs-pos-non-replaced-vrl-056.xht"
+      ]
+    },
+    {
+      "family": "css/CSS2/tables/border-conflict-w-{N}.xht",
+      "count": 79,
+      "categories": {
+        "PixelMismatch": 79
+      },
+      "examples": [
+        "css/CSS2/tables/border-conflict-w-003.xht",
+        "css/CSS2/tables/border-conflict-w-014.xht",
+        "css/CSS2/tables/border-conflict-w-021.xht"
+      ]
+    }
+  ],
   "biggestProblemLimit": 3,
   "lowMatchThreshold": 50.0,
   "biggestProblems": [
     {
-      "kind": "IncompleteShards",
-      "tier": 0,
-      "severity": 8,
-      "impact": 8,
-      "title": "8 shard(s) did not complete",
-      "detail": "A whole shard's tests are unaccounted for \u2014 the pass/fail of that slice is unknown. shard 0 (exit 1), shard 1 (exit 1), shard 2 (exit 1), shard 3 (exit 1), shard 4 (exit 1), shard 5 (exit 1), shard 6 (exit 1), shard 7 (exit 1)."
+      "kind": "LowMatch",
+      "tier": 2,
+      "severity": 100.0,
+      "impact": 1,
+      "matchPercent": 0.0,
+      "relativeTestPath": "css/css-backgrounds/background-image-shared-stylesheet.html",
+      "title": "0.0% match \u2014 css/css-backgrounds/background-image-shared-stylesheet.html",
+      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / MissingContent)."
+    },
+    {
+      "kind": "LowMatch",
+      "tier": 2,
+      "severity": 100.0,
+      "impact": 1,
+      "matchPercent": 0.0,
+      "relativeTestPath": "css/css-color-adjust/rendering/dark-color-scheme/color-scheme-iframe-background-mismatch-opaque-cross-origin-002.sub.html",
+      "title": "0.0% match \u2014 css/css-color-adjust/rendering/dark-color-scheme/color-scheme-iframe-background-mismatch-opaque-cross-origin-002.sub.html",
+      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / MissingContent)."
+    },
+    {
+      "kind": "LowMatch",
+      "tier": 2,
+      "severity": 100.0,
+      "impact": 1,
+      "matchPercent": 0.0,
+      "relativeTestPath": "css/css-inline/empty-span-scroll.html",
+      "title": "0.0% match \u2014 css/css-inline/empty-span-scroll.html",
+      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / ReferenceOverlayExposed)."
     }
   ],
   "results": [
