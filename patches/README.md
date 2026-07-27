@@ -659,3 +659,39 @@ and doc-file env failures as at `0010` — **zero regressions**.
 `EsModuleLinker`, so nothing in the parent repo depends on or regresses without this patch. Driving the
 now-working engine module path from the bridge (and retiring the `EsModuleLinker`) is the remaining Phase-7
 bridge task — application wiring, not a `Broiler.JS` gap.
+
+---
+
+## 0025 — `Broiler.HTML`: keep text-bearing opacity/blend layers on the raster path
+
+**Symptom.** Any element with `0 < opacity < 1` (or a non-normal `mix-blend-mode`) that
+also contained text rendered as **nothing** — background, border and text all vanished —
+in the image renderer. The `css-view-transitions` capture family
+(`old-content-captures-opacity`, `old-content-is-empty-div`, …) is the most visible
+casualty, but the bug hits any faded/semi-transparent labelled box.
+
+**Cause.** `RGraphicsRasterBackend.IsRasterCompatibleItem` marked `DrawTextItem` /
+`DrawSvgTextItem` non-raster, so `IsRasterCompatibleLayer` classified any text-bearing
+opacity/blend layer as non-raster. `GraphicsAdapter.SaveOpacityLayer` /
+`SaveBlendLayer` then routed the layer to the `_canvasCompat` backend, which is a **stub**
+in the image renderer; and once a compat layer is active `CanUseRaster` is false for every
+enclosed draw, so the layer's `FillRect` background and text alike were discarded (the same
+failure mode the `SaveTransformLayer` comment already documents for the stub compat
+backend). The raster `BCanvas` in fact renders text via the text shaper — it is the primary
+path all non-layer text already uses (`DrawString` tries raster first, with a compat
+fallback) — so a text-bearing layer can stay on the raster path where `SaveOpacityLayer` /
+`SaveBlendLayer` composite it correctly (verified: a no-text opacity box already rendered;
+only the text-bearing one vanished).
+
+**Fix.** Mark `DrawTextItem` and `DrawSvgTextItem` raster-compatible in
+`IsRasterCompatibleItem`, so a text-bearing opacity/blend layer uses the raster
+`SaveOpacityLayer` / `SaveBlendLayer` and composites correctly. Verified locally: a
+`opacity: 0.75` box with text now renders semi-transparently (background + faded text)
+instead of vanishing.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships
+as `patches/0025-html-opacity-blend-text-raster-layer.patch` with the pointer left
+**unbumped** (pinned `d09b809`) and the submodule working tree reverted. There is **no
+main-repo fallback** — the paint/compositing pipeline lives entirely in `Broiler.HTML`, so
+the parent repo has no lever to route text-bearing opacity layers onto the raster canvas.
+The fix is renderer-visible only once the patch is applied and the pointer bumped.
