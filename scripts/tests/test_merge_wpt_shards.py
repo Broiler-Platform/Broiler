@@ -270,6 +270,59 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertIn("incomplete_shard_count=1", outputs)
             self.assertIn("create_issue=true", outputs)
 
+    def test_expected_shard_that_uploaded_nothing_is_flagged_incomplete(self) -> None:
+        # Two of the four dispatched shards reported; the other two uploaded
+        # neither a report nor a status file (their jobs were cancelled mid-run).
+        # Without --expected-shards those two vanish silently, dropping ~half of
+        # every merged count; with it they are surfaced as incomplete shards.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [self._failure("css/a/one.html", "PixelMismatch", "MissingContent")],
+            )
+            self._write_report(
+                shard_dir,
+                "shard-1.json",
+                1,
+                [self._failure("html/a/two.html", "PixelMismatch", "MissingContent")],
+            )
+
+            # Baseline: no expected set → the missing shards stay invisible.
+            blind = MODULE.merge(shard_dir)
+            self.assertEqual([], blind["incompleteShards"])
+
+            merged = MODULE.merge(shard_dir, expected_shard_indexes={0, 1, 2, 3})
+            self.assertEqual(
+                [
+                    {"shardIndex": 2, "exitCode": "missing"},
+                    {"shardIndex": 3, "exitCode": "missing"},
+                ],
+                merged["incompleteShards"],
+            )
+
+            markdown = MODULE.render_issue_markdown(merged, "https://example.test/run/1")
+            self.assertIn("Incomplete shards: 2", markdown)
+            self.assertIn("shard 2 (no report uploaded)", markdown)
+
+    def test_reported_expected_shard_is_not_flagged(self) -> None:
+        # A shard that both reported and left a status file is complete, and an
+        # expected set that matches the reports produces no incomplete shards.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [self._failure("css/a/one.html", "PixelMismatch", "MissingContent")],
+            )
+            self._write_status(shard_dir, shard_index=0, exit_code=1)
+
+            merged = MODULE.merge(shard_dir, expected_shard_indexes={0})
+            self.assertEqual([], merged["incompleteShards"])
+
     def test_merge_into_preserves_out_of_scope_entries(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             # Manifest lives outside the scanned shard dir, as in production

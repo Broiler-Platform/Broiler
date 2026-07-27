@@ -74,6 +74,7 @@ jobs:
     outputs:
       shard-matrix: ${{ steps.resolve.outputs.shard-matrix }}
       rerun-failed: ${{ steps.resolve.outputs.rerun-failed }}
+      expected-shards: ${{ steps.resolve.outputs.expected-shards }}
     steps:
       - uses: actions/checkout@v5
 
@@ -106,9 +107,16 @@ jobs:
           rerun_requested = os.environ["RERUN_FAILED_ONLY"].strip().lower() == "true"
           rerun_failed = rerun_requested and Path(os.environ["FAILED_TESTS_FILE"]).exists()
 
+          # The exact set of shard indexes this run dispatches. The merge step uses
+          # it to spot a dispatched shard that uploaded nothing (its job cancelled
+          # mid-run), which would otherwise be silently dropped from the merged
+          # totals rather than flagged as an incomplete shard.
+          expected_shards = ",".join(str(entry["shard-index"]) for entry in matrix)
+
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
               fh.write(f"shard-matrix={json.dumps(matrix)}\n")
               fh.write(f"rerun-failed={'true' if rerun_failed else 'false'}\n")
+              fh.write(f"expected-shards={expected_shards}\n")
           PY
 
   # ── Clone + cache the WPT checkout once (shared by all shards) ────────────
@@ -209,8 +217,13 @@ jobs:
             ARGS+=(--subset "$SUBSET")
           fi
           if [ "$RERUN_FAILED" = "true" ]; then
-            # Incremental: rerun only previously-failed tests, reusing cached refs.
-            ARGS+=(--rerun-json "$FAILED_TESTS_FILE" --skip-reference-generation)
+            # Incremental: rerun only the previously-failed tests. Reference
+            # generation is NOT skipped — run-wpt-tests.sh restricts it to just the
+            # rerun set (fast, and it guarantees those tests have references).
+            # Skipping generation here relied on a cached reference set that is not
+            # reliably present, which skipped every reran test as "missing
+            # reference image" and made the run meaningless.
+            ARGS+=(--rerun-json "$FAILED_TESTS_FILE")
           fi
           EXIT=0
           bash scripts/run-wpt-tests.sh "${ARGS[@]}" || EXIT=$?
@@ -251,7 +264,7 @@ jobs:
 
   # ── Merge shard results; file an issue when there are failures ───────────
   report:
-    needs: run
+    needs: [plan, run]
     if: always() && needs.run.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
@@ -281,6 +294,7 @@ jobs:
             --biggest-issue-md wpt-merged/biggest-issue.md \
             --problem-limit "$MOST_COMMON_PROBLEMS_LIMIT" \
             --biggest-problem-limit "$BIGGEST_PROBLEMS_LIMIT" \
+            --expected-shards "${{ needs.plan.outputs.expected-shards }}" \
             --github-output "$GITHUB_OUTPUT"
 
       - name: Publish merged summary
