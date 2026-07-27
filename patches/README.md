@@ -695,3 +695,37 @@ as `patches/0025-html-opacity-blend-text-raster-layer.patch` with the pointer le
 main-repo fallback** — the paint/compositing pipeline lives entirely in `Broiler.HTML`, so
 the parent repo has no lever to route text-bearing opacity layers onto the raster canvas.
 The fix is renderer-visible only once the patch is applied and the pointer bumped.
+
+---
+
+## 0026 — `Broiler.HTML`: rasterise non-uniform (axis-aligned) scale transforms
+
+**Symptom.** An element with a non-uniform axis-aligned scale — `scaleX()`, `scaleY()`,
+`scale(x, y)` where `x != y` — vanished entirely in the image renderer (background and
+content), the same failure mode as `0025` but for a different rejected transform.
+
+**Cause.** `BCanvas` mapped points with a single uniform `_scale`, so `TrySaveTransform`
+rejected any matrix with `a != d`. `GraphicsAdapter.SaveTransformLayer` then routed the
+transform to the `_canvasCompat` backend, which is a stub in the image renderer, and once a
+compat layer is active `CanUseRaster` is false for every enclosed draw — so the whole
+subtree was discarded.
+
+**Fix.** Give the canvas a per-axis scale (`_scaleX`/`_scaleY`). `TrySaveTransform` now
+accepts axis-aligned scale (`b == c == 0`), including non-uniform, folding `scaleX` into
+`_scaleX` and `scaleY` into `_scaleY`; the point/rect mapping, rounded-clip corner radii,
+and stroke width (geometric mean of the axis scales) use them. **Uniform scale sets both
+axes equal, so existing output is byte-identical** (verified: 205 render tests pass, the 6
+failures are all pre-existing — anchor-positioning and environmental — and fail identically
+with the patch reverted). Rotation and skew (non-zero `b`/`c`) still fall back; they need a
+full affine rasteriser the raster canvas does not have.
+
+**Pairs with the DOM side.** The parent-repo `element.animate()` + transform interpolation
+commit computes the interpolated `scale(x, y)`; this patch lets the renderer actually paint
+it, so animated and static non-uniform scales now render.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships
+as `patches/0026-html-nonuniform-scale-raster.patch` with the pointer left **unbumped**
+(pinned `d09b809`) and the submodule working tree reverted. It is **independent of `0025`**
+(different files — `BCanvas.cs` vs `RGraphicsRasterBackend.cs`) and the two apply cleanly in
+either order. No main-repo fallback is possible — the paint pipeline lives entirely in
+`Broiler.HTML`.
