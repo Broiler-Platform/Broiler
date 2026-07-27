@@ -21,18 +21,19 @@
 #
 # Each entry is "<submodule-dir>|<patch-file-relative-to-repo-root>".
 #
-# NOTE: PENDING_PATCHES is intentionally EMPTY — CI no longer applies any
-# submodule patches on top of the pinned pointers. The mechanism below is kept
-# intact so a future pending patch (one that cannot be pushed to its submodule
-# remote) can be re-enabled simply by adding its "<submodule-dir>|<patch>" entry
-# to the array; no other change is needed.
+# NOTE: entries here are applied on top of the pinned submodule pointers on the
+# WPT CI run. The mechanism is idempotent (a patch already contained in the
+# pinned pointer is skipped), so an entry stops applying automatically once a
+# maintainer lands the fix upstream and bumps the pointer.
 
 set -euo pipefail
 
 # Patches whose fix is not in the pinned submodule pointer and could not be
 # pushed to the submodule remote (push 403 → captured under patches/).
 # Empty by default — add entries here to have CI apply them again.
-PENDING_PATCHES=()
+PENDING_PATCHES=(
+  "Broiler.HTML|patches/0022-html-paint-contain-clip.patch"
+)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
