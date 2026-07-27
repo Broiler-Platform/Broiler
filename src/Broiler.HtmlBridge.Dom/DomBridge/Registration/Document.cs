@@ -116,6 +116,13 @@ public sealed partial class DomBridge
         // document.styleSheets — collection of stylesheet objects for main document
         document.FastAddProperty((KeyString)"styleSheets", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetStyleSheets(this, in a), "get styleSheets"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // document.adoptedStyleSheets — the live array of constructed stylesheets applied to the
+        // document (CSSOM). Readable (supports .push) and assignable (= [sheet, …]).
+        document.FastAddProperty((KeyString)"adoptedStyleSheets",
+            new JSFunction((in _) => AdoptedStyleSheetsArray(), "get adoptedStyleSheets"),
+            new JSFunction((in a) => { SetAdoptedStyleSheets(a.Length > 0 ? a[0] : JSUndefined.Value); return JSUndefined.Value; }, "set adoptedStyleSheets"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // document.open() — for main document
         document.FastAddValue((KeyString)"open", new JSFunction((in _) => document, "open", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
