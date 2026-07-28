@@ -111,9 +111,18 @@ internal static class FragmentTreeBuilder
         // <frame> render a separate document into their content box.  Load the
         // referenced document's HTML here; the image renderer rasterises it at
         // the element's used size and composites it over the box.
+        //
+        // visibility:hidden (or collapse) on the box — including the value
+        // inherited from an enclosing <frameset> — hides this replaced element,
+        // so its nested document must not paint.  Skipping the load here keeps
+        // the composited output empty without the image renderer needing to
+        // re-check visibility.  CSS inheritance does not cross the frame
+        // boundary, so a hidden host frame suppresses the whole nested document
+        // regardless of that document's own styles.
         string embeddedHtml = null;
         string embeddedBaseUrl = null;
-        if (svgContent == null && imgHandle == null && box.HtmlTag != null)
+        if (svgContent == null && imgHandle == null && box.HtmlTag != null
+            && string.Equals(style.Visibility, "visible", StringComparison.OrdinalIgnoreCase))
         {
             (embeddedHtml, embeddedBaseUrl) = TryLoadEmbeddedDocument(box);
         }
