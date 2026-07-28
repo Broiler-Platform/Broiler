@@ -920,3 +920,39 @@ pointer left **unbumped** (pinned `2dda437`) and the submodule working tree reve
 `Broiler.CSS/CssParser.cs` and is listed in `scripts/apply-pending-wpt-patches.sh`'s
 `PENDING_PATCHES`, so the WPT CI run applies it on the pinned pointer (idempotent — it reverts to
 *skip* once a maintainer lands it upstream and bumps the pointer).
+
+## 0032 — `Broiler.HTML`: paint CSS `box-shadow` (outset, sharp) for block and inline boxes
+
+**Symptom.** An element with `box-shadow` painted no shadow at all — e.g. WPT
+`css/css-view-transitions/inline-child-with-overflow-shadow`, whose target is an inline `<span>` with
+`box-shadow: -20px -20px yellow`, rendered the green box with no yellow shadow (and, combined with the
+`&nbsp;`-only inline box collapsing bug fixed parent-side in `Broiler.Layout`, rendered blank).
+
+**Cause.** `box-shadow` was carried on the computed style (`ComputedStyle.BoxShadow`) but the paint
+walker never consumed it — only `text-shadow` was painted. There was no `box-shadow` emission in
+either the block background phase or the inline-box decoration pass.
+
+**Fix.** Adds `ParseBoxShadow` (comma-separated layers: `offset-x offset-y blur? spread? colour?
+inset?`, colour defaulting to `currentColor`) and `EmitBoxShadow`, which emits each **outset** layer
+as a solid fill behind the element's border box — before the background, so a solid background covers
+the overlapping part and only the offset/spread halo shows. Hooked into both paint paths:
+`PaintFragmentBackgroundPhase` (in-flow blocks) and `EmitInlineBoxBackgroundAndBorder` (inline boxes,
+one fill per line fragment). Rounded boxes clip the shadow to the border radius grown by the spread.
+
+**Scope / limitations.** Sharp shadows only: the **blur** radius is not rendered (a blurred shadow
+paints its sharp offset+spread rectangle — an over-approximation) and **inset** layers are skipped
+(they paint inside the box, over the background — not yet modelled). This covers the common no-blur
+case; blur/inset remain follow-ups. No new IR type or renderer change was needed (reuses
+`FillRectItem`/`ClipItem`).
+
+**Verification.** `inline-child-with-overflow-shadow` now matches its Chromium reference (99.9%, via
+the full `Broiler.Wpt` runner against a locally generated golden); block, inline and spread shadows
+verified with `--render`. No regressions: the `Broiler.Cli.Tests` shadow/decoration/graphics-parity
+subset shows the same (pre-existing, environmental Skia-fallback) failures with and without the patch.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships as
+`patches/0032-html-box-shadow-paint.patch` with the pointer left **unbumped** (pinned `3b92c22`) and
+the submodule working tree reverted. It touches only `PaintWalker.{Parsing,Decorations,Stacking}.cs`
+and is listed in `scripts/apply-pending-wpt-patches.sh`'s `PENDING_PATCHES`, so the WPT CI run applies
+it on the pinned pointer (idempotent — it reverts to *skip* once a maintainer lands it upstream and
+bumps the pointer).
