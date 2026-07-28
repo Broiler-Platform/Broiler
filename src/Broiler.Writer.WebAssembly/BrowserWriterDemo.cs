@@ -127,7 +127,11 @@ internal sealed class BrowserWriterDemo : IDisposable
         _formatCodesView = new StandardFormatCodeView
         {
             PreferredSize = new BSize(760, 160),
-            Font = new BFontStyle("Cascadia Mono", 14),
+            // The view lays out on a fixed-width grid, so it needs a genuinely monospace face. Use the
+            // CSS generic "monospace" (the browser's default fixed-width font) rather than a named face
+            // like "Cascadia Mono" that may be absent and fall back to a proportional font — which would
+            // spread glyphs off the grid and open growing gaps between the codes.
+            Font = new BFontStyle("monospace", 14),
             Background = WriterPalette.FormatCodesSurface,
             Foreground = WriterPalette.Title,
             InlineCodeForeground = WriterPalette.FormatCodesInline,

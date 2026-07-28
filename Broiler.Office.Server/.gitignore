@@ -1,3 +1,12 @@
 # The web root is generated: the Broiler Writer WASM bundle is vendored here from the client's
 # published output by the VendorWriterClientForRun MSBuild target (see the .csproj). Never commit it.
 /wwwroot/
+
+# Publish sinks. Prefer publishing out of the project tree, but ignore these in case a publish lands
+# here — see the matching DefaultItemExcludes in the .csproj (a stray in-tree publish would otherwise
+# be re-swept into the next publish via the Web SDK's **/*.json content glob).
+/artifacts/
+/publish/
+/linux-*/
+/win-*/
+/osx-*/

@@ -22,6 +22,10 @@
             padding: 7px 14px; border-radius: 999px; font-weight: 600;
             background: var(--status-bg); color: var(--status-fg); box-shadow: 0 4px 16px rgba(15, 30, 50, .18);
         }
+        /* The ID rule above sets an explicit `display`, which outranks the UA `[hidden]` rule; restore
+           it so `statusLine.hidden = true` (set once the managed UI takes over) actually hides the
+           loading pill instead of leaving it floating over the canvas. */
+        #writer-status[hidden] { display: none; }
         #writer-status[data-state="failed"] { background: #fee2e2; color: #991b1b; }
         #writer-host {
             position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--host-bg);

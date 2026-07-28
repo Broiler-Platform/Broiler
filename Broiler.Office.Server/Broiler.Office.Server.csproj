@@ -30,6 +30,15 @@
          web assets pipeline re-fingerprint or rewrite it. -->
     <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
 
+    <!-- Keep publish outputs from being re-swept into the next publish. The Web SDK's default
+         content glob is **/*.json, so any publish folder left inside the project tree (the
+         artifacts/ sink below, a stray publish/, or a RID folder like linux-arm64/) has its
+         *.deps.json / *.runtimeconfig.json / appsettings.json picked up as content and vendored
+         back in — dragging the whole prior output tree along and bloating/breaking the new one.
+         bin/ and obj/ are already excluded by the SDK; exclude the publish sinks too. The
+         RID-named folders match the default `dotnet publish -r <rid>` output when no -o is given. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);artifacts\**;publish\**;linux-*\**;win-*\**;osx-*\**</DefaultItemExcludes>
+
     <WriterClientProject>..\src\Broiler.Writer.WebAssembly\Broiler.Writer.WebAssembly.csproj</WriterClientProject>
     <!-- Absolute: this PublishDir is handed to the client's build, where a relative path would resolve
          against the client project directory rather than this one. BaseIntermediateOutputPath (obj\)
@@ -49,24 +58,29 @@
              Properties="Configuration=$(Configuration);PublishDir=$(WriterClientStage);RunAOTCompilation=false" />
   </Target>
 
-  <!-- Dev / `dotnet run`: vendor the staged bundle into this project's web root so Kestrel serves it. -->
+  <!-- Dev / `dotnet run`: vendor the staged bundle into this project's web root so Kestrel serves it.
+       Purge the destination web root first: the mono-wasm runtime is content-hashed, so a leftover
+       asset from a prior build (e.g. an older Broiler.Graphics.WebAssembly.<hash>.wasm reachable via a
+       stale, browser-cached index.html/dotnet.<hash>.js) can be loaded against the freshly-vendored,
+       stable-named broiler.graphics.webassembly.js — and a replay op-stream layout change then desyncs
+       ("Unknown replay op …"). A clean vendor guarantees the served tree is exactly one consistent set. -->
   <Target Name="VendorWriterClientForRun" DependsOnTargets="PublishWriterClient" BeforeTargets="Build">
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\wwwroot" />
     <ItemGroup>
       <_WriterClientFile Include="$(WriterClientStage)wwwroot\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(_WriterClientFile)"
-          DestinationFiles="@(_WriterClientFile->'$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
+          DestinationFiles="@(_WriterClientFile->'$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
 
-  <!-- Publish: vendor the staged bundle into the publish output web root. -->
+  <!-- Publish: vendor the staged bundle into the publish output web root (clean-vendored, as above). -->
   <Target Name="VendorWriterClientForPublish" DependsOnTargets="PublishWriterClient" AfterTargets="Publish">
+    <RemoveDir Directories="$(PublishDir)wwwroot" />
     <ItemGroup>
       <_WriterClientPublishFile Include="$(WriterClientStage)wwwroot\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(_WriterClientPublishFile)"
-          DestinationFiles="@(_WriterClientPublishFile->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
+          DestinationFiles="@(_WriterClientPublishFile->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
 
 </Project>

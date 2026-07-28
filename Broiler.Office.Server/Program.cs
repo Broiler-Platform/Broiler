@@ -41,6 +41,25 @@ var staticFiles = new StaticFileOptions
     ContentTypeProvider = contentTypes,
     ServeUnknownFileTypes = true,
     DefaultContentType = "application/octet-stream",
+
+    // Cache versioning for the vendored WebAssembly bundle. The SDK content-fingerprints every runtime
+    // asset (dotnet.<hash>.js, m.<hash>.js, *.<hash>.wasm): the URL itself carries the version, so the
+    // bytes behind a given URL never change and the asset can be cached immutably (a new build changes
+    // the hash, hence the URL, and the browser fetches fresh). The two entry points keep a *stable* URL
+    // across releases — index.html (the shell) and broiler.graphics.webassembly.js (the stable-named
+    // Canvas replay module) — so they are marked no-cache and revalidated on every load. Without that, a
+    // browser can pair a cached shell/replay module with a newer fingerprinted runtime and desync the
+    // replay op stream (the "Unknown replay op …" failure).
+    OnPrepareResponse = context =>
+    {
+        string name = context.File.Name;
+        bool stableEntryPoint =
+            name.Equals("index.html", StringComparison.OrdinalIgnoreCase) ||
+            name.Equals("broiler.graphics.webassembly.js", StringComparison.OrdinalIgnoreCase);
+        context.Context.Response.Headers.CacheControl = stableEntryPoint
+            ? "no-cache"
+            : "public, max-age=31536000, immutable";
+    },
 };
 
 // Serve the vendored Writer bundle: its transformed index.html references content-hashed physical

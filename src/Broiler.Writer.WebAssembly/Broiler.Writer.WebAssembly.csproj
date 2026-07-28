@@ -16,6 +16,7 @@
          a hosted publish through Broiler.Office.Server (BOSS), where the pubxml profile does not
          apply. Full AOT still layers on top with -p:RunAOTCompilation=true. -->
     <PublishTrimmed>true</PublishTrimmed>
+	  <AssemblyVersion>1.0.0.1</AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>

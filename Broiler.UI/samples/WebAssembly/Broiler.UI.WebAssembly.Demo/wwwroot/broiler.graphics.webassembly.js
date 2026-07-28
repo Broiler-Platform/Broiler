@@ -45,6 +45,25 @@ function color(argb) {
     return `rgba(${r},${g},${b},${a})`;
 }
 
+// CSS generic font families. These are keywords, not real face names, so they must
+// reach `ctx.font` unquoted (quoting them turns "monospace" into a lookup for a face
+// literally named "monospace", which the browser then can't find).
+const CSS_GENERIC_FAMILIES = new Set([
+    'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui',
+    'ui-serif', 'ui-sans-serif', 'ui-monospace', 'ui-rounded', 'math', 'emoji', 'fangsong',
+]);
+
+// Resolve a requested Broiler font-family name to a Canvas `ctx.font` family list.
+// A generic keyword passes through as-is; a specific face is quoted and given a
+// sans-serif backstop so an unavailable face still renders. Empty falls back to
+// sans-serif, matching the pre-family-plumbing behavior.
+function cssFontFamily(name) {
+    const family = (name || '').trim();
+    if (family === '') return 'sans-serif';
+    if (CSS_GENERIC_FAMILIES.has(family.toLowerCase())) return family;
+    return `"${family.replace(/["\\]/g, '\\$&')}", sans-serif`;
+}
+
 function sizeCanvas(backingWidth, backingHeight, cssWidth, cssHeight) {
     const canvas = state.canvas;
     if (canvas.width !== backingWidth) canvas.width = backingWidth;
@@ -155,7 +174,8 @@ export function presentFrame(stream, streamLength, strings, backingWidth, backin
                 const fontPx = stream[i++], weight = stream[i++], italic = stream[i++];
                 ctx.fillStyle = color(stream[i++]);
                 const text = strings[stream[i++]];
-                ctx.font = `${italic ? 'italic ' : ''}${weight} ${fontPx}px sans-serif`;
+                const family = cssFontFamily(strings[stream[i++]]);
+                ctx.font = `${italic ? 'italic ' : ''}${weight} ${fontPx}px ${family}`;
                 ctx.textBaseline = 'alphabetic';
                 ctx.textAlign = 'left';
                 ctx.fillText(text, bx, by);

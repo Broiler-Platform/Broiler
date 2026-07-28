@@ -51,13 +51,37 @@ Kestrel listens on `https://localhost:7300` and `http://localhost:5300` (see
 
 ## Publish (single self-contained bundle)
 
+Publish the **project file**, not the directory. The directory also contains
+[`Broiler.Office.Server.slnx`](Broiler.Office.Server.slnx), and `dotnet publish` prefers the solution —
+which fans the single-file / RID / self-contained flags out to the two WebAssembly projects in the
+solution (`Broiler.Writer.WebAssembly`, `Broiler.Graphics.WebAssembly`), and those cannot be
+single-file-published (`MSB4057` / `NETSDK1099`). Naming the `.csproj` avoids that.
+
+Framework-dependent (portable, needs the .NET runtime on the target):
+
 ```powershell
-dotnet publish Broiler.Office.Server -c Release -o artifacts/boss
-dotnet artifacts/boss/Broiler.Office.Server.dll
+dotnet publish Broiler.Office.Server/Broiler.Office.Server.csproj -c Release -o out/boss
 ```
 
-The publish output is one deployable folder whose `wwwroot/` holds the complete, trimmed Writer bundle
-— it boots the Writer over Kestrel with no other dependencies.
+Single-file, self-contained, for a specific target (no .NET runtime needed on the target) — e.g.
+`linux-arm64` (swap the RID for `linux-x64`, `win-x64`, `osx-arm64`, …):
+
+```powershell
+dotnet publish Broiler.Office.Server/Broiler.Office.Server.csproj -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true -o out/boss-linux-arm64
+```
+
+Prefer an output path **outside** the project tree (`out/…` above, or an absolute path). A publish
+that lands inside the project directory is re-swept into the next publish via the Web SDK's `**/*.json`
+content glob; the `.csproj`/`.gitignore` guard the usual sinks (`artifacts/`, `publish/`, RID folders),
+but out-of-tree sidesteps the whole class.
+
+The output is one deployable folder: the single executable (its `.pdb`, `appsettings*.json`) plus a
+`wwwroot/` holding the complete, trimmed Writer bundle — it boots the Writer over Kestrel with no other
+dependencies. Run it directly (on a matching linux-arm64 host):
+
+```bash
+./out/boss-linux-arm64/Broiler.Office.Server
+```
 
 ## Adding more Office apps
 
