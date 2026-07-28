@@ -51,4 +51,32 @@ public class MetaColorSchemeRenderTests
     public void Http_Equiv_Color_Scheme_Is_Not_A_Color_Scheme_Meta() =>
         // Only name=color-scheme counts; an http-equiv of the same token does not.
         Assert.False(IsDarkCanvas("<!DOCTYPE html><meta http-equiv=\"color-scheme\" content=\"dark\"><title>x</title>"));
+
+    [Fact]
+    public void Meta_With_Both_HttpEquiv_And_Name_Still_Applies_ColorScheme() =>
+        // WPT http-equiv-and-name-1: a meta may carry both http-equiv and name; the
+        // name=color-scheme metadata is still processed, so content=dark paints the dark canvas.
+        Assert.True(IsDarkCanvas(
+            "<!DOCTYPE html><meta http-equiv=\"content-language\" name=\"color-scheme\" content=\"dark\">"));
+
+    [Fact]
+    public void First_Valid_Meta_Color_Scheme_Applies_Skipping_Invalid_Ones() =>
+        // WPT meta-color-scheme-first-valid-applies: empty and comma-separated (invalid) values are
+        // skipped; content="dark" is the first *valid* value in tree order, so the canvas is dark —
+        // not "light" from the later meta, nor "light,dark" (invalid, comma) from the earlier one.
+        Assert.True(IsDarkCanvas(
+            "<!DOCTYPE html>"
+            + "<meta name=\"color-scheme\">"
+            + "<meta name=\"color-scheme\" content>"
+            + "<meta name=\"color-scheme\" content=\"\">"
+            + "<meta name=\"color-scheme\" content=\"light,dark\">"
+            + "<meta name=\"color-scheme\" content=\"dark\">"
+            + "<meta name=\"color-scheme\" content=\"light\">"));
+
+    [Fact]
+    public void Comma_Separated_Meta_Color_Scheme_Is_Invalid_And_Falls_Back_To_Light() =>
+        // "light,dark" is not a valid color-scheme value (comma), so it is ignored: no valid meta
+        // remains and the canvas stays the light default.
+        Assert.False(IsDarkCanvas(
+            "<!DOCTYPE html><meta name=\"color-scheme\" content=\"light,dark\"><title>x</title>"));
 }

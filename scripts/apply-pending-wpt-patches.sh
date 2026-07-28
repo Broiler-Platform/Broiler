@@ -32,6 +32,8 @@ set -euo pipefail
 # pushed to the submodule remote (push 403 → captured under patches/).
 # Empty by default — add entries here to have CI apply them again.
 PENDING_PATCHES=(
+  "Broiler.HTML|patches/0029-html-root-filter-canvas-background.patch"
+  "Broiler.HTML|patches/0030-html-css-feflood-filter-reference.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

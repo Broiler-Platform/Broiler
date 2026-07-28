@@ -797,3 +797,80 @@ tree with `0025`+`0026` already applied, so apply them in numeric order (`0025` 
 `FilterItem`/`RestoreFilterItem` IR types, **pushed directly** to the parent) and on `0027`
 (`Broiler.Graphics`). No main-repo fallback is possible — the paint pipeline lives entirely in
 `Broiler.HTML`, so filters render only once the patch is applied and the pointer bumped.
+
+## 0029 — `Broiler.HTML`: apply the root element filter to the whole canvas background
+
+**Symptom.** `filter: invert(100%)` on the `<html>` element with the page background on
+`<body>` rendered **white** instead of black (WPT
+`css/filter-effects/hidpi-invert-filter-background`, 0.0 % match / MissingContent). More
+generally, a root filter inverted the canvas only when the background sat on `<html>` itself and
+was a solid *colour*; a background propagated up from `<body>` (the common case, CSS2.1 §14.2),
+and any background *image*, escaped the filter entirely.
+
+**Cause.** `PaintWalker.EmitCanvasBackground` tinted only the canvas fill **colour** via an
+ad-hoc `ApplyRootFilter`, and it read the filter from whichever element *supplied* the
+background. When `<html>` has no background of its own, the canvas background propagates from
+`<body>`, so the colour source was `<body>` — which carries no filter (it lives on `<html>`) —
+and the invert was skipped. Background images were never routed through `ApplyRootFilter` at all.
+
+**Fix.** Wrap the entire canvas background emission (fill, gradient, and image layers) in a
+single `FilterItem`/`RestoreFilterItem` layer, using the **document root (html) element's**
+filter — resolved independently of the background source — with a fallback to a filter set
+directly on the propagating element (e.g. `<body>`). This reuses the same colour-matrix filter
+layer the `0027`/`0028` work added, so `invert`/`sepia`/`grayscale`/`brightness`/`contrast`/
+`saturate`/`opacity`/`hue-rotate` all apply uniformly to the canvas colour **and** image. The
+ad-hoc `ApplyRootFilter` colour maths is removed in favour of the shared layer.
+
+**Verified** end-to-end with `Broiler.Wpt --render`, patch applied: the test renders a solid
+black viewport, **100 %** pixel-identical to its `hidpi-invert-filter-background-ref.html`
+render (solid black); reverted, it renders solid white (0 %). Regression-checked that the
+background-on-`<html>` cases are unchanged (`filter:invert(100%)`/`invert(1)` over `#000` → white;
+over white → black), and the full `~Filter`/`~Compositing`/`~Canvas`/`~Background`/`~Gradient`/
+`~Acid3`/`~Paint` `Broiler.Cli.Tests` subset shows the **same 11 pre-existing/environmental
+failures** (Acid3 image-capture/score, Skia graphics-abstraction, `background-clip:border-area`,
+`bgblend` shorthand) with and without the change — no new failures.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships as
+`patches/0029-html-root-filter-canvas-background.patch` with the pointer left **unbumped**
+(pinned `3b92c22`) and the submodule working tree reverted. It is **independent** of the other
+pending patches (it touches only `PaintWalker.CanvasBackground.cs`, no overlap with the
+`BCanvas.cs`/`RGraphicsRasterBackend.cs` patches), and it depends only on the filter-layer
+primitives already present in the pinned pointer (`0027`/`0028` are applied upstream). It is
+listed in `scripts/apply-pending-wpt-patches.sh`'s `PENDING_PATCHES`, so the WPT CI run applies
+it on top of the pinned pointer (idempotent — it reverts to *skip* once a maintainer lands it
+upstream and bumps the pointer). **No main-repo fallback** is possible — the canvas paint
+pipeline lives entirely in `Broiler.HTML`, so the fix renders only once the patch is applied.
+
+## 0030 — `Broiler.HTML`: apply a CSS `filter: url(#id)` feFlood reference as a solid fill
+
+**Symptom.** A `<div style="filter: url(#f)">` referencing an SVG `<filter>` whose sole primitive is
+`<feFlood flood-color="green">` rendered the div's own (red) background instead of the flood colour
+(WPT `css/filter-effects/svg-filter-primitive-units-user-space`, 91.5 % → the two HTML boxes were red
+where the reference is a green box).
+
+**Cause.** `PaintWalker`'s filter gate (`HasSupportedFilterFunction`) only recognises the colour-matrix
+functions (`invert`/`sepia`/…); a `url(...)` reference fell through, so no filter was applied and the
+element painted normally.
+
+**Fix.** In `PaintFragment`, before the transform/opacity/filter layers, a `filter: url(#id)` that
+resolves — via the document-wide `Broiler.Layout` `SvgFilterTable` — to a modelled `feFlood` filter
+emits a `FillRectItem` of the flood colour over the element's border box and returns, suppressing the
+element's own background/content (feFlood ignores its source). It is emitted **outside** the element's
+CSS transform because the flood is produced in the element's user space, not its transformed box —
+the WPT test matches a `translate(10px,10px)` filtered `<div>` against an *untranslated* green box, so
+the fill must sit at the pre-transform border box.
+
+**Dependency.** This patch calls `Broiler.Layout.IR.SvgFilterTable` (a new **public** type pushed
+directly to the parent, together with the `SvgRenderer` feFlood support for SVG *shapes* — the
+`filter="url(#id)"` attribute — and the `FragmentTreeBuilder.Build` pass that populates the table from
+every `<svg>` subtree). The SVG-shape half of the fix is entirely parent-side and needs no patch;
+only the CSS `filter: url()` paint decision lives in `Broiler.HTML`. A parent-side unit test
+(`SvgFloodFilterTests`) covers the shape path; the CSS-`filter` path is exercised by the WPT reftest
+on the CI run.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships as
+`patches/0030-html-css-feflood-filter-reference.patch` with the pointer left **unbumped** (pinned
+`3b92c22`) and the submodule working tree reverted. It is **independent** of `0029` (different file,
+`PaintWalker.Stacking.cs`) and is listed in `scripts/apply-pending-wpt-patches.sh`'s
+`PENDING_PATCHES`, so the WPT CI run applies it on the pinned pointer (idempotent — it reverts to
+*skip* once a maintainer lands it upstream and bumps the pointer).

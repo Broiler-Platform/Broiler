@@ -211,10 +211,11 @@ public sealed partial class DomBridge
     /// <para>
     /// Author CSS wins: the meta is applied only when the root declares no <c>color-scheme</c> of
     /// its own, so <c>:root { color-scheme: light }</c> beside <c>&lt;meta … content=dark&gt;</c>
-    /// stays light. The first meta in tree order with a non-empty <c>content</c> and no
-    /// <c>http-equiv</c> supplies the value; the renderer's own token parsing then selects dark or
-    /// light (an unrecognised value contributes neither and falls back to light, matching the
-    /// invalid-value cases in the spec's test suite). Written to the baked overlay, so it reaches
+    /// stays light. The first meta in tree order with a valid <c>content</c> value supplies the
+    /// value (see <see cref="FindMetaColorScheme"/>); the renderer's own token parsing then selects
+    /// dark or light (an unrecognised but syntactically valid value contributes neither and falls
+    /// back to light, matching the invalid-value cases in the spec's test suite). Written to the
+    /// baked overlay, so it reaches
     /// the renderer and the serialized <c>style=</c> without polluting the script-observable inline
     /// style.
     /// </para>
@@ -238,8 +239,17 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// The <c>content</c> of the first <c>&lt;meta name="color-scheme"&gt;</c> in tree order that
-    /// has a non-empty <c>content</c> and no <c>http-equiv</c>, or <c>null</c> when there is none.
+    /// The <c>content</c> of the first <c>&lt;meta name="color-scheme"&gt;</c> in tree order whose
+    /// <c>content</c> is a valid CSS <c>&lt;'color-scheme'&gt;</c> value, or <c>null</c> when there
+    /// is none.
+    /// <para>
+    /// A meta contributes when its <c>name</c> is <c>color-scheme</c>, even if it also carries an
+    /// <c>http-equiv</c> attribute (WPT <c>http-equiv-and-name-1</c>): the name metadata is still
+    /// processed. A meta whose <c>content</c> is absent, empty, or not a valid color-scheme value
+    /// (e.g. the comma-separated <c>light,dark</c>) is skipped, so selection continues to the first
+    /// meta that <em>does</em> parse — "first valid applies" (WPT
+    /// <c>meta-color-scheme-first-valid-applies</c>).
+    /// </para>
     /// </summary>
     private static string? FindMetaColorScheme(DomElement root)
     {
@@ -247,18 +257,40 @@ public sealed partial class DomBridge
         {
             if (!element.TagName.Equals("meta", StringComparison.OrdinalIgnoreCase))
                 continue;
-            if (HasAttr(element, "http-equiv"))
-                continue;
             if (!TryGetAttribute(element, "name", out var name) ||
                 !name.Trim().Equals("color-scheme", StringComparison.OrdinalIgnoreCase))
                 continue;
             if (TryGetAttribute(element, "content", out var content) &&
-                !string.IsNullOrWhiteSpace(content))
+                IsValidColorSchemeValue(content))
             {
                 return content.Trim();
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="content"/> is a valid CSS <c>&lt;'color-scheme'&gt;</c> value:
+    /// a whitespace-separated list of CSS identifiers (<c>normal</c>, <c>light</c>, <c>dark</c>,
+    /// <c>only</c>, or a custom ident). Any other character — most notably a comma, as in the
+    /// invalid <c>light,dark</c> — makes the value unparseable, so the meta is ignored per CSS
+    /// Color Adjust §2.
+    /// </summary>
+    private static bool IsValidColorSchemeValue(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return false;
+
+        var tokens = content.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length == 0)
+            return false;
+
+        foreach (var token in tokens)
+            foreach (var ch in token)
+                if (!(char.IsLetterOrDigit(ch) || ch == '-' || ch == '_' || ch > 0x7F))
+                    return false;
+
+        return true;
     }
 
     /// <summary>

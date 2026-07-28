@@ -16,7 +16,26 @@ internal static class FragmentTreeBuilder
     /// Builds a <see cref="Fragment"/> tree from the given root <see cref="CssBox"/>.
     /// Should be called after <c>PerformLayout</c> has completed.
     /// </summary>
-    public static Fragment Build(CssBox root) => BuildFragment(root, parentHasTransform: false);
+    public static Fragment Build(CssBox root)
+    {
+        // Reset and repopulate the document-wide SVG filter table for this render pass, so a
+        // `filter="url(#id)"` reference resolves even when the `<filter>` lives in a different
+        // `<svg>` subtree than the referencing shape.
+        SvgFilterTable.Reset();
+        var tree = BuildFragment(root, parentHasTransform: false);
+        CollectSvgFilters(tree);
+        return tree;
+    }
+
+    /// <summary>Walks the fragment tree and registers every modelled SVG filter (see
+    /// <see cref="SvgFilterTable"/>) from each fragment's serialized SVG content.</summary>
+    private static void CollectSvgFilters(Fragment fragment)
+    {
+        if (!string.IsNullOrEmpty(fragment.SvgContent))
+            SvgRenderer.CollectFloodFilters(fragment.SvgContent);
+        foreach (var child in fragment.Children)
+            CollectSvgFilters(child);
+    }
 
     private static Fragment BuildFragment(CssBox box, bool parentHasTransform)
     {
@@ -111,9 +130,18 @@ internal static class FragmentTreeBuilder
         // <frame> render a separate document into their content box.  Load the
         // referenced document's HTML here; the image renderer rasterises it at
         // the element's used size and composites it over the box.
+        //
+        // visibility:hidden (or collapse) on the box — including the value
+        // inherited from an enclosing <frameset> — hides this replaced element,
+        // so its nested document must not paint.  Skipping the load here keeps
+        // the composited output empty without the image renderer needing to
+        // re-check visibility.  CSS inheritance does not cross the frame
+        // boundary, so a hidden host frame suppresses the whole nested document
+        // regardless of that document's own styles.
         string embeddedHtml = null;
         string embeddedBaseUrl = null;
-        if (svgContent == null && imgHandle == null && box.HtmlTag != null)
+        if (svgContent == null && imgHandle == null && box.HtmlTag != null
+            && string.Equals(style.Visibility, "visible", StringComparison.OrdinalIgnoreCase))
         {
             (embeddedHtml, embeddedBaseUrl) = TryLoadEmbeddedDocument(box);
         }

@@ -86,6 +86,29 @@ internal static partial class SvgRenderer
         foreach (Match m in ParseRectRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
+
+            // A rect referencing an feFlood filter is replaced by a solid fill of the flood colour
+            // over the filter region — the default objectBoundingBox region is the shape's bounding
+            // box expanded by -10%/+10% on each side (x-10%, y-10%, w+20%, h+20%).
+            if (TryResolveFloodFilter(attrs, out var floodColor))
+            {
+                float bx = GetFloat(attrs, "x"), by = GetFloat(attrs, "y");
+                float bw = GetFloat(attrs, "width"), bh = GetFloat(attrs, "height");
+                float fx = bx - 0.1f * bw, fy = by - 0.1f * bh, fw = 1.2f * bw, fh = 1.2f * bh;
+                items.Add(new DrawSvgRectItem
+                {
+                    Bounds = bounds,
+                    X = fx * sx + tx,
+                    Y = fy * sy + ty,
+                    Width = fw * sx,
+                    Height = fh * sy,
+                    Fill = floodColor,
+                    Stroke = BColor.Empty,
+                    StrokeWidth = 0,
+                });
+                continue;
+            }
+
             items.Add(new DrawSvgRectItem
             {
                 Bounds = bounds,
@@ -250,6 +273,53 @@ internal static partial class SvgRenderer
         return points;
     }
 
+    /// <summary>
+    /// Scans one <c>&lt;svg&gt;</c> string for <c>&lt;filter&gt;</c> definitions whose sole modelled
+    /// primitive is an <c>&lt;feFlood&gt;</c>, and records each under its <c>id</c> in the document-wide
+    /// <see cref="SvgFilterTable"/>. Called for every SVG-bearing fragment before painting so a
+    /// <c>filter="url(#id)"</c> reference resolves even when the filter lives in another
+    /// <c>&lt;svg&gt;</c> subtree.
+    /// </summary>
+    internal static void CollectFloodFilters(string svgXml)
+    {
+        if (string.IsNullOrEmpty(svgXml) || svgXml.IndexOf("<filter", StringComparison.OrdinalIgnoreCase) < 0)
+            return;
+
+        foreach (Match fm in FilterBlockRegex().Matches(svgXml))
+        {
+            var filterAttrs = ParseAttributes(fm.Groups[1].Value);
+            if (!filterAttrs.TryGetValue("id", out var id) || string.IsNullOrEmpty(id))
+                continue;
+
+            var body = fm.Groups[2].Value;
+            var flood = FeFloodRegex().Match(body);
+            if (!flood.Success)
+                continue;
+
+            var floodAttrs = ParseAttributes(flood.Groups[1].Value);
+            var color = GetColor(floodAttrs, "flood-color", BColor.Black);
+            if (floodAttrs.TryGetValue("flood-opacity", out var opStr)
+                && float.TryParse(opStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var op))
+                color = BColor.FromArgb((int)(Math.Clamp(op, 0f, 1f) * color.A), color.R, color.G, color.B);
+
+            SvgFilterTable.AddFlood(id, color);
+        }
+    }
+
+    /// <summary>
+    /// If <paramref name="attrs"/> carries a <c>filter="url(#id)"</c> that resolves to a modelled
+    /// flood filter, returns its colour. Such a filter replaces the shape with a solid fill of that
+    /// colour over the filter region.
+    /// </summary>
+    private static bool TryResolveFloodFilter(Dictionary<string, string> attrs, out BColor color)
+    {
+        color = default;
+        if (!attrs.TryGetValue("filter", out var filterRef) || string.IsNullOrEmpty(filterRef))
+            return false;
+        var id = SvgFilterTable.ExtractUrlReferenceId(filterRef);
+        return id != null && SvgFilterTable.TryGetFlood(id, out var flood) && (color = flood.Color).A > 0;
+    }
+
     private static Dictionary<string, string> ParseAttributes(string attrStr)
     {
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -382,6 +452,12 @@ internal static partial class SvgRenderer
 
     [GeneratedRegex(@"<\s*textpath\b", RegexOptions.IgnoreCase)]
     private static partial Regex ParseTextPathRegex();
+
+    [GeneratedRegex(@"<filter\b([^>]*)>(.*?)</filter>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex FilterBlockRegex();
+
+    [GeneratedRegex(@"<feflood\b([^>]*?)/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex FeFloodRegex();
 
     [GeneratedRegex(@"([\w\-]+)\s*=\s*""([^""]*)""")]
     private static partial Regex ParseAttrRegex();
