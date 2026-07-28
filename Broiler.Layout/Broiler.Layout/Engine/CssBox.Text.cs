@@ -30,6 +30,17 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         textBox.Text = (text ?? string.Empty).AsMemory();
     }
 
+    // CSS Text 3 §White Space Processing: only these five characters are
+    // collapsible "white space" for the purpose of white-space collapsing and
+    // soft-wrap opportunities — space, tab, line feed, carriage return, form
+    // feed. Crucially this excludes U+00A0 NO-BREAK SPACE (&nbsp;) and the other
+    // Unicode space separators (U+2000–U+200A, U+202F, U+205F, U+3000, U+1680, …),
+    // which are NOT collapsible and carry their own advance width. `char.IsWhiteSpace`
+    // returns true for all of those, so using it here collapsed a `&nbsp;`-only inline
+    // box away entirely — dropping its background and box-shadow (WPT
+    // css/css-view-transitions/inline-child-with-overflow-shadow and any nbsp-only span).
+    private static bool IsCssWhiteSpace(char c) => c is ' ' or '\t' or '\n' or '\r' or '\f';
+
     public void ParseToWords()
     {
         Words.Clear();
@@ -100,7 +111,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             var endIdx = startIdx;
 
-            while (endIdx < textSpan.Length && char.IsWhiteSpace(textSpan[endIdx]) && textSpan[endIdx] != '\n')
+            while (endIdx < textSpan.Length && IsCssWhiteSpace(textSpan[endIdx]) && textSpan[endIdx] != '\n')
                 endIdx++;
 
             if (endIdx > startIdx)
@@ -140,7 +151,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // &#xFEFF;) must not be split mid-reference — then emit one word per
                 // decoded code point (surrogate pairs stay intact).
                 endIdx = startIdx;
-                while (endIdx < textSpan.Length && !char.IsWhiteSpace(textSpan[endIdx]))
+                while (endIdx < textSpan.Length && !IsCssWhiteSpace(textSpan[endIdx]))
                     endIdx++;
 
                 if (endIdx > startIdx)
@@ -149,8 +160,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     if (transform != null)
                         runText = transform.Transform(runText);
 
-                    bool leadingSpace = !preserveSpaces && startIdx > 0 && Words.Count == 0 && char.IsWhiteSpace(textSpan[startIdx - 1]);
-                    bool trailingSpace = !preserveSpaces && endIdx < textSpan.Length && char.IsWhiteSpace(textSpan[endIdx]);
+                    bool leadingSpace = !preserveSpaces && startIdx > 0 && Words.Count == 0 && IsCssWhiteSpace(textSpan[startIdx - 1]);
+                    bool trailingSpace = !preserveSpaces && endIdx < textSpan.Length && IsCssWhiteSpace(textSpan[endIdx]);
 
                     for (int i = 0; i < runText.Length;)
                     {
@@ -172,7 +183,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             {
                 endIdx = startIdx;
 
-                while (endIdx < textSpan.Length && !char.IsWhiteSpace(textSpan[endIdx]) && textSpan[endIdx] != '-' && !CommonUtils.IsAsianCharecter(textSpan[endIdx]))
+                while (endIdx < textSpan.Length && !IsCssWhiteSpace(textSpan[endIdx]) && textSpan[endIdx] != '-' && !CommonUtils.IsAsianCharecter(textSpan[endIdx]))
                     endIdx++;
 
                 if (endIdx < textSpan.Length && (textSpan[endIdx] == '-' || CommonUtils.IsAsianCharecter(textSpan[endIdx])))
@@ -189,8 +200,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                 if (endIdx > startIdx)
                 {
-                    var hasSpaceBefore = !preserveSpaces && startIdx > 0 && Words.Count == 0 && char.IsWhiteSpace(textSpan[startIdx - 1]);
-                    var hasSpaceAfter = !preserveSpaces && endIdx < textSpan.Length && char.IsWhiteSpace(textSpan[endIdx]);
+                    var hasSpaceBefore = !preserveSpaces && startIdx > 0 && Words.Count == 0 && IsCssWhiteSpace(textSpan[startIdx - 1]);
+                    var hasSpaceAfter = !preserveSpaces && endIdx < textSpan.Length && IsCssWhiteSpace(textSpan[endIdx]);
 
                     var wordText = WebUtility.HtmlDecode(_text[startIdx..endIdx].ToString());
 
