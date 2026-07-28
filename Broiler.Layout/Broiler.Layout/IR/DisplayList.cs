@@ -34,6 +34,8 @@ public sealed class DisplayList
 [JsonDerivedType(typeof(DrawSvgPolylineItem), "DrawSvgPolyline")]
 [JsonDerivedType(typeof(BlendModeItem), "BlendMode")]
 [JsonDerivedType(typeof(RestoreBlendModeItem), "RestoreBlendMode")]
+[JsonDerivedType(typeof(FilterItem), "Filter")]
+[JsonDerivedType(typeof(RestoreFilterItem), "RestoreFilter")]
 [JsonDerivedType(typeof(DrawTiledGradientItem), "DrawTiledGradient")]
 [JsonDerivedType(typeof(TransformItem), "Transform")]
 [JsonDerivedType(typeof(RestoreTransformItem), "RestoreTransform")]
@@ -179,6 +181,19 @@ public sealed class BlendModeItem : DisplayItem
 
 /// <summary>Restores from a blend mode layer pushed by <see cref="BlendModeItem"/>.</summary>
 public sealed class RestoreBlendModeItem : DisplayItem { }
+
+/// <summary>Begins a compositing layer whose pixels the CSS <c>filter</c> function list is
+/// applied to when the layer is restored (the colour-matrix functions: invert/grayscale/
+/// brightness/contrast/sepia/saturate/opacity/hue-rotate). Blur and drop-shadow are not
+/// modelled here.</summary>
+public sealed class FilterItem : DisplayItem
+{
+    /// <summary>CSS filter value (e.g. "invert(1) grayscale(0.5)").</summary>
+    public string Filter { get; init; } = "none";
+}
+
+/// <summary>Restores from a filter layer pushed by <see cref="FilterItem"/>.</summary>
+public sealed class RestoreFilterItem : DisplayItem { }
 
 /// <summary>
 /// Draws a tiled CSS gradient (e.g. linear-gradient) at a specified tile size.

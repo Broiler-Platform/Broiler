@@ -424,23 +424,29 @@ internal sealed partial class WptTestRunner
 (function() {
   var __broilerPromiseTests = [];
   var __broilerWindowLoaded = false;
-  if (typeof test === 'undefined') {
-    // Chromium-matching mode: the reference generator does not load
-    // testharness.js, so `test` is undefined there and the test body never
-    // runs before the screenshot. Some bodies mutate the DOM (e.g. toggling a
-    // class that changes color-scheme), which would advance our captured DOM
-    // past the reference point. Leave them un-run so the snapshot reflects the
-    // initial post-load state (mirrors the promise_test stub below).
+  // Reference-matching (defer) mode: the reference generator does not load
+  // testharness.js, so `test`/`async_test`/`promise_test` are undefined there and
+  // the first call to one throws — aborting the rest of that <script> block before
+  // any test body, or any post-call DOM mutation, runs. A stub that merely no-ops
+  // instead of throwing lets that later code run (e.g. interpolation-testcommon.js
+  // `create_tests()` removing its container of test boxes after calling test(), or
+  // an HTMLLinkElement-disabled async_test toggling `<link disabled>` on), advancing
+  // our captured DOM past the reference point. So in defer mode we leave these three
+  // undefined too, matching the reference generator; each <script> is eval'd in its
+  // own try/catch, so the throw aborts only that block (exactly as in a browser).
+  // Outside defer mode they are stubbed so local renders still exercise the bodies.
+  var __defer = window.__broilerDeferPromiseTests;
+  if (typeof test === 'undefined' && !__defer) {
     window.test = function(func, name) {};
   }
-  if (typeof async_test === 'undefined') {
+  if (typeof async_test === 'undefined' && !__defer) {
     window.async_test = function(func, name) {
       var t = { step: function(f){try{f();}catch(e){}}, done: function(){}, step_func: function(f){return f;}, step_func_done: function(f){return f;}, step_timeout: function(f,d){try{f();}catch(e){}} };
       if (func) { try { func(t); } catch(e) {} }
       return t;
     };
   }
-  if (typeof promise_test === 'undefined') {
+  if (typeof promise_test === 'undefined' && !__defer) {
     function __broilerRunPromiseTest(func) {
       // Chromium-matching mode: the reference generator screenshots at `load`,
       // before any promise_test body runs. Those bodies are assertions that

@@ -454,6 +454,14 @@ public sealed partial class DomBridge
             }
         }
 
+        // transform interpolates component-wise between matching function lists (the
+        // common animation case, e.g. scale/translate/rotate keyframes); `none` acts as
+        // the identity of the other side's functions. Mismatched lists (which need full
+        // matrix decomposition) fall through to discrete stepping.
+        if (string.Equals(prop, "transform", StringComparison.OrdinalIgnoreCase) &&
+            TryInterpolateTransform(fromValue, toValue, progress, out var interpolatedTransform))
+            return interpolatedTransform;
+
         if (TryInterpolateLengthValue(element, prop, fromValue, toValue, progress, out var interpolatedLength))
             return interpolatedLength;
 

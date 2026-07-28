@@ -1,0 +1,340 @@
+From cea2cd84798dfc76fb219173364e031db9aae17f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 28 Jul 2026 07:19:12 +0000
+Subject: [PATCH] paint: apply CSS colour-matrix filter functions in the image
+ renderer
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+An element with a non-none `filter` establishes a stacking context but the
+image renderer ignored the property entirely, so invert()/grayscale()/sepia()/
+hue-rotate()/brightness()/contrast()/saturate()/opacity() had no visual effect
+— the element rendered exactly as if unfiltered.
+
+Emit a FilterItem/RestoreFilterItem pair around the element's compositing group
+(PaintWalker, wrapping the opacity/blend layers so the filter applies to the
+element's composited result). The raster backend brackets the group in a filter
+layer (BCanvas.SaveFilterLayer/RestoreFilterLayer); at composite time each
+non-transparent pixel is passed through ApplyColorFilter, which walks the filter
+function list left to right and applies the Filter Effects §16 colour matrices.
+Amounts accept numbers and percentages; hue-rotate accepts deg/rad/grad/turn.
+
+Only the colour-matrix subset is modelled — HasSupportedFilterFunction gates
+emission so a filter built only from blur()/drop-shadow()/url() (which need a
+convolution or SVG pass the raster canvas lacks) is left to render unfiltered
+rather than emitting an effect-free layer. When the group is not
+raster-compatible GraphicsAdapter renders the content directly (unfiltered but
+visible) instead of routing it to the stub compat backend and losing it — the
+same graceful degradation the ignored-filter path had before.
+---
+ .../Adapters/GraphicsAdapter.cs               |  20 +++
+ Source/Broiler.HTML.Image/BCanvas.cs          | 149 +++++++++++++++++-
+ .../IR/PaintWalker.Stacking.cs                |  29 ++++
+ .../IR/RGraphicsRasterBackend.cs              |  12 ++
+ 4 files changed, 209 insertions(+), 1 deletion(-)
+
+diff --git a/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs b/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
+index 92f1c0c..318be69 100644
+--- a/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
++++ b/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
+@@ -299,6 +299,26 @@ internal sealed class GraphicsAdapter : RGraphics
+         _activeCompatLayerDepth = Math.Max(0, _activeCompatLayerDepth - 1);
+     }
+ 
++    public override void SaveFilterLayer(string filter)
++    {
++        // Filters need pixel readback to apply, which only the raster canvas offers. When the
++        // layer is raster-compatible, push a real filter layer there; otherwise render the content
++        // directly (unfiltered but visible) rather than route it to the stub compat backend and
++        // lose it — the same graceful degradation the ignored-filter path had before.
++        bool useRaster = _rasterCanvas is not null && _activeCompatLayerDepth == 0 && _nextLayerCanUseRaster;
++        _nextLayerCanUseRaster = false;
++        _rasterLayerStack.Push(useRaster);
++        if (useRaster)
++            _rasterCanvas!.SaveFilterLayer(filter);
++    }
++
++    public override void RestoreFilterLayer()
++    {
++        bool usedRaster = _rasterLayerStack.Count > 0 && _rasterLayerStack.Pop();
++        if (usedRaster)
++            _rasterCanvas!.RestoreFilterLayer();
++    }
++
+     public override void SaveBlendLayer(string blendMode)
+     {
+         bool useRaster = _rasterCanvas is not null
+diff --git a/Source/Broiler.HTML.Image/BCanvas.cs b/Source/Broiler.HTML.Image/BCanvas.cs
+index bc2fe26..7b25c93 100644
+--- a/Source/Broiler.HTML.Image/BCanvas.cs
++++ b/Source/Broiler.HTML.Image/BCanvas.cs
+@@ -585,6 +585,20 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         CompositeLayer(layer);
+     }
+ 
++    public void SaveFilterLayer(string filter)
++    {
++        _layerStack.Push(new LayerState(new BBitmap(_rootBitmap.Width, _rootBitmap.Height), 1f, "normal", filter));
++    }
++
++    public void RestoreFilterLayer()
++    {
++        if (_layerStack.Count == 0)
++            return;
++
++        var layer = _layerStack.Pop();
++        CompositeLayer(layer);
++    }
++
+     public void SaveBlendLayer(string blendMode)
+     {
+         _layerStack.Push(new LayerState(new BBitmap(_rootBitmap.Width, _rootBitmap.Height), 1f, blendMode ?? "normal"));
+@@ -646,6 +660,9 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+                 if (source.A == 0)
+                     continue;
+ 
++                if (layer.Filter is { } filter)
++                    source = ApplyColorFilter(source, filter);
++
+                 if (layer.Opacity < 1f)
+                     source = ApplyOpacity(source, layer.Opacity);
+ 
+@@ -663,6 +680,136 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         return new BColor(color.R, color.G, color.B, alpha);
+     }
+ 
++    private static readonly System.Text.RegularExpressions.Regex FilterFunctionPattern =
++        new(@"([a-zA-Z-]+)\(([^)]*)\)", System.Text.RegularExpressions.RegexOptions.Compiled);
++
++    /// <summary>
++    /// Applies the colour-matrix CSS filter functions (invert/grayscale/brightness/contrast/
++    /// sepia/saturate/opacity/hue-rotate) to a single pixel, left to right. Unsupported functions
++    /// (blur/drop-shadow/…) are skipped. Matrices follow Filter Effects §16.
++    /// </summary>
++    private static BColor ApplyColorFilter(BColor color, string filter)
++    {
++        float r = color.R, g = color.G, b = color.B, a = color.A;
++        foreach (System.Text.RegularExpressions.Match match in FilterFunctionPattern.Matches(filter))
++        {
++            var name = match.Groups[1].Value.ToLowerInvariant();
++            var arg = match.Groups[2].Value.Trim();
++            switch (name)
++            {
++                case "invert":
++                {
++                    float t = ParseFilterAmount(arg, 1f, clampToOne: true);
++                    r = Lerp(r, 255f - r, t); g = Lerp(g, 255f - g, t); b = Lerp(b, 255f - b, t);
++                    break;
++                }
++                case "grayscale":
++                {
++                    float t = ParseFilterAmount(arg, 1f, clampToOne: true);
++                    float l = 0.2126f * r + 0.7152f * g + 0.0722f * b;
++                    r = Lerp(r, l, t); g = Lerp(g, l, t); b = Lerp(b, l, t);
++                    break;
++                }
++                case "brightness":
++                {
++                    float t = ParseFilterAmount(arg, 1f, clampToOne: false);
++                    r *= t; g *= t; b *= t;
++                    break;
++                }
++                case "contrast":
++                {
++                    float t = ParseFilterAmount(arg, 1f, clampToOne: false);
++                    r = (r - 128f) * t + 128f; g = (g - 128f) * t + 128f; b = (b - 128f) * t + 128f;
++                    break;
++                }
++                case "opacity":
++                {
++                    float t = ParseFilterAmount(arg, 1f, clampToOne: true);
++                    a *= t;
++                    break;
++                }
++                case "saturate":
++                {
++                    float s = ParseFilterAmount(arg, 1f, clampToOne: false);
++                    (r, g, b) = (
++                        (0.213f + 0.787f * s) * r + (0.715f - 0.715f * s) * g + (0.072f - 0.072f * s) * b,
++                        (0.213f - 0.213f * s) * r + (0.715f + 0.285f * s) * g + (0.072f - 0.072f * s) * b,
++                        (0.213f - 0.213f * s) * r + (0.715f - 0.715f * s) * g + (0.072f + 0.928f * s) * b);
++                    break;
++                }
++                case "sepia":
++                {
++                    float s = 1f - ParseFilterAmount(arg, 1f, clampToOne: true);
++                    (r, g, b) = (
++                        (0.393f + 0.607f * s) * r + (0.769f - 0.769f * s) * g + (0.189f - 0.189f * s) * b,
++                        (0.349f - 0.349f * s) * r + (0.686f + 0.314f * s) * g + (0.168f - 0.168f * s) * b,
++                        (0.272f - 0.272f * s) * r + (0.534f - 0.534f * s) * g + (0.131f + 0.869f * s) * b);
++                    break;
++                }
++                case "hue-rotate":
++                {
++                    float rad = ParseFilterAngleRadians(arg);
++                    float cos = MathF.Cos(rad), sin = MathF.Sin(rad);
++                    (r, g, b) = (
++                        (0.213f + cos * 0.787f - sin * 0.213f) * r + (0.715f - cos * 0.715f - sin * 0.715f) * g + (0.072f - cos * 0.072f + sin * 0.928f) * b,
++                        (0.213f - cos * 0.213f + sin * 0.143f) * r + (0.715f + cos * 0.285f + sin * 0.140f) * g + (0.072f - cos * 0.072f - sin * 0.283f) * b,
++                        (0.213f - cos * 0.213f - sin * 0.787f) * r + (0.715f - cos * 0.715f + sin * 0.715f) * g + (0.072f + cos * 0.928f + sin * 0.072f) * b);
++                    break;
++                }
++            }
++        }
++
++        return new BColor(ClampByte(r), ClampByte(g), ClampByte(b), ClampByte(a));
++    }
++
++    private static float Lerp(float from, float to, float t) => from + (to - from) * t;
++
++    private static byte ClampByte(float value) => (byte)Math.Clamp((int)MathF.Round(value), 0, 255);
++
++    /// <summary>Parses a filter amount: a number, or a percentage (n%). <paramref name="clampToOne"/>
++    /// caps at 1 for the [0,1]-ranged functions (invert/grayscale/sepia/opacity).</summary>
++    private static float ParseFilterAmount(string arg, float fallback, bool clampToOne)
++    {
++        if (string.IsNullOrWhiteSpace(arg))
++            return fallback;
++
++        float value;
++        if (arg.EndsWith("%", StringComparison.Ordinal))
++        {
++            if (!float.TryParse(arg.AsSpan(0, arg.Length - 1), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var pct))
++                return fallback;
++            value = pct / 100f;
++        }
++        else if (!float.TryParse(arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value))
++        {
++            return fallback;
++        }
++
++        value = Math.Max(0f, value);
++        return clampToOne ? Math.Min(1f, value) : value;
++    }
++
++    private static float ParseFilterAngleRadians(string arg)
++    {
++        arg = arg.Trim();
++        if (string.IsNullOrEmpty(arg) || arg == "0")
++            return 0f;
++
++        (string suffix, float perUnit) = arg switch
++        {
++            _ when arg.EndsWith("rad", StringComparison.OrdinalIgnoreCase) => ("rad", 1f),
++            _ when arg.EndsWith("grad", StringComparison.OrdinalIgnoreCase) => ("grad", MathF.PI / 200f),
++            _ when arg.EndsWith("turn", StringComparison.OrdinalIgnoreCase) => ("turn", MathF.PI * 2f),
++            _ when arg.EndsWith("deg", StringComparison.OrdinalIgnoreCase) => ("deg", MathF.PI / 180f),
++            _ => ("", MathF.PI / 180f),
++        };
++
++        var numberSpan = suffix.Length > 0 ? arg.AsSpan(0, arg.Length - suffix.Length) : arg.AsSpan();
++        return float.TryParse(numberSpan, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var n)
++            ? n * perUnit
++            : 0f;
++    }
++
+     private static void BlendPixel(BBitmap bitmap, int x, int y, BColor source, string blendMode)
+     {
+         if (source.A == 0)
+@@ -903,7 +1050,7 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+ 
+     private readonly record struct CanvasState(PointF Translation, float ScaleX, float ScaleY, int ClipOperationCount);
+ 
+-    private sealed record LayerState(BBitmap Bitmap, float Opacity, string BlendMode);
++    private sealed record LayerState(BBitmap Bitmap, float Opacity, string BlendMode, string? Filter = null);
+ 
+     private readonly record struct ClipOperation(
+         RectangleF Rect,
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
+index d09ddc2..c2544c4 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
+@@ -139,6 +139,20 @@ internal static partial class PaintWalker
+             }
+         }
+ 
++        // Filter Effects §1: a non-none `filter` renders the element into a compositing group
++        // that the filter is applied to. Only the colour-matrix functions are modelled here
++        // (invert/grayscale/brightness/contrast/sepia/saturate/opacity/hue-rotate); a filter with
++        // none of those (e.g. blur only) is left to render unfiltered rather than emitting an
++        // effect-free layer. Wraps opacity/blend so it filters the element's composited result.
++        bool hasFilter = !isRoot
++            && !string.IsNullOrEmpty(style.Filter)
++            && !style.Filter.Equals("none", StringComparison.OrdinalIgnoreCase)
++            && HasSupportedFilterFunction(style.Filter);
++        if (hasFilter)
++        {
++            items.Add(new FilterItem { Bounds = bounds, Filter = style.Filter });
++        }
++
+         // CSS3: 0 < opacity < 1 creates a compositing group — all
+         // descendant content is rendered into a separate layer, then
+         // composited back at the specified opacity.
+@@ -291,11 +305,26 @@ internal static partial class PaintWalker
+         if (hasOpacity)
+             items.Add(new RestoreOpacityItem { Bounds = bounds });
+ 
++
++        // Restore filter layer (wraps opacity/blend, applied to the composited element)
++        if (hasFilter)
++            items.Add(new RestoreFilterItem { Bounds = bounds });
+         // Restore transform layer (outermost layer)
+         if (hasTransform)
+             items.Add(new RestoreTransformItem { Bounds = bounds });
+     }
+ 
++    /// <summary>Whether a CSS <c>filter</c> value contains at least one colour-matrix function
++    /// this renderer applies (invert/grayscale/brightness/contrast/sepia/saturate/opacity/
++    /// hue-rotate). Blur and drop-shadow are not modelled.</summary>
++    private static bool HasSupportedFilterFunction(string filter)
++    {
++        foreach (var name in new[] { "invert", "grayscale", "brightness", "contrast", "sepia", "saturate", "opacity", "hue-rotate" })
++            if (filter.Contains(name + "(", StringComparison.OrdinalIgnoreCase))
++                return true;
++        return false;
++    }
++
+     private static void PaintChildren(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default, BColor? bgClipTextColor = null, bool skipBlockBackgrounds = false)
+     {
+         if (fragment.Children.Count == 0)
+diff --git a/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs b/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs
+index 06aa43d..db0d4a0 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs
+@@ -92,6 +92,13 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
+                 case RestoreBlendModeItem:
+                     g.RestoreBlendLayer();
+                     break;
++                case FilterItem filterItem:
++                    g.HintNextLayerCanUseRaster(IsRasterCompatibleFilterLayer(list.Items, index));
++                    g.SaveFilterLayer(filterItem.Filter);
++                    break;
++                case RestoreFilterItem:
++                    g.RestoreFilterLayer();
++                    break;
+                 case TransformItem transformItem:
+                     g.SaveTransformLayer(transformItem.Matrix, transformItem.OriginX, transformItem.OriginY);
+                     break;
+@@ -109,6 +116,9 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
+         IsRasterBlendModeSupported(blendMode)
+         && IsRasterCompatibleLayer(items, startIndex, typeof(BlendModeItem), typeof(RestoreBlendModeItem));
+ 
++    private static bool IsRasterCompatibleFilterLayer(IReadOnlyList<DisplayItem> items, int startIndex) =>
++        IsRasterCompatibleLayer(items, startIndex, typeof(FilterItem), typeof(RestoreFilterItem));
++
+     private static bool IsRasterCompatibleLayer(
+         IReadOnlyList<DisplayItem> items,
+         int startIndex,
+@@ -159,6 +169,8 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
+         RestoreOpacityItem => true,
+         BlendModeItem blend => IsRasterBlendModeSupported(blend.Mode),
+         RestoreBlendModeItem => true,
++        FilterItem => true,
++        RestoreFilterItem => true,
+         TransformItem => false,
+         RestoreTransformItem => false,
+         // Text renders on the raster canvas via the text shaper (the same path all
+-- 
+2.43.0
+

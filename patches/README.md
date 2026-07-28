@@ -659,3 +659,141 @@ and doc-file env failures as at `0010` — **zero regressions**.
 `EsModuleLinker`, so nothing in the parent repo depends on or regresses without this patch. Driving the
 now-working engine module path from the bridge (and retiring the `EsModuleLinker`) is the remaining Phase-7
 bridge task — application wiring, not a `Broiler.JS` gap.
+
+---
+
+## 0025 — `Broiler.HTML`: keep text-bearing opacity/blend layers on the raster path
+
+**Symptom.** Any element with `0 < opacity < 1` (or a non-normal `mix-blend-mode`) that
+also contained text rendered as **nothing** — background, border and text all vanished —
+in the image renderer. The `css-view-transitions` capture family
+(`old-content-captures-opacity`, `old-content-is-empty-div`, …) is the most visible
+casualty, but the bug hits any faded/semi-transparent labelled box.
+
+**Cause.** `RGraphicsRasterBackend.IsRasterCompatibleItem` marked `DrawTextItem` /
+`DrawSvgTextItem` non-raster, so `IsRasterCompatibleLayer` classified any text-bearing
+opacity/blend layer as non-raster. `GraphicsAdapter.SaveOpacityLayer` /
+`SaveBlendLayer` then routed the layer to the `_canvasCompat` backend, which is a **stub**
+in the image renderer; and once a compat layer is active `CanUseRaster` is false for every
+enclosed draw, so the layer's `FillRect` background and text alike were discarded (the same
+failure mode the `SaveTransformLayer` comment already documents for the stub compat
+backend). The raster `BCanvas` in fact renders text via the text shaper — it is the primary
+path all non-layer text already uses (`DrawString` tries raster first, with a compat
+fallback) — so a text-bearing layer can stay on the raster path where `SaveOpacityLayer` /
+`SaveBlendLayer` composite it correctly (verified: a no-text opacity box already rendered;
+only the text-bearing one vanished).
+
+**Fix.** Mark `DrawTextItem` and `DrawSvgTextItem` raster-compatible in
+`IsRasterCompatibleItem`, so a text-bearing opacity/blend layer uses the raster
+`SaveOpacityLayer` / `SaveBlendLayer` and composites correctly. Verified locally: a
+`opacity: 0.75` box with text now renders semi-transparently (background + faded text)
+instead of vanishing.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships
+as `patches/0025-html-opacity-blend-text-raster-layer.patch` with the pointer left
+**unbumped** (pinned `d09b809`) and the submodule working tree reverted. There is **no
+main-repo fallback** — the paint/compositing pipeline lives entirely in `Broiler.HTML`, so
+the parent repo has no lever to route text-bearing opacity layers onto the raster canvas.
+The fix is renderer-visible only once the patch is applied and the pointer bumped.
+
+---
+
+## 0026 — `Broiler.HTML`: rasterise non-uniform (axis-aligned) scale transforms
+
+**Symptom.** An element with a non-uniform axis-aligned scale — `scaleX()`, `scaleY()`,
+`scale(x, y)` where `x != y` — vanished entirely in the image renderer (background and
+content), the same failure mode as `0025` but for a different rejected transform.
+
+**Cause.** `BCanvas` mapped points with a single uniform `_scale`, so `TrySaveTransform`
+rejected any matrix with `a != d`. `GraphicsAdapter.SaveTransformLayer` then routed the
+transform to the `_canvasCompat` backend, which is a stub in the image renderer, and once a
+compat layer is active `CanUseRaster` is false for every enclosed draw — so the whole
+subtree was discarded.
+
+**Fix.** Give the canvas a per-axis scale (`_scaleX`/`_scaleY`). `TrySaveTransform` now
+accepts axis-aligned scale (`b == c == 0`), including non-uniform, folding `scaleX` into
+`_scaleX` and `scaleY` into `_scaleY`; the point/rect mapping, rounded-clip corner radii,
+and stroke width (geometric mean of the axis scales) use them. **Uniform scale sets both
+axes equal, so existing output is byte-identical** (verified: 205 render tests pass, the 6
+failures are all pre-existing — anchor-positioning and environmental — and fail identically
+with the patch reverted). Rotation and skew (non-zero `b`/`c`) still fall back; they need a
+full affine rasteriser the raster canvas does not have.
+
+**Pairs with the DOM side.** The parent-repo `element.animate()` + transform interpolation
+commit computes the interpolated `scale(x, y)`; this patch lets the renderer actually paint
+it, so animated and static non-uniform scales now render.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships
+as `patches/0026-html-nonuniform-scale-raster.patch` with the pointer left **unbumped**
+(pinned `d09b809`) and the submodule working tree reverted. It is **independent of `0025`**
+(different files — `BCanvas.cs` vs `RGraphicsRasterBackend.cs`) and the two apply cleanly in
+either order. No main-repo fallback is possible — the paint pipeline lives entirely in
+`Broiler.HTML`.
+
+---
+
+## 0027 — `Broiler.Graphics`: `SaveFilterLayer`/`RestoreFilterLayer` surface hooks
+
+**Symptom.** The image renderer had no way to apply the CSS `filter` property — every
+colour-matrix function (`invert()`, `grayscale()`, `brightness()`, `contrast()`, `sepia()`,
+`saturate()`, `opacity()`, `hue-rotate()`) was a visual no-op: a filtered element rendered
+exactly as if unfiltered.
+
+**Cause.** The `RGraphics` abstract surface exposed compositing-layer hooks for opacity and
+blend mode (`SaveOpacityLayer`/`SaveBlendLayer`) but none for filters, so the paint pipeline
+had no primitive to bracket a filterable compositing group with.
+
+**Fix.** Add two `virtual` methods to `RGraphics`, `SaveFilterLayer(string filter)` and
+`RestoreFilterLayer()`, both defaulting to a **no-op** — a platform adapter that does not
+implement pixel-level filtering keeps rendering content unfiltered, exactly as before. The
+raster image adapter overrides them (patch `0028`) to apply the colour matrices.
+
+**Why it's a patch.** The `Broiler.Graphics` push returned **403**, so per `CLAUDE.md` it
+ships as `patches/0027-graphics-filter-layer-hooks.patch` with the pointer left **unbumped**
+(pinned `7986c5e`) and the submodule working tree reverted. It is a pure additive change to
+the abstract surface (no behaviour change on its own) and is a **build prerequisite of
+`0028`**, which calls these methods.
+
+---
+
+## 0028 — `Broiler.HTML`: apply CSS colour-matrix filter functions
+
+**Symptom.** An element with a non-none `filter` established a stacking context but the image
+renderer ignored the property, so `invert()`/`grayscale()`/`brightness()`/`contrast()`/
+`sepia()`/`saturate()`/`opacity()`/`hue-rotate()` had no visual effect.
+
+**Cause.** `PaintWalker` emitted no display item for `filter`, and the raster canvas had no
+filter primitive — the property was dropped on the floor between layout and paint.
+
+**Fix.** `PaintWalker` emits a `FilterItem`/`RestoreFilterItem` pair around the element's
+compositing group (wrapping the opacity/blend layers, so the filter applies to the element's
+composited result). `RGraphicsRasterBackend` brackets the group in a filter layer via the
+`0027` surface hooks; `BCanvas.SaveFilterLayer`/`RestoreFilterLayer` push a layer whose pixels
+are passed through `ApplyColorFilter` at composite time — it walks the filter function list
+left to right and applies the Filter Effects §16 colour matrices (amounts accept numbers and
+percentages; `hue-rotate` accepts `deg`/`rad`/`grad`/`turn`).
+
+Only the colour-matrix subset is modelled: `HasSupportedFilterFunction` gates emission, so a
+`filter` built only from `blur()`/`drop-shadow()`/`url()` (which need a convolution or SVG
+pass the raster canvas lacks) is left to render **unfiltered** rather than emitting an
+effect-free layer. When the compositing group is not raster-compatible, `GraphicsAdapter`
+renders the content **directly (unfiltered but visible)** instead of routing it to the stub
+compat backend and losing it — the same graceful degradation the ignored-`filter` path had.
+
+**Verified** by rendering solid-colour boxes through the engine with the patch applied:
+`invert(1)` of `rgb(0,128,0)` → magenta `rgb(255,127,255)`; `grayscale(1)` → neutral gray;
+`brightness(0.5)` → half-value; `sepia(1)` → brown; `hue-rotate(120deg)` of red → green;
+`contrast(2)` → saturated; `opacity(0.5)` → 50%-blended. `filter:none` and `filter:opacity(1)`
+leave the box unchanged. Regression-checked against the `css-backgrounds/background-clip`
+subset (which uses `filter:opacity(1)` to force a stacking context): match rates are
+byte-identical with and without the change.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships as
+`patches/0028-html-color-matrix-filters.patch` with the pointer left **unbumped** (pinned
+`d09b809`) and the submodule working tree reverted. **Ordering:** it **stacks on `0025`+`0026`**
+— all three touch `BCanvas.cs`/`RGraphicsRasterBackend.cs`, and `0028` was generated against a
+tree with `0025`+`0026` already applied, so apply them in numeric order (`0025` → `0026` →
+`0028`). It also depends on the parent-repo `Broiler.Layout` `DisplayList.cs` change (the
+`FilterItem`/`RestoreFilterItem` IR types, **pushed directly** to the parent) and on `0027`
+(`Broiler.Graphics`). No main-repo fallback is possible — the paint pipeline lives entirely in
+`Broiler.HTML`, so filters render only once the patch is applied and the pointer bumped.

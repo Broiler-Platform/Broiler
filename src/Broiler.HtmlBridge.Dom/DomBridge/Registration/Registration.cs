@@ -54,6 +54,10 @@ public sealed partial class DomBridge
         var messageChannelCtor = new JSFunction((in _) => _messaging.CreateMessageChannel(), "MessageChannel", 0);
         window.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         context["MessageChannel"] = messageChannelCtor;
+        // CSSStyleSheet constructor (constructable stylesheets / adoptedStyleSheets — CSSOM).
+        var cssStyleSheetCtor = new JSFunction((in a) => CreateConstructedStyleSheet(in a), "CSSStyleSheet", 0);
+        window.FastAddValue((KeyString)"CSSStyleSheet", cssStyleSheetCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["CSSStyleSheet"] = cssStyleSheetCtor;
         // getComputedStyle (CSSOM), co-located in the ComputedStyleBinding feature module (Phase 3).
         window.FastAddValue(
             (KeyString)"getComputedStyle",
