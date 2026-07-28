@@ -1050,6 +1050,21 @@ internal static class CssLayoutEngine
                 || child.Float != CssConstants.None
                 || child.Position is CssConstants.Absolute or CssConstants.Fixed)
                 continue;
+
+            // An anonymous inline text run that collapsed to nothing — whitespace-only or
+            // empty, with no words and no children of its own — contributes no rectangle to
+            // the line, so it must not mask an otherwise-invisible inline box. Without this,
+            // the whitespace an author leaves around an out-of-flow child (e.g. the newlines
+            // between a relative <span> and its abspos target) counts as content, and the
+            // empty-inline branch in FlowBox never records the span's flow position — it
+            // defaults to the document origin, so the target (and scrollIntoView to it) lands
+            // at 0 instead of on its line. WPT css/css-inline/empty-span-scroll.
+            if (child.HtmlTag == null
+                && child.Words.Count == 0
+                && child.Boxes.Count == 0
+                && (child.Text.IsEmpty || child.Text.Span.IsWhiteSpace()))
+                continue;
+
             return true;
         }
         return false;

@@ -84,6 +84,36 @@ public class BlockInInlineScrollIntoViewTests : IDisposable
         Assert.True(red < W * H * 0.05, $"red={red}; red filler still visible (page did not scroll).");
     }
 
+    // The verbatim WPT source indents the target inside the relative <span>, so the
+    // span's only in-flow children are the collapsed whitespace runs around the
+    // out-of-flow <a>. Those must not count as content (InlineBoxHasInFlowContent):
+    // otherwise the empty-inline branch never records the span's flow position, the
+    // span (and its abspos target) default to the document origin, and scrollIntoView
+    // computes 0 — the red filler stays on screen. This is the whitespace variant the
+    // single-line test above does not exercise.
+    [Fact]
+    public void ScrollIntoView_TargetInWhitespaceIndentedRelativeSpan_ScrollsGreenIntoView()
+    {
+        const string html =
+            "<!DOCTYPE html>\n<html class=reftest-wait>\n<style>\n" +
+            "body { margin: 0; }\n" +
+            ".relative { position: relative; }\n" +
+            ".scroll-target { position: absolute; top: 0; }\n" +
+            ".filler { height: 3000px; background: red; }\n" +
+            ".good { height: 100vh; background: green; }\n" +
+            "</style>\n" +
+            "<span><div class=\"filler\"></div></span>\n" +
+            "<span>\n  <span class=\"relative\">\n    <a class=\"scroll-target\" id=\"target\"></a>\n  </span>\n</span>\n" +
+            "<span><div class=\"good\"></div></span>\n" +
+            "<span><div class=\"filler\"></div></span>\n" +
+            "<script>\ntarget.scrollIntoView();\ndocument.documentElement.className = \"\";\n</script>\n";
+
+        using var bmp = Render(html);
+        var (red, green) = Count(bmp);
+        Assert.True(green > W * H * 0.95, $"green={green}; whitespace-indented target did not scroll the green box into view.");
+        Assert.True(red < W * H * 0.05, $"red={red}; red filler still visible (page did not scroll).");
+    }
+
     // The direct (non-span) form must keep working — guards against over-counting
     // plain siblings.
     [Fact]
