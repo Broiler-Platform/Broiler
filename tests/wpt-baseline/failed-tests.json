@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 20484,
+    "failed": 20467,
     "skipped": 0,
-    "total": 20484
+    "total": 20467
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 14976,
+      "count": 14971,
       "examples": [
         "accname/name/comp_tooltip.html",
         "appmanifest/icons-member/icons-member-cors-fail-manual.sub.html",
@@ -26,7 +26,7 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 2816,
+      "count": 2805,
       "examples": [
         "css/compositing/Blending_in_a_group_with_filter.html",
         "css/compositing/mix-blend-mode/mix-blend-mode-blended-element-with-transparent-pixels.html",
@@ -38,7 +38,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 1528,
+      "count": 1531,
       "examples": [
         "conformance-checkers/html-aria/accessible-name-updates/706.html",
         "content-security-policy/blob/self-doesnt-match-blob.sub.html",
@@ -50,7 +50,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 966,
+      "count": 961,
       "examples": [
         "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
         "css/compositing/mix-blend-mode/mix-blend-mode-parent-with-text.html",
@@ -62,7 +62,7 @@
       "label": "Timeout",
       "category": "Timeout",
       "subCategory": null,
-      "count": 76,
+      "count": 77,
       "examples": [
         "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
         "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html",
@@ -117,7 +117,7 @@
     ],
     [
       "html/semantics",
-      526
+      524
     ],
     [
       "conformance-checkers/html-svg",
@@ -127,11 +127,11 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      20336
+      20318
     ],
     [
       "Timeout",
-      76
+      77
     ]
   ],
   "droppedDeclarations": [],
@@ -287,9 +287,9 @@
       "severity": 100.0,
       "impact": 1,
       "matchPercent": 0.0,
-      "relativeTestPath": "css/css-inline/empty-span-scroll.html",
-      "title": "0.0% match \u2014 css/css-inline/empty-span-scroll.html",
-      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / ReferenceOverlayExposed)."
+      "relativeTestPath": "css/css-page/monolithic-overflow-011-print.html",
+      "title": "0.0% match \u2014 css/css-page/monolithic-overflow-011-print.html",
+      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / MissingContent)."
     }
   ],
   "results": [
@@ -6160,8 +6160,7 @@
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Naser_al-Din_Shah_Qajar-novalid.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "category": "Timeout"
     },
     {
       "relativeTestPath": "conformance-checkers/html/elements/time/datetime-isvalid.html",
@@ -34183,7 +34182,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-anchor-position/anchor-scroll-position-try-016.html",
@@ -34655,13 +34654,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-after-scroll-in-document.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-after-scroll-out.html",
       "passed": false,
       "skipped": false,
@@ -34687,7 +34679,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-anchor-position/position-visibility-anchors-visible-dynamic-anchor-toggle.html",
@@ -47146,7 +47138,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-contain/content-visibility/content-visibility-animation-becomes-visible.html",
@@ -68706,13 +68698,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-inline/empty-span-scroll.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "css/css-inline/empty-span-size-001.html",
       "passed": false,
       "skipped": false,
@@ -70712,13 +70697,6 @@
     },
     {
       "relativeTestPath": "css/css-masking/clip-path/clip-path-filter-order.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-masking/clip-path/clip-path-fixed-scroll.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -76595,7 +76573,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-paint-api/background-image-tiled.https.html",
@@ -99867,7 +99845,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-view-transitions/block-with-overflowing-text.html",
@@ -99920,13 +99898,6 @@
     },
     {
       "relativeTestPath": "css/css-view-transitions/content-visibility-auto-shared-element.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/content-with-clip.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -100182,7 +100153,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-view-transitions/massive-element-on-top-of-viewport-partially-onscreen-new.html",
@@ -100283,13 +100254,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-view-transitions/nested/compute-explicit-name-nested.tentative.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
       "relativeTestPath": "css/css-view-transitions/nested/compute-explicit-name-non-existent.tentative.html",
       "passed": false,
       "skipped": false,
@@ -100364,7 +100328,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-view-transitions/new-content-escapes-clip-with-abspos-child.html",
@@ -100431,13 +100395,6 @@
     },
     {
       "relativeTestPath": "css/css-view-transitions/new-content-object-view-box-clip-path.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/new-content-object-view-box-overflow.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -100511,7 +100468,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-view-transitions/old-content-element-writing-modes.html",
@@ -100556,13 +100513,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-view-transitions/old-content-object-fit-fill.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-view-transitions/old-content-object-fit-none.html",
       "passed": false,
       "skipped": false,
@@ -100574,7 +100524,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-view-transitions/old-content-object-view-box-clip-path.html",
@@ -100616,7 +100566,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-view-transitions/pseudo-element-overflow-hidden.html",
@@ -100952,7 +100902,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-view-transitions/snapshot-containing-block-includes-scrollbar-gutter.html",
@@ -100973,7 +100923,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-view-transitions/transform-origin-view-transition-group.html",
@@ -101022,14 +100972,14 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-view-transitions/view-transition-types-reserved.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-view-transitions/view-transition-waituntil-animation-manipulation.html",
@@ -108289,13 +108239,6 @@
       "subCategory": "ReferenceOverlayExposed"
     },
     {
-      "relativeTestPath": "css/filter-effects/effect-reference-local-url-with-base-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "css/filter-effects/effect-reference-merge-no-inputs.tentative.html",
       "passed": false,
       "skipped": false,
@@ -108443,13 +108386,6 @@
       "subCategory": "ColorShift"
     },
     {
-      "relativeTestPath": "css/filter-effects/feflood-with-filter-reference.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/filter-effects/feimage-element-ref-geometry.html",
       "passed": false,
       "skipped": false,
@@ -108531,14 +108467,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/filter-effects/filter-region-html-content-viewport.tentative.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/filter-effects/filter-region-negative-positioned-child-001.html",
@@ -108559,7 +108488,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/filter-effects/filter-scale-001.html",
@@ -108639,13 +108568,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/filter-effects/hidpi-invert-filter-background.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/filter-effects/kernel-unit-length-001.html",
       "passed": false,
       "skipped": false,
@@ -108699,7 +108621,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/filter-effects/svg-feimage-001.html",
@@ -108765,18 +108687,11 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/filter-effects/svg-filter-user-space-viewport-change.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "css/filter-effects/svg-multiple-filter-functions.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/filter-effects/svg-mutation-function-to-url.html",
@@ -108843,13 +108758,6 @@
     },
     {
       "relativeTestPath": "css/filter-effects/svg-unknown-input-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/filter-effects/svg-visibility-hidden-element-with-filter-001.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -108944,14 +108852,14 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/filter-effects/tainting-feflood-006.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/filter-effects/tainting-feflood-007.html",
@@ -131225,13 +131133,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "html/rendering/non-replaced-elements/the-frameset-and-frame-elements/frameset-visibility-hidden.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "html/rendering/non-replaced-elements/the-hr-element-0/color.html",
       "passed": false,
       "skipped": false,
@@ -131680,21 +131581,7 @@
       "subCategory": "ReferenceOverlayExposed"
     },
     {
-      "relativeTestPath": "html/semantics/document-metadata/the-meta-element/color-scheme/meta-color-scheme-first-valid-applies.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "html/semantics/document-metadata/the-meta-element/color-scheme/meta-color-scheme-single-value-in-shadow-tree.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/document-metadata/the-meta-element/http-equiv-and-name-1.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -135308,7 +135195,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "html/syntax/charset/in-noscript-after-template-after-1kb.html",
@@ -141068,13 +140955,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "svg/animations/invalid-attribute-type-does-not-block-begin-event.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "svg/animations/invalid-attribute-type-does-not-block-other-animations.html",
