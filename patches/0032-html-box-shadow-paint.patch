@@ -1,0 +1,803 @@
+From 449d4b4bb51ce84e596fac4bf3faaf1199ac2dc7 Mon Sep 17 00:00:00 2001
+From: Claude <enrico.bartky@gmail.com>
+Date: Tue, 28 Jul 2026 16:57:18 +0000
+Subject: [PATCH] paint: render CSS box-shadow (outset + inset, blur, rounded
+ inner) for block and inline boxes
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+box-shadow was stored on the computed style but never painted — only text-shadow
+was. Implement box-shadow:
+
+- Outset layers paint behind the element's background (offset + spread grown box).
+- Inset layers paint over the background, inside the border box, beneath the borders:
+  the frame between the border box and an inner clear rectangle (border box shrunk by
+  spread, offset), emitted as up to four non-overlapping strips; the clear
+  rectangle's corners are rounded concentric with the border box by filling the
+  corner notches as arc-sliced fills.
+- Blur (outset and inset) is approximated by concentric solid fills whose cumulative
+  SrcOver coverage follows the Gaussian (std-dev blur/2) CDF across the shape edge.
+
+Hooked into all three paint paths; outset before the background, inset after it and
+before the borders. Rounded boxes clip to the border radius grown by the spread.
+
+Fixes WPT css/css-view-transitions/inline-child-with-overflow-shadow. Verified vs
+Chromium goldens: sharp outset/inset exact; rounded-corner inset ~99.96%; blurred
+outset ~99.75%, blurred inset ~99.88%.
+---
+ .../IR/PaintWalker.Decorations.cs             | 323 +++++++++++++++++-
+ .../IR/PaintWalker.Parsing.cs                 |  88 +++++
+ .../IR/PaintWalker.Stacking.cs                | 218 ++++++------
+ 3 files changed, 523 insertions(+), 106 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
+index 4d52613..71b0e17 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
+@@ -60,6 +60,9 @@ internal static partial class PaintWalker
+         var style = fragment.Style;
+         var bounds = fragment.Bounds;
+ 
++        // Outset box-shadow paints behind the inline box's own background (and outside its clip).
++        EmitBoxShadow(fragment, items, inset: false);
++
+         bool bgClippedRounded = false;
+         bool hasCornerRadius = style.ActualCornerNw > 0 || style.ActualCornerNe > 0
+             || style.ActualCornerSe > 0 || style.ActualCornerSw > 0;
+@@ -83,12 +86,324 @@ internal static partial class PaintWalker
+ 
+         EmitBackground(fragment, items);
+         EmitBackgroundImage(fragment, items, viewport);
++        // Inset box-shadow paints over the background, inside the box, beneath the borders.
++        EmitBoxShadow(fragment, items, inset: true);
+         EmitBorders(fragment, items);
+ 
+         if (bgClippedRounded)
+             items.Add(new RestoreItem { Bounds = bounds });
+     }
+ 
++    /// <summary>
++    /// Emits the outset layers of a fragment's CSS <c>box-shadow</c> (CSS Backgrounds §7) as solid
++    /// fills behind the element's border box — one per painted rect, so an inline box shadows each
++    /// of its line fragments. Must be emitted <em>before</em> the element's background so the shadow
++    /// sits behind it; a solid background then covers the part of an outset shadow that overlaps the
++    /// box, leaving only the visible offset/spread halo.
++    /// <para>
++    /// A zero-blur layer is a single sharp fill; a blurred layer is approximated by
++    /// <see cref="EmitBlurredShadow"/> (concentric solid fills matching the Gaussian coverage).
++    /// <c>inset</c> layers are skipped (they paint inside the box, over the background, and are not
++    /// yet modelled). This is why a <c>box-shadow: -20px -20px yellow</c> on an inline
++    /// <c>&lt;span&gt;</c> — previously not painted at all — now shows its yellow offset rectangle
++    /// (WPT css/css-view-transitions/inline-child-with-overflow-shadow).
++    /// </para>
++    /// </summary>
++    private static void EmitBoxShadow(Fragment fragment, List<DisplayItem> items, bool inset)
++    {
++        var style = fragment.Style;
++        var layers = ParseBoxShadow(style.BoxShadow, style.ActualColor);
++        if (layers.Count == 0)
++            return;
++
++        bool hasCornerRadius = style.ActualCornerNw > 0 || style.ActualCornerNe > 0
++            || style.ActualCornerSe > 0 || style.ActualCornerSw > 0;
++
++        foreach (var rect in GetPaintRects(fragment))
++        {
++            if (rect.Width <= 0 || rect.Height <= 0)
++                continue;
++
++            // Paint later-listed layers first so the first-listed shadow ends up on top.
++            for (int i = layers.Count - 1; i >= 0; i--)
++            {
++                var s = layers[i];
++                if (s.Inset != inset || s.Color.A == 0)
++                    continue;
++
++                if (inset)
++                {
++                    EmitInsetShadow(items, fragment, rect, s, hasCornerRadius);
++                    continue;
++                }
++
++                // Outset: the un-blurred shape is the border box, offset, then grown by the spread.
++                var core = InflateRect(new RectangleF(
++                    rect.X + s.OffsetX, rect.Y + s.OffsetY, rect.Width, rect.Height), s.Spread);
++                if (core.Width <= 0 || core.Height <= 0)
++                    continue;
++
++                if (s.Blur > 0.5f)
++                    EmitBlurredShadow(items, fragment, rect, s, core, hasCornerRadius);
++                else
++                    EmitShadowFill(items, fragment, rect, core, s.Spread, s.Color, hasCornerRadius);
++            }
++        }
++    }
++
++    /// <summary>
++    /// Emits an <c>inset</c> box-shadow layer (CSS Backgrounds §7). Unlike an outset shadow this
++    /// paints <em>inside</em> the border box, over the background: the shadow fills the frame between
++    /// the border box and an inner "clear" rectangle (the border box inset by the spread, then
++    /// offset), so it reads as a recess. The whole layer is clipped to the border box. A zero-blur
++    /// layer is that frame as up to four solid strips; a blurred layer softens the inner edge with the
++    /// same Gaussian-coverage shells as the outset path, each shell being the frame around a
++    /// progressively inflated inner rectangle. The strips of one shell never overlap, so alpha does
++    /// not double up at the corners.
++    /// </summary>
++    private static void EmitInsetShadow(
++        List<DisplayItem> items, Fragment fragment, RectangleF borderRect,
++        in BoxShadowLayer s, bool hasCornerRadius)
++    {
++        // Confine the shadow to the (optionally rounded) border box.
++        EmitBorderBoxClip(items, fragment, borderRect, hasCornerRadius);
++
++        // The clear inner rectangle: border box shrunk by the spread, then translated by the offset.
++        var innerBase = InflateRect(borderRect, -s.Spread);
++        innerBase = new RectangleF(innerBase.X + s.OffsetX, innerBase.Y + s.OffsetY, innerBase.Width, innerBase.Height);
++
++        if (s.Blur > 0.5f)
++        {
++            float sigma = Math.Max(0.01f, s.Blur * 0.5f);
++            float extent = 3f * sigma;
++            int shells = Math.Clamp((int)MathF.Ceiling(extent), 4, 24);
++            float peak = s.Color.A;
++            float prevT = 0f;
++            for (int k = 0; k < shells; k++)
++            {
++                // Boundary `e` px outside the clear rect (from -extent inside to +extent toward border).
++                float e = -extent + ((k + 1) / (float)(shells + 1)) * (2f * extent);
++                float targetT = peak * NormalCdf(e / sigma);
++                float denom = 255f - prevT;
++                float aShell = denom > 0.001f ? (targetT - prevT) / denom : 0f;
++                prevT = targetT;
++                int alpha = (int)Math.Round(Math.Clamp(aShell, 0f, 1f) * 255f);
++                if (alpha <= 0)
++                    continue;
++                var shellColor = BColor.FromArgb(alpha, s.Color.R, s.Color.G, s.Color.B);
++                EmitFrameStrips(items, borderRect, InflateRect(innerBase, e), shellColor);
++            }
++        }
++        else
++        {
++            EmitFrameStrips(items, borderRect, innerBase, s.Color);
++            // Round the clear rectangle's corners to match the (rounded) border box, concentric —
++            // the inner radius is the border radius reduced by the inset distance (the spread).
++            if (hasCornerRadius)
++                EmitInnerCornerNotches(items, fragment, innerBase, s.Spread, s.Color);
++        }
++
++        items.Add(new RestoreItem { Bounds = borderRect });
++    }
++
++    /// <summary>
++    /// Rounds the corners of an inset shadow's clear rectangle by filling, at each corner, the region
++    /// inside the sharp corner but outside the rounded arc (a quarter-square minus its quarter-ellipse)
++    /// as thin horizontal slices. The clear rectangle is concentric with the border box, so each inner
++    /// radius is the border radius reduced by <paramref name="inset"/> (the shadow's inset distance).
++    /// These notch fills sit within the sharp clear rectangle, which the frame strips leave unpainted,
++    /// so they never overlap the strips.
++    /// </summary>
++    private static void EmitInnerCornerNotches(
++        List<DisplayItem> items, Fragment fragment, RectangleF inner, float inset, BColor color)
++    {
++        if (inner.Width <= 0 || inner.Height <= 0)
++            return;
++
++        var style = fragment.Style;
++        float halfW = inner.Width / 2f;
++        float halfH = inner.Height / 2f;
++
++        float Radius(double actual) => Math.Clamp((float)actual - inset, 0f, Math.Min(halfW, halfH));
++        float RadiusY(string raw, double actual) =>
++            Math.Clamp((float)GetEffectiveCornerRadiusY(raw, actual, inner) - inset, 0f, Math.Min(halfW, halfH));
++
++        EmitCornerNotch(items, inner.Left, inner.Top, Radius(style.ActualCornerNw), RadiusY(style.CornerNwRadiusRaw, style.ActualCornerNw), +1f, +1f, color);
++        EmitCornerNotch(items, inner.Right, inner.Top, Radius(style.ActualCornerNe), RadiusY(style.CornerNeRadiusRaw, style.ActualCornerNe), -1f, +1f, color);
++        EmitCornerNotch(items, inner.Right, inner.Bottom, Radius(style.ActualCornerSe), RadiusY(style.CornerSeRadiusRaw, style.ActualCornerSe), -1f, -1f, color);
++        EmitCornerNotch(items, inner.Left, inner.Bottom, Radius(style.ActualCornerSw), RadiusY(style.CornerSwRadiusRaw, style.ActualCornerSw), +1f, -1f, color);
++    }
++
++    /// <summary>
++    /// Fills one rounded-corner notch: the area between the sharp corner at
++    /// (<paramref name="cornerX"/>, <paramref name="cornerY"/>) and the quarter-ellipse of radii
++    /// (<paramref name="rX"/>, <paramref name="rY"/>) whose centre lies inside the rectangle in the
++    /// (<paramref name="dirX"/>, <paramref name="dirY"/>) direction. Emitted as 1px-tall slices.
++    /// </summary>
++    private static void EmitCornerNotch(
++        List<DisplayItem> items, float cornerX, float cornerY, float rX, float rY,
++        float dirX, float dirY, BColor color)
++    {
++        if (rX <= 0.5f || rY <= 0.5f)
++            return;
++
++        float centerX = cornerX + (dirX * rX);
++        float centerY = cornerY + (dirY * rY);
++        int steps = (int)MathF.Ceiling(rY);
++        for (int yy = 0; yy < steps; yy++)
++        {
++            float sliceTop = dirY > 0 ? cornerY + yy : cornerY - yy - 1f;
++            float sy = sliceTop + 0.5f;
++            float dyN = MathF.Min(1f, MathF.Abs(sy - centerY) / rY);
++            float dx = rX * MathF.Sqrt(MathF.Max(0f, 1f - (dyN * dyN)));
++            float arcX = centerX - (dirX * dx);          // clear-region boundary along this row
++            float w = MathF.Abs(arcX - cornerX);
++            if (w <= 0.01f)
++                continue;
++            float x0 = MathF.Min(cornerX, arcX);
++            items.Add(new FillRectItem { Bounds = new RectangleF(x0, sliceTop, w, 1f), Color = color });
++        }
++    }
++
++    /// <summary>
++    /// Fills <paramref name="outer"/> minus its intersection with <paramref name="inner"/> as up to
++    /// four non-overlapping rectangles (top and bottom bands span the full width; the left and right
++    /// bands fill only the height between them). Used to paint an inset shadow's frame without the
++    /// corner over-draw that overlapping edge strips would cause.
++    /// </summary>
++    private static void EmitFrameStrips(List<DisplayItem> items, RectangleF outer, RectangleF inner, BColor color)
++    {
++        float il = Math.Max(outer.Left, inner.Left);
++        float ir = Math.Min(outer.Right, inner.Right);
++        float it = Math.Max(outer.Top, inner.Top);
++        float ib = Math.Min(outer.Bottom, inner.Bottom);
++
++        // The clear rectangle does not overlap the border box: the whole box is shadowed.
++        if (ir <= il || ib <= it)
++        {
++            items.Add(new FillRectItem { Bounds = outer, Color = color });
++            return;
++        }
++
++        if (it > outer.Top)
++            items.Add(new FillRectItem { Bounds = new RectangleF(outer.Left, outer.Top, outer.Width, it - outer.Top), Color = color });
++        if (ib < outer.Bottom)
++            items.Add(new FillRectItem { Bounds = new RectangleF(outer.Left, ib, outer.Width, outer.Bottom - ib), Color = color });
++        if (il > outer.Left)
++            items.Add(new FillRectItem { Bounds = new RectangleF(outer.Left, it, il - outer.Left, ib - it), Color = color });
++        if (ir < outer.Right)
++            items.Add(new FillRectItem { Bounds = new RectangleF(ir, it, outer.Right - ir, ib - it), Color = color });
++    }
++
++    /// <summary>Pushes a clip to the element's border box, rounded when it has a border radius.</summary>
++    private static void EmitBorderBoxClip(List<DisplayItem> items, Fragment fragment, RectangleF borderRect, bool hasCornerRadius)
++    {
++        if (!hasCornerRadius)
++        {
++            items.Add(new ClipItem { Bounds = borderRect, ClipRect = borderRect });
++            return;
++        }
++
++        var style = fragment.Style;
++        items.Add(new ClipItem
++        {
++            Bounds = borderRect,
++            ClipRect = borderRect,
++            CornerNw = style.ActualCornerNw,
++            CornerNwY = GetEffectiveCornerRadiusY(style.CornerNwRadiusRaw, style.ActualCornerNw, borderRect),
++            CornerNe = style.ActualCornerNe,
++            CornerNeY = GetEffectiveCornerRadiusY(style.CornerNeRadiusRaw, style.ActualCornerNe, borderRect),
++            CornerSe = style.ActualCornerSe,
++            CornerSeY = GetEffectiveCornerRadiusY(style.CornerSeRadiusRaw, style.ActualCornerSe, borderRect),
++            CornerSw = style.ActualCornerSw,
++            CornerSwY = GetEffectiveCornerRadiusY(style.CornerSwRadiusRaw, style.ActualCornerSw, borderRect),
++        });
++    }
++
++    /// <summary>
++    /// Emits a blurred outset shadow layer as a stack of concentric solid fills whose cumulative
++    /// SrcOver coverage approximates a Gaussian blur of the shadow shape. Per CSS Backgrounds §7 the
++    /// blur applies a Gaussian with standard deviation <c>blur/2</c>; the coverage across the shape
++    /// edge is that Gaussian's cumulative distribution. Shells run from the outer edge of the blur
++    /// band (<c>~3σ</c> outside the shape, coverage ≈ 0) inward to its interior (coverage ≈ the
++    /// shadow colour's own alpha), each painted at the incremental alpha needed to reach the target
++    /// cumulative coverage. Still an approximation — a true separable Gaussian would soften the
++    /// corners further — but far closer than a sharp rectangle.
++    /// </summary>
++    private static void EmitBlurredShadow(
++        List<DisplayItem> items, Fragment fragment, RectangleF borderRect,
++        in BoxShadowLayer s, RectangleF core, bool hasCornerRadius)
++    {
++        float sigma = Math.Max(0.01f, s.Blur * 0.5f);
++        float extent = 3f * sigma;                              // band half-width (±3σ ≈ full falloff)
++        int shells = Math.Clamp((int)MathF.Ceiling(extent), 4, 24);
++        float peak = s.Color.A;                                 // cumulative coverage reached inside
++
++        // Outer → inner: SrcOver accumulates toward `peak` at the interior. Shell k's boundary sits
++        // `d` px into the shape from the core edge (d from -extent outside to +extent inside).
++        float prevT = 0f;
++        for (int k = 0; k < shells; k++)
++        {
++            float d = -extent + ((k + 1) / (float)(shells + 1)) * (2f * extent);
++            float targetT = peak * NormalCdf(d / sigma);        // desired cumulative coverage here
++            float denom = 255f - prevT;
++            float aShell = denom > 0.001f ? (targetT - prevT) / denom : 0f;
++            prevT = targetT;
++
++            int alpha = (int)Math.Round(Math.Clamp(aShell, 0f, 1f) * 255f);
++            if (alpha <= 0)
++                continue;
++
++            float inflate = -d;                                 // boundary d inside ⇒ shrink core by d
++            var shellRect = InflateRect(core, inflate);
++            var shellColor = BColor.FromArgb(alpha, s.Color.R, s.Color.G, s.Color.B);
++            EmitShadowFill(items, fragment, borderRect, shellRect, s.Spread + inflate, shellColor, hasCornerRadius);
++        }
++    }
++
++    /// <summary>Standard-normal CDF Φ(z), via a monotonic logistic approximation (max error ≈ 1%),
++    /// used to shape the blurred-shadow coverage falloff.</summary>
++    private static float NormalCdf(float z) => 1f / (1f + MathF.Exp(-1.702f * z));
++
++    private static RectangleF InflateRect(RectangleF r, float by) =>
++        new(r.X - by, r.Y - by, r.Width + (2f * by), r.Height + (2f * by));
++
++    /// <summary>
++    /// Emits one shadow rectangle fill of <paramref name="color"/>, clipped to the box's rounded
++    /// corners (grown by <paramref name="cornerDelta"/>) when the element has a border radius.
++    /// </summary>
++    private static void EmitShadowFill(
++        List<DisplayItem> items, Fragment fragment, RectangleF borderRect,
++        RectangleF fillRect, float cornerDelta, BColor color, bool hasCornerRadius)
++    {
++        if (fillRect.Width <= 0 || fillRect.Height <= 0)
++            return;
++
++        if (hasCornerRadius)
++        {
++            var style = fragment.Style;
++            items.Add(new ClipItem
++            {
++                Bounds = fillRect,
++                ClipRect = fillRect,
++                CornerNw = Math.Max(0.0, style.ActualCornerNw + cornerDelta),
++                CornerNwY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerNwRadiusRaw, style.ActualCornerNw, borderRect) + cornerDelta),
++                CornerNe = Math.Max(0.0, style.ActualCornerNe + cornerDelta),
++                CornerNeY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerNeRadiusRaw, style.ActualCornerNe, borderRect) + cornerDelta),
++                CornerSe = Math.Max(0.0, style.ActualCornerSe + cornerDelta),
++                CornerSeY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerSeRadiusRaw, style.ActualCornerSe, borderRect) + cornerDelta),
++                CornerSw = Math.Max(0.0, style.ActualCornerSw + cornerDelta),
++                CornerSwY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerSwRadiusRaw, style.ActualCornerSw, borderRect) + cornerDelta),
++            });
++            items.Add(new FillRectItem { Bounds = fillRect, Color = color });
++            items.Add(new RestoreItem { Bounds = fillRect });
++        }
++        else
++        {
++            items.Add(new FillRectItem { Bounds = fillRect, Color = color });
++        }
++    }
++
+     private static void EmitReplacedImage(Fragment fragment, List<DisplayItem> items)
+     {
+         // SVG content for <object data="...svg"> elements — render via SvgRenderer.
+@@ -156,10 +471,10 @@ internal static partial class PaintWalker
+                 bounds.Height - (float)(border.Top + border.Bottom + padding.Top + padding.Bottom));
+ 
+             if (r.Width > 0 && r.Height > 0)
+-                // Pass the box's effective CSS zoom so a view-box-less SVG's raw user-unit geometry scales
+-                // with the box (a view-boxed SVG is unaffected — its scale derives from the zoomed bounds).
+-                // 1.0 while the native-zoom engine is off, so this is inert by default.
+-                items.AddRange(SvgRenderer.RenderSvgContent(fragment.SvgContent, r, fragment.Style.EffectiveZoom));
++                // Pass the box's effective CSS zoom so a view-box-less SVG's raw user-unit geometry scales
++                // with the box (a view-boxed SVG is unaffected — its scale derives from the zoomed bounds).
++                // 1.0 while the native-zoom engine is off, so this is inert by default.
++                items.AddRange(SvgRenderer.RenderSvgContent(fragment.SvgContent, r, fragment.Style.EffectiveZoom));
+         }
+     }
+ 
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Parsing.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Parsing.cs
+index 0c06f25..56daf6d 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Parsing.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Parsing.cs
+@@ -75,6 +75,94 @@ internal static partial class PaintWalker
+         return (offsetX, offsetY, color);
+     }
+ 
++    /// <summary>One parsed CSS <c>box-shadow</c> layer.</summary>
++    private readonly record struct BoxShadowLayer(
++        float OffsetX, float OffsetY, float Blur, float Spread, BColor Color, bool Inset);
++
++    /// <summary>
++    /// Parses a CSS <c>box-shadow</c> value into its comma-separated layers. Each layer is
++    /// <c>inset? &amp;&amp; &lt;offset-x&gt; &lt;offset-y&gt; &lt;blur&gt;? &lt;spread&gt;? &lt;color&gt;?</c>
++    /// (CSS Backgrounds §7). Lengths are read positionally (x, y, blur, spread); the colour may
++    /// appear anywhere and defaults to <paramref name="currentColor"/>. Layers are returned in
++    /// source order (the first is painted on top). Only pixel lengths are recognised — the
++    /// computed value has already resolved font/viewport-relative lengths to px.
++    /// </summary>
++    private static List<BoxShadowLayer> ParseBoxShadow(string? value, BColor currentColor)
++    {
++        var layers = new List<BoxShadowLayer>();
++        if (string.IsNullOrEmpty(value) || value.Equals("none", StringComparison.OrdinalIgnoreCase))
++            return layers;
++
++        foreach (var layerText in Broiler.CSS.CssSyntax.SplitTopLevel(value, ','))
++        {
++            var lengths = new List<float>();
++            string colorStr = "";
++            bool inset = false;
++
++            // Space-split at paren depth 0 so a functional colour like rgb(0 0 0) stays whole.
++            int depth = 0, start = 0;
++            var span = layerText;
++            for (int i = 0; i <= span.Length; i++)
++            {
++                char c = i < span.Length ? span[i] : ' ';
++                if (c == '(') depth++;
++                else if (c == ')') { if (depth > 0) depth--; }
++                else if ((c == ' ' || c == '\t') && depth == 0 && i > start)
++                {
++                    AddShadowToken(span[start..i]);
++                    start = i + 1;
++                }
++                else if ((c == ' ' || c == '\t') && depth == 0)
++                {
++                    start = i + 1;
++                }
++            }
++
++            void AddShadowToken(string raw)
++            {
++                var t = raw.Trim();
++                if (t.Length == 0)
++                    return;
++                if (t.Equals("inset", StringComparison.OrdinalIgnoreCase)) { inset = true; return; }
++                if (lengths.Count < 4 && TryParsePixelLength(t, out float v)) { lengths.Add(v); return; }
++                colorStr += (colorStr.Length > 0 ? " " : "") + t;
++            }
++
++            if (lengths.Count < 2)
++                continue; // offset-x and offset-y are required.
++
++            BColor color = currentColor;
++            if (!string.IsNullOrEmpty(colorStr))
++            {
++                var parsed = ParseCssColor(colorStr);
++                if (parsed != BColor.Empty)
++                    color = parsed;
++            }
++
++            layers.Add(new BoxShadowLayer(
++                lengths[0], lengths[1],
++                lengths.Count >= 3 ? lengths[2] : 0f,
++                lengths.Count >= 4 ? lengths[3] : 0f,
++                color, inset));
++        }
++
++        return layers;
++    }
++
++    /// <summary>Parses a single CSS pixel length token (e.g. <c>-20px</c>, <c>0</c>).</summary>
++    private static bool TryParsePixelLength(string token, out float value)
++    {
++        value = 0f;
++        var t = token.Trim();
++        if (t.Length == 0)
++            return false;
++        if (!(char.IsDigit(t[0]) || t[0] == '-' || t[0] == '+' || t[0] == '.'))
++            return false;
++        if (t.EndsWith("px", StringComparison.OrdinalIgnoreCase))
++            t = t[..^2];
++        return float.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
++    }
++
+     /// <summary>
+     /// Splits a CSS value on top-level commas, delegating to the canonical
+     /// <see cref="Broiler.CSS.CssSyntax.SplitTopLevel(string, char)"/> (which also
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
+index b987dfc..ace2399 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
+@@ -65,20 +65,20 @@ internal static partial class PaintWalker
+         return new RectangleF(left, top, width, height);
+     }
+ 
+-    private static void PaintFragment(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default, bool isRoot = false, BColor? bgClipTextColor = null, bool asInlineContent = false, bool paintingTopLayer = false)
++    private static void PaintFragment(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default, bool isRoot = false, BColor? bgClipTextColor = null, bool asInlineContent = false, bool paintingTopLayer = false)
+     {
+         var style = fragment.Style;
+ 
+-        // CSS Position 4 §top-layer: a top-layer box (open modal <dialog>, open popover, or a
+-        // synthesized ::backdrop — marked by the bridge, projected to Fragment.TopLayerOrder)
+-        // does NOT paint in normal in-tree stacking order. It is skipped here and re-painted by
+-        // PaintTopLayer in a final root-level pass, above every ordinary stacking context. The
+-        // final pass calls back in with paintingTopLayer:true so the target itself paints; a
+-        // nested top-layer descendant reached during that subtree walk (paintingTopLayer:false
+-        // again) is skipped and painted from its own collection entry — so no box double-paints.
+-        if (fragment.TopLayerOrder != null && !paintingTopLayer)
+-            return;
+-
++        // CSS Position 4 §top-layer: a top-layer box (open modal <dialog>, open popover, or a
++        // synthesized ::backdrop — marked by the bridge, projected to Fragment.TopLayerOrder)
++        // does NOT paint in normal in-tree stacking order. It is skipped here and re-painted by
++        // PaintTopLayer in a final root-level pass, above every ordinary stacking context. The
++        // final pass calls back in with paintingTopLayer:true so the target itself paints; a
++        // nested top-layer descendant reached during that subtree walk (paintingTopLayer:false
++        // again) is skipped and painted from its own collection entry — so no box double-paints.
++        if (fragment.TopLayerOrder != null && !paintingTopLayer)
++            return;
++
+         // Skip invisible fragments
+         if (style.Display == "none")
+             return;
+@@ -139,20 +139,20 @@ internal static partial class PaintWalker
+             }
+         }
+ 
+-        // Filter Effects §1: a non-none `filter` renders the element into a compositing group
+-        // that the filter is applied to. Only the colour-matrix functions are modelled here
+-        // (invert/grayscale/brightness/contrast/sepia/saturate/opacity/hue-rotate); a filter with
+-        // none of those (e.g. blur only) is left to render unfiltered rather than emitting an
+-        // effect-free layer. Wraps opacity/blend so it filters the element's composited result.
+-        bool hasFilter = !isRoot
+-            && !string.IsNullOrEmpty(style.Filter)
+-            && !style.Filter.Equals("none", StringComparison.OrdinalIgnoreCase)
+-            && HasSupportedFilterFunction(style.Filter);
+-        if (hasFilter)
+-        {
+-            items.Add(new FilterItem { Bounds = bounds, Filter = style.Filter });
+-        }
+-
++        // Filter Effects §1: a non-none `filter` renders the element into a compositing group
++        // that the filter is applied to. Only the colour-matrix functions are modelled here
++        // (invert/grayscale/brightness/contrast/sepia/saturate/opacity/hue-rotate); a filter with
++        // none of those (e.g. blur only) is left to render unfiltered rather than emitting an
++        // effect-free layer. Wraps opacity/blend so it filters the element's composited result.
++        bool hasFilter = !isRoot
++            && !string.IsNullOrEmpty(style.Filter)
++            && !style.Filter.Equals("none", StringComparison.OrdinalIgnoreCase)
++            && HasSupportedFilterFunction(style.Filter);
++        if (hasFilter)
++        {
++            items.Add(new FilterItem { Bounds = bounds, Filter = style.Filter });
++        }
++
+         // CSS3: 0 < opacity < 1 creates a compositing group — all
+         // descendant content is rendered into a separate layer, then
+         // composited back at the specified opacity.
+@@ -216,6 +216,10 @@ internal static partial class PaintWalker
+         bool bgClippedRounded = false;
+         if (!asInlineContent && !ReferenceEquals(fragment, propagatedFrom))
+         {
++            // Outset box-shadow paints behind the element's background and outside its rounded
++            // background clip, so emit it before either is pushed.
++            EmitBoxShadow(fragment, items, inset: false);
++
+             bool hasCornerRadius = style.ActualCornerNw > 0 || style.ActualCornerNe > 0
+                 || style.ActualCornerSe > 0 || style.ActualCornerSw > 0;
+             if (hasCornerRadius)
+@@ -238,6 +242,8 @@ internal static partial class PaintWalker
+ 
+             EmitBackground(fragment, items);
+             EmitBackgroundImage(fragment, items, viewport);
++            // Inset box-shadow paints over the background, inside the box, beneath the borders.
++            EmitBoxShadow(fragment, items, inset: true);
+         }
+ 
+         // Borders (clipped to the rounded border-box when border-radius is set)
+@@ -305,26 +311,26 @@ internal static partial class PaintWalker
+         if (hasOpacity)
+             items.Add(new RestoreOpacityItem { Bounds = bounds });
+ 
+-
+-        // Restore filter layer (wraps opacity/blend, applied to the composited element)
+-        if (hasFilter)
+-            items.Add(new RestoreFilterItem { Bounds = bounds });
++
++        // Restore filter layer (wraps opacity/blend, applied to the composited element)
++        if (hasFilter)
++            items.Add(new RestoreFilterItem { Bounds = bounds });
+         // Restore transform layer (outermost layer)
+         if (hasTransform)
+             items.Add(new RestoreTransformItem { Bounds = bounds });
+     }
+ 
+-    /// <summary>Whether a CSS <c>filter</c> value contains at least one colour-matrix function
+-    /// this renderer applies (invert/grayscale/brightness/contrast/sepia/saturate/opacity/
+-    /// hue-rotate). Blur and drop-shadow are not modelled.</summary>
+-    private static bool HasSupportedFilterFunction(string filter)
+-    {
+-        foreach (var name in new[] { "invert", "grayscale", "brightness", "contrast", "sepia", "saturate", "opacity", "hue-rotate" })
+-            if (filter.Contains(name + "(", StringComparison.OrdinalIgnoreCase))
+-                return true;
+-        return false;
+-    }
+-
++    /// <summary>Whether a CSS <c>filter</c> value contains at least one colour-matrix function
++    /// this renderer applies (invert/grayscale/brightness/contrast/sepia/saturate/opacity/
++    /// hue-rotate). Blur and drop-shadow are not modelled.</summary>
++    private static bool HasSupportedFilterFunction(string filter)
++    {
++        foreach (var name in new[] { "invert", "grayscale", "brightness", "contrast", "sepia", "saturate", "opacity", "hue-rotate" })
++            if (filter.Contains(name + "(", StringComparison.OrdinalIgnoreCase))
++                return true;
++        return false;
++    }
++
+     private static void PaintChildren(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default, BColor? bgClipTextColor = null, bool skipBlockBackgrounds = false)
+     {
+         if (fragment.Children.Count == 0)
+@@ -337,7 +343,7 @@ internal static partial class PaintWalker
+         // through transparent areas.
+         if (fragment.Style.Display is "table" or "inline-table")
+         {
+-            PaintTableChildren(fragment, items, propagatedFrom, viewport, bgClipTextColor);
++            PaintTableChildren(fragment, items, propagatedFrom, viewport, bgClipTextColor);
+             return;
+         }
+ 
+@@ -507,64 +513,64 @@ internal static partial class PaintWalker
+         }
+     }
+ 
+-    /// <summary>
+-    /// CSS Position 4 §top-layer painting: after the whole document tree has painted, re-paint
+-    /// every top-layer fragment (<see cref="Fragment.TopLayerOrder"/> non-null — an open modal
+-    /// <c>&lt;dialog&gt;</c>, an open popover, or a synthesized <c>::backdrop</c>) above all
+-    /// ordinary stacking contexts, ordered by top-layer order (a later-added element paints over
+-    /// an earlier one). During the normal traversal these fragments were skipped by
+-    /// <see cref="PaintFragment"/>; this is where they actually paint. A no-op when nothing is in
+-    /// the top layer, so ordinary documents are unaffected. Replaces the bridge's approximate
+-    /// very-large-z-index top-layer emulation with a real, isolated top-layer pass.
+-    /// </summary>
+-    private static void PaintTopLayer(Fragment root, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport)
+-    {
+-        List<Fragment>? topLayer = null;
+-        CollectTopLayer(root, ref topLayer);
+-        if (topLayer == null)
+-            return;
+-
+-        // Stable order by top-layer order (document order breaks ties — the collection walk is in
+-        // document order and List.Sort is not stable, so decorate with the collected index).
+-        var ordered = new List<(int Order, int Index, Fragment Fragment)>(topLayer.Count);
+-        for (int i = 0; i < topLayer.Count; i++)
+-            ordered.Add((topLayer[i].TopLayerOrder!.Value, i, topLayer[i]));
+-        ordered.Sort((a, b) => a.Order != b.Order ? a.Order.CompareTo(b.Order) : a.Index.CompareTo(b.Index));
+-
+-        foreach (var (_, _, fragment) in ordered)
+-        {
+-            // Top-layer boxes are UA position:fixed, so apply the fixed-position viewport offset
+-            // (CSS2.1 §9.6.1) over the emitted subtree exactly as PaintChildren does for a fixed
+-            // child. paintingTopLayer:true lets this fragment through the PaintFragment skip; any
+-            // nested top-layer descendant is skipped there and painted from its own entry.
+-            if (viewport.Width > 0 && viewport.Height > 0)
+-            {
+-                int startIdx = items.Count;
+-                PaintFragment(fragment, items, propagatedFrom, viewport, paintingTopLayer: true);
+-                OffsetDisplayItems(items, startIdx, viewport.X, viewport.Y);
+-            }
+-            else
+-            {
+-                PaintFragment(fragment, items, propagatedFrom, viewport, paintingTopLayer: true);
+-            }
+-        }
+-    }
+-
+-    /// <summary>
+-    /// Collects every top-layer fragment in the subtree (document order). Recurses through
+-    /// top-layer fragments too, so a nested top-layer box is collected as its own entry rather
+-    /// than only painted inside its ancestor's subtree.
+-    /// </summary>
+-    private static void CollectTopLayer(Fragment fragment, ref List<Fragment>? acc)
+-    {
+-        foreach (var child in fragment.Children)
+-        {
+-            if (child.TopLayerOrder != null)
+-                (acc ??= []).Add(child);
+-            CollectTopLayer(child, ref acc);
+-        }
+-    }
+-
++    /// <summary>
++    /// CSS Position 4 §top-layer painting: after the whole document tree has painted, re-paint
++    /// every top-layer fragment (<see cref="Fragment.TopLayerOrder"/> non-null — an open modal
++    /// <c>&lt;dialog&gt;</c>, an open popover, or a synthesized <c>::backdrop</c>) above all
++    /// ordinary stacking contexts, ordered by top-layer order (a later-added element paints over
++    /// an earlier one). During the normal traversal these fragments were skipped by
++    /// <see cref="PaintFragment"/>; this is where they actually paint. A no-op when nothing is in
++    /// the top layer, so ordinary documents are unaffected. Replaces the bridge's approximate
++    /// very-large-z-index top-layer emulation with a real, isolated top-layer pass.
++    /// </summary>
++    private static void PaintTopLayer(Fragment root, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport)
++    {
++        List<Fragment>? topLayer = null;
++        CollectTopLayer(root, ref topLayer);
++        if (topLayer == null)
++            return;
++
++        // Stable order by top-layer order (document order breaks ties — the collection walk is in
++        // document order and List.Sort is not stable, so decorate with the collected index).
++        var ordered = new List<(int Order, int Index, Fragment Fragment)>(topLayer.Count);
++        for (int i = 0; i < topLayer.Count; i++)
++            ordered.Add((topLayer[i].TopLayerOrder!.Value, i, topLayer[i]));
++        ordered.Sort((a, b) => a.Order != b.Order ? a.Order.CompareTo(b.Order) : a.Index.CompareTo(b.Index));
++
++        foreach (var (_, _, fragment) in ordered)
++        {
++            // Top-layer boxes are UA position:fixed, so apply the fixed-position viewport offset
++            // (CSS2.1 §9.6.1) over the emitted subtree exactly as PaintChildren does for a fixed
++            // child. paintingTopLayer:true lets this fragment through the PaintFragment skip; any
++            // nested top-layer descendant is skipped there and painted from its own entry.
++            if (viewport.Width > 0 && viewport.Height > 0)
++            {
++                int startIdx = items.Count;
++                PaintFragment(fragment, items, propagatedFrom, viewport, paintingTopLayer: true);
++                OffsetDisplayItems(items, startIdx, viewport.X, viewport.Y);
++            }
++            else
++            {
++                PaintFragment(fragment, items, propagatedFrom, viewport, paintingTopLayer: true);
++            }
++        }
++    }
++
++    /// <summary>
++    /// Collects every top-layer fragment in the subtree (document order). Recurses through
++    /// top-layer fragments too, so a nested top-layer box is collected as its own entry rather
++    /// than only painted inside its ancestor's subtree.
++    /// </summary>
++    private static void CollectTopLayer(Fragment fragment, ref List<Fragment>? acc)
++    {
++        foreach (var child in fragment.Children)
++        {
++            if (child.TopLayerOrder != null)
++                (acc ??= []).Add(child);
++            CollectTopLayer(child, ref acc);
++        }
++    }
++
+     /// <summary>
+     /// CSS2.1 Appendix E Step 3 — Background phase: paints only the
+     /// background colour, background image, borders, and replaced-image of
+@@ -600,6 +606,11 @@ internal static partial class PaintWalker
+         if (clipPathClipped)
+             items.Add(clipPathItem);
+ 
++        // Outset box-shadow paints behind the element's background and outside its rounded
++        // background clip (but is clipped by any clip-path, emitted above), so emit it here.
++        if (!ReferenceEquals(fragment, propagatedFrom))
++            EmitBoxShadow(fragment, items, inset: false);
++
+         // CSS2.1 §14.2/§11.1.1: Background, background image, and borders
+         // are part of the element's own rendering and are NOT clipped by
+         // the element's overflow.  Emit them before the overflow clip.
+@@ -628,6 +639,9 @@ internal static partial class PaintWalker
+             EmitBackground(fragment, items);
+             EmitBackgroundImage(fragment, items, viewport);
+         }
++        // Inset box-shadow paints over the background, inside the box, beneath the borders.
++        if (!ReferenceEquals(fragment, propagatedFrom))
++            EmitBoxShadow(fragment, items, inset: true);
+         EmitBorders(fragment, items);
+ 
+         if (hasCornerRadius)
+@@ -787,7 +801,7 @@ internal static partial class PaintWalker
+     /// Layers 2–3: column-group and column backgrounds.
+     /// Layers 4–6: row-group, row, and cell backgrounds (tree order).
+     /// </summary>
+-    private static void PaintTableChildren(Fragment table, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport = default, BColor? bgClipTextColor = null)
++    private static void PaintTableChildren(Fragment table, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport = default, BColor? bgClipTextColor = null)
+     {
+         // Collect column/column-group fragments whose backgrounds will be
+         // emitted early (layers 2–3) so PaintFragment can skip them later.
+@@ -832,7 +846,7 @@ internal static partial class PaintWalker
+             else
+             {
+                 var skipBg = propagatedFrom ?? (earlyBgFragments != null && earlyBgFragments.Contains(child) ? child : null);
+-                PaintFragment(child, items, skipBg, viewport, bgClipTextColor: bgClipTextColor);
++                PaintFragment(child, items, skipBg, viewport, bgClipTextColor: bgClipTextColor);
+             }
+         }
+ 
+@@ -842,7 +856,7 @@ internal static partial class PaintWalker
+             foreach (var child in positioned)
+             {
+                 var skipBg = propagatedFrom ?? (earlyBgFragments != null && earlyBgFragments.Contains(child) ? child : null);
+-                PaintFragment(child, items, skipBg, viewport, bgClipTextColor: bgClipTextColor);
++                PaintFragment(child, items, skipBg, viewport, bgClipTextColor: bgClipTextColor);
+             }
+         }
+     }
+-- 
+2.43.0
+

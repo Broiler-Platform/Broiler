@@ -874,3 +874,101 @@ on the CI run.
 `PaintWalker.Stacking.cs`) and is listed in `scripts/apply-pending-wpt-patches.sh`'s
 `PENDING_PATCHES`, so the WPT CI run applies it on the pinned pointer (idempotent — it reverts to
 *skip* once a maintainer lands it upstream and bumps the pointer).
+
+## 0031 — `Broiler.CSS`: implement CSS Nesting (nested rules + `&` selector)
+
+**Symptom.** The `html/semantics/popovers/popover-{img,textarea,checkbox,progress,iframe}-backdrop`
+WPT reftests rendered **blank white** against a solid-green reference (0.0 % match / MissingContent).
+Each test hides the open popover element and paints a green `::backdrop` through a *nested* rule:
+
+```css
+img:popover-open {
+  visibility: hidden;
+  &::backdrop { visibility: visible; background-color: green; }
+}
+```
+
+The element was hidden correctly, but the green `&::backdrop` never applied, so nothing painted.
+
+**Cause.** `CssParser` had no CSS Nesting support. A style rule's block was parsed as a flat
+declaration list (`ParseDeclarationBlock`, splitting on top-level `;`), so a nested rule such as
+`&::backdrop { … }` arrived as one segment whose first top-level `:` sits inside `{ background: … }` —
+it was rejected as a malformed declaration (`CSS2002`) and silently dropped. Every nested rule (with
+or without `&`) was lost engine-wide, not just on `::backdrop`.
+
+**Fix.** `CssParser` now parses a style rule's body with a nesting-aware walker
+(`ParseStyleRuleBlock`) that separates the parent's own declarations from nested style rules and
+nested conditional groups (`@media`/`@supports`/`@container`/…). Each nested selector is desugared
+against the parent (CSS Nesting Level 1 §nest-desugaring): a selector containing `&` has it replaced
+by the parent; a relative or bare selector gets the parent prepended with a descendant combinator
+(`.child` → `.parent .child`, `> .child` → `.parent > .child`); a comma-separated parent is wrapped in
+`:is(…)` to keep it one unit with its combined specificity. Nested rules are flattened to independent
+`CssStyleRule`s emitted **immediately after** their parent, so the cascade's existing document-order
+tie-break makes a nested declaration win over an equally-specific one in the parent block. The change
+is confined to the parser — the cascade already matches the resulting flat rules (including for the
+`::backdrop` pseudo-element), so no style-engine change was needed.
+
+**Verification.** All five `popover-*-backdrop` reftests now render full green (verified locally with
+`Broiler.Wpt --render` against the shared `…-ref.html`). No regressions: `Broiler.CSS.Tests` (217),
+`Broiler.CSS.Dom.Tests` (287, the 2 pre-existing architecture failures unaffected), and
+`Broiler.Layout.Tests` (262) all pass; the `Broiler.Cli.Tests` failures are identical with and without
+this patch (pre-existing, environmental).
+
+**Why it's a patch.** The `Broiler.CSS` push returned **403** (the submodule remote is outside the
+session's GitHub scope), so per `CLAUDE.md` it ships as `patches/0031-css-nesting.patch` with the
+pointer left **unbumped** (pinned `2dda437`) and the submodule working tree reverted. It touches only
+`Broiler.CSS/CssParser.cs` and is listed in `scripts/apply-pending-wpt-patches.sh`'s
+`PENDING_PATCHES`, so the WPT CI run applies it on the pinned pointer (idempotent — it reverts to
+*skip* once a maintainer lands it upstream and bumps the pointer).
+
+## 0032 — `Broiler.HTML`: paint CSS `box-shadow` (outset + inset, blur, rounded corners) for block and inline boxes
+
+**Symptom.** An element with `box-shadow` painted no shadow at all — e.g. WPT
+`css/css-view-transitions/inline-child-with-overflow-shadow`, whose target is an inline `<span>` with
+`box-shadow: -20px -20px yellow`, rendered the green box with no yellow shadow (and, combined with the
+`&nbsp;`-only inline box collapsing bug fixed parent-side in `Broiler.Layout`, rendered blank).
+
+**Cause.** `box-shadow` was carried on the computed style (`ComputedStyle.BoxShadow`) but the paint
+walker never consumed it — only `text-shadow` was painted. There was no `box-shadow` emission in
+either the block background phase or the inline-box decoration pass.
+
+**Fix.** Adds `ParseBoxShadow` (comma-separated layers: `offset-x offset-y blur? spread? colour?
+inset?`, colour defaulting to `currentColor`) and `EmitBoxShadow`, hooked into all three paint paths
+(`PaintFragment`, `PaintFragmentBackgroundPhase` for in-flow blocks, and
+`EmitInlineBoxBackgroundAndBorder` for inline boxes — one fill per line fragment):
+
+- **Outset** layers paint **before** the background, behind the element's border box (box offset +
+  grown by the spread), so a solid background covers the overlap and only the offset/spread/blur halo
+  shows.
+- **Inset** layers paint **after** the background, inside the border box and beneath the borders: the
+  frame between the border box and an inner clear rectangle (the border box shrunk by the spread, then
+  offset), emitted as up to four **non-overlapping** strips so alpha does not double at the corners,
+  with the whole layer clipped to the border box. On a rounded box the clear rectangle's corners are
+  rounded **concentric** with the border box (each inner radius = border radius − inset), filled as
+  arc-sliced corner notches that sit inside the sharp clear rectangle the strips leave unpainted.
+
+A **zero-blur** layer is a single solid fill (or frame). A **blurred** layer is approximated by a
+stack of concentric solid fills whose cumulative `SrcOver` coverage matches the Gaussian (std-dev
+`blur/2`) cumulative distribution across the shape edge — each shell painted at the incremental alpha
+needed to reach the target coverage at its offset. Rounded boxes clip to the border radius grown by
+the spread. No new IR type or renderer change was needed (reuses `FillRectItem`/`ClipItem`).
+
+**Scope / limitations.** The blur is a rectangular-shell approximation of a true separable Gaussian
+(it softens corners slightly less); the rounded inner-corner notches are arc-sliced (1px slices, hard
+edges) rather than anti-aliased; and rounded corners are applied to sharp inset layers (a blurred
+inset already softens its inner corners).
+
+**Verification** (against Chromium-generated goldens via the full `Broiler.Wpt` runner / `--render`):
+`inline-child-with-overflow-shadow` matches its reference (99.9%). Sharp outset and sharp inset
+(`box-shadow: inset 0 0 0 15px steelblue`) match **exactly**; a sharp inset on a rounded box
+(`border-radius: 40px; inset 0 0 0 20px`) matches to **99.96%** with rounded inner corners; a blurred
+outset (`0 0 30px black`) matches to **99.75%** and a blurred inset (`inset 0 0 25px black`) to
+**99.88%**. No regressions: the `Broiler.Cli.Tests` shadow/decoration/graphics-parity subset shows the
+same (pre-existing, environmental Skia-fallback) failures with and without the patch.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships as
+`patches/0032-html-box-shadow-paint.patch` with the pointer left **unbumped** (pinned `3b92c22`) and
+the submodule working tree reverted. It touches only `PaintWalker.{Parsing,Decorations,Stacking}.cs`
+and is listed in `scripts/apply-pending-wpt-patches.sh`'s `PENDING_PATCHES`, so the WPT CI run applies
+it on the pinned pointer (idempotent — it reverts to *skip* once a maintainer lands it upstream and
+bumps the pointer).
