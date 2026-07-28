@@ -1,0 +1,371 @@
+From a654df4691dec390e79db681aabae14a986a87d8 Mon Sep 17 00:00:00 2001
+From: Claude <enrico.bartky@gmail.com>
+Date: Tue, 28 Jul 2026 09:33:24 +0000
+Subject: [PATCH] paint: apply the root element filter to the whole canvas
+ background
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A CSS filter on the document root (html) element applies to the entire canvas
+background per CSS Filter Effects — including a background propagated up from
+<body> (CSS2.1 §14.2), and to the background image as well as the colour.
+
+EmitCanvasBackground previously tinted only the canvas fill colour, and read the
+filter from whichever element supplied the background. So filter:invert(100%) on
+<html> with the background on <body> (the common case) missed the invert twice:
+the filter was looked up on <body> (which has none), and background images were
+never filtered at all. A white <body> background under an inverted root rendered
+white instead of black (WPT css/filter-effects/hidpi-invert-filter-background,
+0% pixel match).
+
+Wrap the canvas background emission (fill, gradient, and image layers) in a
+single FilterItem/RestoreFilterItem layer using the root element's filter,
+falling back to the propagating element's own filter (e.g. a filter set directly
+on <body>). This reuses the rasterizer's colour-matrix filter layer, so invert /
+sepia / grayscale / etc. all apply uniformly to colour and image. The ad-hoc
+ApplyRootFilter colour maths is removed in favour of the shared layer.
+---
+ .../IR/PaintWalker.CanvasBackground.cs        | 268 ++++++++----------
+ 1 file changed, 118 insertions(+), 150 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs
+index f5e666a..2ff8c36 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs
+@@ -31,11 +31,11 @@ internal static partial class PaintWalker
+             propagatedFrom = EmitCanvasBackground(root, viewport, items);
+ 
+         PaintFragment(root, items, propagatedFrom, viewport, isRoot: true);
+-
+-        // CSS Position 4 §top-layer: modal dialogs, open popovers, and their ::backdrops paint
+-        // above every ordinary stacking context, after the whole tree. A no-op unless a fragment
+-        // carries a top-layer order (bridge-marked); see PaintTopLayer.
+-        PaintTopLayer(root, items, propagatedFrom, viewport);
++
++        // CSS Position 4 §top-layer: modal dialogs, open popovers, and their ::backdrops paint
++        // above every ordinary stacking context, after the whole tree. A no-op unless a fragment
++        // carries a top-layer order (bridge-marked); see PaintTopLayer.
++        PaintTopLayer(root, items, propagatedFrom, viewport);
+         return new DisplayList { Items = items };
+     }
+ 
+@@ -49,14 +49,14 @@ internal static partial class PaintWalker
+     /// </summary>
+     private static Fragment? EmitCanvasBackground(Fragment root, RectangleF viewport, List<DisplayItem> items)
+     {
+-        // CSS Color Adjust §2.3: when the document root's used color scheme is
+-        // dark, the canvas is painted the UA dark backdrop colour instead of
+-        // white. Emit it as the bottom layer so a propagated root/body
+-        // background (found below) paints over it; a fully-transparent root and
+-        // body leave the dark backdrop showing.
+-        if (RootUsesDarkColorScheme(root))
+-            items.Add(new FillRectItem { Bounds = viewport, Color = DarkCanvasColor });
+-
++        // CSS Color Adjust §2.3: when the document root's used color scheme is
++        // dark, the canvas is painted the UA dark backdrop colour instead of
++        // white. Emit it as the bottom layer so a propagated root/body
++        // background (found below) paints over it; a fully-transparent root and
++        // body leave the dark backdrop showing.
++        if (RootUsesDarkColorScheme(root))
++            items.Add(new FillRectItem { Bounds = viewport, Color = DarkCanvasColor });
++
+         // Find which element supplies the canvas background (color + image
+         // as a unit, per CSS2.1 §14.2).
+         var (canvasBg, colorSource, imgSource) = FindCanvasBackgroundAndImage(root);
+@@ -78,14 +78,40 @@ internal static partial class PaintWalker
+             rootOpacity = Math.Clamp(op, 0f, 1f);
+         }
+ 
++        // CSS Filter Effects §: a `filter` on the document root (html) element applies to
++        // the entire canvas background — colour and image alike — even when that background
++        // was propagated up from <body> (CSS2.1 §14.2). Wrap the canvas emission in a filter
++        // layer rather than only tinting the fill colour, so e.g. `filter: invert(100%)` on
++        // <html> with a white <body> background renders black (WPT hidpi-invert-filter-background).
++        // Prefer the root element's filter; fall back to the propagating element's own filter
++        // (e.g. a filter set directly on <body>).
++        string? canvasFilter = ResolveCanvasFilter(root, htmlFragment);
++        if (canvasFilter != null)
++            items.Add(new FilterItem { Bounds = viewport, Filter = canvasFilter });
++
++        var propagated = EmitCanvasBackgroundLayers(
++            viewport, items, canvasBg, colorSource, imgSource, gradientSource, rootOpacity);
++
++        if (canvasFilter != null)
++            items.Add(new RestoreFilterItem { Bounds = viewport });
++
++        return propagated;
++    }
++
++    /// <summary>
++    /// Emits the canvas background fill / gradient / image layers (CSS2.1 §14.2), returning the
++    /// fragment whose background was propagated so it can be suppressed during normal painting.
++    /// Kept separate from <see cref="EmitCanvasBackground"/> so the caller can wrap the whole
++    /// emission in a single root-filter layer.
++    /// </summary>
++    private static Fragment? EmitCanvasBackgroundLayers(
++        RectangleF viewport, List<DisplayItem> items,
++        BColor canvasBg, Fragment? colorSource, Fragment? imgSource, Fragment? gradientSource,
++        float rootOpacity)
++    {
+         if (canvasBg.A > 0)
+         {
+             BColor finalBg = CompositOverWhite(canvasBg, rootOpacity);
+-
+-            // CSS Filter Effects §8: When the root element has filter: invert(N),
+-            // the filter applies to the canvas background.
+-            finalBg = ApplyRootFilter(htmlFragment, finalBg);
+-
+             items.Add(new FillRectItem { Bounds = viewport, Color = finalBg });
+         }
+ 
+@@ -205,7 +231,7 @@ internal static partial class PaintWalker
+         {
+             // CSS Backgrounds §2.11.1: if the root element has display:none
+             // its background must not propagate to the canvas.
+-            if (SuppressesPropagation(root, isRootElement: true))
++            if (SuppressesPropagation(root, isRootElement: true))
+                 return (BColor.Empty, null, null);
+ 
+             return (root.Style.ActualBackgroundColor, root,
+@@ -220,10 +246,10 @@ internal static partial class PaintWalker
+             return (BColor.Empty, null, null);
+ 
+         // CSS Containment §4.2: contain:paint on the html element prevents
+-        // propagation from body.  The html element is the document root, so
+-        // CSS Display §2.5 blockifies a display:contents value here — it does
+-        // not remove the root's box, and its background still propagates.
+-        bool htmlSuppressed = SuppressesPropagation(html, isRootElement: true);
++        // propagation from body.  The html element is the document root, so
++        // CSS Display §2.5 blockifies a display:contents value here — it does
++        // not remove the root's box, and its background still propagates.
++        bool htmlSuppressed = SuppressesPropagation(html, isRootElement: true);
+ 
+         bool htmlHasBg = html.Style.ActualBackgroundColor.A > 0;
+         bool htmlHasImg = html.BackgroundImageHandle != null;
+@@ -270,44 +296,44 @@ internal static partial class PaintWalker
+         return (BColor.Empty, null, null);
+     }
+ 
+-    // CSS Color Adjust §2.3: the UA-defined dark canvas backdrop colour that
+-    // Chromium paints for a dark used color scheme (rgb(18, 18, 18)).
+-    private static readonly BColor DarkCanvasColor = BColor.FromArgb(255, 18, 18, 18);
+-
+-    /// <summary>
+-    /// CSS Color Adjust §2.2–2.3: whether the document root element's used
+-    /// color scheme is <c>dark</c>, which makes the canvas backdrop dark.
+-    /// <para>
+-    /// The reference environment prefers a <em>light</em> color scheme
+-    /// (Playwright's default). The used scheme is the preferred one when the
+-    /// element's <c>color-scheme</c> list includes it; otherwise the first
+-    /// supported scheme in the list is used. So the canvas is dark exactly when
+-    /// the list offers <c>dark</c> but not <c>light</c>. The <c>only</c> keyword
+-    /// does not change this here (it forbids a UA override we do not perform).
+-    /// </para>
+-    /// </summary>
+-    private static bool RootUsesDarkColorScheme(Fragment root)
+-    {
+-        // color-scheme governing the canvas is the document root element's
+-        // (html). `root` may be the html fragment itself or a synthetic parent.
+-        var html = FindFragmentByTag(root, "html") ?? FindFirstBlockChild(root) ?? root;
+-
+-        var scheme = html.Style.ColorScheme;
+-        if (string.IsNullOrWhiteSpace(scheme))
+-            return false;
+-
+-        bool hasDark = false, hasLight = false;
+-        foreach (var token in scheme.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+-        {
+-            if (token.Equals("dark", StringComparison.OrdinalIgnoreCase))
+-                hasDark = true;
+-            else if (token.Equals("light", StringComparison.OrdinalIgnoreCase))
+-                hasLight = true;
+-        }
+-
+-        return hasDark && !hasLight;
+-    }
+-
++    // CSS Color Adjust §2.3: the UA-defined dark canvas backdrop colour that
++    // Chromium paints for a dark used color scheme (rgb(18, 18, 18)).
++    private static readonly BColor DarkCanvasColor = BColor.FromArgb(255, 18, 18, 18);
++
++    /// <summary>
++    /// CSS Color Adjust §2.2–2.3: whether the document root element's used
++    /// color scheme is <c>dark</c>, which makes the canvas backdrop dark.
++    /// <para>
++    /// The reference environment prefers a <em>light</em> color scheme
++    /// (Playwright's default). The used scheme is the preferred one when the
++    /// element's <c>color-scheme</c> list includes it; otherwise the first
++    /// supported scheme in the list is used. So the canvas is dark exactly when
++    /// the list offers <c>dark</c> but not <c>light</c>. The <c>only</c> keyword
++    /// does not change this here (it forbids a UA override we do not perform).
++    /// </para>
++    /// </summary>
++    private static bool RootUsesDarkColorScheme(Fragment root)
++    {
++        // color-scheme governing the canvas is the document root element's
++        // (html). `root` may be the html fragment itself or a synthetic parent.
++        var html = FindFragmentByTag(root, "html") ?? FindFirstBlockChild(root) ?? root;
++
++        var scheme = html.Style.ColorScheme;
++        if (string.IsNullOrWhiteSpace(scheme))
++            return false;
++
++        bool hasDark = false, hasLight = false;
++        foreach (var token in scheme.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
++        {
++            if (token.Equals("dark", StringComparison.OrdinalIgnoreCase))
++                hasDark = true;
++            else if (token.Equals("light", StringComparison.OrdinalIgnoreCase))
++                hasLight = true;
++        }
++
++        return hasDark && !hasLight;
++    }
++
+     /// <summary>
+     /// Returns <see langword="true"/> when the given fragment's CSS properties
+     /// suppress background propagation to the canvas.  Per the CSS
+@@ -320,19 +346,19 @@ internal static partial class PaintWalker
+     ///         e.g. <c>strict</c>, <c>content</c>) — paint containment
+     ///         prevents the background from propagating.</item>
+     /// </list>
+-    /// <para>
+-    /// When <paramref name="isRootElement"/> is set, <c>display: contents</c>
+-    /// does <em>not</em> suppress: CSS Display §2.5 blockifies the document
+-    /// root element, so its box (and background) is generated as if
+-    /// <c>display: block</c> had been specified.
+-    /// </para>
++    /// <para>
++    /// When <paramref name="isRootElement"/> is set, <c>display: contents</c>
++    /// does <em>not</em> suppress: CSS Display §2.5 blockifies the document
++    /// root element, so its box (and background) is generated as if
++    /// <c>display: block</c> had been specified.
++    /// </para>
+     /// </summary>
+-    private static bool SuppressesPropagation(Fragment fragment, bool isRootElement = false)
++    private static bool SuppressesPropagation(Fragment fragment, bool isRootElement = false)
+     {
+         var display = fragment.Style.Display;
+-        if (display == "none")
+-            return true;
+-        if (display == "contents" && !isRootElement)
++        if (display == "none")
++            return true;
++        if (display == "contents" && !isRootElement)
+             return true;
+ 
+         var contain = fragment.Style.Contain;
+@@ -370,88 +396,30 @@ internal static partial class PaintWalker
+     }
+ 
+     /// <summary>
+-    /// Applies CSS filter functions on the root/html fragment to the canvas background color.
+-    /// Supports <c>invert()</c> and <c>sepia()</c>; other filter functions are silently ignored.
++    /// The CSS <c>filter</c> that applies to the canvas background, or <c>null</c> when none
++    /// applies. The document root (html) element's filter governs the canvas — including a
++    /// background propagated up from <body> — so it is preferred; a filter set directly on the
++    /// propagating element (e.g. <body>) is the fallback. Only colour-matrix functions the
++    /// rasterizer models are returned (see <see cref="HasSupportedFilterFunction"/>).
+     /// </summary>
+-    private static BColor ApplyRootFilter(Fragment? htmlFragment, BColor color)
++    private static string? ResolveCanvasFilter(Fragment root, Fragment? bgSource)
+     {
+-        if (htmlFragment == null) return color;
+-
+-        string? filter = htmlFragment.Style.Filter;
+-        if (string.IsNullOrEmpty(filter) || filter == "none") return color;
+-
+-        // Parse invert(N) where N is 0..1 (or 0%..100%)
+-        var invertMatch = System.Text.RegularExpressions.Regex.Match(filter, @"invert\(\s*([^)]+)\s*\)");
+-        if (invertMatch.Success)
+-        {
+-            string valStr = invertMatch.Groups[1].Value.Trim();
+-            float amount = 1f;
+-            if (valStr.EndsWith("%"))
+-            {
+-                if (float.TryParse(valStr.AsSpan(0, valStr.Length - 1),
+-                    NumberStyles.Float,
+-                    CultureInfo.InvariantCulture, out var pct))
+-                    amount = pct / 100f;
+-            }
+-            else if (float.TryParse(valStr,
+-                NumberStyles.Float,
+-                CultureInfo.InvariantCulture, out var val))
+-            {
+-                amount = val;
+-            }
+-            amount = Math.Clamp(amount, 0f, 1f);
+-
+-            // invert(amount): result = value × (1 - amount) + (255 - value) × amount
+-            int r = (int)Math.Round(color.R * (1 - amount) + (255 - color.R) * amount);
+-            int g = (int)Math.Round(color.G * (1 - amount) + (255 - color.G) * amount);
+-            int b = (int)Math.Round(color.B * (1 - amount) + (255 - color.B) * amount);
+-
+-            return BColor.FromArgb(color.A,
+-                Math.Clamp(r, 0, 255),
+-                Math.Clamp(g, 0, 255),
+-                Math.Clamp(b, 0, 255));
+-        }
++        var rootElement = string.Equals(root.Style.TagName, "html", StringComparison.OrdinalIgnoreCase)
++            ? root
++            : FindFragmentByTag(root, "html") ?? FindFirstBlockChild(root) ?? root;
+ 
+-        // Parse sepia(N) where N is 0..1 (or 0%..100%)
+-        // sepia transform matrix (CSS Filter Effects Module Level 1):
+-        //   R' = min(255, 0.393R + 0.769G + 0.189B)
+-        //   G' = min(255, 0.349R + 0.686G + 0.168B)
+-        //   B' = min(255, 0.272R + 0.534G + 0.131B)
+-        var sepiaMatch = System.Text.RegularExpressions.Regex.Match(filter, @"sepia\(\s*([^)]+)\s*\)");
+-        if (sepiaMatch.Success)
+-        {
+-            string valStr = sepiaMatch.Groups[1].Value.Trim();
+-            float amount = 1f;
+-            if (valStr.EndsWith("%"))
+-            {
+-                if (float.TryParse(valStr.AsSpan(0, valStr.Length - 1),
+-                    NumberStyles.Float,
+-                    CultureInfo.InvariantCulture, out var pct))
+-                    amount = pct / 100f;
+-            }
+-            else if (float.TryParse(valStr,
+-                NumberStyles.Float,
+-                CultureInfo.InvariantCulture, out var val))
+-            {
+-                amount = val;
+-            }
+-            amount = Math.Clamp(amount, 0f, 1f);
+-
+-            // Sepia matrix applied with interpolation: result = original × (1-amount) + sepia × amount
+-            double sr = 0.393 * color.R + 0.769 * color.G + 0.189 * color.B;
+-            double sg = 0.349 * color.R + 0.686 * color.G + 0.168 * color.B;
+-            double sb = 0.272 * color.R + 0.534 * color.G + 0.131 * color.B;
+-
+-            int r = (int)Math.Round(color.R * (1 - amount) + Math.Min(255, sr) * amount);
+-            int g = (int)Math.Round(color.G * (1 - amount) + Math.Min(255, sg) * amount);
+-            int b = (int)Math.Round(color.B * (1 - amount) + Math.Min(255, sb) * amount);
+-
+-            return BColor.FromArgb(color.A,
+-                Math.Clamp(r, 0, 255),
+-                Math.Clamp(g, 0, 255),
+-                Math.Clamp(b, 0, 255));
+-        }
++        return SupportedFilterOrNull(rootElement) ?? SupportedFilterOrNull(bgSource);
++    }
+ 
+-        return color;
++    /// <summary>Returns the fragment's <c>filter</c> value when it is non-<c>none</c> and contains
++    /// at least one colour-matrix function the rasterizer applies; otherwise <c>null</c>.</summary>
++    private static string? SupportedFilterOrNull(Fragment? fragment)
++    {
++        var filter = fragment?.Style.Filter;
++        if (string.IsNullOrEmpty(filter)
++            || filter.Equals("none", StringComparison.OrdinalIgnoreCase)
++            || !HasSupportedFilterFunction(filter))
++            return null;
++        return filter;
+     }
+ }
+-- 
+2.43.0
+
