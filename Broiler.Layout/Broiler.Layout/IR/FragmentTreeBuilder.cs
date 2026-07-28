@@ -16,7 +16,26 @@ internal static class FragmentTreeBuilder
     /// Builds a <see cref="Fragment"/> tree from the given root <see cref="CssBox"/>.
     /// Should be called after <c>PerformLayout</c> has completed.
     /// </summary>
-    public static Fragment Build(CssBox root) => BuildFragment(root, parentHasTransform: false);
+    public static Fragment Build(CssBox root)
+    {
+        // Reset and repopulate the document-wide SVG filter table for this render pass, so a
+        // `filter="url(#id)"` reference resolves even when the `<filter>` lives in a different
+        // `<svg>` subtree than the referencing shape.
+        SvgFilterTable.Reset();
+        var tree = BuildFragment(root, parentHasTransform: false);
+        CollectSvgFilters(tree);
+        return tree;
+    }
+
+    /// <summary>Walks the fragment tree and registers every modelled SVG filter (see
+    /// <see cref="SvgFilterTable"/>) from each fragment's serialized SVG content.</summary>
+    private static void CollectSvgFilters(Fragment fragment)
+    {
+        if (!string.IsNullOrEmpty(fragment.SvgContent))
+            SvgRenderer.CollectFloodFilters(fragment.SvgContent);
+        foreach (var child in fragment.Children)
+            CollectSvgFilters(child);
+    }
 
     private static Fragment BuildFragment(CssBox box, bool parentHasTransform)
     {

@@ -840,3 +840,37 @@ listed in `scripts/apply-pending-wpt-patches.sh`'s `PENDING_PATCHES`, so the WPT
 it on top of the pinned pointer (idempotent — it reverts to *skip* once a maintainer lands it
 upstream and bumps the pointer). **No main-repo fallback** is possible — the canvas paint
 pipeline lives entirely in `Broiler.HTML`, so the fix renders only once the patch is applied.
+
+## 0030 — `Broiler.HTML`: apply a CSS `filter: url(#id)` feFlood reference as a solid fill
+
+**Symptom.** A `<div style="filter: url(#f)">` referencing an SVG `<filter>` whose sole primitive is
+`<feFlood flood-color="green">` rendered the div's own (red) background instead of the flood colour
+(WPT `css/filter-effects/svg-filter-primitive-units-user-space`, 91.5 % → the two HTML boxes were red
+where the reference is a green box).
+
+**Cause.** `PaintWalker`'s filter gate (`HasSupportedFilterFunction`) only recognises the colour-matrix
+functions (`invert`/`sepia`/…); a `url(...)` reference fell through, so no filter was applied and the
+element painted normally.
+
+**Fix.** In `PaintFragment`, before the transform/opacity/filter layers, a `filter: url(#id)` that
+resolves — via the document-wide `Broiler.Layout` `SvgFilterTable` — to a modelled `feFlood` filter
+emits a `FillRectItem` of the flood colour over the element's border box and returns, suppressing the
+element's own background/content (feFlood ignores its source). It is emitted **outside** the element's
+CSS transform because the flood is produced in the element's user space, not its transformed box —
+the WPT test matches a `translate(10px,10px)` filtered `<div>` against an *untranslated* green box, so
+the fill must sit at the pre-transform border box.
+
+**Dependency.** This patch calls `Broiler.Layout.IR.SvgFilterTable` (a new **public** type pushed
+directly to the parent, together with the `SvgRenderer` feFlood support for SVG *shapes* — the
+`filter="url(#id)"` attribute — and the `FragmentTreeBuilder.Build` pass that populates the table from
+every `<svg>` subtree). The SVG-shape half of the fix is entirely parent-side and needs no patch;
+only the CSS `filter: url()` paint decision lives in `Broiler.HTML`. A parent-side unit test
+(`SvgFloodFilterTests`) covers the shape path; the CSS-`filter` path is exercised by the WPT reftest
+on the CI run.
+
+**Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships as
+`patches/0030-html-css-feflood-filter-reference.patch` with the pointer left **unbumped** (pinned
+`3b92c22`) and the submodule working tree reverted. It is **independent** of `0029` (different file,
+`PaintWalker.Stacking.cs`) and is listed in `scripts/apply-pending-wpt-patches.sh`'s
+`PENDING_PATCHES`, so the WPT CI run applies it on the pinned pointer (idempotent — it reverts to
+*skip* once a maintainer lands it upstream and bumps the pointer).

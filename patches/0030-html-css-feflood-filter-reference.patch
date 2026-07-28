@@ -1,0 +1,56 @@
+From 21c6d1dc2ebb2875de8127b3279d488f8c996142 Mon Sep 17 00:00:00 2001
+From: Claude <enrico.bartky@gmail.com>
+Date: Tue, 28 Jul 2026 12:22:21 +0000
+Subject: [PATCH] paint: apply a CSS filter:url() feFlood reference as a solid
+ fill
+
+A CSS filter:url(#id) that references an SVG <filter> whose sole modelled
+primitive is an <feFlood> replaces the element's rendering with a solid fill of
+the flood colour over the filter region (the border box). feFlood ignores its
+source, so the element's own background/content and descendants are suppressed.
+
+The fill is emitted before the transform/opacity/filter layers because the flood
+is produced in the element's own user space, not its transformed box (WPT
+css/filter-effects/svg-filter-primitive-units-user-space matches a translated,
+filtered <div> against an untranslated green box). A url() filter that does not
+resolve to a modelled flood is left to render unfiltered, as before.
+
+The flood colour is resolved via the document-wide Broiler.Layout SvgFilterTable
+(populated from every <svg> subtree during fragment-tree building), so a filter
+defined in one <svg> resolves from a CSS reference on an unrelated element.
+---
+ .../IR/PaintWalker.Stacking.cs                 | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
+index b987dfc..9dd34a9 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs
+@@ -103,6 +103,24 @@ internal static partial class PaintWalker
+ 
+         var bounds = fragment.Bounds;
+ 
++        // Filter Effects: a CSS `filter: url(#id)` that references an SVG filter whose sole modelled
++        // primitive is an `feFlood` replaces the element's entire rendering with a solid fill of the
++        // flood colour over the filter region (the element’s border box). feFlood ignores its source,
++        // so the element's own background/content and descendants are suppressed. The fill is emitted
++        // here — before the transform/opacity/filter layers — because the flood is produced in the
++        // element’s own user space, not its transformed box (WPT
++        // css/filter-effects/svg-filter-primitive-units-user-space: a translated, filtered <div>
++        // matches an untranslated green box). A non-flood url() filter is left to render unfiltered.
++        if (!isRoot
++            && !string.IsNullOrEmpty(style.Filter)
++            && Layout.IR.SvgFilterTable.ExtractUrlReferenceId(style.Filter) is { } floodId
++            && Layout.IR.SvgFilterTable.TryGetFlood(floodId, out var flood)
++            && flood.Color.A > 0)
++        {
++            items.Add(new FillRectItem { Bounds = bounds, Color = flood.Color });
++            return;
++        }
++
+         // Skip empty-cells table cells
+         if (style.Display == "table-cell" && style.EmptyCells == "hide")
+         {
+-- 
+2.43.0
+
