@@ -260,6 +260,11 @@ public sealed partial class DomBridge
             if (!TryGetAttribute(element, "name", out var name) ||
                 !name.Trim().Equals("color-scheme", StringComparison.OrdinalIgnoreCase))
                 continue;
+            // A meta in a shadow tree is not in the document tree (HTML §4.2.5.3), so it
+            // contributes no document-level color scheme (WPT
+            // meta-color-scheme-single-value-in-shadow-tree).
+            if (FindContainingShadowRoot(element) != null)
+                continue;
             if (TryGetAttribute(element, "content", out var content) &&
                 IsValidColorSchemeValue(content))
             {
