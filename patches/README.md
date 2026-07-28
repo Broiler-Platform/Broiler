@@ -874,3 +874,49 @@ on the CI run.
 `PaintWalker.Stacking.cs`) and is listed in `scripts/apply-pending-wpt-patches.sh`'s
 `PENDING_PATCHES`, so the WPT CI run applies it on the pinned pointer (idempotent — it reverts to
 *skip* once a maintainer lands it upstream and bumps the pointer).
+
+## 0031 — `Broiler.CSS`: implement CSS Nesting (nested rules + `&` selector)
+
+**Symptom.** The `html/semantics/popovers/popover-{img,textarea,checkbox,progress,iframe}-backdrop`
+WPT reftests rendered **blank white** against a solid-green reference (0.0 % match / MissingContent).
+Each test hides the open popover element and paints a green `::backdrop` through a *nested* rule:
+
+```css
+img:popover-open {
+  visibility: hidden;
+  &::backdrop { visibility: visible; background-color: green; }
+}
+```
+
+The element was hidden correctly, but the green `&::backdrop` never applied, so nothing painted.
+
+**Cause.** `CssParser` had no CSS Nesting support. A style rule's block was parsed as a flat
+declaration list (`ParseDeclarationBlock`, splitting on top-level `;`), so a nested rule such as
+`&::backdrop { … }` arrived as one segment whose first top-level `:` sits inside `{ background: … }` —
+it was rejected as a malformed declaration (`CSS2002`) and silently dropped. Every nested rule (with
+or without `&`) was lost engine-wide, not just on `::backdrop`.
+
+**Fix.** `CssParser` now parses a style rule's body with a nesting-aware walker
+(`ParseStyleRuleBlock`) that separates the parent's own declarations from nested style rules and
+nested conditional groups (`@media`/`@supports`/`@container`/…). Each nested selector is desugared
+against the parent (CSS Nesting Level 1 §nest-desugaring): a selector containing `&` has it replaced
+by the parent; a relative or bare selector gets the parent prepended with a descendant combinator
+(`.child` → `.parent .child`, `> .child` → `.parent > .child`); a comma-separated parent is wrapped in
+`:is(…)` to keep it one unit with its combined specificity. Nested rules are flattened to independent
+`CssStyleRule`s emitted **immediately after** their parent, so the cascade's existing document-order
+tie-break makes a nested declaration win over an equally-specific one in the parent block. The change
+is confined to the parser — the cascade already matches the resulting flat rules (including for the
+`::backdrop` pseudo-element), so no style-engine change was needed.
+
+**Verification.** All five `popover-*-backdrop` reftests now render full green (verified locally with
+`Broiler.Wpt --render` against the shared `…-ref.html`). No regressions: `Broiler.CSS.Tests` (217),
+`Broiler.CSS.Dom.Tests` (287, the 2 pre-existing architecture failures unaffected), and
+`Broiler.Layout.Tests` (262) all pass; the `Broiler.Cli.Tests` failures are identical with and without
+this patch (pre-existing, environmental).
+
+**Why it's a patch.** The `Broiler.CSS` push returned **403** (the submodule remote is outside the
+session's GitHub scope), so per `CLAUDE.md` it ships as `patches/0031-css-nesting.patch` with the
+pointer left **unbumped** (pinned `2dda437`) and the submodule working tree reverted. It touches only
+`Broiler.CSS/CssParser.cs` and is listed in `scripts/apply-pending-wpt-patches.sh`'s
+`PENDING_PATCHES`, so the WPT CI run applies it on the pinned pointer (idempotent — it reverts to
+*skip* once a maintainer lands it upstream and bumps the pointer).
