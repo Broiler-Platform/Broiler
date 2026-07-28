@@ -934,21 +934,27 @@ either the block background phase or the inline-box decoration pass.
 
 **Fix.** Adds `ParseBoxShadow` (comma-separated layers: `offset-x offset-y blur? spread? colour?
 inset?`, colour defaulting to `currentColor`) and `EmitBoxShadow`, which emits each **outset** layer
-as a solid fill behind the element's border box — before the background, so a solid background covers
-the overlapping part and only the offset/spread halo shows. Hooked into both paint paths:
+behind the element's border box — before the background, so a solid background covers the overlapping
+part and only the offset/spread/blur halo shows. Hooked into both paint paths:
 `PaintFragmentBackgroundPhase` (in-flow blocks) and `EmitInlineBoxBackgroundAndBorder` (inline boxes,
 one fill per line fragment). Rounded boxes clip the shadow to the border radius grown by the spread.
 
-**Scope / limitations.** Sharp shadows only: the **blur** radius is not rendered (a blurred shadow
-paints its sharp offset+spread rectangle — an over-approximation) and **inset** layers are skipped
-(they paint inside the box, over the background — not yet modelled). This covers the common no-blur
-case; blur/inset remain follow-ups. No new IR type or renderer change was needed (reuses
-`FillRectItem`/`ClipItem`).
+A **zero-blur** layer is a single solid fill. A **blurred** layer (`EmitBlurredShadow`) is
+approximated by a stack of concentric solid fills whose cumulative `SrcOver` coverage matches the
+Gaussian (std-dev `blur/2`) cumulative distribution across the shape edge — each shell painted at the
+incremental alpha needed to reach the target coverage at its offset. No new IR type or renderer change
+was needed (reuses `FillRectItem`/`ClipItem`).
 
-**Verification.** `inline-child-with-overflow-shadow` now matches its Chromium reference (99.9%, via
-the full `Broiler.Wpt` runner against a locally generated golden); block, inline and spread shadows
-verified with `--render`. No regressions: the `Broiler.Cli.Tests` shadow/decoration/graphics-parity
-subset shows the same (pre-existing, environmental Skia-fallback) failures with and without the patch.
+**Scope / limitations.** The blur is a rectangular-shell approximation of a true separable Gaussian
+(it softens corners slightly less), and **inset** layers are skipped (they paint inside the box, over
+the background — not yet modelled).
+
+**Verification.** `inline-child-with-overflow-shadow` matches its Chromium reference (99.9%, via the
+full `Broiler.Wpt` runner against a locally generated golden). A blurred drop shadow
+(`box-shadow: 0 0 30px black`) matches a Chromium-generated golden to **99.75%**; block, inline and
+spread shadows verified with `--render`. No regressions: the `Broiler.Cli.Tests`
+shadow/decoration/graphics-parity subset shows the same (pre-existing, environmental Skia-fallback)
+failures with and without the patch.
 
 **Why it's a patch.** The `Broiler.HTML` push returned **403**, so per `CLAUDE.md` it ships as
 `patches/0032-html-box-shadow-paint.patch` with the pointer left **unbumped** (pinned `3b92c22`) and

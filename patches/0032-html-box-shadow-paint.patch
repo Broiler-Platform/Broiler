@@ -1,35 +1,32 @@
-From f589cd42612c7c8d5e811352e75f1d7943adb276 Mon Sep 17 00:00:00 2001
+From 6f9733eb061fd81d05abeb2895912abd62cabd2c Mon Sep 17 00:00:00 2001
 From: Claude <enrico.bartky@gmail.com>
-Date: Tue, 28 Jul 2026 15:49:45 +0000
-Subject: [PATCH] paint: render CSS box-shadow (outset, sharp) for block and
- inline boxes
+Date: Tue, 28 Jul 2026 16:08:31 +0000
+Subject: [PATCH] paint: render CSS box-shadow (outset) for block and inline
+ boxes
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
 box-shadow was stored on the computed style but never painted — only text-shadow
-was. Implement the outset layers as solid fills behind the element's border box,
-emitted before the background in both paint paths (PaintFragmentBackgroundPhase for
-in-flow blocks; EmitInlineBoxBackgroundAndBorder for inline boxes, one fill per line
-fragment). ParseBoxShadow reads the comma-separated layers (offset-x, offset-y,
-blur?, spread?, colour?, inset?), defaulting the colour to currentColor.
+was. Implement outset box-shadow: a zero-blur layer is a solid fill behind the
+element's border box (offset + spread); a blurred layer is approximated by a stack
+of concentric solid fills whose cumulative SrcOver coverage matches the Gaussian
+(std-dev blur/2) cumulative distribution across the shape edge. Emitted before the
+background in both paint paths (PaintFragmentBackgroundPhase for in-flow blocks;
+EmitInlineBoxBackgroundAndBorder for inline boxes, one per line fragment); rounded
+boxes clip the shadow to the border radius grown by the spread. inset layers are
+not yet modelled.
 
-Scope: sharp shadows — the blur radius is not rendered (a blurred shadow paints its
-offset+spread rectangle) and inset layers are skipped; rounded boxes clip the shadow
-to the border radius grown by the spread. This is enough for the common no-blur case
-and fixes WPT css/css-view-transitions/inline-child-with-overflow-shadow, whose target
-is an inline span with 'box-shadow: -20px -20px yellow' that previously did not paint.
-
-Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_012YoRLXEenpQMtKxqtHdWZa
+Fixes WPT css/css-view-transitions/inline-child-with-overflow-shadow (inline span
+with a sharp offset shadow) and renders blurred shadows within ~99.7% of Chromium.
 ---
- .../IR/PaintWalker.Decorations.cs             |  83 ++++++-
+ .../IR/PaintWalker.Decorations.cs             | 146 +++++++++++-
  .../IR/PaintWalker.Parsing.cs                 |  88 ++++++++
  .../IR/PaintWalker.Stacking.cs                | 213 +++++++++---------
- 3 files changed, 278 insertions(+), 106 deletions(-)
+ 3 files changed, 341 insertions(+), 106 deletions(-)
 
 diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
-index 4d52613..91b99f7 100644
+index 4d52613..e2fdae1 100644
 --- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
 +++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
 @@ -60,6 +60,9 @@ internal static partial class PaintWalker
@@ -42,7 +39,7 @@ index 4d52613..91b99f7 100644
          bool bgClippedRounded = false;
          bool hasCornerRadius = style.ActualCornerNw > 0 || style.ActualCornerNe > 0
              || style.ActualCornerSe > 0 || style.ActualCornerSw > 0;
-@@ -89,6 +92,78 @@ internal static partial class PaintWalker
+@@ -89,6 +92,141 @@ internal static partial class PaintWalker
              items.Add(new RestoreItem { Bounds = bounds });
      }
  
@@ -53,12 +50,12 @@ index 4d52613..91b99f7 100644
 +    /// sits behind it; a solid background then covers the part of an outset shadow that overlaps the
 +    /// box, leaving only the visible offset/spread halo.
 +    /// <para>
-+    /// Modelled as sharp shadows: the blur radius is not rendered (a blurred shadow paints its
-+    /// sharp offset+spread rectangle — an over-approximation), and <c>inset</c> layers are skipped
-+    /// (they paint inside the box, over the background, and are not yet modelled). This is why a
-+    /// <c>box-shadow: -20px -20px yellow</c> on an inline <c>&lt;span&gt;</c> — previously not painted
-+    /// at all — now shows its yellow offset rectangle (WPT
-+    /// css/css-view-transitions/inline-child-with-overflow-shadow).
++    /// A zero-blur layer is a single sharp fill; a blurred layer is approximated by
++    /// <see cref="EmitBlurredShadow"/> (concentric solid fills matching the Gaussian coverage).
++    /// <c>inset</c> layers are skipped (they paint inside the box, over the background, and are not
++    /// yet modelled). This is why a <c>box-shadow: -20px -20px yellow</c> on an inline
++    /// <c>&lt;span&gt;</c> — previously not painted at all — now shows its yellow offset rectangle
++    /// (WPT css/css-view-transitions/inline-child-with-overflow-shadow).
 +    /// </para>
 +    /// </summary>
 +    private static void EmitBoxShadow(Fragment fragment, List<DisplayItem> items)
@@ -83,45 +80,108 @@ index 4d52613..91b99f7 100644
 +                if (s.Inset || s.Color.A == 0)
 +                    continue;
 +
-+                var sr = new RectangleF(
-+                    rect.X + s.OffsetX - s.Spread,
-+                    rect.Y + s.OffsetY - s.Spread,
-+                    rect.Width + (2f * s.Spread),
-+                    rect.Height + (2f * s.Spread));
-+                if (sr.Width <= 0 || sr.Height <= 0)
++                // The un-blurred shadow shape: the border box, offset, then grown by the spread.
++                var core = InflateRect(new RectangleF(
++                    rect.X + s.OffsetX, rect.Y + s.OffsetY, rect.Width, rect.Height), s.Spread);
++                if (core.Width <= 0 || core.Height <= 0)
 +                    continue;
 +
-+                if (hasCornerRadius)
-+                {
-+                    // Outset-shadow corners follow the border radius grown by the spread distance.
-+                    items.Add(new ClipItem
-+                    {
-+                        Bounds = sr,
-+                        ClipRect = sr,
-+                        CornerNw = Math.Max(0.0, style.ActualCornerNw + s.Spread),
-+                        CornerNwY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerNwRadiusRaw, style.ActualCornerNw, rect) + s.Spread),
-+                        CornerNe = Math.Max(0.0, style.ActualCornerNe + s.Spread),
-+                        CornerNeY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerNeRadiusRaw, style.ActualCornerNe, rect) + s.Spread),
-+                        CornerSe = Math.Max(0.0, style.ActualCornerSe + s.Spread),
-+                        CornerSeY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerSeRadiusRaw, style.ActualCornerSe, rect) + s.Spread),
-+                        CornerSw = Math.Max(0.0, style.ActualCornerSw + s.Spread),
-+                        CornerSwY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerSwRadiusRaw, style.ActualCornerSw, rect) + s.Spread),
-+                    });
-+                    items.Add(new FillRectItem { Bounds = sr, Color = s.Color });
-+                    items.Add(new RestoreItem { Bounds = sr });
-+                }
++                if (s.Blur > 0.5f)
++                    EmitBlurredShadow(items, fragment, rect, s, core, hasCornerRadius);
 +                else
-+                {
-+                    items.Add(new FillRectItem { Bounds = sr, Color = s.Color });
-+                }
++                    EmitShadowFill(items, fragment, rect, core, s.Spread, s.Color, hasCornerRadius);
 +            }
++        }
++    }
++
++    /// <summary>
++    /// Emits a blurred outset shadow layer as a stack of concentric solid fills whose cumulative
++    /// SrcOver coverage approximates a Gaussian blur of the shadow shape. Per CSS Backgrounds §7 the
++    /// blur applies a Gaussian with standard deviation <c>blur/2</c>; the coverage across the shape
++    /// edge is that Gaussian's cumulative distribution. Shells run from the outer edge of the blur
++    /// band (<c>~3σ</c> outside the shape, coverage ≈ 0) inward to its interior (coverage ≈ the
++    /// shadow colour's own alpha), each painted at the incremental alpha needed to reach the target
++    /// cumulative coverage. Still an approximation — a true separable Gaussian would soften the
++    /// corners further — but far closer than a sharp rectangle.
++    /// </summary>
++    private static void EmitBlurredShadow(
++        List<DisplayItem> items, Fragment fragment, RectangleF borderRect,
++        in BoxShadowLayer s, RectangleF core, bool hasCornerRadius)
++    {
++        float sigma = Math.Max(0.01f, s.Blur * 0.5f);
++        float extent = 3f * sigma;                              // band half-width (±3σ ≈ full falloff)
++        int shells = Math.Clamp((int)MathF.Ceiling(extent), 4, 24);
++        float peak = s.Color.A;                                 // cumulative coverage reached inside
++
++        // Outer → inner: SrcOver accumulates toward `peak` at the interior. Shell k's boundary sits
++        // `d` px into the shape from the core edge (d from -extent outside to +extent inside).
++        float prevT = 0f;
++        for (int k = 0; k < shells; k++)
++        {
++            float d = -extent + ((k + 1) / (float)(shells + 1)) * (2f * extent);
++            float targetT = peak * NormalCdf(d / sigma);        // desired cumulative coverage here
++            float denom = 255f - prevT;
++            float aShell = denom > 0.001f ? (targetT - prevT) / denom : 0f;
++            prevT = targetT;
++
++            int alpha = (int)Math.Round(Math.Clamp(aShell, 0f, 1f) * 255f);
++            if (alpha <= 0)
++                continue;
++
++            float inflate = -d;                                 // boundary d inside ⇒ shrink core by d
++            var shellRect = InflateRect(core, inflate);
++            var shellColor = BColor.FromArgb(alpha, s.Color.R, s.Color.G, s.Color.B);
++            EmitShadowFill(items, fragment, borderRect, shellRect, s.Spread + inflate, shellColor, hasCornerRadius);
++        }
++    }
++
++    /// <summary>Standard-normal CDF Φ(z), via a monotonic logistic approximation (max error ≈ 1%),
++    /// used to shape the blurred-shadow coverage falloff.</summary>
++    private static float NormalCdf(float z) => 1f / (1f + MathF.Exp(-1.702f * z));
++
++    private static RectangleF InflateRect(RectangleF r, float by) =>
++        new(r.X - by, r.Y - by, r.Width + (2f * by), r.Height + (2f * by));
++
++    /// <summary>
++    /// Emits one shadow rectangle fill of <paramref name="color"/>, clipped to the box's rounded
++    /// corners (grown by <paramref name="cornerDelta"/>) when the element has a border radius.
++    /// </summary>
++    private static void EmitShadowFill(
++        List<DisplayItem> items, Fragment fragment, RectangleF borderRect,
++        RectangleF fillRect, float cornerDelta, BColor color, bool hasCornerRadius)
++    {
++        if (fillRect.Width <= 0 || fillRect.Height <= 0)
++            return;
++
++        if (hasCornerRadius)
++        {
++            var style = fragment.Style;
++            items.Add(new ClipItem
++            {
++                Bounds = fillRect,
++                ClipRect = fillRect,
++                CornerNw = Math.Max(0.0, style.ActualCornerNw + cornerDelta),
++                CornerNwY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerNwRadiusRaw, style.ActualCornerNw, borderRect) + cornerDelta),
++                CornerNe = Math.Max(0.0, style.ActualCornerNe + cornerDelta),
++                CornerNeY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerNeRadiusRaw, style.ActualCornerNe, borderRect) + cornerDelta),
++                CornerSe = Math.Max(0.0, style.ActualCornerSe + cornerDelta),
++                CornerSeY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerSeRadiusRaw, style.ActualCornerSe, borderRect) + cornerDelta),
++                CornerSw = Math.Max(0.0, style.ActualCornerSw + cornerDelta),
++                CornerSwY = Math.Max(0.0, GetEffectiveCornerRadiusY(style.CornerSwRadiusRaw, style.ActualCornerSw, borderRect) + cornerDelta),
++            });
++            items.Add(new FillRectItem { Bounds = fillRect, Color = color });
++            items.Add(new RestoreItem { Bounds = fillRect });
++        }
++        else
++        {
++            items.Add(new FillRectItem { Bounds = fillRect, Color = color });
 +        }
 +    }
 +
      private static void EmitReplacedImage(Fragment fragment, List<DisplayItem> items)
      {
          // SVG content for <object data="...svg"> elements — render via SvgRenderer.
-@@ -156,10 +231,10 @@ internal static partial class PaintWalker
+@@ -156,10 +294,10 @@ internal static partial class PaintWalker
                  bounds.Height - (float)(border.Top + border.Bottom + padding.Top + padding.Bottom));
  
              if (r.Width > 0 && r.Height > 0)
