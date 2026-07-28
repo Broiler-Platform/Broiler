@@ -189,6 +189,70 @@ internal sealed class CssLayoutEngineTable
 
         if (_footerBox != null)
             _allRows.AddRange(_footerBox.Boxes);
+
+        // CSS2.1 §17.2.1: within each row, a child that is not a table-cell (a
+        // block, inline, etc.) is wrapped — together with its consecutive
+        // non-cell siblings — in an anonymous table-cell box. GenerateAnonymousTableRows
+        // only wraps non-cell children of the *table*; a non-cell child of an
+        // explicit <div style="display:table-row"> was left uncelled and never laid
+        // out (WPT css-sizing/table-child-percentage-height-with-border-box).
+        foreach (var row in _allRows)
+            WrapRowNonCellChildrenInAnonymousCells(row, baseUrl);
+    }
+
+    /// <summary>
+    /// CSS2.1 §17.2.1: wraps each run of consecutive non-<c>table-cell</c> children of
+    /// <paramref name="row"/> in a single anonymous <c>table-cell</c> box, preserving
+    /// child order. A no-op when every child is already a table-cell.
+    /// </summary>
+    private void WrapRowNonCellChildrenInAnonymousCells(CssBox row, Uri baseUrl)
+    {
+        bool needsWrapping = false;
+        foreach (var child in row.Boxes)
+        {
+            if (child.Display != CssConstants.TableCell)
+            {
+                needsWrapping = true;
+                break;
+            }
+        }
+
+        if (!needsWrapping)
+            return;
+
+        var children = new List<CssBox>(row.Boxes);
+        row.Boxes.Clear();
+
+        List<CssBox>? pendingNonCell = null;
+
+        void FlushAnonymousCell()
+        {
+            if (pendingNonCell == null)
+                return;
+
+            // The CssBox(parent, tag) constructor appends the new cell to row.Boxes,
+            // keeping it in order after any real cells already re-added.
+            var anonCell = new CssBox(row, null, baseUrl) { Display = CssConstants.TableCell };
+            foreach (var child in pendingNonCell)
+                child.ParentBox = anonCell;
+            pendingNonCell = null;
+        }
+
+        foreach (var child in children)
+        {
+            if (child.Display == CssConstants.TableCell)
+            {
+                FlushAnonymousCell();
+                row.Boxes.Add(child);
+            }
+            else
+            {
+                pendingNonCell ??= [];
+                pendingNonCell.Add(child);
+            }
+        }
+
+        FlushAnonymousCell();
     }
 
     /// <summary>
@@ -1033,6 +1097,7 @@ internal sealed class CssLayoutEngineTable
                 cell.ActualBottom = newBottom;
                 cell.Size = new SizeF(cell.Size.Width, (float)(newBottom - cell.Location.Y));
 
+                ResolveCellPercentageHeightChildren(g, cell);
                 CssLayoutEngine.ApplyCellVerticalAlignment(g, cell);
             }
 
@@ -1040,6 +1105,61 @@ internal sealed class CssLayoutEngineTable
         }
 
         return naturalBottom + surplus;
+    }
+
+    /// <summary>
+    /// CSS2.1 §17.5.3 / §10.5: a table cell's used height is only known after the
+    /// row-height pass, so a percentage-height in-flow child laid out during the cell's
+    /// own <c>PerformLayout</c> (when the cell was still content-sized) resolved its
+    /// height against an indefinite base and fell back to its content height. Once the
+    /// cell has been stretched to its final height, make that height definite and re-run
+    /// the cell layout so such children resolve against — and fill — the cell (WPT
+    /// css-sizing/table-child-percentage-height-with-border-box). The original CSS
+    /// <c>height</c> is restored afterwards so a later full relayout pass re-derives it
+    /// naturally rather than inheriting this pass's pixel value.
+    /// </summary>
+    private void ResolveCellPercentageHeightChildren(ILayoutEnvironment g, CssBox cell)
+    {
+        if (cell is CssSpacingBox || !CellHasPercentageHeightChild(cell))
+            return;
+
+        double finalBorderBoxHeight = cell.ActualBottom - cell.Location.Y;
+        if (finalBorderBoxHeight <= 0)
+            return;
+
+        double edges = cell.ActualBorderTopWidth + cell.ActualBorderBottomWidth
+            + cell.ActualPaddingTop + cell.ActualPaddingBottom;
+        double cssHeight = string.Equals(cell.BoxSizing, "border-box", StringComparison.OrdinalIgnoreCase)
+            ? finalBorderBoxHeight
+            : Math.Max(0, finalBorderBoxHeight - edges);
+
+        string savedHeight = cell.Height;
+        var savedLocation = cell.Location;
+        cell.Height = cssHeight.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "px";
+        cell.PerformLayout(g);
+        // Keep the finalized cell geometry; only the children needed re-resolution.
+        cell.Height = savedHeight;
+        cell.Location = savedLocation;
+        cell.ActualBottom = savedLocation.Y + finalBorderBoxHeight;
+        cell.Size = new SizeF(cell.Size.Width, (float)finalBorderBoxHeight);
+    }
+
+    /// <summary>Whether <paramref name="cell"/> has an in-flow child whose <c>height</c>
+    /// is a percentage — the case that needs re-resolution once the cell height is final.</summary>
+    private static bool CellHasPercentageHeightChild(CssBox cell)
+    {
+        foreach (var child in cell.Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+            var h = child.Height;
+            if (!string.IsNullOrEmpty(h) && h.EndsWith("%", StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
     }
 
     private double GetSpannedMinWidth(CssBox row, int realcolindex, int colspan)
