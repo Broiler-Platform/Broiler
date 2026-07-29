@@ -117,19 +117,37 @@ try {
         Write-Host "    /                   OK ($($index.Content.Length) bytes, import map present)"
     }
 
-    # Follow the import map to the fingerprinted runtime entry point and make sure it is really
-    # served — a wwwroot that lost _framework/ still returns a perfectly good index.html.
-    $runtimeMatch = [regex]::Match($index.Content, '_framework/dotnet\.[a-z0-9]+\.js')
-    if (-not $runtimeMatch.Success) {
-        $failures.Add('The import map references no fingerprinted _framework/dotnet.<hash>.js module.')
+    # Follow the import map and fetch every module the app boots from — a wwwroot that lost
+    # _framework/ still returns a perfectly good index.html.
+    #
+    # Walk the map's *values*, never scan the document for a module-shaped name: the keys are the
+    # unfingerprinted aliases (./_framework/dotnet.native.js, …/dotnet.runtime.js) and name no file
+    # on disk, so any pattern loose enough to match a hash can match a key instead — and the two
+    # platforms do not agree on which comes first. Only the values point at published files.
+    $importMapMatch = [regex]::Match($index.Content, '(?s)<script type="importmap">(?<json>.*?)</script>')
+    if (-not $importMapMatch.Success) {
+        $failures.Add('The import map in index.html could not be read.')
     }
     else {
-        $runtime = Invoke-BossRequest "/$($runtimeMatch.Value)"
-        if ($runtime.StatusCode -ne 200) {
-            $failures.Add("$($runtimeMatch.Value) returned HTTP $($runtime.StatusCode) — the mono-wasm runtime is not being served.")
+        $imports = $importMapMatch.Groups['json'].Value | ConvertFrom-Json
+        $modules = @()
+        if ($imports.PSObject.Properties.Name -contains 'imports') {
+            $modules = @($imports.imports.PSObject.Properties | ForEach-Object { $_.Value })
         }
-        else {
-            Write-Host "    $($runtimeMatch.Value)  OK"
+
+        if ($modules.Count -eq 0) {
+            $failures.Add('The import map lists no modules — the Writer bundle cannot boot from this shell.')
+        }
+
+        foreach ($module in $modules) {
+            $modulePath = '/' + ($module -replace '^\./', '')
+            $response = Invoke-BossRequest $modulePath
+            if ($response.StatusCode -ne 200) {
+                $failures.Add("$modulePath returned HTTP $($response.StatusCode) — a module the app boots from is not being served.")
+            }
+            else {
+                Write-Host "    $modulePath  OK"
+            }
         }
     }
 
