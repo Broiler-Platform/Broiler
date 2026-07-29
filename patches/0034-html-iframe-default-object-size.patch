@@ -1,0 +1,57 @@
+From 1c97cad8c5f5c9ab2738a57e6630f843aada17fd Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 29 Jul 2026 12:59:30 +0000
+Subject: [PATCH] html: give <iframe> the HTML default object size of 300x150
+
+An <iframe> with no CSS width/height had no size at all in the UA sheet, so it collapsed
+to its 2px border: neither the frame box nor the document inside it rendered, and every
+such test failed as MissingContent even though the sub-document projection itself works.
+
+HTML treats an iframe as a replaced element with a default object size of 300x150 when
+nothing else supplies one. Expressing that as a UA width/height is an approximation of
+the sizing algorithm -- an author `width: auto` wins over a UA declaration and would
+still shrink the box, where a real default object size would keep it 300 wide -- but it
+covers the case that matters and matches how the rule already models the iframe border.
+
+Deliberately not <frame>: it only ever appears inside a <frameset>, which sizes and
+positions its own cells (LayoutFramesetChildren), so a fixed default object size and
+inline-block display would fight that grid instead of helping it.
+
+WPT resource-timing goes 91 -> 92 of 127 with no regressions, including
+tentative/initiator-url/static-resource (item 28 of the biggest-problems report), whose
+iframe now renders green.html at 300x150 as Chromium's golden does.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ Source/Broiler.HTML.Core/CssDefaults.cs | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Core/CssDefaults.cs b/Source/Broiler.HTML.Core/CssDefaults.cs
+index f2ac049..10abce4 100644
+--- a/Source/Broiler.HTML.Core/CssDefaults.cs
++++ b/Source/Broiler.HTML.Core/CssDefaults.cs
+@@ -116,8 +116,19 @@ internal static class CssDefaults
+            the author shorthand, so the legacy `<table border>` grey is applied
+            directly in DomParser (TranslateAttributes / ApplyTableBorder), not
+            here, and author CSS is left to win normally. */
+-        /* Replaced inline elements — WHATWG default rendering */
+-        iframe          { border: 2px inset; display: inline-block }
++        /* Replaced inline elements — WHATWG default rendering.
++           The 300x150 is the HTML replaced-elements rule: an iframe is a replaced element
++           with a *default object size* of 300x150, used when nothing else gives it one.
++           Expressing that as a UA width/height is an approximation of the sizing algorithm
++           (an author `width: auto` would win here and shrink the box, where a real default
++           object size would still be 300 wide), but it is the case that matters: without it
++           an unsized <iframe> collapsed to its border and neither the frame nor its document
++           rendered at all — every such test failed as MissingContent
++           (WPT resource-timing/tentative/initiator-url/static-resource and friends).
++           Deliberately *not* <frame>: it only ever appears inside a <frameset>, which sizes
++           and positions its cells itself (DomParser.LayoutFramesetChildren), so a default
++           object size would fight the grid rather than help it. */
++        iframe          { border: 2px inset; display: inline-block; width: 300px; height: 150px }
+         object          { display: inline-block }
+ 
+         /* HTML5 semantic/sectioning elements – display:block per WHATWG */
+-- 
+2.43.0
+
