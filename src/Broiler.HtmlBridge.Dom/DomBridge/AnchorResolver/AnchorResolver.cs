@@ -106,6 +106,18 @@ public sealed partial class DomBridge
         //     the document body with a single <img> at the origin.
         ReplaceRootWithReplacedContent();
 
+        // -1b. The same element replacement for non-root elements: the element renders the
+        //      image and its children generate no boxes. Must precede the dialog/popover
+        //      passes below so a modal <dialog> inside a replaced element is never hoisted
+        //      into the top layer (WPT modal-dialog-in-replaced-renderer).
+        ReplaceElementsWithReplacedContent();
+
+        // -1c. An <object> with an image resource is a replaced element showing that resource;
+        //      its children are fallback and must not render. Also precedes the dialog passes so
+        //      a modal <dialog> in the fallback is never hoisted into the top layer
+        //      (WPT modal-dialog-in-object).
+        ReplaceImageObjectsWithResource();
+
         // 0. Apply UA default position:fixed to modal dialogs before anchor
         //    resolution, since browsers treat top-layer elements as fixed.
         ApplyDialogUAPositioning(DocumentElement);
@@ -289,6 +301,155 @@ public sealed partial class DomBridge
             });
         SetParent(img, body);
         body.AppendChild(img);
+    }
+
+    /// <summary>
+    /// Tags whose rendering is already replaced (or which generate no box at all), so CSS
+    /// Content 3 element replacement does not apply to them here.
+    /// </summary>
+    private static readonly HashSet<string> ContentReplacementSkipTags =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "area", "audio", "base", "br", "canvas", "col", "embed", "head", "hr", "iframe",
+            "img", "input", "link", "meta", "object", "param", "script", "select", "source",
+            "style", "textarea", "title", "track", "video",
+        };
+
+    /// <summary>
+    /// CSS Content 3 §"content" element replacement for non-root elements: an element whose
+    /// computed <c>content</c> is a replaced value (an image <c>url()</c>) is replaced by that
+    /// image, and — critically — <em>its children generate no boxes</em>.
+    /// <para>
+    /// Broiler does not model non-pseudo element replacement in layout (see
+    /// <see cref="ReplaceRootWithReplacedContent"/>, which reproduces the root case the same
+    /// way), so reproduce the visual result here: drop the element's children and give it a
+    /// single <c>&lt;img&gt;</c> of the replaced image.
+    /// </para>
+    /// <para>
+    /// Both halves matter for WPT
+    /// <c>html/semantics/interactive-elements/the-dialog-element/modal-dialog-in-replaced-renderer</c>,
+    /// whose reference is simply the replaced image with no dialog: the image half was missing
+    /// (a <c>content:url()</c> div painted nothing), and the child-suppression half is what stops
+    /// a nested modal <c>&lt;dialog&gt;</c> from being hoisted into the top layer and painted —
+    /// an element inside a replaced renderer generates no box, top layer or not. Runs before
+    /// <see cref="ApplyDialogUAPositioning"/> and backdrop synthesis, so the removed dialog is
+    /// never stamped into the top layer and no <c>::backdrop</c> is synthesized for it.
+    /// </para>
+    /// </summary>
+    private void ReplaceElementsWithReplacedContent()
+    {
+        var root = DocumentElement;
+        if (root == null)
+            return;
+
+        List<(DomElement Element, string Url)>? pending = null;
+        CollectContentReplacedElements(root, ref pending, isRoot: true);
+        if (pending == null)
+            return;
+
+        foreach (var (element, url) in pending)
+        {
+            ClearChildren(element);
+
+            var img = CreateBridgeElement(
+                "img",
+                attributes: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["src"] = url,
+                });
+            SetParent(img, element);
+            element.AppendChild(img);
+        }
+    }
+
+    /// <summary>
+    /// HTML §4.8.4: an <c>&lt;object&gt;</c> whose resource loads is a replaced element showing that
+    /// resource; its child content is <em>fallback</em>, rendered only when the resource does not
+    /// load. Broiler renders neither half — an <c>&lt;object&gt;</c> with an image resource painted
+    /// nothing, while its fallback children (including a modal <c>&lt;dialog&gt;</c>, which was then
+    /// hoisted into the top layer) painted regardless. WPT
+    /// <c>html/semantics/interactive-elements/the-dialog-element/modal-dialog-in-object</c> needs
+    /// both: its reference is the bare <c>&lt;object&gt;</c> showing a green rectangle, with no dialog.
+    /// <para>
+    /// Reproduce the visual result the same way the sibling <c>content</c> passes do: swap the
+    /// fallback for a single <c>&lt;img&gt;</c> of the resource, carrying the object's
+    /// <c>width</c>/<c>height</c> across so the replaced box keeps its authored size.
+    /// </para>
+    /// <para>
+    /// Deliberately gated on an explicit <c>type="image/*"</c> attribute. Fallback exists precisely
+    /// so a failed resource can degrade, and Acid2 depends on that: its eyes are nested
+    /// <c>&lt;object&gt;</c>s whose outer resources must fail
+    /// (<c>data:application/x-unknown</c> with no <c>type</c>, and a 404 with
+    /// <c>type="text/html"</c>) so the inner fallback shows. None of those carries an
+    /// <c>image/*</c> type, so this pass cannot disturb them.
+    /// </para>
+    /// </summary>
+    private void ReplaceImageObjectsWithResource()
+    {
+        var root = DocumentElement;
+        if (root == null)
+            return;
+
+        var objects = root.Descendants()
+            .OfType<DomElement>()
+            .Where(e => e.TagName.Equals("object", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        foreach (var element in objects)
+        {
+            if (!TryGetAttribute(element, "type", out var type) ||
+                !type.Trim().StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!TryGetAttribute(element, "data", out var data) || string.IsNullOrWhiteSpace(data))
+                continue;
+
+            var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["src"] = data.Trim(),
+            };
+
+            // Keep the authored replaced-box size (the object's own width/height).
+            if (TryGetAttribute(element, "width", out var width) && !string.IsNullOrWhiteSpace(width))
+                attributes["width"] = width.Trim();
+            if (TryGetAttribute(element, "height", out var height) && !string.IsNullOrWhiteSpace(height))
+                attributes["height"] = height.Trim();
+
+            ClearChildren(element);
+
+            var img = CreateBridgeElement("img", attributes: attributes);
+            SetParent(img, element);
+            element.AppendChild(img);
+        }
+    }
+
+    /// <summary>
+    /// Collects, in document order, every element to be replaced by its <c>content</c> image.
+    /// Does not descend into a collected element (its subtree is dropped anyway) and skips the
+    /// root, which <see cref="ReplaceRootWithReplacedContent"/> owns.
+    /// </summary>
+    private void CollectContentReplacedElements(
+        DomElement element, ref List<(DomElement Element, string Url)>? acc, bool isRoot)
+    {
+        if (!isRoot &&
+            !IsText(element) &&
+            !ContentReplacementSkipTags.Contains(element.TagName) &&
+            !element.TagName.Equals("html", StringComparison.OrdinalIgnoreCase))
+        {
+            var content = GetComputedProps(element).GetValueOrDefault("content")?.Trim();
+            if (!string.IsNullOrEmpty(content))
+            {
+                var url = ExtractContentImageUrl(content);
+                if (url != null)
+                {
+                    (acc ??= []).Add((element, url));
+                    return; // Subtree generates no boxes — nothing below to collect.
+                }
+            }
+        }
+
+        foreach (var child in ChildElements(element))
+            CollectContentReplacedElements(child, ref acc, isRoot: false);
     }
 
     /// <summary>

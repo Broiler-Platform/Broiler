@@ -265,6 +265,15 @@ public sealed partial class DomBridge
         if (HtmlSerializer.VoidElements.Contains(contextTag))
             return false;
 
+        // A bridge-internal container (a '#'-prefixed name such as #shadow-root) is not an HTML
+        // element, so it cannot be a fragment parsing context: the parser round-trips the context
+        // tag, and "<#shadow-root>" is unparsable — it came back as a literal text node plus a
+        // bogus comment, which then rendered as visible "<#shadow-root>" text inside every shadow
+        // host (the css/css-shadow reftest family). Parse in a neutral container context instead;
+        // a shadow root imposes no special content model of its own.
+        if (contextTag.StartsWith('#'))
+            contextTag = "div";
+
         var (fragment, _) = BuildFragmentTree(html, contextTag);
         container = fragment;
         return true;

@@ -44,6 +44,8 @@ public sealed partial class DomBridge : IDialogHost
             // A fresh show clears any leftover "transitioning out" mark: if the element is now
             // transitioning `overlay` at all, it is transitioning *in*.
             DialogStateFor(element).PopoverTransitioningOut.Remove();
+            DialogStateFor(element).PopoverOverlayTransitionFinished.Remove();
+            ScheduleOverlayTransitionCompletion(element);
         }
         else
         {

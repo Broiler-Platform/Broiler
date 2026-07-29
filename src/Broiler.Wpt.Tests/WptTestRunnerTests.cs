@@ -110,11 +110,15 @@ public class WptTestRunnerTests : IDisposable
         var resourcesDir = Path.Combine(testDir, "resources");
         var supportDir = Path.Combine(testDir, "support");
         var testPlanDir = Path.Combine(testDir, "test-plan");
+        var toolsDir = Path.Combine(_tempDir, "tools", "third_party", "websockets", "experiments");
+        var docsDir = Path.Combine(_tempDir, "docs", "writing-tests");
         Directory.CreateDirectory(testDir);
         Directory.CreateDirectory(refDir);
         Directory.CreateDirectory(resourcesDir);
         Directory.CreateDirectory(supportDir);
         Directory.CreateDirectory(testPlanDir);
+        Directory.CreateDirectory(toolsDir);
+        Directory.CreateDirectory(docsDir);
 
         // Actual test files (should be discovered).
         File.WriteAllText(Path.Combine(testDir, "mix-blend-mode-basic.html"), "<html></html>");
@@ -128,6 +132,9 @@ public class WptTestRunnerTests : IDisposable
         File.WriteAllText(Path.Combine(testPlanDir, "test-plan.src.html"), "<html></html>");
         File.WriteAllText(Path.Combine(testDir, "opacity-ref.html"), "<html></html>");
         File.WriteAllText(Path.Combine(testDir, "opacity-notref.html"), "<html></html>");
+        // WPT tooling / vendored third-party demos and documentation are not tests.
+        File.WriteAllText(Path.Combine(toolsDir, "first_message.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(docsDir, "index.html"), "<html></html>");
 
         // Act
         var tests = WptTestRunner.DiscoverTests(_tempDir).ToList();
@@ -5239,6 +5246,38 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/support/helper.html"));
         Assert.True(WptTestRunner.IsNonTestFile("C:\\wpt\\support\\utils.html"));
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/resources/fixture.html"));
+    }
+
+    [Fact]
+    public void IsNonTestFile_Detects_Tools_Directory()
+    {
+        // WPT keeps its own runner/server infrastructure and vendored third-party
+        // libraries under tools/; none of it is a test. The websockets library's demo
+        // pages were being pixel-compared as tests and reported as 0.0%-match failures.
+        Assert.True(WptTestRunner.IsNonTestFile(
+            "/wpt/tools/third_party/websockets/experiments/authentication/first_message.html"));
+        Assert.True(WptTestRunner.IsNonTestFile(
+            "/wpt/tools/third_party/websockets/experiments/authentication/user_info.html"));
+        Assert.True(WptTestRunner.IsNonTestFile("C:\\wpt\\tools\\wptrunner\\page.html"));
+        // Also applies to a per-suite tooling directory (e.g. css/tools/).
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/tools/build.html"));
+    }
+
+    [Fact]
+    public void IsNonTestFile_Detects_Docs_Directory()
+    {
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/docs/writing-tests/index.html"));
+        Assert.True(WptTestRunner.IsNonTestFile("C:\\wpt\\docs\\index.html"));
+    }
+
+    [Fact]
+    public void IsNonTestFile_Allows_Real_Tests_With_Similar_Names()
+    {
+        // Guard the new segments against over-matching: a test file or directory whose
+        // name merely contains "tools"/"docs" is still a test.
+        Assert.False(WptTestRunner.IsNonTestFile("/wpt/css/css-ui/tools-in-name.html"));
+        Assert.False(WptTestRunner.IsNonTestFile("/wpt/css/css-ui/docsomething.html"));
+        Assert.False(WptTestRunner.IsNonTestFile("/wpt/html/toolsbar/basic.html"));
     }
 
     [Fact]

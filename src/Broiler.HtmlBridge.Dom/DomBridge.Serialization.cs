@@ -188,6 +188,13 @@ public sealed partial class DomBridge
         ApplyCssomStyleSheetMutations(root);
         InlineStyleSheetImports(root);
         ApplyAdoptedStyleSheets(root);
+        // A shadow root's <style> is serialized inline as a global rule, so its :host
+        // selectors must be rewritten to target that root's own host — otherwise the
+        // renderer's lenient :host matching paints every element.
+        ScopeShadowHostSelectors(root);
+        // A host's light-DOM children render only where a <slot> assigns them; with no slot in
+        // the shadow tree they generate no boxes.
+        HideUnslottedShadowHostChildren(root);
         ApplyBaseHrefToStyleUrls(root);
         ApplyMetaColorScheme(root);
         // Zoom baking is applied by the callers (GetRenderDocument/SerializeToHtml) before this,
@@ -195,6 +202,12 @@ public sealed partial class DomBridge
         // the baked sizes and must run after it.
         ApplyZoomPseudoSerializationOverrides(root);
         ApplyProgressLikeSerializationPlaceholders(root);
+        // Flatten the #shadow-root wrapper LAST: it is not an HTML element, so the renderer would
+        // paint its serialized "<#shadow-root>" open tag as literal text. It must run after every
+        // pass that reads shadow-tree ancestry — ApplyMetaColorScheme in particular skips a
+        // <meta name=color-scheme> inside a shadow tree, and unwrapping first moved that meta into
+        // the document tree and wrongly darkened the canvas.
+        UnwrapShadowRootsForRender(root);
     }
 
     /// <summary>
@@ -259,6 +272,11 @@ public sealed partial class DomBridge
                 continue;
             if (!TryGetAttribute(element, "name", out var name) ||
                 !name.Trim().Equals("color-scheme", StringComparison.OrdinalIgnoreCase))
+                continue;
+            // A meta in a shadow tree is not in the document tree (HTML §4.2.5.3), so it
+            // contributes no document-level color scheme (WPT
+            // meta-color-scheme-single-value-in-shadow-tree).
+            if (FindContainingShadowRoot(element) != null)
                 continue;
             if (TryGetAttribute(element, "content", out var content) &&
                 IsValidColorSchemeValue(content))

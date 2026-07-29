@@ -802,15 +802,29 @@ internal sealed partial class WptTestRunner
     /// Per WPT conventions, <c>reference/</c> and <c>reftest/</c> hold
     /// reference comparison files, <c>support/</c> holds shared resources,
     /// and <c>test-plan/</c> holds specification documentation.
+    /// <para>
+    /// <c>tools/</c> and <c>docs/</c> are likewise excluded: upstream WPT keeps its
+    /// own test-running infrastructure under <c>tools/</c> (wptrunner, wptserve, and
+    /// the vendored third-party libraries under <c>tools/third_party/</c>) and its
+    /// Sphinx documentation under <c>docs/</c>, and its manifest generation treats
+    /// neither as a test source. Without this, vendored demo pages were discovered and
+    /// pixel-compared as if they were tests — e.g. the <c>websockets</c> library's
+    /// <c>tools/third_party/websockets/experiments/authentication/*.html</c> demos were
+    /// reported as 0.0%-match failures in the WPT top-problems report (issue #1473),
+    /// crowding real rendering bugs out of the ranking. This is the same class of
+    /// corpus pollution the <see cref="IsManualTest"/> filter was added to fix.
+    /// </para>
     /// </summary>
     private static readonly string[] NonTestDirSegments =
     [
+        "/docs/", "\\docs\\",
         "/reference/", "\\reference\\",
         "/references/", "\\references\\",
         "/reftest/", "\\reftest\\",
         "/resources/", "\\resources\\",
         "/support/", "\\support\\",
         "/test-plan/", "\\test-plan\\",
+        "/tools/", "\\tools\\",
     ];
 
     /// <summary>
@@ -1040,6 +1054,8 @@ internal sealed partial class WptTestRunner
     /// <list type="bullet">
     ///   <item>Files in <c>reference/</c>, <c>reftest/</c>, or <c>support/</c> directories.</item>
     ///   <item>Files in <c>test-plan/</c> directories (spec documentation).</item>
+    ///   <item>Files in <c>tools/</c> (WPT's own tooling and vendored third-party code)
+    ///         or <c>docs/</c> (documentation) directories.</item>
     ///   <item>Files ending in <c>-ref.html/.htm/.xht/.xhtml</c> or <c>-notref.html/.htm/.xht/.xhtml</c>
     ///         (WPT reference/mismatch reference files).</item>
     ///   <item>Files with a <c>.src.html</c> extension (ReSpec source files).</item>

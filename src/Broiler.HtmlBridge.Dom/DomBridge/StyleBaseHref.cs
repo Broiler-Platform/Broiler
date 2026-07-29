@@ -23,16 +23,19 @@ namespace Broiler.HtmlBridge;
 /// <see cref="InlineStyleSheetImports"/> (so inlined <c>@import</c> content — already rebased
 /// onto the imported sheet's own URL — carries absolute <c>url()</c>s this pass leaves alone).
 /// Only the render-bound serialization is affected; the live CSSOM rule model and JS-visible
-/// serialization are untouched. Only <c>&lt;style&gt;</c> <c>url()</c>s are rewritten today;
-/// element <c>src</c>/<c>href</c> attributes still resolve without <c>&lt;base&gt;</c>.
+/// serialization are untouched. <c>&lt;style&gt;</c> <c>url()</c>s and
+/// <c>&lt;link rel="stylesheet"&gt;</c> <c>href</c>s are rebased against <c>&lt;base&gt;</c>;
+/// other element <c>src</c>/<c>href</c> attributes still resolve without <c>&lt;base&gt;</c>.
 /// </para>
 /// </summary>
 public sealed partial class DomBridge
 {
     /// <summary>
     /// Rewrites relative <c>url()</c> references in every <c>&lt;style&gt;</c> in the tree
-    /// against the document's first <c>&lt;base href&gt;</c>. A no-op (byte-identical output)
-    /// when the document declares no usable <c>&lt;base href&gt;</c>.
+    /// against the document's first <c>&lt;base href&gt;</c>, and likewise resolves each
+    /// <c>&lt;link rel="stylesheet"&gt;</c>'s relative <c>href</c> so the linked sheet is
+    /// fetched from the base-relative location rather than the document's own directory. A
+    /// no-op (byte-identical output) when the document declares no usable <c>&lt;base href&gt;</c>.
     /// </summary>
     private void ApplyBaseHrefToStyleUrls(DomElement root)
     {
@@ -40,6 +43,47 @@ public sealed partial class DomBridge
             return;
 
         RewriteStyleElementUrls(root, baseHref);
+        RewriteLinkStyleSheetHrefs(root, baseHref);
+    }
+
+    /// <summary>
+    /// Resolves the relative <c>href</c> of every <c>&lt;link rel="stylesheet"&gt;</c> against
+    /// the document's first <c>&lt;base href&gt;</c>. The renderer resolves a linked sheet's
+    /// <c>href</c> against the document URL and never consults <c>&lt;base&gt;</c>, so
+    /// <c>&lt;base href="resources/"&gt;</c> before <c>&lt;link href="stylesheet.css"&gt;</c>
+    /// fetched the sheet from the document's own directory instead of <c>resources/</c> — it
+    /// was not found and the unstyled fallback showed through (WPT
+    /// <c>html/semantics/document-metadata/the-link-element/stylesheet-with-base</c>). Absolute,
+    /// <c>data:</c>, root-relative, and fragment hrefs are left untouched.
+    /// </summary>
+    private void RewriteLinkStyleSheetHrefs(DomElement root, string baseHref)
+    {
+        foreach (var element in root.Descendants().OfType<DomElement>())
+        {
+            if (!element.TagName.Equals("link", StringComparison.OrdinalIgnoreCase) ||
+                !LinkRelIsStyleSheet(element) ||
+                !TryGetAttribute(element, "href", out var href) ||
+                string.IsNullOrWhiteSpace(href))
+                continue;
+
+            var resolved = ResolveUrlAgainstBaseHref(href, baseHref);
+            if (resolved is not null)
+                SetAttr(element, "href", resolved);
+        }
+    }
+
+    /// <summary>Whether a <c>&lt;link&gt;</c>'s space-separated <c>rel</c> token list includes
+    /// <c>stylesheet</c> (case-insensitive), so only sheet links have their href re-based.</summary>
+    private static bool LinkRelIsStyleSheet(DomElement element)
+    {
+        if (!TryGetAttribute(element, "rel", out var rel) || string.IsNullOrWhiteSpace(rel))
+            return false;
+
+        foreach (var token in rel.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            if (token.Equals("stylesheet", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+        return false;
     }
 
     /// <summary>The first <c>&lt;base&gt;</c> in document order with a non-empty
