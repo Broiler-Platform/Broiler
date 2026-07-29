@@ -118,7 +118,7 @@ public sealed partial class DomBridge
         if (node is DomElement insertedElement)
         {
             var insertedTag = insertedElement.TagName?.ToLowerInvariant();
-            if (insertedTag == "iframe" || insertedTag == "object")
+            if (IsNestedBrowsingContextContainer(insertedTag))
                 FireSubDocumentOnload(insertedElement);
             else
                 FireDescendantOnloads(insertedElement);

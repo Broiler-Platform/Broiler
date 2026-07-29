@@ -238,7 +238,10 @@ public sealed partial class DomBridge
         // iframe's content (its own sub-document) is not a descendant here, matching the old walk.
         foreach (var child in element.Descendants().OfType<DomElement>())
         {
-            if (string.Equals(child.TagName, "iframe", StringComparison.OrdinalIgnoreCase))
+            // `window.frames` is the child browsing contexts, which includes a frameset's
+            // <frame> cells and not just <iframe> (HTML §"nested browsing contexts").
+            var childTag = child.TagName?.ToLowerInvariant();
+            if (childTag is "iframe" or "frame")
             {
                 var src = TryGetAttribute(child, "src", out var srcValue) ? srcValue : string.Empty;
                 if (!IsCrossOrigin(src, _pageUrl))
