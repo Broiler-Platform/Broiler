@@ -59,7 +59,7 @@ permissions:
 env:
   # Bump to invalidate the cached WPT checkout + references.
   CACHE_EPOCH: '6' # reference generator honours `reftest-wait`, so a deferred-screenshot test's golden is its post-signal state
-  SHARD_COUNT: '8'
+  SHARD_COUNT: '7'
   WPT_CHECKOUT_DIR: tests/wpt/checkout
   REFERENCE_DIR: tests/wpt/references
   RESULTS_DIR: tests/wpt-results
