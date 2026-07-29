@@ -1,7 +1,5 @@
 using System.Runtime.CompilerServices;
 using Broiler.HtmlBridge.Dom.Runtime;
-using Broiler.JavaScript.BuiltIns.Function;
-using Broiler.JavaScript.Runtime;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge;
@@ -154,11 +152,16 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Applies UA top-layer positioning to open popovers (HTML §popover): a
-    /// popover is laid out in the top layer as a fixed-position box, so give one
-    /// with no explicit position <c>position: fixed</c> anchored at the viewport
-    /// origin. Later-shown popovers keep their source order, so they paint over
-    /// earlier ones — matching the top-layer stacking these overlay tests probe.
+    /// Applies UA popover positioning and top-layer elevation to open popovers (HTML §popover).
+    /// <para>
+    /// The UA sheet's <c>[popover] { position: fixed; inset: 0 }</c> is unconditional — it is not
+    /// gated on top-layer membership — so every open popover with no explicit position becomes a
+    /// fixed box anchored at the viewport origin. Top-layer <em>elevation</em> is the separate,
+    /// conditional half: a popover held out by a running <c>overlay</c> entry transition is still an
+    /// out-of-flow fixed box, it just does not paint in the top layer yet. Later-shown popovers keep
+    /// their source order, so they paint over earlier ones — matching the top-layer stacking these
+    /// overlay tests probe.
+    /// </para>
     /// </summary>
     // Base z-index for the synthetic top layer. The real top layer sits above
     // every painted stacking context (CSS Position §top-layer); Broiler has no
@@ -176,11 +179,6 @@ public sealed partial class DomBridge
             if (!(DialogStateFor(el).PopoverOpen.TryGet(out var open) && open is true))
                 continue;
 
-            // An open popover whose `overlay` is transitioning in is not in the top layer yet — leave
-            // it in normal flow (no UA fixed-positioning, no top-layer marker).
-            if (PopoverHeldOutByOverlayTransitionIn(el))
-                continue;
-
             var props = GetComputedProps(el);
             bool alreadyPositioned = props.TryGetValue("position", out var pos) &&
                 (pos == "fixed" || pos == "absolute");
@@ -193,6 +191,14 @@ public sealed partial class DomBridge
                 if (!BakedInlineStyle(el).ContainsKey("left") && !props.ContainsKey("left"))
                     BakedInlineStyle(el)["left"] = "0";
             }
+
+            // An open popover whose `overlay` is still transitioning in is out of the top layer: it
+            // keeps the UA fixed positioning above but gets no elevation, so it paints in ordinary
+            // stacking order beneath the top layer (WPT css/css-position/overlay/
+            // overlay-transition-in-rendering, -backdrop-entry, -finished). Laying it out in normal
+            // flow instead would also displace the static position of following out-of-flow boxes.
+            if (PopoverHeldOutByOverlayTransitionIn(el))
+                continue;
 
             // Elevate into the top layer, ordered by show order, so the popover paints above
             // non-top-layer content (e.g. a plain position:fixed sibling) and later popovers paint over
@@ -495,91 +501,7 @@ public sealed partial class DomBridge
     {
         if (DialogStateFor(element).PopoverTransitioningOut.TryGet(out var out_) && out_ is true)
             return false;
-        // The entry transition has reached its deadline on the event loop — the element is in the
-        // top layer now (CSS Position 4 §overlay: `overlay` flips to `auto` when the discrete
-        // transition finishes).
-        if (DialogStateFor(element).PopoverOverlayTransitionFinished.TryGet(out var done) && done is true)
-            return false;
         return HasDiscreteOverlayTransition(element);
-    }
-
-    /// <summary>
-    /// Schedules the end of a popover's entry <c>overlay</c> transition on the event loop, so the
-    /// element enters the top layer once the transition's duration elapses.
-    /// <para>
-    /// The completion is a real timer rather than a duration heuristic, which is what makes the two
-    /// cases fall out correctly: a page that drains its event loop (the WPT runner, and any page
-    /// that waits for <c>transitionend</c> before screenshotting) reaches the deadline and paints
-    /// the popover on top, while a render taken without draining timers still sees the transition
-    /// running and keeps the popover — and its <c>::backdrop</c> — out of the top layer.
-    /// </para>
-    /// </summary>
-    private void ScheduleOverlayTransitionCompletion(DomElement element)
-    {
-        if (!HasDiscreteOverlayTransition(element))
-            return;
-
-        var durationMs = OverlayTransitionDurationMs(element);
-        if (durationMs is null)
-            return;
-
-        _eventLoop.SetTimeout(
-            new JSFunction((in Arguments _) =>
-            {
-                DialogStateFor(element).PopoverOverlayTransitionFinished.Set(true);
-                return JSUndefined.Value;
-            }, "overlayTransitionEnd", 0),
-            durationMs.Value);
-    }
-
-    /// <summary>
-    /// The declared duration of the element's <c>overlay</c> transition in milliseconds, read from
-    /// <c>transition-duration</c> or the first time value in the <c>transition</c> shorthand.
-    /// <c>null</c> when no duration is declared (nothing to schedule).
-    /// </summary>
-    private double? OverlayTransitionDurationMs(DomElement element)
-    {
-        var props = GetComputedProps(element);
-        foreach (var source in new[]
-                 {
-                     props.GetValueOrDefault("transition-duration", string.Empty),
-                     props.GetValueOrDefault("transition", string.Empty),
-                 })
-        {
-            if (string.IsNullOrWhiteSpace(source))
-                continue;
-
-            foreach (var token in source.Split(new[] { ' ', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                if (TryParseTimeMs(token, out var ms))
-                    return ms;
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>Parses a CSS time token (<c>0.1s</c> / <c>100ms</c>) to milliseconds.</summary>
-    private static bool TryParseTimeMs(string token, out double milliseconds)
-    {
-        milliseconds = 0;
-        var culture = System.Globalization.CultureInfo.InvariantCulture;
-
-        if (token.EndsWith("ms", StringComparison.OrdinalIgnoreCase))
-        {
-            return double.TryParse(token[..^2], System.Globalization.NumberStyles.Float, culture, out milliseconds);
-        }
-
-        if (token.EndsWith("s", StringComparison.OrdinalIgnoreCase))
-        {
-            if (double.TryParse(token[..^1], System.Globalization.NumberStyles.Float, culture, out var seconds))
-            {
-                milliseconds = seconds * 1000;
-                return true;
-            }
-        }
-
-        return false;
     }
 
     // CSS Position 4 §overlay: the computed value of the UA-controlled `overlay` property.

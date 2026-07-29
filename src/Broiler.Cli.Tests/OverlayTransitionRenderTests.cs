@@ -90,6 +90,48 @@ public class OverlayTransitionRenderTests
         }
     }
 
+    // WPT overlay-transition-finished: being held out of the top layer is *only* about paint order.
+    // The UA sheet's `[popover] { position: fixed; inset: 0 }` still applies, so the held-out popover
+    // stays an out-of-flow box at the viewport origin — it does not fall back into normal flow, and
+    // it does not push the static position of the fixed #red box that follows it below the viewport.
+    // The page is the popover's green at the 8px body margin and #red everywhere inside it.
+    [Fact]
+    public void Overlay_Transitioning_In_Keeps_UA_Fixed_Positioning()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><head><style>
+  #transition-in, #red { display: block; border: none; width: 100vw; height: 100vh; }
+  #red { position: fixed; background-color: red; }
+  #transition-in {
+    transition: overlay 0.1s step-end;
+    transition-behavior: allow-discrete;
+    background-color: green;
+  }
+</style></head>
+<body>
+  <div id="transition-in" popover></div>
+  <div id="red"></div>
+</body></html>
+""";
+        using var bitmap = Render(html, "document.getElementById('transition-in').showPopover();");
+
+        // Inside the body margin the fixed red box covers the popover…
+        foreach (var (x, y) in new[] { (100, 100), (20, 20), (190, 190) })
+        {
+            var px = bitmap.GetPixel(x, y);
+            Assert.True(px is { R: 255, G: 0, B: 0 }, $"({x},{y}) was {px.R},{px.G},{px.B}");
+        }
+
+        // …and the 8px margin strips show the popover, which reaches the viewport origin because it
+        // is still UA-fixed at inset 0. In normal flow it would start at (8,8) and leave white here.
+        foreach (var (x, y) in new[] { (2, 100), (100, 2), (2, 2) })
+        {
+            var px = bitmap.GetPixel(x, y);
+            Assert.True(px is { R: 0, G: 128, B: 0 }, $"({x},{y}) was {px.R},{px.G},{px.B}");
+        }
+    }
+
     // Regression guard: a popover shown WITHOUT an overlay transition still promotes to the top layer
     // and paints its ::backdrop normally (the hold applies only to an in-flight overlay-in transition).
     [Fact]
