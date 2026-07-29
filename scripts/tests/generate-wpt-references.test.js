@@ -7,6 +7,9 @@ const path = require('node:path');
 const test = require('node:test');
 
 const {
+    DEFAULT_RENDER_TIMEOUT,
+    StepTimeoutError,
+    closeQuietly,
     contentTypeForExtension,
     createBrowserContextOptions,
     discoverTests,
@@ -15,10 +18,19 @@ const {
     isWptHarnessScript,
     loadRerunTestPaths,
     parsePositiveIntegerEnv,
+    renderTestWithWatchdog,
     requiresJavaScript,
+    resolveRenderTimeoutMs,
     resolveRootRelativeResource,
     shardIndexForPath,
+    waitForReftestReady,
+    withTimeout,
 } = require('../generate-wpt-references.js');
+
+/** A promise that never settles — stands in for a wedged renderer. */
+function never() {
+    return new Promise(() => {});
+}
 
 
 test('regular reference generation enables Chromium JavaScript', () => {
@@ -219,4 +231,138 @@ test('loadRerunTestPaths rejects a manifest without a results array', () => {
     } finally {
         fs.rmSync(dir, { recursive: true, force: true });
     }
+});
+
+// ---------------------------------------------------------------------------
+// Hang containment
+//
+// A WPT test that wedges its renderer main thread after `load` (an infinite loop
+// started from a timer, a runaway rAF chain) used to park a worker forever on the
+// unbounded page.evaluate in waitForReftestReady, so Promise.all(workers) never
+// settled and the shard sat silent until the CI job timed out hours later. Every
+// await that can reach the renderer is now bounded.
+// ---------------------------------------------------------------------------
+
+test('withTimeout rejects an operation that overruns its budget', async () => {
+    await assert.rejects(
+        () => withTimeout(never, 10, 'wedged step'),
+        (err) => err instanceof StepTimeoutError && /wedged step exceeded 10ms/.test(err.message),
+    );
+});
+
+test('withTimeout passes through a result and a rejection inside budget', async () => {
+    assert.equal(await withTimeout(async () => 'ok', 5_000, 'fast step'), 'ok');
+    await assert.rejects(
+        () => withTimeout(async () => { throw new Error('boom'); }, 5_000, 'failing step'),
+        /boom/,
+    );
+    // A synchronous throw in the thunk is reported as a rejection, not thrown at
+    // the call site (which would escape the worker's try/catch).
+    await assert.rejects(
+        () => withTimeout(() => { throw new Error('sync boom'); }, 5_000, 'throwing step'),
+        /sync boom/,
+    );
+});
+
+test('withTimeout does not leave an abandoned operation as an unhandled rejection', async () => {
+    const unhandled = [];
+    const record = (reason) => unhandled.push(reason);
+    process.on('unhandledRejection', record);
+    try {
+        let rejectLate;
+        const late = new Promise((_, reject) => { rejectLate = reject; });
+        await assert.rejects(() => withTimeout(() => late, 10, 'late step'), StepTimeoutError);
+        rejectLate(new Error('renderer died after the watchdog gave up'));
+        // Two macrotask turns: long enough for Node to report an unhandled rejection.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+    } finally {
+        process.off('unhandledRejection', record);
+    }
+    assert.deepEqual(unhandled, []);
+});
+
+test('waitForReftestReady gives up on a renderer that never answers the probe', async () => {
+    // page.evaluate has no timeout of its own: unbounded, this returns never.
+    const page = { evaluate: never, waitForFunction: never };
+    const started = Date.now();
+    await waitForReftestReady(page, 20);
+    assert.ok(Date.now() - started < 5_000, 'probe must be bounded, not left pending');
+});
+
+test('waitForReftestReady still waits for a page that signals ready', async () => {
+    const calls = [];
+    const page = {
+        evaluate: async () => { calls.push('probe'); return true; },
+        waitForFunction: async () => { calls.push('wait'); },
+    };
+    await waitForReftestReady(page, 5_000);
+    assert.deepEqual(calls, ['probe', 'wait']);
+});
+
+test('waitForReftestReady skips the signal wait for a page that is not reftest-wait', async () => {
+    const calls = [];
+    const page = {
+        evaluate: async () => { calls.push('probe'); return false; },
+        waitForFunction: async () => { calls.push('wait'); },
+    };
+    await waitForReftestReady(page, 5_000);
+    assert.deepEqual(calls, ['probe']);
+});
+
+test('the per-test watchdog frees a worker held by a wedged navigation', async () => {
+    const page = { goto: never, evaluate: never, waitForFunction: never, screenshot: never };
+    await assert.rejects(
+        () => renderTestWithWatchdog(page, '/wpt/css/wedged.html', '/out/wedged.png', 'css/wedged.html', 20),
+        (err) => err instanceof StepTimeoutError &&
+            /rendering css\/wedged\.html exceeded 20ms/.test(err.message),
+    );
+});
+
+test('the per-test watchdog leaves a healthy render untouched', async () => {
+    const seen = {};
+    const page = {
+        goto: async (url, options) => { seen.url = url; seen.gotoOptions = options; },
+        evaluate: async () => false,
+        waitForFunction: never,
+        screenshot: async (options) => { seen.screenshotOptions = options; },
+    };
+    await renderTestWithWatchdog(page, __filename, '/out/ok.png', 'ok.html', 5_000);
+    assert.match(seen.url, /^file:\/\//);
+    assert.equal(seen.gotoOptions.waitUntil, 'load');
+    assert.equal(seen.screenshotOptions.path, '/out/ok.png');
+    assert.equal(seen.screenshotOptions.fullPage, false);
+    // Spelled out rather than left to Playwright's ambient default, so the
+    // watchdog budget stays derivable from this file's constants.
+    assert.ok(seen.screenshotOptions.timeout > 0);
+});
+
+test('the watchdog budget covers every step of a worst-case legitimate render', () => {
+    // load (10s) + reftest-wait probe and signal wait (5s each) + screenshot (30s).
+    assert.ok(DEFAULT_RENDER_TIMEOUT > 10_000 + 2 * 5_000 + 30_000);
+    assert.equal(resolveRenderTimeoutMs({}), DEFAULT_RENDER_TIMEOUT);
+    assert.equal(
+        resolveRenderTimeoutMs({ BROILER_WPT_REFERENCE_RENDER_TIMEOUT_SECONDS: '90' }),
+        90_000);
+    // Junk and non-positive overrides fall back to the derived default.
+    for (const raw of ['0', '-5', 'abc', '']) {
+        assert.equal(
+            resolveRenderTimeoutMs({ BROILER_WPT_REFERENCE_RENDER_TIMEOUT_SECONDS: raw }),
+            DEFAULT_RENDER_TIMEOUT);
+    }
+});
+
+test('closeQuietly survives a teardown that fails or wedges', async () => {
+    let closed = false;
+    await closeQuietly({ close: async () => { closed = true; } }, 'ordinary close');
+    assert.equal(closed, true);
+
+    // A close that throws must not propagate: cleanup failure is never a reason
+    // to fail a shard.
+    await closeQuietly(
+        { close: async () => { throw new Error('already gone'); } }, 'failing close');
+
+    // A close that never returns must not park the worker either.
+    const started = Date.now();
+    await closeQuietly({ close: never }, 'wedged close', 20);
+    assert.ok(Date.now() - started < 5_000, 'a wedged close must be bounded');
 });
