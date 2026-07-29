@@ -112,6 +112,12 @@ public sealed partial class DomBridge
         //      into the top layer (WPT modal-dialog-in-replaced-renderer).
         ReplaceElementsWithReplacedContent();
 
+        // -1c. An <object> with an image resource is a replaced element showing that resource;
+        //      its children are fallback and must not render. Also precedes the dialog passes so
+        //      a modal <dialog> in the fallback is never hoisted into the top layer
+        //      (WPT modal-dialog-in-object).
+        ReplaceImageObjectsWithResource();
+
         // 0. Apply UA default position:fixed to modal dialogs before anchor
         //    resolution, since browsers treat top-layer elements as fixed.
         ApplyDialogUAPositioning(DocumentElement);
@@ -351,6 +357,67 @@ public sealed partial class DomBridge
                 {
                     ["src"] = url,
                 });
+            SetParent(img, element);
+            element.AppendChild(img);
+        }
+    }
+
+    /// <summary>
+    /// HTML §4.8.4: an <c>&lt;object&gt;</c> whose resource loads is a replaced element showing that
+    /// resource; its child content is <em>fallback</em>, rendered only when the resource does not
+    /// load. Broiler renders neither half — an <c>&lt;object&gt;</c> with an image resource painted
+    /// nothing, while its fallback children (including a modal <c>&lt;dialog&gt;</c>, which was then
+    /// hoisted into the top layer) painted regardless. WPT
+    /// <c>html/semantics/interactive-elements/the-dialog-element/modal-dialog-in-object</c> needs
+    /// both: its reference is the bare <c>&lt;object&gt;</c> showing a green rectangle, with no dialog.
+    /// <para>
+    /// Reproduce the visual result the same way the sibling <c>content</c> passes do: swap the
+    /// fallback for a single <c>&lt;img&gt;</c> of the resource, carrying the object's
+    /// <c>width</c>/<c>height</c> across so the replaced box keeps its authored size.
+    /// </para>
+    /// <para>
+    /// Deliberately gated on an explicit <c>type="image/*"</c> attribute. Fallback exists precisely
+    /// so a failed resource can degrade, and Acid2 depends on that: its eyes are nested
+    /// <c>&lt;object&gt;</c>s whose outer resources must fail
+    /// (<c>data:application/x-unknown</c> with no <c>type</c>, and a 404 with
+    /// <c>type="text/html"</c>) so the inner fallback shows. None of those carries an
+    /// <c>image/*</c> type, so this pass cannot disturb them.
+    /// </para>
+    /// </summary>
+    private void ReplaceImageObjectsWithResource()
+    {
+        var root = DocumentElement;
+        if (root == null)
+            return;
+
+        var objects = root.Descendants()
+            .OfType<DomElement>()
+            .Where(e => e.TagName.Equals("object", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        foreach (var element in objects)
+        {
+            if (!TryGetAttribute(element, "type", out var type) ||
+                !type.Trim().StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!TryGetAttribute(element, "data", out var data) || string.IsNullOrWhiteSpace(data))
+                continue;
+
+            var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["src"] = data.Trim(),
+            };
+
+            // Keep the authored replaced-box size (the object's own width/height).
+            if (TryGetAttribute(element, "width", out var width) && !string.IsNullOrWhiteSpace(width))
+                attributes["width"] = width.Trim();
+            if (TryGetAttribute(element, "height", out var height) && !string.IsNullOrWhiteSpace(height))
+                attributes["height"] = height.Trim();
+
+            ClearChildren(element);
+
+            var img = CreateBridgeElement("img", attributes: attributes);
             SetParent(img, element);
             element.AppendChild(img);
         }
