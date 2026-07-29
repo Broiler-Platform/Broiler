@@ -160,6 +160,17 @@ function isWptHarnessScript(requestPath) {
  * one whose script aborted because the harness scripts are deliberately not served
  * (see isWptHarnessScript) — is screenshotted in whatever state it reached, which
  * is the same at-load state as before this wait existed.
+ *
+ * Measured when this landed: +25 in css/css-view-transitions (313 -> 338 of 490),
+ * and exactly one mover across 1598 tests in css/css-position, html/semantics/popovers,
+ * html/semantics/interactive-elements/the-dialog-element and css/css-backgrounds — so
+ * the new semantics are surgical rather than broad churn. That one mover is
+ * css/css-position/overlay/overlay-transition-finished, which screenshots from its
+ * `transitionend` handler: its golden is now the post-transition page, and Broiler
+ * cannot reach that state because it has no snapshot clock to end a discrete `overlay`
+ * transition against (the event loop drains every timer to a fixed point regardless of
+ * delay, so a duration cannot be modelled with a timer). Closing that needs the runner
+ * to adopt `reftest-wait` as its own snapshot signal, mirroring this side.
  */
 async function waitForReftestReady(page) {
     const isWaiting = () =>
