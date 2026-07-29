@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Hosting.WindowsServices;
 
 // ── BOSS: the Broiler Office Standalone Server ────────────────────────────────────────────────────
 // A Kestrel host that serves the Broiler Office web apps. Today that is the Broiler Writer word
@@ -7,10 +8,24 @@ using Microsoft.AspNetCore.StaticFiles;
 // content-hashed WebAssembly bundle (see the .csproj for how the bundle gets here). Additional Office
 // apps register the same way: vendor the client's published wwwroot and add it to the app list.
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = ResolveContentRoot(args),
+});
 
 // Kestrel is the default (and only) server here; make the intent explicit.
 builder.WebHost.UseKestrel();
+
+// Run as a managed service when launched by one — see packaging/ for the prepared unit files.
+// Both calls are no-ops for an ordinary console launch (`dotnet run`, a shell, a container), so the
+// interactive experience is unchanged. Under systemd, UseSystemd switches the host to
+// Type=notify readiness/stop signalling and journald-style log formatting; under the Windows SCM,
+// UseWindowsService answers the service control protocol, logs to the event log, and roots the
+// content root at the executable's directory (so the vendored wwwroot is found regardless of the
+// working directory the SCM hands us).
+builder.Host.UseSystemd();
+builder.Host.UseWindowsService();
 
 var app = builder.Build();
 
@@ -103,6 +118,48 @@ app.Lifetime.ApplicationStarted.Register(() =>
 });
 
 app.Run();
+
+// The content root is where the vendored Writer bundle (wwwroot/) is looked up. The host default is
+// the *working directory*, which is right for `dotnet run` (the build vendors the bundle into the
+// project directory) but wrong for a deployed server: systemd, the Windows SCM, an init script or a
+// plain `/opt/broiler/office-server/Broiler.Office.Server` invocation from elsewhere all leave the
+// working directory pointing somewhere without a wwwroot, and every page 404s while /healthz keeps
+// answering OK. Anchor it to the executable's own directory in that case.
+//
+// Returning null keeps the host default, which is what an explicit --contentRoot / ASPNETCORE_CONTENTROOT
+// needs: WebApplicationOptions.ContentRootPath is applied after the command line and would silently win.
+static string? ResolveContentRoot(string[] args)
+{
+    // Under the Windows SCM, UseWindowsService() sets the content root to the executable's directory
+    // itself — and WebApplicationBuilder rejects a *late* host-configuration change to a different
+    // value ("The content root changed from … to …"). So it has to already be that value here.
+    if (WindowsServiceHelpers.IsWindowsService())
+        return AppContext.BaseDirectory;
+
+    if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_CONTENTROOT")) ||
+        !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOTNET_CONTENTROOT")))
+        return null;
+
+    foreach (string arg in args)
+    {
+        // Matches every spelling the command-line configuration provider accepts:
+        // --contentRoot <path>, --contentRoot=<path>, /contentRoot=<path>.
+        string token = arg.TrimStart('-', '/');
+        int separator = token.IndexOf('=');
+        if (separator >= 0)
+            token = token[..separator];
+
+        if (token.Equals("contentRoot", StringComparison.OrdinalIgnoreCase))
+            return null;
+    }
+
+    if (Directory.Exists(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")))
+        return null;
+
+    return Directory.Exists(Path.Combine(AppContext.BaseDirectory, "wwwroot"))
+        ? AppContext.BaseDirectory
+        : null;
+}
 
 /// <summary>An Office web app mounted by BOSS, as reported by <c>/api/info</c>.</summary>
 internal sealed record OfficeApp(string Name, string Description, string Path, string[] Formats);

@@ -46,6 +46,14 @@
     <WriterClientStage>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)writer-client\</WriterClientStage>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Service-manager integration for the prepared unit files under packaging/: systemd
+         readiness/stop notification (Type=notify) and the Windows service control protocol.
+         Both are inert when the server is started from a console. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
+  </ItemGroup>
+
   <!-- Publish the Writer WASM client (trimmed — untrimmed crashes mono at boot) into an intermediate
        stage. Skipped once staged, so the dev inner loop stays fast; force a refresh after changing the
        Writer with -p:ForceWriterClientPublish=true (or delete obj/). -->
@@ -53,9 +61,21 @@
           Condition="!Exists('$(WriterClientStage)wwwroot\index.html') Or '$(ForceWriterClientPublish)' == 'true'">
     <Message Importance="high" Text="BOSS: publishing the Broiler Writer WASM client into $(WriterClientStage)…" />
     <RemoveDir Directories="$(WriterClientStage)" />
+    <!--
+      Strip this project's publish shape before crossing into the client. The MSBuild task hands the
+      caller's *global* properties to the child, so a self-contained / single-file / RID-specific
+      publish of THIS project would otherwise force the browser-wasm client to publish as, say,
+      linux-x64: the WebAssembly SDK then never imports its browser targets and the build dies with
+      "MSB4057: The target 'Publish' does not exist in the project" (or NETSDK1099 for a single-file
+      publish). The client always publishes for browser-wasm with its own settings — its .csproj
+      pins PublishTrimmed, and RunAOTCompilation is turned off here. Properties listed above still
+      apply: an explicit `Properties` entry outranks a global of the same name, which is what keeps
+      Configuration and the staging PublishDir flowing through.
+    -->
     <MSBuild Projects="$(WriterClientProject)"
              Targets="Publish"
-             Properties="Configuration=$(Configuration);PublishDir=$(WriterClientStage);RunAOTCompilation=false" />
+             Properties="Configuration=$(Configuration);PublishDir=$(WriterClientStage);RunAOTCompilation=false"
+             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSingleFile;PublishTrimmed;PublishReadyToRun;PublishAot;UseAppHost;TargetFramework;OutputPath;OutDir;BaseOutputPath;IntermediateOutputPath;BaseIntermediateOutputPath" />
   </Target>
 
   <!-- Dev / `dotnet run`: vendor the staged bundle into this project's web root so Kestrel serves it.

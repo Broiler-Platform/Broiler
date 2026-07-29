@@ -1,0 +1,28 @@
+# BOSS — Broiler Office Standalone Server
+# Settings for the SysV init script. Install as:
+#   Debian/Ubuntu : /etc/default/broiler-office-server
+#   RHEL/CentOS   : /etc/sysconfig/broiler-office-server
+#
+# This file is sourced by /bin/sh, so it is a shell fragment: KEY=value, quote anything containing
+# spaces. Apply changes with `service broiler-office-server restart`.
+
+# Where the package was installed and which account runs it.
+BOSS_HOME=/opt/broiler/office-server
+BOSS_USER=broiler
+
+# Arguments passed to the server. The word splitting is the shell's, so several arguments work:
+#   BOSS_ARGS="--urls http://0.0.0.0:5555 --environment Staging"
+#   BOSS_ARGS="--urls http://127.0.0.1:5555"          # loopback only, behind a reverse proxy
+#   BOSS_ARGS="--urls http://[::]:5555"               # IPv4 + IPv6
+BOSS_ARGS="--urls http://0.0.0.0:5555"
+
+# Selects appsettings.<name>.json; Production also turns off the developer exception page.
+BOSS_ENVIRONMENT=Production
+
+# stdout/stderr sink. Unlike the systemd unit there is no journal here, so the init script keeps a
+# plain log file — rotate it with logrotate if the server runs long enough to matter.
+LOGFILE=/var/log/broiler-office-server.log
+
+# PID file location and how long to wait for a graceful stop before SIGKILL.
+PIDFILE=/var/run/broiler-office-server.pid
+STOP_TIMEOUT=30
