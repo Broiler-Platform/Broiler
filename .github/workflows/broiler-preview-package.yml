@@ -29,6 +29,8 @@ jobs:
     env:
       BROWSER_PROJECT_PATH: src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj
       WRITER_PROJECT_PATH: src/Broiler.Writer.Windows/Broiler.Writer.Windows.csproj
+      BOSS_PROJECT_PATH: Broiler.Office.Server/Broiler.Office.Server.csproj
+      WRITER_CLIENT_PROJECT_PATH: src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj
 
     steps:
       - name: Checkout selected branch
@@ -45,11 +47,27 @@ jobs:
             8.0.x
             10.0.x
 
+      - name: Install the WebAssembly build workload
+        shell: pwsh
+        run: |
+          # BOSS serves the Writer compiled to WebAssembly; publishing that client needs wasm-tools
+          # (emscripten + the browser-wasm runtime packs).
+          dotnet workload install wasm-tools
+          if ($LASTEXITCODE -ne 0) {
+            throw "dotnet workload install wasm-tools exited with code $LASTEXITCODE."
+          }
+
       - name: Restore Windows runtime graphs
         shell: pwsh
         run: |
           dotnet restore $env:BROWSER_PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION
           dotnet restore $env:WRITER_PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION
+          dotnet restore $env:BOSS_PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION
+
+          # The Writer WebAssembly client is not a ProjectReference of BOSS — the server publishes it
+          # through an MSBuild task and vendors the result — so it needs its own restore, and one
+          # without the Windows RID: the client always targets browser-wasm.
+          dotnet restore $env:WRITER_CLIENT_PROJECT_PATH -p:Configuration=$env:WINDOWS_CONFIGURATION
 
       - name: Build Windows targets
         shell: pwsh
@@ -89,6 +107,16 @@ jobs:
             --output $output `
             -p:UseAppHost=true
 
+          # BOSS goes into its own subfolder: it ships a vendored wwwroot, an appsettings.json and a
+          # service/ tree, none of which belong loose beside the desktop apps.
+          dotnet publish $env:BOSS_PROJECT_PATH `
+            --configuration $env:WINDOWS_CONFIGURATION `
+            --runtime win-x64 `
+            --self-contained false `
+            --no-restore `
+            --output (Join-Path $output 'BOSS') `
+            -p:UseAppHost=true
+
       - name: Publish Windows self-contained apps
         shell: pwsh
         run: |
@@ -110,8 +138,37 @@ jobs:
             --no-restore `
             --output $output
 
+          dotnet publish $env:BOSS_PROJECT_PATH `
+            --configuration $env:WINDOWS_CONFIGURATION `
+            --runtime win-x64 `
+            --self-contained true `
+            --no-restore `
+            --output (Join-Path $output 'BOSS')
+
+      - name: Assemble and smoke-test the BOSS payloads
+        shell: pwsh
+        run: |
+          # Lay the README, launcher and service files around each published server, then start it
+          # and check it really serves the Writer — a package whose wwwroot did not survive the
+          # publish still starts and answers /healthz, so only a real request catches it.
+          $packageParent = Join-Path $env:RUNNER_TEMP 'packages'
+          $port = 5555
+
+          foreach ($variant in @('framework-dependent', 'self-contained')) {
+            $bossDir = Join-Path $packageParent "BPP-Win32-$variant\BOSS"
+
+            ./scripts/package-boss.ps1 -BossDirectory $bossDir -Platform windows
+            ./scripts/smoke-test-boss.ps1 -BossDirectory $bossDir -Port $port
+
+            # A fresh port per variant: Windows can hold a listening socket in TIME_WAIT briefly
+            # after the previous server exits.
+            $port++
+          }
+
       - name: Package Windows assets
         shell: pwsh
+        env:
+          RELEASE_BRANCH: ${{ github.event.inputs.branch }}
         run: |
           function Rename-AppPublish {
             param(
@@ -183,6 +240,13 @@ jobs:
               -PackageBaseName 'Broiler.Writer' `
               -ExecutableExtension '.exe'
 
+            ./scripts/write-bpp-build-info.ps1 `
+              -PackageDirectory $packageRoot `
+              -Platform windows `
+              -Variant $variant `
+              -Branch $env:RELEASE_BRANCH `
+              -Configuration $env:WINDOWS_CONFIGURATION
+
             New-WindowsArchive `
               -PackageParent $packageParent `
               -PackageName $packageName `
@@ -210,6 +274,8 @@ jobs:
     env:
       BROWSER_PROJECT_PATH: src/Broiler.Browser.Linux/Broiler.Browser.Linux.csproj
       WRITER_PROJECT_PATH: src/Broiler.Writer.Linux/Broiler.Writer.Linux.csproj
+      BOSS_PROJECT_PATH: Broiler.Office.Server/Broiler.Office.Server.csproj
+      WRITER_CLIENT_PROJECT_PATH: src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj
 
     steps:
       - name: Checkout selected branch
@@ -226,11 +292,27 @@ jobs:
             8.0.x
             10.0.x
 
+      - name: Install the WebAssembly build workload
+        shell: pwsh
+        run: |
+          # BOSS serves the Writer compiled to WebAssembly; publishing that client needs wasm-tools
+          # (emscripten + the browser-wasm runtime packs).
+          dotnet workload install wasm-tools
+          if ($LASTEXITCODE -ne 0) {
+            throw "dotnet workload install wasm-tools exited with code $LASTEXITCODE."
+          }
+
       - name: Restore Linux runtime graphs
         shell: pwsh
         run: |
           dotnet restore $env:BROWSER_PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION
           dotnet restore $env:WRITER_PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION
+          dotnet restore $env:BOSS_PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION
+
+          # The Writer WebAssembly client is not a ProjectReference of BOSS — the server publishes it
+          # through an MSBuild task and vendors the result — so it needs its own restore, and one
+          # without the Linux RID: the client always targets browser-wasm.
+          dotnet restore $env:WRITER_CLIENT_PROJECT_PATH -p:Configuration=$env:LINUX_CONFIGURATION
 
       - name: Build Linux targets
         shell: pwsh
@@ -293,6 +375,16 @@ jobs:
             --output $output `
             -p:UseAppHost=true
 
+          # BOSS goes into its own subfolder: it ships a vendored wwwroot, an appsettings.json and a
+          # service/ tree, none of which belong loose beside the desktop apps.
+          dotnet publish $env:BOSS_PROJECT_PATH `
+            --configuration $env:LINUX_CONFIGURATION `
+            --runtime linux-x64 `
+            --self-contained false `
+            --no-restore `
+            --output (Join-Path $output 'BOSS') `
+            -p:UseAppHost=true
+
       - name: Publish Linux self-contained apps
         shell: pwsh
         run: |
@@ -314,8 +406,35 @@ jobs:
             --no-restore `
             --output $output
 
+          dotnet publish $env:BOSS_PROJECT_PATH `
+            --configuration $env:LINUX_CONFIGURATION `
+            --runtime linux-x64 `
+            --self-contained true `
+            --no-restore `
+            --output (Join-Path $output 'BOSS')
+
+      - name: Assemble and smoke-test the BOSS payloads
+        shell: pwsh
+        run: |
+          # Lay the README, launcher and service files around each published server, then start it
+          # and check it really serves the Writer — a package whose wwwroot did not survive the
+          # publish still starts and answers /healthz, so only a real request catches it.
+          $packageParent = Join-Path $env:RUNNER_TEMP 'packages'
+          $port = 5555
+
+          foreach ($variant in @('framework-dependent', 'self-contained')) {
+            $bossDir = Join-Path $packageParent "BPP-Linux-$variant/BOSS"
+
+            ./scripts/package-boss.ps1 -BossDirectory $bossDir -Platform linux
+            ./scripts/smoke-test-boss.ps1 -BossDirectory $bossDir -Port $port
+
+            $port++
+          }
+
       - name: Package Linux assets
         shell: pwsh
+        env:
+          RELEASE_BRANCH: ${{ github.event.inputs.branch }}
         run: |
           function Rename-AppPublish {
             param(
@@ -380,6 +499,13 @@ jobs:
               -OriginalBaseName 'Broiler.Writer.Linux' `
               -PackageBaseName 'Broiler.Writer' `
               -ExecutableExtension ''
+
+            ./scripts/write-bpp-build-info.ps1 `
+              -PackageDirectory $packageRoot `
+              -Platform linux `
+              -Variant $variant `
+              -Branch $env:RELEASE_BRANCH `
+              -Configuration $env:LINUX_CONFIGURATION
 
             New-LinuxArchive `
               -PackageParent $packageParent `
@@ -476,27 +602,88 @@ jobs:
           $linuxFrameworkDependent = Resolve-Asset 'BPP-Linux-framework-dependent' @('.tar.xz', '.tar.gz')
           $linuxSelfContained = Resolve-Asset 'BPP-Linux-self-contained' @('.tar.xz', '.tar.gz')
 
-          foreach ($asset in @($windowsFrameworkDependent, $windowsSelfContained, $linuxFrameworkDependent, $linuxSelfContained)) {
+          $packages = @(
+            $windowsFrameworkDependent,
+            $windowsSelfContained,
+            $linuxFrameworkDependent,
+            $linuxSelfContained
+          )
+
+          foreach ($asset in $packages) {
             if (-not (Test-Path -LiteralPath $asset)) {
               throw "Missing expected BPP asset: $asset"
             }
           }
 
-          $assetList = @(
-            $windowsFrameworkDependent,
-            $windowsSelfContained,
-            $linuxFrameworkDependent,
-            $linuxSelfContained
-          ) | ForEach-Object { "- " + (Split-Path -Leaf $_) }
+          # sha256sum-compatible manifest (hash, two spaces, file name) so `sha256sum -c` works as-is
+          # after downloading the archives next to it.
+          $checksumPath = Join-Path $assetDir 'SHA256SUMS.txt'
+          $checksumLines = $packages | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant(), (Split-Path -Leaf $_)
+          }
+          Set-Content -LiteralPath $checksumPath -Value $checksumLines -Encoding ascii
 
-          $body = @"
-          Draft Broiler Preview Package prepared from branch $env:RELEASE_BRANCH at commit $env:SHORT_SHA.
+          $assetList = ($packages + $checksumPath) | ForEach-Object { "- " + (Split-Path -Leaf $_) }
 
-          Each package contains Broiler.Browser and Broiler.Writer.
+          # Single-quoted here-string: the notes are full of Markdown backticks, and in an
+          # interpolating string PowerShell would eat them as escape characters.
+          $contents = @'
+          Each package contains:
 
-          Assets:
-          $($assetList -join "`n")
-          "@
+          * `Broiler.Browser` — the Broiler web browser.
+          * `Broiler.Writer` — the Broiler word processor (desktop).
+          * `BOSS/` — **Broiler Office Standalone Server**: a Kestrel host that serves the Broiler
+            Writer web app (WebAssembly), so the Writer runs in a browser with no other web server
+            involved.
+
+          Starting BOSS after extracting a package:
+
+          ```
+          ./BOSS/run-boss.sh --urls http://0.0.0.0:5555        # Linux
+          BOSS\Start-BOSS.cmd                                  # Windows
+          ```
+
+          Then open <http://localhost:5555/>. Liveness probe at `/healthz`, server details at
+          `/api/info`.
+
+          To keep it serving across reboots, `BOSS/service/` carries prepared unit files and
+          installers — a hardened systemd unit (`Type=notify`), an LSB SysV init script, a Windows
+          service installer, plus nginx and Apache reverse-proxy samples:
+
+          ```
+          sudo ./BOSS/service/install-service.sh --urls http://0.0.0.0:5555
+          powershell -ExecutionPolicy Bypass -File BOSS\service\Install-BossService.ps1 -OpenFirewall
+          ```
+
+          Full documentation ships in the package: `BOSS/README.md` and `BOSS/service/README.md`.
+          Each package root also carries a `BUILD-INFO.txt` naming the branch, commit and build time.
+
+          Variants:
+
+          * **self-contained** — carries its own .NET runtime; nothing to install.
+          * **framework-dependent** — smaller, needs the .NET 10 desktop runtime and, for BOSS, the
+            ASP.NET Core 10 runtime on the target machine.
+          '@
+
+          $verify = @'
+          Verify a download against `SHA256SUMS.txt`:
+
+          ```
+          sha256sum -c SHA256SUMS.txt --ignore-missing        # Linux
+          Get-FileHash .\BPP-Win32-self-contained.7z -Algorithm SHA256   # Windows
+          ```
+          '@
+
+          $body = @(
+            "Draft Broiler Preview Package prepared from branch $env:RELEASE_BRANCH at commit $env:SHORT_SHA.",
+            '',
+            $contents,
+            '',
+            'Assets:',
+            ($assetList -join "`n"),
+            '',
+            $verify
+          ) -join "`n"
 
           $bodyPath = Join-Path $env:RUNNER_TEMP 'broiler-preview-package-notes.md'
           Set-Content -LiteralPath $bodyPath -Value $body -Encoding UTF8
@@ -506,6 +693,7 @@ jobs:
             $windowsSelfContained `
             $linuxFrameworkDependent `
             $linuxSelfContained `
+            $checksumPath `
             --draft `
             --target $env:RELEASE_BRANCH `
             --title $env:RELEASE_TITLE `

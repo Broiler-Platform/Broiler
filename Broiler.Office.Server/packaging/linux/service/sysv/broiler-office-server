@@ -1,0 +1,194 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          broiler-office-server
+# Required-Start:    $local_fs $remote_fs $network $syslog
+# Required-Stop:     $local_fs $remote_fs $network $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: BOSS - Broiler Office Standalone Server
+# Description:       Kestrel host serving the Broiler Office web apps (Broiler Writer).
+### END INIT INFO
+#
+# SysV init script for BOSS - the Broiler Office Standalone Server.
+#
+# Install as /etc/init.d/broiler-office-server (mode 0755), then register it:
+#   Debian/Ubuntu : update-rc.d broiler-office-server defaults
+#   RHEL/CentOS   : chkconfig --add broiler-office-server
+#   Alpine/busybox: rc-update add broiler-office-server default
+#
+# Settings live in /etc/default/broiler-office-server (Debian) or
+# /etc/sysconfig/broiler-office-server (RHEL) - see the sample beside this file. Nothing below needs
+# editing for an ordinary install.
+
+set -e
+
+NAME=broiler-office-server
+DESC="BOSS - Broiler Office Standalone Server"
+
+# ── Defaults (override in the settings file, do not edit here) ───────────────────────────────────
+BOSS_HOME=/opt/broiler/office-server
+BOSS_EXEC=
+BOSS_USER=broiler
+BOSS_ARGS="--urls http://0.0.0.0:5555"
+BOSS_ENVIRONMENT=Production
+PIDFILE=/var/run/$NAME.pid
+LOGFILE=/var/log/$NAME.log
+STOP_TIMEOUT=30
+
+[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+[ -r /etc/sysconfig/$NAME ] && . /etc/sysconfig/$NAME
+
+[ -n "$BOSS_EXEC" ] || BOSS_EXEC=$BOSS_HOME/Broiler.Office.Server
+
+export ASPNETCORE_ENVIRONMENT=$BOSS_ENVIRONMENT
+export DOTNET_NOLOGO=1
+export DOTNET_PRINT_TELEMETRY_MESSAGE=false
+# Extraction target for a single-file publish; harmless for a folder publish.
+export DOTNET_BUNDLE_EXTRACT_BASE_DIR=${DOTNET_BUNDLE_EXTRACT_BASE_DIR:-/var/cache/$NAME}
+
+# LSB exit codes: 0 = success, 1 = generic error, 3 = not running, 4 = unknown status,
+# 5 = program not installed.
+lsb_running=0
+lsb_dead=3
+
+log_action() {
+    if [ -x /lib/lsb/init-functions ] || [ -r /lib/lsb/init-functions ]; then
+        # shellcheck disable=SC1091
+        . /lib/lsb/init-functions 2>/dev/null || true
+    fi
+    echo "$*"
+}
+
+# Echoes the PID when the service is up; empty (and returns 1) when it is not.
+running_pid() {
+    [ -f "$PIDFILE" ] || return 1
+    pid=$(cat "$PIDFILE" 2>/dev/null) || return 1
+    [ -n "$pid" ] || return 1
+    kill -0 "$pid" 2>/dev/null || return 1
+    echo "$pid"
+}
+
+ensure_paths() {
+    [ -x "$BOSS_EXEC" ] || {
+        echo "$NAME: server executable not found or not executable: $BOSS_EXEC" >&2
+        exit 5
+    }
+    for dir in "$(dirname "$PIDFILE")" "$(dirname "$LOGFILE")" "$DOTNET_BUNDLE_EXTRACT_BASE_DIR"; do
+        [ -d "$dir" ] || mkdir -p "$dir"
+    done
+    : > "$LOGFILE" 2>/dev/null || true
+    if id "$BOSS_USER" >/dev/null 2>&1; then
+        chown "$BOSS_USER" "$LOGFILE" "$DOTNET_BUNDLE_EXTRACT_BASE_DIR" 2>/dev/null || true
+    fi
+}
+
+do_start() {
+    if pid=$(running_pid); then
+        log_action "$DESC is already running (pid $pid)."
+        return 0
+    fi
+
+    ensure_paths
+    log_action "Starting $DESC ..."
+
+    if command -v start-stop-daemon >/dev/null 2>&1; then
+        start-stop-daemon --start --quiet \
+            --chuid "$BOSS_USER" \
+            --chdir "$BOSS_HOME" \
+            --background \
+            --no-close \
+            --make-pidfile --pidfile "$PIDFILE" \
+            --exec "$BOSS_EXEC" -- $BOSS_ARGS >> "$LOGFILE" 2>&1
+    else
+        # No start-stop-daemon (RHEL, Alpine, minimal images): background it by hand and record the
+        # PID of the server itself - `exec` replaces the shell so $! is the server, not a wrapper.
+        su -s /bin/sh -c \
+            "cd '$BOSS_HOME' && exec '$BOSS_EXEC' $BOSS_ARGS >> '$LOGFILE' 2>&1 & echo \$! > '$PIDFILE'" \
+            "$BOSS_USER"
+    fi
+
+    # Give it a moment to fail loudly (bad port, missing wwwroot) rather than report a false start.
+    sleep 2
+    if pid=$(running_pid); then
+        log_action "$DESC started (pid $pid); logging to $LOGFILE."
+        return 0
+    fi
+
+    echo "$NAME: failed to start; see $LOGFILE" >&2
+    rm -f "$PIDFILE"
+    return 1
+}
+
+do_stop() {
+    if ! pid=$(running_pid); then
+        log_action "$DESC is not running."
+        rm -f "$PIDFILE"
+        return 0
+    fi
+
+    log_action "Stopping $DESC (pid $pid) ..."
+    kill -TERM "$pid" 2>/dev/null || true
+
+    waited=0
+    while [ "$waited" -lt "$STOP_TIMEOUT" ]; do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    if kill -0 "$pid" 2>/dev/null; then
+        log_action "$DESC did not stop within ${STOP_TIMEOUT}s; sending SIGKILL."
+        kill -KILL "$pid" 2>/dev/null || true
+        sleep 1
+    fi
+
+    rm -f "$PIDFILE"
+    log_action "$DESC stopped."
+    return 0
+}
+
+do_status() {
+    if pid=$(running_pid); then
+        echo "$DESC is running (pid $pid)."
+        return $lsb_running
+    fi
+    if [ -f "$PIDFILE" ]; then
+        echo "$DESC is not running, but $PIDFILE exists."
+        return 1
+    fi
+    echo "$DESC is not running."
+    return $lsb_dead
+}
+
+case "$1" in
+    start)
+        do_start
+        ;;
+    stop)
+        do_stop
+        ;;
+    restart|force-reload)
+        do_stop
+        do_start
+        ;;
+    try-restart)
+        if running_pid >/dev/null; then
+            do_stop
+            do_start
+        else
+            log_action "$DESC is not running; nothing to restart."
+        fi
+        ;;
+    status)
+        # `set -e` would abort before the caller sees the LSB status code.
+        set +e
+        do_status
+        exit $?
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|try-restart|force-reload|status}" >&2
+        exit 2
+        ;;
+esac
+
+exit 0

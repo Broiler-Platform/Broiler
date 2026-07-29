@@ -57,6 +57,11 @@ which fans the single-file / RID / self-contained flags out to the two WebAssemb
 solution (`Broiler.Writer.WebAssembly`, `Broiler.Graphics.WebAssembly`), and those cannot be
 single-file-published (`MSB4057` / `NETSDK1099`). Naming the `.csproj` avoids that.
 
+Within the project the same flags are stripped before the Writer client is published (the `MSBuild`
+task hands its caller's global properties to the child, so `-r linux-x64` would otherwise reach a
+browser-wasm project and fail the same way) — so any RID, self-contained or single-file combination
+below is safe.
+
 Framework-dependent (portable, needs the .NET runtime on the target):
 
 ```powershell
@@ -81,6 +86,28 @@ dependencies. Run it directly (on a matching linux-arm64 host):
 
 ```bash
 ./out/boss-linux-arm64/Broiler.Office.Server
+```
+
+The published server finds its `wwwroot/` next to the executable, so it can be started from any
+working directory — which is what a service manager does. `Program.cs` also calls `UseSystemd()` and
+`UseWindowsService()`, so the same binary runs unchanged as a `Type=notify` systemd unit or a
+Windows service.
+
+## Shipping: preview packages and service files
+
+BOSS ships inside every **Broiler Preview Package** (BPP) — Linux and Windows, self-contained and
+framework-dependent — under `BOSS/`, alongside `Broiler.Browser` and `Broiler.Writer`. The
+[`Prepare Broiler Preview Package`](../.github/workflows/broiler-preview-package.yml) workflow
+publishes the server, lays the packaging assets around it
+([`scripts/package-boss.ps1`](../scripts/package-boss.ps1)), and smoke-tests the result
+([`scripts/smoke-test-boss.ps1`](../scripts/smoke-test-boss.ps1)) before anything reaches a release.
+
+What a user gets next to the binary — end-user README, foreground launcher, and ready-to-install
+service definitions (a hardened systemd unit, an LSB SysV init script, a Windows service installer,
+nginx/Apache reverse-proxy samples) — lives in [`packaging/`](packaging/README.md).
+
+```bash
+sudo ./BOSS/service/install-service.sh --urls http://0.0.0.0:5555     # systemd or SysV
 ```
 
 ## Adding more Office apps
