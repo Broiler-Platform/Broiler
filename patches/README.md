@@ -24,7 +24,7 @@ Delete the patch file and its row below once the pointer is bumped.
 | Patch | Submodule | Summary |
 | --- | --- | --- |
 | `0033-html-canvas-backdrop-translucent-root-background.patch` | `Broiler.HTML` | Composite a translucent propagated canvas background over the dark canvas backdrop instead of a hard-coded white one, so `:root { color-scheme: dark; background-color: rgba(…) }` renders over `rgb(18,18,18)` (WPT `css/css-color-adjust/rendering/dark-color-scheme/color-scheme-iframe-background-mismatch-alpha`). |
-| `0034-html-iframe-default-object-size.patch` | `Broiler.HTML` | Give `<iframe>` the HTML default object size of 300×150 in the UA sheet. Without it an unsized iframe collapsed to its 2px border and rendered neither the frame nor its document (WPT `resource-timing/tentative/initiator-url/static-resource`; `resource-timing` 91 → 92 of 127). |
+| `0034-html-iframe-default-object-size.patch` | `Broiler.HTML` | Give `<iframe>` the replaced-element default object size of 300×150 in `CorrectIframeBoxes`, behind author CSS and the `width`/`height` presentation attributes. Without it an unsized iframe collapsed to its 2px border and rendered neither the frame nor its document (WPT `resource-timing/tentative/initiator-url/static-resource`; `resource-timing` 89 → 92 of 127). |
 
 Apply them in order — both touch `Broiler.HTML` and 0034 was authored on top of
 0033.
