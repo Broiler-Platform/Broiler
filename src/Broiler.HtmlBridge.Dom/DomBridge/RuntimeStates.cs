@@ -121,12 +121,20 @@ internal sealed class DialogRuntimeState
     // finishes) — both have PopoverOpen set and the same transition declarations.
     public RuntimeValue<bool> PopoverTransitioningOut { get; } = new();
 
+    // CSS Position §overlay: set when the entry `overlay` transition scheduled at showPopover() has
+    // reached its deadline on the event loop, so the element is now in the top layer. Without it a
+    // discrete `overlay` transition held the popover out of the top layer forever — the transition
+    // finishing was never modelled (WPT css/css-position/overlay/overlay-transition-finished, which
+    // screenshots from its `transitionend` handler and expects the popover on top).
+    public RuntimeValue<bool> PopoverOverlayTransitionFinished { get; } = new();
+
     public void CopyTo(DialogRuntimeState target)
     {
         Modal.CopyTo(target.Modal);
         TopLayerOrder.CopyTo(target.TopLayerOrder);
         PopoverOpen.CopyTo(target.PopoverOpen);
         PopoverTransitioningOut.CopyTo(target.PopoverTransitioningOut);
+        PopoverOverlayTransitionFinished.CopyTo(target.PopoverOverlayTransitionFinished);
     }
 }
 
