@@ -39,9 +39,81 @@ const NON_TEST_DIRECTORIES = new Set([
 const VIEWPORT = { width: 1024, height: 768 };
 const PAGE_LOAD_TIMEOUT = 10_000;   // ms — max time to wait for page load
 const REFTEST_WAIT_TIMEOUT = 5_000; // ms — max time to wait for a reftest-wait page to signal ready
+const SCREENSHOT_TIMEOUT = 30_000;  // ms — max time to capture one screenshot
+const CLOSE_TIMEOUT = 30_000;       // ms — max time to tear down a page/context/browser
+const CONTEXT_SETUP_TIMEOUT = 60_000; // ms — max time to build a fresh context+page (incl. a browser restart)
+// Per-test watchdog: an upper bound on one test's whole render, derived from the
+// step budgets above so it cannot drift out of sync when one of them changes.
+// The worst legitimate render spends the full load budget, both halves of the
+// reftest-wait budget (probe + signal wait), and the full screenshot budget; the
+// slack keeps a merely slow test from tripping the watchdog. See withTimeout for
+// why a watchdog is needed on top of the per-step timeouts.
+const RENDER_WATCHDOG_SLACK = 15_000;
+const DEFAULT_RENDER_TIMEOUT =
+    PAGE_LOAD_TIMEOUT + 2 * REFTEST_WAIT_TIMEOUT + SCREENSHOT_TIMEOUT + RENDER_WATCHDOG_SLACK;
 const DEFAULT_CONCURRENCY = 8;
 const ALL_SHARDS = -1;              // --shard-index sentinel meaning "all shards"
 const DEFAULT_BROWSER_RESTART_LIMIT = 3;
+
+/** Raised when an operation exceeded the time budget a watchdog gave it. */
+class StepTimeoutError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = 'StepTimeoutError';
+    }
+}
+
+/**
+ * Run `operation` under a hard deadline, rejecting with StepTimeoutError when it
+ * overruns.
+ *
+ * Playwright's own per-call timeouts cover most of this script — page.goto,
+ * page.waitForFunction and page.screenshot each reject once their budget is
+ * spent, because the timer that enforces them lives in the *driver*, not in the
+ * page. `page.evaluate` is the exception: it takes no timeout at all, so it
+ * stays pending for as long as the renderer refuses to answer. A WPT test that
+ * wedges its main thread *after* `load` has fired — an infinite loop started
+ * from a timer, a runaway requestAnimationFrame chain — therefore navigates
+ * fine and then parks the evaluate forever, and with it the worker awaiting it.
+ * The remaining workers drain the queue and exit, `Promise.all(workers)` never
+ * settles, and the shard sits at "N/M done" until the CI job's own timeout kills
+ * it hours later with no output and no results (observed: a shard stuck for two
+ * hours after 9000/9399, having never printed the 100% line).
+ *
+ * So every await that can reach the renderer gets an explicit bound, and the
+ * whole per-test render additionally runs under this watchdog — belt and braces,
+ * so that a future unbounded call cannot re-introduce a silent multi-hour stall.
+ *
+ * `operation` is a thunk so that the clock starts with the work rather than at
+ * the call site, and so a synchronous throw is reported as a rejection.
+ */
+function withTimeout(operation, timeoutMs, description) {
+    const promise = Promise.resolve().then(operation);
+    // Once the watchdog fires the operation is abandoned, but it keeps running
+    // and may reject later (typically when its context is torn down). Attach an
+    // inert handler so that late rejection cannot surface as an unhandled
+    // rejection and take the whole generator down.
+    promise.catch(() => {});
+
+    let timer = null;
+    return new Promise((resolve, reject) => {
+        timer = setTimeout(
+            () => reject(new StepTimeoutError(`${description} exceeded ${timeoutMs}ms`)),
+            timeoutMs);
+        promise.then(resolve, reject);
+    }).finally(() => clearTimeout(timer));
+}
+
+/** Close a page/context/browser, tolerating both failure and a wedged renderer. */
+async function closeQuietly(closeable, description, timeoutMs = CLOSE_TIMEOUT) {
+    try {
+        await withTimeout(() => closeable.close(), timeoutMs, description);
+    } catch {
+        // Already gone, or too wedged to tear down cleanly — either way closing
+        // the browser at the end of the run reclaims it, and a leaked context is
+        // far cheaper than a stalled worker. Cleanup must never block progress.
+    }
+}
 
 /**
  * Deterministic shard index in [0, shardCount) for a forward-slash relative
@@ -159,7 +231,9 @@ function isWptHarnessScript(requestPath) {
  * Bounded by <see>REFTEST_WAIT_TIMEOUT</see>: a page that never signals — commonly
  * one whose script aborted because the harness scripts are deliberately not served
  * (see isWptHarnessScript) — is screenshotted in whatever state it reached, which
- * is the same at-load state as before this wait existed.
+ * is the same at-load state as before this wait existed. The same bound covers the
+ * opening `reftest-wait` probe, which would otherwise be unbounded and hang the
+ * whole shard on a page that wedges its main thread (see withTimeout).
  *
  * Measured when this landed: +25 in css/css-view-transitions (313 -> 338 of 490),
  * and exactly one mover across 1598 tests in css/css-position, html/semantics/popovers,
@@ -172,24 +246,58 @@ function isWptHarnessScript(requestPath) {
  * delay, so a duration cannot be modelled with a timer). Closing that needs the runner
  * to adopt `reftest-wait` as its own snapshot signal, mirroring this side.
  */
-async function waitForReftestReady(page) {
+async function waitForReftestReady(page, timeoutMs = REFTEST_WAIT_TIMEOUT) {
     const isWaiting = () =>
         !!document.documentElement &&
         document.documentElement.classList.contains('reftest-wait');
 
     try {
-        if (!(await page.evaluate(isWaiting))) {
+        // page.evaluate takes no timeout of its own — unlike waitForFunction
+        // below, it waits on the renderer indefinitely — so it must be bounded
+        // here or a page that wedges its main thread parks this worker forever.
+        const waiting = await withTimeout(
+            () => page.evaluate(isWaiting),
+            timeoutMs,
+            'reftest-wait probe');
+        if (!waiting) {
             return;
         }
         await page.waitForFunction(
             () => !document.documentElement ||
                 !document.documentElement.classList.contains('reftest-wait'),
             null,
-            { timeout: REFTEST_WAIT_TIMEOUT },
+            { timeout: timeoutMs },
         );
     } catch {
-        // Never signalled (or the page went away mid-wait) — screenshot as-is.
+        // Never signalled, too wedged to answer the probe, or the page went away
+        // mid-wait — screenshot as-is.
     }
+}
+
+/** Navigate to one test, settle any reftest-wait, and capture its reference PNG. */
+async function renderTest(page, testFile, outPath) {
+    await page.goto(pathToFileURL(testFile).href, {
+        waitUntil: 'load',
+        timeout: PAGE_LOAD_TIMEOUT,
+    });
+    await waitForReftestReady(page);
+    // Screenshot's timeout is spelled out rather than left to Playwright's
+    // ambient 30s default, so the watchdog budget above stays derivable from
+    // the constants in this file.
+    await page.screenshot({ path: outPath, fullPage: false, timeout: SCREENSHOT_TIMEOUT });
+}
+
+/**
+ * renderTest under a per-test watchdog: no single test may hold a worker beyond
+ * `watchdogMs`, whatever goes wrong inside Playwright. A trip is reported as an
+ * ordinary render failure — the test simply gets no reference and the runner
+ * reports it as skipped — which is strictly better than stalling the shard.
+ */
+function renderTestWithWatchdog(page, testFile, outPath, label, watchdogMs) {
+    return withTimeout(
+        () => renderTest(page, testFile, outPath),
+        watchdogMs,
+        `rendering ${label}`);
 }
 
 function decodeFileUrlPath(requestUrl) {
@@ -282,8 +390,8 @@ function ensureDir(filePath) {
     fs.mkdirSync(dir, { recursive: true });
 }
 
-function parsePositiveIntegerEnv(name, fallback) {
-    const raw = process.env[name];
+function parsePositiveIntegerEnv(name, fallback, env = process.env) {
+    const raw = env[name];
     if (raw === undefined || raw === '') {
         return fallback;
     }
@@ -294,6 +402,17 @@ function parsePositiveIntegerEnv(name, fallback) {
 
     const value = Number.parseInt(raw, 10);
     return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+/**
+ * Per-test watchdog budget in milliseconds, overridable (in whole seconds) via
+ * BROILER_WPT_REFERENCE_RENDER_TIMEOUT_SECONDS for runners whose pages legitimately
+ * render slower than the derived default.
+ */
+function resolveRenderTimeoutMs(env = process.env) {
+    const seconds = parsePositiveIntegerEnv(
+        'BROILER_WPT_REFERENCE_RENDER_TIMEOUT_SECONDS', 0, env);
+    return seconds > 0 ? seconds * 1000 : DEFAULT_RENDER_TIMEOUT;
 }
 
 function isBrowserClosedError(error) {
@@ -460,6 +579,7 @@ async function main(args = process.argv.slice(2)) {
     const browserRestartLimit = parsePositiveIntegerEnv(
         'BROILER_WPT_REFERENCE_BROWSER_RESTARTS',
         DEFAULT_BROWSER_RESTART_LIMIT);
+    const renderTimeout = resolveRenderTimeoutMs();
 
     async function restartBrowser(reason) {
         if (browserRestartPromise !== null) {
@@ -523,7 +643,14 @@ async function main(args = process.argv.slice(2)) {
 
     // Create a fresh context + page, registering the resource route.  Used both
     // for a worker's initial page and to recover after a renderer crash.
+    // Bounded like every other await that can reach the browser: a wedged
+    // browser process must fail the shard with a diagnosable error rather than
+    // park a worker (and with it Promise.all) indefinitely.
     async function newRenderTarget() {
+        return withTimeout(buildRenderTarget, CONTEXT_SETUP_TIMEOUT, 'creating a render context');
+    }
+
+    async function buildRenderTarget() {
         if (browserRestartPromise !== null) {
             await browserRestartPromise;
         }
@@ -560,21 +687,19 @@ async function main(args = process.argv.slice(2)) {
                 outputDir,
                 relative.replace(/\.[^.]+$/, '.png'),
             );
+            const rel = path.relative(testDir, testFile);
 
             try {
                 ensureDir(outPath);
-                const fileUrl = pathToFileURL(testFile).href;
-                await page.goto(fileUrl, {
-                    waitUntil: 'load',
-                    timeout: PAGE_LOAD_TIMEOUT,
-                });
-                await waitForReftestReady(page);
-                await page.screenshot({ path: outPath, fullPage: false });
+                await renderTestWithWatchdog(page, testFile, outPath, rel, renderTimeout);
             } catch (err) {
                 // Log the failure path for diagnostics; the file will be
-                // reported as "skipped" by the Broiler.Wpt runner.
-                if (errors === 0 || errors % 100 === 0) {
-                    const rel = path.relative(testDir, testFile);
+                // reported as "skipped" by the Broiler.Wpt runner. A tripped
+                // watchdog is always reported, however many ordinary failures
+                // preceded it: it marks a test that would once have hung the
+                // shard, and the throttle below could otherwise swallow the only
+                // clue to a stall.
+                if (err instanceof StepTimeoutError || errors === 0 || errors % 100 === 0) {
                     console.error(`  ⚠ Failed: ${rel}: ${err.message || err}`);
                 }
                 errors++;
@@ -582,7 +707,7 @@ async function main(args = process.argv.slice(2)) {
                 // Rebuild the render target after every failed navigation or
                 // screenshot. Timeouts can leave a page stuck in recursive
                 // loading, and renderer crashes leave it permanently dead.
-                try { await context.close(); } catch { /* already gone */ }
+                await closeQuietly(context, `closing context after ${rel}`);
                 try {
                     ({ context, page } = await newRenderTarget());
                 } catch (rebuildErr) {
@@ -598,8 +723,8 @@ async function main(args = process.argv.slice(2)) {
             }
         }
 
-        try { await page.close(); } catch { /* may already be closed */ }
-        try { await context.close(); } catch { /* may already be closed */ }
+        await closeQuietly(page, 'closing worker page');
+        await closeQuietly(context, 'closing worker context');
     }
 
     // Shallow-copy as a mutable queue (pop from end is O(1)).
@@ -612,7 +737,7 @@ async function main(args = process.argv.slice(2)) {
     }
     await Promise.all(workers);
 
-    try { await browser.close(); } catch { /* may already be closed */ }
+    await closeQuietly(browser, 'closing browser');
 
     console.log();
     console.log(`Reference generation complete: ${completed} files, ${errors} errors`);
@@ -624,6 +749,9 @@ async function main(args = process.argv.slice(2)) {
 }
 
 module.exports = {
+    DEFAULT_RENDER_TIMEOUT,
+    StepTimeoutError,
+    closeQuietly,
     contentTypeForExtension,
     createBrowserContextOptions,
     discoverTests,
@@ -633,9 +761,13 @@ module.exports = {
     isBrowserClosedError,
     loadRerunTestPaths,
     parsePositiveIntegerEnv,
+    renderTestWithWatchdog,
     requiresJavaScript,
+    resolveRenderTimeoutMs,
     resolveRootRelativeResource,
     shardIndexForPath,
+    waitForReftestReady,
+    withTimeout,
 };
 
 if (require.main === module) {
