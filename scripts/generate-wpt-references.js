@@ -38,6 +38,7 @@ const NON_TEST_DIRECTORIES = new Set([
 ]);
 const VIEWPORT = { width: 1024, height: 768 };
 const PAGE_LOAD_TIMEOUT = 10_000;   // ms — max time to wait for page load
+const REFTEST_WAIT_TIMEOUT = 5_000; // ms — max time to wait for a reftest-wait page to signal ready
 const DEFAULT_CONCURRENCY = 8;
 const ALL_SHARDS = -1;              // --shard-index sentinel meaning "all shards"
 const DEFAULT_BROWSER_RESTART_LIMIT = 3;
@@ -139,6 +140,56 @@ function contentTypeForExtension(ext) {
 function isWptHarnessScript(requestPath) {
     const lower = requestPath.toLowerCase();
     return lower.includes('testharness') || lower.includes('check-layout');
+}
+
+/**
+ * Hold the screenshot until a `reftest-wait` page says it is ready.
+ *
+ * A test that marks `<html class="reftest-wait">` is telling the reftest runner
+ * *not* to compare at load: it drives the page to the state under test — start a
+ * view transition and wait for `transition.ready`, wait for a `transitionend`,
+ * settle two animation frames — and then calls `takeScreenshot()`, which removes
+ * the class (see /common/reftest-wait.js). Screenshotting at load captures the
+ * page *before* any of that, so the golden records the pre-test state and the
+ * whole family fails on a reference artefact rather than an engine bug: Broiler
+ * drains its event loop before rendering, so it produces the post-signal state
+ * the test's own `rel=match` reference describes, and `--verify-reference` flags
+ * exactly these as "suspect reference" (most of css-view-transitions).
+ *
+ * Bounded by <see>REFTEST_WAIT_TIMEOUT</see>: a page that never signals — commonly
+ * one whose script aborted because the harness scripts are deliberately not served
+ * (see isWptHarnessScript) — is screenshotted in whatever state it reached, which
+ * is the same at-load state as before this wait existed.
+ *
+ * Measured when this landed: +25 in css/css-view-transitions (313 -> 338 of 490),
+ * and exactly one mover across 1598 tests in css/css-position, html/semantics/popovers,
+ * html/semantics/interactive-elements/the-dialog-element and css/css-backgrounds — so
+ * the new semantics are surgical rather than broad churn. That one mover is
+ * css/css-position/overlay/overlay-transition-finished, which screenshots from its
+ * `transitionend` handler: its golden is now the post-transition page, and Broiler
+ * cannot reach that state because it has no snapshot clock to end a discrete `overlay`
+ * transition against (the event loop drains every timer to a fixed point regardless of
+ * delay, so a duration cannot be modelled with a timer). Closing that needs the runner
+ * to adopt `reftest-wait` as its own snapshot signal, mirroring this side.
+ */
+async function waitForReftestReady(page) {
+    const isWaiting = () =>
+        !!document.documentElement &&
+        document.documentElement.classList.contains('reftest-wait');
+
+    try {
+        if (!(await page.evaluate(isWaiting))) {
+            return;
+        }
+        await page.waitForFunction(
+            () => !document.documentElement ||
+                !document.documentElement.classList.contains('reftest-wait'),
+            null,
+            { timeout: REFTEST_WAIT_TIMEOUT },
+        );
+    } catch {
+        // Never signalled (or the page went away mid-wait) — screenshot as-is.
+    }
 }
 
 function decodeFileUrlPath(requestUrl) {
@@ -517,6 +568,7 @@ async function main(args = process.argv.slice(2)) {
                     waitUntil: 'load',
                     timeout: PAGE_LOAD_TIMEOUT,
                 });
+                await waitForReftestReady(page);
                 await page.screenshot({ path: outPath, fullPage: false });
             } catch (err) {
                 // Log the failure path for diagnostics; the file will be

@@ -508,10 +508,18 @@ internal sealed partial class WptTestRunner
   if (typeof assert_greater_than === 'undefined') {
     window.assert_greater_than = function(a, b, msg) {};
   }
-  if (typeof setup === 'undefined') {
+  // `setup`/`done` follow the same defer-mode rule as test/async_test/promise_test above: the
+  // reference generator does not serve testharness.js, so they are undefined there and the first
+  // call throws, aborting the rest of that <script> block. Stubbing them unconditionally let our
+  // side run on past the abort point and mutate the DOM the reference never saw — WPT
+  // html/semantics/interactive-elements/the-dialog-element/backdrop-receives-element-events opens
+  // with `setup({single_test: true})` and only then calls dialog.showModal(), so Chromium's golden
+  // is a blank page while Broiler painted the dialog's red ::backdrop over the whole viewport.
+  // Outside defer mode they stay stubbed so local renders still exercise the page.
+  if (typeof setup === 'undefined' && !__defer) {
     window.setup = function(obj) {};
   }
-  if (typeof done === 'undefined') {
+  if (typeof done === 'undefined' && !__defer) {
     window.done = function() {};
   }
   if (typeof checkLayout === 'undefined') {
@@ -1788,12 +1796,39 @@ internal sealed partial class WptTestRunner
         }
     }
 
-    private static string? TryResolveWptRootRelativePath(string? src, string wptRoot)
+    /// <summary>
+    /// Maps a root-relative WPT URL (<c>/images/blue.png</c>, <c>/fonts/Ahem.ttf</c>) onto the file
+    /// it names under <paramref name="wptRoot"/>, mirroring what a real WPT server resolves. Returns
+    /// <c>null</c> when the URL is not root-relative or names nothing on disk.
+    /// <para>
+    /// The query and fragment are stripped, and percent-escapes decoded, before touching the disk —
+    /// exactly what the reference generator's <c>decodeFileUrlPath</c> does on its side. WPT routinely
+    /// tags a resource with a cache-busting or identifying query
+    /// (<c>/images/blue.png?inline-style</c>, <c>/fonts/Ahem.ttf?initiator-html</c>); taking the raw
+    /// string as a path looked for a file literally named <c>blue.png?inline-style</c>, so every such
+    /// image, font and stylesheet silently failed to load while Chromium's golden had it
+    /// (WPT resource-timing/tentative/initiator-url/static-resource, resource-timing/initiator-type/misc).
+    /// </para>
+    /// </summary>
+    internal static string? TryResolveWptRootRelativePath(string? src, string wptRoot)
     {
         if (src == null || !src.StartsWith("/", StringComparison.Ordinal))
             return null;
 
-        var rel = src.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var path = src.Split('?', '#')[0];
+        if (path.Length <= 1)
+            return null;
+
+        try
+        {
+            path = Uri.UnescapeDataString(path);
+        }
+        catch (UriFormatException)
+        {
+            // Malformed escape — fall back to the raw path rather than failing the resolve.
+        }
+
+        var rel = path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
         var local = Path.Combine(wptRoot, rel);
         return File.Exists(local) ? local : null;
     }

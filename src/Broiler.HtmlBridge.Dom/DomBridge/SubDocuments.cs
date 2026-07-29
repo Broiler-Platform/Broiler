@@ -51,8 +51,8 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Fires the onload event handler on an iframe or object element after its
-    /// sub-document has been loaded. The handler is only fired once per element.
+    /// Fires the onload event handler on a nested-browsing-context container (iframe/object/frame)
+    /// after its sub-document has been loaded. The handler is only fired once per element.
     /// Handles both property-based handlers (element.onload = function) and
     /// attribute-based handlers (setAttribute("onload", code)).
     /// </summary>
@@ -62,7 +62,7 @@ public sealed partial class DomBridge
         if (_browsingContexts.HasOnloadFired(element)) return;
 
         var tag = element.TagName?.ToLowerInvariant();
-        if (tag != "iframe" && tag != "object") return;
+        if (!IsNestedBrowsingContextContainer(tag)) return;
 
         var hasSrcDoc = tag == "iframe" && HasAttr(element, "srcdoc");
         var resourceUrl = hasSrcDoc ? "about:srcdoc" : GetSubResourceUrl(element);
@@ -89,8 +89,8 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Recursively fires onload for all iframe/object descendants of an element.
-    /// Called when a subtree containing iframes/objects is added to the document.
+    /// Recursively fires onload for all iframe/object/frame descendants of an element.
+    /// Called when a subtree containing nested browsing contexts is added to the document.
     /// </summary>
     private void FireDescendantOnloads(DomElement element)
     {
@@ -103,7 +103,7 @@ public sealed partial class DomBridge
         foreach (var child in SnapshotChildren(element))
         {
             var childTag = child.TagName?.ToLowerInvariant();
-            if (childTag == "iframe" || childTag == "object")
+            if (IsNestedBrowsingContextContainer(childTag))
             {
                 FireSubDocumentOnload(child);
             }
@@ -478,12 +478,26 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Gets the resource URL for a container element (iframe src or object data).
+    /// Whether the tag names a nested browsing context container whose resource this bridge loads
+    /// as a sub-document: <c>&lt;iframe&gt;</c>, <c>&lt;object&gt;</c> or <c>&lt;frame&gt;</c>.
+    /// <para>
+    /// <c>&lt;frame&gt;</c> is here because a frameset's cells are nested browsing contexts exactly
+    /// like an iframe's — the renderer already lays out the frameset grid
+    /// (<c>DomParser.LayoutFramesetChildren</c>) and projects a container's content document as a
+    /// sub-viewport, but nothing ever loaded a <c>&lt;frame src&gt;</c>, so every frameset rendered
+    /// as empty cells (WPT resource-timing/initiator-type/frameset).
+    /// </para>
+    /// </summary>
+    internal static bool IsNestedBrowsingContextContainer(string? tag) =>
+        tag is "iframe" or "object" or "frame";
+
+    /// <summary>
+    /// Gets the resource URL for a container element (iframe/frame src, or object data).
     /// </summary>
     internal static string GetSubResourceUrl(DomElement containerElement)
     {
         var tag = containerElement.TagName?.ToLowerInvariant();
-        if (tag == "iframe")
+        if (tag == "iframe" || tag == "frame")
             return TryGetAttribute(containerElement, "src", out var src) ? src : string.Empty;
         if (tag == "object")
             return TryGetAttribute(containerElement, "data", out var data) ? data : string.Empty;

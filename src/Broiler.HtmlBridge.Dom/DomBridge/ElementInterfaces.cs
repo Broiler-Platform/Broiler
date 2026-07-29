@@ -118,6 +118,24 @@ public sealed partial class DomBridge
             }
         }
 
+        // HTMLIFrameElement.width/height are plain reflected DOMString content attributes (unlike
+        // HTMLImageElement's, which are unsigned longs returning the used dimension). Without the
+        // reflection `iframe.width = 100` set nothing at all, so the box fell back to the replaced
+        // element's 300x150 default object size instead of the size the page asked for
+        // (WPT html/semantics/interactive-elements/the-dialog-element/centering).
+        if (tag == "iframe")
+        {
+            foreach (var dim in new[] { "height", "width" })
+            {
+                var dimName = dim;
+                obj.FastAddProperty((KeyString)dimName,
+                    new JSFunction((in _) => new JSString(
+                        TryGetAttribute(element, dimName, out var v) ? v : string.Empty), "get " + dimName),
+                    new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedDimension(dimName, element, in a), "set " + dimName),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+        }
+
         // Box-model metrics (client*/offset*/scroll* dimensions, offsetParent, getBoundingClientRect/
         // getClientRects) and the imperative scrolling API (scrollTop/scrollLeft, scroll/scrollTo/scrollBy,
         // scrollIntoView, scrollParent) — Phase 3 P3.51: extracted into the co-located ElementGeometryBinding

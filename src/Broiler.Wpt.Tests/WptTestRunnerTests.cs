@@ -11609,4 +11609,45 @@ div {{ width: 256px; height: 768px; }}
         Assert.True(result.Passed,
             $"z-index:-1 box must paint behind in-flow content (no red). Match={result.MatchPercent:F1}% {result.Message}");
     }
+
+    // --- Root-relative resource resolution mirrors the reference generator --------------------
+
+    [Fact]
+    public void TryResolveWptRootRelativePath_Ignores_Query_And_Fragment()
+    {
+        // WPT tags resources with a cache-busting/identifying query — /images/blue.png?inline-style,
+        // /fonts/Ahem.ttf?initiator-html. Taking the raw URL as a path looked for a file literally
+        // named "blue.png?inline-style", so the resource silently failed to load while Chromium's
+        // golden had it (resource-timing/initiator-type/misc, .../initiator-url/static-resource).
+        Directory.CreateDirectory(Path.Combine(_tempDir, "images"));
+        var onDisk = Path.Combine(_tempDir, "images", "blue.png");
+        File.WriteAllText(onDisk, "not-really-a-png");
+
+        Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("/images/blue.png", _tempDir));
+        Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("/images/blue.png?inline-style", _tempDir));
+        Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("/images/blue.png?id=body&x=1", _tempDir));
+        Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("/images/blue.png#frag", _tempDir));
+    }
+
+    [Fact]
+    public void TryResolveWptRootRelativePath_Decodes_Percent_Escapes()
+    {
+        Directory.CreateDirectory(Path.Combine(_tempDir, "sup port"));
+        var onDisk = Path.Combine(_tempDir, "sup port", "a b.css");
+        File.WriteAllText(onDisk, "body{}");
+
+        Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("/sup%20port/a%20b.css", _tempDir));
+    }
+
+    [Fact]
+    public void TryResolveWptRootRelativePath_Rejects_Non_Root_Relative_And_Missing()
+    {
+        // Only root-relative URLs are remapped; a relative or absolute URL is left to the caller,
+        // and a root-relative path that names nothing on disk still resolves to null.
+        Assert.Null(WptTestRunner.TryResolveWptRootRelativePath("images/blue.png", _tempDir));
+        Assert.Null(WptTestRunner.TryResolveWptRootRelativePath("https://a.test/blue.png", _tempDir));
+        Assert.Null(WptTestRunner.TryResolveWptRootRelativePath(null, _tempDir));
+        Assert.Null(WptTestRunner.TryResolveWptRootRelativePath("/", _tempDir));
+        Assert.Null(WptTestRunner.TryResolveWptRootRelativePath("/nope/missing.png?x", _tempDir));
+    }
 }

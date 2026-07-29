@@ -1,0 +1,55 @@
+From 19e44a5ef2da03f1e8f543e56e1e9c632bc6459e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 29 Jul 2026 14:09:14 +0000
+Subject: [PATCH] html: give <iframe> the replaced-element default object size
+ of 300x150
+
+An <iframe> with no CSS width/height had no size at all, so it collapsed to its 2px
+border: neither the frame box nor the projected sub-document rendered, and every such
+test failed as MissingContent even though the sub-document projection itself works.
+
+Apply the default in CorrectIframeBoxes with the same precedence CorrectVideoBoxes
+already uses for the other replaced element that cannot supply an intrinsic size: author
+CSS sizing wins, then the width/height presentation attributes, then the CSS
+replaced-element default object size 300x150.
+
+Deliberately not a UA-stylesheet width/height. That form outranks the presentation
+attributes, so an <iframe width=100> -- or an iframe.width assignment reflecting into
+that attribute -- stopped taking effect and the box was forced to 300x150
+(WPT the-dialog-element/centering, popovers/popover-move-documents both regressed on it).
+
+WPT resource-timing goes 89 -> 92 of 127, including
+tentative/initiator-url/static-resource, whose iframe now renders green.html at 300x150
+as Chromium's golden does.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ Source/Broiler.HTML.Orchestration/Parse/DomParser.cs | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+index 24407d6..f314f81 100644
+--- a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
++++ b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+@@ -922,6 +922,18 @@ internal sealed class DomParser
+         if (box.HtmlTag != null
+             && box.HtmlTag.Name.Equals("iframe", StringComparison.OrdinalIgnoreCase))
+         {
++            // Author CSS sizing wins; otherwise the width/height presentation attributes, then the CSS
++            // replaced-element default object size 300×150 — the same precedence CorrectVideoBoxes uses.
++            // Without a default an unsized iframe collapsed to its border and neither the frame box nor
++            // the projected sub-document rendered (WPT resource-timing/tentative/initiator-url/
++            // static-resource). This must not be a UA-stylesheet width/height: that form outranks the
++            // presentation attributes, so `iframe.width = 100` stopped taking effect
++            // (the-dialog-element/centering, popovers/popover-move-documents).
++            if (box.Width == CssConstants.Auto)
++                box.Width = PresentationLengthPx(box, "width", "300px");
++            if (box.Height == CssConstants.Auto)
++                box.Height = PresentationLengthPx(box, "height", "150px");
++
+             // display:none on each direct child hides that child and its whole subtree.
+             foreach (var child in box.Boxes)
+                 child.Display = CssConstants.None;
+-- 
+2.43.0
+
