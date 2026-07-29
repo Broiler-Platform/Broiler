@@ -1788,12 +1788,39 @@ internal sealed partial class WptTestRunner
         }
     }
 
-    private static string? TryResolveWptRootRelativePath(string? src, string wptRoot)
+    /// <summary>
+    /// Maps a root-relative WPT URL (<c>/images/blue.png</c>, <c>/fonts/Ahem.ttf</c>) onto the file
+    /// it names under <paramref name="wptRoot"/>, mirroring what a real WPT server resolves. Returns
+    /// <c>null</c> when the URL is not root-relative or names nothing on disk.
+    /// <para>
+    /// The query and fragment are stripped, and percent-escapes decoded, before touching the disk —
+    /// exactly what the reference generator's <c>decodeFileUrlPath</c> does on its side. WPT routinely
+    /// tags a resource with a cache-busting or identifying query
+    /// (<c>/images/blue.png?inline-style</c>, <c>/fonts/Ahem.ttf?initiator-html</c>); taking the raw
+    /// string as a path looked for a file literally named <c>blue.png?inline-style</c>, so every such
+    /// image, font and stylesheet silently failed to load while Chromium's golden had it
+    /// (WPT resource-timing/tentative/initiator-url/static-resource, resource-timing/initiator-type/misc).
+    /// </para>
+    /// </summary>
+    internal static string? TryResolveWptRootRelativePath(string? src, string wptRoot)
     {
         if (src == null || !src.StartsWith("/", StringComparison.Ordinal))
             return null;
 
-        var rel = src.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var path = src.Split('?', '#')[0];
+        if (path.Length <= 1)
+            return null;
+
+        try
+        {
+            path = Uri.UnescapeDataString(path);
+        }
+        catch (UriFormatException)
+        {
+            // Malformed escape — fall back to the raw path rather than failing the resolve.
+        }
+
+        var rel = path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
         var local = Path.Combine(wptRoot, rel);
         return File.Exists(local) ? local : null;
     }
