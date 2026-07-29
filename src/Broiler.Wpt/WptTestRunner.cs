@@ -508,10 +508,18 @@ internal sealed partial class WptTestRunner
   if (typeof assert_greater_than === 'undefined') {
     window.assert_greater_than = function(a, b, msg) {};
   }
-  if (typeof setup === 'undefined') {
+  // `setup`/`done` follow the same defer-mode rule as test/async_test/promise_test above: the
+  // reference generator does not serve testharness.js, so they are undefined there and the first
+  // call throws, aborting the rest of that <script> block. Stubbing them unconditionally let our
+  // side run on past the abort point and mutate the DOM the reference never saw — WPT
+  // html/semantics/interactive-elements/the-dialog-element/backdrop-receives-element-events opens
+  // with `setup({single_test: true})` and only then calls dialog.showModal(), so Chromium's golden
+  // is a blank page while Broiler painted the dialog's red ::backdrop over the whole viewport.
+  // Outside defer mode they stay stubbed so local renders still exercise the page.
+  if (typeof setup === 'undefined' && !__defer) {
     window.setup = function(obj) {};
   }
-  if (typeof done === 'undefined') {
+  if (typeof done === 'undefined' && !__defer) {
     window.done = function() {};
   }
   if (typeof checkLayout === 'undefined') {
