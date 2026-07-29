@@ -398,12 +398,67 @@ public sealed partial class DomBridge
         if (csp == null || DocumentElement == null)
             return;
 
-        ApplyStyleCsp(DocumentElement, csp, blockStyleAttribute: !csp.AllowsInlineStyleAttribute());
+        // CSP §"Processing a `meta` element": a policy delivered by
+        // <meta http-equiv="Content-Security-Policy"> is enforced from the point the parser reaches
+        // the meta — markup already parsed is *not* retroactively blocked. Enforcing document-wide
+        // stripped a style attribute that precedes the meta, including on the ancestors that
+        // *contain* it: WPT content-security-policy/style-src/inline-style-attribute-on-html has
+        // <html style="background-color: blue"> before a `style-src 'none'` meta, and rendered white
+        // instead of blue.
+        //
+        // A pre-order walk visits an element's start tag in parse order, and visits ancestors before
+        // descendants, so "not yet reached the meta" is exactly "this start tag was parsed first".
+        // A policy with no meta in the document came from a header and applies document-wide.
+        var policyMeta = FindCspMetaElement(DocumentElement);
+        ApplyStyleCsp(
+            DocumentElement, csp,
+            blockStyleAttribute: !csp.AllowsInlineStyleAttribute(),
+            policyMeta,
+            enforcing: policyMeta == null);
     }
 
-    private void ApplyStyleCsp(DomElement element, ContentSecurityPolicy csp, bool blockStyleAttribute)
+    /// <summary>
+    /// The <c>&lt;meta http-equiv="Content-Security-Policy"&gt;</c> element that delivered the
+    /// document's policy, in document order, or <c>null</c> when none is present (a header-delivered
+    /// policy). Mirrors the acceptance rules of <c>CspMetaDiscovery.FindPolicyContent</c>, which
+    /// parses the same meta out of the source text.
+    /// </summary>
+    private DomElement? FindCspMetaElement(DomElement element)
     {
-        if (!IsText(element))
+        if (!IsText(element) &&
+            element.TagName.Equals("meta", StringComparison.OrdinalIgnoreCase) &&
+            TryGetAttribute(element, "http-equiv", out var httpEquiv) &&
+            string.Equals(httpEquiv?.Trim(), "Content-Security-Policy", StringComparison.OrdinalIgnoreCase) &&
+            TryGetAttribute(element, "content", out var content) &&
+            !string.IsNullOrWhiteSpace(content))
+        {
+            return element;
+        }
+
+        foreach (var child in ChildElements(element))
+        {
+            var found = FindCspMetaElement(child);
+            if (found != null)
+                return found;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Walks the document in parse order applying the style-src family. <paramref name="enforcing"/>
+    /// starts <c>false</c> for a meta-delivered policy and flips to <c>true</c> at
+    /// <paramref name="policyMeta"/>; it is threaded through the walk (rather than being recomputed
+    /// per element) so the flip is observed by every subsequent element in document order.
+    /// </summary>
+    private bool ApplyStyleCsp(
+        DomElement element, ContentSecurityPolicy csp, bool blockStyleAttribute,
+        DomElement? policyMeta, bool enforcing)
+    {
+        if (ReferenceEquals(element, policyMeta))
+            enforcing = true;
+
+        if (enforcing && !IsText(element))
         {
             if (element.TagName.Equals("style", StringComparison.OrdinalIgnoreCase))
             {
@@ -411,7 +466,7 @@ public sealed partial class DomBridge
                 if (!csp.AllowsInlineStyleElement(nonce, GetStyleElementCssText(element)))
                 {
                     element.Remove();
-                    return;
+                    return enforcing;
                 }
             }
 
@@ -425,7 +480,9 @@ public sealed partial class DomBridge
 
         // Snapshot: a blocked <style> child removes itself from this collection.
         foreach (var child in ChildElements(element).ToArray())
-            ApplyStyleCsp(child, csp, blockStyleAttribute);
+            enforcing = ApplyStyleCsp(child, csp, blockStyleAttribute, policyMeta, enforcing);
+
+        return enforcing;
     }
 
     private string GetStyleElementCssText(DomElement styleEl)

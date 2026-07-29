@@ -540,4 +540,68 @@ public class ContentSecurityPolicyTests
         empty.Parse("img-src 'self'");
         Assert.True(empty.AllowsExternalStyle("https://cdn.test/a.css", "https://a.test/page.html"));
     }
+
+    // --- CSP §"Processing a `meta` element": a meta policy is not retroactive ------------------
+
+    [Fact]
+    public void Meta_Csp_Does_Not_Block_A_Style_Attribute_Parsed_Before_It()
+    {
+        // WPT content-security-policy/style-src/inline-style-attribute-on-html: the style attribute
+        // is on <html>, whose start tag the parser reads before it ever reaches the meta, so
+        // `style-src 'none'` does not apply to it. Enforcing document-wide stripped it and the page
+        // rendered white instead of blue.
+        const string html = """
+            <!DOCTYPE html>
+            <html style="background-color: blue">
+            <head><meta http-equiv="Content-Security-Policy" content="style-src 'none'"></head>
+            <body></body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///t.html");
+
+        Assert.Contains("background-color: blue", result);
+    }
+
+    [Fact]
+    public void Meta_Csp_Still_Blocks_A_Style_Attribute_That_Follows_It()
+    {
+        // The other half of the ordering rule: everything from the meta onwards is enforced, so the
+        // fix must not turn into a blanket exemption.
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <head><meta http-equiv="Content-Security-Policy" content="style-src 'none'"></head>
+            <body style="background: green"><p style="color: red">x</p></body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///t.html");
+
+        Assert.DoesNotContain("background: green", result);
+        Assert.DoesNotContain("color: red", result);
+    }
+
+    [Fact]
+    public void Meta_Csp_Blocks_A_Style_Element_After_It_But_Not_One_Before_It()
+    {
+        // Same ordering rule for <style> elements, and it must hold across the head/body boundary:
+        // the earlier sheet survives, the later one is removed.
+        const string html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>body { background: blue; }</style>
+                <meta http-equiv="Content-Security-Policy" content="style-src 'none'">
+                <style>body { background: green; }</style>
+            </head>
+            <body></body>
+            </html>
+            """;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///t.html");
+
+        Assert.Contains("background: blue", result);
+        Assert.DoesNotContain("background: green", result);
+    }
 }
