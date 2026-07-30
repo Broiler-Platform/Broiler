@@ -1101,10 +1101,22 @@ internal sealed partial class WptTestRunner
     /// Determines whether the given test path is a WPT <em>manual</em> test.
     /// Per WPT convention a test is manual when its filename (without the
     /// extension) ends in <c>-manual</c> — e.g.
-    /// <c>animation-delay-001-manual.html</c>. Such tests require human
-    /// interaction (they have no automated pass condition) and therefore cannot
-    /// be pixel-compared against a Chromium screenshot; the upstream wptrunner
-    /// skips them unless <c>--include-manual</c> is passed.
+    /// <c>animation-delay-001-manual.html</c> — or when it sits under a
+    /// <c>manual/</c> directory segment, which upstream treats the same way
+    /// (the directory carries the signal for a whole family of tests instead of
+    /// each filename repeating it). Such tests require human interaction (they
+    /// have no automated pass condition) and therefore cannot be pixel-compared
+    /// against a Chromium screenshot; the upstream wptrunner skips them unless
+    /// <c>--include-manual</c> is passed.
+    /// <para>
+    /// DIAGNOSTIC NOTE (WPT issue #1491, problem 24):
+    /// <c>html/canvas/element/manual/draw-element-image/dialog-paints-in-top-layer.tentative.html</c>
+    /// was discovered and scored as a Regular test. Its Chromium reference is a
+    /// blank canvas — Chromium does not implement the proposed
+    /// <c>draw-element-image</c> API either — so the only way to "pass" was to
+    /// render nothing, while Broiler painting the dialog scored 0.0%. The
+    /// directory-segment check below takes such tests out of the scored set.
+    /// </para>
     /// <para>
     /// DIAGNOSTIC NOTE (WPT issue #1100): before this check existed, all 59
     /// <c>-manual</c> tests under <c>css/css-animations</c> were rendered and
@@ -1118,6 +1130,13 @@ internal sealed partial class WptTestRunner
     /// </summary>
     internal static bool IsManualTest(string testPath)
     {
+        // Normalise separators so the check works on both Unix and Windows paths,
+        // mirroring IsCrashTest's "/crashtests/" and IsTentativeTest's
+        // "/tentative/" segment checks.
+        if (testPath.Contains("/manual/", StringComparison.OrdinalIgnoreCase) ||
+            testPath.Contains("\\manual\\", StringComparison.OrdinalIgnoreCase))
+            return true;
+
         var nameWithoutExt = Path.GetFileNameWithoutExtension(testPath);
         return nameWithoutExt.EndsWith("-manual", StringComparison.OrdinalIgnoreCase);
     }
@@ -1434,7 +1453,7 @@ internal sealed partial class WptTestRunner
                 TestPath = testPath,
                 Skipped = true,
                 SkipReason = SkipReason.ManualTest,
-                Message = "WPT manual test (filename ends in -manual); requires human interaction.",
+                Message = "WPT manual test (filename ends in -manual, or a manual/ path segment); requires human interaction.",
             };
         }
 
@@ -2353,9 +2372,21 @@ internal sealed partial class WptTestRunner
     /// <c>::view-transition*</c> pseudo tree and <c>view-transition-group</c> nesting) and animation
     /// snapshots — which otherwise only see inline <c>&lt;style&gt;</c> content. Links that do not
     /// resolve to a readable local file are left untouched.
+    /// <para>
+    /// DIAGNOSTIC NOTE (WPT issue #1491, problem 25): this inliner runs before the DomBridge
+    /// serialization transforms, so it — not <c>ApplyBaseHrefToStyleUrls</c> — is what decides
+    /// which file a linked sheet comes from. Resolving the href against the test's own directory
+    /// made <c>the-link-element/stylesheet-with-base.html</c> inline the red sibling sheet that
+    /// the test plants as a trap, and the test rendered 100% red. Both sites now resolve through
+    /// the shared <see cref="HtmlBaseHref"/> seam.
+    /// </para>
     /// </summary>
-    private static string InlineLinkedStylesheets(string html, string? testDir, string? wptRoot)
+    internal static string InlineLinkedStylesheets(string html, string? testDir, string? wptRoot)
     {
+        // HTML §4.2.3: a relative href resolves against the document base URL, which
+        // <base href> overrides. Found once for the document, not per link.
+        var hasBaseHref = HtmlBaseHref.TryFindBaseHref(html, out var baseHref);
+
         return LinkStylesheetTagPattern.Replace(html, match =>
         {
             var tag = match.Value;
@@ -2366,7 +2397,11 @@ internal sealed partial class WptTestRunner
             if (!href.Success)
                 return tag;
 
-            var local = ResolveExternalScriptPath(href.Groups[1].Value, testDir, wptRoot);
+            var target = href.Groups[1].Value;
+            if (hasBaseHref && HtmlBaseHref.Resolve(target, baseHref, pageUrl: null) is { } rebased)
+                target = rebased;
+
+            var local = ResolveExternalScriptPath(target, testDir, wptRoot);
             if (local == null || !File.Exists(local))
                 return tag;
 

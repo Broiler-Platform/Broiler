@@ -20,11 +20,15 @@ public class StylesheetBaseHrefTests
             System.IO.Path.GetTempPath(), "broiler-basehref-" + System.Guid.NewGuid().ToString("N"));
         var resourcesDir = System.IO.Path.Combine(baseDir, "resources");
         System.IO.Directory.CreateDirectory(resourcesDir);
-        // The sheet exists ONLY under resources/ — reachable only if the link's relative href is
-        // resolved against <base href="resources/">, not the document's own directory.
         System.IO.File.WriteAllText(
             System.IO.Path.Combine(resourcesDir, "stylesheet.css"),
             "body { background-color: green; }");
+        // The trap the WPT test plants: a same-named sheet next to the document. Resolving the
+        // href against the document's own directory picks THIS one and paints red, which is
+        // exactly how the test failed (issue #1491, problem 25).
+        System.IO.File.WriteAllText(
+            System.IO.Path.Combine(baseDir, "stylesheet.css"),
+            "body { background-color: red; }");
         try
         {
             var pageUrl = new System.Uri(System.IO.Path.Combine(baseDir, "test.html")).AbsoluteUri;

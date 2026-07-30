@@ -37,7 +37,20 @@ public sealed partial class DomBridge
     /// Inlines the leading <c>@import</c> rules of every <c>&lt;style&gt;</c> in the tree,
     /// replacing each with the (recursively import-expanded) text of the imported sheet.
     /// </summary>
-    private void InlineStyleSheetImports(DomElement element)
+    private void InlineStyleSheetImports(DomElement root)
+    {
+        // HTML §4.2.3: <base href> replaces the document URL that a relative
+        // @import resolves against, so the base is folded in before the walk
+        // rather than resolving each import against the page URL. Computed once
+        // for the document. (This transform runs before ApplyBaseHrefToStyleUrls,
+        // so it cannot rely on that pass having rebased anything.)
+        TryFindDocumentBaseHref(root, out var baseHref);
+        var documentBaseUrl = HtmlBaseHref.ResolveDocumentBaseUrl(_pageUrl, baseHref);
+
+        InlineStyleSheetImports(root, documentBaseUrl);
+    }
+
+    private void InlineStyleSheetImports(DomElement element, string documentBaseUrl)
     {
         if (!IsText(element) &&
             element.TagName.Equals("style", StringComparison.OrdinalIgnoreCase))
@@ -46,14 +59,14 @@ public sealed partial class DomBridge
             if (HasLeadingImport(original))
             {
                 var expanded = ExpandCssImports(
-                    original, _pageUrl, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0);
+                    original, documentBaseUrl, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0);
                 if (!string.Equals(expanded, original, StringComparison.Ordinal))
                     SetElementTextContent(element, expanded);
             }
         }
 
         foreach (var child in ChildElements(element))
-            InlineStyleSheetImports(child);
+            InlineStyleSheetImports(child, documentBaseUrl);
     }
 
     /// <summary>Quick, allocation-free check for a leading <c>@import</c> before the

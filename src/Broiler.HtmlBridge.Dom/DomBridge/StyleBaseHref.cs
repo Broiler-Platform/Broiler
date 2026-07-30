@@ -131,52 +131,11 @@ public sealed partial class DomBridge
         });
 
     /// <summary>
-    /// Resolves a CSS <c>url()</c> value against a <c>&lt;base href&gt;</c>, or returns
-    /// <c>null</c> when it should be left untouched (empty / <c>data:</c> / fragment /
-    /// already-absolute). A root-relative base yields a root-relative result (so the
-    /// <c>wptRoot</c> host-relative mapper still resolves it); an absolute base yields an
-    /// absolute URL; a document-relative base resolves through the page URL first.
+    /// Resolves a CSS <c>url()</c> value or a <c>&lt;link&gt;</c> href against a
+    /// <c>&lt;base href&gt;</c>. Delegates to <see cref="HtmlBaseHref.Resolve"/>, the shared
+    /// seam this and the WPT runner's stylesheet inliner both go through — see that type for
+    /// the resolution rules and why there is only one implementation.
     /// </summary>
-    private string? ResolveUrlAgainstBaseHref(string rawUrl, string baseHref)
-    {
-        var url = rawUrl.Trim();
-        if (url.Length == 0 ||
-            url.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ||
-            url.StartsWith("#", StringComparison.Ordinal) ||
-            HasUrlScheme(url))
-            return null;
-
-        if (baseHref.StartsWith("/", StringComparison.Ordinal))
-        {
-            // Root-relative base: do the path math under a placeholder authority, then hand
-            // back the host-relative path so a root-relative resource mapper still matches.
-            var placeholder = new Uri("http://base.invalid", UriKind.Absolute);
-            if (Uri.TryCreate(placeholder, baseHref, out var rootBase) &&
-                Uri.TryCreate(rootBase, url, out var rootResolved))
-            {
-                var result = rootResolved.PathAndQuery + rootResolved.Fragment;
-                return string.Equals(result, url, StringComparison.Ordinal) ? null : result;
-            }
-
-            return null;
-        }
-
-        if (Uri.TryCreate(baseHref, UriKind.Absolute, out var absoluteBase) &&
-            Uri.TryCreate(absoluteBase, url, out var absoluteResolved))
-        {
-            var result = absoluteResolved.AbsoluteUri;
-            return string.Equals(result, url, StringComparison.Ordinal) ? null : result;
-        }
-
-        if (!string.IsNullOrEmpty(_pageUrl) &&
-            Uri.TryCreate(_pageUrl, UriKind.Absolute, out var pageBase) &&
-            Uri.TryCreate(pageBase, baseHref, out var docBase) &&
-            Uri.TryCreate(docBase, url, out var docResolved))
-        {
-            var result = docResolved.AbsoluteUri;
-            return string.Equals(result, url, StringComparison.Ordinal) ? null : result;
-        }
-
-        return null;
-    }
+    private string? ResolveUrlAgainstBaseHref(string rawUrl, string baseHref) =>
+        HtmlBaseHref.Resolve(rawUrl, baseHref, _pageUrl);
 }

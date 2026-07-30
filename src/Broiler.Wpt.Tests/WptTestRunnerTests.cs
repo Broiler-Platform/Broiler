@@ -5158,11 +5158,28 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(WptTestRunner.IsManualTest(path));
     }
 
+    // A "manual/" directory segment carries the same signal as the filename
+    // suffix (WPT issue #1491, problem 24): the canvas draw-element-image test
+    // below was scored as Regular against a blank Chromium reference, so the
+    // only way to "pass" it was to render nothing.
+    [Theory]
+    [InlineData("/wpt/html/canvas/element/manual/draw-element-image/dialog-paints-in-top-layer.tentative.html")]
+    [InlineData("/wpt/css/css-animations/manual/animation-delay-001.html")]
+    [InlineData("C:\\wpt\\html\\canvas\\element\\manual\\draw-element-image\\dialog.html")]
+    [InlineData("/wpt/css/MANUAL/foo.html")]
+    public void IsManualTest_Detects_ManualDirectorySegment(string path)
+    {
+        Assert.True(WptTestRunner.IsManualTest(path));
+    }
+
     [Theory]
     [InlineData("/wpt/css/css-animations/animation-delay-009.html")]
     [InlineData("/wpt/css/css-align/abspos/align-self-static-position-003.html")]
     // "-manual" only counts as a suffix of the base name, not anywhere in it.
     [InlineData("/wpt/css/manual-override-001.html")]
+    // ...and "manual" only counts as a whole path segment, not a prefix of one.
+    [InlineData("/wpt/css/manually/foo.html")]
+    [InlineData("/wpt/css/semi-manual/foo.html")]
     public void IsManualTest_Returns_False_For_Automated_Tests(string path)
     {
         Assert.False(WptTestRunner.IsManualTest(path));
@@ -5191,6 +5208,9 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     [InlineData("/wpt/css/compositing/crashtests/bgblend.html", "CrashTest")]
     [InlineData("/wpt/css/foo-crash.html", "CrashTest")]
     [InlineData("/wpt/css/css-animations/anim-001-manual.html", "Manual")]
+    // A manual/ segment wins over .tentative — Manual is the bucket that takes
+    // the test out of the scored set, which is the point (issue #1491, #24).
+    [InlineData("/wpt/html/canvas/element/manual/draw-element-image/dialog.tentative.html", "Manual")]
     [InlineData("/wpt/css/css-anchor-position/anchor.tentative.html", "Tentative")]
     [InlineData("/wpt/css/css-flexbox/flex-001.html", "Regular")]
     public void ClassifyTestKind_Returns_Expected_Kind(string path, string expected)
