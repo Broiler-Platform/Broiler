@@ -526,18 +526,35 @@ Four caveats, all learned the hard way:
      class's prototype either. The reactions are copied onto the element and the
      connected one is invoked for elements already in the document — which is
      where a component builds its shadow root.
-  4. **Still open — `template.content` and `document.importNode` do not exist.**
-     `t.content` is `undefined` and `importNode` is not a function, so the
+  4. **`template.content` and `document.importNode` did not exist.** `t.content`
+     was `undefined` and `importNode` was not a function, so the
      `importNode(template.content, true)` idiom every one of these components uses
-     yields nothing. That is the last thing between this test and its reference,
-     and it is a real DOM gap in HtmlBridge rather than a harness one.
+     yielded nothing. Both are implemented in HtmlBridge now — a real DOM gap
+     rather than a harness one. One deviation is deliberate and pinned by a test:
+     the spec has the parser move a template's children into the content fragment,
+     leaving the element childless, whereas Broiler's parser keeps them as
+     children so a template round-trips through serialization, so `content` is a
+     stable *snapshot copy* of them. Stamping, querying and
+     populating-before-stamping all behave; reading one side after mutating the
+     other does not. Nothing renders either way — template contents are inert.
+- **And that made the test's score go down, which is the useful part.** With all
+  four fixes it reads **90.5%**, against 98.2% for the template patch alone.
+  Nothing regressed: the shadow content simply renders now, and it renders at the
+  wrong size, where before it was absent. Ours is 7.8% `#aaa` against the
+  reference's 0.1%. The cause is measured, not guessed — a host's box grows with
+  the length of its shadow `<style>`'s CSS text: 125×327 with the test's full
+  style, 468×95 with a shorter one, 1008×19 with none, where Chromium's is one
+  line tall. A `<style>` inside an ordinary rendered `<div>` correctly does not
+  lay out (120×19), so this is specific to the style the shadow projection inlines
+  into the host. That is a pre-existing projection bug these fixes merely exposed,
+  and it is the next thread to pull.
 - **A note on where these live.** Items 1–3 are in the runner's browser-API shim,
   which exists only because the bridge implements no custom elements. That is the
   honest fix for a harness bug — the component's own code runs and builds a real
   shadow root — but the durable answer is `customElements` in HtmlBridge proper.
-- **Exit gate:** `template.content` and `document.importNode` exist, a custom
-  element's shadow content renders, and only then the focus question — a focused
-  test for `delegatesFocus` moving focus to the first focusable shadow
+- **Exit gate:** the shadow projection's inlined `<style>` stops taking part in
+  layout so hosts size to their content, and only then the focus question — a
+  focused test for `delegatesFocus` moving focus to the first focusable shadow
   descendant.
 
 ## Items that need the WPT server before they can be judged
@@ -624,5 +641,5 @@ feature they test — closing those means rendering less, not more.
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
 | 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — patch 0038 applied; bridge now delegates to it |
 | 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** — patch 0036 applied |
-| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 98.2%**, **pending patch 0041**; last 1.8% is custom-element shadow content |
+| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 90.5%** (98.2% from patch 0041 alone); shadow content now renders but hosts are oversized |
 | 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** — patches 0036/0037 applied |

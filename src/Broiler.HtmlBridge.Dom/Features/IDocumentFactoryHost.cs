@@ -20,4 +20,10 @@ internal interface IDocumentFactoryHost
     DomDocumentFragment CreateBridgeDocumentFragment();
 
     JSObject BuildStandaloneAttrNode(string qualifiedName, string? namespaceUri);
+
+    /// <summary>Resolves a JS wrapper back to the node it wraps, or <see langword="null"/>.</summary>
+    DomNode? FindDomNodeByJSObject(JSObject obj);
+
+    /// <summary>Clones a node, deeply when asked — the copy <c>importNode</c> hands back.</summary>
+    DomNode CloneDomNode(DomNode source, bool deep);
 }
