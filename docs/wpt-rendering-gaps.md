@@ -12,12 +12,14 @@
   [the root roadmap](ROADMAP.md#htmlbridge-runtime).
 - **Companion documents:** [root roadmap](ROADMAP.md) for cross-component work;
   the component roadmaps own the implementation once an item below names them.
-- **Progress:** problems 24, 25, 27, 28 and the `vb` half of 30 are fixed; each
+- **Progress:** problems 6, 24, 25, 27, 28 and the `vb` half of 30 are fixed; each
   section says what landed, what was verified locally, and what is left for CI to
-  confirm. Two of those fixes live in submodules whose remotes this session
-  cannot push to, so they ship as `patches/0036-…` and `patches/0037-…` and are
-  **not on CI until a maintainer applies them and bumps the pointers** — see
-  [`patches/README.md`](../patches/README.md).
+  confirm. Several of those fixes live in submodules whose remotes this session
+  cannot push to, so they ship as patches under `patches/` and are **not on CI
+  until a maintainer applies them and bumps the pointers** — see
+  [`patches/README.md`](../patches/README.md). Problems 25 and 27 do work on CI
+  today: 25 is entirely main-repo, and 27 carries a main-repo fallback. Problems
+  6, 28 and 30 are inert until their patches land.
 
 Every item names an owner, the evidence behind it, its next action, and an
 objective exit gate. Where the evidence is a local measurement rather than the CI
@@ -142,22 +144,56 @@ Two caveats, both learned the hard way while writing this document:
   pixel result is CI's to confirm. The patch must be applied and the submodule
   pointer bumped before CI sees any of this.
 
-## `contrast-color()` and style container queries
+## `contrast-color()` and style container queries — **fixed, pending patch**
 
 - **Test:** problem 6, `css/css-color/contrast-color-style-query.html`.
 - **Owner:** Broiler.CSS.
-- **Current evidence:** Broiler renders 100% white where Chromium renders 100%
+- **Original evidence:** Broiler renders 100% white where Chromium renders 100%
   green. The test needs three features to compose: an `@property`-registered
   `<color>` custom property, `contrast-color(#000)` resolving to an absolute
   colour, and `@container style(--contrast-color: white)` matching on it. Any one
-  missing leaves the `background: green` rule unapplied, which is what the blank
-  render shows.
-- **Next action:** implement `contrast-color()` as an absolute-colour resolution
-  at computed-value time, then confirm whether the style container query
-  evaluates registered custom properties; the test distinguishes the two once
-  either lands.
-- **Exit gate:** `contrast-color()` computes to an absolute colour, a style
-  container query matches on a registered custom property, and the test matches.
+  missing leaves the `background: green` rule unapplied.
+- **Which of the three were missing:** registration already worked. The other two
+  did not — and the earlier guess that the test would "distinguish the two once
+  either lands" was wrong: it needs *both*, so neither alone moves the test.
+- **What landed** (`patches/0039-…`):
+  1. `contrast-color(<color>)` resolves to whichever of black or white contrasts
+     more with its argument, via the WCAG 2 contrast ratio over relative
+     luminance. The comparison collapses to one threshold — white wins below
+     luminance `√(1.05 × 0.05) − 0.05 ≈ 0.1791`, where the two ratios are equal.
+     **That is not mid-grey:** `#767676` takes black while `#757575` takes white,
+     and a test pins exactly that boundary. Wired into
+     `CssValueParser.TryParseColor`, so it is a `<color>` everywhere; the system
+     colours are routed there in the same pass, since they are `<color>` keywords
+     too.
+  2. `style()` container queries, which were explicitly unsupported and forced
+     the whole query false. A *style* container needs no `container-type` —
+     css-contain-3 makes every element one — so size and style containers are now
+     resolved separately and a style-only query works where no size container
+     exists. Comparison is colour-aware, because a registered `<color>` property
+     computes to an absolute colour: `white` and `rgb(255, 255, 255)` are the
+     same computed value.
+- **Two parsing traps this uncovered,** both of which made *every* style query
+  silently false rather than erroring:
+  - `SplitContainerName` read the leading identifier of `style(...)` as a
+    container **name**, so the lookup hunted for `container-name: style`, found
+    nothing, and bailed. An identifier immediately followed by `(` is a function.
+  - The condition tokenizer split `style` from its parenthesised argument,
+    leaving the argument looking like a nested condition and the name like a bare
+    size feature. Function tokens now keep their argument list.
+- **Verified:** the composed scenario renders red with the patch reverted and
+  green with it applied. The negative half — `contrast-color(#fff)` is *black*,
+  so the `white` query must **not** match — is what makes that meaningful; an
+  early version of this check passed only because the query never matched at all.
+- **Known gaps, deliberate:** only the custom-property form of `style()` is
+  supported (a standard-property query returns false rather than guessing), and
+  an `@property` registration with `inherits: false` is not honoured by the
+  ancestor walk. The walk reads cascaded declarations rather than
+  `GetComputedStyle` because it runs *during* style computation and re-entering
+  it for an ancestor would recurse.
+- **No main-repo fallback is possible:** the cascade lives entirely in
+  Broiler.CSS, so unlike problems 25 and 27 there is no main-repo layer to carry
+  an equivalent fix. This one is inert on CI until the patch is applied.
 
 ## `<base href>` was ignored for `<link rel=stylesheet>` in the render path — **fixed**
 
@@ -377,7 +413,7 @@ a submodule whose remote this session cannot push to (see `patches/README.md`).
 | --- | --- | --- | --- | --- |
 | 4 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | 99.8% — needs the server's `trickle` pipe | open |
 | 5 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | ours `#121212`, Chromium white — needs `.sub` | open |
-| 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green | open |
+| 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green | **fixed** (patch 0039) |
 | 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | open |
 | 11 | `css-page/monolithic-overflow-011-print` | 0.0% | ours blank, Chromium yellow + hotpink | open |
 | 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white | open |
