@@ -27,6 +27,30 @@ abstractions exist. This file tracks only work that is still open.
   approved follow-ups; do not infer support from the current evdev
   keyboard/mouse provider.
 
+## Android providers
+
+Android is the first planned consumer of the Touch, Pen, and Text contracts, so
+it is the first real test of whether they are correct. The cross-component
+sequencing, ownership, and exit gates are in
+[the root roadmap](../../docs/ROADMAP.md#a2--real-touch-pen-and-ime-input) and
+[the Android application architecture](../../docs/architecture/android.md).
+
+- Add `Broiler.Input.Touch.Android` and `Broiler.Input.Pen.Android` over
+  `MotionEvent`: pointer id to `ContactId`, `ActionMasked` to
+  `TouchContactState`, `GetPressure` to pressure, and `GetToolType` separating
+  finger, stylus, and eraser. Include cancellation, capture loss, and
+  duplicate compatibility-mouse suppression, matching the requirements already
+  listed for the Windows providers.
+- Add `Broiler.Input.Text.Android` over `InputConnection`, and
+  `Broiler.Input.Keyboard.Android` for hardware keys. The editor-side half of
+  the IME protocol — text around the cursor, selection, composing region,
+  commit — is a `Broiler.UI` contract, not an Input one; Input supplies devices,
+  timing, and delivery as it does elsewhere.
+- Report touch, pen, and text capability honestly through the existing
+  descriptor and capability surface rather than assuming a device profile.
+- Keep Android types inside the `.Android` assemblies; the neutral contracts must
+  not gain `Android.Views` or `Java.Lang` dependencies.
+
 ## Validate hardware and privacy
 
 - Complete and retain evidence for the opt-in checks in

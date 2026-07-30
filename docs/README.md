@@ -13,6 +13,7 @@ conformance, and implementation work belongs with that component.
 | [WPT rendering gaps](wpt-rendering-gaps.md) | The worst-scoring WPT pixel mismatches, the capability each one is missing, and its owning component |
 | [HtmlBridge architecture](architecture/htmlbridge.md) | Current bridge assemblies, ownership boundaries, and public seams |
 | [Browser WebAssembly architecture](architecture/browser-webassembly.md) | Current browser-host, rendering, input, and support decisions |
+| [Android application architecture](architecture/android.md) | Proposed Android host topology, platform baseline, and ownership boundaries |
 
 Completed migration plans, delivery logs, and investigation journals remain
 available in Git history. They are not the current backlog; durable decisions
