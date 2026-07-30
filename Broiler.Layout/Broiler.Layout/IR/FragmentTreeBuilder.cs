@@ -542,12 +542,163 @@ internal static class FragmentTreeBuilder
             if (!File.Exists(docPath))
                 return (null, null);
 
-            return (File.ReadAllText(docPath), new Uri(docPath).AbsoluteUri);
+            string docUrl = new Uri(docPath).AbsoluteUri;
+            string markup = BuildEmbeddedDocumentMarkup(docPath, docUrl);
+            return markup == null ? (null, null) : (markup, docUrl);
         }
         catch
         {
             return (null, null);
         }
+    }
+
+    /// <summary>
+    /// The markup a nested browsing context renders for the resource at
+    /// <paramref name="path"/>, or <c>null</c> when the resource has no document
+    /// representation (the frame then paints empty).
+    /// </summary>
+    /// <remarks>
+    /// Only an HTML resource is its own document. Navigating a frame to an image,
+    /// to media, or to plain text does not parse the resource as markup: the UA
+    /// synthesises a document that presents it (HTML §"read-image" /
+    /// §"read-media" / §"read-text"). Feeding such a resource to the HTML parser
+    /// instead is not merely wrong output — the tokeniser mints tag names out of
+    /// binary noise, and a name like <c>n&#x5;4&#x353;:</c> (real bytes from a
+    /// WebM file) reaches <c>DomDocument.CreateElement</c> and throws, taking down
+    /// the whole page render (WPT
+    /// <c>navigation-timing/dom-interactive-media-document.html</c>).
+    /// </remarks>
+    private static string BuildEmbeddedDocumentMarkup(string path, string docUrl)
+    {
+        switch (ClassifyEmbeddedResource(path))
+        {
+            case EmbeddedResourceKind.Html:
+                return File.ReadAllText(path);
+
+            case EmbeddedResourceKind.Image:
+                // Image document: the image alone on the canvas, at its natural size.
+                return "<!DOCTYPE html><html><head><style>html,body{margin:0}</style></head>"
+                     + $"<body><img src=\"{AttributeEscaped(docUrl)}\"></body></html>";
+
+            case EmbeddedResourceKind.Media:
+                // Media document: one media element alone on a black canvas, as a
+                // top-level media document paints it — a <video> for audio too,
+                // which is the element a UA media document builds either way.
+                return "<!DOCTYPE html><html><head><style>html,body{margin:0;background:#000}</style></head>"
+                     + $"<body><video controls src=\"{AttributeEscaped(docUrl)}\"></video></body></html>";
+
+            case EmbeddedResourceKind.PlainText:
+                return BuildPlainTextDocument(File.ReadAllText(path));
+
+            case EmbeddedResourceKind.Unknown:
+                // No extension to classify by (common for generated WPT resources):
+                // sniff the bytes rather than guess. Text is treated as markup — an
+                // extensionless HTML resource is the usual case — and binary is not.
+                return LooksBinary(path) ? null : File.ReadAllText(path);
+
+            default:
+                // A resource we can classify but cannot present (PDF, a font, an
+                // archive): no document, so no markup.
+                return null;
+        }
+    }
+
+    /// <summary>A plain-text document: the text preserved in a <c>&lt;pre&gt;</c>, as a
+    /// text document's UA stylesheet presents it.</summary>
+    private static string BuildPlainTextDocument(string text)
+    {
+        var sb = new StringBuilder(
+            "<!DOCTYPE html><html><head><style>html,body{margin:0}"
+            + "pre{margin:0;white-space:pre-wrap;word-wrap:break-word}</style></head><body><pre>");
+        AppendXmlEscaped(sb, text);
+        sb.Append("</pre></body></html>");
+        return sb.ToString();
+    }
+
+    private enum EmbeddedResourceKind
+    {
+        /// <summary>Markup — parse it as the frame's document.</summary>
+        Html,
+        Image,
+        /// <summary>Audio or video.</summary>
+        Media,
+        PlainText,
+        /// <summary>Classified, but with no document representation (PDF, font, …).</summary>
+        Opaque,
+        /// <summary>Not classifiable from the file name.</summary>
+        Unknown,
+    }
+
+    /// <summary>Classifies an embedded resource by file extension, the only signal a
+    /// file:// load carries (there is no Content-Type header).</summary>
+    private static EmbeddedResourceKind ClassifyEmbeddedResource(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            "" => EmbeddedResourceKind.Unknown,
+            ".html" or ".htm" or ".xhtml" or ".xht" or ".shtml" or ".svg" => EmbeddedResourceKind.Html,
+            ".txt" or ".text" or ".csv" or ".md" or ".js" or ".mjs" or ".css" or ".json"
+                => EmbeddedResourceKind.PlainText,
+            ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp" or ".bmp" or ".ico" or ".avif"
+                => EmbeddedResourceKind.Image,
+            ".webm" or ".mp4" or ".m4v" or ".ogv" or ".mov" or ".mkv"
+                or ".mp3" or ".m4a" or ".wav" or ".ogg" or ".oga" or ".flac" or ".opus"
+                => EmbeddedResourceKind.Media,
+            ".pdf" or ".woff" or ".woff2" or ".ttf" or ".otf" or ".eot"
+                or ".zip" or ".gz" or ".wasm" => EmbeddedResourceKind.Opaque,
+            // .py/.asis/.sub and friends: WPT server-generated resources whose
+            // payload is usually markup, and anything else unrecognised.
+            _ => EmbeddedResourceKind.Unknown,
+        };
+
+    /// <summary>
+    /// True when the head of <paramref name="path"/> does not decode as text — a NUL
+    /// byte or an invalid UTF-8 sequence. Both are impossible in a text resource and
+    /// characteristic of a binary one, so this is the last guard that keeps binary
+    /// bytes out of the HTML parser when the file name says nothing.
+    /// </summary>
+    private static bool LooksBinary(string path)
+    {
+        const int SniffLength = 1024;
+        byte[] head;
+        try
+        {
+            using var stream = File.OpenRead(path);
+            head = new byte[(int)Math.Min(SniffLength, Math.Max(stream.Length, 0))];
+            int read = stream.Read(head, 0, head.Length);
+            if (read < head.Length)
+                Array.Resize(ref head, read);
+        }
+        catch
+        {
+            return true;
+        }
+
+        if (Array.IndexOf(head, (byte)0) >= 0)
+            return true;
+
+        try
+        {
+            // Decode all but a possibly truncated trailing sequence: a multi-byte
+            // character straddling the sniff boundary is not evidence of binary.
+            int end = head.Length;
+            for (int i = 0; i < 4 && end > 0 && (head[end - 1] & 0x80) != 0; i++)
+                end--;
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
+                .GetString(head, 0, end);
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>Escapes <paramref name="value"/> for a double-quoted attribute.</summary>
+    private static string AttributeEscaped(string value)
+    {
+        var sb = new StringBuilder(value.Length);
+        AppendXmlEscaped(sb, value);
+        return sb.ToString();
     }
 
     private static bool HasHtmlExtension(string url)
