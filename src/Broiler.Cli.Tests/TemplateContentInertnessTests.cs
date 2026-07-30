@@ -24,7 +24,7 @@ public class TemplateContentInertnessTests
 
     /// <summary>
     /// Whether the pinned <c>Broiler.HTML</c> stops the stylesheet walk at a template. The fix
-    /// ships as <c>patches/0041-html-template-contents-inert.patch</c> and the submodule remote is
+    /// ships as <c>patches/0042-html-template-contents-inert.patch</c> and the submodule remote is
     /// outside this session's GitHub scope, so until a maintainer applies it and bumps the pointer
     /// the leak is still there and the two assertions that depend on it cannot hold. Probed rather
     /// than assumed, so these turn into real guards the moment the patch lands — the same shape as

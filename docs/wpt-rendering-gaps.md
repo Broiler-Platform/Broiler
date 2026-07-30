@@ -18,7 +18,7 @@
   half of 6, 27, 28 and 30 — **have since been applied and their pointers
   bumped**, so all of those are now live on CI rather than pending. The one fix
   still waiting on a maintainer are problems 7–10's
-  [`patches/0040`](../patches/README.md) and problem 29's `patches/0041`, whose
+  [`patches/0041`](../patches/README.md) and problem 29's `patches/0042`, whose
   remote this session cannot push to (403, as documented in `CLAUDE.md`). Neither
   has a main-repo fallback, so those tests stay at their old numbers on CI until
   the patches land.
@@ -118,7 +118,7 @@ Four caveats, all learned the hard way:
      pins that clock per test from the test's own `takeScreenshotDelayed(N)`,
      read from the source before the script pass and the post-processor strip the
      `<script>` that carries it.
-  2. **`patches/0040` (Broiler.HTML).** `StubImageAdapter`'s decode — the single
+  2. **`patches/0041` (Broiler.HTML).** `StubImageAdapter`'s decode — the single
      seam where a decoded sequence collapses to one bitmap — selects the frame at
      that clock instead of taking `FirstFrame`.
 - **The clamp is what makes the numbers work.** `anim-gr.gif`'s green frame
@@ -494,7 +494,7 @@ Four caveats, all learned the hard way:
   rendered grey, so the style could only be coming from the template. A
   three-line document-level case confirms it with no shadow DOM at all — a
   `.probe` rule inside a template repaints a `div` outside it.
-- **What landed:** `patches/0041-…` stops `DomParser.CascadeParseStyles` at a
+- **What landed:** `patches/0042-…` stops `DomParser.CascadeParseStyles` at a
   `<template>` box. Narrow by design — template *contents* already produce no
   boxes and correctly do not render; only the stylesheet walk descended into
   them.
@@ -695,7 +695,7 @@ feature they test — closing those means rendering less, not more.
 | 4 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | 99.8% — needs the server's `trickle` pipe | open |
 | 5 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | ours `#121212`, Chromium white — needs `.sub` | open |
 | 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green | **fixed** — patch 0039 applied |
-| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | **fixed** — 0.0% → 100% locally; **pending patch 0040** |
+| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | **fixed** — 0.0% → 100% locally; **pending patch 0041** |
 | 11 | `css-page/monolithic-overflow-011-print` | 0.0% | ours blank, Chromium yellow + hotpink | open |
 | 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white | open |
 | 13 | `css-transforms/animation/transform-interpolation-002` | 0.0% | 100% — both empty offline | open |
@@ -710,5 +710,5 @@ feature they test — closing those means rendering less, not more.
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
 | 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — patch 0038 applied; bridge now delegates to it |
 | 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** — patch 0036 applied |
-| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 97.8%** with patch 0041; residual is inline-block line height |
+| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 97.8%** with patch 0042; residual is inline-block line height |
 | 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** — patches 0036/0037 applied |
