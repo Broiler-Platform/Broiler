@@ -40,6 +40,34 @@ managed runtime (the workload's default Mono configuration, or CoreCLR-on-Androi
 if it is selected and verified), the linker/AOT mode, and the signing and release
 channel policy.
 
+## Development environment
+
+Verified in this container on 2026-07-30:
+
+| Requirement | State |
+| --- | --- |
+| `android` workload (`Microsoft.Android.Sdk.Linux`, `Microsoft.Android.Ref.36`, runtime packs) | **Installed.** `dotnet workload install android` succeeds; the packs come from `api.nuget.org`, which egress policy allows. |
+| JDK | **Present.** OpenJDK 21, with the proxy truststore already wired through `JAVA_TOOL_OPTIONS`. |
+| Android SDK (`android.jar`, `aapt2`, `d8`, platform-tools) | **Unavailable.** It is served from `dl.google.com`, which this session's egress policy denies with 403. No SDK exists anywhere in the image. |
+
+The consequence is specific: **no `net10.0-android` project can build here, not even a
+class library with no resources.** `Xamarin.Android.Tooling.targets` fails with
+`XA5300: The Android SDK directory could not be found` before compilation, and
+pointing `AndroidSdkDirectory` at a stub directory does not satisfy it — the
+target validates real SDK contents.
+
+That is why the `Broiler.Input.*.Android` backends target plain `net10.0` and take
+primitive event data: the translation layer is fully buildable and testable in
+this environment, and only the thin host glue needs the workload. It is a
+deliberate mitigation, not a coincidence.
+
+Unblocking the application phases is an environment-configuration change, not
+something to work around from inside the container — the same shape as the
+submodule egress caveat in [CLAUDE.md](../../CLAUDE.md). Either add
+`dl.google.com` to the environment's egress allowlist, or pre-install the Android
+SDK into the image and set `ANDROID_HOME`. Do not fetch the SDK from a
+third-party mirror to route around the denial.
+
 ## Target and ownership
 
 | Concern | Owner |

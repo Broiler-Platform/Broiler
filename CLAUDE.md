@@ -98,6 +98,18 @@ something to attempt from inside the container.
 - The `SessionStart` hook (`.claude/hooks/session-start.sh`) provisions the SDK,
   initializes submodules, and warns if the branch has diverged from
   `origin/main` (see "Start of task" above).
+- **Android cannot be built in this container.** `dotnet workload install android`
+  succeeds (the packs come from nuget.org, which is allowed), and a JDK is
+  present, but the Android SDK is served from `dl.google.com`, which egress
+  policy denies with 403. Every `net10.0-android` project then fails with
+  `XA5300: The Android SDK directory could not be found` — including a resource-free
+  class library, and setting `AndroidSdkDirectory` to a stub does not help.
+  Do not fetch the SDK from a third-party mirror to route around this; it is an
+  environment-config change, like the submodule egress caveat above. The
+  `Broiler.Input.*.Android` backends deliberately target plain `net10.0` and take
+  primitive event data so they stay buildable and testable here; keep new Android
+  translation work on that side of the line. Details:
+  [Android development environment](docs/architecture/android.md#development-environment).
 - WPT runner: `dotnet run --project src/Broiler.Wpt -- --wpt-dir tests/wpt
   --reference-dir tests/wpt/references [--subset <path>] [--failure-images <dir>]`.
   Pixel pass threshold is 99% match (≤1% differing pixels).

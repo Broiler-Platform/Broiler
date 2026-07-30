@@ -389,18 +389,31 @@ for an Android head. Release, signing, and update policy are already open items
 under [Release and distribution](#release-and-distribution) and must not be
 forked.
 
+The `android` workload installs cleanly from NuGet and a JDK is present, but the
+Android SDK is served from `dl.google.com`, which the development environment's
+egress policy denies. No `net10.0-android` project can build until that is
+resolved — see
+[the development environment table](architecture/android.md#development-environment).
+This blocks A1, A4, and A5 from being *verified* locally; it does not block the
+neutral work in A2 and A3, which is why the delivered input backends carry no
+Android SDK dependency.
+
 **Next actions:**
 
-1. Add an Android build workflow that provisions the SDK and workload and builds
+1. Grant the development and CI environments access to the Android SDK — either
+   allow `dl.google.com` in the egress policy or pre-install the SDK into the
+   image and set `ANDROID_HOME`. Everything else in this phase is blocked on it,
+   and it must not be worked around with a third-party SDK mirror.
+2. Add an Android build workflow that provisions the SDK and workload and builds
    the Android solutions on every change to the shared applications, so the port
    does not silently rot.
-2. Add an instrumented smoke run — launch, render a frame, dispatch synthetic
+3. Add an instrumented smoke run — launch, render a frame, dispatch synthetic
    touch and text, rotate, background, resume — on an emulator, with the honest
    note that emulator evidence is not hardware evidence.
-3. Produce signed AAB/APK artifacts through the frozen A0 signing policy and
+4. Produce signed AAB/APK artifacts through the frozen A0 signing policy and
    reconcile channels, versioning, and update ownership with the existing
    release work.
-4. Record the Android support statement in [the README](../README.md) and the
+5. Record the Android support statement in [the README](../README.md) and the
    component READMEs only after the A1–A5 gates pass, and keep it scoped to what
    was measured.
 
