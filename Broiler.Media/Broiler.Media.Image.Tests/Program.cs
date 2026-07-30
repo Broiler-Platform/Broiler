@@ -16,6 +16,10 @@ internal static class Program
             ("ImageBuffer validates RGBA stride and length", ImageBufferShape),
             ("ImageSequence wraps still frames", StaticSequence),
             ("ImageCodec default encode path is explicit unsupported", DefaultEncodeUnsupported),
+            ("Animation timeline selects the frame showing at a presentation time", FrameSelectionAtPresentationTime),
+            ("Animation timeline clamps delays too short to honour", FrameSelectionClampsShortDelays),
+            ("Animation timeline loops or holds by loop count", FrameSelectionLoopCount),
+            ("The animation clock pins and restores a presentation time", AnimationClockPin),
         };
 
         int passed = 0;
@@ -96,6 +100,98 @@ internal static class Program
 
         await Assert.ThrowsAsync<NotSupportedException>(
             () => codec.EncodeAsync(sequence, Stream.Null).AsTask()).ConfigureAwait(false);
+    }
+
+    private static ValueTask FrameSelectionAtPresentationTime()
+    {
+        // Three 50 ms frames, looping forever.
+        ImageSequence sequence = Animation(0, [50, 50, 50]);
+
+        Assert.Equal(0, sequence.FrameIndexAt(TimeSpan.Zero));
+        Assert.Equal(0, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(49)));
+        Assert.Equal(1, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(50)));
+        Assert.Equal(2, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(120)));
+
+        // Past the end of one pass it wraps, because loop count 0 means "forever".
+        Assert.Equal(0, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(150)));
+        Assert.Equal(1, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(200)));
+
+        // A time before the start, and a still image, both resolve to the first frame.
+        Assert.Equal(0, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(-500)));
+        Assert.Equal(0, ImageSequence.Static(Rgba1x1()).FrameIndexAt(TimeSpan.FromHours(1)));
+
+        Assert.Equal(sequence.Frames[2], sequence.FrameAt(TimeSpan.FromMilliseconds(120)));
+        return ValueTask.CompletedTask;
+    }
+
+    private static ValueTask FrameSelectionClampsShortDelays()
+    {
+        // What wpt/images/anim-gr.gif carries: a 10 ms green frame then a 100 s red one.
+        // 10 ms is below the threshold every engine applies, so the green frame occupies
+        // 100 ms — not 10 — and the 300 ms screenshot the reftest takes lands on red.
+        ImageSequence sequence = Animation(0, [10, 100_000]);
+
+        Assert.Equal(TimeSpan.FromMilliseconds(100), sequence.Frames[0].EffectiveDuration);
+        Assert.Equal(TimeSpan.FromMilliseconds(10), sequence.Frames[0].Duration);
+        Assert.Equal(0, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(99)));
+        Assert.Equal(1, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(100)));
+        Assert.Equal(1, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(300)));
+
+        // A zero delay is the same case: "as fast as possible", not "no time at all".
+        Assert.Equal(
+            TimeSpan.FromMilliseconds(100),
+            Animation(0, [0, 0]).Frames[0].EffectiveDuration);
+
+        // A delay on the threshold is honoured as written.
+        Assert.Equal(TimeSpan.FromMilliseconds(11), Animation(0, [11, 11]).Frames[0].EffectiveDuration);
+        return ValueTask.CompletedTask;
+    }
+
+    private static ValueTask FrameSelectionLoopCount()
+    {
+        // Played twice, then held: 4 × 50 ms of timeline, and every later time is the last frame.
+        ImageSequence sequence = Animation(2, [50, 50]);
+
+        Assert.Equal(1, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(50)));
+        Assert.Equal(0, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(100)));
+        Assert.Equal(1, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(150)));
+        Assert.Equal(1, sequence.FrameIndexAt(TimeSpan.FromMilliseconds(200)));
+        Assert.Equal(1, sequence.FrameIndexAt(TimeSpan.FromDays(1)));
+
+        // The unbounded case never holds — it is still cycling a day later.
+        Assert.Equal(0, Animation(0, [50, 50]).FrameIndexAt(TimeSpan.FromMilliseconds(200)));
+        return ValueTask.CompletedTask;
+    }
+
+    private static ValueTask AnimationClockPin()
+    {
+        TimeSpan outer = ImageAnimationClock.PresentationTime;
+        using (ImageAnimationClock.Pin(TimeSpan.FromMilliseconds(300)))
+        {
+            Assert.Equal(TimeSpan.FromMilliseconds(300), ImageAnimationClock.PresentationTime);
+
+            using (ImageAnimationClock.Pin(TimeSpan.FromMilliseconds(50)))
+                Assert.Equal(TimeSpan.FromMilliseconds(50), ImageAnimationClock.PresentationTime);
+
+            // The inner scope restores the outer one's value, not the process default.
+            Assert.Equal(TimeSpan.FromMilliseconds(300), ImageAnimationClock.PresentationTime);
+        }
+
+        Assert.Equal(outer, ImageAnimationClock.PresentationTime);
+
+        ImageAnimationClock.PresentationTime = TimeSpan.FromMilliseconds(-10);
+        Assert.Equal(TimeSpan.Zero, ImageAnimationClock.PresentationTime);
+        ImageAnimationClock.PresentationTime = outer;
+        return ValueTask.CompletedTask;
+    }
+
+    private static ImageSequence Animation(int loopCount, int[] delaysMilliseconds)
+    {
+        var frames = new List<ImageFrame>(delaysMilliseconds.Length);
+        foreach (int delay in delaysMilliseconds)
+            frames.Add(new ImageFrame(Rgba1x1(), TimeSpan.FromMilliseconds(delay)));
+
+        return new ImageSequence(frames, 1, 1, loopCount);
     }
 
     private static ImageBuffer Rgba1x1() =>

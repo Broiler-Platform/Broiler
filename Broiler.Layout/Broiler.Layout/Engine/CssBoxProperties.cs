@@ -2271,6 +2271,14 @@ internal abstract partial class CssBoxProperties
         // it must NOT be scaled by 96/72 again here — doing so inflated the
         // 'normal' line height by ~1.33x (e.g. Arial 32px produced a 50px
         // line box instead of the ~37px browsers use).
+        // Rounded UP, which is measurably not what the reference engine does at most sizes — and
+        // is nonetheless kept. Flooring instead matches Chromium on 12 of 19 font sizes swept from
+        // 8px to 48px where this matches 6 (it would fix 16px to 18, 24px to 27, 32px to 37), but
+        // measured over the WPT suite it *lost*: css-values `lh` unit and
+        // css-overflow clip-border-box-with-size regressed while css-align
+        // safe-justify-self-vrl recovered, a net −1. Whole-page rendering is the authority here,
+        // not a single metric compared in isolation. Closing the gap properly needs real per-size
+        // ascent/descent from the font backend rather than a rounding mode over this one number.
         double fontHeight = ActualFont.Height;
         return fontHeight > 0 ? Math.Ceiling(fontHeight) : GetEmHeight() * CssMetrics.NormalLineHeightFactor;
     }

@@ -1327,6 +1327,7 @@ internal static class CssLayoutEngine
         else
         {
             ibHeight = Math.Max(0, b.ActualBottom - b.Location.Y);
+
         }
 
         // CSS 2.1 §10.7: Apply min-height constraint for inline-blocks.

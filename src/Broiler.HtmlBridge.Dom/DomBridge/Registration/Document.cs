@@ -47,6 +47,7 @@ public sealed partial class DomBridge
         document.FastAddValue((KeyString)"createTextNode", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateTextNode(this, in a), "createTextNode", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"createAttribute", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateAttribute(this, context, in a), "createAttribute", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"createDocumentFragment", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateDocumentFragment(this, in a), "createDocumentFragment", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"importNode", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.ImportNode(this, context, in a), "importNode", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.createEvent(type) — DOM Events Level 3 (Phase 3: co-located LegacyEventBinding module)
         document.FastAddValue((KeyString)"createEvent", new JSFunction(Dom.Features.LegacyEventBinding.Create, "createEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);

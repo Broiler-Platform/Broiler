@@ -1,0 +1,115 @@
+From d9aa8d9a3272385d6a7ecaf0216f1673b1b648b5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 30 Jul 2026 14:30:55 +0000
+Subject: [PATCH] html: paint an animated image's frame at the pass's
+ presentation time
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A still render decodes each image once and paints it, so an animated GIF or
+WebP always showed frame 0 no matter when the render claimed to be taken. The
+four css-image-animation reftests screenshot at 300 ms via
+takeScreenshotDelayed(300) and are compared against a Chromium capture of the
+same instant; wpt's images/anim-gr.gif is green for its first frame and red
+thereafter, so Broiler rendered a whole-canvas green against a whole-canvas red
+reference — 0.0% match on all four.
+
+Select the frame the image's own timeline has reached at
+ImageAnimationClock.PresentationTime, the ambient render-pass clock in
+Broiler.Media.Image, using ImageSequence.FrameAt. StubImageAdapter's decode is
+the single seam where a sequence collapses to one bitmap — everything above it
+holds a decoded BBitmap — so the clock is read there rather than threaded down
+through the container and the image load handlers.
+
+At the default presentation time of zero the later frames are not decoded at
+all, so the still-image path costs exactly what it did before; only a render
+that has pinned a clock pays for the extra frames.
+
+image-animation: paused is deliberately still unimplemented. Chromium does not
+implement it either, so the reference for each of these tests is the *unpaused*
+render; honouring the property would make them diverge again.
+---
+ .../Adapters/StubImageAdapter.cs              |  7 +++++-
+ Source/Broiler.HTML.Image/BBitmap.cs          | 24 +++++++++++++++----
+ 2 files changed, 26 insertions(+), 5 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Image.Compat/Adapters/StubImageAdapter.cs b/Source/Broiler.HTML.Image.Compat/Adapters/StubImageAdapter.cs
+index 119ff2f..47ded6e 100644
+--- a/Source/Broiler.HTML.Image.Compat/Adapters/StubImageAdapter.cs
++++ b/Source/Broiler.HTML.Image.Compat/Adapters/StubImageAdapter.cs
+@@ -5,6 +5,7 @@ using System.IO;
+ using Broiler.Graphics;
+ using Broiler.HTML.Adapters;
+ using Broiler.CSS;
++using Broiler.Media.Image;
+ 
+ namespace Broiler.HTML.Image.Adapters;
+ 
+@@ -377,7 +378,11 @@ internal sealed class StubImageAdapter : RAdapter
+ 
+         try
+         {
+-            return new ImageAdapter(BBitmap.Decode(data));
++            // An animated image shows the frame its own timeline has reached at the pass's
++            // presentation time. This is the only seam where the frame is chosen — everything
++            // above holds one decoded bitmap — so the clock is read here rather than threaded
++            // down through the container and the load handlers.
++            return new ImageAdapter(BBitmap.DecodeFrameAt(data, ImageAnimationClock.PresentationTime));
+         }
+         catch (ArgumentException)
+         {
+diff --git a/Source/Broiler.HTML.Image/BBitmap.cs b/Source/Broiler.HTML.Image/BBitmap.cs
+index d22b23b..7c0263d 100644
+--- a/Source/Broiler.HTML.Image/BBitmap.cs
++++ b/Source/Broiler.HTML.Image/BBitmap.cs
+@@ -113,10 +113,26 @@ public sealed class BBitmap : IDisposable
+         return resized;
+     }
+ 
+-    public static BBitmap Decode(byte[] data)
++    public static BBitmap Decode(byte[] data) => DecodeFrameAt(data, TimeSpan.Zero);
++
++    /// <summary>
++    /// Decodes an image and returns the frame its own animation timeline is showing at
++    /// <paramref name="presentationTime"/>. A still image decodes to itself whatever the time;
++    /// an animated one advances through its frame delays, so a render taken 300 ms in shows
++    /// what a browser would have been showing 300 ms in rather than always frame 0.
++    /// </summary>
++    /// <remarks>
++    /// At <see cref="TimeSpan.Zero"/> — the default for callers with no clock — the later frames
++    /// are not decoded at all, so the common still-image path costs exactly what it did before.
++    /// </remarks>
++    public static BBitmap DecodeFrameAt(byte[] data, TimeSpan presentationTime)
+     {
+         ArgumentNullException.ThrowIfNull(data);
+-        return FromImageBuffer(DecodeMedia(data).FirstFrame);
++
++        bool needsTimeline = presentationTime > TimeSpan.Zero;
++        ImageSequence sequence = DecodeMedia(data, preserveAnimation: needsTimeline);
++        return FromImageBuffer(
++            needsTimeline ? sequence.FrameAt(presentationTime).Pixels : sequence.FirstFrame);
+     }
+ 
+     public static BBitmap Decode(Stream stream)
+@@ -153,7 +169,7 @@ public sealed class BBitmap : IDisposable
+         return new BBitmap(buffer.Width, buffer.Height, (byte[])buffer.Rgba.Clone());
+     }
+ 
+-    private static ImageSequence DecodeMedia(byte[] data)
++    private static ImageSequence DecodeMedia(byte[] data, bool preserveAnimation = false)
+     {
+         using var probeInput = new MediaInput(new MemoryStream(data), leaveOpen: false);
+         MediaCodecMatch? match = ImageCodecs.SelectAsync(MediaKind.Image, probeInput).AsTask().GetAwaiter().GetResult();
+@@ -161,7 +177,7 @@ public sealed class BBitmap : IDisposable
+             throw new NotSupportedException("Unrecognized image data. The media image codec catalog matched no image codec.");
+ 
+         using var decodeInput = new MediaInput(new MemoryStream(data), leaveOpen: false);
+-        return codec.DecodeAsync(decodeInput, new ImageDecodeOptions(preserveAnimation: false))
++        return codec.DecodeAsync(decodeInput, new ImageDecodeOptions(preserveAnimation: preserveAnimation))
+             .AsTask()
+             .GetAwaiter()
+             .GetResult();
+-- 
+2.43.0
+

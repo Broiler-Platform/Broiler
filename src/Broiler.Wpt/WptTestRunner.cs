@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Broiler.HTML.Image;
+using Broiler.Media.Image;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
@@ -670,10 +671,20 @@ internal sealed partial class WptTestRunner
       __broilerEnsureAnimate(upgraded);
 
       if (sourceElement && upgraded !== sourceElement) {
-        if (sourceElement.attributes) {
+        // Prefer getAttributeNames(): the bridge's `attributes` reports a length but does not
+        // answer to numeric indexing, so the obvious loop read `undefined.name` and threw out of
+        // customElements.define — taking the whole page's script with it.
+        if (typeof sourceElement.getAttributeNames === 'function') {
+          var names = sourceElement.getAttributeNames();
+          for (var n = 0; n < names.length; n++) {
+            upgraded.setAttribute(names[n], sourceElement.getAttribute(names[n]));
+          }
+        } else if (sourceElement.attributes) {
           for (var i = 0; i < sourceElement.attributes.length; i++) {
             var attr = sourceElement.attributes[i];
-            upgraded.setAttribute(attr.name, attr.value);
+            if (attr && attr.name) {
+              upgraded.setAttribute(attr.name, attr.value);
+            }
           }
         }
 
@@ -687,6 +698,22 @@ internal sealed partial class WptTestRunner
 
         if (sourceElement.id && window[sourceElement.id] === sourceElement) {
           window[sourceElement.id] = upgraded;
+        }
+      }
+
+      // `new ctor()` yields a native element (the HTMLElement base hands back a real one), and it
+      // does not carry the class's prototype, so its reaction callbacks are not reachable on it.
+      // Copy them across so `element.connectedCallback()` runs the component's own code with
+      // `this` bound to the element — which is what it expects.
+      if (ctor && ctor.prototype) {
+        var __reactions = ['connectedCallback', 'disconnectedCallback',
+                           'attributeChangedCallback', 'adoptedCallback'];
+        for (var __r = 0; __r < __reactions.length; __r++) {
+          var __reaction = __reactions[__r];
+          if (typeof upgraded[__reaction] !== 'function' &&
+              typeof ctor.prototype[__reaction] === 'function') {
+            upgraded[__reaction] = ctor.prototype[__reaction];
+          }
         }
       }
 
@@ -715,7 +742,21 @@ internal sealed partial class WptTestRunner
 
         var existing = document.querySelectorAll(tagName);
         for (var i = 0; i < existing.length; i++) {
-          __broilerUpgradeElement(tagName, ctor, existing[i]);
+          var upgraded = __broilerUpgradeElement(tagName, ctor, existing[i]);
+          // Upgrading an element that is already in the document runs its connectedCallback:
+          // the custom-elements spec enqueues the upgrade reaction and then, because the
+          // element is connected, the connected reaction. That callback is where a component
+          // builds its shadow root, so skipping it left every such element empty — which is
+          // what made the four <x-menu> hosts of WPT
+          // shadow-dom/focus-navigation/delegatesFocus-highlight-sibling.html render nothing.
+          // Elements created later via document.createElement are not connected yet and are
+          // deliberately not called here.
+          if (upgraded && typeof upgraded.connectedCallback === 'function') {
+            try {
+              upgraded.connectedCallback();
+            } catch (e) {
+            }
+          }
         }
       },
       get: function(name) {
@@ -725,6 +766,25 @@ internal sealed partial class WptTestRunner
         return Promise.resolve(__broilerCustomElementRegistry[String(name || '').toLowerCase()]);
       }
     };
+  }
+
+  // Expose the DOM globals a page reaches for by bare name. The bridge registers these on
+  // `window`, but a bare identifier does not resolve through it the way it does in a browser
+  // (where window *is* the global object), so `class extends HTMLElement` threw
+  // 'HTMLElement is not defined' and `customElements.define(...)` threw before any component
+  // could build itself. Assigned without `var` so they land in the global scope rather than in
+  // this IIFE. Each is aliased only when the bare name is genuinely missing, so a real
+  // implementation always wins.
+  var __broilerGlobalAliases = ['HTMLElement', 'Element', 'customElements', 'ShadowRoot',
+                                'DocumentFragment', 'HTMLTemplateElement'];
+  for (var __a = 0; __a < __broilerGlobalAliases.length; __a++) {
+    var __name = __broilerGlobalAliases[__a];
+    try {
+      if (typeof globalThis[__name] === 'undefined' && typeof window[__name] !== 'undefined') {
+        globalThis[__name] = window[__name];
+      }
+    } catch (e) {
+    }
   }
 })();
 ";
@@ -1478,6 +1538,11 @@ internal sealed partial class WptTestRunner
         // failures so triage can read intent without opening the file (#9).
         var metadata = ExtractTestMetadata(html);
 
+        // The instant this test wants to be screenshotted at, read now: `html` is rewritten
+        // by the script pass and the post-processor below, and the call that carries the
+        // delay lives in a <script> both of them remove.
+        TimeSpan presentationTime = ScreenshotPresentationTime(html);
+
         if (IsWptVariantTest(html))
         {
             return new WptTestResult
@@ -1576,6 +1641,7 @@ internal sealed partial class WptTestRunner
         HTML.Image.BBitmap rendered;
         try
         {
+            using var presentation = ImageAnimationClock.Pin(presentationTime);
             rendered = RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
                 backgroundColor: BColor.White,
                 stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
@@ -1884,6 +1950,9 @@ internal sealed partial class WptTestRunner
         if (IsMediaPlaybackTest(html))
             throw new InvalidOperationException("Test requires media playback.");
 
+        // Read before the script pass and post-processor rewrite `html` out from under it.
+        TimeSpan presentationTime = ScreenshotPresentationTime(html);
+
         var testBaseUrl = new Uri(Path.GetFullPath(htmlPath)).AbsoluteUri;
 
         // Set local base path for sub-resource resolution.
@@ -1909,6 +1978,7 @@ internal sealed partial class WptTestRunner
             };
         }
 
+        using var presentation = ImageAnimationClock.Pin(presentationTime);
         return RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
             backgroundColor: BColor.White,
             stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
@@ -1969,6 +2039,55 @@ internal sealed partial class WptTestRunner
 
     [GeneratedRegex(@"<style[^>]*>(?<css>.*?)</style>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex StyleBlockRegex();
+
+    /// <summary>
+    /// The moment a test asks to be screenshotted at, as an offset from load.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A <c>reftest-wait</c> test that calls <c>takeScreenshotDelayed(N)</c>
+    /// (<c>/common/reftest-wait.js</c>) is stating that its result is only correct once N
+    /// milliseconds of the page's timeline have passed — the reference generator honours that
+    /// by waiting, so the runner has to render *as of* the same instant or the two disagree by
+    /// construction. Anything driven by that timeline reads this: today that is animated image
+    /// frame selection, through <see cref="ImageAnimationClock"/>.
+    /// </para>
+    /// <para>
+    /// This is not a substitute for actually running the page for N milliseconds — no timers
+    /// fire and no animations are ticked. It is the one number those mechanisms need to agree
+    /// on, and it is read from the test source before scripts run, because the post-processor
+    /// strips the <c>&lt;script&gt;</c> that carries it.
+    /// </para>
+    /// <para>
+    /// A test with no delayed screenshot renders at zero — the first frame, which is what every
+    /// render produced before this existed.
+    /// </para>
+    /// </remarks>
+    internal static TimeSpan ScreenshotPresentationTime(string? html)
+    {
+        if (string.IsNullOrEmpty(html))
+            return TimeSpan.Zero;
+
+        Match match = ScreenshotDelayRegex().Match(html);
+        if (!match.Success ||
+            !double.TryParse(
+                match.Groups["ms"].Value,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double milliseconds) ||
+            !double.IsFinite(milliseconds) ||
+            milliseconds <= 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return TimeSpan.FromMilliseconds(milliseconds);
+    }
+
+    // Case-sensitive: this is a JavaScript identifier, and the surrounding word boundary keeps
+    // a test's own `myTakeScreenshotDelayed` helper from being read as the WPT one.
+    [GeneratedRegex(@"\btakeScreenshotDelayed\s*\(\s*(?<ms>[0-9]*\.?[0-9]+)\s*\)")]
+    private static partial Regex ScreenshotDelayRegex();
 
     internal HTML.Image.BBitmap RenderHtmlFileBitmapPublic(string htmlPath, string? wptRoot)
     {

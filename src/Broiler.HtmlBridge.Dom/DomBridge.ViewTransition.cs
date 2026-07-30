@@ -290,10 +290,11 @@ public sealed partial class DomBridge
     private void CaptureOldViewTransitionState(ViewTransitionState state)
     {
         var rootStyle = UsedStyleForCapture(DocumentElement);
-        if (!IsExplicitNoneName(rootStyle.GetValueOrDefault("view-transition-name")))
+        var rootName = ResolveRootViewTransitionName(rootStyle);
+        if (rootName is not null)
         {
             var (l, t, w, h) = GetBoundingClientRectForDomElement(DocumentElement, isRoot: true);
-            state.OldCaptures["root"] = new NamedSnapshot(l, t, w, h,
+            state.OldCaptures[rootName] = new NamedSnapshot(l, t, w, h,
                 rootStyle.GetValueOrDefault("background-color") ?? "transparent");
         }
 
@@ -301,7 +302,9 @@ public sealed partial class DomBridge
         {
             var style = UsedStyleForCapture(element);
             var name = ResolveUsedViewTransitionName(element, style.GetValueOrDefault("view-transition-name"));
-            if (name is null || string.Equals(name, "root", System.StringComparison.Ordinal))
+            // A descendant carrying the root's name would collide with the root capture; one carrying
+            // the literal "root" while the root is renamed is a separate, legitimate capture.
+            if (name is null || string.Equals(name, rootName, System.StringComparison.Ordinal))
                 continue;
 
             var (l, t, w, h) = GetBoundingClientRectForDomElement(element, isRoot: false);
@@ -499,12 +502,13 @@ public sealed partial class DomBridge
 
         // Map each captured (non-root) name to its new-side element, so a group's
         // `view-transition-group` (and the ancestry `nearest` walks) can be resolved.
+        var rootName = ResolveRootViewTransitionName(UsedStyleForCapture(root));
         var elementByName = new Dictionary<string, DomElement>(System.StringComparer.Ordinal);
         foreach (var element in root.Descendants().OfType<DomElement>())
         {
             var elementName = ResolveUsedViewTransitionName(
                 element, UsedStyleForCapture(element).GetValueOrDefault("view-transition-name"));
-            if (elementName is not null && elementName != "root" && !elementByName.ContainsKey(elementName))
+            if (elementName is not null && elementName != rootName && !elementByName.ContainsKey(elementName))
                 elementByName[elementName] = element;
         }
 
@@ -531,7 +535,7 @@ public sealed partial class DomBridge
             // capture-with-offscreen-child-translated). Root and old-only/unknown captures keep the
             // clip (viewport / prior behaviour).
             bool clipsContent = true;
-            if (capture.Name != "root" && elementByName.TryGetValue(capture.Name, out var capturedElement))
+            if (capture.Name != rootName && elementByName.TryGetValue(capture.Name, out var capturedElement))
                 clipsContent = CapturedElementClipsContent(UsedStyleForCapture(capturedElement));
 
             var group = CreateStyledBox(BaseStyle(
@@ -541,7 +545,19 @@ public sealed partial class DomBridge
                 ("overflow", clipsContent ? "hidden" : "visible")),
                 LookupPseudo(pseudoRules, "group", capture));
 
-            // Snapshot boxes are stacked top-left within the group: old under new. Each box is a
+            // Between the group and its two snapshots sits ::view-transition-image-pair, the box the
+            // spec gives the old/new pair so a rule can address both at once — WPT
+            // old-content-captures-root hides a whole group with
+            // `::view-transition-image-pair(shared) { visibility: hidden }`, which has nowhere to land
+            // if old and new hang directly off the group.
+            var imagePair = CreateStyledBox(BaseStyle(
+                ("position", "absolute"), ("left", "0"), ("top", "0"),
+                ("width", "100%"), ("height", "100%")),
+                LookupPseudo(pseudoRules, "image-pair", capture));
+            SetAttr(imagePair, "data-broiler-view-transition-image-pair", "");
+            AppendBridgeChild(group, imagePair);
+
+            // Snapshot boxes are stacked top-left within the pair: old under new. Each box is a
             // transparent positioned container carrying the author ::view-transition-old/-new
             // declarations (e.g. the pinned opacity); the captured content box inside it carries the
             // element's own paint (background, opacity, text) so an element's opacity composites over
@@ -553,7 +569,7 @@ public sealed partial class DomBridge
                     ("width", Px(capture.OldWidth)), ("height", Px(capture.OldHeight))),
                     LookupPseudo(pseudoRules, "old", capture));
                 AttachSnapshotPaint(oldBox, capture.OldContent, capture.OldBackground);
-                AppendBridgeChild(group, oldBox);
+                AppendBridgeChild(imagePair, oldBox);
             }
 
             if (capture.HasNew)
@@ -563,7 +579,7 @@ public sealed partial class DomBridge
                     ("width", Px(capture.NewWidth)), ("height", Px(capture.NewHeight))),
                     LookupPseudo(pseudoRules, "new", capture));
                 AttachSnapshotPaint(newBox, capture.NewContent, capture.NewBackground);
-                AppendBridgeChild(group, newBox);
+                AppendBridgeChild(imagePair, newBox);
             }
 
             groupByName[capture.Name] = group;
@@ -696,8 +712,22 @@ public sealed partial class DomBridge
         inline["box-sizing"] = "border-box";
 
         foreach (var property in SnapshotPaintProperties)
-            if (used.TryGetValue(property, out var value) && !string.IsNullOrWhiteSpace(value))
-                inline[property] = value;
+        {
+            if (!used.TryGetValue(property, out var value) || string.IsNullOrWhiteSpace(value))
+                continue;
+
+            // `visibility` is inherited, and the pseudo tree uses it as a control of its own:
+            // `::view-transition-image-pair(name) { visibility: hidden }` is how a reftest hides a
+            // whole group (WPT old-content-captures-root). Baking the captured element's own
+            // `visible` — the initial value nearly every element has — would re-show the snapshot
+            // underneath that rule. Only a non-initial value is worth carrying: an element that was
+            // itself hidden must stay hidden.
+            if (string.Equals(property, "visibility", System.StringComparison.Ordinal) &&
+                string.Equals(value.Trim(), "visible", System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            inline[property] = value;
+        }
 
         // Clone the element's content verbatim (text and any descendants) so the snapshot paints it.
         foreach (var child in element.ChildNodes.ToArray())
@@ -709,6 +739,7 @@ public sealed partial class DomBridge
 
         return content;
     }
+
 
     /// <summary>Strips identity/capture markers from a cloned snapshot subtree: <c>id</c> (so the
     /// clone does not duplicate a live element's id) and any inline <c>view-transition-name</c> (so a
@@ -776,17 +807,24 @@ public sealed partial class DomBridge
         }
 
         var rootStyle = UsedStyleForCapture(root);
-        if (!IsExplicitNoneName(rootStyle.GetValueOrDefault("view-transition-name")))
+        var rootName = ResolveRootViewTransitionName(rootStyle);
+        if (rootName is not null)
         {
             var (l, t, w, h) = GetBoundingClientRectForDomElement(root, isRoot: true);
-            AddNew("root", new NamedSnapshot(l, t, w, h, rootStyle.GetValueOrDefault("background-color") ?? "transparent"));
+            // Only the *old* root snapshot is reproduced by cloning. The new one is left
+            // content-less on purpose: it sits over the live page, which is the same content it
+            // would be reproducing — and the real rendering is exact where a DOM clone is only
+            // close. Cloning it too cost 7 tests between 0.8 and 4 pixel-points, and 79 on
+            // root-to-shared-animation-end, for no test it alone fixed.
+            AddNew(rootName, new NamedSnapshot(l, t, w, h,
+                rootStyle.GetValueOrDefault("background-color") ?? "transparent"));
         }
 
         foreach (var element in root.Descendants().OfType<DomElement>())
         {
             var style = UsedStyleForCapture(element);
             var name = ResolveUsedViewTransitionName(element, style.GetValueOrDefault("view-transition-name"));
-            if (name is null || string.Equals(name, "root", System.StringComparison.Ordinal))
+            if (name is null || string.Equals(name, rootName, System.StringComparison.Ordinal))
                 continue;
 
             var (l, t, w, h) = GetBoundingClientRectForDomElement(element, isRoot: false);
@@ -880,6 +918,32 @@ public sealed partial class DomBridge
 
     private static bool IsExplicitNoneName(string? name) =>
         name is not null && string.Equals(name.Trim(), "none", System.StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The name the document element is captured under. The UA stylesheet gives it
+    /// <c>view-transition-name: root</c>, so that is the default — but an author may rename it, and
+    /// then <c>root</c> is just an ordinary name that matches nothing. WPT
+    /// <c>root-captured-as-different-tag</c> pins exactly that: it names the root
+    /// <c>another-root</c> and paints <c>::view-transition-group(root)</c> red to assert the
+    /// <c>root</c> rules no longer apply. <see langword="null"/> when the root is not captured.
+    /// <c>auto</c>/<c>match-element</c> on the document element resolve to <c>root</c> rather than a
+    /// generated name (css-view-transitions-2).
+    /// </summary>
+    private static string? ResolveRootViewTransitionName(Dictionary<string, string> rootStyle)
+    {
+        var raw = rootStyle.GetValueOrDefault("view-transition-name");
+        if (IsExplicitNoneName(raw))
+            return null;
+
+        if (IsNoneName(raw))
+            return "root";
+
+        var trimmed = raw!.Trim();
+        return trimmed.Equals("auto", System.StringComparison.OrdinalIgnoreCase) ||
+               trimmed.Equals("match-element", System.StringComparison.OrdinalIgnoreCase)
+            ? "root"
+            : trimmed;
+    }
 
     /// <summary>Author <c>::view-transition*</c> declarations, keyed by
     /// <c>"&lt;kind&gt;|&lt;argument&gt;"</c> (kind is <c>""</c> for the bare <c>::view-transition</c>,

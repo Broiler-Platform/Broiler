@@ -6,20 +6,31 @@
   reference, so each is a whole-canvas difference rather than a tolerance
   problem.
 - **Not in scope:** problem 1 (the `DomDocument.CreateElement` crash) is fixed —
-  frames no longer parse a non-HTML resource as markup, and
-  `patches/0035-…` carries the DOM-layer fix. Problems 2 and 3 (per-test memory
+  frames no longer parse a non-HTML resource as markup, and `patches/0035-…`
+  carried the DOM-layer fix (since applied). Problems 2 and 3 (per-test memory
   aborts) are the per-element JS wrapper cost, tracked in
   [the root roadmap](ROADMAP.md#htmlbridge-runtime).
 - **Companion documents:** [root roadmap](ROADMAP.md) for cross-component work;
   the component roadmaps own the implementation once an item below names them.
-- **Progress:** problems 6, 24, 25, 27, 28 and the `vb` half of 30 are fixed; each
-  section says what landed, what was verified locally, and what is left for CI to
-  confirm. Several of those fixes live in submodules whose remotes this session
-  cannot push to, so they ship as patches under `patches/` and are **not on CI
-  until a maintainer applies them and bumps the pointers** — see
-  [`patches/README.md`](../patches/README.md). Problems 25 and 27 do work on CI
-  today: 25 is entirely main-repo, and 27 carries a main-repo fallback. Problems
-  6, 28 and 30 are inert until their patches land.
+- **Progress:** problems 6, 7–10, 24, 25, 27, 28 and the `vb` half of
+  30 are fixed; each section says what landed, what was verified locally, and what
+  is left for CI to confirm. Patches `0035`–`0039` — which carried the submodule
+  half of 6, 27, 28 and 30 — **have since been applied and their pointers
+  bumped**, so all of those are now live on CI rather than pending. The one fix
+  still waiting on a maintainer are problems 7–10's
+  [`patches/0041`](../patches/README.md) and problem 29's `patches/0042`, whose
+  remote this session cannot push to (403, as documented in `CLAUDE.md`). Neither
+  has a main-repo fallback, so those tests stay at their old numbers on CI until
+  the patches land.
+- **Four of these tests should not be "fixed".** Problems 14, 15 and 24 pass only
+  by rendering *less* than Broiler already does — their Chromium reference was
+  produced by an engine that does not implement the feature under test, so the
+  reference is the unfeatured render. Problem 18's reference is a blank white
+  canvas for the same reason. Chasing them would mean deleting working support.
+  The same trap governs problems 7–10, where the reference is the *unpaused*
+  animation: the fix there is frame selection, deliberately not
+  `image-animation: paused`. Check what the reference actually contains before
+  treating a 0.0% as a gap.
 
 Every item names an owner, the evidence behind it, its next action, and an
 objective exit gate. Where the evidence is a local measurement rather than the CI
@@ -37,16 +48,31 @@ test, so a local investigation needs both halves:
 dotnet run --project src/Broiler.Wpt -- --wpt-dir <checkout> --render <checkout>/<test>
 
 # 2. Chromium's reference (Playwright is pinned in tests/wpt/package.json;
-#    this container already has a browser at $PLAYWRIGHT_BROWSERS_PATH)
-node scripts/generate-wpt-references.js <checkout>/<dir> <refs>/<dir> --base-dir <checkout>
+#    this container already has a browser at $PLAYWRIGHT_BROWSERS_PATH).
+#    `npm install` puts playwright under tests/wpt/node_modules, which is not on
+#    the resolution path of a script run from scripts/ — hence NODE_PATH.
+(cd tests/wpt && npm install)
+NODE_PATH=tests/wpt/node_modules BROILER_CHROMIUM_PATH=/opt/pw-browsers/chromium \
+  node scripts/generate-wpt-references.js <checkout>/<dir> <refs> --base-dir <checkout>
 
 # 3. The comparison, its category, and side-by-side images
 dotnet run --project src/Broiler.Wpt -- --wpt-dir <checkout> --reference-dir <refs> \
   --subset <dir> --failure-images <out>
 ```
 
-Two caveats, both learned the hard way while writing this document:
+Four caveats, all learned the hard way:
 
+- **The reference generator's output path is relative to `--base-dir`, not to the
+  test directory.** Pointing it at one subdirectory writes
+  `<out>/<dir>/<dir>/…`, and the runner then reports every test as
+  `MissingReferenceImage` rather than as a mismatch. Give `--reference-dir` the
+  root that mirrors `--wpt-dir`.
+- **Playwright's pinned browser build may not be the one installed.** The
+  container ships a browser at `$PLAYWRIGHT_BROWSERS_PATH` whose build number
+  need not match `tests/wpt/package.json`'s pin, and the launch then fails with
+  "Executable doesn't exist". Point the generator at the installed one with
+  `BROILER_CHROMIUM_PATH=/opt/pw-browsers/chromium` rather than downloading
+  another.
 - **A test that needs the WPT server cannot be reproduced from a bare checkout.**
   `.sub.html` files need substitution, `?pipe=trickle(…)` needs the server's pipe
   handlers, and cross-origin tests need a second host. Offline, both engines fail
@@ -55,65 +81,169 @@ Two caveats, both learned the hard way while writing this document:
 - **Reference generation must honour `reftest-wait`.** A flat screenshot delay
   reads a view-transition or `takeScreenshotDelayed` test at the wrong moment, so
   the local reference disagrees with CI's.
+- **A reference is evidence about Chromium, not about the spec.** Before treating
+  a 0.0% as an engine gap, look at what the reference contains — a histogram of
+  its colours is usually enough, and a mostly-white one is a warning. Where the
+  answer turns on whether Chromium implements something, ask it directly rather
+  than inferring from pixels: load the test under Playwright and read the CSSOM
+  (`document.styleSheets[…].cssRules`) or the computed value. That is how the
+  `view-transition-name: auto` tests were settled — Chromium keeps the rule but
+  drops the declaration, so it captures nothing and its reference is the
+  untransitioned page. Note that a bare Playwright script does **not** serve
+  root-relative WPT paths, so `/common/reftest-wait.js` 404s and every such probe
+  looks like "the test never ran"; register a `file://` route that serves them
+  from the checkout, the way `generate-wpt-references.js` does.
 
-## Animated images always paint their first frame
+## Animated images always painted their first frame — **fixed, pending patch**
 
 - **Tests:** problems 7–10, all four
   `css/css-image-animation/image-animation-*-paused.html`.
 - **Owner:** Broiler.Media (frame selection) with Broiler.HTML (a paint-time
   clock).
-- **Current evidence:** measured locally, and unambiguous — for all four tests
-  Broiler's canvas is 100% `rgb(0,255,0)` and Chromium's is 100% `rgb(255,0,0)`.
+- **Original evidence:** measured locally, and unambiguous — for all four tests
+  Broiler's canvas was 100% `rgb(0,255,0)` and Chromium's is 100% `rgb(255,0,0)`.
   The tests set an animated GIF (`images/anim-gr.gif`, two frames, green then
   red) as the root or body background and ask for `image-animation: paused`.
   Chromium does not implement `image-animation`, so its reference is simply the
   frame its own timeline had reached at screenshot time (300 ms, via
-  `takeScreenshotDelayed`); Broiler paints frame 0 because nothing in the static
-  render path carries elapsed time into image decoding. The propagation
+  `takeScreenshotDelayed`); Broiler painted frame 0 because nothing in the static
+  render path carried elapsed time into image decoding. The propagation
   variations (root vs body, propagating or not) are incidental — the background
-  is painted in every case, only its frame is wrong.
-- **Next actions:**
-  1. Give the render pass a pinned presentation time and select an animated
-     image's frame from its own frame delays against that time, instead of
-     always decoding frame 0.
-  2. Thread the runner's reftest-wait delay into that presentation time so a
-     `takeScreenshotDelayed(N)` test is rendered as of N.
-  3. Only then implement `image-animation: paused` itself; while Chromium's
-     reference is the unpaused render, honouring the property makes these four
-     tests *diverge* rather than converge.
-- **Exit gate:** an animated image paints the frame its timeline selects at the
-  pass's presentation time, the four tests match their references, and a focused
-  test pins frame selection at two different presentation times.
+  is painted in every case, only its frame was wrong.
+- **What landed, in two halves.** The machinery is main-repo and on CI now; the
+  single call site that consumes it is the patch.
+  1. **Main repo.** `ImageSequence.FrameAt` / `FrameIndexAt` in `Broiler.Media`
+     answer "which frame is showing at time *t*", and `ImageAnimationClock`
+     carries the presentation time a still render is taken at. The WPT runner
+     pins that clock per test from the test's own `takeScreenshotDelayed(N)`,
+     read from the source before the script pass and the post-processor strip the
+     `<script>` that carries it.
+  2. **`patches/0041` (Broiler.HTML).** `StubImageAdapter`'s decode — the single
+     seam where a decoded sequence collapses to one bitmap — selects the frame at
+     that clock instead of taking `FirstFrame`.
+- **The clamp is what makes the numbers work.** `anim-gr.gif`'s green frame
+  carries a **10 ms** delay and its red frame 100 s. Taken literally, a 300 ms
+  screenshot would land deep in a fast loop; every engine instead treats a delay
+  that short as "unspecified" and substitutes 100 ms (Blink's threshold is 11 ms,
+  and the references are Chromium's). So green occupies 0–100 ms and red
+  everything after — 300 ms is red, which is exactly what the reference shows.
+- **`image-animation: paused` is still deliberately unimplemented.** Chromium
+  does not implement it either, so each reference *is* the unpaused render;
+  honouring the property would make these four tests diverge again. The property
+  is what the tests are named for, not what they currently measure.
+- **Verified:** the four tests, run against locally generated Chromium
+  references, go from **0.0% to 100%** — the same 0.0% CI reports, reproduced
+  before the change and gone after. Four focused tests cover the timeline
+  (selection at successive times, the short-delay clamp, loop-count wrap versus
+  hold, and the clock's nested pin/restore), and 14 cases cover the runner's
+  delay extraction — including the negative half, that a test with no literal
+  delay resolves to zero rather than guessing.
+- **Remaining:** the patch. There is no main-repo fallback — the decode is
+  entirely the submodule's — so CI paints frame 0 until it is applied and the
+  pointer bumped. A frame-selection test at the `BBitmap` level has to wait for
+  the same thing: `Broiler.HTML` has no test project of its own, and a main-repo
+  test calling the new `DecodeFrameAt` would not compile against the pinned
+  submodule.
+- **A cost worth naming:** the clock is process-wide, not thread-local, because
+  image loading is dispatched to the thread pool — a `[ThreadStatic]` value would
+  be invisible to the code that reads it. Concurrent renders at *different*
+  presentation times are therefore unsupported, which is the honest state of a
+  stack that renders one document per process.
 
-## View transitions composite no captured content
+## View transitions do not capture the document — **still open; 2 will not be won here**
 
 - **Tests:** problems 14–23, ten `css/css-view-transitions/*` tests.
-- **Owner:** HtmlBridge (`DomBridge.ViewTransition.cs`) with Broiler.HTML for the
-  snapshot compositing.
-- **Current evidence:** the pseudo tree is materialised, but nothing captured
-  goes into it. In `auto-name.html` Broiler's canvas is 97%
-  `rebeccapurple` — exactly the `html::view-transition { background:
-  rebeccapurple }` root the test sets — while Chromium's is 97% white with the 1%
-  green and 1% yellow squares that are the captured old/new items. So the
-  `::view-transition` root paints as an opaque box over the viewport and the
-  `::view-transition-old()` / `::view-transition-new()` images are absent.
-  `root-captured-as-different-tag` (ours 100% red vs 98% white) and
-  `old-/new-content-captures-root` (ours 99% pink) fail the same way. The two
-  `iframe-and-main-frame-transition-*` tests render blank against a reference
-  that is 75% green + 25% blue, so there the transition never starts at all.
-- **Next actions:**
-  1. Capture the old and new snapshots as images and paint them in the
-     `::view-transition-old()` / `::view-transition-new()` boxes, rather than
-     materialising the pseudo tree as empty positioned boxes.
-  2. Keep the `::view-transition` root behind the captured groups in paint order.
-  3. Make `document.startViewTransition`'s callback and its `ready` promise run
-     the DOM update before the screenshot, which the blank-rendering iframe pair
-     suggests is not happening for a nested browsing context.
-- **Exit gate:** a paused view transition composites both captured snapshots at
-  their group geometry, the ten tests report a non-trivial match, and a focused
-  test asserts old/new snapshot paint order against the pseudo root.
+- **Owner:** HtmlBridge (`DomBridge.ViewTransition.cs`).
+- **The earlier reading of this bucket was wrong in a way worth recording.** It
+  said "the pseudo tree is materialised, but nothing captured goes into it".
+  Measuring each test individually shows the opposite: named elements' snapshots
+  were already painting at the right size and colour — in `auto-name` ours
+  carries the 1.3% green and 1.3% yellow item squares the reference has. The
+  failures were four narrower gaps, and *three of the ten tests are not engine
+  bugs at all* — 14 and 15 measure a feature the reference engine lacks, and 18's
+  reference is blank. The ten break down as: 3 already passing locally (18, 20,
+  22), 2 won't-fix (14, 15), 5 still open — 19, 21 and 23 on a rasterised root
+  snapshot, 16 and 17 on nested browsing contexts.
+- **What landed** — three narrow corrections, none of which closes a test on its
+  own:
+  1. **The root's captured name was hardcoded to `root`.** It is really whatever
+     `view-transition-name` the document element carries; the UA sheet only
+     supplies `root` as the default. `root-captured-as-different-tag` renames it
+     to `another-root` and paints `::view-transition-group(root)` red *precisely
+     to assert the `root` rules stop applying* — so our 100% red canvas was the
+     test working as designed. `auto`/`match-element` on the document element
+     resolve to `root` rather than a generated name.
+  2. **`::view-transition-image-pair` was never materialised.** The spec puts it
+     between a group and its old/new pair so one rule can address both;
+     `old-content-captures-root` hides an entire group through it, and with no
+     such box the rule had nowhere to land.
+  3. **The pair box alone was not enough** — and this is the sort of thing only a
+     real render catches. The snapshot content box bakes the captured element's
+     computed style, so it re-asserted `visibility: visible` (the initial value
+     nearly everything has) *over* the pair's inherited `hidden`. Only a
+     non-initial `visibility` is carried now.
+- **What did *not* work, and why it is worth knowing.** The remaining gap is that
+  the root capture carries only a background colour, no content, so
+  `::view-transition-old(root)` is transparent and the author backdrop shows
+  through the page. Reproducing the page by **cloning the DOM** into the snapshot
+  box was implemented, measured, and reverted. It did fix problems 19, 21 and 23
+  outright (0.0% → 100%), but across the 458 local `css-view-transitions` tests it
+  was **+8 passing / −7 passing** — and it cost 79 pixel points on
+  `root-to-shared-animation-end` (82.7% → 3.1%) and ~4 on
+  `content-with-transform-old-/new-image`. Restricting the clone to the *old*
+  snapshot did not rescue those. The reason is structural, not a missing detail: a
+  DOM clone re-lays-out and is only *close*, while the transparent box let the
+  **live page** show through — and the live page is pixel-exact. Anywhere the old
+  root snapshot is genuinely visible, exact beats close. **A root capture needs a
+  rasterised snapshot from the renderer, which is a `Broiler.HTML` capability, not
+  something the bridge can synthesise from the DOM.** That is what the original
+  "capture the old and new snapshots as images" next action asked for, and it
+  still stands.
+- **A trap the attempt uncovered, worth keeping for whoever does the raster
+  version.** The overlay serializes after `</body>` and the HTML parser
+  foster-parents it back *inside* `<body>`, so a rule anchored on an ancestor
+  outside the snapshot — `body.updated #box` — repaints the **old** snapshot with
+  the **new** state the update callback just produced. Any DOM-shaped snapshot has
+  to freeze its paint at capture time.
+- **Problems 14 and 15 cannot be won by improving the engine.** Both
+  `auto-name.html` and `auto-name-from-id-shadow.html` need
+  `view-transition-name: auto`, and the reference Chromium **drops that
+  declaration at parse time** — it computes to `none` (verified directly: the
+  rule survives in the CSSOM with `view-transition-name` removed). Chromium
+  therefore captures nothing, the transition finishes immediately, and its
+  reference is the plain post-callback page: 97.5% white plus the two squares.
+  Broiler implements `auto`, captures both items correctly, and paints the
+  author's `rebeccapurple` backdrop over them. **Matching that reference would
+  mean deleting working support** — the same shape as problem 24 and as
+  `image-animation: paused`. Leave them failing.
+- **Problems 16 and 17 are a different gap.** The two
+  `iframe-and-main-frame-transition-*` tests drive
+  `iframe.contentDocument.startViewTransition` — a transition in a nested
+  browsing context, composited with the parent's. Ours renders 99.5% white
+  against a 74.5% green + 25% blue reference, so the script never gets going.
+  That belongs with problem 26 (framesets), not with compositing.
+- **Problems 18, 20 and 22 already pass locally** at 100% (`compute-explicit-name-non-ancestor.tentative`,
+  both `*-root-scrollbar-with-fixed-background`), where CI reported 0.0%. The two
+  scrollbar tests are genuine — their reference is 99% `lightblue`, so both engines
+  are drawing the same substantial content. The `.tentative` one is *not* worth
+  trusting: its reference is 100% white, so the only way to "pass" is to render
+  nothing, exactly like problem 24.
+- **Verified:** 25 `ViewTransition*` tests pass — three new ones covering the
+  renamed root and the image-pair hide *with its negative half* (the same group
+  paints without the rule, so the test cannot be satisfied by a blank group). The
+  three corrections were swept over all 458 local `css-view-transitions` tests to
+  confirm they cost nothing.
+- **Beware the flaky one.** `new-content-transform-change-001` scores 99.6% in one
+  run and 1.0% in the next on an unmodified build. It appeared in a regression
+  diff and was very nearly attributed to a change that had nothing to do with it;
+  re-run a suspicious test against the unmodified build before believing a diff.
+- **Exit gate for what remains:** a rasterised root snapshot composites at the
+  group geometry so 19, 21 and 23 match without the clone's approximation; and a
+  nested browsing context runs its own transition and composites into the parent
+  (16, 17), with a focused test pinning an iframe's old root snapshot against the
+  parent's.
 
-## System colour keywords did not resolve at all — **fixed, pending patch**
+## System colour keywords did not resolve at all — **fixed**
 
 - **Test:** problem 28, `forced-colors-mode/forced-colors-mode-20.html`.
 - **Owner:** Broiler.CSS.
@@ -127,7 +257,8 @@ Two caveats, both learned the hard way while writing this document:
   unknown-colour fallback: black. That turned every system-colour test into a
   whole-canvas mismatch, and this one is only the worst-scoring member of the
   family.
-- **What landed:** `patches/0036-…` fills in the CSS Color 4 §6 table from the
+- **What landed:** `patches/0036-…` (since applied, pointer bumped) fills in the
+  CSS Color 4 §6 table from the
   light palette (matched to what Chromium reports, since the references are
   Chromium screenshots), maps the §6.2 deprecated keywords onto their aliases,
   and adds a `CssColorScheme` overload so a dark used colour scheme selects the
@@ -141,10 +272,10 @@ Two caveats, both learned the hard way while writing this document:
   so the render path demonstrably goes through it. 45 focused tests cover the
   light palette, the `color-scheme: dark` switch, and the deprecated aliases.
 - **Remaining:** the test itself is not in this container's WPT subset, so the
-  pixel result is CI's to confirm. The patch must be applied and the submodule
-  pointer bumped before CI sees any of this.
+  pixel result is CI's to confirm. The patch has since been applied and the
+  pointer bumped, so CI is now running this.
 
-## `contrast-color()` and style container queries — **fixed, pending patch**
+## `contrast-color()` and style container queries — **fixed**
 
 - **Test:** problem 6, `css/css-color/contrast-color-style-query.html`.
 - **Owner:** Broiler.CSS.
@@ -191,9 +322,11 @@ Two caveats, both learned the hard way while writing this document:
   ancestor walk. The walk reads cascaded declarations rather than
   `GetComputedStyle` because it runs *during* style computation and re-entering
   it for an ancestor would recurse.
-- **No main-repo fallback is possible:** the cascade lives entirely in
-  Broiler.CSS, so unlike problems 25 and 27 there is no main-repo layer to carry
-  an equivalent fix. This one is inert on CI until the patch is applied.
+- **No main-repo fallback was possible:** the cascade lives entirely in
+  Broiler.CSS, so unlike problems 25 and 27 there was no main-repo layer to carry
+  an equivalent fix — this one was inert on CI until its patch was applied.
+  `patches/0039` has since been applied and the pointer bumped, so CI now runs it
+  and the pixel result is CI's to confirm.
 
 ## `<base href>` was ignored for `<link rel=stylesheet>` in the render path — **fixed**
 
@@ -258,7 +391,8 @@ Two caveats, both learned the hard way while writing this document:
 - **Next actions:**
   1. ~~Resolve the logical viewport units (`vb`, `vi`, and their `sv`/`lv`/`dv`
      variants) against the writing mode.~~ **Done** — `patches/0036-…` and
-     `patches/0037-…`. `vb`/`vi` did not parse at all. They now resolve against
+     `patches/0037-…`, both since applied and their pointers bumped, so this is
+     live on CI. `vb`/`vi` did not parse at all. They now resolve against
      the *root element's* writing mode, which is what CSS Values 4 §6.1.4
      specifies (not the element the unit appears on), so a per-pass factor set
      from the root's mode is the right granularity; `Broiler.HTML`'s layout pass
@@ -314,13 +448,15 @@ Two caveats, both learned the hard way while writing this document:
      the move (records are queued for both parents); only the disconnection is
      skipped.
   2. The bridge binding in the main repo, which is what CI runs. It exposes
-     `moveBefore` on the element surface and — **until 0038 lands** — reproduces
-     the observable behaviour on the primitives available at the pinned submodule
-     SHA: a reposition that skips the sub-document onload firing, so a moved
-     iframe does not reload. It is *not* fully atomic (the node is briefly
-     detached, so the id index churns). `DomBridge.MoveNodeBefore` carries the
-     note; once the pointer is bumped its body becomes one call to
-     `parent.MoveBefore` and the duplicated validity check goes away.
+     `moveBefore` on the element surface. It originally reproduced the observable
+     behaviour on the primitives available at the pinned submodule SHA — a
+     reposition that skipped the sub-document onload firing, not fully atomic
+     (the node was briefly detached, so the id index churned). **0038 has since
+     been applied and the pointer bumped**, so that interim body is gone:
+     `DomBridge.MoveNodeBefore` now delegates the move to `parent.MoveBefore` and
+     keeps only what is genuinely the bridge's — marshalling the canonical
+     `DomException` into a JavaScript `DOMException`, and invalidating the style
+     scopes the reposition dirtied. The duplicated validity check is deleted.
 - **Verified:** rendering the move scenario paints green where it painted white;
   moving an orphan throws as the spec requires; a within-parent forward reorder
   lands in the right slot. 16 DOM-level tests (in the patch) and 10 bridge-level
@@ -331,23 +467,164 @@ Two caveats, both learned the hard way while writing this document:
   silently accepted by an insert; a caller relying on the atomic guarantee needs
   the exception instead of insert-shaped behaviour.
 - **Remaining:** the WPT test is not in this container's subset, so its pixel
-  result is CI's to confirm — and CI sees only the bridge fallback until 0038 is
-  applied.
+  result is CI's to confirm. CI now runs the atomic version; the 10 bridge-level
+  tests were re-run against it unchanged, which is the evidence that the
+  delegation preserved the binding's observable behaviour.
 
-## Shadow-DOM focus delegation paints the wrong surface
+## A `<template>`'s styles leaked into the page — **fixed, pending patch**
 
 - **Test:** problem 29, `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling.html`.
-- **Owner:** HtmlBridge (shadow tree + focus) with Broiler.HTML for control
-  chrome.
-- **Current evidence:** Broiler's canvas is 99% `#cccccc` — one flat grey area —
-  where Chromium's is 98% white with form-control chrome and a focus highlight.
-  The rendered surface, not just the highlight, is wrong, so this is more than a
-  missing focus ring.
-- **Next action:** establish what Broiler is painting grey (a slotted host box, or
-  a UA widget fallback) before touching focus delegation itself; the highlight is
-  the test's subject but not its current failure.
-- **Exit gate:** the test matches, with a focused test for `delegatesFocus`
-  moving focus to the first focusable shadow descendant.
+- **Owner:** Broiler.HTML (the stylesheet walk), then HtmlBridge for what is left.
+- **It was never about focus.** The old next action here was "establish what
+  Broiler is painting grey before touching focus delegation", and that was the
+  right instinct: the answer had nothing to do with focus, delegation, or control
+  chrome. A `<style>` inside a `<template>` was being collected into the
+  **document** cascade. HTML §4.12.3 keeps a template's children in a separate
+  fragment as *template contents* — inert until stamped out. The test keeps its
+  component styles in a template, as components normally do, so
+  `:host { background-color: #aaa }` and `:host(:focus) { background-color: #ccc }`
+  leaked into the page, matched it, and painted 99% of the canvas `#ccc`.
+- **How it was narrowed,** since the signature pointed the wrong way. Bisecting
+  the three ways to get a style into a shadow root separates the causes cleanly:
+  a plain host populated by `innerHTML` renders correctly (2.8% `#aaa`); the same
+  rules delivered by `<template>` + `importNode` fill the viewport (99.7%); and a
+  custom element populated by `innerHTML` renders nothing. Removing the
+  `:host(:focus)` rule still filled the viewport, which ruled the focus rule out.
+  The serialized DOM then settled it: the shadow root was **empty** while the page
+  rendered grey, so the style could only be coming from the template. A
+  three-line document-level case confirms it with no shadow DOM at all — a
+  `.probe` rule inside a template repaints a `div` outside it.
+- **What landed:** `patches/0042-…` stops `DomParser.CascadeParseStyles` at a
+  `<template>` box. Narrow by design — template *contents* already produce no
+  boxes and correctly do not render; only the stylesheet walk descended into
+  them.
+- **Verified:** the test goes from **0.0% to 98.2%**. Four regression tests cover
+  the leak, its nested form, the negative half (a sheet *next to* a template must
+  still apply), and that template contents do not render. They probe the pinned
+  submodule and skip when the patch is unapplied, so they become live guards the
+  moment it lands.
+- **This is not specific to problem 29.** Any component that keeps its styles in
+  a template — the ordinary way to write one — has been leaking them into the
+  page, so the blast radius is wider than one test.
+- **What is left is a different gap: custom elements.** The remaining 1.8% is the
+  shadow content, and chasing it uncovered that the runner's `customElements`
+  shim never worked at all. Four things were wrong, three now fixed in the main
+  repo (so they are on CI immediately):
+  1. **The DOM globals were unreachable by bare name.** The bridge registers
+     `HTMLElement` and the shim registers `customElements` on `window`, but a bare
+     identifier does not resolve through `window` the way it does in a browser, so
+     `class extends HTMLElement` threw *"HTMLElement is not defined"* and
+     `customElements.define(...)` threw before any component could build itself.
+     Both are now aliased into the global scope when — and only when — the bare
+     name is missing.
+  2. **The upgrade threw on any element with attributes.** It read
+     `element.attributes[i].name`, but the bridge's `attributes` reports a length
+     without answering to numeric indexing, so the read hit `undefined` and took
+     the page's whole script with it. It uses `getAttributeNames()` now.
+  3. **`connectedCallback` was never called.** The shim constructed and replaced
+     the element but ran no reaction, and the upgraded element did not carry its
+     class's prototype either. The reactions are copied onto the element and the
+     connected one is invoked for elements already in the document — which is
+     where a component builds its shadow root.
+  4. **`template.content` and `document.importNode` did not exist.** `t.content`
+     was `undefined` and `importNode` was not a function, so the
+     `importNode(template.content, true)` idiom every one of these components uses
+     yielded nothing. Both are implemented in HtmlBridge now — a real DOM gap
+     rather than a harness one. One deviation is deliberate and pinned by a test:
+     the spec has the parser move a template's children into the content fragment,
+     leaving the element childless, whereas Broiler's parser keeps them as
+     children so a template round-trips through serialization, so `content` is a
+     stable *snapshot copy* of them. Stamping, querying and
+     populating-before-stamping all behave; reading one side after mutating the
+     other does not. Nothing renders either way — template contents are inert.
+- **And that made the test's score go down, which is the useful part.** With all
+  four fixes it reads **90.5%**, against 98.2% for the template patch alone.
+  Nothing regressed: the shadow content simply renders now, and it renders at the
+  wrong size, where before it was absent. Ours is 7.8% `#aaa` against the
+  reference's 0.1%. **Found and fixed, and it was not a shadow bug at all.** The
+  min/max-content passes (`GetMinMaxSumWords`, `GetMinimumWidth_LongestWord` in
+  Broiler.Layout) walked every child collecting words with no `display:none`
+  guard — while the shrink-to-fit *height* paths beside them had one. So the
+  UA-hidden elements that carry text (`<style>`, `<script>`, `<title>`) were
+  measured, and their **source text set the width of any shrink-to-fit
+  ancestor**. Every shadow host is such a box holding its component's
+  `<style>`, which is why it surfaced here, but a plain
+  `<div style="display:inline-block">` holding one `<li>` and a stylesheet
+  measured 861px wide against 65px without it. A `display:none` box generates no
+  boxes at all (CSS 2.1 §9.2.4), so both passes now skip it. Problem 29 goes
+  **90.5% → 95.7%** and the hosts drop from 7.8% of the canvas to 1.7%.
+- **Two wrong turns on the way, recorded so they are not repeated.** First, the
+  cause was ascribed to the CSS *text length*, then "refuted" by a pure-comment
+  stylesheet that left the host at 1008×19 — but that case had no `:host` rule,
+  so the host was full-width and the comment fit on one line; the test did not
+  discriminate, and the refutation was wrong. Holding `:host` fixed and varying
+  only inert text settles it: a 600-character comment takes the box from 468px to
+  6014px. Second, `getBoundingClientRect` is the bridge's own measurement taken
+  while scripts run, *before* the shadow style is projected, so it reported some
+  cases as unchanged when the render had in fact improved. Measure the render.
+- **A note on where these live.** Items 1–3 are in the runner's browser-API shim,
+  which exists only because the bridge implements no custom elements. That is the
+  honest fix for a harness bug — the component's own code runs and builds a real
+  shadow root — but the durable answer is `customElements` in HtmlBridge proper.
+- **A third general bug, also found and fixed here: a collapsible space between
+  inline-block siblings counted as zero.** A space between siblings is normally
+  carried as a flag on an adjacent *word*, but between two inline-blocks the
+  neighbours live in other boxes, so the space is a text box of its own whose
+  words collapsing clears — and the intrinsic pass measured nothing. The
+  shrink-to-fit container then came out exactly one space too narrow and its last
+  child wrapped: two 10px inline-blocks measured 20px and **stacked**, the second
+  at `y=34`, where 24px would have put them side by side. Give the same row
+  `width: 200px` and they sat on one line all along, which is what showed the
+  line-breaking was right and the width was wrong. `GetMinMaxSumWords` now counts
+  a collapsed whitespace separator as one space advance; preserved whitespace
+  (`pre`, `pre-wrap`, `pre-line`) keeps its words and takes the normal path.
+  The row now measures 25px — matching `&nbsp;` and plain text, which always
+  counted the space and are the cross-check for what the collapsible case should
+  have been. Problem 29 goes **95.7% → 97.8%**. Reproducible with no shadow DOM,
+  template or custom element in sight, which is why it is worth fixing on its own
+  account:
+
+  ```html
+  <style>
+    .row { display: inline-block; background-color: #aaa; }
+    .row span { display: inline-block; background-color: #eee; }
+  </style>
+  <div class="row"><span>Item One</span> <span>Item Two</span> <span>Item Three</span></div>
+  ```
+- **A fourth bug found here was fixed and then reverted, which is the useful
+  record.** An auto-height inline-block ignored `line-height`: its height came
+  from the glyphs, so `line-height: 10px` around a 32px font measured **39px**
+  where every browser gives 10, and the ordinary 16px case measured 22px against
+  Chromium's 18. A *block* with the same content already honoured `line-height`,
+  so the two paths disagreed with each other as well as with the reference.
+  Clamping a single-line auto-height inline-block to its line box fixed every
+  direct measurement — 10px, 16px, 24px and 40px line-heights all matched
+  Chromium exactly — **and regressed WPT
+  `css-anchor-position/position-area-scrolling-002` to 90.6%**, content shifted
+  left 30px and up 19px. Bisected to the clamp rather than assumed: reverting the
+  `normal` change alone left the failure, reverting the clamp restored the test.
+  So it is out. The diagnosis stands and is worth keeping — an inline-block's
+  height really should be bounded by its line box — but the naive clamp is not the
+  shape of the fix, and whatever replaces it has to keep that anchor-positioning
+  test green.
+- **A fifth attempt, also measured and also reverted: flooring
+  `line-height: normal`.** The reference builds `normal` from integer ascent and
+  descent, so the sum lands a whole pixel below the fractional height measured
+  here, and flooring instead of rounding up matches Chromium on **12 of 19** font
+  sizes swept from 8px to 48px where rounding up matches **6** — it would fix 16px
+  (18 not 19), 24px (27 not 28) and 32px (37 not 38). Over the WPT suite it
+  nonetheless *lost*: `css-values` `lh` unit and `css-overflow`
+  clip-border-box-with-size regressed while `css-align` safe-justify-self-vrl
+  recovered — a net −1, reproduced by running each test on both builds. **Whole-page
+  rendering is the authority, not a single metric compared in isolation**, which is
+  the lesson worth carrying: a sweep against one number said 12 > 6 and was
+  measuring the wrong thing. Closing the gap properly needs real per-size
+  ascent/descent from the font backend rather than a rounding mode over this one
+  value — the layout layer approximates the baseline with a hardcoded 0.8 ratio and
+  has no ascent/descent to work from.
+- **Exit gate:** a line box holding nested inline-blocks sizes to the reference
+  (the rows are 76px against 54px), and only then the focus question — a focused
+  test for `delegatesFocus` moving focus to the first focusable shadow descendant.
 
 ## Items that need the WPT server before they can be judged
 
@@ -406,23 +683,32 @@ Two caveats, both learned the hard way while writing this document:
 
 Local numbers come from this container against locally generated Chromium
 references; CI's are authoritative where they disagree. **Status** records work
-landed since the run — a fix marked *patch* is not yet on CI, because it lives in
-a submodule whose remote this session cannot push to (see `patches/README.md`).
+landed since the run — a fix marked *pending patch* is not yet on CI, because it
+lives in a submodule whose remote this session cannot push to (see
+`patches/README.md`). Patches 0035–0039 have since been applied and their
+pointers bumped, so everything they carried is now on CI. **won't fix** and
+**untrustworthy** mark tests whose Chromium reference was produced without the
+feature they test — closing those means rendering less, not more.
 
 | # | Test | CI | Local observation | Status |
 | --- | --- | --- | --- | --- |
 | 4 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | 99.8% — needs the server's `trickle` pipe | open |
 | 5 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | ours `#121212`, Chromium white — needs `.sub` | open |
-| 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green | **fixed** (patch 0039) |
-| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | open |
+| 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green | **fixed** — patch 0039 applied |
+| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | **fixed** — 0.0% → 100% locally; **pending patch 0041** |
 | 11 | `css-page/monolithic-overflow-011-print` | 0.0% | ours blank, Chromium yellow + hotpink | open |
 | 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white | open |
 | 13 | `css-transforms/animation/transform-interpolation-002` | 0.0% | 100% — both empty offline | open |
-| 14–23 | `css-view-transitions/*` (10) | 0.0–1.3% | pseudo root paints, captures absent | open |
+| 14, 15 | `css-view-transitions/auto-name*` (2) | 0.0% | ours captures both items + backdrop; Chromium drops `view-transition-name: auto` | **won't fix** — reference is the unfeatured render |
+| 16, 17 | `css-view-transitions/iframe-and-main-frame-*` (2) | 0.0% | ours 99.5% white, Chromium 74.5% green + 25% blue | open — needs a transition in a nested browsing context |
+| 18 | `css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative` | 0.0% | 100% — reference is a blank white canvas | **untrustworthy** — passes only by rendering nothing |
+| 19, 21 | `css-view-transitions/old-/new-content-captures-root` (2) | 0.0% | ours 98.7% pink (backdrop through the page) | open — needs a rasterised root snapshot |
+| 20, 22 | `css-view-transitions/*-root-scrollbar-with-fixed-background` (2) | 0.0% | 100% — reference is 99% `lightblue`, genuine | passing locally |
+| 23 | `css-view-transitions/root-captured-as-different-tag` | 0.0% | ours 100% red (the `(root)` trap rule) | part-fixed — the `(root)` rules no longer match; still needs the root snapshot |
 | 24 | `canvas/…/manual/dialog-paints-in-top-layer.tentative` | 0.0% | ours dialog, Chromium blank (unsupported) | **fixed** — reclassified Manual |
 | 25 | `the-link-element/stylesheet-with-base` | 0.0% | ours red (trap file), Chromium white | **fixed** — renders green locally |
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
-| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — bridge on CI, patch 0038 for the atomic DOM move |
-| 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** (patch 0036) |
-| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc`, Chromium white + chrome | open |
-| 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** (patches 0036/0037) |
+| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — patch 0038 applied; bridge now delegates to it |
+| 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** — patch 0036 applied |
+| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 97.8%** with patch 0042; residual is inline-block line height |
+| 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** — patches 0036/0037 applied |

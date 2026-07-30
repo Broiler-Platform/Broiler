@@ -25,4 +25,10 @@ public sealed partial class DomBridge : Dom.Features.IDocumentFactoryHost
 
     JSObject Dom.Features.IDocumentFactoryHost.BuildStandaloneAttrNode(string qualifiedName, string? namespaceUri)
         => _attributes.BuildStandaloneAttrNode(qualifiedName, namespaceUri);
+
+    DomNode? Dom.Features.IDocumentFactoryHost.FindDomNodeByJSObject(JSObject obj)
+        => FindDomNodeByJSObject(obj);
+
+    DomNode Dom.Features.IDocumentFactoryHost.CloneDomNode(DomNode source, bool deep)
+        => CloneDomElement(source, deep);
 }

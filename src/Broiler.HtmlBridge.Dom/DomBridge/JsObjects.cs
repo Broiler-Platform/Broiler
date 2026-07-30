@@ -418,6 +418,17 @@ public sealed partial class DomBridge
 
         // -- DOM manipulation methods --
 
+        // HTMLTemplateElement.content — the template contents fragment. Every component idiom goes
+        // through it (`importNode(t.content, true)`, `t.content.cloneNode(true)`,
+        // `t.content.querySelector(...)`), and without it `t.content` was undefined and the whole
+        // component script threw. See GetTemplateContent for what this fragment is and is not.
+        if (string.Equals(element.TagName, "template", StringComparison.OrdinalIgnoreCase))
+        {
+            obj.FastAddProperty((KeyString)"content",
+                new JSFunction((in a) => bridge.ToJSObject(bridge.GetTemplateContent(element)), "get content"),
+                null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
         // attachShadow(init) — Phase 3 P3.62: co-located ShadowDomBinding feature module.
         obj.FastAddValue((KeyString)"attachShadow",
             new JSFunction((in a) => Dom.Features.ShadowDomBinding.AttachShadow(this, element, in a), "attachShadow", 1),

@@ -36,6 +36,33 @@ internal static class DocumentFactoryBinding
     public static JSValue CreateDocumentFragment(IDocumentFactoryHost host, in Arguments a)
         => host.ToJSObject(host.CreateBridgeDocumentFragment());
 
+    /// <summary>
+    /// <c>document.importNode(node, deep)</c> — a copy of <paramref name="a"/>[0] owned by this
+    /// document. <c>deep</c> defaults to <see langword="false"/>, so a bare
+    /// <c>importNode(node)</c> copies the node alone; the idiom that matters,
+    /// <c>importNode(template.content, true)</c>, copies the whole stamped subtree. Every node this
+    /// bridge mints already belongs to the one document, so importing is exactly a clone — there is
+    /// no adoption step to perform.
+    /// </summary>
+    public static JSValue ImportNode(IDocumentFactoryHost host, JSContext context, in Arguments a)
+    {
+        if (a.Length == 0 || a[0] is not JSObject source)
+        {
+            DomBridge.ThrowDOMException(context, "importNode requires a node to import.", "TypeError");
+            return JSUndefined.Value;
+        }
+
+        Broiler.Dom.DomNode? node = host.FindDomNodeByJSObject(source);
+        if (node is null)
+        {
+            DomBridge.ThrowDOMException(context, "importNode was passed something that is not a node.", "TypeError");
+            return JSUndefined.Value;
+        }
+
+        bool deep = a.Length > 1 && a[1].BooleanValue;
+        return host.ToJSObject(host.CloneDomNode(node, deep));
+    }
+
     public static JSValue CreateElementNS(IDocumentFactoryHost host, JSContext context, in Arguments a)
     {
         var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
