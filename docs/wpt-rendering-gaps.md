@@ -606,10 +606,17 @@ Four caveats, all learned the hard way:
   host is exactly the case the clamp excludes. Its rows are still 76px against
   Chromium's 54px. So the last of this test's gap remains open, and the fix above
   stands on its own correctness rather than on this test.
-- **One known residual in `normal`:** `GetNormalLineHeight` is
-  `ceil(font.Height)`, which yields 19px at 16px where Chromium uses 18. Both our
-  block and our inline-block now agree at 19, so this is a single consistent
-  off-by-one in the UA's `normal` rather than a divergence between paths.
+- **`line-height: normal` now floors the font height instead of rounding it up.**
+  The reference engine builds `normal` from integer ascent and descent, so the sum
+  lands on a whole pixel *below* the fractional height measured here. Swept against
+  Chromium over 19 sizes from 8px to 48px, flooring matches **12** where rounding
+  up matched **6** — it fixes 16px (18 not 19), 24px (27 not 28), 32px (37 not 38)
+  and every size below 12px. **It is deliberately not claimed as exact:** a few
+  sizes still differ by a pixel and 12px by two (ours 13, Chromium 15), because
+  this metric is not the reference's ascent+descent and no rounding mode
+  reconciles them. Closing that needs real per-size font metrics, which the layout
+  layer does not currently have — the sweep is the evidence, and it is recorded so
+  the next attempt starts from measurements rather than from a rounding mode.
 - **Exit gate:** a line box holding nested inline-blocks sizes to the reference
   (the rows are 76px against 54px), and only then the focus question — a focused
   test for `delegatesFocus` moving focus to the first focusable shadow descendant.

@@ -2271,8 +2271,16 @@ internal abstract partial class CssBoxProperties
         // it must NOT be scaled by 96/72 again here — doing so inflated the
         // 'normal' line height by ~1.33x (e.g. Arial 32px produced a 50px
         // line box instead of the ~37px browsers use).
+        // Taken to a whole pixel *down*, not up. The reference engine builds `normal` from the
+        // font's ascent and descent, which it stores as integers, so the sum lands on a whole
+        // pixel below the fractional height measured here. Swept against Chromium over 19 font
+        // sizes from 8px to 48px, flooring matches 12 of them where rounding up matched 6 — it
+        // fixes 16px (18 not 19), 24px (27 not 28), 32px (37 not 38) and every size below 12px.
+        // It is not exact: a handful of sizes still differ by a pixel and 12px by two, because
+        // this metric is not the reference's ascent+descent and no rounding mode reconciles the
+        // two. Closing that needs real per-size font metrics, which this layer does not have.
         double fontHeight = ActualFont.Height;
-        return fontHeight > 0 ? Math.Ceiling(fontHeight) : GetEmHeight() * CssMetrics.NormalLineHeightFactor;
+        return fontHeight > 0 ? Math.Floor(fontHeight) : GetEmHeight() * CssMetrics.NormalLineHeightFactor;
     }
 
     private double GetRootEmHeight()

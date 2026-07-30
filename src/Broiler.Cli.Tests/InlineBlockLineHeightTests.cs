@@ -66,6 +66,23 @@ public sealed class InlineBlockLineHeightTests
             "<span id=\"t\" style=\"display:inline-block\">Ag</span></div>", "t"));
     }
 
+    [Theory]
+    // `line-height: normal` comes from the font's height taken down to a whole pixel, matching the
+    // reference engine's integer ascent+descent. These sizes were swept against Chromium; rounding
+    // up gave 19, 27 and 37 here. The sweep is not exact at every size (see GetNormalLineHeight),
+    // so only sizes measured to agree are pinned.
+    [InlineData(16, 18)]
+    [InlineData(24, 27)]
+    [InlineData(32, 37)]
+    [InlineData(48, 55)]
+    public void Normal_Line_Height_Floors_The_Font_Height(int fontSize, int expected)
+    {
+        Assert.Equal(expected, Height($"<div id=\"t\" style=\"font-size:{fontSize}px\">Ag</div>", "t"));
+        // The inline-block path must agree with the block path at the same size.
+        Assert.Equal(expected,
+            Height($"<span id=\"t\" style=\"display:inline-block;font-size:{fontSize}px\">Ag</span>", "t"));
+    }
+
     [Fact]
     public void An_Atomic_Inline_Child_May_Still_Make_The_Line_Taller()
     {
