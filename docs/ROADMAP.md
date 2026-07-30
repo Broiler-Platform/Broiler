@@ -153,11 +153,34 @@ The current assembly and ownership boundaries are in
   evidence before retiring their compatibility levers.
 - Remove vestigial cutover flags only after their rollback and differential tests
   have been replaced by permanent invariant tests.
+- Give the element JS wrapper a shared prototype instead of a per-instance
+  surface. `DomBridge.ToJSObject` installs the whole element API — every
+  reflector, method, `style`, `classList`, `dataset` — onto each wrapper object,
+  so one script-created element costs **~550 KiB** of retained memory. Measured
+  on this container (peak RSS of `Broiler.Wpt --render`, 107 MiB baseline):
+
+  | Page | Peak RSS |
+  | --- | --- |
+  | 10 000 `<span>`s in the markup (no wrapper) | 223 MiB |
+  | 4 000 `document.createElement("span")`, never inserted | 2 290 MiB |
+  | 4 000 created and appended | 2 294 MiB |
+
+  The cost is linear per created element and attaches to `createElement` itself,
+  not to insertion, layout, or style: creating the wrapper is what allocates.
+  This is what the WPT runner's per-test memory guard reports as
+  `Program.Main — Test aborted after exceeding the … per-test memory limit`
+  (issue #1491 problems 2 and 3: `css/css-variables/url-syntax-crash.html` and
+  `editing/crashtests/insertparagraph-in-listitem-in-svg-followed-by-collapsible-spaces.html`,
+  both of which create ~10 000 elements from script — the custom property in the
+  first is incidental, a bare 10 000-span loop blows the same limit). It crosses
+  the bridge and the JS engine's object model, so it cannot be fixed inside
+  either alone.
 
 **Exit gate:** all execution surfaces use the same ordered scheduling model,
 session dependencies are instance-scoped, native zoom/top-layer behavior is
-enabled for every supported consumer, and focused plus broad regression gates
-remain green.
+enabled for every supported consumer, a script-created element's wrapper costs a
+constant handful of bytes over its canonical node, and focused plus broad
+regression gates remain green.
 
 ## Linux application preview
 
