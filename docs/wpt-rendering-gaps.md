@@ -12,15 +12,24 @@
   [the root roadmap](ROADMAP.md#htmlbridge-runtime).
 - **Companion documents:** [root roadmap](ROADMAP.md) for cross-component work;
   the component roadmaps own the implementation once an item below names them.
-- **Progress:** problems 6, 7–10, 24, 25, 27, 28 and the `vb` half of 30 are
-  fixed; each section says what landed, what was verified locally, and what is
-  left for CI to confirm. Patches `0035`–`0039` — which carried the submodule half
-  of 6, 27, 28 and 30 — **have since been applied and their pointers bumped**, so
-  all of those are now live on CI rather than pending. The one fix still waiting
-  on a maintainer is problems 7–10's:
+- **Progress:** problems 6, 7–10, 19, 21, 23, 24, 25, 27, 28 and the `vb` half of
+  30 are fixed; each section says what landed, what was verified locally, and what
+  is left for CI to confirm. Patches `0035`–`0039` — which carried the submodule
+  half of 6, 27, 28 and 30 — **have since been applied and their pointers
+  bumped**, so all of those are now live on CI rather than pending. The one fix
+  still waiting on a maintainer is problems 7–10's:
   [`patches/0040`](../patches/README.md), whose remote this session cannot push to
   (403, as documented in `CLAUDE.md`). It has no main-repo fallback, so those four
   tests stay at 0.0% on CI until it lands.
+- **Four of these tests should not be "fixed".** Problems 14, 15 and 24 pass only
+  by rendering *less* than Broiler already does — their Chromium reference was
+  produced by an engine that does not implement the feature under test, so the
+  reference is the unfeatured render. Problem 18's reference is a blank white
+  canvas for the same reason. Chasing them would mean deleting working support.
+  The same trap governs problems 7–10, where the reference is the *unpaused*
+  animation: the fix there is frame selection, deliberately not
+  `image-animation: paused`. Check what the reference actually contains before
+  treating a 0.0% as a gap.
 
 Every item names an owner, the evidence behind it, its next action, and an
 objective exit gate. Where the evidence is a local measurement rather than the CI
@@ -71,6 +80,18 @@ Four caveats, all learned the hard way:
 - **Reference generation must honour `reftest-wait`.** A flat screenshot delay
   reads a view-transition or `takeScreenshotDelayed` test at the wrong moment, so
   the local reference disagrees with CI's.
+- **A reference is evidence about Chromium, not about the spec.** Before treating
+  a 0.0% as an engine gap, look at what the reference contains — a histogram of
+  its colours is usually enough, and a mostly-white one is a warning. Where the
+  answer turns on whether Chromium implements something, ask it directly rather
+  than inferring from pixels: load the test under Playwright and read the CSSOM
+  (`document.styleSheets[…].cssRules`) or the computed value. That is how the
+  `view-transition-name: auto` tests were settled — Chromium keeps the rule but
+  drops the declaration, so it captures nothing and its reference is the
+  untransitioned page. Note that a bare Playwright script does **not** serve
+  root-relative WPT paths, so `/common/reftest-wait.js` 404s and every such probe
+  looks like "the test never ran"; register a `file://` route that serves them
+  from the checkout, the way `generate-wpt-references.js` does.
 
 ## Animated images always painted their first frame — **fixed, pending patch**
 
@@ -128,33 +149,82 @@ Four caveats, all learned the hard way:
   presentation times are therefore unsupported, which is the honest state of a
   stack that renders one document per process.
 
-## View transitions composite no captured content
+## View transitions did not capture the document — **3 of 10 fixed; 2 will not be won here**
 
 - **Tests:** problems 14–23, ten `css/css-view-transitions/*` tests.
-- **Owner:** HtmlBridge (`DomBridge.ViewTransition.cs`) with Broiler.HTML for the
-  snapshot compositing.
-- **Current evidence:** the pseudo tree is materialised, but nothing captured
-  goes into it. In `auto-name.html` Broiler's canvas is 97%
-  `rebeccapurple` — exactly the `html::view-transition { background:
-  rebeccapurple }` root the test sets — while Chromium's is 97% white with the 1%
-  green and 1% yellow squares that are the captured old/new items. So the
-  `::view-transition` root paints as an opaque box over the viewport and the
-  `::view-transition-old()` / `::view-transition-new()` images are absent.
-  `root-captured-as-different-tag` (ours 100% red vs 98% white) and
-  `old-/new-content-captures-root` (ours 99% pink) fail the same way. The two
-  `iframe-and-main-frame-transition-*` tests render blank against a reference
-  that is 75% green + 25% blue, so there the transition never starts at all.
-- **Next actions:**
-  1. Capture the old and new snapshots as images and paint them in the
-     `::view-transition-old()` / `::view-transition-new()` boxes, rather than
-     materialising the pseudo tree as empty positioned boxes.
-  2. Keep the `::view-transition` root behind the captured groups in paint order.
-  3. Make `document.startViewTransition`'s callback and its `ready` promise run
-     the DOM update before the screenshot, which the blank-rendering iframe pair
-     suggests is not happening for a nested browsing context.
-- **Exit gate:** a paused view transition composites both captured snapshots at
-  their group geometry, the ten tests report a non-trivial match, and a focused
-  test asserts old/new snapshot paint order against the pseudo root.
+- **Owner:** HtmlBridge (`DomBridge.ViewTransition.cs`).
+- **The earlier reading of this bucket was wrong in a way worth recording.** It
+  said "the pseudo tree is materialised, but nothing captured goes into it".
+  Measuring each test individually shows the opposite: named elements' snapshots
+  were already painting at the right size and colour — in `auto-name` ours
+  carries the 1.3% green and 1.3% yellow item squares the reference has. The
+  failures were four narrower gaps, and *three of the ten tests are not engine
+  bugs at all* — 14 and 15 measure a feature the reference engine lacks, and 18's
+  reference is blank. The ten break down as: 3 fixed (19, 21, 23), 3 already
+  passing locally (18, 20, 22), 2 won't-fix (14, 15), 2 still open (16, 17).
+- **What landed** (problems 19, 21, 23 — `old-/new-content-captures-root`,
+  `root-captured-as-different-tag` — all three now **100%**, from 0.0%):
+  1. **The root's captured name was hardcoded to `root`.** It is really whatever
+     `view-transition-name` the document element carries; the UA sheet only
+     supplies `root` as the default. `root-captured-as-different-tag` renames it
+     to `another-root` and paints `::view-transition-group(root)` red *precisely
+     to assert the `root` rules stop applying* — so our 100% red canvas was the
+     test working as designed. `auto`/`match-element` on the document element
+     resolve to `root` rather than a generated name.
+  2. **`::view-transition-image-pair` was never materialised.** The spec puts it
+     between a group and its old/new pair so one rule can address both;
+     `old-content-captures-root` hides an entire group through it, and with no
+     such box the rule had nowhere to land.
+  3. **The pair box alone was not enough** — and this is the sort of thing only a
+     real render catches. The snapshot content box bakes the captured element's
+     computed style, so it re-asserted `visibility: visible` (the initial value
+     nearly everything has) *over* the pair's inherited `hidden`. Only a
+     non-initial `visibility` is carried now.
+  4. **The root capture carried no content, only a background colour**, so
+     `::view-transition-old(root)` was transparent and the author backdrop showed
+     through the page. It now reproduces the canvas background (the root's, else
+     the body's by propagation, else the UA white the canvas is painted with) plus
+     the body's children, omitting elements captured separately — those have their
+     own group and the spec does not paint them twice.
+- **A trap this uncovered.** The overlay serializes after `</body>`, and the HTML
+  parser foster-parents it back *inside* `<body>`. So a rule anchored on an
+  ancestor outside the snapshot — `body.updated #box` — repainted the **old**
+  snapshot with the **new** state the update callback had just produced. Cloned
+  content now has its paint frozen from the element it was cloned from. Geometry
+  is deliberately *not* frozen and cloned ids are kept: id selectors are often
+  what position a page, and the clone is appended after the live document so an id
+  lookup still finds the original first.
+- **Problems 14 and 15 cannot be won by improving the engine.** Both
+  `auto-name.html` and `auto-name-from-id-shadow.html` need
+  `view-transition-name: auto`, and the reference Chromium **drops that
+  declaration at parse time** — it computes to `none` (verified directly: the
+  rule survives in the CSSOM with `view-transition-name` removed). Chromium
+  therefore captures nothing, the transition finishes immediately, and its
+  reference is the plain post-callback page: 97.5% white plus the two squares.
+  Broiler implements `auto`, captures both items correctly, and paints the
+  author's `rebeccapurple` backdrop over them. **Matching that reference would
+  mean deleting working support** — the same shape as problem 24 and as
+  `image-animation: paused`. Leave them failing.
+- **Problems 16 and 17 are a different gap.** The two
+  `iframe-and-main-frame-transition-*` tests drive
+  `iframe.contentDocument.startViewTransition` — a transition in a nested
+  browsing context, composited with the parent's. Ours renders 99.5% white
+  against a 74.5% green + 25% blue reference, so the script never gets going.
+  That belongs with problem 26 (framesets), not with compositing.
+- **Problems 18, 20 and 22 already pass locally** at 100% (`compute-explicit-name-non-ancestor.tentative`,
+  both `*-root-scrollbar-with-fixed-background`), where CI reported 0.0%. The two
+  scrollbar tests are genuine — their reference is 99% `lightblue`, so both engines
+  are drawing the same substantial content. The `.tentative` one is *not* worth
+  trusting: its reference is 100% white, so the only way to "pass" is to render
+  nothing, exactly like problem 24.
+- **Verified:** the three fixed tests at 100% against locally generated Chromium
+  references, and 27 `ViewTransition*` tests pass — five new ones covering the
+  renamed root, the image-pair hide *and its negative half* (the same group paints
+  without the rule, so the test cannot be satisfied by a blank group), omission of
+  separately captured elements, and the old snapshot showing the pre-callback page.
+- **Exit gate for what remains:** a nested browsing context runs its own
+  transition and composites into the parent (16, 17), with a focused test pinning
+  an iframe's old root snapshot against the parent's.
 
 ## System colour keywords did not resolve at all — **fixed**
 
@@ -459,7 +529,9 @@ references; CI's are authoritative where they disagree. **Status** records work
 landed since the run — a fix marked *pending patch* is not yet on CI, because it
 lives in a submodule whose remote this session cannot push to (see
 `patches/README.md`). Patches 0035–0039 have since been applied and their
-pointers bumped, so everything they carried is now on CI.
+pointers bumped, so everything they carried is now on CI. **won't fix** and
+**untrustworthy** mark tests whose Chromium reference was produced without the
+feature they test — closing those means rendering less, not more.
 
 | # | Test | CI | Local observation | Status |
 | --- | --- | --- | --- | --- |
@@ -470,7 +542,12 @@ pointers bumped, so everything they carried is now on CI.
 | 11 | `css-page/monolithic-overflow-011-print` | 0.0% | ours blank, Chromium yellow + hotpink | open |
 | 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white | open |
 | 13 | `css-transforms/animation/transform-interpolation-002` | 0.0% | 100% — both empty offline | open |
-| 14–23 | `css-view-transitions/*` (10) | 0.0–1.3% | pseudo root paints, captures absent | open |
+| 14, 15 | `css-view-transitions/auto-name*` (2) | 0.0% | ours captures both items + backdrop; Chromium drops `view-transition-name: auto` | **won't fix** — reference is the unfeatured render |
+| 16, 17 | `css-view-transitions/iframe-and-main-frame-*` (2) | 0.0% | ours 99.5% white, Chromium 74.5% green + 25% blue | open — needs a transition in a nested browsing context |
+| 18 | `css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative` | 0.0% | 100% — reference is a blank white canvas | **untrustworthy** — passes only by rendering nothing |
+| 19, 21 | `css-view-transitions/old-/new-content-captures-root` (2) | 0.0% | ours 98.7% pink (backdrop through the page) | **fixed** — 100% locally |
+| 20, 22 | `css-view-transitions/*-root-scrollbar-with-fixed-background` (2) | 0.0% | 100% — reference is 99% `lightblue`, genuine | passing locally |
+| 23 | `css-view-transitions/root-captured-as-different-tag` | 0.0% | ours 100% red (the `(root)` trap rule) | **fixed** — 100% locally |
 | 24 | `canvas/…/manual/dialog-paints-in-top-layer.tentative` | 0.0% | ours dialog, Chromium blank (unsupported) | **fixed** — reclassified Manual |
 | 25 | `the-link-element/stylesheet-with-base` | 0.0% | ours red (trap file), Chromium white | **fixed** — renders green locally |
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
