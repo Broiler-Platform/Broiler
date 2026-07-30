@@ -2271,16 +2271,16 @@ internal abstract partial class CssBoxProperties
         // it must NOT be scaled by 96/72 again here — doing so inflated the
         // 'normal' line height by ~1.33x (e.g. Arial 32px produced a 50px
         // line box instead of the ~37px browsers use).
-        // Taken to a whole pixel *down*, not up. The reference engine builds `normal` from the
-        // font's ascent and descent, which it stores as integers, so the sum lands on a whole
-        // pixel below the fractional height measured here. Swept against Chromium over 19 font
-        // sizes from 8px to 48px, flooring matches 12 of them where rounding up matched 6 — it
-        // fixes 16px (18 not 19), 24px (27 not 28), 32px (37 not 38) and every size below 12px.
-        // It is not exact: a handful of sizes still differ by a pixel and 12px by two, because
-        // this metric is not the reference's ascent+descent and no rounding mode reconciles the
-        // two. Closing that needs real per-size font metrics, which this layer does not have.
+        // Rounded UP, which is measurably not what the reference engine does at most sizes — and
+        // is nonetheless kept. Flooring instead matches Chromium on 12 of 19 font sizes swept from
+        // 8px to 48px where this matches 6 (it would fix 16px to 18, 24px to 27, 32px to 37), but
+        // measured over the WPT suite it *lost*: css-values `lh` unit and
+        // css-overflow clip-border-box-with-size regressed while css-align
+        // safe-justify-self-vrl recovered, a net −1. Whole-page rendering is the authority here,
+        // not a single metric compared in isolation. Closing the gap properly needs real per-size
+        // ascent/descent from the font backend rather than a rounding mode over this one number.
         double fontHeight = ActualFont.Height;
-        return fontHeight > 0 ? Math.Floor(fontHeight) : GetEmHeight() * CssMetrics.NormalLineHeightFactor;
+        return fontHeight > 0 ? Math.Ceiling(fontHeight) : GetEmHeight() * CssMetrics.NormalLineHeightFactor;
     }
 
     private double GetRootEmHeight()

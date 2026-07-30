@@ -607,17 +607,21 @@ Four caveats, all learned the hard way:
   height really should be bounded by its line box — but the naive clamp is not the
   shape of the fix, and whatever replaces it has to keep that anchor-positioning
   test green.
-- **`line-height: normal` now floors the font height instead of rounding it up.**
-  The reference engine builds `normal` from integer ascent and descent, so the sum
-  lands on a whole pixel *below* the fractional height measured here. Swept against
-  Chromium over 19 sizes from 8px to 48px, flooring matches **12** where rounding
-  up matched **6** — it fixes 16px (18 not 19), 24px (27 not 28), 32px (37 not 38)
-  and every size below 12px. **It is deliberately not claimed as exact:** a few
-  sizes still differ by a pixel and 12px by two (ours 13, Chromium 15), because
-  this metric is not the reference's ascent+descent and no rounding mode
-  reconciles them. Closing that needs real per-size font metrics, which the layout
-  layer does not currently have — the sweep is the evidence, and it is recorded so
-  the next attempt starts from measurements rather than from a rounding mode.
+- **A fifth attempt, also measured and also reverted: flooring
+  `line-height: normal`.** The reference builds `normal` from integer ascent and
+  descent, so the sum lands a whole pixel below the fractional height measured
+  here, and flooring instead of rounding up matches Chromium on **12 of 19** font
+  sizes swept from 8px to 48px where rounding up matches **6** — it would fix 16px
+  (18 not 19), 24px (27 not 28) and 32px (37 not 38). Over the WPT suite it
+  nonetheless *lost*: `css-values` `lh` unit and `css-overflow`
+  clip-border-box-with-size regressed while `css-align` safe-justify-self-vrl
+  recovered — a net −1, reproduced by running each test on both builds. **Whole-page
+  rendering is the authority, not a single metric compared in isolation**, which is
+  the lesson worth carrying: a sweep against one number said 12 > 6 and was
+  measuring the wrong thing. Closing the gap properly needs real per-size
+  ascent/descent from the font backend rather than a rounding mode over this one
+  value — the layout layer approximates the baseline with a hardcoded 0.8 ratio and
+  has no ascent/descent to work from.
 - **Exit gate:** a line box holding nested inline-blocks sizes to the reference
   (the rows are 76px against 54px), and only then the focus question — a focused
   test for `delegatesFocus` moving focus to the first focusable shadow descendant.
