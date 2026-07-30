@@ -44,5 +44,9 @@ TYPE Broiler.HtmlBridge.DomBridgeFactory : Broiler.HtmlBridge.Dom.IDomBridgeRunt
 TYPE Broiler.HtmlBridge.DomBridgeSessionOptions
   ctor ()
   property System.Func<Broiler.Layout.ILayoutView> LayoutViewFactory { get; set; }
+TYPE Broiler.HtmlBridge.HtmlBaseHref
+  method System.Boolean TryFindBaseHref(System.String, ref System.String)
+  method System.String Resolve(System.String, System.String, System.String)
+  method System.String ResolveDocumentBaseUrl(System.String, System.String)
 TYPE Broiler.HtmlBridge.Scripting.EngineModuleSupport
   property System.Boolean Available { get; }
