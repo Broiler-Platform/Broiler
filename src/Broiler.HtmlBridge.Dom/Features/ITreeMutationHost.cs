@@ -22,6 +22,11 @@ internal interface ITreeMutationHost
     DomNode? FindDomNodeByJSObject(JSObject jsObj);
     List<DomNode> BuildChildNodeArgumentNodes(in Arguments arguments);
     void InsertNodeAt(DomNode parent, DomNode node, int index);
+
+    /// <summary>The state-preserving reposition behind <c>moveBefore</c> — unlike
+    /// <see cref="InsertNodeAt"/> it never disconnects the node, so a moved iframe does not
+    /// reload and a render-blocking element keeps blocking.</summary>
+    void MoveNodeBefore(DomNode parent, DomNode node, DomNode? reference);
     void InvalidateStyleScope(DomElement anchor);
     void NotifyNodeIteratorPreRemoval(DomNode node);
     void NotifyChildAdded(DomNode parent, DomNode child, int index);

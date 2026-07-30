@@ -12,7 +12,7 @@
   [the root roadmap](ROADMAP.md#htmlbridge-runtime).
 - **Companion documents:** [root roadmap](ROADMAP.md) for cross-component work;
   the component roadmaps own the implementation once an item below names them.
-- **Progress:** problems 24, 25, 28 and the `vb` half of 30 are fixed; each
+- **Progress:** problems 24, 25, 27, 28 and the `vb` half of 30 are fixed; each
   section says what landed, what was verified locally, and what is left for CI to
   confirm. Two of those fixes live in submodules whose remotes this session
   cannot push to, so they ship as `patches/0036-…` and `patches/0037-…` and are
@@ -261,20 +261,42 @@ Two caveats, both learned the hard way while writing this document:
 - **Exit gate:** the test matches, and a focused test asserts a two-frame
   frameset paints both documents at their grid rects.
 
-## `Node.moveBefore` is missing
+## `Node.moveBefore` was missing — **fixed**
 
 - **Test:** problem 27, `dom/nodes/moveBefore/preserve-render-blocking-style.html`.
 - **Owner:** Broiler.DOM with HtmlBridge for the binding.
-- **Current evidence:** Broiler renders white where Chromium renders 100% green.
+- **Original evidence:** Broiler renders white where Chromium renders 100% green.
   The test moves a render-blocking `<style>` with `moveBefore()` and asserts the
   styles survive the move; without the method the script throws and the document
   is never styled.
-- **Next actions:**
-  1. Implement `moveBefore()` as a state-preserving move (no removal/insertion
-     pair), and expose it on the bridge's node surface.
-  2. Keep a moved render-blocking element's blocking state intact.
-- **Exit gate:** the test matches, and focused tests cover a move within and
-  across parents plus the render-blocking case.
+- **What landed, in two pieces:**
+  1. `patches/0038-…` adds the canonical `DomNode.MoveBefore` — the genuinely
+     atomic version. The state it preserves follows from one spec constraint: both
+     parents must share a shadow-including root, so a moved node's *connectedness
+     cannot change*. That is why the document's id index is deliberately not torn
+     down and rebuilt, and why an `<iframe>` must not reload. Observers still see
+     the move (records are queued for both parents); only the disconnection is
+     skipped.
+  2. The bridge binding in the main repo, which is what CI runs. It exposes
+     `moveBefore` on the element surface and — **until 0038 lands** — reproduces
+     the observable behaviour on the primitives available at the pinned submodule
+     SHA: a reposition that skips the sub-document onload firing, so a moved
+     iframe does not reload. It is *not* fully atomic (the node is briefly
+     detached, so the id index churns). `DomBridge.MoveNodeBefore` carries the
+     note; once the pointer is bumped its body becomes one call to
+     `parent.MoveBefore` and the duplicated validity check goes away.
+- **Verified:** rendering the move scenario paints green where it painted white;
+  moving an orphan throws as the spec requires; a within-parent forward reorder
+  lands in the right slot. 16 DOM-level tests (in the patch) and 10 bridge-level
+  tests (on CI) cover moves within and across parents, the render-blocking
+  `<style>` case, the observer records, and every pre-move validity rejection.
+- **Why validity is stricter than `insertBefore`:** `moveBefore` rejects a node
+  that is not already in the tree, and one from a different root. Both would be
+  silently accepted by an insert; a caller relying on the atomic guarantee needs
+  the exception instead of insert-shaped behaviour.
+- **Remaining:** the WPT test is not in this container's subset, so its pixel
+  result is CI's to confirm — and CI sees only the bridge fallback until 0038 is
+  applied.
 
 ## Shadow-DOM focus delegation paints the wrong surface
 
@@ -364,7 +386,7 @@ a submodule whose remote this session cannot push to (see `patches/README.md`).
 | 24 | `canvas/…/manual/dialog-paints-in-top-layer.tentative` | 0.0% | ours dialog, Chromium blank (unsupported) | **fixed** — reclassified Manual |
 | 25 | `the-link-element/stylesheet-with-base` | 0.0% | ours red (trap file), Chromium white | **fixed** — renders green locally |
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
-| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | open |
+| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — bridge on CI, patch 0038 for the atomic DOM move |
 | 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** (patch 0036) |
 | 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc`, Chromium white + chrome | open |
 | 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** (patches 0036/0037) |

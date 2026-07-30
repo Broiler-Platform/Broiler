@@ -381,6 +381,11 @@ public sealed partial class DomBridge
             new JSFunction((in a) => Dom.Features.TreeMutationBinding.InsertBefore(this, element, in a), "insertBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // moveBefore(node, refChild) — the atomic, state-preserving sibling of insertBefore.
+        obj.FastAddValue((KeyString)"moveBefore",
+            new JSFunction((in a) => Dom.Features.TreeMutationBinding.MoveBefore(this, element, in a), "moveBefore", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // children (read-only) — element children only (no text nodes)
         obj.FastAddProperty((KeyString)"children",
             new JSFunction((in a) => Dom.Features.ElementTraversalBinding.GetChildren(this, element, in a), "get children"),

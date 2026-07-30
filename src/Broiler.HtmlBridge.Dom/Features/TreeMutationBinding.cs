@@ -17,6 +17,46 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </summary>
 internal static class TreeMutationBinding
 {
+    /// <summary>
+    /// The DOM <c>Node.moveBefore(node, child)</c> method: repositions an already-attached node
+    /// atomically, preserving state that a remove-then-insert would destroy (iframe content,
+    /// focus, running animations, render-blocking status).
+    /// <para>
+    /// Unlike <see cref="InsertBefore"/> this throws rather than quietly returning when the
+    /// arguments are wrong: <c>moveBefore</c> is specified to reject a node that is not already in
+    /// the tree, or that does not share the target's root, and a caller relying on the atomic
+    /// guarantee needs to hear about it rather than silently get a copy-shaped result. The
+    /// canonical <c>DomNode.MoveBefore</c> raises those as DOM exceptions.
+    /// </para>
+    /// <para>
+    /// WPT issue #1491 problem 27: without this method the test's script threw on an undefined
+    /// function, so the document was never styled and rendered white against Chromium's green.
+    /// </para>
+    /// </summary>
+    public static JSValue MoveBefore(ITreeMutationHost host, DomElement element, in Arguments a)
+    {
+        if (a.Length == 0 || a[0] is not JSObject movedObj)
+            throw new JSException("TypeError: moveBefore requires a node to move.");
+
+        var moved = host.FindDomNodeByJSObject(movedObj);
+        if (moved is null)
+            throw new JSException("TypeError: moveBefore's first argument is not a node.");
+
+        DomNode? reference = null;
+        if (a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined)
+        {
+            if (a[1] is not JSObject referenceObj)
+                throw new JSException("TypeError: moveBefore's second argument is not a node.");
+
+            reference = host.FindDomNodeByJSObject(referenceObj);
+            if (reference is null)
+                throw new JSException("TypeError: moveBefore's second argument is not a node.");
+        }
+
+        host.MoveNodeBefore(element, moved, reference);
+        return a[0];
+    }
+
     public static JSValue InsertBefore(ITreeMutationHost host, DomElement element, in Arguments a)
     {
         if (a.Length == 0)
