@@ -5,11 +5,17 @@ using Broiler.JavaScript.Engine;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// What a view transition captures for the <em>document</em>, and the box between a group and its
-/// two snapshots. Covers the three gaps behind WPT issue #1491 problems 19, 21 and 23
-/// (<c>css/css-view-transitions/old-content-captures-root.html</c>,
-/// <c>new-content-captures-root.html</c>, <c>root-captured-as-different-tag.html</c>), each of which
-/// rendered as a flat sheet of the author's <c>::view-transition</c> backdrop.
+/// The name the <em>document</em> is captured under, and the box the spec puts between a group and
+/// its two snapshots.
+/// <para>
+/// Neither closes WPT issue #1491 problems 19, 21 or 23 on its own. Those need the root snapshot to
+/// reproduce the page, and reproducing it by cloning the DOM was tried and reverted: it is close but
+/// not exact, and where the old root snapshot is genuinely visible "close" scores worse than the
+/// transparent box it replaced, because the live page underneath is pixel-exact. Measured over the
+/// 458 local <c>css-view-transitions</c> tests it was +8 passing / −7 passing, and it cost 79 pixel
+/// points on <c>root-to-shared-animation-end</c>. A real capture wants a rasterised snapshot from
+/// the renderer, not a DOM clone — see <c>docs/wpt-rendering-gaps.md</c>.
+/// </para>
 /// </summary>
 public class ViewTransitionRootCaptureTests
 {
@@ -54,10 +60,10 @@ public class ViewTransitionRootCaptureTests
 """;
         using var bitmap = Render(html, "document.startViewTransition(() => { document.body.style.background = 'red'; });");
 
-        // The old root snapshot covers the viewport, so neither the `(root)` rule's red nor the
-        // backdrop's pink may show.
-        AssertPixel(bitmap, 150, 150, 255, 255, 255, "canvas outside the box");
-        AssertPixel(bitmap, 40, 40, 0, 0, 255, "the captured page content");
+        // The `(root)` rule must not have matched: its `background: red` would fill the group over
+        // the whole viewport. What shows instead is the ::view-transition backdrop, because the root
+        // snapshot itself is not reproduced (see the class remarks).
+        AssertPixel(bitmap, 150, 150, 255, 192, 203, "the backdrop, not the (root) rule's red");
     }
 
     // ::view-transition-image-pair is the box the spec puts between a group and its old/new pair, so
@@ -111,61 +117,5 @@ public class ViewTransitionRootCaptureTests
 
         AssertPixel(bitmap, 20, 20, 255, 0, 0, "the visible group's snapshot");
         AssertPixel(bitmap, 150, 150, 255, 192, 203, "the backdrop");
-    }
-
-    // The root snapshot reproduces the page, not just a background colour: an opaque canvas plus the
-    // body's content, and an element captured separately is left out of it rather than painted twice.
-    [Fact]
-    public void RootSnapshot_Reproduces_The_Page_And_Omits_Separately_Captured_Elements()
-    {
-        const string html = """
-<!DOCTYPE html>
-<html class="reftest-wait">
-<style>
-  body { margin: 0; }
-  #box { position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; background: blue; }
-  #shared { position: absolute; top: 120px; left: 20px; width: 60px; height: 60px;
-            background: red; view-transition-name: shared; }
-  html::view-transition { background: pink; }
-  html::view-transition-old(root) { animation: unset; opacity: 1; }
-  html::view-transition-new(root) { animation: unset; opacity: 0; }
-  html::view-transition-image-pair(shared) { visibility: hidden; }
-</style>
-<div id="box"></div>
-<div id="shared"></div>
-</html>
-""";
-        using var bitmap = Render(html, "document.startViewTransition(() => { document.body.style.background = 'lime'; });");
-
-        // The canvas is the UA white the page renders on, not the pink backdrop showing through.
-        AssertPixel(bitmap, 150, 150, 255, 255, 255, "the captured canvas");
-        AssertPixel(bitmap, 40, 40, 0, 0, 255, "content carried into the root snapshot");
-        // #shared has its own group — hidden here — so it must not appear inside the root snapshot.
-        AssertPixel(bitmap, 40, 140, 255, 255, 255, "the separately captured element's area");
-    }
-
-    // The old snapshot is taken before the update callback, so it must show the pre-callback page
-    // even though the callback repaints it — the point of "old" content.
-    [Fact]
-    public void RootSnapshot_Old_Shows_The_Page_As_It_Was_Before_The_Callback()
-    {
-        const string html = """
-<!DOCTYPE html>
-<html class="reftest-wait">
-<style>
-  body { margin: 0; background: white; }
-  #box { position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; background: blue; }
-  body.updated #box { background: red; }
-  html::view-transition { background: pink; }
-  html::view-transition-old(root) { animation: unset; opacity: 1; }
-  html::view-transition-new(root) { animation: unset; opacity: 0; }
-</style>
-<div id="box"></div>
-</html>
-""";
-        using var bitmap = Render(html,
-            "document.startViewTransition(() => { document.body.classList.add('updated'); });");
-
-        AssertPixel(bitmap, 40, 40, 0, 0, 255, "the pre-callback content in the old snapshot");
     }
 }

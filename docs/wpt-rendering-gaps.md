@@ -12,7 +12,7 @@
   [the root roadmap](ROADMAP.md#htmlbridge-runtime).
 - **Companion documents:** [root roadmap](ROADMAP.md) for cross-component work;
   the component roadmaps own the implementation once an item below names them.
-- **Progress:** problems 6, 7–10, 19, 21, 23, 24, 25, 27, 28 and the `vb` half of
+- **Progress:** problems 6, 7–10, 24, 25, 27, 28 and the `vb` half of
   30 are fixed; each section says what landed, what was verified locally, and what
   is left for CI to confirm. Patches `0035`–`0039` — which carried the submodule
   half of 6, 27, 28 and 30 — **have since been applied and their pointers
@@ -149,7 +149,7 @@ Four caveats, all learned the hard way:
   presentation times are therefore unsupported, which is the honest state of a
   stack that renders one document per process.
 
-## View transitions did not capture the document — **3 of 10 fixed; 2 will not be won here**
+## View transitions do not capture the document — **still open; 2 will not be won here**
 
 - **Tests:** problems 14–23, ten `css/css-view-transitions/*` tests.
 - **Owner:** HtmlBridge (`DomBridge.ViewTransition.cs`).
@@ -160,10 +160,11 @@ Four caveats, all learned the hard way:
   carries the 1.3% green and 1.3% yellow item squares the reference has. The
   failures were four narrower gaps, and *three of the ten tests are not engine
   bugs at all* — 14 and 15 measure a feature the reference engine lacks, and 18's
-  reference is blank. The ten break down as: 3 fixed (19, 21, 23), 3 already
-  passing locally (18, 20, 22), 2 won't-fix (14, 15), 2 still open (16, 17).
-- **What landed** (problems 19, 21, 23 — `old-/new-content-captures-root`,
-  `root-captured-as-different-tag` — all three now **100%**, from 0.0%):
+  reference is blank. The ten break down as: 3 already passing locally (18, 20,
+  22), 2 won't-fix (14, 15), 5 still open — 19, 21 and 23 on a rasterised root
+  snapshot, 16 and 17 on nested browsing contexts.
+- **What landed** — three narrow corrections, none of which closes a test on its
+  own:
   1. **The root's captured name was hardcoded to `root`.** It is really whatever
      `view-transition-name` the document element carries; the UA sheet only
      supplies `root` as the default. `root-captured-as-different-tag` renames it
@@ -180,20 +181,29 @@ Four caveats, all learned the hard way:
      computed style, so it re-asserted `visibility: visible` (the initial value
      nearly everything has) *over* the pair's inherited `hidden`. Only a
      non-initial `visibility` is carried now.
-  4. **The root capture carried no content, only a background colour**, so
-     `::view-transition-old(root)` was transparent and the author backdrop showed
-     through the page. It now reproduces the canvas background (the root's, else
-     the body's by propagation, else the UA white the canvas is painted with) plus
-     the body's children, omitting elements captured separately — those have their
-     own group and the spec does not paint them twice.
-- **A trap this uncovered.** The overlay serializes after `</body>`, and the HTML
-  parser foster-parents it back *inside* `<body>`. So a rule anchored on an
-  ancestor outside the snapshot — `body.updated #box` — repainted the **old**
-  snapshot with the **new** state the update callback had just produced. Cloned
-  content now has its paint frozen from the element it was cloned from. Geometry
-  is deliberately *not* frozen and cloned ids are kept: id selectors are often
-  what position a page, and the clone is appended after the live document so an id
-  lookup still finds the original first.
+- **What did *not* work, and why it is worth knowing.** The remaining gap is that
+  the root capture carries only a background colour, no content, so
+  `::view-transition-old(root)` is transparent and the author backdrop shows
+  through the page. Reproducing the page by **cloning the DOM** into the snapshot
+  box was implemented, measured, and reverted. It did fix problems 19, 21 and 23
+  outright (0.0% → 100%), but across the 458 local `css-view-transitions` tests it
+  was **+8 passing / −7 passing** — and it cost 79 pixel points on
+  `root-to-shared-animation-end` (82.7% → 3.1%) and ~4 on
+  `content-with-transform-old-/new-image`. Restricting the clone to the *old*
+  snapshot did not rescue those. The reason is structural, not a missing detail: a
+  DOM clone re-lays-out and is only *close*, while the transparent box let the
+  **live page** show through — and the live page is pixel-exact. Anywhere the old
+  root snapshot is genuinely visible, exact beats close. **A root capture needs a
+  rasterised snapshot from the renderer, which is a `Broiler.HTML` capability, not
+  something the bridge can synthesise from the DOM.** That is what the original
+  "capture the old and new snapshots as images" next action asked for, and it
+  still stands.
+- **A trap the attempt uncovered, worth keeping for whoever does the raster
+  version.** The overlay serializes after `</body>` and the HTML parser
+  foster-parents it back *inside* `<body>`, so a rule anchored on an ancestor
+  outside the snapshot — `body.updated #box` — repaints the **old** snapshot with
+  the **new** state the update callback just produced. Any DOM-shaped snapshot has
+  to freeze its paint at capture time.
 - **Problems 14 and 15 cannot be won by improving the engine.** Both
   `auto-name.html` and `auto-name-from-id-shadow.html` need
   `view-transition-name: auto`, and the reference Chromium **drops that
@@ -217,14 +227,20 @@ Four caveats, all learned the hard way:
   are drawing the same substantial content. The `.tentative` one is *not* worth
   trusting: its reference is 100% white, so the only way to "pass" is to render
   nothing, exactly like problem 24.
-- **Verified:** the three fixed tests at 100% against locally generated Chromium
-  references, and 27 `ViewTransition*` tests pass — five new ones covering the
-  renamed root, the image-pair hide *and its negative half* (the same group paints
-  without the rule, so the test cannot be satisfied by a blank group), omission of
-  separately captured elements, and the old snapshot showing the pre-callback page.
-- **Exit gate for what remains:** a nested browsing context runs its own
-  transition and composites into the parent (16, 17), with a focused test pinning
-  an iframe's old root snapshot against the parent's.
+- **Verified:** 25 `ViewTransition*` tests pass — three new ones covering the
+  renamed root and the image-pair hide *with its negative half* (the same group
+  paints without the rule, so the test cannot be satisfied by a blank group). The
+  three corrections were swept over all 458 local `css-view-transitions` tests to
+  confirm they cost nothing.
+- **Beware the flaky one.** `new-content-transform-change-001` scores 99.6% in one
+  run and 1.0% in the next on an unmodified build. It appeared in a regression
+  diff and was very nearly attributed to a change that had nothing to do with it;
+  re-run a suspicious test against the unmodified build before believing a diff.
+- **Exit gate for what remains:** a rasterised root snapshot composites at the
+  group geometry so 19, 21 and 23 match without the clone's approximation; and a
+  nested browsing context runs its own transition and composites into the parent
+  (16, 17), with a focused test pinning an iframe's old root snapshot against the
+  parent's.
 
 ## System colour keywords did not resolve at all — **fixed**
 
@@ -545,9 +561,9 @@ feature they test — closing those means rendering less, not more.
 | 14, 15 | `css-view-transitions/auto-name*` (2) | 0.0% | ours captures both items + backdrop; Chromium drops `view-transition-name: auto` | **won't fix** — reference is the unfeatured render |
 | 16, 17 | `css-view-transitions/iframe-and-main-frame-*` (2) | 0.0% | ours 99.5% white, Chromium 74.5% green + 25% blue | open — needs a transition in a nested browsing context |
 | 18 | `css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative` | 0.0% | 100% — reference is a blank white canvas | **untrustworthy** — passes only by rendering nothing |
-| 19, 21 | `css-view-transitions/old-/new-content-captures-root` (2) | 0.0% | ours 98.7% pink (backdrop through the page) | **fixed** — 100% locally |
+| 19, 21 | `css-view-transitions/old-/new-content-captures-root` (2) | 0.0% | ours 98.7% pink (backdrop through the page) | open — needs a rasterised root snapshot |
 | 20, 22 | `css-view-transitions/*-root-scrollbar-with-fixed-background` (2) | 0.0% | 100% — reference is 99% `lightblue`, genuine | passing locally |
-| 23 | `css-view-transitions/root-captured-as-different-tag` | 0.0% | ours 100% red (the `(root)` trap rule) | **fixed** — 100% locally |
+| 23 | `css-view-transitions/root-captured-as-different-tag` | 0.0% | ours 100% red (the `(root)` trap rule) | part-fixed — the `(root)` rules no longer match; still needs the root snapshot |
 | 24 | `canvas/…/manual/dialog-paints-in-top-layer.tentative` | 0.0% | ours dialog, Chromium blank (unsupported) | **fixed** — reclassified Manual |
 | 25 | `the-link-element/stylesheet-with-base` | 0.0% | ours red (trap file), Chromium white | **fixed** — renders green locally |
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
