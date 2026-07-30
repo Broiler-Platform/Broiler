@@ -125,6 +125,90 @@ public sealed partial class DomBridge
         }
     }
 
+    /// <summary>
+    /// The state-preserving reposition behind <c>Node.moveBefore()</c>: relocates
+    /// <paramref name="node"/> under <paramref name="parent"/> before
+    /// <paramref name="reference"/> without the disconnection <see cref="InsertNodeAt"/> performs.
+    /// <para>
+    /// The difference from <see cref="InsertNodeAt"/> is deliberate and is the entire point of the
+    /// operation: no sub-document onload is fired, so a moved <c>&lt;iframe&gt;</c> does not
+    /// reload, and no node-iterator pre-removal is signalled.
+    /// </para>
+    /// <para>
+    /// INTERIM IMPLEMENTATION. The atomic version lives in the canonical DOM as
+    /// <c>DomNode.MoveBefore</c> and ships as <c>patches/0038-dom-node-movebefore.patch</c>; the
+    /// submodule remote is outside this session's GitHub scope, so the pointer still names a
+    /// commit without it. Calling it here would not compile against the pinned submodule, so this
+    /// reproduces the observable behaviour on top of the primitives that do exist — a reposition
+    /// that skips the onload firing. It is NOT fully atomic: the node is briefly detached, so the
+    /// document's id index is torn down and rebuilt. Once 0038 lands and the pointer is bumped,
+    /// replace this body with <c>parent.MoveBefore(node, reference)</c> and drop the local
+    /// validity check, which duplicates the canonical one.
+    /// </para>
+    /// <para>
+    /// WPT issue #1491 problem 27
+    /// (<c>dom/nodes/moveBefore/preserve-render-blocking-style.html</c>).
+    /// </para>
+    /// </summary>
+    private void MoveNodeBefore(DomNode parent, DomNode node, DomNode? reference)
+    {
+        // Per spec: a reference equal to the moved node collapses to its next sibling, making
+        // moveBefore(n, n) a no-op rather than an error.
+        if (ReferenceEquals(reference, node))
+            reference = node.NextSibling;
+
+        EnsurePreMoveValidity(parent, node, reference);
+
+        var oldParent = node.ParentNode!;
+        if (ReferenceEquals(oldParent, parent) && ReferenceEquals(node.NextSibling, reference))
+            return;
+
+        var index = reference is null ? parent.ChildNodes.Count : ChildIndexOf(parent, reference);
+
+        // Removing first shifts every later index down by one, so a forward move within the same
+        // parent has to compensate — the same correction InsertNodeAt applies.
+        var oldIndex = ChildIndexOf(oldParent, node);
+        if (ReferenceEquals(oldParent, parent) && oldIndex >= 0 && oldIndex < index)
+            index--;
+
+        RemoveChildFrom(oldParent, node);
+        InsertChildAt(parent, index, node);
+
+        if (oldParent is DomElement oldParentElement && !ReferenceEquals(oldParent, parent))
+            InvalidateStyleScope(oldParentElement);
+
+        if (parent is DomElement parentElement)
+            InvalidateStyleScope(parentElement);
+    }
+
+    /// <summary>
+    /// The DOM "ensure pre-move validity" steps, stricter than pre-insert in two ways that matter:
+    /// the node must already be in the tree (a move has nothing to preserve otherwise) and must
+    /// share the target's root (moving across roots would change connectedness, which a move is
+    /// defined never to do). Duplicates the canonical check in <c>DomNode.MoveBefore</c> only
+    /// while <c>patches/0038</c> is unlanded — see <see cref="MoveNodeBefore"/>.
+    /// </summary>
+    private void EnsurePreMoveValidity(DomNode parent, DomNode node, DomNode? reference)
+    {
+        if (parent is not (DomDocument or DomDocumentFragment or DomElement))
+            ThrowDOMException(_jsContext!, "This node cannot be a moveBefore parent.", "HierarchyRequestError");
+
+        if (ReferenceEquals(node, parent) || parent.IsDescendantOf(node))
+            ThrowDOMException(_jsContext!, "A node cannot be moved into itself or one of its descendants.", "HierarchyRequestError");
+
+        if (node is not (DomElement or DomCharacterData))
+            ThrowDOMException(_jsContext!, "This node type cannot be moved with moveBefore.", "HierarchyRequestError");
+
+        if (node.ParentNode is null)
+            ThrowDOMException(_jsContext!, "The node to move must already be in the tree.", "HierarchyRequestError");
+
+        if (reference is not null && !ReferenceEquals(reference.ParentNode, parent))
+            ThrowDOMException(_jsContext!, "The reference node is not a child of this node.", "NotFoundError");
+
+        if (!ReferenceEquals(node.GetRootNode(), parent.GetRootNode()))
+            ThrowDOMException(_jsContext!, "The node to move must share this node's root.", "HierarchyRequestError");
+    }
+
     private List<DomNode> BuildAdjacentHtmlNodes(DomElement contextElement, string html)
     {
         var nodes = new List<DomNode>();

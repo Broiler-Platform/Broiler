@@ -12,6 +12,14 @@
   [the root roadmap](ROADMAP.md#htmlbridge-runtime).
 - **Companion documents:** [root roadmap](ROADMAP.md) for cross-component work;
   the component roadmaps own the implementation once an item below names them.
+- **Progress:** problems 6, 24, 25, 27, 28 and the `vb` half of 30 are fixed; each
+  section says what landed, what was verified locally, and what is left for CI to
+  confirm. Several of those fixes live in submodules whose remotes this session
+  cannot push to, so they ship as patches under `patches/` and are **not on CI
+  until a maintainer applies them and bumps the pointers** — see
+  [`patches/README.md`](../patches/README.md). Problems 25 and 27 do work on CI
+  today: 25 is entirely main-repo, and 27 carries a main-repo fallback. Problems
+  6, 28 and 30 are inert until their patches land.
 
 Every item names an owner, the evidence behind it, its next action, and an
 objective exit gate. Where the evidence is a local measurement rather than the CI
@@ -105,62 +113,126 @@ Two caveats, both learned the hard way while writing this document:
   their group geometry, the ten tests report a non-trivial match, and a focused
   test asserts old/new snapshot paint order against the pseudo root.
 
-## System colour keywords resolve to a dark palette
+## System colour keywords did not resolve at all — **fixed, pending patch**
 
 - **Test:** problem 28, `forced-colors-mode/forced-colors-mode-20.html`.
 - **Owner:** Broiler.CSS.
-- **Current evidence:** the test paints `body { background-color: Canvas }`.
+- **Original evidence:** the test paints `body { background-color: Canvas }`.
   Broiler's canvas is 98% black; Chromium's is 98% white. Forced colors are not
   active in either engine (the reference is an ordinary Chromium render), so
-  `Canvas` must resolve to the light palette's white. Broiler resolving it to
-  black turns every system-colour test into a whole-canvas mismatch, and this one
-  is only the worst-scoring member of that family.
-- **Next actions:**
-  1. Resolve the CSS system colours (`Canvas`, `CanvasText`, `LinkText`, `Field`,
-     `ButtonFace`, …) from the light palette by default.
-  2. Switch palettes only where a used `color-scheme` or an emulated forced-colors
-     mode asks for it, and keep `forced-colors` computing to `none` while nothing
-     emulates it.
-- **Exit gate:** `getComputedStyle` reports the light-palette value for every
-  system colour in a default document, the test matches, and a focused test
-  covers the `color-scheme: dark` switch.
+  `Canvas` must resolve to the light palette's white.
+- **Root cause:** not a dark palette, as first suspected — `CssSystemColors`
+  carried only `Field` and `FieldText`. Every other system colour fell through to
+  the named-colour lookup, which does not know them, and resolved to the
+  unknown-colour fallback: black. That turned every system-colour test into a
+  whole-canvas mismatch, and this one is only the worst-scoring member of the
+  family.
+- **What landed:** `patches/0036-…` fills in the CSS Color 4 §6 table from the
+  light palette (matched to what Chromium reports, since the references are
+  Chromium screenshots), maps the §6.2 deprecated keywords onto their aliases,
+  and adds a `CssColorScheme` overload so a dark used colour scheme selects the
+  dark palette — `Canvas` there is the same `rgb(18, 18, 18)` the canvas-background
+  paint path already uses. `forced-colors` still computes to `none`; nothing
+  emulates it. Both existing call sites (the renderer's colour hook in
+  `Broiler.HTML`, and `CssAnimationResolver`) already went through `TryResolve`,
+  so filling the table lit up both.
+- **Verified:** rendering `background-color: Canvas` now paints 100% white and
+  `ButtonFace` paints `rgb(239, 239, 239)` — a value only the new table produces,
+  so the render path demonstrably goes through it. 45 focused tests cover the
+  light palette, the `color-scheme: dark` switch, and the deprecated aliases.
+- **Remaining:** the test itself is not in this container's WPT subset, so the
+  pixel result is CI's to confirm. The patch must be applied and the submodule
+  pointer bumped before CI sees any of this.
 
-## `contrast-color()` and style container queries
+## `contrast-color()` and style container queries — **fixed, pending patch**
 
 - **Test:** problem 6, `css/css-color/contrast-color-style-query.html`.
 - **Owner:** Broiler.CSS.
-- **Current evidence:** Broiler renders 100% white where Chromium renders 100%
+- **Original evidence:** Broiler renders 100% white where Chromium renders 100%
   green. The test needs three features to compose: an `@property`-registered
   `<color>` custom property, `contrast-color(#000)` resolving to an absolute
   colour, and `@container style(--contrast-color: white)` matching on it. Any one
-  missing leaves the `background: green` rule unapplied, which is what the blank
-  render shows.
-- **Next action:** implement `contrast-color()` as an absolute-colour resolution
-  at computed-value time, then confirm whether the style container query
-  evaluates registered custom properties; the test distinguishes the two once
-  either lands.
-- **Exit gate:** `contrast-color()` computes to an absolute colour, a style
-  container query matches on a registered custom property, and the test matches.
+  missing leaves the `background: green` rule unapplied.
+- **Which of the three were missing:** registration already worked. The other two
+  did not — and the earlier guess that the test would "distinguish the two once
+  either lands" was wrong: it needs *both*, so neither alone moves the test.
+- **What landed** (`patches/0039-…`):
+  1. `contrast-color(<color>)` resolves to whichever of black or white contrasts
+     more with its argument, via the WCAG 2 contrast ratio over relative
+     luminance. The comparison collapses to one threshold — white wins below
+     luminance `√(1.05 × 0.05) − 0.05 ≈ 0.1791`, where the two ratios are equal.
+     **That is not mid-grey:** `#767676` takes black while `#757575` takes white,
+     and a test pins exactly that boundary. Wired into
+     `CssValueParser.TryParseColor`, so it is a `<color>` everywhere; the system
+     colours are routed there in the same pass, since they are `<color>` keywords
+     too.
+  2. `style()` container queries, which were explicitly unsupported and forced
+     the whole query false. A *style* container needs no `container-type` —
+     css-contain-3 makes every element one — so size and style containers are now
+     resolved separately and a style-only query works where no size container
+     exists. Comparison is colour-aware, because a registered `<color>` property
+     computes to an absolute colour: `white` and `rgb(255, 255, 255)` are the
+     same computed value.
+- **Two parsing traps this uncovered,** both of which made *every* style query
+  silently false rather than erroring:
+  - `SplitContainerName` read the leading identifier of `style(...)` as a
+    container **name**, so the lookup hunted for `container-name: style`, found
+    nothing, and bailed. An identifier immediately followed by `(` is a function.
+  - The condition tokenizer split `style` from its parenthesised argument,
+    leaving the argument looking like a nested condition and the name like a bare
+    size feature. Function tokens now keep their argument list.
+- **Verified:** the composed scenario renders red with the patch reverted and
+  green with it applied. The negative half — `contrast-color(#fff)` is *black*,
+  so the `white` query must **not** match — is what makes that meaningful; an
+  early version of this check passed only because the query never matched at all.
+- **Known gaps, deliberate:** only the custom-property form of `style()` is
+  supported (a standard-property query returns false rather than guessing), and
+  an `@property` registration with `inherits: false` is not honoured by the
+  ancestor walk. The walk reads cascaded declarations rather than
+  `GetComputedStyle` because it runs *during* style computation and re-entering
+  it for an ancestor would recurse.
+- **No main-repo fallback is possible:** the cascade lives entirely in
+  Broiler.CSS, so unlike problems 25 and 27 there is no main-repo layer to carry
+  an equivalent fix. This one is inert on CI until the patch is applied.
 
-## `<base href>` is ignored for `<link rel=stylesheet>` in the render path
+## `<base href>` was ignored for `<link rel=stylesheet>` in the render path — **fixed**
 
 - **Test:** problem 25,
   `html/semantics/document-metadata/the-link-element/stylesheet-with-base.html`.
 - **Owner:** main repo (the renderer's stylesheet resolution).
-- **Current evidence:** the test sets `<base href="resources/">` and links
+- **Original evidence:** the test sets `<base href="resources/">` and links
   `stylesheet.css`, so only `resources/stylesheet.css` (green) may load — the
   sibling `stylesheet.css` next to the test sets red as the trap. Broiler renders
   100% red. It resolved the href against the document URL and loaded the trap
   file, which is exactly what the `<base>` is there to prevent.
-- **Next actions:**
-  1. Resolve a `<link rel=stylesheet>` href against the document's base URL in
-     the render path. `e4cc5e9` fixed one such site; this render path is a second
-     one, so find the shared seam rather than patching a third.
-  2. Cover `@import` and `url()` inside a `<base>`-scoped document at the same
-     time.
-- **Exit gate:** every stylesheet URL in the render path resolves against
-  `<base href>`, the test matches, and a focused test asserts the trap file is
-  never loaded.
+- **Root cause:** the second site the previous entry predicted. `e4cc5e9` taught
+  the DomBridge serialization transform to honour `<base>`, but the WPT runner's
+  `InlineLinkedStylesheets` reads linked sheets off disk *before* those transforms
+  run — resolving against the test's own directory. It inlined the trap as a
+  `<style>`, so by the time `ApplyBaseHrefToStyleUrls` ran there was no `<link>`
+  left to rebase.
+- **What landed:** rather than a third implementation, `HtmlBaseHref`
+  (`src/Broiler.HtmlBridge.Dom/HtmlBaseHref.cs`) is now the one seam both sites
+  resolve through — it finds the document base (from raw HTML or the DOM) and
+  resolves a URL against it, keeping the base's shape so downstream mapping still
+  works: absolute base → absolute URL, root-relative base → root-relative path
+  (the `wptRoot` handler still matches), document-relative base → a
+  document-relative path when no page URL is known, which is what a caller
+  holding a directory needs. `DomBridge.ResolveUrlAgainstBaseHref` delegates to
+  it; the runner's inliner calls it before touching disk.
+  - `@import` was the same bug one layer down: `InlineStyleSheetImports` resolved
+    a relative import against `_pageUrl`, never the base. It now folds the base in
+    via `HtmlBaseHref.ResolveDocumentBaseUrl`. `<style>` `url()` was already
+    covered by `RewriteStyleElementUrls`.
+- **Verified:** the trap scenario reproduced locally at 100% red before the change
+  and renders 100% green after. Focused tests assert the trap file is never
+  loaded (not merely outranked in the cascade), that a document with no `<base>`
+  still picks the sibling, and that non-stylesheet `<link>`s are untouched; the
+  pre-existing bridge-level test grew the trap file it had been missing.
+- **Note for the next reader:** on a Unix host `Uri.TryCreate("/css/",
+  UriKind.Absolute)` succeeds as the *file path* `file:///css/`. Base resolution
+  must check for a scheme before treating a base as absolute or it silently drops
+  the page's origin — the helper does, and a test pins it.
 
 ## Screen-layout gaps behind the three `*-print.html` tests
 
@@ -173,7 +245,8 @@ Two caveats, both learned the hard way while writing this document:
   screen-layout gap:
   - `page-box-008`: Broiler is 99% hotpink (the body background) where Chromium
     is 99% yellow (a `block-size: 100vb` box). The logical viewport unit `vb`
-    does not resolve, so the box has no size.
+    does not resolve, so the box has no size. **The unit gap is fixed** — see
+    below.
   - `monolithic-overflow-011`: Broiler renders 99% white against 95% yellow + 5%
     hotpink — the `display: table` subtree with a `contain: size; height: 350vh`
     row-group paints nothing.
@@ -183,14 +256,31 @@ Two caveats, both learned the hard way while writing this document:
     position is. **Unconfirmed** — verify the scroll origin before treating this
     as a paint bug.
 - **Next actions:**
-  1. Resolve the logical viewport units (`vb`, `vi`, and their `sv`/`lv`/`dv`
-     variants) against the writing mode.
+  1. ~~Resolve the logical viewport units (`vb`, `vi`, and their `sv`/`lv`/`dv`
+     variants) against the writing mode.~~ **Done** — `patches/0036-…` and
+     `patches/0037-…`. `vb`/`vi` did not parse at all. They now resolve against
+     the *root element's* writing mode, which is what CSS Values 4 §6.1.4
+     specifies (not the element the unit appears on), so a per-pass factor set
+     from the root's mode is the right granularity; `Broiler.HTML`'s layout pass
+     hands that mode to the parser alongside the viewport size. The
+     small/large/dynamic variants coincide with the default viewport in a
+     headless render with no retractable UA chrome, so they canonicalise onto it.
+     Verified end-to-end: `100vi × 100vb` fills the viewport, a `vertical-rl`
+     root swaps the axes, and `100dvw × 50svh` covers half the canvas.
   2. Lay out and paint a `contain: size` box inside table internals.
   3. Establish what a vertical-rl root's initial scroll position is and align the
      canvas extent with it.
 - **Exit gate:** all three tests match on screen, with focused tests for logical
   viewport units and for `contain: size` in table internals — and no paged-media
-  work is required to get there.
+  work is required to get there. The viewport-unit half of that gate is met (a
+  focused suite pins both axes, both writing modes, and all four viewport sizes);
+  `page-box-008` itself is CI's to confirm, since it is not in this container's
+  WPT subset.
+- **Trap this uncovered:** canonicalising `svmin` → `vmin` means the unit *as
+  written* can be longer than the unit reported. Three call sites split
+  number-from-unit by the canonical length, so `"100svmin"` parsed its number as
+  `"100s"` and silently resolved to 0. `GetUnit` now also reports the written
+  length; any new site that splits a length must use it.
 
 ## Frameset frames render nothing
 
@@ -207,20 +297,42 @@ Two caveats, both learned the hard way while writing this document:
 - **Exit gate:** the test matches, and a focused test asserts a two-frame
   frameset paints both documents at their grid rects.
 
-## `Node.moveBefore` is missing
+## `Node.moveBefore` was missing — **fixed**
 
 - **Test:** problem 27, `dom/nodes/moveBefore/preserve-render-blocking-style.html`.
 - **Owner:** Broiler.DOM with HtmlBridge for the binding.
-- **Current evidence:** Broiler renders white where Chromium renders 100% green.
+- **Original evidence:** Broiler renders white where Chromium renders 100% green.
   The test moves a render-blocking `<style>` with `moveBefore()` and asserts the
   styles survive the move; without the method the script throws and the document
   is never styled.
-- **Next actions:**
-  1. Implement `moveBefore()` as a state-preserving move (no removal/insertion
-     pair), and expose it on the bridge's node surface.
-  2. Keep a moved render-blocking element's blocking state intact.
-- **Exit gate:** the test matches, and focused tests cover a move within and
-  across parents plus the render-blocking case.
+- **What landed, in two pieces:**
+  1. `patches/0038-…` adds the canonical `DomNode.MoveBefore` — the genuinely
+     atomic version. The state it preserves follows from one spec constraint: both
+     parents must share a shadow-including root, so a moved node's *connectedness
+     cannot change*. That is why the document's id index is deliberately not torn
+     down and rebuilt, and why an `<iframe>` must not reload. Observers still see
+     the move (records are queued for both parents); only the disconnection is
+     skipped.
+  2. The bridge binding in the main repo, which is what CI runs. It exposes
+     `moveBefore` on the element surface and — **until 0038 lands** — reproduces
+     the observable behaviour on the primitives available at the pinned submodule
+     SHA: a reposition that skips the sub-document onload firing, so a moved
+     iframe does not reload. It is *not* fully atomic (the node is briefly
+     detached, so the id index churns). `DomBridge.MoveNodeBefore` carries the
+     note; once the pointer is bumped its body becomes one call to
+     `parent.MoveBefore` and the duplicated validity check goes away.
+- **Verified:** rendering the move scenario paints green where it painted white;
+  moving an orphan throws as the spec requires; a within-parent forward reorder
+  lands in the right slot. 16 DOM-level tests (in the patch) and 10 bridge-level
+  tests (on CI) cover moves within and across parents, the render-blocking
+  `<style>` case, the observer records, and every pre-move validity rejection.
+- **Why validity is stricter than `insertBefore`:** `moveBefore` rejects a node
+  that is not already in the tree, and one from a different root. Both would be
+  silently accepted by an insert; a caller relying on the atomic guarantee needs
+  the exception instead of insert-shaped behaviour.
+- **Remaining:** the WPT test is not in this container's subset, so its pixel
+  result is CI's to confirm — and CI sees only the bridge fallback until 0038 is
+  applied.
 
 ## Shadow-DOM focus delegation paints the wrong surface
 
@@ -266,43 +378,51 @@ Two caveats, both learned the hard way while writing this document:
 - **Exit gate:** each of the three is either reproducible locally or reassigned to
   an owning component with a CI-artifact failure image as its evidence.
 
-## Runner: a `manual/` test is being scored
+## Runner: a `manual/` test was being scored — **fixed**
 
 - **Test:** problem 24,
   `html/canvas/element/manual/draw-element-image/dialog-paints-in-top-layer.tentative.html`.
 - **Owner:** the WPT runner (`src/Broiler.Wpt`).
-- **Current evidence:** the test sits under a `manual/` path segment and is
+- **Original evidence:** the test sits under a `manual/` path segment and is
   `.tentative`, but it is discovered and scored as a Regular test. Its reference
   is a 100% white Chromium canvas, because Chromium does not implement the
   proposed `draw-element-image` API either — so the only way to "pass" is to
   render nothing. Broiler paints a dialog (98% `#e5e5e5` + 2% green), which is
   arguably the more useful behaviour.
-- **Next action:** treat a `manual/` path segment as a manual test in discovery,
-  the way a `-manual.html` suffix already is, and report the count change so the
-  drop is not read as a regression.
-- **Exit gate:** `manual/` tests land in the Manual bucket, the run's Regular
-  count changes by exactly the number reclassified, and problem 24 leaves the
-  scored set.
+- **What landed:** `WptTestRunner.IsManualTest` now treats a `manual/` directory
+  segment as the manual signal, alongside the `-manual` filename suffix —
+  mirroring how `IsCrashTest` already accepts `/crashtests/` and `IsTentativeTest`
+  accepts `/tentative/`. `ClassifyTestKind` checks Manual before Tentative, so
+  such a test lands in the Manual bucket and leaves the scored set.
+- **Verified:** focused tests cover the segment on both separators and
+  case-insensitively, pin that `manual` only counts as a *whole* segment
+  (`manually/`, `semi-manual/` stay automated), and assert the `manual/` +
+  `.tentative` test classifies as Manual.
+- **Remaining:** the count change is CI's to report — the run's Regular count
+  should drop by exactly the number reclassified, and that drop is not a
+  regression.
 
 ## Reported problems, at a glance
 
 Local numbers come from this container against locally generated Chromium
-references; CI's are authoritative where they disagree.
+references; CI's are authoritative where they disagree. **Status** records work
+landed since the run — a fix marked *patch* is not yet on CI, because it lives in
+a submodule whose remote this session cannot push to (see `patches/README.md`).
 
-| # | Test | CI | Local observation |
-| --- | --- | --- | --- |
-| 4 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | 99.8% — needs the server's `trickle` pipe |
-| 5 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | ours `#121212`, Chromium white — needs `.sub` |
-| 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green |
-| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red |
-| 11 | `css-page/monolithic-overflow-011-print` | 0.0% | ours blank, Chromium yellow + hotpink |
-| 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white |
-| 13 | `css-transforms/animation/transform-interpolation-002` | 0.0% | 100% — both empty offline |
-| 14–23 | `css-view-transitions/*` (10) | 0.0–1.3% | pseudo root paints, captures absent |
-| 24 | `canvas/…/manual/dialog-paints-in-top-layer.tentative` | 0.0% | ours dialog, Chromium blank (unsupported) |
-| 25 | `the-link-element/stylesheet-with-base` | 0.0% | ours red (trap file), Chromium white |
-| 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` |
-| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green |
-| 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white |
-| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc`, Chromium white + chrome |
-| 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow |
+| # | Test | CI | Local observation | Status |
+| --- | --- | --- | --- | --- |
+| 4 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | 99.8% — needs the server's `trickle` pipe | open |
+| 5 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | ours `#121212`, Chromium white — needs `.sub` | open |
+| 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green | **fixed** (patch 0039) |
+| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | open |
+| 11 | `css-page/monolithic-overflow-011-print` | 0.0% | ours blank, Chromium yellow + hotpink | open |
+| 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white | open |
+| 13 | `css-transforms/animation/transform-interpolation-002` | 0.0% | 100% — both empty offline | open |
+| 14–23 | `css-view-transitions/*` (10) | 0.0–1.3% | pseudo root paints, captures absent | open |
+| 24 | `canvas/…/manual/dialog-paints-in-top-layer.tentative` | 0.0% | ours dialog, Chromium blank (unsupported) | **fixed** — reclassified Manual |
+| 25 | `the-link-element/stylesheet-with-base` | 0.0% | ours red (trap file), Chromium white | **fixed** — renders green locally |
+| 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
+| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — bridge on CI, patch 0038 for the atomic DOM move |
+| 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** (patch 0036) |
+| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc`, Chromium white + chrome | open |
+| 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** (patches 0036/0037) |

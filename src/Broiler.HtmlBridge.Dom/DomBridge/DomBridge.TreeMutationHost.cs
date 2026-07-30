@@ -20,6 +20,9 @@ public sealed partial class DomBridge : Dom.Features.ITreeMutationHost
     List<DomNode> Dom.Features.ITreeMutationHost.BuildChildNodeArgumentNodes(in Arguments arguments)
         => BuildChildNodeArgumentNodes(arguments);
 
+    void Dom.Features.ITreeMutationHost.MoveNodeBefore(DomNode parent, DomNode node, DomNode? reference)
+        => MoveNodeBefore(parent, node, reference);
+
     void Dom.Features.ITreeMutationHost.InsertNodeAt(DomNode parent, DomNode node, int index)
         => InsertNodeAt(parent, node, index);
 

@@ -37,7 +37,27 @@ public sealed partial class DomBridge
     /// Inlines the leading <c>@import</c> rules of every <c>&lt;style&gt;</c> in the tree,
     /// replacing each with the (recursively import-expanded) text of the imported sheet.
     /// </summary>
-    private void InlineStyleSheetImports(DomElement element)
+    private void InlineStyleSheetImports(DomElement root)
+    {
+        // HTML §4.2.3: <base href> replaces the document URL that a relative
+        // @import resolves against, so the base has to be folded in rather than
+        // resolving each import against the page URL. (This transform runs before
+        // ApplyBaseHrefToStyleUrls, so it cannot rely on that pass.)
+        //
+        // Resolved LAZILY, and at most once: finding the base means walking every
+        // descendant, and the overwhelming majority of documents have no @import
+        // at all — they must not pay for a second full-tree scan. A document with
+        // thousands of nodes and no imports is the case that makes this matter.
+        string? documentBaseUrl = null;
+        string ResolveBaseOnce() =>
+            documentBaseUrl ??= HtmlBaseHref.ResolveDocumentBaseUrl(
+                _pageUrl,
+                TryFindDocumentBaseHref(root, out var baseHref) ? baseHref : null);
+
+        InlineStyleSheetImports(root, ResolveBaseOnce);
+    }
+
+    private void InlineStyleSheetImports(DomElement element, Func<string> documentBaseUrl)
     {
         if (!IsText(element) &&
             element.TagName.Equals("style", StringComparison.OrdinalIgnoreCase))
@@ -46,14 +66,14 @@ public sealed partial class DomBridge
             if (HasLeadingImport(original))
             {
                 var expanded = ExpandCssImports(
-                    original, _pageUrl, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0);
+                    original, documentBaseUrl(), new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0);
                 if (!string.Equals(expanded, original, StringComparison.Ordinal))
                     SetElementTextContent(element, expanded);
             }
         }
 
         foreach (var child in ChildElements(element))
-            InlineStyleSheetImports(child);
+            InlineStyleSheetImports(child, documentBaseUrl);
     }
 
     /// <summary>Quick, allocation-free check for a leading <c>@import</c> before the
