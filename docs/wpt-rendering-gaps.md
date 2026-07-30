@@ -679,6 +679,66 @@ Four caveats, all learned the hard way:
   should drop by exactly the number reclassified, and that drop is not a
   regression.
 
+## The next run (issue #1497, 2026-07-30)
+
+Everything above is scoped to
+[issue #1491](https://github.com/Broiler-Platform/Broiler/issues/1491). The next
+run reported the same shape of tail, and **most of it is the same tests under new
+numbers** — so this section records only what is new, and what the re-run
+confirmed or contradicted. Cross-referencing the two lists:
+
+- **#1497 problems 1 and 2 are one bug, and it was the run's largest.** Both crash
+  signatures — `Worker closed stdout before returning a result` (68 tests) and
+  `Worker exited with code 134` (3 tests) — were a single unbounded recursion in
+  `@container` prelude evaluation. Every `(` was read as the start of a nested
+  condition, so a prelude whose parentheses belong to a *value* function
+  (`(width = calc(100px + 10rem))`) or to a *query* function other than `style()`
+  (`anchored(fallback: --foo)`, `scroll-state(scrollable: block-end)`) handed the
+  tokenizer the identical text at every level. A .NET stack overflow cannot be
+  caught, so it killed the worker outright — which is why the reported signature
+  named the runner rather than the CSS engine. Measured locally over the 302
+  `container-queries` tests in both affected directories: **68 crashes → 0**, no
+  test regressed. Fixed in `Broiler.CSS`; **pending [`patches/0043`](../patches/README.md)**,
+  with no main-repo fallback, so CI keeps crashing until it lands.
+- **#1497 problems 3 and 4 are #1491's problems 2 and 3** — the per-element JS
+  wrapper cost, still tracked in [the root roadmap](ROADMAP.md#htmlbridge-runtime).
+- **#1497 problem 24 was recorded here as fixed, and was not.**
+  `dom/nodes/moveBefore/preserve-render-blocking-style` is listed in the table
+  below as "**fixed** — patch 0038 applied", but the re-run still had it at 0.0%,
+  and so did this container. `Node.moveBefore` was only ever half the test. The
+  real gap: **`<link>` had no IDL reflectors at all**, so the ordinary way to
+  inject a stylesheet —
+  `createElement("link")`, set `.rel` and `.href`, append — wrote *nothing*, and
+  the element serialized as a bare `<link>` that never reached the cascade.
+  `setAttribute("rel", …)` worked, which is how it stayed hidden. `<link>`/`<base>`
+  now reflect `href` as a URL like `<a>`/`<area>`, and `<link>` reflects `rel`,
+  `as`, `media`, `hreflang`, `integrity` and `referrerPolicy`. **0.0% → 100%**, in
+  the main repo, so it is on CI immediately. The `?pipe=trickle(d1)` query and the
+  `moveBefore` call in that test were both red herrings — a static `<link>` with
+  the same query already rendered correctly.
+- **#1497 problem 30 is new and is two bugs in one spec rule.**
+  `css/css-transforms/transform-scale-percent-001` uses
+  `transform: scale(50%, 75%)`, and css-transforms-2 makes a scale factor
+  `<number> | <percentage>` where the percentage is *the ratio* — `scale(50%)` is
+  `scale(0.5)`. The paint parser resolved every percentage against the element's
+  box (right for `translate`, wrong for `scale`), so a 100px square came out 50×
+  and filled the canvas; the bridge's geometry parser had no percentage branch for
+  scale at all, so `50%` fell back to `0` and collapsed the box. **0.5% → 99.99%**,
+  and the 939-test `css-transforms` subset goes 376 → 377 passing. Geometry is on
+  CI now; the pixels need **[`patches/0044`](../patches/README.md)**.
+- **Still unanalysed**, and genuinely new to this run rather than renumbered:
+  `css-view-transitions/names-are-tree-scoped`,
+  `css-color-adjust/…/color-scheme-iframe-background-mismatch-dynamic`,
+  `css-view-transitions/new-content-flat-transform-ancestor` (0.3%),
+  `css-position/overlay/overlay-transition-dialog` (0.4%), and
+  `css-view-transitions/html-becomes-fixed` (0.4%).
+- **`uievents/…/UIEvent.load.stylesheet` is a `load`-event gap, not a style gap.**
+  The test sets `link.href` from `window.onload` and waits for a `load` event on
+  the `<link>`. With the reflection fix the href now reaches the attribute and the
+  sheet applies — the body background matches the reference — but no `load` event
+  is dispatched for a stylesheet, so the page still renders `FAIL`. That needs
+  resource-load events on `<link>`, which nothing here provides yet.
+
 ## Reported problems, at a glance
 
 Local numbers come from this container against locally generated Chromium
@@ -708,7 +768,7 @@ feature they test — closing those means rendering less, not more.
 | 24 | `canvas/…/manual/dialog-paints-in-top-layer.tentative` | 0.0% | ours dialog, Chromium blank (unsupported) | **fixed** — reclassified Manual |
 | 25 | `the-link-element/stylesheet-with-base` | 0.0% | ours red (trap file), Chromium white | **fixed** — renders green locally |
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
-| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — patch 0038 applied; bridge now delegates to it |
+| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — but only at the *second* attempt; `moveBefore` (patch 0038) was half of it, and the test stayed at 0.0% until `<link>` got its IDL reflectors. See [the #1497 section](#the-next-run-issue-1497-2026-07-30) |
 | 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** — patch 0036 applied |
 | 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 97.8%** with patch 0042; residual is inline-block line height |
 | 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** — patches 0036/0037 applied |
