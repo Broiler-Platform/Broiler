@@ -43,6 +43,14 @@ on:
         description: Per-test timeout in seconds.
         required: false
         default: '30'
+      memory_limit_mb:
+        description: >
+          Per-test RAM cap in MiB, measured as growth of the rendering process's
+          resident set. A test that passes it is aborted and reported as
+          MemoryLimitExceeded; a worker that reaches it is recycled between tests.
+          0 disables the cap.
+        required: false
+        default: '1024'
       most_common_problems_limit:
         description: Maximum number of common failure groups to include in the GitHub issue.
         required: false
@@ -149,6 +157,7 @@ jobs:
         include: ${{ fromJson(needs.plan.outputs.shard-matrix) }}
     env:
       BROILER_WPT_TIMEOUT_SECONDS: ${{ github.event.inputs.test_timeout_seconds || '30' }}
+      BROILER_WPT_MEMORY_LIMIT_MB: ${{ github.event.inputs.memory_limit_mb || '1024' }}
     steps:
       - uses: actions/checkout@v5
         with:

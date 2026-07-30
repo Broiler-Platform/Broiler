@@ -31,6 +31,15 @@ public class Program
 
     private const double DefaultRunTestTimeoutSeconds = 30;
     private const string RunTestTimeoutEnvironmentVariable = "BROILER_WPT_TIMEOUT_SECONDS";
+
+    /// <summary>
+    /// Per-test RAM cap. A single runaway document must not be able to OOM-kill the
+    /// runner (or the CI machine) and take the whole shard's results with it, so a test
+    /// that grows the memory of the process rendering it past this cap is aborted and
+    /// reported as a failure. See <see cref="WptMemoryGuard"/> for what is measured and why.
+    /// </summary>
+    private const int DefaultRunTestMemoryLimitMegabytes = 1024;
+    private const string RunTestMemoryLimitEnvironmentVariable = "BROILER_WPT_MEMORY_LIMIT_MB";
     private const int ProgressCheckpointInterval = 25;
     private const int TopBucketLimit = 5;
     private const int MissingContentDominantBucketMinimumFailures = 5;
@@ -73,6 +82,7 @@ public class Program
         string? rerunJsonPath = null;
         RerunSelectionKind rerunSelectionKind = RerunSelectionKind.Failures;
         double? timeoutSeconds = null;
+        int? memoryLimitMegabytes = null;
         int shardCount = 1;
         int shardIndex = WptTestRunner.AllShards;
         bool nonJavaScriptOnly = false;
@@ -134,6 +144,15 @@ public class Program
 
                     timeoutSeconds = parsedTimeoutSeconds;
                     break;
+                case "--memory-limit-mb" when i + 1 < args.Length:
+                    if (!TryParseMemoryLimitMegabytes(args[++i], out var parsedMemoryLimitMegabytes))
+                    {
+                        Console.Error.WriteLine("Error: '--memory-limit-mb' must be a non-negative integer (0 disables the cap).");
+                        return 1;
+                    }
+
+                    memoryLimitMegabytes = parsedMemoryLimitMegabytes;
+                    break;
                 case "--shard-count" when i + 1 < args.Length:
                     if (!int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out shardCount) || shardCount < 1)
                     {
@@ -170,6 +189,7 @@ public class Program
                 case "--rerun-json":
                 case "--rerun-kind":
                 case "--timeout":
+                case "--memory-limit-mb":
                 case "--shard-count":
                 case "--shard-index":
                     Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
@@ -227,6 +247,12 @@ public class Program
             return 1;
         }
 
+        if (!TryResolveRunTestMemoryLimit(memoryLimitMegabytes, out var runTestMemoryLimitBytes, out var memoryLimitError))
+        {
+            Console.Error.WriteLine(memoryLimitError);
+            return 1;
+        }
+
         if (shardIndex != WptTestRunner.AllShards && shardIndex >= shardCount)
         {
             Console.Error.WriteLine($"Error: '--shard-index' ({shardIndex}) must be less than '--shard-count' ({shardCount}).");
@@ -242,6 +268,11 @@ public class Program
             useWorkerIsolation
                 ? "Isolation     : worker process (timed-out tests are killed)"
                 : "Isolation     : in-process");
+        Console.WriteLine(
+            runTestMemoryLimitBytes > 0
+                ? $"Memory limit  : {WptMemoryGuard.FormatMebibytes(runTestMemoryLimitBytes)} of growth per test" +
+                  (useWorkerIsolation ? " (worker recycled once it reaches the cap)" : "")
+                : "Memory limit  : disabled");
         if (!string.IsNullOrWhiteSpace(subset))
             Console.WriteLine($"Subset        : {subset}");
         if (shardIndex != WptTestRunner.AllShards)
@@ -321,7 +352,7 @@ public class Program
             "SIGINT",
             terminationDiagnostics.Write);
         using var workerClient = useWorkerIsolation
-            ? new WptWorkerClient(wptPath, referenceDir, failureImagesDir, verifyReference)
+            ? new WptWorkerClient(wptPath, referenceDir, failureImagesDir, verifyReference, runTestMemoryLimitBytes)
             : null;
         int completed = 0, runningPassed = 0, runningFailed = 0, runningSkipped = 0;
 
@@ -343,7 +374,8 @@ public class Program
                     referenceDir,
                     wptPath,
                     runTestTimeout,
-                    runProgress.SetWorkerThreadId);
+                    runProgress.SetWorkerThreadId,
+                    runTestMemoryLimitBytes);
             allResults.Add(result);
             completed++;
 
@@ -583,6 +615,22 @@ public class Program
         {
             return workerClient.RunTest(testPath, timeout, workerProcessStarted);
         }
+        catch (WptMemoryLimitExceededException limitExceeded)
+        {
+            // Killing the worker is what actually aborts the runaway render — the worker
+            // is mid-test and will not answer again. The next test starts a fresh one.
+            var workerProcessId = workerClient.CurrentProcessId;
+            workerClient.KillCurrentWorker();
+
+            var memoryLimitResult = CreateMemoryLimitResult(
+                testPath,
+                limitExceeded,
+                workerThreadId: -1,
+                workerProcessId);
+            Console.Error.WriteLine($"[MEMORY] {memoryLimitResult.Message}");
+            Console.Error.WriteLine(memoryLimitResult.StackTrace);
+            return memoryLimitResult;
+        }
         catch (TimeoutException)
         {
             var workerProcessId = workerClient.CurrentProcessId;
@@ -617,7 +665,8 @@ public class Program
         string referenceDir,
         string? wptPath,
         TimeSpan timeout,
-        Action<int>? workerThreadStarted = null)
+        Action<int>? workerThreadStarted = null,
+        long memoryLimitBytes = 0)
     {
         int workerThreadId = -1;
         var runTestTask = Task.Run(() =>
@@ -627,17 +676,35 @@ public class Program
             return RunTestExecutor(runner, testPath, referenceDir, wptPath);
         });
 
+        // In-process there is no worker to recycle, so an aborted test's thread keeps
+        // running and its memory stays charged to the harness. Measuring growth keeps
+        // that from being billed to every test that follows.
+        var memoryGuard = new WptMemoryGuard(
+            memoryLimitBytes,
+            WptMemoryGuard.CreateCurrentProcessSampler());
+
+        // Abandoned tasks can still fault later; observe their Exception so the process
+        // does not surface an unrelated unobserved-task crash.
+        void ObserveLaterFaults() => _ = runTestTask.ContinueWith(
+            static t => _ = t.Exception,
+            TaskContinuationOptions.OnlyOnFaulted);
+
         try
         {
-            return runTestTask.WaitAsync(timeout).GetAwaiter().GetResult();
+            return memoryGuard.Wait(runTestTask, timeout);
+        }
+        catch (WptMemoryLimitExceededException limitExceeded)
+        {
+            ObserveLaterFaults();
+
+            var memoryLimitResult = CreateMemoryLimitResult(testPath, limitExceeded, workerThreadId);
+            Console.Error.WriteLine($"[MEMORY] {memoryLimitResult.Message}");
+            Console.Error.WriteLine(memoryLimitResult.StackTrace);
+            return memoryLimitResult;
         }
         catch (TimeoutException)
         {
-            _ = runTestTask.ContinueWith(
-                // Timed-out tasks can still fault later; observe their Exception
-                // so the process does not surface an unrelated unobserved-task crash.
-                static t => _ = t.Exception,
-                TaskContinuationOptions.OnlyOnFaulted);
+            ObserveLaterFaults();
 
             var timeoutResult = CreateTimeoutResult(testPath, timeout, workerThreadId);
             Console.Error.WriteLine($"[TIMEOUT] {timeoutResult.Message}");
@@ -652,6 +719,7 @@ public class Program
         private readonly string _referenceDir;
         private readonly string? _failureImagesDir;
         private readonly bool _verifyReference;
+        private readonly long _memoryLimitBytes;
         private Process? _process;
         private Task<string?>? _pendingResponse;
 
@@ -659,12 +727,14 @@ public class Program
             string wptPath,
             string referenceDir,
             string? failureImagesDir,
-            bool verifyReference)
+            bool verifyReference,
+            long memoryLimitBytes = 0)
         {
             _wptPath = wptPath;
             _referenceDir = referenceDir;
             _failureImagesDir = failureImagesDir;
             _verifyReference = verifyReference;
+            _memoryLimitBytes = memoryLimitBytes;
         }
 
         internal int? CurrentProcessId
@@ -698,7 +768,13 @@ public class Program
             string? responseLine;
             try
             {
-                responseLine = _pendingResponse.WaitAsync(timeout).GetAwaiter().GetResult();
+                // The worker renders exactly one test at a time, so everything its resident
+                // set gains while this response is outstanding was allocated by this test.
+                var memoryGuard = new WptMemoryGuard(
+                    _memoryLimitBytes,
+                    WptMemoryGuard.CreateProcessSampler(process));
+                responseLine = memoryGuard.Wait(_pendingResponse, timeout);
+                RecycleIfOverMemoryLimit(process, testPath);
             }
             finally
             {
@@ -736,6 +812,46 @@ public class Program
                 Message = "Worker returned no test result.",
                 Category = FailureCategory.Unknown,
             };
+        }
+
+        /// <summary>
+        /// Restarts the worker between tests once its resident set has reached the cap.
+        /// The per-test guard only bounds what one test adds, so without this the worker
+        /// would drift upwards across a shard — a measured css run leaves it at ~860 MiB
+        /// after 147 tests — until the machine, not the runner, decided the matter.
+        /// Recycling here costs one worker startup and blames no test for memory that
+        /// accumulated across many.
+        /// </summary>
+        private void RecycleIfOverMemoryLimit(Process process, string testPath)
+        {
+            if (_memoryLimitBytes <= 0)
+                return;
+
+            long residentBytes;
+            try
+            {
+                if (process.HasExited)
+                    return;
+
+                process.Refresh();
+                residentBytes = process.WorkingSet64;
+            }
+            catch (Exception ex) when (
+                ex is InvalidOperationException ||
+                ex is NotSupportedException ||
+                ex is PlatformNotSupportedException ||
+                ex is System.ComponentModel.Win32Exception)
+            {
+                return;
+            }
+
+            if (residentBytes < _memoryLimitBytes)
+                return;
+
+            Console.Error.WriteLine(
+                $"[MEMORY] Recycling WPT worker: resident set {WptMemoryGuard.FormatMebibytes(residentBytes)} " +
+                $"reached the {WptMemoryGuard.FormatMebibytes(_memoryLimitBytes)} cap after {testPath}");
+            KillCurrentWorker();
         }
 
         internal void KillCurrentWorker()
@@ -948,6 +1064,48 @@ public class Program
                timeoutSeconds > 0;
     }
 
+    /// <summary>
+    /// Resolves the per-test RAM cap in bytes from (in order) the command line, the
+    /// <c>BROILER_WPT_MEMORY_LIMIT_MB</c> environment variable, and the default. A
+    /// resolved value of 0 disables the guard.
+    /// </summary>
+    internal static bool TryResolveRunTestMemoryLimit(
+        int? cliMemoryLimitMegabytes,
+        out long memoryLimitBytes,
+        out string? error)
+    {
+        memoryLimitBytes = 0;
+        error = null;
+
+        if (cliMemoryLimitMegabytes.HasValue)
+        {
+            memoryLimitBytes = cliMemoryLimitMegabytes.Value * WptMemoryGuard.BytesPerMebibyte;
+            return true;
+        }
+
+        var envMemoryLimit = Environment.GetEnvironmentVariable(RunTestMemoryLimitEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(envMemoryLimit))
+        {
+            if (!TryParseMemoryLimitMegabytes(envMemoryLimit, out var parsedEnvMemoryLimitMegabytes))
+            {
+                error = $"Error: '{RunTestMemoryLimitEnvironmentVariable}' must be a non-negative integer (0 disables the cap).";
+                return false;
+            }
+
+            memoryLimitBytes = parsedEnvMemoryLimitMegabytes * WptMemoryGuard.BytesPerMebibyte;
+            return true;
+        }
+
+        memoryLimitBytes = DefaultRunTestMemoryLimitMegabytes * WptMemoryGuard.BytesPerMebibyte;
+        return true;
+    }
+
+    private static bool TryParseMemoryLimitMegabytes(string value, out int memoryLimitMegabytes)
+    {
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out memoryLimitMegabytes) &&
+               memoryLimitMegabytes >= 0;
+    }
+
     private static bool TryParseRerunSelectionKind(string value, out RerunSelectionKind selectionKind)
     {
         selectionKind = RerunSelectionKind.Failures;
@@ -1078,6 +1236,49 @@ public class Program
             Passed = false,
             Message = message,
             Category = FailureCategory.Timeout,
+            StackTrace = stackTrace,
+        };
+    }
+
+    /// <summary>
+    /// Builds the failure result for a test aborted by <see cref="WptMemoryGuard"/>. The
+    /// message reports the footprint the test started from as well as the one it reached,
+    /// so triage can tell a test that allocated a gigabyte outright from one that did so
+    /// on top of an already-large worker.
+    /// </summary>
+    private static WptTestResult CreateMemoryLimitResult(
+        string testPath,
+        WptMemoryLimitExceededException limitExceeded,
+        int workerThreadId,
+        int? workerProcessId = null)
+    {
+        var message =
+            $"Test aborted after exceeding the {WptMemoryGuard.FormatMebibytes(limitExceeded.LimitBytes)} " +
+            $"per-test memory limit ({limitExceeded.Describe()}): {testPath}";
+        var invocationStackTrace = new StackTrace(skipFrames: 2, fNeedFileInfo: true).ToString();
+        var stackTrace = new StringBuilder()
+            .AppendLine("=== Memory limit diagnostics ===")
+            .AppendLine(message)
+            .AppendLine($"Limit: {WptMemoryGuard.FormatMebibytes(limitExceeded.LimitBytes)} of growth per test")
+            .AppendLine($"Baseline: {WptMemoryGuard.FormatMebibytes(limitExceeded.BaselineBytes)}")
+            .AppendLine($"Peak: {WptMemoryGuard.FormatMebibytes(limitExceeded.ObservedBytes)}")
+            .AppendLine($"Growth: {WptMemoryGuard.FormatMebibytes(limitExceeded.GrowthBytes)}")
+            .AppendLine($"Worker thread id: {(workerThreadId >= 0 ? workerThreadId : "unknown")}")
+            .AppendLine($"Worker process id: {(workerProcessId.HasValue ? workerProcessId.Value : "unknown")}")
+            .AppendLine()
+            .AppendLine("RunTest invocation stack:")
+            .AppendLine(invocationStackTrace)
+            .AppendLine()
+            .AppendLine("Memory limit detection stack:")
+            .AppendLine(Environment.StackTrace)
+            .ToString();
+
+        return new WptTestResult
+        {
+            TestPath = testPath,
+            Passed = false,
+            Message = message,
+            Category = FailureCategory.MemoryLimitExceeded,
             StackTrace = stackTrace,
         };
     }
@@ -2286,6 +2487,11 @@ public class Program
         Console.WriteLine("                             css-anchor-position scroll cluster. Env: BROILER_WPT_DEFER_PROMISE_TESTS=1");
         Console.WriteLine("  --timeout <SECS>           Per-test timeout in seconds (default: 30, env:");
         Console.WriteLine($"                             {RunTestTimeoutEnvironmentVariable})");
+        Console.WriteLine("  --memory-limit-mb <MB>     Per-test RAM cap in MiB, measured as growth of the rendering");
+        Console.WriteLine("                             process's resident set; a test that passes it is aborted and");
+        Console.WriteLine($"                             reported as {FailureCategory.MemoryLimitExceeded}. A worker whose own resident");
+        Console.WriteLine("                             set reaches the cap is recycled between tests. 0 disables");
+        Console.WriteLine($"                             (default: {DefaultRunTestMemoryLimitMegabytes}, env: {RunTestMemoryLimitEnvironmentVariable})");
         Console.WriteLine("  --no-worker-isolation      Run tests in-process instead of the default worker process");
         Console.WriteLine("                             isolation. Useful for debugger sessions only.");
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");
