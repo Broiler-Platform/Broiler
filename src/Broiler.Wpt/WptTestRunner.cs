@@ -671,10 +671,20 @@ internal sealed partial class WptTestRunner
       __broilerEnsureAnimate(upgraded);
 
       if (sourceElement && upgraded !== sourceElement) {
-        if (sourceElement.attributes) {
+        // Prefer getAttributeNames(): the bridge's `attributes` reports a length but does not
+        // answer to numeric indexing, so the obvious loop read `undefined.name` and threw out of
+        // customElements.define — taking the whole page's script with it.
+        if (typeof sourceElement.getAttributeNames === 'function') {
+          var names = sourceElement.getAttributeNames();
+          for (var n = 0; n < names.length; n++) {
+            upgraded.setAttribute(names[n], sourceElement.getAttribute(names[n]));
+          }
+        } else if (sourceElement.attributes) {
           for (var i = 0; i < sourceElement.attributes.length; i++) {
             var attr = sourceElement.attributes[i];
-            upgraded.setAttribute(attr.name, attr.value);
+            if (attr && attr.name) {
+              upgraded.setAttribute(attr.name, attr.value);
+            }
           }
         }
 
@@ -688,6 +698,22 @@ internal sealed partial class WptTestRunner
 
         if (sourceElement.id && window[sourceElement.id] === sourceElement) {
           window[sourceElement.id] = upgraded;
+        }
+      }
+
+      // `new ctor()` yields a native element (the HTMLElement base hands back a real one), and it
+      // does not carry the class's prototype, so its reaction callbacks are not reachable on it.
+      // Copy them across so `element.connectedCallback()` runs the component's own code with
+      // `this` bound to the element — which is what it expects.
+      if (ctor && ctor.prototype) {
+        var __reactions = ['connectedCallback', 'disconnectedCallback',
+                           'attributeChangedCallback', 'adoptedCallback'];
+        for (var __r = 0; __r < __reactions.length; __r++) {
+          var __reaction = __reactions[__r];
+          if (typeof upgraded[__reaction] !== 'function' &&
+              typeof ctor.prototype[__reaction] === 'function') {
+            upgraded[__reaction] = ctor.prototype[__reaction];
+          }
         }
       }
 
@@ -716,7 +742,21 @@ internal sealed partial class WptTestRunner
 
         var existing = document.querySelectorAll(tagName);
         for (var i = 0; i < existing.length; i++) {
-          __broilerUpgradeElement(tagName, ctor, existing[i]);
+          var upgraded = __broilerUpgradeElement(tagName, ctor, existing[i]);
+          // Upgrading an element that is already in the document runs its connectedCallback:
+          // the custom-elements spec enqueues the upgrade reaction and then, because the
+          // element is connected, the connected reaction. That callback is where a component
+          // builds its shadow root, so skipping it left every such element empty — which is
+          // what made the four <x-menu> hosts of WPT
+          // shadow-dom/focus-navigation/delegatesFocus-highlight-sibling.html render nothing.
+          // Elements created later via document.createElement are not connected yet and are
+          // deliberately not called here.
+          if (upgraded && typeof upgraded.connectedCallback === 'function') {
+            try {
+              upgraded.connectedCallback();
+            } catch (e) {
+            }
+          }
         }
       },
       get: function(name) {
@@ -726,6 +766,25 @@ internal sealed partial class WptTestRunner
         return Promise.resolve(__broilerCustomElementRegistry[String(name || '').toLowerCase()]);
       }
     };
+  }
+
+  // Expose the DOM globals a page reaches for by bare name. The bridge registers these on
+  // `window`, but a bare identifier does not resolve through it the way it does in a browser
+  // (where window *is* the global object), so `class extends HTMLElement` threw
+  // 'HTMLElement is not defined' and `customElements.define(...)` threw before any component
+  // could build itself. Assigned without `var` so they land in the global scope rather than in
+  // this IIFE. Each is aliased only when the bare name is genuinely missing, so a real
+  // implementation always wins.
+  var __broilerGlobalAliases = ['HTMLElement', 'Element', 'customElements', 'ShadowRoot',
+                                'DocumentFragment', 'HTMLTemplateElement'];
+  for (var __a = 0; __a < __broilerGlobalAliases.length; __a++) {
+    var __name = __broilerGlobalAliases[__a];
+    try {
+      if (typeof globalThis[__name] === 'undefined' && typeof window[__name] !== 'undefined') {
+        globalThis[__name] = window[__name];
+      }
+    } catch (e) {
+    }
   }
 })();
 ";

@@ -506,16 +506,39 @@ Four caveats, all learned the hard way:
 - **This is not specific to problem 29.** Any component that keeps its styles in
   a template — the ordinary way to write one — has been leaking them into the
   page, so the blast radius is wider than one test.
-- **What is left is a different gap:** the remaining 1.8% is the shadow content
-  itself. A shadow root attached from a **custom element's**
-  `connectedCallback` does not render its content, so the test's four `<x-menu>`
-  hosts and their `<li>` items are missing; a shadow root populated by
-  `innerHTML` on a plain element does render, which is what isolates the
-  custom-element path. That, not focus, is what stands between 98.2% and the 99%
-  pass threshold.
-- **Exit gate:** a custom element's shadow content renders, and only then the
-  focus question — a focused test for `delegatesFocus` moving focus to the first
-  focusable shadow descendant.
+- **What is left is a different gap: custom elements.** The remaining 1.8% is the
+  shadow content, and chasing it uncovered that the runner's `customElements`
+  shim never worked at all. Four things were wrong, three now fixed in the main
+  repo (so they are on CI immediately):
+  1. **The DOM globals were unreachable by bare name.** The bridge registers
+     `HTMLElement` and the shim registers `customElements` on `window`, but a bare
+     identifier does not resolve through `window` the way it does in a browser, so
+     `class extends HTMLElement` threw *"HTMLElement is not defined"* and
+     `customElements.define(...)` threw before any component could build itself.
+     Both are now aliased into the global scope when — and only when — the bare
+     name is missing.
+  2. **The upgrade threw on any element with attributes.** It read
+     `element.attributes[i].name`, but the bridge's `attributes` reports a length
+     without answering to numeric indexing, so the read hit `undefined` and took
+     the page's whole script with it. It uses `getAttributeNames()` now.
+  3. **`connectedCallback` was never called.** The shim constructed and replaced
+     the element but ran no reaction, and the upgraded element did not carry its
+     class's prototype either. The reactions are copied onto the element and the
+     connected one is invoked for elements already in the document — which is
+     where a component builds its shadow root.
+  4. **Still open — `template.content` and `document.importNode` do not exist.**
+     `t.content` is `undefined` and `importNode` is not a function, so the
+     `importNode(template.content, true)` idiom every one of these components uses
+     yields nothing. That is the last thing between this test and its reference,
+     and it is a real DOM gap in HtmlBridge rather than a harness one.
+- **A note on where these live.** Items 1–3 are in the runner's browser-API shim,
+  which exists only because the bridge implements no custom elements. That is the
+  honest fix for a harness bug — the component's own code runs and builds a real
+  shadow root — but the durable answer is `customElements` in HtmlBridge proper.
+- **Exit gate:** `template.content` and `document.importNode` exist, a custom
+  element's shadow content renders, and only then the focus question — a focused
+  test for `delegatesFocus` moving focus to the first focusable shadow
+  descendant.
 
 ## Items that need the WPT server before they can be judged
 
