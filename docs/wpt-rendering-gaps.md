@@ -541,13 +541,17 @@ Four caveats, all learned the hard way:
   four fixes it reads **90.5%**, against 98.2% for the template patch alone.
   Nothing regressed: the shadow content simply renders now, and it renders at the
   wrong size, where before it was absent. Ours is 7.8% `#aaa` against the
-  reference's 0.1%. The cause is measured, not guessed — a host's box grows with
-  the length of its shadow `<style>`'s CSS text: 125×327 with the test's full
-  style, 468×95 with a shorter one, 1008×19 with none, where Chromium's is one
-  line tall. A `<style>` inside an ordinary rendered `<div>` correctly does not
-  lay out (120×19), so this is specific to the style the shadow projection inlines
-  into the host. That is a pre-existing projection bug these fixes merely exposed,
-  and it is the next thread to pull.
+  reference's 0.1%. What is measured: a host containing one `<li>Item One</li>`
+  boxes at 125×327 with the test's two-rule shadow style, 468×95 with one rule,
+  and 1008×19 with no style at all, where Chromium's is one line tall.
+  **The cause is not yet identified.** The obvious reading — that the inlined
+  CSS text is laying out — is *wrong*, and worth recording so nobody re-derives
+  it: a shadow style whose whole body is a long comment leaves the host at
+  1008×19, and a `<style>` inside an ordinary rendered `<div>` does not lay out
+  either (120×19). So the size tracks which *rules* the shadow stylesheet
+  carries, not how much text it holds. This is a pre-existing shadow-projection
+  bug that these fixes merely exposed — nothing rendered before, so nothing could
+  be the wrong size — and it is the next thread to pull.
 - **A note on where these live.** Items 1–3 are in the runner's browser-API shim,
   which exists only because the bridge implements no custom elements. That is the
   honest fix for a harness bug — the component's own code runs and builds a real
