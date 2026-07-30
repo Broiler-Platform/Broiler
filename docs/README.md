@@ -10,6 +10,7 @@ conformance, and implementation work belongs with that component.
 | Document | Purpose |
 | --- | --- |
 | [Root roadmap](ROADMAP.md) | The unfinished cross-repository work and its exit gates |
+| [WPT rendering gaps](wpt-rendering-gaps.md) | The worst-scoring WPT pixel mismatches, the capability each one is missing, and its owning component |
 | [HtmlBridge architecture](architecture/htmlbridge.md) | Current bridge assemblies, ownership boundaries, and public seams |
 | [Browser WebAssembly architecture](architecture/browser-webassembly.md) | Current browser-host, rendering, input, and support decisions |
 
