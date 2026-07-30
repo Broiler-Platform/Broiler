@@ -1327,6 +1327,23 @@ internal static class CssLayoutEngine
         else
         {
             ibHeight = Math.Max(0, b.ActualBottom - b.Location.Y);
+
+            // CSS 2.1 §10.6.3 with §10.8: an auto-height inline-block holding a single line of
+            // text is as tall as that line box, and a line box's height comes from `line-height`.
+            // Glyphs taller than it *overflow* the line box rather than growing it. The content
+            // height measured above is driven by the glyphs, so without this an inline-block
+            // ignored line-height entirely — `line-height: 10px` around a 32px font measured 39px
+            // where every browser gives 10, and the ordinary 16px case came out 22px against 18.
+            // Only the single-line, text-only case is clamped: an atomic inline-level child
+            // (inline-block, image, inline-table) contributes its own margin box to the line and
+            // legitimately makes it taller, and a multi-line box is the sum of its lines.
+            if (b.LineBoxes.Count == 1 && b.ActualLineHeight > 0 && !LineHoldsAtomicInlineContent(b))
+            {
+                double lineBoxHeight = b.ActualLineHeight
+                    + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
+                    + b.ActualPaddingTop + b.ActualPaddingBottom;
+                ibHeight = Math.Min(ibHeight, lineBoxHeight);
+            }
         }
 
         // CSS 2.1 §10.7: Apply min-height constraint for inline-blocks.
@@ -1806,6 +1823,33 @@ internal static class CssLayoutEngine
     /// clamped.  Replaced inline content (images) and runs with no positive
     /// line-height keep contributing their full box.
     /// </summary>
+    /// <summary>
+    /// Whether an inline-block's line holds anything that is not plain text — an image or an
+    /// atomic inline-level box. Such a child contributes its own margin box to the line box and so
+    /// may legitimately make it taller than <c>line-height</c>, which plain glyphs may not.
+    /// </summary>
+    private static bool LineHoldsAtomicInlineContent(CssBox box)
+    {
+        foreach (CssRect word in box.Words)
+        {
+            if (word.IsImage)
+                return true;
+        }
+
+        foreach (CssBox child in box.Boxes)
+        {
+            if (child.Display is CssConstants.InlineBlock or CssConstants.InlineTable
+                or "inline-flex" or "inline-grid"
+                || child.Float != CssConstants.None)
+                return true;
+
+            if (LineHoldsAtomicInlineContent(child))
+                return true;
+        }
+
+        return false;
+    }
+
     private static double InlineWordLineBoxBottom(CssRect word)
     {
         double ownerLineHeight = word.OwnerBox?.ActualLineHeight ?? 0;

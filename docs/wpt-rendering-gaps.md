@@ -591,14 +591,28 @@ Four caveats, all learned the hard way:
   </style>
   <div class="row"><span>Item One</span> <span>Item Two</span> <span>Item Three</span></div>
   ```
-- **What is left is not wrapping any more.** The menu rows render 76px tall
-  against Chromium's 54px, where they were 133px. The items no longer wrap; they
-  are simply ~25px tall where Chromium's are ~18px, which is line-height and font
-  metrics — a different class of problem from the three fixed here, and one that
-  will move many tests at once when it is addressed.
-- **Exit gate:** inline-block line height matches the reference (ours ~25px against
-  ~18px), and only then the focus question — a focused test for `delegatesFocus`
-  moving focus to the first focusable shadow descendant.
+- **A fourth general bug fixed: an auto-height inline-block ignored
+  `line-height`.** Its height came from the glyphs, so `line-height: 10px` around
+  a 32px font measured **39px** where every browser gives 10, and the ordinary
+  16px case measured 22px against Chromium's 18. A *block* with the same content
+  already honoured `line-height`, so the two paths disagreed with each other as
+  well as with the reference. An auto-height inline-block holding a single line is
+  now clamped to its line box (CSS 2.1 §10.6.3 with §10.8 — glyphs taller than the
+  line box overflow it rather than growing it). A line holding an atomic
+  inline-level child is deliberately left alone: that child contributes its own
+  margin box and may legitimately make the line taller.
+- **It does not move problem 29, which is worth saying plainly.** The test stays
+  at **97.8%**: its rows nest inline-blocks inside inline-blocks, and the outer
+  host is exactly the case the clamp excludes. Its rows are still 76px against
+  Chromium's 54px. So the last of this test's gap remains open, and the fix above
+  stands on its own correctness rather than on this test.
+- **One known residual in `normal`:** `GetNormalLineHeight` is
+  `ceil(font.Height)`, which yields 19px at 16px where Chromium uses 18. Both our
+  block and our inline-block now agree at 19, so this is a single consistent
+  off-by-one in the UA's `normal` rather than a divergence between paths.
+- **Exit gate:** a line box holding nested inline-blocks sizes to the reference
+  (the rows are 76px against 54px), and only then the focus question — a focused
+  test for `delegatesFocus` moving focus to the first focusable shadow descendant.
 
 ## Items that need the WPT server before they can be judged
 
