@@ -17,10 +17,11 @@
   is left for CI to confirm. Patches `0035`–`0039` — which carried the submodule
   half of 6, 27, 28 and 30 — **have since been applied and their pointers
   bumped**, so all of those are now live on CI rather than pending. The one fix
-  still waiting on a maintainer is problems 7–10's:
-  [`patches/0040`](../patches/README.md), whose remote this session cannot push to
-  (403, as documented in `CLAUDE.md`). It has no main-repo fallback, so those four
-  tests stay at 0.0% on CI until it lands.
+  still waiting on a maintainer are problems 7–10's
+  [`patches/0040`](../patches/README.md) and problem 29's `patches/0041`, whose
+  remote this session cannot push to (403, as documented in `CLAUDE.md`). Neither
+  has a main-repo fallback, so those tests stay at their old numbers on CI until
+  the patches land.
 - **Four of these tests should not be "fixed".** Problems 14, 15 and 24 pass only
   by rendering *less* than Broiler already does — their Chromium reference was
   produced by an engine that does not implement the feature under test, so the
@@ -470,20 +471,51 @@ Four caveats, all learned the hard way:
   tests were re-run against it unchanged, which is the evidence that the
   delegation preserved the binding's observable behaviour.
 
-## Shadow-DOM focus delegation paints the wrong surface
+## A `<template>`'s styles leaked into the page — **fixed, pending patch**
 
 - **Test:** problem 29, `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling.html`.
-- **Owner:** HtmlBridge (shadow tree + focus) with Broiler.HTML for control
-  chrome.
-- **Current evidence:** Broiler's canvas is 99% `#cccccc` — one flat grey area —
-  where Chromium's is 98% white with form-control chrome and a focus highlight.
-  The rendered surface, not just the highlight, is wrong, so this is more than a
-  missing focus ring.
-- **Next action:** establish what Broiler is painting grey (a slotted host box, or
-  a UA widget fallback) before touching focus delegation itself; the highlight is
-  the test's subject but not its current failure.
-- **Exit gate:** the test matches, with a focused test for `delegatesFocus`
-  moving focus to the first focusable shadow descendant.
+- **Owner:** Broiler.HTML (the stylesheet walk), then HtmlBridge for what is left.
+- **It was never about focus.** The old next action here was "establish what
+  Broiler is painting grey before touching focus delegation", and that was the
+  right instinct: the answer had nothing to do with focus, delegation, or control
+  chrome. A `<style>` inside a `<template>` was being collected into the
+  **document** cascade. HTML §4.12.3 keeps a template's children in a separate
+  fragment as *template contents* — inert until stamped out. The test keeps its
+  component styles in a template, as components normally do, so
+  `:host { background-color: #aaa }` and `:host(:focus) { background-color: #ccc }`
+  leaked into the page, matched it, and painted 99% of the canvas `#ccc`.
+- **How it was narrowed,** since the signature pointed the wrong way. Bisecting
+  the three ways to get a style into a shadow root separates the causes cleanly:
+  a plain host populated by `innerHTML` renders correctly (2.8% `#aaa`); the same
+  rules delivered by `<template>` + `importNode` fill the viewport (99.7%); and a
+  custom element populated by `innerHTML` renders nothing. Removing the
+  `:host(:focus)` rule still filled the viewport, which ruled the focus rule out.
+  The serialized DOM then settled it: the shadow root was **empty** while the page
+  rendered grey, so the style could only be coming from the template. A
+  three-line document-level case confirms it with no shadow DOM at all — a
+  `.probe` rule inside a template repaints a `div` outside it.
+- **What landed:** `patches/0041-…` stops `DomParser.CascadeParseStyles` at a
+  `<template>` box. Narrow by design — template *contents* already produce no
+  boxes and correctly do not render; only the stylesheet walk descended into
+  them.
+- **Verified:** the test goes from **0.0% to 98.2%**. Four regression tests cover
+  the leak, its nested form, the negative half (a sheet *next to* a template must
+  still apply), and that template contents do not render. They probe the pinned
+  submodule and skip when the patch is unapplied, so they become live guards the
+  moment it lands.
+- **This is not specific to problem 29.** Any component that keeps its styles in
+  a template — the ordinary way to write one — has been leaking them into the
+  page, so the blast radius is wider than one test.
+- **What is left is a different gap:** the remaining 1.8% is the shadow content
+  itself. A shadow root attached from a **custom element's**
+  `connectedCallback` does not render its content, so the test's four `<x-menu>`
+  hosts and their `<li>` items are missing; a shadow root populated by
+  `innerHTML` on a plain element does render, which is what isolates the
+  custom-element path. That, not focus, is what stands between 98.2% and the 99%
+  pass threshold.
+- **Exit gate:** a custom element's shadow content renders, and only then the
+  focus question — a focused test for `delegatesFocus` moving focus to the first
+  focusable shadow descendant.
 
 ## Items that need the WPT server before they can be judged
 
@@ -569,5 +601,5 @@ feature they test — closing those means rendering less, not more.
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
 | 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — patch 0038 applied; bridge now delegates to it |
 | 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** — patch 0036 applied |
-| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc`, Chromium white + chrome | open |
+| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 98.2%**, **pending patch 0041**; last 1.8% is custom-element shadow content |
 | 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** — patches 0036/0037 applied |
