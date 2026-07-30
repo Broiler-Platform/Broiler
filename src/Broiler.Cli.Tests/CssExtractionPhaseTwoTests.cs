@@ -103,11 +103,13 @@ public sealed class CssExtractionPhaseTwoTests
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Broiler.slnx")))
+            if (File.Exists(Path.Combine(directory.FullName, ".gitmodules")) &&
+                File.Exists(Path.Combine(directory.FullName, "Directory.Build.props")))
                 return directory.FullName;
             directory = directory.Parent;
         }
 
-        throw new DirectoryNotFoundException("Could not locate Broiler.slnx.");
+        throw new DirectoryNotFoundException(
+            "Could not locate repository root containing .gitmodules and Directory.Build.props.");
     }
 }

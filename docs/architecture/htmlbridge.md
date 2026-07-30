@@ -2,7 +2,7 @@
 
 - **Boundary:** `htmlbridge-public-surface/v2`
 - **Status:** Current aggregate-repository architecture
-- **Last reconciled:** 2026-07-24
+- **Last reconciled:** 2026-07-29
 
 HtmlBridge connects the Broiler JavaScript engine to the canonical DOM, CSS,
 HTML, and layout components. It owns JavaScript-facing browser behavior and host
@@ -40,9 +40,9 @@ single web-platform feature.
 | Concern | Canonical owner | HtmlBridge responsibility |
 | --- | --- | --- |
 | DOM nodes, mutation, traversal, ranges | `Broiler.Dom` | Preserve JavaScript wrapper identity, convert arguments/results, and dispatch browser-facing behavior |
-| HTML parsing and neutral serialization | `Broiler.Dom.Html` / `Broiler.HTML` | Apply host/runtime state and produce the renderer-facing projection |
+| HTML parsing and neutral serialization | `Broiler.Dom.Html` / `Broiler.HTML` | Supply neutral host/runtime inputs to the renderer; retire compatibility transforms through the root roadmap |
 | CSS syntax, selectors, cascade, computed values | `Broiler.CSS` / `Broiler.CSS.Dom` | Own CSSOM JavaScript objects, live identity, host-fetched stylesheet text, and invalidation orchestration |
-| Layout boxes and used geometry | `Broiler.Layout` through `ILayoutView` | Translate layout snapshots into CSSOM View, hit testing, scroll, sticky, and anchor APIs |
+| Layout boxes, used values, hit testing, scrolling, and positioning algorithms | `Broiler.Layout` through `ILayoutView` and its future snapshot/query extensions | Translate canonical results into JavaScript/CSSOM View objects, state changes, and events |
 | JavaScript language and modules | `Broiler.JS` | Supply browser globals, DOM bindings, module URL resolution, CSP/host policy, and page lifecycle ordering |
 | Raster/image/audio/video implementation | `Broiler.Graphics` / `Broiler.Media` / `Broiler.HTML` | Record Canvas API calls and route resources; do not duplicate codecs |
 | Networking, origins, frames, timers, messaging | HtmlBridge/host | Enforce host policy and expose browser-shaped JavaScript behavior |
@@ -79,8 +79,13 @@ under [`src/Broiler.Cli.Tests`](../../src/Broiler.Cli.Tests/).
    host-provided resolution context.
 4. `DomBridge` mutates a canonical `DomDocument`; JavaScript wrappers retain
    object identity without becoming a second DOM.
-5. Rendering builds a non-destructive renderer projection from the canonical
-   state. Geometry queries use the layout snapshot described below.
+5. Rendering imports the canonical tree into a fresh owner document, copies the
+   bridge runtime state needed for rendering, and applies compatibility
+   transforms only to that projection. Direct rendering, serialization, and
+   geometry snapshots therefore leave the script-visible document unchanged.
+   Promoting the private projection inputs into a neutral renderer contract
+   remains in Phase 0 of
+   [the component-rehoming roadmap](../ROADMAP.md#component-rehoming-roadmap).
 6. Session disposal tears down queued work, layout resources, bridge state, and
    the JavaScript context.
 
@@ -93,10 +98,12 @@ for `getBoundingClientRect`, `client*`, `offset*`, scrolling, hit testing, and
 check-layout assertions. Elements that produce no box return the defined empty
 geometry rather than reviving a parallel estimator.
 
-The concrete headless view is registered by an application/test composition
-root. The current static `LayoutViewFactory` is a temporary seam; replacing it
-with explicit session/composition injection is tracked in
-[the root roadmap](../ROADMAP.md#htmlbridge-runtime).
+The preferred concrete headless view is supplied per bridge through
+`DomBridgeSessionOptions`. This gives simultaneous documents independent layout
+configuration and deterministic view ownership. The static `LayoutViewFactory`
+remains only as a compatibility fallback for composition roots that have not
+migrated; removing that fallback and the native thread-static feature channels
+is tracked in [the root roadmap](../ROADMAP.md#htmlbridge-runtime).
 
 Geometry snapshots enable the layout engine's native CSS `zoom` used-value path.
 The direct serialization/capture path still retains a compatibility carry-through
@@ -124,7 +131,8 @@ driving them through fixed phase buckets. That work is tracked in
   independent of JavaScript identity and host policy.
 - Resource fetching remains host/bridge-owned; parsers and style engines consume
   supplied bytes or text.
-- Layout answers geometry; the bridge owns the JavaScript/CSSOM View projection.
+- Layout owns used geometry and layout-policy algorithms; the bridge owns the
+  JavaScript/CSSOM View projection, browser state changes, and event dispatch.
 - A bridge/document session owns and disposes all mutable runtime state.
 - WPT-only transforms stay explicit and cannot silently become the production
   semantics.

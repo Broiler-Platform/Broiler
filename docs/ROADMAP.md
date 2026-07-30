@@ -2,7 +2,7 @@
 
 - **Status:** Active preview
 - **Scope:** Only unfinished work that crosses component or application boundaries
-- **Last reconciled:** 2026-07-24
+- **Last reconciled:** 2026-07-29
 
 Component-local work is tracked in the roadmaps linked from
 [the documentation index](README.md). This file does not repeat completed
@@ -141,26 +141,96 @@ reproducible from CI artifacts.
 The current assembly and ownership boundaries are in
 [the HtmlBridge architecture](architecture/htmlbridge.md).
 
+### Component rehoming roadmap
+
+**Current evidence:** the 2026-07-12 promotion audit was correct for the source
+tree it examined, but it is no longer a complete description of HtmlBridge.
+Compared with the source tree at the 2026-07-24 documentation consolidation,
+55 bridge files have changed by 4,097 insertions and 1,225 deletions. The new
+concentrations include the 1,030-line
+[`DomBridge.ViewTransition.cs`](../src/Broiler.HtmlBridge.Dom/DomBridge.ViewTransition.cs),
+4,620 lines in
+[`AnchorResolver`](../src/Broiler.HtmlBridge.Dom/DomBridge/AnchorResolver/),
+and new animation, stylesheet-import, shadow-selector, transform, and scroll-snap
+implementations.
+
+Several of those paths now duplicate or work around canonical facilities:
+
+- `Broiler.Dom.Html` already owns fragment parsing and HTML-semantic tree queries.
+- `Broiler.CSS` exposes parsed `@import` metadata, while `Broiler.CSS.Dom` owns
+  stylesheet scope assembly and the canonical style engine.
+- `Broiler.Layout` already has native anchor, animation, zoom, and used-geometry
+  paths, but bridge fallbacks still calculate or bake parts of the same behavior.
+- [`GetRenderDocument`](../src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.cs)
+  now imports the canonical tree into an isolated renderer projection before
+  applying compatibility transforms and reflecting runtime state. The projection
+  is still a bridge-private mechanism rather than a neutral renderer contract.
+
+The second-wave rule is to move reusable models and algorithms, not entire
+bridge-shaped classes. JavaScript identity, callbacks, promises, events, browser
+policy, resource access, and session lifecycle remain in HtmlBridge.
+
+#### Target ownership
+
+The API names below are working names; the ownership and dependency direction
+are the contract.
+
+| Current bridge slice | Better canonical home | What remains in HtmlBridge |
+| --- | --- | --- |
+| Table, select, form, and fragment tree operations in `Features/*Binding.cs` and `HtmlFragmentMutation.cs` | `Broiler.Dom.Html`: stateless HTML element queries and mutations first, then a document-scoped companion for engine-neutral control dirty/default/selection rules; generic tree primitives remain in `Broiler.Dom` | IDL overloads and exceptions, JS collection identity, callbacks, and conversion to/from the canonical control state |
+| `#shadow-root` state, slot projection, and selector stamping | `Broiler.Dom`: a real `DomShadowRoot`, host link, slot assignment, and composed-tree traversal; `Broiler.CSS.Dom`: scoped matching for `:host`, `:host-context`, and `::slotted`; `Broiler.HTML.Dom`/orchestration: composed-tree rendering | `attachShadow()` wrappers, JS identity, mode policy, focus/event behavior, and lifecycle |
+| `StyleImports`, `StyleBaseHref`, constructed/adopted-sheet application, and bridge stylesheet assembly | `Broiler.CSS`: token-aware import and URL algorithms; `Broiler.CSS.Dom`: a document style set over parsed, adopted, imported, and scoped sheets; `Broiler.Dom.Html`: effective document-base and link/meta semantics | Fetching, CSP and origin policy, JS `CSSStyleSheet`/rule-list identity, and host-supplied source text |
+| Bridge animation rule lookup, selector matching, easing, and value interpolation | `Broiler.CSS`: typed keyframes and value interpolation; `Broiler.CSS.Dom`: cascade/rule selection; `Broiler.Layout`: used-value sampling and application | `Animation` objects, promises, timelines, callbacks, event dispatch, and document scheduling |
+| Transform, scroll-snap, anchor, sticky, hit-test, top-layer, and replaced-element fallback calculations | `Broiler.Layout`: an additive layout snapshot with visual geometry, clipping, scroll extents, snap/anchor results, and paint/hit-test order; `Broiler.HTML`: native replaced-element and top-layer painting | CSSOM View argument/result conversion, browser scroll state, events, dialog/popover state, and layout-session coordination |
+| View-transition CSS matching, snapshot geometry, synthetic pseudo-tree, and paint properties | `Broiler.CSS.Dom`: transition pseudo-style resolution; `Broiler.HTML`/`Broiler.Layout`: a neutral `ViewTransitionRenderPlan` and snapshot/overlay rendering | `startViewTransition()`, update callback/thenables, promises, transition lifecycle, and capture identity |
+| Serialization transforms and `HtmlPostProcessor` | Native `Broiler.HTML` rendering fed by a non-destructive render context; Acid/WPT-only cleanup belongs in `Broiler.Wpt` or test fixtures | Projection of genuinely live bridge state into neutral render inputs; no production regex cleanup |
+| Runtime and execution responsibilities in `Broiler.HtmlBridge.Core` | Runtime interfaces to `Broiler.HtmlBridge.Dom`; module execution plus execution DTOs/profiling to `Broiler.HtmlBridge.Scripting`; generic meta discovery to `Broiler.Dom.Html` | Host orchestration and public v2 forwarding facades until a major-version boundary |
+| Logging, URL/origin/CSP, and resource responsibilities in `Broiler.HtmlBridge.Core` | `RenderLogger` to `Broiler.Diagnostics`; injected web URL/origin/security/resource primitives to a small host-services component only after its dependency seam is proven | Security decisions, credentials/network policy, and browser API bindings |
+
+Canvas is deliberately not a current extraction candidate: its implementation is
+primarily JS-observable state and the draw calls are still no-ops. A future real
+display-list or raster contract belongs in `Broiler.Graphics`; moving the stub
+would only put bridge behavior in the wrong assembly.
+
+#### Phase 0 — trustworthy gates and a non-destructive seam
+
+**Owner:** HtmlBridge, `Broiler.HTML`, and `Broiler.Layout` integration.
+
+**Current evidence:** the stale runtime-state guard now recognizes the
+concern-specific per-session state tables, and the 750-line ratchet records
+`DomBridge.ViewTransition.cs` as its only current exemption;
+`DomBridge.Serialization.cs` is below the limit. Render preparation imports into
+an isolated owner document and
+[`RenderProjectionIsolationTests`](../src/Broiler.Cli.Tests/RenderProjectionIsolationTests.cs)
+pin live version, mutation-record, attribute, and child-tree invariants.
+`DomBridgeSessionOptions` allows simultaneous sessions to use different layout
+factories. Legacy hosts still register the process-static fallback, native zoom
+and anchor inputs remain thread-static, and the projection inputs are not yet a
+public neutral `Broiler.HTML` contract.
+
 **Next actions:**
 
-- Replace the remaining fixed script-phase buckets with one ordered task model
-  that can interleave deferred/module tasks, timers, animation frames, and
-  microtask checkpoints with explicit thread affinity.
-- Replace the temporary process-static layout-view factory with composition-root
-  or session injection so simultaneous hosts cannot overwrite configuration.
-- Enable the native CSS `zoom` used-value route at every layout consumer,
-  including the external renderer used by `CaptureService`, before deleting the
-  serialization carry-through.
-- Complete externally gated pinch-zoom and `::backdrop` browser/pixel corpus
-  evidence before retiring their compatibility levers.
-- Remove vestigial cutover flags only after their rollback and differential tests
-  have been replaced by permanent invariant tests.
+1. Migrate CLI, WPT, baseline, and test composition roots from the compatibility
+   `LayoutViewFactory` fallback to `DomBridgeSessionOptions`, then remove the
+   process-static fallback.
+2. Add a session-scoped neutral render input in `Broiler.HTML.Orchestration`
+   (for example, `RenderDocumentContext`) containing the canonical document,
+   base URI, resolved stylesheet sources, form values, nested documents, and
+   neutral shadow/top-layer/transition state; make the private projection produce
+   that contract.
+3. Replace the remaining thread-static native zoom, anchor, and visual-viewport
+   channels with immutable layout-request/session options.
+4. Record HTML, geometry, and pixel parity baselines for the projection cutover.
+   Do not add new one-shot serialization transforms.
 - Give the element JS wrapper a shared prototype instead of a per-instance
   surface. `DomBridge.ToJSObject` installs the whole element API — every
   reflector, method, `style`, `classList`, `dataset` — onto each wrapper object,
   so one script-created element costs **~550 KiB** of retained memory. Measured
   on this container (peak RSS of `Broiler.Wpt --render`, 107 MiB baseline):
 
+**Exit gate:** all repaired guards pass; two simultaneous sessions can use
+different renderer/layout configuration; a render pass is non-destructive; and
+old and new projection paths have recorded HTML, geometry, and pixel baselines.
   | Page | Peak RSS |
   | --- | --- |
   | 10 000 `<span>`s in the markup (no wrapper) | 223 MiB |
@@ -183,6 +253,213 @@ session dependencies are instance-scoped, native zoom/top-layer behavior is
 enabled for every supported consumer, a script-created element's wrapper costs a
 constant handful of bytes over its canonical node, and focused plus broad
 regression gates remain green.
+
+#### Phase 1 — pure promotions and quick deletions
+
+**Owner:** `Broiler.DOM`, `Broiler.CSS`, `Broiler.CSS.Dom`, HtmlBridge adapters,
+and the production/test hosts that call `HtmlPostProcessor`.
+
+**Current evidence:** `HtmlElementQueries.CollectTableRows` is already canonical
+while neighboring caption/section/row/cell operations remain in `TableBinding`;
+`HtmlDocumentParser.ParseFragment` is canonical while the bridge still owns the
+mutation orchestration; `CssomRuleMetadata.GetImport` is canonical while
+`StyleImports` scans CSS text again. Position-try collection and transform
+parsing also have multiple consumers or implementations.
+
+**Next actions:**
+
+1. Add tested `Broiler.Dom.Html` table algorithms, stateless select option/value
+   queries, fragment mutation operations, and generic document metadata queries.
+   Characterize and correct form validity/default-state behavior before
+   canonizing it.
+2. Add token-aware CSS import/URL traversal and a typed transform representation
+   to `Broiler.CSS`; add one DOM-aware position-try rule collector to
+   `Broiler.CSS.Dom`.
+3. Replace the bridge's limited animation selector matcher with the canonical
+   scoped style engine.
+4. Remove thin parser wrappers such as `HtmlTreeBuilding` after their callers use
+   canonical APIs.
+5. Prove native script and iframe-fallback rendering in Browser and Capture,
+   remove `ProcessForBrowsing`, and relocate or retire each Acid/WPT-only
+   transform instead of moving its regex into `Broiler.HTML`.
+
+**Exit gate:** each promoted API has owner-local unit tests and no JS/bridge/host
+dependency; every old caller delegates to it; duplicate parsing/tree logic is
+deleted; and production rendering no longer calls `HtmlPostProcessor`.
+
+#### Phase 2 — one document stylesheet authority
+
+**Owner:** `Broiler.CSS`, `Broiler.CSS.Dom`, `Broiler.Dom.Html`, and HtmlBridge
+CSSOM/resource adapters.
+
+**Current evidence:** `CssStyleScopeBuilder` already synchronizes ordered,
+media-filtered sources into `CssStyleEngine`, but the bridge separately expands
+imports, rebases URLs, applies CSSOM and adopted-sheet mutations, and builds
+render-time style text. The bridge's computed-style projection already delegates
+most cascade work to `CssStyleEngine` and should not grow into another engine.
+
+**Next actions:**
+
+1. Evolve the scope builder into a document style-set service over parsed author,
+   imported, constructed/adopted, and shadow-scoped sheets. Accept resolved text
+   or a narrow resource callback; never perform network or CSP policy in CSS.
+2. Put effective base-URL discovery in the HTML semantic layer and token-aware
+   CSS URL resolution in CSS, with the host supplying document/resource URLs.
+3. Close canonical computed-style gaps such as explicit `inherit` folding and UA
+   display defaults, then route CSSOM reads, layout consumers, and renderer
+   consumers to the appropriate canonical result.
+4. Keep JS stylesheet/rule wrappers as live bridge objects, but make their
+   mutations update the one canonical style set.
+
+**Exit gate:** one document style set supplies CSSOM reads, layout, and rendering;
+external I/O remains injected; and serialization no longer needs
+`ApplyCssomStyleSheetMutations`, `InlineStyleSheetImports`,
+`ApplyAdoptedStyleSheets`, or CSS URL/base rewrites.
+
+#### Phase 3 — canonical shadow and composed trees
+
+**Owner:** `Broiler.Dom`, `Broiler.CSS.Dom`, `Broiler.HTML.Dom`, Layout, and the
+HtmlBridge Shadow DOM adapter.
+
+**Current evidence:** shadow ownership is a bridge runtime table plus a synthetic
+`#shadow-root`; rendering deletes/hides light children, unwraps the sentinel, and
+rewrites selectors onto marker attributes. Promoting those workarounds would make
+them permanent.
+
+**Next actions:**
+
+1. Add dependency-free shadow-root/host relationships, slot assignment, and
+   composed-tree traversal to `Broiler.Dom`.
+2. Teach `Broiler.CSS.Dom` scoped rule provenance and shadow selectors against
+   that model.
+3. Make `Broiler.HTML.Dom` and Layout consume the composed tree while retaining
+   canonical node identity for geometry and events.
+4. Cut bridge wrappers over the canonical model, then delete selector stamping,
+   marker attributes, light-child hiding, and sentinel unwrapping.
+
+**Exit gate:** DOM, style, layout, rendering, hit testing, and event retargeting
+share one shadow/composed-tree model; no render pass structurally rewrites the
+document; and focused Shadow DOM plus broad WPT/pixel comparisons show no new
+regressions.
+
+#### Phase 4 — native layout and renderer cutover
+
+**Owner:** `Broiler.Layout`, `Broiler.HTML`, every `ILayoutView`/renderer consumer,
+and thin HtmlBridge CSSOM View adapters.
+
+**Current evidence:** native anchor and zoom routes exist, but
+`AnchorResolver`, `LayoutMetrics.Transform`, `LayoutMetrics.ScrollSnap`, zoom
+serialization, progress/meta/top-layer transforms, and compatibility flags still
+carry parallel behavior. A geometry-only dictionary is too narrow for consumers
+that then reconstruct used layout policy.
+
+**Next actions:**
+
+1. Add an additive `LayoutSnapshot` or sibling query contract with visual rects,
+   scroll extents, clipping, snap offsets, anchor/position-try results, used
+   values, and paint/hit-test order.
+2. Inventory each residual bridge fallback as a native-layout parity case. Extend
+   Layout rather than transplanting `AnchorResolver` or bridge CSS-length math.
+3. Make `Broiler.HTML` natively own meta color-scheme canvas policy, replaced
+   elements, composed-tree painting, top layer/backdrop, and every remaining
+   production render behavior.
+4. Cut over Browser, Capture, WPT, and baseline-engine consumers before deleting
+   bridge anchor, sticky, scroll-snap, transform, zoom, hit-test, and render-bake
+   fallbacks.
+
+**Exit gate:** every supported consumer uses the native path; CSSOM View is a thin
+projection over a shared layout snapshot; native zoom, anchor, sticky, snap,
+top-layer, and replaced-element behavior pass focused and broad gates; and the
+fallback switches and corresponding bridge implementations are deleted.
+
+#### Phase 5 — animation and view-transition split
+
+**Owner:** `Broiler.CSS`, `Broiler.CSS.Dom`, `Broiler.Layout`, `Broiler.HTML`, and
+HtmlBridge lifecycle adapters.
+
+**Current evidence:** CSS interpolation exists independently in bridge CSS
+animation resolution, Web Animations, and Layout. View-transition code combines
+JS promises and lifecycle with selector parsing, geometry capture, synthetic
+DOM, clipping, and painting in one file.
+
+**Next actions:**
+
+1. Add one canonical CSS keyframe/value interpolator with narrow callbacks for
+   percentage or used-length resolution, then reuse it from Layout and Web
+   Animations.
+2. Let the canonical style engine select animation and view-transition rules;
+   let Layout sample used values.
+3. Define a neutral renderer-facing view-transition plan containing capture IDs,
+   old/new snapshots, geometry, clipping, stacking, and resolved pseudo styles.
+4. Keep callbacks, promises, timelines, events, and lifecycle in HtmlBridge;
+   delete bridge selector/interpolation and synthetic-paint implementations after
+   the native route is universal.
+
+**Exit gate:** CSS parsing/interpolation has one authority; Layout/HTML own
+sampling and pixels; bridge animation/view-transition code contains only JS and
+document lifecycle; and no canonical assembly references a JavaScript type.
+
+#### Phase 6 — Core consolidation and public cleanup
+
+**Owner:** HtmlBridge Dom/Scripting, host composition, and the public API boundary.
+
+**Current evidence:** the 1,507-line Core assembly mixes runtime contracts,
+logging, CSP/origin/URL policy, HTML metadata discovery, script fetching,
+microtasks, execution DTOs, and profiling. Its public types are protected by the
+`htmlbridge-public-surface/v2` snapshots, so physical relocation is not an
+internal refactor.
+
+**Next actions:**
+
+1. Move runtime contracts to Dom and execution/module/profiling DTOs to Scripting
+   behind v2 forwarding facades or type forwarders. Inject a module executor into
+   Dom before moving the current module context, so subdocument execution does
+   not create a Dom-to-Scripting dependency cycle.
+2. Fold `MicroTaskQueue` into the document event loop while replacing fixed
+   script-phase buckets with one ordered task model for scripts, timers,
+   animation frames, and microtask checkpoints.
+3. Generalize parser-backed CSP meta discovery in `Broiler.Dom.Html`; keep script
+   discovery there, but make `ScriptExtractionService` a Scripting facade over
+   injected security and resource services.
+4. Consolidate script/style/frame/fetch/XHR resource access behind an injected
+   host service, while keeping CSP enforcement, credentials/network policy, and
+   browser bindings outside canonical components.
+5. Define an injected diagnostics contract for the existing bridge, CLI, WPT,
+   and DevConsole consumers, move `RenderLogger` to `Broiler.Diagnostics`, and
+   keep the public v2 facade. Create a web-primitives assembly only when its API
+   and dependency seam are independently useful; do not use a new assembly as a
+   folder.
+6. Decide at an approved v3 boundary whether the remaining Core compatibility
+   assembly is retained, renamed, or dissolved.
+
+**Exit gate:** Core has one documented cohesive purpose or no implementation;
+all execution surfaces share the ordered event loop and injected host services;
+the v2 API snapshots remain compatible until an explicit v3; and direct Browser,
+CLI, WPT, baseline-engine, and DevConsole consumers have migrated.
+
+#### Delivery and evidence rules
+
+For every slice:
+
+1. Land owner-local neutral APIs and unit tests in the canonical submodule first.
+2. Push the submodule commit, then update the parent pointer and add the thin
+   bridge adapter; use the documented patch fallback if the commit cannot be
+   made reachable.
+3. Cut over all production and test consumers before deleting the old path.
+4. Keep temporary dual-route switches document/session-scoped. Remove the switch
+   immediately after its final parity gate; do not turn it into permanent
+   configuration.
+5. Keep public-v2 changes additive or behavior-preserving. Reserve type removal
+   and assembly reshaping for an approved v3.
+6. Run the owner suites, HtmlBridge architecture/boundary/public-API guards,
+   targeted bridge tests, and the applicable Release solution builds. Render-visible slices
+   additionally require pinned WPT/Acid/pixel A/B evidence with an identical or
+   improved failure set.
+
+Success is fewer competing authorities and a thinner adapter, not a target line
+count. No canonical component may reference HtmlBridge or JavaScript runtime
+types, and no networking, CSP enforcement, or JS object identity may leak into
+DOM, CSS, Layout, or HTML merely to reduce the bridge assembly.
 
 ## Linux application preview
 

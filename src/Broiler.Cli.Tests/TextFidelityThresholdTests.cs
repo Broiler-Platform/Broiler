@@ -86,7 +86,9 @@ public class TextFidelityThresholdTests
     private static string GetRepoRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null && !File.Exists(Path.Combine(current.FullName, "Broiler.slnx")))
+        while (current is not null &&
+               !(File.Exists(Path.Combine(current.FullName, ".gitmodules")) &&
+                 File.Exists(Path.Combine(current.FullName, "Directory.Build.props"))))
             current = current.Parent;
 
         return current?.FullName

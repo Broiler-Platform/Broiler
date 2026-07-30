@@ -2,8 +2,8 @@
 
   <!--
     Standalone Broiler.HTML builds use the Graphics checkout nested inside that submodule.
-    The root conglomeration instead uses the canonical top-level Graphics checkout so the
-    solution graph contains one project per assembly identity.
+    Root builds instead use the canonical top-level Graphics checkout so every specialized
+    solution graph contains at most one project per assembly identity.
   -->
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(MSBuildThisFileDirectory)Broiler.HTML\Source\Broiler.HTML.Graphics.Win32.Demo\Broiler.HTML.Graphics.Win32.Demo.csproj'">
     <ProjectReference Remove="..\..\Broiler.Graphics\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" />

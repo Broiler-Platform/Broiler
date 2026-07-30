@@ -2,16 +2,16 @@
 #
 # HtmlBridge complexity-reduction Phase 1 (project-graph repair), item 4.
 #
-# The main solution collapses each canonical kernel (Broiler.Dom, Broiler.Graphics) to the
-# ROOT submodule checkout via $(BroilerDomPath) / $(BroilerGraphicsPath) (see the root
-# Directory.Build.props). Two submodules carry a *nested* checkout of those kernels for their
-# own standalone builds:
+# Root builds collapse each canonical kernel (Broiler.Dom, Broiler.Graphics) to the ROOT
+# submodule checkout via $(BroilerDomPath) / $(BroilerGraphicsPath) (see the root
+# Directory.Build.props). Two submodules carry a *nested* checkout of those kernels for
+# their own standalone builds:
 #
 #   Broiler.CSS/Broiler.DOM        vs  root Broiler.DOM
 #   Broiler.HTML/Broiler.Graphics  vs  root Broiler.Graphics
 #
 # If a nested checkout is bumped to a different commit than the root one, a standalone
-# submodule build would compile different sources than the single node the main solution
+# submodule build would compile different sources than the canonical node used by root
 # builds. This guard fails when a nested submodule gitlink SHA drifts from the root one.
 #
 # It reads recorded gitlink SHAs with `git ls-tree`. The root gitlinks are read from the

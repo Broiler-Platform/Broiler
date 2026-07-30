@@ -27,21 +27,14 @@ public sealed partial class DomBridge
     /// </summary>
     public string SerializeToHtml()
     {
-        // The serialize transforms/zoom bakes mutate the live tree; suppress observer delivery so
-        // they neither deliver spurious records nor re-enter script synchronously mid-serialize.
-        using var mutationSuppression = SuppressMutationDelivery();
-
-        var root = RenderedDocumentElement;
+        var projection = CreateRenderProjection();
+        var root = projection.Document.DocumentElement;
         if (root is null)
             return EmptyDocumentHtml;
 
-        if (ZoomBakeActive)
-            ApplyZoomSerializationStyles(root, 1.0);
-        ApplySerializationTransforms(root);
-        ApplyViewTransitionRendering(root);
         return HtmlSerializer.Serialize(
             root,
-            CreateSerializationAdapter(),
+            CreateSerializationAdapter(projection.SourceFor),
             new HtmlSerializationOptions(
                 IncludeHtmlDoctype: true,
                 MaximumDepth: MaxSerializationDepth,
@@ -75,38 +68,11 @@ public sealed partial class DomBridge
     private const string EmptyDocumentHtml = "<!DOCTYPE html>\n";
 
     /// <summary>
-    /// Returns the canonical document prepared for direct renderer consumption.
-    /// Bridge-owned style and form-control state is reflected into canonical
-    /// attributes because the typed renderer intentionally depends only on
-    /// <see cref="DomDocument"/>.
+    /// Returns an isolated document prepared for direct renderer consumption.
+    /// Bridge-owned style and form-control state is reflected into the projection;
+    /// the script-visible canonical <see cref="Document"/> is not changed.
     /// </summary>
-    public DomDocument GetRenderDocument()
-    {
-        // ReflectRenderState + transforms bake style/value attributes onto the live tree; suppress
-        // observer delivery so they neither deliver spurious records nor re-enter script mid-bake.
-        using var mutationSuppression = SuppressMutationDelivery();
-
-        // Nothing to bake or reflect once the document has no element child; the renderer
-        // gets the empty document and paints the bare canvas (see RenderedDocumentElement).
-        var root = RenderedDocumentElement;
-        if (root is null)
-            return _document;
-
-        // Zoom baking runs per call (not part of the run-once guarded transforms); it is idempotent
-        // once baked (the `zoom` property is stripped), so repeat calls on the render path are no-ops.
-        // Must run before the guarded pseudo/progress transforms, which depend on the baked sizes. The
-        // geometry-snapshot path enables NativeZoom (so ZoomBakeActive is false) and never bakes, so it
-        // needs no revert — the live document stays pristine.
-        if (ZoomBakeActive)
-            ApplyZoomSerializationStyles(root, 1.0);
-        ApplySerializationTransforms(root);
-        // The view-transition pseudo tree bakes onto existing elements (the active-type rules) and
-        // appends new boxes; run it before ReflectRenderState so both reach the render document's
-        // style attributes.
-        ApplyViewTransitionRendering(root);
-        ReflectRenderState(root);
-        return _document;
-    }
+    public DomDocument GetRenderDocument() => CreateRenderProjection().Document;
 
     /// <summary>
     /// Whether the element-<c>zoom</c> serialization bake (<see cref="ApplyZoomSerializationStyles"/>)
@@ -180,10 +146,6 @@ public sealed partial class DomBridge
 
     private void ApplySerializationTransforms(DomElement root)
     {
-        if (_serializationTransformsApplied)
-            return;
-
-        _serializationTransformsApplied = true;
         RemoveRenderCommentNodes(root);
         ApplyCssomStyleSheetMutations(root);
         InlineStyleSheetImports(root);
@@ -323,9 +285,9 @@ public sealed partial class DomBridge
     /// text node with the serialized model closes that gap, so the renderer and the
     /// CSSOM agree on one stylesheet.
     /// <para>
-    /// Runs inside <see cref="ApplySerializationTransforms"/>, with mutation delivery
-    /// suppressed by its callers, so the rewrite delivers no observer records. It is
-    /// idempotent: the text it writes reparses to the same rules, and the reparse
+    /// Runs inside <see cref="ApplySerializationTransforms"/> on the isolated render projection,
+    /// so the rewrite delivers no live-document observer records. It is idempotent: the text it
+    /// writes reparses to the same rules, and the reparse
     /// clears <see cref="StyleSheetRuntimeState.RulesMutated"/>, so a second pass is a
     /// no-op. JS-visible <c>innerHTML</c>/<c>outerHTML</c> serialize without the
     /// transforms and still expose the author text.
@@ -671,7 +633,8 @@ public sealed partial class DomBridge
     // kinds off the canonical node types; everything else is an element. GetName/GetAttributes/
     // GetStyles are only invoked for element/doctype nodes (see HtmlSerializer.Append), so their
     // Broiler.Dom.DomElement narrowing is always satisfied.
-    private HtmlSerializationAdapter<DomNode> CreateSerializationAdapter() => new(
+    private HtmlSerializationAdapter<DomNode> CreateSerializationAdapter(
+        Func<DomElement, DomElement?>? sourceResolver = null) => new(
         GetKind: static node =>
             IsText(node) ? HtmlSerializationNodeKind.Text
             : IsComment(node) ? HtmlSerializationNodeKind.Comment
@@ -685,7 +648,9 @@ public sealed partial class DomBridge
         // container and rasterised in isolation (srcdoc content round-trips via the srcdoc
         // attribute), so it can never appear in ChildNodes and needs no serialization skip.
         GetChildren: static node => node.ChildNodes,
-        GetAttributes: node => node is DomElement element ? GetSerializableAttributes(element) : [],
+        GetAttributes: node => node is DomElement element
+            ? GetSerializableAttributes(element, sourceResolver?.Invoke(element))
+            : [],
         GetStyles: node => node is DomElement element
             ? EffectiveInlineStyle(element).OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1)
             : [],
@@ -713,14 +678,16 @@ public sealed partial class DomBridge
         node.ParentNode is DomElement parent &&
         HtmlSerializer.IsRawTextElement(parent.TagName);
 
-    private IEnumerable<KeyValuePair<string, string>> GetSerializableAttributes(DomElement element)
+    private IEnumerable<KeyValuePair<string, string>> GetSerializableAttributes(
+        DomElement element,
+        DomElement? sourceElement = null)
     {
         if (!string.IsNullOrEmpty(element.Id))
             yield return new("id", element.Id);
         if (!string.IsNullOrEmpty(element.ClassName))
             yield return new("class", element.ClassName);
 
-        var serializedSrcDoc = TrySerializeCurrentSrcDoc(element);
+        var serializedSrcDoc = TrySerializeCurrentSrcDoc(element, sourceElement);
         foreach (var attribute in element.Attributes.Values)
         {
             var name = attribute.QualifiedName;
@@ -748,7 +715,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private string? TrySerializeCurrentSrcDoc(DomElement element)
+    private string? TrySerializeCurrentSrcDoc(DomElement element, DomElement? sourceElement)
     {
         if (!string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase) ||
             !HasAttr(element, "srcdoc"))
@@ -756,7 +723,7 @@ public sealed partial class DomBridge
             return null;
         }
 
-        var subDocumentRoot = GetContentDocument(element);
+        var subDocumentRoot = GetContentDocument(sourceElement ?? element);
         if (subDocumentRoot == null || subDocumentRoot.ChildNodes.Count == 0)
             return null;
 

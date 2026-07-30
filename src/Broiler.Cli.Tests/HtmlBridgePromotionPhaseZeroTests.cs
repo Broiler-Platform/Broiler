@@ -76,16 +76,32 @@ public sealed class HtmlBridgePromotionPhaseZeroTests
     }
 
     [Fact]
-    public void Bridge_Runtime_State_Remains_A_Bridge_Owned_Seam()
+    public void Split_Runtime_State_Remains_A_Bridge_Owned_Seam()
     {
-        // ElementRuntimeState holds JavaScript identity, listeners, mutation
-        // observer options, form/scroll/layout cache, and other host state. The
-        // roadmap explicitly marks it a non-candidate for promotion; it stays in
-        // the bridge assembly.
-        var runtimeState = typeof(DomBridge).Assembly.GetType("Broiler.HtmlBridge.ElementRuntimeState");
+        // The former catch-all ElementRuntimeState was split into concern-specific,
+        // per-session tables. These JavaScript/host concerns remain bridge-owned and
+        // must not be promoted into the canonical DOM model.
+        var bridgeAssembly = typeof(DomBridge).Assembly;
+        string[] runtimeStateTypes =
+        [
+            "Broiler.HtmlBridge.Dom.Runtime.InlineStyleRuntimeState",
+            "Broiler.HtmlBridge.Dom.Runtime.FormControlRuntimeState",
+            "Broiler.HtmlBridge.Dom.Runtime.ScrollRuntimeState",
+            "Broiler.HtmlBridge.Dom.Runtime.DialogRuntimeState",
+            "Broiler.HtmlBridge.Dom.Runtime.ShadowRuntimeState",
+            "Broiler.HtmlBridge.Dom.Runtime.StyleSheetRuntimeState",
+            "Broiler.HtmlBridge.Dom.Runtime.DocumentRuntimeState",
+            "Broiler.HtmlBridge.Dom.Runtime.AnimationRuntimeState",
+        ];
 
-        Assert.NotNull(runtimeState);
-        Assert.Equal("Broiler.HtmlBridge.Dom", runtimeState!.Assembly.GetName().Name);
+        Assert.Null(bridgeAssembly.GetType("Broiler.HtmlBridge.ElementRuntimeState"));
+        Assert.Null(bridgeAssembly.GetType("Broiler.HtmlBridge.Dom.Runtime.ElementRuntimeState"));
+        Assert.All(runtimeStateTypes, typeName =>
+        {
+            var runtimeState = bridgeAssembly.GetType(typeName);
+            Assert.NotNull(runtimeState);
+            Assert.Equal("Broiler.HtmlBridge.Dom", runtimeState!.Assembly.GetName().Name);
+        });
     }
 
     [Fact]

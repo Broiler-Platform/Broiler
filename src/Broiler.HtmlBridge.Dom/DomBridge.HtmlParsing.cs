@@ -32,8 +32,6 @@ public sealed partial class DomBridge
         // Clear the document first so the doctype/<html> re-append below satisfies canonical
         // DomDocument ordering (doctype must precede the document element).
         ClearChildren(_document);
-        _serializationTransformsApplied = false;
-        _viewTransitionBaked = false;
         // A re-parse is a new document generation: drop the prior document's timers, listeners,
         // observers and message ports so re-attaching leaves no state from the previous document
         // (HtmlBridge complexity-reduction roadmap Phase 2, P2.1).

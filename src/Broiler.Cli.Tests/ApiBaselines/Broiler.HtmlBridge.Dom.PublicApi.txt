@@ -3,6 +3,7 @@
 // regenerate with UPDATE_API_BASELINES=1 when the change is intentional.
 TYPE Broiler.HtmlBridge.DomBridge : Broiler.HtmlBridge.Dom.IDomBridgeRuntime, System.IDisposable
   ctor ()
+  ctor (Broiler.HtmlBridge.DomBridgeSessionOptions)
   field const System.Int32 AsyncDrainIterationLimit
   method Broiler.Dom.DomDocument GetRenderDocument()
   method System.Boolean FlushTimerStep()
@@ -38,6 +39,10 @@ TYPE Broiler.HtmlBridge.DomBridge+CheckLayoutAssertion : System.IEquatable<Broil
   property System.String Property { get; set; }
 TYPE Broiler.HtmlBridge.DomBridgeFactory : Broiler.HtmlBridge.Dom.IDomBridgeRuntimeFactory
   ctor ()
+  ctor (Broiler.HtmlBridge.DomBridgeSessionOptions)
   method Broiler.HtmlBridge.Dom.IDomBridgeRuntime Create()
+TYPE Broiler.HtmlBridge.DomBridgeSessionOptions
+  ctor ()
+  property System.Func<Broiler.Layout.ILayoutView> LayoutViewFactory { get; set; }
 TYPE Broiler.HtmlBridge.Scripting.EngineModuleSupport
   property System.Boolean Available { get; }

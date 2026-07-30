@@ -19,16 +19,18 @@ elseif (-not [IO.Path]::IsPathRooted($ResultsDirectory)) {
 New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
 
 if (-not $NoBuild) {
-    & dotnet build (Join-Path $repoRoot 'Broiler.slnx') --configuration $Configuration --nologo -m:1
-    if ($LASTEXITCODE -ne 0) {
-        throw "RF-LAYOUT solution build failed with exit code $LASTEXITCODE."
-    }
-
-    # The layout test project intentionally sits beside the extracted component
-    # and is not part of the root solution graph.
-    & dotnet build (Join-Path $repoRoot 'Broiler.Layout/Broiler.Layout.Tests/Broiler.Layout.Tests.csproj') --configuration $Configuration --nologo -m:1
-    if ($LASTEXITCODE -ne 0) {
-        throw "RF-LAYOUT test build failed with exit code $LASTEXITCODE."
+    # Build exactly the projects used below with --no-build.
+    $validationProjects = @(
+        'Broiler.Layout/Broiler.Layout.Tests/Broiler.Layout.Tests.csproj',
+        'src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj',
+        'src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj',
+        'src/Broiler.Wpt/Broiler.Wpt.csproj'
+    )
+    foreach ($project in $validationProjects) {
+        & dotnet build (Join-Path $repoRoot $project) --configuration $Configuration --nologo -m:1
+        if ($LASTEXITCODE -ne 0) {
+            throw "RF-LAYOUT validation project build failed for $project with exit code $LASTEXITCODE."
+        }
     }
 }
 

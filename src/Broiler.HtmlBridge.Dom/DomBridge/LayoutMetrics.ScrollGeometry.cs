@@ -41,7 +41,12 @@ public sealed partial class DomBridge
 
             foreach (var child in ChildElements(host))
             {
-                if (!IsText(child) && SlotAcceptsNode(element, child))
+                // The bridge stores the shadow root as a host child, but it is not
+                // light-DOM slot content. Projecting it back through a default slot
+                // creates a host -> shadow root -> slot -> shadow root traversal cycle.
+                if (!IsText(child) &&
+                    !string.Equals(child.TagName, "#shadow-root", StringComparison.Ordinal) &&
+                    SlotAcceptsNode(element, child))
                     yield return child;
             }
 

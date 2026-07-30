@@ -1,0 +1,30 @@
+<Solution>
+  <!-- Generated from eng/solutions.json by scripts/update-solutions.ps1. -->
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+  </Configurations>
+  <Folder Name="/Entry points/">
+    <Project Path="Broiler.Graphics/Broiler.Graphics.Linux.Tests/Broiler.Graphics.Linux.Tests.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Linux.Tests/Broiler.Input.Linux.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Dependencies/Broiler.Graphics/">
+    <Project Path="Broiler.Graphics/Broiler.Graphics.Linux.OpenGL/Broiler.Graphics.Linux.OpenGL.csproj" />
+    <Project Path="Broiler.Graphics/Broiler.Graphics.Linux.Vulkan/Broiler.Graphics.Linux.Vulkan.csproj" />
+    <Project Path="Broiler.Graphics/Broiler.Graphics.Linux/Broiler.Graphics.Linux.csproj" />
+    <Project Path="Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj" />
+  </Folder>
+  <Folder Name="/Dependencies/Broiler.Input/">
+    <Project Path="Broiler.Input/Broiler.Input.Keyboard.Linux/Broiler.Input.Keyboard.Linux.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Keyboard/Broiler.Input.Keyboard.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Linux/Broiler.Input.Linux.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Mouse.Linux/Broiler.Input.Mouse.Linux.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Mouse/Broiler.Input.Mouse.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input/Broiler.Input.csproj" />
+  </Folder>
+  <Folder Name="/Dependencies/Broiler.Media/">
+    <Project Path="Broiler.Media/Broiler.Media.Image.Managed/Broiler.Media.Image.Managed.csproj" />
+    <Project Path="Broiler.Media/Broiler.Media.Image/Broiler.Media.Image.csproj" />
+    <Project Path="Broiler.Media/Broiler.Media/Broiler.Media.csproj" />
+  </Folder>
+</Solution>

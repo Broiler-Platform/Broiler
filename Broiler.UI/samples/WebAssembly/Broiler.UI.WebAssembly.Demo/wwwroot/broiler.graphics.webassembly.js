@@ -64,6 +64,26 @@ function cssFontFamily(name) {
     return `"${family.replace(/["\\]/g, '\\$&')}", sans-serif`;
 }
 
+// The single source of truth for the Canvas `font` shorthand. Both text drawing and text
+// measurement go through this so measured advances match painted glyphs exactly (otherwise
+// caret/selection/grid layout drifts from what is drawn).
+function fontString(fontPx, weight, italic, familyName) {
+    return `${italic ? 'italic ' : ''}${weight} ${fontPx}px ${cssFontFamily(familyName)}`;
+}
+
+// A detached 2D context used only for text measurement, so a measure never disturbs the
+// presenter context's state mid-frame.
+let measureCtx = null;
+function ensureMeasureContext() {
+    if (measureCtx === null) {
+        const canvas = (typeof OffscreenCanvas !== 'undefined')
+            ? new OffscreenCanvas(1, 1)
+            : document.createElement('canvas');
+        measureCtx = canvas.getContext('2d');
+    }
+    return measureCtx;
+}
+
 function sizeCanvas(backingWidth, backingHeight, cssWidth, cssHeight) {
     const canvas = state.canvas;
     if (canvas.width !== backingWidth) canvas.width = backingWidth;
@@ -174,8 +194,7 @@ export function presentFrame(stream, streamLength, strings, backingWidth, backin
                 const fontPx = stream[i++], weight = stream[i++], italic = stream[i++];
                 ctx.fillStyle = color(stream[i++]);
                 const text = strings[stream[i++]];
-                const family = cssFontFamily(strings[stream[i++]]);
-                ctx.font = `${italic ? 'italic ' : ''}${weight} ${fontPx}px ${family}`;
+                ctx.font = fontString(fontPx, weight, italic, strings[stream[i++]]);
                 ctx.textBaseline = 'alphabetic';
                 ctx.textAlign = 'left';
                 ctx.fillText(text, bx, by);
@@ -225,6 +244,16 @@ export function uploadImage(id, width, height, rgba) {
 export function releaseImage(id) {
     state.resources.delete(id);
     diag.resourceCount = state.resources.size;
+}
+
+// Horizontal advance (CSS px) of `text` in the same font the replay draws with, so managed
+// text layout agrees with what is painted. Measured at the logical font size; the presenter
+// bakes the device scale separately, and the advance/size ratio is scale-invariant.
+export function measureAdvance(text, fontPx, weight, italic, family) {
+    if (!text) return 0;
+    const ctx = ensureMeasureContext();
+    ctx.font = fontString(fontPx, weight, italic, family);
+    return ctx.measureText(text).width;
 }
 
 export function dispose() {

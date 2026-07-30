@@ -1,0 +1,156 @@
+{
+  "solutions": [
+    {
+      "path": "Broiler.Windows.Browser.slnx",
+      "description": "Windows browser application and its transitive dependencies.",
+      "roots": [
+        "src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*Linux[^/]*\\.csproj$",
+        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.Linux.Browser.slnx",
+      "description": "Linux browser application and its transitive dependencies.",
+      "roots": [
+        "src/Broiler.Browser.Linux/Broiler.Browser.Linux.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation)[^/]*\\.csproj$",
+        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.Windows.Writer.slnx",
+      "description": "Windows Writer application and its transitive dependencies.",
+      "roots": [
+        "src/Broiler.Writer.Windows/Broiler.Writer.Windows.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*Linux[^/]*\\.csproj$",
+        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.Linux.Writer.slnx",
+      "description": "Linux Writer application and its transitive dependencies.",
+      "roots": [
+        "src/Broiler.Writer.Linux/Broiler.Writer.Linux.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation)[^/]*\\.csproj$",
+        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.WebAssembly.Writer.slnx",
+      "description": "WebAssembly Writer application and its transitive dependencies.",
+      "roots": [
+        "src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux)[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.Office.Server.slnx",
+      "description": "Office server and its property-driven Writer WebAssembly client dependency.",
+      "roots": [
+        "Broiler.Office.Server/Broiler.Office.Server.csproj",
+        "src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux)[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.Cli.slnx",
+      "description": "Command-line renderer and its transitive dependencies.",
+      "roots": [
+        "src/Broiler.Cli/Broiler.Cli.csproj"
+      ]
+    },
+    {
+      "path": "Broiler.Wpt.slnx",
+      "description": "Web Platform Test runner and its transitive dependencies.",
+      "roots": [
+        "src/Broiler.Wpt/Broiler.Wpt.csproj"
+      ]
+    },
+    {
+      "path": "Broiler.Tooling.slnx",
+      "description": "Developer diagnostics, playback, and baseline tooling.",
+      "roots": [
+        "src/Broiler.DevConsole/Broiler.DevConsole.csproj",
+        "src/Broiler.DevSite/Broiler.DevSite.csproj",
+        "src/Broiler.Engines.Baseline/Broiler.Engines.Baseline.csproj",
+        "src/Broiler.Playback/Broiler.Playback.csproj"
+      ]
+    },
+    {
+      "path": "Broiler.Tests.slnx",
+      "description": "Cross-component integration tests; component unit tests stay in component-owned solutions.",
+      "roots": [
+        "src/Broiler.App.Tests/Broiler.App.Tests.csproj",
+        "src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj",
+        "src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj",
+        "src/Broiler.Playback.Tests/Broiler.Playback.Tests.csproj",
+        "src/Broiler.Wpt.Tests/Broiler.Wpt.Tests.csproj",
+        "src/Broiler.Writer.FormatCodes.Tests/Broiler.Writer.FormatCodes.Tests.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.Windows.Tests.slnx",
+      "description": "Windows-only component contract and backend tests.",
+      "roots": [
+        "Broiler.Graphics/Broiler.Graphics.Windows.Tests/Broiler.Graphics.Windows.Tests.csproj",
+        "Broiler.Input/Broiler.Input.Contract.Tests/Broiler.Input.Contract.Tests.csproj",
+        "Broiler.Media/Broiler.Media.Video.MediaFoundation.Tests/Broiler.Media.Video.MediaFoundation.Tests.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*Linux[^/]*\\.csproj$",
+        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.Linux.Tests.slnx",
+      "description": "Linux-only component contract and backend tests.",
+      "roots": [
+        "Broiler.Graphics/Broiler.Graphics.Linux.Tests/Broiler.Graphics.Linux.Tests.csproj",
+        "Broiler.Input/Broiler.Input.Linux.Tests/Broiler.Input.Linux.Tests.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation)[^/]*\\.csproj$",
+        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.WebAssembly.Tests.slnx",
+      "description": "WebAssembly backend tests and browser-WASM validation baselines.",
+      "roots": [
+        "Broiler.Graphics/Broiler.Graphics.WebAssembly.Tests/Broiler.Graphics.WebAssembly.Tests.csproj",
+        "tests/browser-wasm-phase0/Broiler.BrowserWasm.Phase0/Broiler.BrowserWasm.Phase0.csproj",
+        "tests/browser-wasm-phase0/Broiler.Wasm.EmptyBaseline/Broiler.Wasm.EmptyBaseline.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux)[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.Benchmarks.slnx",
+      "description": "Repository-level formatting-code performance harnesses.",
+      "roots": [
+        "tests/formatting-codes-phase0/Broiler.FormattingCodes.Phase0.Benchmarks/Broiler.FormattingCodes.Phase0.Benchmarks.csproj",
+        "tests/formatting-codes-phase1/Broiler.FormattingCodes.Phase1.Benchmarks/Broiler.FormattingCodes.Phase1.Benchmarks.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"
+      ]
+    }
+  ]
+}

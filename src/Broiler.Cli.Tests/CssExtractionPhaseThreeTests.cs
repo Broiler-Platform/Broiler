@@ -54,7 +54,8 @@ public sealed class CssExtractionPhaseThreeTests
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Broiler.slnx")))
+            if (File.Exists(Path.Combine(directory.FullName, ".gitmodules")) &&
+                File.Exists(Path.Combine(directory.FullName, "Directory.Build.props")))
                 return directory.FullName;
             directory = directory.Parent;
         }

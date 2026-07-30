@@ -24,7 +24,7 @@ capabilities.
 ## Prerequisites
 
 - .NET 8.0 SDK or later
-- The Broiler solution built (or at least `HtmlRenderer.Image` available)
+- The relevant Broiler project or specialized solution built (or at least `HtmlRenderer.Image` available)
 
 ## Getting Started
 

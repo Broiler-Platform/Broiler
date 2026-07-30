@@ -21,14 +21,9 @@ elseif (-not [IO.Path]::IsPathRooted($ResultsDirectory)) {
 New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
 
 if (-not $NoBuild) {
-    & dotnet build (Join-Path $repoRoot 'Broiler.slnx') --configuration $Configuration --nologo -m:1
-    if ($LASTEXITCODE -ne 0) {
-        throw "RF-CSS validation build failed with exit code $LASTEXITCODE."
-    }
-
-    # Some validation projects are intentionally kept outside the main solution
-    # graph. Build every test assembly that this script can execute so --no-build
-    # never reuses binaries from the retired Broiler.HTML.CSS assembly graph.
+    # Build every test assembly that this script can execute so --no-build never
+    # reuses binaries from an unrelated specialized solution or the retired
+    # Broiler.HTML.CSS assembly graph.
     $validationProjects = @(
         'Broiler.CSS/Broiler.CSS.Tests/Broiler.CSS.Tests.csproj',
         'Broiler.CSS/Broiler.CSS.Dom.Tests/Broiler.CSS.Dom.Tests.csproj',

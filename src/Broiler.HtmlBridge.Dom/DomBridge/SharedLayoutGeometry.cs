@@ -27,21 +27,18 @@ public sealed partial class DomBridge
     // See docs/architecture/htmlbridge.md#layout-and-geometry.
     internal static bool UseSharedGeometryExclusively = true;
 
-    // Phase 1 (project-graph repair): the concrete renderer-backed layout view
-    // (Broiler.HTML.Headless.HeadlessLayoutView) is injected here so this binding project
-    // depends only on the neutral ILayoutView contract in Broiler.Layout — not on
-    // Broiler.HTML.Image. A composition root that references the renderer registers the
-    // factory once at startup (see the [ModuleInitializer]s in Broiler.Cli / Broiler.Wpt /
-    // the test hosts). A bare `new DomBridge()` with no factory set falls back to an empty
-    // view, so it never throws and never pulls the renderer stack. This process-static seam
-    // is a deliberate, temporary Phase-1 compromise (the roadmap otherwise avoids service
-    // locators); Phase 2's BrowserDocumentSession replaces it with constructor injection.
+    // The preferred binding is the per-session factory supplied through DomBridgeSessionOptions,
+    // which keeps simultaneous documents independent. This process-static factory remains only
+    // as a source-compatibility fallback for composition roots that have not migrated yet. A bare
+    // `new DomBridge()` with neither factory falls back to an empty view and does not pull in the
+    // concrete renderer stack.
     internal static Func<ILayoutView>? LayoutViewFactory;
 
+    private readonly Func<ILayoutView>? _layoutViewFactory;
     private ILayoutView? _layoutView;
 
     private ILayoutView LayoutView =>
-        _layoutView ??= LayoutViewFactory?.Invoke() ?? NullLayoutView.Instance;
+        _layoutView ??= _layoutViewFactory?.Invoke() ?? LayoutViewFactory?.Invoke() ?? NullLayoutView.Instance;
 
     // Document-scoped teardown: dispose the current view (releasing the renderer's headless
     // container) and drop the per-pass snapshot so a re-attached/re-parsed document lays out
@@ -55,7 +52,7 @@ public sealed partial class DomBridge
 
     // The geometry snapshot for the current WithLayoutGeometryCache read pass. Built
     // lazily on the first shared query and torn down with the pass, so the renderer
-    // lays out at most once per pass (one GetRenderDocument call) rather than per
+    // lays out at most once per pass (one render-projection build) rather than per
     // element — see ClearSharedGeometrySnapshot in WithLayoutGeometryCache.
     private IReadOnlyDictionary<DomElement, BoxGeometry> _sharedGeometrySnapshot;
 
@@ -69,7 +66,7 @@ public sealed partial class DomBridge
     private bool TryGetSharedLayoutGeometry(DomElement element, out BoxGeometry geometry)
     {
         var snapshot = _sharedGeometrySnapshot ??= BuildSharedGeometrySnapshot();
-        return snapshot.TryGetValue(element, out geometry);
+        return snapshot.TryGetValue(ResolveRenderSource(element), out geometry);
     }
 
     private static readonly IReadOnlyDictionary<DomElement, BoxGeometry> EmptySharedGeometry =
@@ -92,7 +89,7 @@ public sealed partial class DomBridge
         Broiler.Layout.Engine.NativeZoom.Enabled = true;
         try
         {
-            var document = GetRenderDocument();
+            var projection = CreateRenderProjection();
             var viewport = new SizeF(_viewportWidth, _viewportHeight);
 
             // Native visual-viewport (Phase 5 endgame, blocker (b)): hand the document-root
@@ -109,7 +106,27 @@ public sealed partial class DomBridge
                 // P4.4b: a materialised iframe/object sub-document is no longer an in-tree
                 // #subdoc-root child — hand the layout view the resolver so it projects each
                 // referenced content document as a sub-viewport and composes its geometry.
-                return LayoutView.GetGeometry(document, viewport, _pageUrl, ResolveContentDocumentForRender);
+                var projectedGeometry = LayoutView.GetGeometry(
+                    projection.Document,
+                    viewport,
+                    _pageUrl,
+                    projectedContainer =>
+                    {
+                        var source = projection.SourceFor(projectedContainer);
+                        return source is null ? null : ResolveContentDocumentForRender(source);
+                    });
+                var sourceGeometry = new Dictionary<DomElement, BoxGeometry>(ReferenceEqualityComparer.Instance);
+                foreach (var (projectedElement, geometry) in projectedGeometry)
+                {
+                    if (projection.SourceFor(projectedElement) is { } source)
+                        sourceGeometry[source] = geometry;
+                    else if (!ReferenceEquals(projectedElement.OwnerDocument, projection.Document))
+                        // Nested-document geometry is keyed by the resolver's canonical content
+                        // document, not by the outer projection. Preserve those live subdocument
+                        // identities until nested documents receive their own projection mapping.
+                        sourceGeometry[projectedElement] = geometry;
+                }
+                return sourceGeometry;
             }
             finally
             {
@@ -128,9 +145,8 @@ public sealed partial class DomBridge
         finally
         {
             Broiler.Layout.Engine.NativeZoom.Enabled = previousNativeZoom;
-            // GetRenderDocument mutated the live document (ReflectRenderState / serialization transforms),
-            // so drop the computed-props cache — subsequent CSSOM queries must recompute against the live
-            // styles, not values cached mid-build. (Previously done incidentally by RevertZoomSerialization.)
+            // Projection preparation can populate computed-style caches for detached elements.
+            // Drop them after the pass so the projection is not retained by the bridge.
             ClearComputedPropsCache();
         }
     }

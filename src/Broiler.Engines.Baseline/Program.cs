@@ -813,7 +813,8 @@ internal static partial class Program
         var current = AppContext.BaseDirectory;
         while (!string.IsNullOrEmpty(current))
         {
-            if (File.Exists(Path.Combine(current, "Broiler.slnx")))
+            if (File.Exists(Path.Combine(current, ".gitmodules")) &&
+                File.Exists(Path.Combine(current, "Directory.Build.props")))
             {
                 return current;
             }

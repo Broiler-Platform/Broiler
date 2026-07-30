@@ -160,7 +160,6 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // viewport dimensions for window.innerWidth/innerHeight and element box-model properties
     private int _viewportWidth = 1024;
     private int _viewportHeight = 768;
-    private bool _serializationTransformsApplied;
 
     /// <summary>
     /// Optional callback invoked after each queued timer, interval, animation-frame,
@@ -185,7 +184,16 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private string _pageOrigin = string.Empty;
 
     public DomBridge()
+        : this(null)
     {
+    }
+
+    /// <summary>
+    /// Creates a bridge with dependencies scoped to this document/session.
+    /// </summary>
+    public DomBridge(DomBridgeSessionOptions? sessionOptions)
+    {
+        _layoutViewFactory = sessionOptions?.LayoutViewFactory;
         _selectorMatcher = new CssSelectorMatcher(new BridgeSelectorStateProvider(this));
         _traversal = new Dom.Features.TraversalBinding(this);
         _mutations = new Dom.Features.MutationObserverBinding(this);
@@ -338,11 +346,11 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <summary>Mints a canonical <see cref="DomText"/> carrying <paramref name="data"/>
     /// (RF-BRIDGE-1c Phase F, F3c part 2d — construction cutover). The single funnel for text-node
     /// construction; callers treat the result as a <see cref="DomNode"/>.</summary>
-    private DomText CreateBridgeTextNode(string data) => _document.CreateTextNode(data);
+    private DomText CreateBridgeTextNode(string data) => NodeFactoryDocument.CreateTextNode(data);
 
     /// <summary>Mints a canonical <see cref="DomComment"/> carrying <paramref name="data"/>
     /// (see <see cref="CreateBridgeTextNode"/>).</summary>
-    private DomComment CreateBridgeCommentNode(string data) => _document.CreateComment(data);
+    private DomComment CreateBridgeCommentNode(string data) => NodeFactoryDocument.CreateComment(data);
 
     /// <summary>
     /// The single construction funnel for bridge element nodes (RF-BRIDGE-1c Phase F, F4). Every
@@ -365,7 +373,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     private DomElement CreateBridgeElementNS(string? namespaceUri, string tagName, string? id = null, string? className = null, Dictionary<string, string>? attributes = null)
     {
-        var element = _document.CreateElementNS(namespaceUri, tagName);
+        var element = NodeFactoryDocument.CreateElementNS(namespaceUri, tagName);
         if (attributes is not null)
             foreach (var (name, value) in attributes)
                 element.SetAttribute(name, value);
@@ -382,13 +390,13 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// publicId/systemId keep their case. The single funnel for doctype construction over the
     /// canonical document factory.</summary>
     private DomDocumentType CreateBridgeDocumentType(string name, string publicId, string systemId) =>
-        _document.CreateDocumentType(name.ToLowerInvariant(), publicId, systemId);
+        NodeFactoryDocument.CreateDocumentType(name.ToLowerInvariant(), publicId, systemId);
 
     /// <summary>Mints a canonical <see cref="DomDocumentFragment"/> (Phase 4 item 1 — the former
     /// <c>#document-fragment</c> sentinel element). The single funnel for fragment construction over
     /// the canonical document factory (used by <c>createDocumentFragment</c>, Range clone/extract
     /// results, and the internal HTML fragment-parse container).</summary>
-    private DomDocumentFragment CreateBridgeDocumentFragment() => _document.CreateDocumentFragment();
+    private DomDocumentFragment CreateBridgeDocumentFragment() => NodeFactoryDocument.CreateDocumentFragment();
 
     /// <summary>Mints a canonical <see cref="DomDocument"/> for a detached browsing context (Phase 4
     /// item 1, P4.4a — the former <c>#subdoc-root</c> sentinel for <c>createDocument</c>/

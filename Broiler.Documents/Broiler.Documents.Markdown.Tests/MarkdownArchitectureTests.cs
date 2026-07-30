@@ -63,7 +63,9 @@ public sealed class MarkdownArchitectureTests
         while (directory is not null)
         {
             string candidate = Path.Combine(directory.FullName, "Broiler.Documents");
-            if (Directory.Exists(candidate) && File.Exists(Path.Combine(directory.FullName, "Broiler.slnx")))
+            if (Directory.Exists(candidate) &&
+                File.Exists(Path.Combine(directory.FullName, ".gitmodules")) &&
+                File.Exists(Path.Combine(directory.FullName, "Directory.Build.props")))
                 return candidate;
 
             directory = directory.Parent;

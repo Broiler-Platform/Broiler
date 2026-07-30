@@ -14,9 +14,8 @@ namespace Broiler.Cli.Tests;
 /// idempotently.
 /// </summary>
 /// <remarks>
-/// The disposal cases override the process-static <see cref="DomBridge.LayoutViewFactory"/> in a
-/// try/finally, so this class joins the <c>SharedGeometryStatics</c> collection to run
-/// sequentially with the other geometry-static tests.
+/// Layout ownership is supplied through <see cref="DomBridgeSessionOptions"/>. The collection
+/// remains sequential with older geometry-static compatibility tests while those callers migrate.
 ///
 /// The Phase-2 "two *simultaneous* sessions are isolated" exit criterion is now met and exercised by
 /// <see cref="Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State"/>: the Broiler.JS engine isolates
@@ -127,49 +126,52 @@ public sealed class DomBridgeSessionLifetimeTests
     public void Dispose_Releases_The_Layout_View()
     {
         var recording = new RecordingLayoutView();
-        var saved = DomBridge.LayoutViewFactory;
-        try
-        {
-            DomBridge.LayoutViewFactory = () => recording;
-            using var ctx = new JSContext();
-            var bridge = new DomBridge();
-            bridge.Attach(ctx, BodyHtml, "file:///d.html");
+        using var ctx = new JSContext();
+        var bridge = CreateBridgeWithLayoutView(recording);
+        bridge.Attach(ctx, BodyHtml, "file:///d.html");
 
-            // Force a geometry query so the bridge materializes its ILayoutView from the factory.
-            ctx.Eval("document.body.getBoundingClientRect();");
-            Assert.True(recording.GetGeometryCount >= 1, "geometry read did not materialize the layout view");
-            Assert.Equal(0, recording.DisposeCount);
+        // Force a geometry query so the bridge materializes its ILayoutView from the factory.
+        ctx.Eval("document.body.getBoundingClientRect();");
+        Assert.True(recording.GetGeometryCount >= 1, "geometry read did not materialize the layout view");
+        Assert.Equal(0, recording.DisposeCount);
 
-            bridge.Dispose();
-            Assert.Equal(1, recording.DisposeCount);
-        }
-        finally
-        {
-            DomBridge.LayoutViewFactory = saved;
-        }
+        bridge.Dispose();
+        Assert.Equal(1, recording.DisposeCount);
     }
 
     [Fact]
     public void Dispose_Is_Idempotent()
     {
         var recording = new RecordingLayoutView();
-        var saved = DomBridge.LayoutViewFactory;
-        try
-        {
-            DomBridge.LayoutViewFactory = () => recording;
-            using var ctx = new JSContext();
-            var bridge = new DomBridge();
-            bridge.Attach(ctx, BodyHtml, "file:///d.html");
-            ctx.Eval("document.body.getBoundingClientRect();");
+        using var ctx = new JSContext();
+        var bridge = CreateBridgeWithLayoutView(recording);
+        bridge.Attach(ctx, BodyHtml, "file:///d.html");
+        ctx.Eval("document.body.getBoundingClientRect();");
 
-            bridge.Dispose();
-            bridge.Dispose();
-            Assert.Equal(1, recording.DisposeCount);
-        }
-        finally
-        {
-            DomBridge.LayoutViewFactory = saved;
-        }
+        bridge.Dispose();
+        bridge.Dispose();
+        Assert.Equal(1, recording.DisposeCount);
+    }
+
+    [Fact]
+    public void Two_Sessions_Use_Their_Own_Layout_View_Factories()
+    {
+        var recordingA = new RecordingLayoutView();
+        var recordingB = new RecordingLayoutView();
+        using var bridgeA = CreateBridgeWithLayoutView(recordingA);
+        using var bridgeB = CreateBridgeWithLayoutView(recordingB);
+        using var ctxA = new JSContext();
+        using var ctxB = new JSContext();
+
+        bridgeA.Attach(ctxA, BodyHtml, "file:///a.html");
+        bridgeB.Attach(ctxB, BodyHtml, "file:///b.html");
+        ctxA.Eval("document.body.getBoundingClientRect();");
+        ctxB.Eval("document.body.getBoundingClientRect();");
+
+        Assert.True(recordingA.GetGeometryCount >= 1);
+        Assert.True(recordingB.GetGeometryCount >= 1);
+        Assert.Equal(0, recordingA.DisposeCount);
+        Assert.Equal(0, recordingB.DisposeCount);
     }
 
     [Fact]
@@ -244,6 +246,12 @@ public sealed class DomBridgeSessionLifetimeTests
         // Source-compatibility guard: IDomBridgeRuntime consumers must not be forced to dispose
         // the bridge (Phase 2 P2.1 keeps IDisposable on the concrete type only).
         Assert.False(typeof(IDisposable).IsAssignableFrom(typeof(Broiler.HtmlBridge.Dom.IDomBridgeRuntime)));
+
+    private static DomBridge CreateBridgeWithLayoutView(ILayoutView layoutView) =>
+        new(new DomBridgeSessionOptions
+        {
+            LayoutViewFactory = () => layoutView,
+        });
 
     /// <summary>Test-local <see cref="ILayoutView"/> that records geometry queries and disposals.</summary>
     private sealed class RecordingLayoutView : ILayoutView

@@ -27,7 +27,7 @@ lineage comes from [Yantra JS](https://github.com/yantrajs/yantra).
 | `Broiler.Cli`, `Broiler.Wpt` | Rendering and web-platform-test tooling |
 | `Broiler.DevConsole`, `Broiler.DevSite` | Development and diagnostics tools |
 
-The solution also consumes the nested `Broiler.DateTime`, `Broiler.Regex`, and
+The application and integration solutions also consume the nested `Broiler.DateTime`, `Broiler.Regex`, and
 `Broiler.Unicode` components through `Broiler.JS`.
 
 ## Foundations and independence
@@ -112,17 +112,39 @@ Requirements:
 - Windows for WPF and Direct2D applications
 - Node.js only for the Broiler.HTML JavaScript-based WPT tooling
 
-Build and test the main solution:
+Choose the solution for the product, platform, or validation slice you are working on:
 
 ```bash
-dotnet build Broiler.slnx
-dotnet test Broiler.slnx
+dotnet build Broiler.Windows.Browser.slnx
+dotnet build Broiler.Linux.Writer.slnx
+dotnet test Broiler.Tests.slnx
 ```
 
-Run the WPF application on Windows:
+The root workspaces are deliberately split so an IDE does not load unrelated applications,
+platform backends, tests, samples, generators, and benchmarks:
 
-```bash
-dotnet run --project src/Broiler.App/Broiler.App.csproj
+| Scope | Solution |
+|---|---|
+| Browser applications | `Broiler.Windows.Browser.slnx`, `Broiler.Linux.Browser.slnx` |
+| Writer applications | `Broiler.Windows.Writer.slnx`, `Broiler.Linux.Writer.slnx`, `Broiler.WebAssembly.Writer.slnx` |
+| Hosted Writer | `Broiler.Office.Server.slnx` |
+| Rendering and WPT tools | `Broiler.Cli.slnx`, `Broiler.Wpt.slnx` |
+| Developer tooling | `Broiler.Tooling.slnx` |
+| Integration tests | `Broiler.Tests.slnx` |
+| Platform tests | `Broiler.Windows.Tests.slnx`, `Broiler.Linux.Tests.slnx`, `Broiler.WebAssembly.Tests.slnx` |
+| Performance harnesses | `Broiler.Benchmarks.slnx` |
+
+Each root solution contains only its declared entry points and their transitive
+`ProjectReference` closure. Component-owned unit tests remain in the existing component
+solutions such as `Broiler.Documents/Broiler.Documents.slnx` and
+`Broiler.UI/Broiler.UI.slnx`.
+
+Solution entry points are declared in `eng/solutions.json`. Regenerate and verify the
+dependency closures after changing project references:
+
+```powershell
+./scripts/update-solutions.ps1
+./scripts/verify-solution-projects.ps1
 ```
 
 Run the Win32/Direct2D application on Windows:
@@ -147,7 +169,8 @@ Broiler/
 ├── Broiler.Graphics/          # Git submodule
 ├── Broiler.HTML/              # Git submodule; contains a nested graphics checkout
 ├── Broiler.JS/                # Git submodule; contains DateTime, Regex, and Unicode
-└── Broiler.slnx
+├── eng/solutions.json         # focused-solution entry points and platform boundaries
+└── Broiler.*.slnx             # generated product/platform/test workspaces
 ```
 
 ## AI-assisted development

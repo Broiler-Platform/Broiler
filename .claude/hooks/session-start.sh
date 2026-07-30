@@ -1,9 +1,9 @@
 #!/bin/bash
 # SessionStart hook for Broiler.
 #
-# Prepares a Claude Code on the web container so the .NET solution can be
+# Prepares a Claude Code on the web container so the .NET solutions can be
 # built and the test suites run:
-#   1. Installs the .NET 10 SDK (the solution targets net10.0 / net10.0-windows).
+#   1. Installs the .NET 10 SDK (the solutions target net10.0 / net10.0-windows).
 #   2. Initializes the git submodules (Broiler.CSS / .DOM / .HTML / .JS / .Graphics).
 #
 # Both steps are idempotent (safe to re-run) and the whole hook is best-effort:

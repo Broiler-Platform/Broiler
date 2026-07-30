@@ -23,11 +23,13 @@ public class Acid2ImageComparisonTests
         get
         {
             var dir = AppDomain.CurrentDomain.BaseDirectory;
-            while (dir != null && !File.Exists(Path.Combine(dir, "Broiler.slnx")))
+            while (dir != null &&
+                   !(File.Exists(Path.Combine(dir, ".gitmodules")) &&
+                     File.Exists(Path.Combine(dir, "Directory.Build.props"))))
                 dir = Path.GetDirectoryName(dir);
 
             return dir ?? throw new InvalidOperationException(
-                "Could not locate repository root (Broiler.slnx)");
+                "Could not locate repository root (.gitmodules and Directory.Build.props).");
         }
     }
 

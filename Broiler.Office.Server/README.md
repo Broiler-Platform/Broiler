@@ -51,10 +51,9 @@ Kestrel listens on `https://localhost:7300` and `http://localhost:5300` (see
 
 ## Publish (single self-contained bundle)
 
-Publish the **project file**, not the directory. The directory also contains
-[`Broiler.Office.Server.slnx`](Broiler.Office.Server.slnx), and `dotnet publish` prefers the solution —
-which fans the single-file / RID / self-contained flags out to the two WebAssembly projects in the
-solution (`Broiler.Writer.WebAssembly`, `Broiler.Graphics.WebAssembly`), and those cannot be
+Publish the **project file**, not the root
+[`Broiler.Office.Server.slnx`](../Broiler.Office.Server.slnx). Publishing the solution would fan the
+single-file / RID / self-contained flags out to its WebAssembly projects, and those cannot be
 single-file-published (`MSB4057` / `NETSDK1099`). Naming the `.csproj` avoids that.
 
 Within the project the same flags are stripped before the Writer client is published (the `MSBuild`
@@ -117,6 +116,6 @@ Vendor another client's published `wwwroot` (under its own sub-path) and add an 
 
 ## Solution
 
-[`Broiler.Office.Server.slnx`](Broiler.Office.Server.slnx) bundles the server, the Writer WebAssembly
-client, and the direct-Canvas graphics backend. Like the other WebAssembly samples, it is a
-repo-root sibling with its own solution file and is not part of the root `Broiler.slnx`.
+The root [`Broiler.Office.Server.slnx`](../Broiler.Office.Server.slnx) bundles the server, the Writer
+WebAssembly client, and their complete transitive project-reference closure. It is separate from
+the desktop application and test solutions.

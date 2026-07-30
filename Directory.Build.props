@@ -128,12 +128,12 @@
     single-source paths for the Broiler.Dom and Broiler.Graphics kernels.
 
     Two submodules carry a nested checkout of these kernels for their own standalone builds
-    (Broiler.CSS/Broiler.DOM and Broiler.HTML/Broiler.Graphics). Left unmanaged the main
-    solution builds two nodes with the same assembly name for each kernel. Each submodule's
-    Directory.Build.props defaults $(BroilerDomPath)/$(BroilerGraphicsPath) to its nested
-    copy (used only when built standalone). In the in-tree main build those submodule props
+    (Broiler.CSS/Broiler.DOM and Broiler.HTML/Broiler.Graphics). Left unmanaged, in-tree
+    solution graphs could build two nodes with the same assembly name for each kernel. Each
+    submodule's Directory.Build.props defaults $(BroilerDomPath)/$(BroilerGraphicsPath) to
+    its nested copy (used only when built standalone). In root builds those submodule props
     chain up to THIS file, so the unconditional values below win and every consumer resolves
-    to the single ROOT checkout — one Broiler.Dom node and one Graphics node in the solution.
+    to the single ROOT checkout — one Broiler.Dom node and one Graphics node per build graph.
 
     scripts/check-submodule-sha-drift.sh fails CI if a nested submodule SHA drifts from the
     root, so the collapsed single node is always assembly-identical to the nested copy.

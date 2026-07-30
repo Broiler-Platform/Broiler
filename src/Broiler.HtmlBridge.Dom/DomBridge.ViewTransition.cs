@@ -27,22 +27,16 @@ namespace Broiler.HtmlBridge;
 /// screenshot mid-animation with unpinned timing.
 /// </para>
 /// <para>
-/// The pseudo-tree bake is deliberately <em>not</em> folded into the run-once
-/// <c>ApplySerializationTransforms</c> pass: capturing the old geometry probes layout during the
-/// script, which builds a render-document snapshot and would otherwise consume that run-once budget
-/// (and bake the overlay from the pre-callback state). Instead <see cref="ApplyViewTransitionRendering"/>
-/// runs from the serialize/render entry points after those transforms, skips geometry-snapshot passes
-/// (<see cref="_layoutGeometryPassActive"/>), and carries its own once-guard.
+/// The pseudo-tree bake remains separate from <c>ApplySerializationTransforms</c> because capturing
+/// old geometry probes layout during the script. <see cref="ApplyViewTransitionRendering"/> runs on
+/// each fresh serialize/render projection after the compatibility transforms and skips
+/// geometry-snapshot passes (<see cref="_layoutGeometryPassActive"/>).
 /// </para>
 /// </summary>
 public sealed partial class DomBridge
 {
     /// <summary>The active view transition, or <c>null</c> when none is running.</summary>
     private ViewTransitionState? _activeViewTransition;
-
-    /// <summary>Whether the <c>::view-transition</c> pseudo tree has been baked for this render.
-    /// Reset on reparse alongside <c>_serializationTransformsApplied</c>.</summary>
-    private bool _viewTransitionBaked;
 
     private sealed class ViewTransitionState
     {
@@ -276,17 +270,16 @@ public sealed partial class DomBridge
     /// <summary>
     /// Renders a running view transition: applies the <c>:active-view-transition-type()</c> rules it
     /// activates and materialises the <c>::view-transition</c> pseudo tree. Invoked from the
-    /// serialize/render entry points after the run-once serialization transforms, so its own layout
+    /// serialize/render entry points after the compatibility serialization transforms, so its own layout
     /// probes (already spent capturing the old state) cannot swallow it. Skips geometry-snapshot
-    /// passes so a mid-script <c>getBoundingClientRect()</c> never bakes the overlay, and carries its
-    /// own once-guard so repeated serialize calls stay idempotent. A no-op when no transition runs.
+    /// passes so a mid-script <c>getBoundingClientRect()</c> never bakes the overlay. Each call
+    /// operates on a fresh projection, so repeated renders stay idempotent without a live-tree guard.
     /// </summary>
     private void ApplyViewTransitionRendering(DomElement root)
     {
-        if (_activeViewTransition is null || _viewTransitionBaked || _layoutGeometryPassActive)
+        if (_activeViewTransition is null || _layoutGeometryPassActive)
             return;
 
-        _viewTransitionBaked = true;
         ApplyActiveViewTransitionTypeRules(root);
         ApplyViewTransitionPseudoTree(root);
     }
@@ -649,7 +642,7 @@ public sealed partial class DomBridge
     private void AttachSnapshotPaint(DomElement box, DomElement? content, string fallbackBackground)
     {
         if (content is not null)
-            AppendBridgeChild(box, content);
+            AppendBridgeChild(box, CloneSnapshotContentForRender(content));
         else
             InlineStyle(box)["background-color"] = fallbackBackground;
     }
@@ -869,18 +862,19 @@ public sealed partial class DomBridge
     private string GenerateAutoViewTransitionName(DomElement element, string keyword)
     {
         var map = _activeViewTransition!.AutoNames;
-        if (map.TryGetValue(element, out var existing))
+        var identityElement = ResolveRenderSource(element);
+        if (map.TryGetValue(identityElement, out var existing))
             return existing;
 
         // auto with an id → a stable id-derived name (two elements with the same id resolve equal, as
         // the spec requires); auto without an id, and match-element → a unique per-element name. The
         // "-ua-" prefix mirrors the spec's generated-name convention and cannot collide with a
         // <custom-ident> (which may not start with two dashes but may not be "-ua-…" either here).
-        var id = element.Id;
+        var id = identityElement.Id;
         var generated = keyword.Equals("auto", System.StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(id)
             ? "-ua-id-" + id
             : "-ua-el-" + (map.Count + 1);
-        map[element] = generated;
+        map[identityElement] = generated;
         return generated;
     }
 

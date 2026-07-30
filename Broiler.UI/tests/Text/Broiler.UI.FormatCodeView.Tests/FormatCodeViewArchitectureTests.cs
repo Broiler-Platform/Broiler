@@ -39,7 +39,9 @@ public sealed class FormatCodeViewArchitectureTests
         while (directory is not null)
         {
             string root = Path.Combine(directory.FullName, "Broiler.UI");
-            if (Directory.Exists(root) && File.Exists(Path.Combine(directory.FullName, "Broiler.slnx")))
+            if (Directory.Exists(root) &&
+                File.Exists(Path.Combine(directory.FullName, ".gitmodules")) &&
+                File.Exists(Path.Combine(directory.FullName, "Directory.Build.props")))
                 return Path.Combine([root, .. parts]);
             directory = directory.Parent;
         }

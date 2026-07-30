@@ -31,8 +31,21 @@ public sealed class CssExtractionPhaseZeroTests
         foreach (var file in legacyModels)
             Assert.False(File.Exists(Path.Combine(htmlSource, "Broiler.HTML.Core", "Entities", file)), file);
 
-        var solution = File.ReadAllText(Path.Combine(root, "Broiler.slnx"));
-        Assert.DoesNotContain("Broiler.HTML.CSS", solution, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Specialized_Solutions_Do_Not_Reference_The_Legacy_Css_Project()
+    {
+        var solutionPaths = Directory.GetFiles(
+            FindRepositoryRoot(),
+            "Broiler.*.slnx",
+            SearchOption.TopDirectoryOnly);
+        Assert.NotEmpty(solutionPaths);
+        foreach (var solutionPath in solutionPaths)
+        {
+            var solution = File.ReadAllText(solutionPath);
+            Assert.DoesNotContain("Broiler.HTML.CSS", solution, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     [Fact]
@@ -169,7 +182,8 @@ public sealed class CssExtractionPhaseZeroTests
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {
-            if (File.Exists(Path.Combine(directory.FullName, "Broiler.slnx")))
+            if (File.Exists(Path.Combine(directory.FullName, ".gitmodules")) &&
+                File.Exists(Path.Combine(directory.FullName, "Directory.Build.props")))
                 return directory.FullName;
             directory = directory.Parent;
         }

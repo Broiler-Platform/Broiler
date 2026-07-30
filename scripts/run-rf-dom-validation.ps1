@@ -21,21 +21,17 @@ elseif (-not [IO.Path]::IsPathRooted($ResultsDirectory)) {
 New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
 
 if (-not $NoBuild) {
-    & dotnet build (Join-Path $repoRoot 'Broiler.slnx') --configuration $Configuration --nologo -m:1
-    if ($LASTEXITCODE -ne 0) {
-        throw "RF-DOM solution build failed with exit code $LASTEXITCODE."
-    }
-
-    $standaloneProjects = @(
+    $validationProjects = @(
         'Broiler.DOM/Broiler.Dom.Tests/Broiler.Dom.Tests.csproj',
         'Broiler.DOM/Broiler.Dom.Html.Tests/Broiler.Dom.Html.Tests.csproj',
-        'src/Broiler.Wpt.Tests/Broiler.Wpt.Tests.csproj'
+        'src/Broiler.Wpt.Tests/Broiler.Wpt.Tests.csproj',
+        'src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj'
     )
     if ($IncludeVisual) {
-        $standaloneProjects += 'Broiler.Layout/Broiler.Layout.Tests/Broiler.Layout.Tests.csproj'
+        $validationProjects += 'Broiler.Layout/Broiler.Layout.Tests/Broiler.Layout.Tests.csproj'
     }
 
-    foreach ($project in $standaloneProjects) {
+    foreach ($project in $validationProjects) {
         & dotnet build (Join-Path $repoRoot $project) --configuration $Configuration --nologo -m:1
         if ($LASTEXITCODE -ne 0) {
             throw "RF-DOM validation project build failed for $project with exit code $LASTEXITCODE."

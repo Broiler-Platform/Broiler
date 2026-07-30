@@ -1,0 +1,290 @@
+[CmdletBinding()]
+param(
+    [switch] $Verify
+)
+
+$ErrorActionPreference = 'Stop'
+$repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$manifestPath = Join-Path $repositoryRoot 'eng/solutions.json'
+$manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+
+$duplicateCheckoutMappings = [ordered]@{
+    'Broiler.CSS/Broiler.DOM/' = 'Broiler.DOM/'
+    'Broiler.HTML/Broiler.Graphics/' = 'Broiler.Graphics/'
+    'Broiler.JS/Broiler.Regex/Broiler.Unicode/' = 'Broiler.JS/Broiler.Unicode/'
+}
+
+$referenceCache = @{}
+
+function Convert-ToRepositoryPath {
+    param(
+        [Parameter(Mandatory)]
+        [string] $FullPath
+    )
+
+    $normalizedFullPath = [IO.Path]::GetFullPath($FullPath)
+    $rootPrefix = $repositoryRoot.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if (-not $normalizedFullPath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Project path escapes the repository: $normalizedFullPath"
+    }
+    $relativePath = $normalizedFullPath.Substring($rootPrefix.Length).Replace('\', '/')
+
+    foreach ($mapping in $duplicateCheckoutMappings.GetEnumerator()) {
+        if ($relativePath.StartsWith($mapping.Key, [StringComparison]::OrdinalIgnoreCase)) {
+            $relativePath = $mapping.Value + $relativePath.Substring($mapping.Key.Length)
+            break
+        }
+    }
+
+    $canonicalFullPath = Join-Path $repositoryRoot $relativePath
+    if (-not (Test-Path -LiteralPath $canonicalFullPath -PathType Leaf)) {
+        throw "Project does not exist: $relativePath"
+    }
+
+    return $relativePath
+}
+
+function Resolve-ProjectReference {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProjectPath,
+
+        [Parameter(Mandatory)]
+        [string] $Include
+    )
+
+    $projectFullPath = Join-Path $repositoryRoot $ProjectPath
+    $projectDirectory = Split-Path -Parent $projectFullPath
+
+    $resolvedInclude = $Include
+    $resolvedInclude = $resolvedInclude.Replace(
+        '$(MSBuildThisFileDirectory)',
+        $projectDirectory + [IO.Path]::DirectorySeparatorChar)
+    $resolvedInclude = $resolvedInclude.Replace(
+        '$(BroilerDomPath)',
+        (Join-Path $repositoryRoot 'Broiler.DOM/Broiler.Dom/Broiler.Dom.csproj'))
+    $resolvedInclude = $resolvedInclude.Replace(
+        '$(BroilerGraphicsPath)',
+        (Join-Path $repositoryRoot 'Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj'))
+
+    if ($resolvedInclude.Contains('$(')) {
+        throw "Unsupported property in ProjectReference '$Include' from '$ProjectPath'."
+    }
+
+    if (-not [IO.Path]::IsPathRooted($resolvedInclude)) {
+        $resolvedInclude = Join-Path $projectDirectory $resolvedInclude
+    }
+
+    return Convert-ToRepositoryPath -FullPath $resolvedInclude
+}
+
+function Get-ProjectReferences {
+    param(
+        [Parameter(Mandatory)]
+        [string] $ProjectPath
+    )
+
+    if ($referenceCache.ContainsKey($ProjectPath)) {
+        return @($referenceCache[$ProjectPath])
+    }
+
+    $projectFullPath = Join-Path $repositoryRoot $ProjectPath
+    [xml] $project = Get-Content -Raw -LiteralPath $projectFullPath
+    $references = @(
+        $project.SelectNodes('//ProjectReference[@Include]') |
+            ForEach-Object {
+                foreach ($include in ([string] $_.Include).Split(';', [StringSplitOptions]::RemoveEmptyEntries)) {
+                    Resolve-ProjectReference -ProjectPath $ProjectPath -Include $include
+                }
+            } |
+            Sort-Object -Unique
+    )
+
+    $referenceCache[$ProjectPath] = $references
+    return @($references)
+}
+
+function Get-ProjectClosure {
+    param(
+        [Parameter(Mandatory)]
+        [string[]] $Roots
+    )
+
+    $pending = [Collections.Generic.Queue[string]]::new()
+    $visited = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+
+    foreach ($root in $Roots) {
+        $pending.Enqueue((Convert-ToRepositoryPath -FullPath (Join-Path $repositoryRoot $root)))
+    }
+
+    while ($pending.Count -gt 0) {
+        $projectPath = $pending.Dequeue()
+        if (-not $visited.Add($projectPath)) {
+            continue
+        }
+
+        foreach ($reference in Get-ProjectReferences -ProjectPath $projectPath) {
+            $pending.Enqueue($reference)
+        }
+    }
+
+    return @($visited | Sort-Object)
+}
+
+function Convert-ToXmlAttribute {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Value
+    )
+
+    return [Security.SecurityElement]::Escape($Value)
+}
+
+function New-SolutionText {
+    param(
+        [Parameter(Mandatory)]
+        [pscustomobject] $Definition,
+
+        [Parameter(Mandatory)]
+        [string[]] $Projects
+    )
+
+    $rootSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($root in $Definition.roots) {
+        [void] $rootSet.Add((Convert-ToRepositoryPath -FullPath (Join-Path $repositoryRoot $root)))
+    }
+
+    $groups = [ordered]@{}
+    $groups['Entry points'] = @($Projects | Where-Object { $rootSet.Contains($_) })
+    foreach ($project in $Projects | Where-Object { -not $rootSet.Contains($_) }) {
+        $topLevelDirectory = $project.Split('/')[0]
+        $groupName = "Dependencies/$topLevelDirectory"
+        if (-not $groups.Contains($groupName)) {
+            $groups[$groupName] = @()
+        }
+        $groups[$groupName] += $project
+    }
+
+    $lines = [Collections.Generic.List[string]]::new()
+    $lines.Add('<Solution>')
+    $lines.Add('  <!-- Generated from eng/solutions.json by scripts/update-solutions.ps1. -->')
+    $lines.Add('  <Configurations>')
+    $lines.Add('    <BuildType Name="Debug" />')
+    $lines.Add('    <BuildType Name="Release" />')
+    $lines.Add('  </Configurations>')
+
+    foreach ($group in $groups.GetEnumerator()) {
+        if ($group.Value.Count -eq 0) {
+            continue
+        }
+
+        $folderName = Convert-ToXmlAttribute -Value "/$($group.Key)/"
+        $lines.Add("  <Folder Name=`"$folderName`">")
+        foreach ($project in $group.Value | Sort-Object) {
+            $projectPath = Convert-ToXmlAttribute -Value $project
+            $lines.Add("    <Project Path=`"$projectPath`" />")
+        }
+        $lines.Add('  </Folder>')
+    }
+
+    $lines.Add('</Solution>')
+    return ($lines -join "`n") + "`n"
+}
+
+$manifestSolutionPaths = @($manifest.solutions | ForEach-Object { [string] $_.path })
+$duplicateManifestPaths = @(
+    $manifestSolutionPaths |
+        Group-Object |
+        Where-Object Count -gt 1 |
+        ForEach-Object Name
+)
+if ($duplicateManifestPaths.Count -gt 0) {
+    throw "Duplicate solution paths in eng/solutions.json:`n  $($duplicateManifestPaths -join "`n  ")"
+}
+
+$testRootOwners = @{}
+foreach ($definition in $manifest.solutions | Where-Object path -Like '*.Tests.slnx') {
+    foreach ($root in $definition.roots) {
+        $canonicalRoot = Convert-ToRepositoryPath -FullPath (Join-Path $repositoryRoot $root)
+        if ($testRootOwners.ContainsKey($canonicalRoot)) {
+            throw (
+                "Test root '$canonicalRoot' belongs to both " +
+                "'$($testRootOwners[$canonicalRoot])' and '$($definition.path)'.")
+        }
+        $testRootOwners[$canonicalRoot] = $definition.path
+    }
+}
+
+$topLevelSolutions = @(
+    Get-ChildItem -LiteralPath $repositoryRoot -Filter '*.slnx' -File |
+        ForEach-Object { $_.Name } |
+        Sort-Object
+)
+$unexpectedSolutions = @(
+    $topLevelSolutions |
+        Where-Object { $_ -notin $manifestSolutionPaths }
+)
+if ($unexpectedSolutions.Count -gt 0) {
+    throw "Top-level solution files are not declared in eng/solutions.json:`n  $($unexpectedSolutions -join "`n  ")"
+}
+
+$errors = [Collections.Generic.List[string]]::new()
+$utf8WithoutBom = [Text.UTF8Encoding]::new($false)
+
+foreach ($definition in $manifest.solutions) {
+    $solutionPath = Join-Path $repositoryRoot $definition.path
+    $projects = Get-ProjectClosure -Roots @($definition.roots)
+
+    if ($definition.path -notlike '*.Tests.slnx' -and
+        $definition.path -ne 'Broiler.Benchmarks.slnx') {
+        $qualityProjects = @(
+            $projects |
+                Where-Object { $_ -match '(?i)\.(Tests|Benchmarks)\.csproj$' }
+        )
+        if ($qualityProjects.Count -gt 0) {
+            $errors.Add(
+                "$($definition.path) includes test or benchmark projects: " +
+                ($qualityProjects -join ', '))
+        }
+    }
+
+    foreach ($pattern in @(
+        $definition.forbiddenProjectPatterns |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string] $_) }
+    )) {
+        $violations = @($projects | Where-Object { $_ -match $pattern })
+        if ($violations.Count -gt 0) {
+            $errors.Add(
+                "$($definition.path) crosses a declared platform boundary for '$pattern': " +
+                ($violations -join ', '))
+        }
+    }
+
+    $expectedText = New-SolutionText -Definition $definition -Projects $projects
+    if ($Verify) {
+        if (-not (Test-Path -LiteralPath $solutionPath -PathType Leaf)) {
+            $errors.Add("$($definition.path) is missing. Run scripts/update-solutions.ps1.")
+            continue
+        }
+
+        $actualText = [IO.File]::ReadAllText($solutionPath).Replace("`r`n", "`n")
+        if ($actualText -ne $expectedText) {
+            $errors.Add("$($definition.path) is stale. Run scripts/update-solutions.ps1.")
+        }
+    }
+    else {
+        [IO.File]::WriteAllText($solutionPath, $expectedText, $utf8WithoutBom)
+        Write-Host ("Updated {0} ({1} roots, {2} projects)." -f
+            $definition.path,
+            @($definition.roots).Count,
+            $projects.Count)
+    }
+}
+
+if ($errors.Count -gt 0) {
+    throw "Solution verification failed:`n  $($errors -join "`n  ")"
+}
+
+if ($Verify) {
+    Write-Host "Verified $($manifest.solutions.Count) focused solutions against eng/solutions.json."
+}
