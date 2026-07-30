@@ -23,29 +23,21 @@ Delete the patch file and its row below once the pointer is bumped.
 
 | Patch | Submodule | Summary |
 | --- | --- | --- |
-| `0035-dom-create-element-local-name-colon.patch` | `Broiler.DOM` | Stop `DomDocument.CreateElement` routing through the namespace-aware `DomName` constructor. Per DOM, `createElement` takes a *local* name: it does no prefix splitting and no qualified-name validation. Because that is also the HTML parser's element-creation path, a tag name the tokeniser legitimately produced — anything with a leading, trailing or doubled colon, e.g. `<x::y>` — threw `'…' is not a valid qualified name` and took down the whole page render (WPT issue #1491 problem 1, `navigation-timing/dom-interactive-media-document.html`, whose name came from WebM bytes). |
-| `0036-css-system-colors-and-logical-viewport-units.patch` | `Broiler.CSS` | Two whole-canvas failures from WPT issue #1491. **System colours** (problem 28): `CssSystemColors` carried only `Field`/`FieldText`, so `Canvas`, `CanvasText`, `ButtonFace` and the rest fell through to the named-colour lookup and resolved to black — `forced-colors-mode-20.html` rendered 98% black against Chromium's 98% white, and the whole family failed the same way. Fills in the CSS Color 4 §6 table from the light palette, aliases the §6.2 deprecated keywords, and adds a `CssColorScheme` overload for a dark used colour scheme. **Logical viewport units** (problem 30): `vb`/`vi` did not parse at all, so `page-box-008-print.html`'s `block-size: 100vb` box got no size. Adds them against the root element's writing mode plus the `sv*`/`lv*`/`dv*` variants, and fixes the number/unit split that canonicalisation broke (`"100svmin"` parsed its number as `"100s"`). |
-| `0037-html-root-writing-mode-for-logical-viewport-units.patch` | `Broiler.HTML` | Hands the root element's `writing-mode` to `CssLengthParser.SetViewportSize` alongside the viewport dimensions, so `vi`/`vb` resolve on the axes CSS Values 4 §6.1.4 specifies. **Apply after 0036** — it calls the overload that patch adds. |
-| `0038-dom-node-movebefore.patch` | `Broiler.DOM` | Adds the canonical `DomNode.MoveBefore` — the atomic form of `Node.moveBefore()`. Because the spec requires both parents to share a shadow-including root, a moved node's connectedness cannot change, so the document's id index is deliberately not torn down and rebuilt and the node is never disconnected (an `<iframe>` does not reload, a render-blocking element keeps blocking). Observers still get records for both parents; only the disconnection is skipped. WPT issue #1491 problem 27, `dom/nodes/moveBefore/preserve-render-blocking-style.html`, which rendered white because the missing method threw and the document was never styled. |
-| `0039-css-contrast-color-and-style-container-queries.patch` | `Broiler.CSS` | Adds `contrast-color(<color>)` — resolves to whichever of black or white contrasts more, by WCAG 2 contrast ratio over relative luminance; the threshold is where the two ratios are equal (luminance ≈ 0.1791), **not** mid-grey, so `#767676` takes black while `#757575` takes white. Also implements `style()` container queries, which were explicitly unsupported and forced the whole query false; a style container needs no `container-type` (css-contain-3 makes every element one). Two parsing bugs fell out: `SplitContainerName` read `style` as a container *name*, and the tokenizer split it from its argument list — each silently made every style query false. WPT issue #1491 problem 6, `css/css-color/contrast-color-style-query.html`, which needs both features plus `@property` registration to compose. **No main-repo fallback is possible** — the cascade lives entirely in the submodule — so this one is inert on CI until applied. Independent of 0036: no file overlap, applies in either order. |
 | `0040-graphics-android-opengles-backend.patch` | `Broiler.Graphics` | Adds `Broiler.Graphics.Android`, the Android EGL / OpenGL ES presentation backend (phase A1), plus the Android system-font paths `FallbackSystemFont` was missing. Three things cannot be copied from the Linux EGL backend and each is a hard failure if missed: Android has no desktop GL, so the context binds `EGL_OPENGL_ES_API` (0x30A0) and the config asks for `EGL_OPENGL_ES3_BIT` (0x40) rather than `EGL_OPENGL_API`/`EGL_OPENGL_BIT`; the soname is `libEGL.so` with no `.1`; and `glBlitFramebuffer` is ES 3.0, which fixes the feature floor. The surface lifecycle is the part with no Linux equivalent — the EGL *surface* is torn down and rebuilt on every rotation while the context and its GPU resources survive, and `EGL_CONTEXT_LOST` surfaces as the neutral `BDeviceLostException`. Without the font paths an Android build finds no face at all and renders no text. **No main-repo fallback is possible** — the backend is a submodule assembly — so `Broiler.Graphics.Android` and its 16 tests are absent from every build until this is applied. Independent of 0035–0039: no file overlap. |
+| `0041-html-animated-image-frame-at-presentation-time.patch` | `Broiler.HTML` | An animated image painted frame 0 no matter when the render claimed to be taken, because a still render decodes each image once and nothing carried elapsed time into the decode. Selects the frame the image's own timeline has reached at `ImageAnimationClock.PresentationTime` (the main-repo clock in `Broiler.Media.Image`) via `ImageSequence.FrameAt`, read at `StubImageAdapter`'s decode — the single seam where a sequence collapses to one bitmap. WPT issue #1491 problems 7–10, the four `css/css-image-animation/*-paused.html` tests, which screenshot at 300 ms and rendered whole-canvas green against a whole-canvas red reference. **No main-repo fallback:** the decode lives entirely in the submodule, so CI still paints frame 0 until this is applied. Verified locally against Chromium references: 0.0% → 100% on all four. |
 
-0036 and 0037 are a pair: 0037's call site needs the `SetViewportSize` overload
-0036 introduces, so applying 0037 alone will not compile. There is no main-repo
-fallback for either — until both are applied and the pointers bumped, CI still
-resolves system colours to black and `vb`/`vi` to nothing.
+The half of 0041 that is on CI already is the machinery it drives:
+`ImageSequence.FrameAt` and `ImageAnimationClock` in `Broiler.Media`, and the WPT
+runner pinning that clock from each test's `takeScreenshotDelayed(N)`. Applying
+the patch is what connects them to the paint.
 
-A main-repo fallback ships for 0038 too: the bridge's `moveBefore` binding
-(`DomBridge.MoveNodeBefore`) reproduces the observable behaviour on the primitives
-available at the pinned submodule SHA, so the API exists and the WPT test is
-green on CI without the patch. It is not fully atomic — the node is briefly
-detached, so the id index churns. When 0038 lands, replace that method's body
-with `parent.MoveBefore(node, reference)` and delete its local
-`EnsurePreMoveValidity`, which duplicates the canonical check.
+## Landed
 
-A main-repo fallback ships for 0035, so the WPT test that reported the crash is
-green on CI without it: `FragmentTreeBuilder.BuildEmbeddedDocumentMarkup` no
-longer feeds a frame's non-HTML resource to the HTML parser, which is what minted
-that tag name. The patch is the fix at its own layer — it covers every other way
-such a tag name reaches the parser, ordinary markup included — so it is still
-worth applying.
+`0035`–`0039` have been applied and the pointers bumped — verified against the
+submodules this checkout pins, whose histories now carry those commits — so their
+files are removed from this directory as the workflow above prescribes. Lower
+numbers were removed by earlier sessions under the same rule. Source comments
+that still name a patch (e.g. "patches/0002, applied by the maintainer") are
+historical notes, not pending work; a few older tests still probe at runtime for
+a patch they were written before, which is likewise not a signal that it is
+outstanding.

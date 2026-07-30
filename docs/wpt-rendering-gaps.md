@@ -6,20 +6,21 @@
   reference, so each is a whole-canvas difference rather than a tolerance
   problem.
 - **Not in scope:** problem 1 (the `DomDocument.CreateElement` crash) is fixed —
-  frames no longer parse a non-HTML resource as markup, and
-  `patches/0035-…` carries the DOM-layer fix. Problems 2 and 3 (per-test memory
+  frames no longer parse a non-HTML resource as markup, and `patches/0035-…`
+  carried the DOM-layer fix (since applied). Problems 2 and 3 (per-test memory
   aborts) are the per-element JS wrapper cost, tracked in
   [the root roadmap](ROADMAP.md#htmlbridge-runtime).
 - **Companion documents:** [root roadmap](ROADMAP.md) for cross-component work;
   the component roadmaps own the implementation once an item below names them.
-- **Progress:** problems 6, 24, 25, 27, 28 and the `vb` half of 30 are fixed; each
-  section says what landed, what was verified locally, and what is left for CI to
-  confirm. Several of those fixes live in submodules whose remotes this session
-  cannot push to, so they ship as patches under `patches/` and are **not on CI
-  until a maintainer applies them and bumps the pointers** — see
-  [`patches/README.md`](../patches/README.md). Problems 25 and 27 do work on CI
-  today: 25 is entirely main-repo, and 27 carries a main-repo fallback. Problems
-  6, 28 and 30 are inert until their patches land.
+- **Progress:** problems 6, 7–10, 24, 25, 27, 28 and the `vb` half of 30 are
+  fixed; each section says what landed, what was verified locally, and what is
+  left for CI to confirm. Patches `0035`–`0039` — which carried the submodule half
+  of 6, 27, 28 and 30 — **have since been applied and their pointers bumped**, so
+  all of those are now live on CI rather than pending. The one fix still waiting
+  on a maintainer is problems 7–10's:
+  [`patches/0040`](../patches/README.md), whose remote this session cannot push to
+  (403, as documented in `CLAUDE.md`). It has no main-repo fallback, so those four
+  tests stay at 0.0% on CI until it lands.
 
 Every item names an owner, the evidence behind it, its next action, and an
 objective exit gate. Where the evidence is a local measurement rather than the CI
@@ -37,16 +38,31 @@ test, so a local investigation needs both halves:
 dotnet run --project src/Broiler.Wpt -- --wpt-dir <checkout> --render <checkout>/<test>
 
 # 2. Chromium's reference (Playwright is pinned in tests/wpt/package.json;
-#    this container already has a browser at $PLAYWRIGHT_BROWSERS_PATH)
-node scripts/generate-wpt-references.js <checkout>/<dir> <refs>/<dir> --base-dir <checkout>
+#    this container already has a browser at $PLAYWRIGHT_BROWSERS_PATH).
+#    `npm install` puts playwright under tests/wpt/node_modules, which is not on
+#    the resolution path of a script run from scripts/ — hence NODE_PATH.
+(cd tests/wpt && npm install)
+NODE_PATH=tests/wpt/node_modules BROILER_CHROMIUM_PATH=/opt/pw-browsers/chromium \
+  node scripts/generate-wpt-references.js <checkout>/<dir> <refs> --base-dir <checkout>
 
 # 3. The comparison, its category, and side-by-side images
 dotnet run --project src/Broiler.Wpt -- --wpt-dir <checkout> --reference-dir <refs> \
   --subset <dir> --failure-images <out>
 ```
 
-Two caveats, both learned the hard way while writing this document:
+Four caveats, all learned the hard way:
 
+- **The reference generator's output path is relative to `--base-dir`, not to the
+  test directory.** Pointing it at one subdirectory writes
+  `<out>/<dir>/<dir>/…`, and the runner then reports every test as
+  `MissingReferenceImage` rather than as a mismatch. Give `--reference-dir` the
+  root that mirrors `--wpt-dir`.
+- **Playwright's pinned browser build may not be the one installed.** The
+  container ships a browser at `$PLAYWRIGHT_BROWSERS_PATH` whose build number
+  need not match `tests/wpt/package.json`'s pin, and the launch then fails with
+  "Executable doesn't exist". Point the generator at the installed one with
+  `BROILER_CHROMIUM_PATH=/opt/pw-browsers/chromium` rather than downloading
+  another.
 - **A test that needs the WPT server cannot be reproduced from a bare checkout.**
   `.sub.html` files need substitution, `?pipe=trickle(…)` needs the server's pipe
   handlers, and cross-origin tests need a second host. Offline, both engines fail
@@ -56,34 +72,61 @@ Two caveats, both learned the hard way while writing this document:
   reads a view-transition or `takeScreenshotDelayed` test at the wrong moment, so
   the local reference disagrees with CI's.
 
-## Animated images always paint their first frame
+## Animated images always painted their first frame — **fixed, pending patch**
 
 - **Tests:** problems 7–10, all four
   `css/css-image-animation/image-animation-*-paused.html`.
 - **Owner:** Broiler.Media (frame selection) with Broiler.HTML (a paint-time
   clock).
-- **Current evidence:** measured locally, and unambiguous — for all four tests
-  Broiler's canvas is 100% `rgb(0,255,0)` and Chromium's is 100% `rgb(255,0,0)`.
+- **Original evidence:** measured locally, and unambiguous — for all four tests
+  Broiler's canvas was 100% `rgb(0,255,0)` and Chromium's is 100% `rgb(255,0,0)`.
   The tests set an animated GIF (`images/anim-gr.gif`, two frames, green then
   red) as the root or body background and ask for `image-animation: paused`.
   Chromium does not implement `image-animation`, so its reference is simply the
   frame its own timeline had reached at screenshot time (300 ms, via
-  `takeScreenshotDelayed`); Broiler paints frame 0 because nothing in the static
-  render path carries elapsed time into image decoding. The propagation
+  `takeScreenshotDelayed`); Broiler painted frame 0 because nothing in the static
+  render path carried elapsed time into image decoding. The propagation
   variations (root vs body, propagating or not) are incidental — the background
-  is painted in every case, only its frame is wrong.
-- **Next actions:**
-  1. Give the render pass a pinned presentation time and select an animated
-     image's frame from its own frame delays against that time, instead of
-     always decoding frame 0.
-  2. Thread the runner's reftest-wait delay into that presentation time so a
-     `takeScreenshotDelayed(N)` test is rendered as of N.
-  3. Only then implement `image-animation: paused` itself; while Chromium's
-     reference is the unpaused render, honouring the property makes these four
-     tests *diverge* rather than converge.
-- **Exit gate:** an animated image paints the frame its timeline selects at the
-  pass's presentation time, the four tests match their references, and a focused
-  test pins frame selection at two different presentation times.
+  is painted in every case, only its frame was wrong.
+- **What landed, in two halves.** The machinery is main-repo and on CI now; the
+  single call site that consumes it is the patch.
+  1. **Main repo.** `ImageSequence.FrameAt` / `FrameIndexAt` in `Broiler.Media`
+     answer "which frame is showing at time *t*", and `ImageAnimationClock`
+     carries the presentation time a still render is taken at. The WPT runner
+     pins that clock per test from the test's own `takeScreenshotDelayed(N)`,
+     read from the source before the script pass and the post-processor strip the
+     `<script>` that carries it.
+  2. **`patches/0040` (Broiler.HTML).** `StubImageAdapter`'s decode — the single
+     seam where a decoded sequence collapses to one bitmap — selects the frame at
+     that clock instead of taking `FirstFrame`.
+- **The clamp is what makes the numbers work.** `anim-gr.gif`'s green frame
+  carries a **10 ms** delay and its red frame 100 s. Taken literally, a 300 ms
+  screenshot would land deep in a fast loop; every engine instead treats a delay
+  that short as "unspecified" and substitutes 100 ms (Blink's threshold is 11 ms,
+  and the references are Chromium's). So green occupies 0–100 ms and red
+  everything after — 300 ms is red, which is exactly what the reference shows.
+- **`image-animation: paused` is still deliberately unimplemented.** Chromium
+  does not implement it either, so each reference *is* the unpaused render;
+  honouring the property would make these four tests diverge again. The property
+  is what the tests are named for, not what they currently measure.
+- **Verified:** the four tests, run against locally generated Chromium
+  references, go from **0.0% to 100%** — the same 0.0% CI reports, reproduced
+  before the change and gone after. Four focused tests cover the timeline
+  (selection at successive times, the short-delay clamp, loop-count wrap versus
+  hold, and the clock's nested pin/restore), and 14 cases cover the runner's
+  delay extraction — including the negative half, that a test with no literal
+  delay resolves to zero rather than guessing.
+- **Remaining:** the patch. There is no main-repo fallback — the decode is
+  entirely the submodule's — so CI paints frame 0 until it is applied and the
+  pointer bumped. A frame-selection test at the `BBitmap` level has to wait for
+  the same thing: `Broiler.HTML` has no test project of its own, and a main-repo
+  test calling the new `DecodeFrameAt` would not compile against the pinned
+  submodule.
+- **A cost worth naming:** the clock is process-wide, not thread-local, because
+  image loading is dispatched to the thread pool — a `[ThreadStatic]` value would
+  be invisible to the code that reads it. Concurrent renders at *different*
+  presentation times are therefore unsupported, which is the honest state of a
+  stack that renders one document per process.
 
 ## View transitions composite no captured content
 
@@ -113,7 +156,7 @@ Two caveats, both learned the hard way while writing this document:
   their group geometry, the ten tests report a non-trivial match, and a focused
   test asserts old/new snapshot paint order against the pseudo root.
 
-## System colour keywords did not resolve at all — **fixed, pending patch**
+## System colour keywords did not resolve at all — **fixed**
 
 - **Test:** problem 28, `forced-colors-mode/forced-colors-mode-20.html`.
 - **Owner:** Broiler.CSS.
@@ -127,7 +170,8 @@ Two caveats, both learned the hard way while writing this document:
   unknown-colour fallback: black. That turned every system-colour test into a
   whole-canvas mismatch, and this one is only the worst-scoring member of the
   family.
-- **What landed:** `patches/0036-…` fills in the CSS Color 4 §6 table from the
+- **What landed:** `patches/0036-…` (since applied, pointer bumped) fills in the
+  CSS Color 4 §6 table from the
   light palette (matched to what Chromium reports, since the references are
   Chromium screenshots), maps the §6.2 deprecated keywords onto their aliases,
   and adds a `CssColorScheme` overload so a dark used colour scheme selects the
@@ -141,10 +185,10 @@ Two caveats, both learned the hard way while writing this document:
   so the render path demonstrably goes through it. 45 focused tests cover the
   light palette, the `color-scheme: dark` switch, and the deprecated aliases.
 - **Remaining:** the test itself is not in this container's WPT subset, so the
-  pixel result is CI's to confirm. The patch must be applied and the submodule
-  pointer bumped before CI sees any of this.
+  pixel result is CI's to confirm. The patch has since been applied and the
+  pointer bumped, so CI is now running this.
 
-## `contrast-color()` and style container queries — **fixed, pending patch**
+## `contrast-color()` and style container queries — **fixed**
 
 - **Test:** problem 6, `css/css-color/contrast-color-style-query.html`.
 - **Owner:** Broiler.CSS.
@@ -191,9 +235,11 @@ Two caveats, both learned the hard way while writing this document:
   ancestor walk. The walk reads cascaded declarations rather than
   `GetComputedStyle` because it runs *during* style computation and re-entering
   it for an ancestor would recurse.
-- **No main-repo fallback is possible:** the cascade lives entirely in
-  Broiler.CSS, so unlike problems 25 and 27 there is no main-repo layer to carry
-  an equivalent fix. This one is inert on CI until the patch is applied.
+- **No main-repo fallback was possible:** the cascade lives entirely in
+  Broiler.CSS, so unlike problems 25 and 27 there was no main-repo layer to carry
+  an equivalent fix — this one was inert on CI until its patch was applied.
+  `patches/0039` has since been applied and the pointer bumped, so CI now runs it
+  and the pixel result is CI's to confirm.
 
 ## `<base href>` was ignored for `<link rel=stylesheet>` in the render path — **fixed**
 
@@ -258,7 +304,8 @@ Two caveats, both learned the hard way while writing this document:
 - **Next actions:**
   1. ~~Resolve the logical viewport units (`vb`, `vi`, and their `sv`/`lv`/`dv`
      variants) against the writing mode.~~ **Done** — `patches/0036-…` and
-     `patches/0037-…`. `vb`/`vi` did not parse at all. They now resolve against
+     `patches/0037-…`, both since applied and their pointers bumped, so this is
+     live on CI. `vb`/`vi` did not parse at all. They now resolve against
      the *root element's* writing mode, which is what CSS Values 4 §6.1.4
      specifies (not the element the unit appears on), so a per-pass factor set
      from the root's mode is the right granularity; `Broiler.HTML`'s layout pass
@@ -314,13 +361,15 @@ Two caveats, both learned the hard way while writing this document:
      the move (records are queued for both parents); only the disconnection is
      skipped.
   2. The bridge binding in the main repo, which is what CI runs. It exposes
-     `moveBefore` on the element surface and — **until 0038 lands** — reproduces
-     the observable behaviour on the primitives available at the pinned submodule
-     SHA: a reposition that skips the sub-document onload firing, so a moved
-     iframe does not reload. It is *not* fully atomic (the node is briefly
-     detached, so the id index churns). `DomBridge.MoveNodeBefore` carries the
-     note; once the pointer is bumped its body becomes one call to
-     `parent.MoveBefore` and the duplicated validity check goes away.
+     `moveBefore` on the element surface. It originally reproduced the observable
+     behaviour on the primitives available at the pinned submodule SHA — a
+     reposition that skipped the sub-document onload firing, not fully atomic
+     (the node was briefly detached, so the id index churned). **0038 has since
+     been applied and the pointer bumped**, so that interim body is gone:
+     `DomBridge.MoveNodeBefore` now delegates the move to `parent.MoveBefore` and
+     keeps only what is genuinely the bridge's — marshalling the canonical
+     `DomException` into a JavaScript `DOMException`, and invalidating the style
+     scopes the reposition dirtied. The duplicated validity check is deleted.
 - **Verified:** rendering the move scenario paints green where it painted white;
   moving an orphan throws as the spec requires; a within-parent forward reorder
   lands in the right slot. 16 DOM-level tests (in the patch) and 10 bridge-level
@@ -331,8 +380,9 @@ Two caveats, both learned the hard way while writing this document:
   silently accepted by an insert; a caller relying on the atomic guarantee needs
   the exception instead of insert-shaped behaviour.
 - **Remaining:** the WPT test is not in this container's subset, so its pixel
-  result is CI's to confirm — and CI sees only the bridge fallback until 0038 is
-  applied.
+  result is CI's to confirm. CI now runs the atomic version; the 10 bridge-level
+  tests were re-run against it unchanged, which is the evidence that the
+  delegation preserved the binding's observable behaviour.
 
 ## Shadow-DOM focus delegation paints the wrong surface
 
@@ -406,15 +456,17 @@ Two caveats, both learned the hard way while writing this document:
 
 Local numbers come from this container against locally generated Chromium
 references; CI's are authoritative where they disagree. **Status** records work
-landed since the run — a fix marked *patch* is not yet on CI, because it lives in
-a submodule whose remote this session cannot push to (see `patches/README.md`).
+landed since the run — a fix marked *pending patch* is not yet on CI, because it
+lives in a submodule whose remote this session cannot push to (see
+`patches/README.md`). Patches 0035–0039 have since been applied and their
+pointers bumped, so everything they carried is now on CI.
 
 | # | Test | CI | Local observation | Status |
 | --- | --- | --- | --- | --- |
 | 4 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | 99.8% — needs the server's `trickle` pipe | open |
 | 5 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | ours `#121212`, Chromium white — needs `.sub` | open |
-| 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green | **fixed** (patch 0039) |
-| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | open |
+| 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green | **fixed** — patch 0039 applied |
+| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | **fixed** — 0.0% → 100% locally; **pending patch 0040** |
 | 11 | `css-page/monolithic-overflow-011-print` | 0.0% | ours blank, Chromium yellow + hotpink | open |
 | 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white | open |
 | 13 | `css-transforms/animation/transform-interpolation-002` | 0.0% | 100% — both empty offline | open |
@@ -422,7 +474,7 @@ a submodule whose remote this session cannot push to (see `patches/README.md`).
 | 24 | `canvas/…/manual/dialog-paints-in-top-layer.tentative` | 0.0% | ours dialog, Chromium blank (unsupported) | **fixed** — reclassified Manual |
 | 25 | `the-link-element/stylesheet-with-base` | 0.0% | ours red (trap file), Chromium white | **fixed** — renders green locally |
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
-| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — bridge on CI, patch 0038 for the atomic DOM move |
-| 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** (patch 0036) |
+| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — patch 0038 applied; bridge now delegates to it |
+| 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** — patch 0036 applied |
 | 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc`, Chromium white + chrome | open |
-| 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** (patches 0036/0037) |
+| 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** — patches 0036/0037 applied |

@@ -14,10 +14,10 @@ namespace Broiler.Cli.Tests;
 /// Chromium's 100% green.
 /// </para>
 /// <para>
-/// These cover the main-repo binding, which is what CI runs. The canonical DOM-level
-/// implementation and its own tests ship as <c>patches/0038-dom-node-movebefore.patch</c> — the
-/// submodule remote is outside this session's GitHub scope — so until that lands the bridge
-/// reproduces the observable behaviour on the primitives available at the pinned submodule SHA.
+/// These cover the main-repo binding. The move itself is the canonical
+/// <c>DomNode.MoveBefore</c> (<c>patches/0038</c>, applied by the maintainer and now pinned);
+/// what the binding still owns is the JavaScript surface, the <c>DOMException</c> marshalling
+/// and the style-scope invalidation, so these stay the guard on that seam.
 /// </para>
 /// </summary>
 public sealed class MoveBeforeBindingTests

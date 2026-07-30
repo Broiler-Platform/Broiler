@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Broiler.HTML.Image;
+using Broiler.Media.Image;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
@@ -1478,6 +1479,11 @@ internal sealed partial class WptTestRunner
         // failures so triage can read intent without opening the file (#9).
         var metadata = ExtractTestMetadata(html);
 
+        // The instant this test wants to be screenshotted at, read now: `html` is rewritten
+        // by the script pass and the post-processor below, and the call that carries the
+        // delay lives in a <script> both of them remove.
+        TimeSpan presentationTime = ScreenshotPresentationTime(html);
+
         if (IsWptVariantTest(html))
         {
             return new WptTestResult
@@ -1576,6 +1582,7 @@ internal sealed partial class WptTestRunner
         HTML.Image.BBitmap rendered;
         try
         {
+            using var presentation = ImageAnimationClock.Pin(presentationTime);
             rendered = RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
                 backgroundColor: BColor.White,
                 stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
@@ -1884,6 +1891,9 @@ internal sealed partial class WptTestRunner
         if (IsMediaPlaybackTest(html))
             throw new InvalidOperationException("Test requires media playback.");
 
+        // Read before the script pass and post-processor rewrite `html` out from under it.
+        TimeSpan presentationTime = ScreenshotPresentationTime(html);
+
         var testBaseUrl = new Uri(Path.GetFullPath(htmlPath)).AbsoluteUri;
 
         // Set local base path for sub-resource resolution.
@@ -1909,6 +1919,7 @@ internal sealed partial class WptTestRunner
             };
         }
 
+        using var presentation = ImageAnimationClock.Pin(presentationTime);
         return RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
             backgroundColor: BColor.White,
             stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
@@ -1969,6 +1980,55 @@ internal sealed partial class WptTestRunner
 
     [GeneratedRegex(@"<style[^>]*>(?<css>.*?)</style>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex StyleBlockRegex();
+
+    /// <summary>
+    /// The moment a test asks to be screenshotted at, as an offset from load.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A <c>reftest-wait</c> test that calls <c>takeScreenshotDelayed(N)</c>
+    /// (<c>/common/reftest-wait.js</c>) is stating that its result is only correct once N
+    /// milliseconds of the page's timeline have passed — the reference generator honours that
+    /// by waiting, so the runner has to render *as of* the same instant or the two disagree by
+    /// construction. Anything driven by that timeline reads this: today that is animated image
+    /// frame selection, through <see cref="ImageAnimationClock"/>.
+    /// </para>
+    /// <para>
+    /// This is not a substitute for actually running the page for N milliseconds — no timers
+    /// fire and no animations are ticked. It is the one number those mechanisms need to agree
+    /// on, and it is read from the test source before scripts run, because the post-processor
+    /// strips the <c>&lt;script&gt;</c> that carries it.
+    /// </para>
+    /// <para>
+    /// A test with no delayed screenshot renders at zero — the first frame, which is what every
+    /// render produced before this existed.
+    /// </para>
+    /// </remarks>
+    internal static TimeSpan ScreenshotPresentationTime(string? html)
+    {
+        if (string.IsNullOrEmpty(html))
+            return TimeSpan.Zero;
+
+        Match match = ScreenshotDelayRegex().Match(html);
+        if (!match.Success ||
+            !double.TryParse(
+                match.Groups["ms"].Value,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double milliseconds) ||
+            !double.IsFinite(milliseconds) ||
+            milliseconds <= 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        return TimeSpan.FromMilliseconds(milliseconds);
+    }
+
+    // Case-sensitive: this is a JavaScript identifier, and the surrounding word boundary keeps
+    // a test's own `myTakeScreenshotDelayed` helper from being read as the WPT one.
+    [GeneratedRegex(@"\btakeScreenshotDelayed\s*\(\s*(?<ms>[0-9]*\.?[0-9]+)\s*\)")]
+    private static partial Regex ScreenshotDelayRegex();
 
     internal HTML.Image.BBitmap RenderHtmlFileBitmapPublic(string htmlPath, string? wptRoot)
     {
