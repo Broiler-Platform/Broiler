@@ -145,6 +145,24 @@ public sealed partial class DomBridge
         double Length(int i, double percentBasis) =>
             i < values.Length ? ResolveLength(values[i].Trim(), percentBasis) : 0;
 
+        // A scale factor is <number> | <percentage> (css-transforms-2 §"scale"), and the percentage
+        // is simply the ratio: scale(50%) is scale(0.5). Number() could not parse "50%" at all and
+        // fell back to 0, which collapsed the box instead of halving it. Absent or unparsable falls
+        // back to 1, matching this parser's rule that what it cannot model contributes identity.
+        double Ratio(int i)
+        {
+            if (i >= values.Length)
+                return 1;
+
+            var v = values[i].Trim();
+            if (v.EndsWith('%'))
+                return double.TryParse(v[..^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var pct)
+                    ? pct / 100.0
+                    : 1;
+
+            return double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var n) ? n : 1;
+        }
+
         switch (name)
         {
             case "matrix":
@@ -153,14 +171,14 @@ public sealed partial class DomBridge
                     : Affine.Identity;
             case "scale":
             {
-                var sx = Number(0);
-                var sy = values.Length >= 2 ? Number(1) : sx;
+                var sx = Ratio(0);
+                var sy = values.Length >= 2 ? Ratio(1) : sx;
                 return new Affine(sx, 0, 0, sy, 0, 0);
             }
             case "scalex":
-                return new Affine(Number(0), 0, 0, 1, 0, 0);
+                return new Affine(Ratio(0), 0, 0, 1, 0, 0);
             case "scaley":
-                return new Affine(1, 0, 0, Number(0), 0, 0);
+                return new Affine(1, 0, 0, Ratio(0), 0, 0);
             case "translate":
                 return new Affine(1, 0, 0, 1, Length(0, boxWidth), Length(1, boxHeight));
             case "translatex":
