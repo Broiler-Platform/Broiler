@@ -101,6 +101,12 @@ something to attempt from inside the container.
 - WPT runner: `dotnet run --project src/Broiler.Wpt -- --wpt-dir tests/wpt
   --reference-dir tests/wpt/references [--subset <path>] [--failure-images <dir>]`.
   Pixel pass threshold is 99% match (≤1% differing pixels).
+- WPT per-test limits: 30s timeout (`--timeout`, `BROILER_WPT_TIMEOUT_SECONDS`)
+  and a 1024 MiB RAM cap (`--memory-limit-mb`, `BROILER_WPT_MEMORY_LIMIT_MB`,
+  0 disables). The cap is on the *growth* of the rendering process's resident
+  set during one test — a test that passes it is aborted and reported as
+  `MemoryLimitExceeded`, and a worker whose own resident set reaches the cap is
+  recycled between tests. See `src/Broiler.Wpt/WptMemoryGuard.cs`.
 - Current cross-component WPT work:
   `docs/ROADMAP.md#standards-and-test-infrastructure`. Generated results live
   under `tests/html/wpt-results` and `tests/css/wpt-results`.

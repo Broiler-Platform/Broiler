@@ -34,6 +34,8 @@ internal enum FailureCategory
     RenderingError,
     /// <summary>The test exceeded the configured execution timeout.</summary>
     Timeout,
+    /// <summary>The test was aborted after exceeding the configured per-test RAM cap.</summary>
+    MemoryLimitExceeded,
     /// <summary>The reference image could not be decoded.</summary>
     ReferenceDecodeError,
     /// <summary>Rendered output did not match the reference image.</summary>
