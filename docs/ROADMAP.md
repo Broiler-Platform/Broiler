@@ -2,7 +2,7 @@
 
 - **Status:** Active preview
 - **Scope:** Only unfinished work that crosses component or application boundaries
-- **Last reconciled:** 2026-07-29
+- **Last reconciled:** 2026-07-30
 
 Component-local work is tracked in the roadmaps linked from
 [the documentation index](README.md). This file does not repeat completed
@@ -192,6 +192,92 @@ primarily JS-observable state and the draw calls are still no-ops. A future real
 display-list or raster contract belongs in `Broiler.Graphics`; moving the stub
 would only put bridge behavior in the wrong assembly.
 
+#### DOM component rehoming
+
+**Owner:** `Broiler.DOM` for the canonical APIs, HtmlBridge Dom for the cutover
+and deletions, `Broiler.CSS.Dom` as the one other consumer.
+
+The DOM-bound slices of Phase 1 and Phase 3 are specific enough to sequence on
+their own. API design, unit tests, and component exit gates are items D1–D8 in
+[the Broiler.DOM roadmap](../Broiler.DOM/docs/roadmap.md); this section owns the
+order, the bridge-side cutover, the guard changes, and the submodule mechanics.
+
+**Current evidence (2026-07-30 source tree):** `Broiler.HtmlBridge.Dom` is 36,080
+lines against 2,473 in `Broiler.Dom` and 1,180 in `Broiler.Dom.Html`. The
+DOM-bound share is small and identified: roughly 2,000 lines of neutral algorithm
+to promote plus roughly 500 lines of bridge shim to delete. Specifically,
+`DomBridge/Attributes.cs` holds a case-insensitive qualified-name attribute
+lookup with ~195 bridge call sites that is independently reimplemented in
+`HtmlElementQueries.ReadNumericAttribute` and `CssSelectorMatcher.MatchesAttribute`;
+`Features/CharacterDataBinding.cs` implements DOM §4.10 against a 54-line
+`DomCharacterData`; `DomBridge.GetElementTextContent` duplicates canonical
+`DomNode.TextContent`; and the legacy-facade shim block in `DomBridge.cs`
+(`ChildElements`, `ChildAt`, `SetParent`, `IsText`, and siblings) accounts for
+~490 occurrences that mostly paraphrase canonical members. Everything larger in
+the assembly — `AnchorResolver` (4,620), `LayoutMetrics*` (2,718),
+`DomBridge.ViewTransition.cs` (1,024), the stylesheet and import code — belongs
+to Layout, CSS, or HTML per the target-ownership table above, not to `Broiler.DOM`.
+
+**Waves.** Each wave lands the canonical API first, cuts every consumer over, then
+deletes the old path. Waves 1–4 are behavior-preserving apart from two deliberate
+spec corrections that need their own tests — the `compareDocumentPosition` bitmask
+replacing a tri-state result, and character-data offset failures becoming a named
+`IndexSizeError` instead of a raw exception string. Waves 5 and 6 are gated on
+evidence that does not exist yet.
+
+| Wave | Canonical items | Bridge cutover and deletion | Other consumers | Gate |
+| --- | --- | --- | --- | --- |
+| 1 — API gaps | D1 attribute accessors, D2 character data, D3 `textContent` setter / `compareDocumentPosition` / element traversal | Delete the `Attributes.cs` accessor set, `GetElementTextContent`, `SetElementTextContent`, `CompareTreeOrder`, and the arithmetic in `CharacterDataBinding` | `CssSelectorMatcher.MatchesAttribute`, `HtmlElementQueries.ReadNumericAttribute` | Owner suites, bridge guards, pinned WPT/Acid A/B |
+| 2 — shim retirement | D4 `ChildNode`/`ParentNode` mixins | Classify and retire the `DomBridge.cs` shim block; inline canonical members at ~490 sites | None | Owner suites, full bridge suites, pinned WPT/Acid A/B |
+| 3 — HTML element ops | D5 `HtmlTableOperations`, `HtmlSelectQueries` | Reduce `TableBinding` and `SelectBinding` to wrapper installation and coercion; promote or delete `IsTableCellElement` | None | Owner suites, targeted table/select tests, WPT A/B |
+| 4 — fragment and metadata | D6 fragment context, base-href discovery, meta scanners, adjacency resolution | Delete `HtmlTreeBuilding.cs` and the bridge `<base>`/`<meta>` scans; keep CSP policy and the `innerHTML` orchestration | `Broiler.HtmlBridge.Core` CSP discovery | Owner suites, CSP tests, pinned pixel A/B (serialization-visible) |
+| 5 — form control state | D7 `HtmlFormState`, `HtmlFormQueries` | Move the neutral reflectors first; move state only after the baseline | None | Recorded Chromium characterization baseline, then owner suites |
+| 6 — shadow model | D8 `DomShadowRoot`, slots, composed traversal | Delete selector stamping, marker attributes, light-child hiding, sentinel unwrapping | `Broiler.CSS.Dom` scoped matching, `Broiler.HTML.Dom` and Layout composed painting | Phase 3 exit gate |
+
+**Ordering rationale:** wave 1 removes duplication that every later wave would
+otherwise have to preserve in three places. Wave 2 follows it because the
+attribute shims cannot be classified until the canonical accessors exist, and
+because interleaving the two diffs would make a ~490-site cleanup unreviewable.
+Waves 3 and 4 are independent of each other and can run in parallel. Wave 5 is
+blocked on characterization, not on the earlier waves. Wave 6 is Phase 3 and is
+blocked on a canonical model that does not exist yet; it must not be
+started by promoting the current synthetic `#shadow-root`.
+
+**Guard and gate changes:**
+
+1. Extend `HtmlBridgeBoundaryGuardTests` so each completed wave is pinned: no
+   case-insensitive attribute scan outside `Broiler.Dom`, no bridge copy of
+   `textContent` or document-order comparison, and no bridge table/select tree
+   arithmetic. Assert against types and members, not source text, wherever the
+   reflection surface allows it.
+2. The deleted helpers are `internal static`, so `htmlbridge-public-surface/v2`
+   snapshots should be unaffected. Confirm that per wave rather than assuming it;
+   a snapshot diff is a v3 question, not a refactor detail.
+3. The 750-line file ratchet should move down as waves land. Do not add a new
+   exemption to accommodate a promotion.
+
+**Submodule mechanics.** `Broiler.DOM` is a submodule, so every wave is two
+changes: the component commit, then the parent pointer bump plus the bridge
+adapter. Follow the documented order in [CLAUDE.md](../CLAUDE.md) — push the
+component commit first and bump the pointer only if the push succeeded; on a 403,
+capture the change under [`patches/`](../patches/README.md) with an index entry
+and leave the pointer untouched. Two additional constraints apply here:
+
+- `Broiler.CSS` nests its own `Broiler.DOM` submodule pointer. Wave 1 is consumed
+  by `CssSelectorMatcher`, so it requires bumping the nested pointer as well as
+  the aggregate one; bumping only the aggregate leaves `Broiler.CSS` compiling
+  against a DOM without the new accessor.
+- No wave may be declared complete while its canonical commit is unreachable from
+  a pushed pointer, because CI clones submodules by pointer.
+
+**Exit gate:** the bridge contains no reimplementation of a DOM or HTML-semantic
+algorithm that `Broiler.Dom`/`Broiler.Dom.Html` can express; the attribute
+lookup, character-data mutation, tree mixins, table/select operations, and
+document-metadata queries each have exactly one owner with owner-local tests;
+`Broiler.Dom` is still dependency-free and `Broiler.Dom.Html` still references
+only `Broiler.Dom`; and the WPT/Acid failure set is identical or improved at every
+wave boundary.
+
 #### Phase 0 — trustworthy gates and a non-destructive seam
 
 **Owner:** HtmlBridge, `Broiler.HTML`, and `Broiler.Layout` integration.
@@ -257,7 +343,9 @@ regression gates remain green.
 #### Phase 1 — pure promotions and quick deletions
 
 **Owner:** `Broiler.DOM`, `Broiler.CSS`, `Broiler.CSS.Dom`, HtmlBridge adapters,
-and the production/test hosts that call `HtmlPostProcessor`.
+and the production/test hosts that call `HtmlPostProcessor`. The `Broiler.DOM`
+share of actions 1 and 4 is sequenced in
+[DOM component rehoming](#dom-component-rehoming) as waves 1–5.
 
 **Current evidence:** `HtmlElementQueries.CollectTableRows` is already canonical
 while neighboring caption/section/row/cell operations remain in `TableBinding`;
@@ -319,7 +407,9 @@ external I/O remains injected; and serialization no longer needs
 #### Phase 3 — canonical shadow and composed trees
 
 **Owner:** `Broiler.Dom`, `Broiler.CSS.Dom`, `Broiler.HTML.Dom`, Layout, and the
-HtmlBridge Shadow DOM adapter.
+HtmlBridge Shadow DOM adapter. The canonical model in action 1 is item D8 of
+[the Broiler.DOM roadmap](../Broiler.DOM/docs/roadmap.md), delivered as wave 6 of
+[DOM component rehoming](#dom-component-rehoming).
 
 **Current evidence:** shadow ownership is a bridge runtime table plus a synthetic
 `#shadow-root`; rendering deletes/hides light children, unwraps the sentinel, and
