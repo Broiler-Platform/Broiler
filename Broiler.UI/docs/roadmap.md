@@ -27,6 +27,44 @@ that is still open.
 - Replace the pending Phase-0-era human review with a review of a named current
   revision before expanding the preview claim.
 
+## Touch input and gestures
+
+Required by the planned Android applications, but none of it is Android-specific:
+Windows and Linux touch providers would need the same neutral behavior. The
+sequencing and exit gates are in
+[the root roadmap](../../docs/ROADMAP.md#a3--touch-first-interaction-in-broilerui).
+
+- Carry contact identity and phase through `UiInputEvent`.
+  `FromTouchContact` currently keeps only the position and discards `ContactId`,
+  `TouchContactState`, and `Pressure`; `FromPenContact` discards the same, so no
+  control can distinguish a press from a release or see a second contact.
+- Add one shared gesture recognizer over neutral contact streams — tap,
+  double-tap, long-press, drag, fling with momentum, and pinch — consumed by
+  every control instead of being reimplemented per control or per platform
+  backend.
+- Give `StandardScrollView` content-drag scrolling, fling with deceleration,
+  overscroll, and scroll-chaining. Its pointer path currently requires
+  `MouseButton.Left` and only drags the scrollbar thumb or track, so a
+  touch-derived event scrolls nothing.
+- Add touch-target minimum sizes and hit slop to the token work below, plus
+  long-press context activation.
+- Add selection and caret handles and a text-selection model that does not
+  depend on a hover state, for `Edit` and `RichEdit`.
+- Consume host-published window insets so content reflows around the soft
+  keyboard, system bars, and display cutouts, and keep the focused caret visible
+  when the keyboard opens.
+
+## Editor-side text input contract
+
+- Extend the text-input host seam beyond `PublishCaret`/`ClearCaret` so a real
+  IME can be satisfied: text around the cursor, the current selection,
+  composing-region set and clear, and commit or replace. Android's
+  `InputConnection` is the immediate driver, but Windows TSF and browser
+  composition need the same two-way protocol, so it belongs here rather than in
+  any one platform backend.
+- Drive soft-keyboard visibility, keyboard type, and the IME action from editor
+  focus through the host, without the editor knowing the platform.
+
 ## Design-system and UX conformance
 
 - Finish token enforcement: CI contrast coverage, raw-color/size linting,

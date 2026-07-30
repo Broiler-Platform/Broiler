@@ -136,6 +136,303 @@ broad browser-support claim.
 performance and accessibility gates, handles capability denial honestly, and is
 reproducible from CI artifacts.
 
+## Android applications
+
+The durable topology and platform decisions are in
+[the Android application architecture](architecture/android.md): `net10.0-android`
+from the .NET for Android workload, **no .NET MAUI**, one `Activity` hosting one
+`SurfaceView`, and reuse of `Broiler.UI`, `Broiler.Input`, `Broiler.Graphics`,
+`Broiler.Documents`, `Broiler.Browser.Core`, and `Broiler.Writer.Core` rather
+than a parallel stack.
+
+**Current evidence:** the Android input providers (phase A2) are implemented and
+unit-tested; no other Android code, project, or workflow exists yet. What the
+rest of the port builds on: `IUiHost` is a five-member interface with three
+working implementations (Win32, X11, browser Canvas); `Broiler.Graphics` core is
+platform-neutral, trimmable, and AOT-annotated, and the GPU backends only upload
+and blit a CPU-rasterized frame; `Broiler.Documents` and the media codecs are
+managed, with the one native image path (a WIC WebP accelerator) already guarded
+to Windows and backed by a managed decoder. No Android code has run on a device
+or an emulator. The gaps are equally concrete and are recorded per phase below.
+
+Phases A1–A3 are platform-neutral or backend work that Windows and Linux touch
+support would also need; A4 and A5 are the applications. Writer leads because it
+needs no JS engine, no network policy, and no engine-scale surface.
+
+### A0 — Freeze the Android platform baseline
+
+**Owner:** root, with `Broiler.Graphics` and `Broiler.Input` consulted.
+
+**Current evidence:** no target framework, ABI, API level, runtime, linker, or
+signing decision exists for Android. The desktop applications pin
+`net10.0` with `Debug-Linux`/`Release-Linux`-style configurations and explicit
+runtime identifiers; the WebAssembly Writer shows the established pattern for a
+non-desktop head with its own SDK, backend, and host.
+
+**Next actions:**
+
+1. Freeze minimum and target API levels against the workload's documented floor
+   and the Play target-API requirement in force at release, plus the shipped ABI
+   set (`android-arm64` required, `android-x64` for emulator CI).
+2. Freeze the managed runtime and the linker/AOT mode, and record the
+   consequence for JS execution: `Broiler.JavaScript.ExpressionCompiler` uses
+   `System.Reflection.Emit` and cannot run under full AOT, while
+   `Broiler.JavaScript.Portable` can. Writer may adopt a stricter mode than
+   Browser.
+3. Define the Android workspace topology for
+   [`eng/solutions.json`](../eng/solutions.json) — the intended roots and the
+   `forbiddenProjectPatterns` excluding Windows, Linux, and WebAssembly
+   projects. The entries themselves land with the first Android project that can
+   serve as a root, since a solution cannot reference a project that does not
+   exist yet.
+4. Record the product identifiers, package names, release channels, and signing
+   key policy, and reconcile them with the pending release-and-distribution work
+   above rather than inventing a second scheme.
+
+**Exit gate:** one reviewed document states the TFM, API levels, ABIs, runtime,
+linker/AOT mode, JS execution mode, workspace topology, and signing policy, and
+every later Android phase cites it instead of re-deciding.
+
+### A1 — Android graphics presentation backend
+
+**Owner:** `Broiler.Graphics` (submodule).
+
+**Current evidence:** the backend is written and unit-tested, and is **pending as
+[`patches/0040-graphics-android-opengles-backend.patch`](../patches/README.md)**.
+The push to the `Broiler.Graphics` remote returned 403 — it is outside this
+session's GitHub scope — so the submodule pointer is deliberately unchanged and
+the assembly is absent from every build until a maintainer applies the patch.
+There is no main-repo fallback for this one: the backend is a submodule assembly,
+so unlike the HtmlBridge-shaped patches nothing covers it in the meantime.
+
+The patch adds `Broiler.Graphics.Android` — EGL/GLES3 context, off-screen pbuffer
+surface, on-screen `ANativeWindow` surface, the CPU-frame upload-and-blit present,
+readback, and a dependency probe — plus the `/system/fonts` roots and
+Roboto/Noto/Droid pairs `FallbackSystemFont` was missing, without which an Android
+build finds no face at all and renders no text. Sixteen tests cover geometry,
+pixel orientation, the EGL constants that differ from desktop, the ES3-only
+import surface, the dependency probe, and the detached-surface state machine.
+
+Three differences from the Linux EGL backend are handled and pinned by tests:
+Android binds `EGL_OPENGL_ES_API` (0x30A0) with `EGL_OPENGL_ES3_BIT` (0x40) rather
+than `EGL_OPENGL_API`/`EGL_OPENGL_BIT`; the soname is `libEGL.so` with no `.1`;
+and `glBlitFramebuffer` is ES 3.0, so context creation refuses anything below ES 3
+rather than failing later at present time. The surface lifecycle has no Linux
+equivalent and is the substantive new work: the EGL surface is destroyed and
+rebuilt on every rotation while the context and its GPU resources survive, frames
+arriving while detached are retained on the CPU rather than throwing, and
+`EGL_CONTEXT_LOST` surfaces as the neutral `BDeviceLostException`.
+
+**Next actions:**
+
+1. Apply the patch, push the `Broiler.Graphics` commit, and bump the submodule
+   pointer. Until then nothing in this phase is on CI.
+2. Record the presentation contract: surface format, colour handling, and the
+   scaling rule when the surface size and the logical viewport disagree.
+3. Run the native path on a device — context creation, upload, blit, swap, and
+   readback are all untested, because they need a real EGL implementation.
+4. Measure rotation, backgrounding, and resize for GPU-resource leaks, and
+   confirm the context genuinely survives surface loss rather than being silently
+   recreated.
+
+**Exit gate:** an Android device presents a frame whose pixels match the CPU
+reference within the established tolerance; rotation, backgrounding, and
+resize survive without leaking or losing GPU resources; text renders with a
+system font on a clean device.
+
+### A2 — Real touch, pen, and IME input
+
+**Owner:** `Broiler.Input` for providers, `Broiler.UI` for the neutral event
+surface.
+
+**Current evidence:** the Android providers are implemented and unit-tested —
+`Broiler.Input.Android` plus the `Touch`, `Pen`, `Keyboard`, and `Text` backends,
+and the neutral provider contracts they needed
+(`ITouchInputProvider`/`TouchOpenOptions` and the pen and text equivalents,
+mirroring the keyboard pattern). These are the **first implementations of
+`TouchInputDevice`, `PenInputDevice`, and `TextInputDevice` on any platform**;
+Windows touch/pen and Linux touch/text remain unstarted.
+`Broiler.Input.Android.Tests` covers pointer-id tracking across a finger lift,
+capture-loss cancellation, tool-type routing, the IME composition state machine,
+provider lifecycle, and an assembly-boundary check, and runs on any host because
+the backends carry no Android SDK reference.
+
+What is delivered is the Input half. Two things still block touch end to end:
+the neutral UI event drops what the backends now produce —
+`UiInputEvent.FromTouchContact` keeps only the position and discards `ContactId`,
+`TouchContactState`, and `Pressure`, and `FromPenContact` does the same — and
+`IUiTextInputHost` exposes only `PublishCaret`/`ClearCaret`, which cannot satisfy
+`InputConnection`. Both are Broiler.UI changes. No hardware evidence exists for
+any of it.
+
+**Next actions:**
+
+1. Extend `UiInputEvent` to carry contact identity, phase, pressure, and — for
+   pen — tilt and eraser state, without regressing the mouse and keyboard paths
+   that currently construct it. Until this lands, the delivered backends cannot
+   express a second finger to any control.
+2. Define the editor-side text contract that a real IME needs — text around the
+   cursor, current selection, composing-region set/clear, and commit — as a
+   `Broiler.UI` concern, since Windows TSF and browser composition need the same
+   thing. `IAndroidEditorTextSource` and `AndroidTextEditRequest` are the
+   Android-side statement of that gap and should collapse into the neutral
+   contract when it exists.
+3. Drive the providers from a real Activity and `SurfaceView`, including
+   soft-keyboard show/hide, keyboard type, and IME action from editor focus.
+4. Populate descriptors from `InputDevice.getDeviceIds()` and
+   `InputManager.InputDeviceListener` so capability reporting and hot-plug
+   reflect the real device set rather than the `RegisterDefault*` fallbacks.
+5. Verify the stylus tilt conversion against a real digitizer; the formula is
+   implemented and self-consistent but its sign convention is unconfirmed.
+
+**Exit gate:** a two-finger gesture is distinguishable from two sequential taps
+at the `Broiler.UI` boundary; a CJK IME composes, converts, and commits into
+RichEdit with correct candidate placement; stylus pressure reaches the pen
+contract; no Android type appears in `Broiler.Input` core or `Broiler.UI`.
+
+### A3 — Touch-first interaction in Broiler.UI
+
+**Owner:** `Broiler.UI`.
+
+**Current evidence:** no control consumes `UiInputEventKind.TouchContact`.
+`StandardScrollView` scrolls by wheel or by dragging the scrollbar thumb/track,
+and its pointer path requires `MouseButton.Left`, which a touch-derived event
+does not carry — so the primary scrolling gesture on a touch device does
+nothing. There is no gesture recognizer, no kinetic scrolling, and no
+touch-target sizing anywhere in the component. The existing pointer-capture and
+focus mechanisms (`Session.CaptureInput`, `SetFocus`) are reusable.
+
+**Next actions:**
+
+1. Add a shared gesture recognizer over neutral contact streams — tap,
+   double-tap, long-press, drag, fling with momentum, and pinch — resolved once
+   and consumed by every control, not reimplemented per backend or per control.
+2. Give `StandardScrollView` content-drag scrolling, fling with deceleration,
+   overscroll behavior, and scroll-chaining rules; keep wheel and scrollbar
+   behavior unchanged for desktop.
+3. Add touch-target minimum sizes, touch-appropriate hit slop, and long-press
+   context activation to the design-system token work already open in the
+   component roadmap.
+4. Add selection and caret handles, and a text-selection interaction model that
+   works without a hover state, for `Edit` and `RichEdit`.
+5. Consume host-published insets so content reflows around the soft keyboard,
+   the navigation bar, and display cutouts; keep the focused caret visible when
+   the keyboard opens.
+6. Apply the system font-scale and reduced-motion settings to the existing
+   tokens rather than adding an Android-only path.
+
+**Exit gate:** Writer and Browser are fully operable by touch alone on a
+handheld — scroll, select, edit, and invoke every command — with no control
+requiring hover or a physical wheel; the same gestures work on a Linux or
+Windows touch device once those providers exist.
+
+### A4 — Broiler.Writer.Android
+
+**Owner:** `Broiler.Writer.Android`, reusing `Broiler.Writer.Core`.
+
+**Current evidence:** `WriterApp` is shared and already runs under three hosts.
+Its document I/O is desktop-shaped: `StandardFileDialog` builds places from
+`Environment.SpecialFolder` and `Directory.GetLogicalDrives`, and open/save use
+`File.ReadAllBytes`/`File.WriteAllBytes` against full paths. Under Android
+scoped storage those reach only the app-private sandbox. `Broiler.Documents`
+(RTF, DOCX, HTML, Markdown) and the managed codecs port unchanged.
+
+**Next actions:**
+
+1. Add the Activity host: `SurfaceView`, `Choreographer`-driven frames that stop
+   when not resumed, main-thread marshalling through `IUiHost.Post`, and
+   graphics teardown/rebuild across surface loss.
+2. Express Writer open/save as a stream pair plus a display name so the system
+   picker (`ActionOpenDocument`/`ActionCreateDocument`) can satisfy it; the
+   WebAssembly Writer has the same constraint and should share the seam rather
+   than growing a second one.
+3. Add autosave and crash recovery to app-private storage, and restore document
+   and caret state across process death — not merely across rotation.
+4. Adapt the Writer chrome for a handheld: collapsible toolbar, reachable
+   command surfaces, and a formatting affordance that works without a menu bar.
+5. Wire clipboard through the platform clipboard, and share/print through the
+   system intents where they are supported.
+
+**Exit gate:** open, edit, format, save, and reopen a DOCX and an RTF through the
+system picker on a real device; document and caret state survive rotation,
+backgrounding, and process death; the editing surface is usable by touch and
+with an attached keyboard.
+
+### A5 — Broiler.Browser.Android
+
+**Owner:** `Broiler.Browser.Android`, reusing `Broiler.Browser.Core`.
+
+**Current evidence:** `BrowserApp` is shared and host-agnostic, and fetches
+through `HttpClient`, which needs the `INTERNET` permission and an explicit
+cleartext policy. The desktop runner polls a 16 ms `PeriodicTimer`, which is not
+an acceptable handheld frame loop. The preview safety notice already states that
+JavaScript is not a sandbox; that statement carries more weight on a personal
+device.
+
+**Next actions:**
+
+1. Add the Activity host on the same lifecycle, scheduling, and surface-loss
+   rules as A4.
+2. Adapt browser chrome to a handheld: single-column layout, touch-sized
+   controls, an address surface that coexists with the soft keyboard, and system
+   back mapped to history navigation.
+3. Add pinch-zoom and touch panning of page content, including the viewport
+   meta-tag interaction, through the shared gesture layer from A3.
+4. Decide and document the JS execution mode against the A0 linker/AOT decision,
+   and measure startup, frame time, input latency, and memory on a mid-range
+   device rather than an emulator.
+5. Restate the security posture honestly for a mobile context — controlled
+   content, no sandbox claim, explicit network and permission policy — and do
+   not ship a general-purpose browsing claim.
+
+**Exit gate:** the published support statement names the exact devices, API
+levels, and content scope tested; navigation, zoom, and back behave correctly on
+hardware; performance and memory are recorded from a real device; no capability
+is claimed that the security posture does not support.
+
+### A6 — Android build, CI, and delivery
+
+**Owner:** root.
+
+**Current evidence:** the four existing workflows cover preview packaging, NuGet,
+Octane, and WPT; none provisions an Android SDK, and no `.slnx` workspace exists
+for an Android head. Release, signing, and update policy are already open items
+under [Release and distribution](#release-and-distribution) and must not be
+forked.
+
+The container can now build Android. `scripts/install-android-sdk.sh` provisions
+the `android` workload and the Android SDK, a `net10.0-android` project builds,
+and the delivered input backends compile against real `MotionEvent` and
+`KeyEvent` types — so the primitive-forwarding seam is confirmed against the
+actual Android API, not just unit-tested in isolation. Setup details and the
+failure modes worth knowing are in
+[the development environment section](architecture/android.md#development-environment).
+A1, A4, and A5 are no longer blocked on environment access; they are blocked only
+on being written.
+
+**Next actions:**
+
+1. Give CI the same Android provisioning the development container now has —
+   `scripts/install-android-sdk.sh`, or the runner's own SDK image — and confirm
+   the CI egress policy allows `dl.google.com`, since the development
+   environment's allowlist does not extend to it.
+2. Add an Android build workflow that provisions the SDK and workload and builds
+   the Android solutions on every change to the shared applications, so the port
+   does not silently rot.
+3. Add an instrumented smoke run — launch, render a frame, dispatch synthetic
+   touch and text, rotate, background, resume — on an emulator, with the honest
+   note that emulator evidence is not hardware evidence.
+4. Produce signed AAB/APK artifacts through the frozen A0 signing policy and
+   reconcile channels, versioning, and update ownership with the existing
+   release work.
+5. Record the Android support statement in [the README](../README.md) and the
+   component READMEs only after the A1–A5 gates pass, and keep it scoped to what
+   was measured.
+
+**Exit gate:** a clean checkout produces a signed installable artifact through
+CI; the smoke suite gates every change to the shared application code; the
+published support claim names its devices, API levels, and evidence.
+
 ## HtmlBridge runtime
 
 The current assembly and ownership boundaries are in
