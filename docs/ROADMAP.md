@@ -97,7 +97,9 @@ The current WPT artifacts remain the evidence source:
   presence.
 - Keep prioritized WPT failures in generated reports and component roadmaps.
   Root tracking should cover only cross-component runner, timeout, reference, and
-  ownership problems.
+  ownership problems. The worst-scoring pixel mismatches of the current run, with
+  the capability each is missing and the component that owns it, are in
+  [WPT rendering gaps](wpt-rendering-gaps.md).
 - Prototype per-component stress attribution with a small Broiler.JS slice before
   investing in full coverage-guided selection.
 
