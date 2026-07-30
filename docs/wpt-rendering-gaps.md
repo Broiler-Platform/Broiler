@@ -541,23 +541,33 @@ Four caveats, all learned the hard way:
   four fixes it reads **90.5%**, against 98.2% for the template patch alone.
   Nothing regressed: the shadow content simply renders now, and it renders at the
   wrong size, where before it was absent. Ours is 7.8% `#aaa` against the
-  reference's 0.1%. What is measured: a host containing one `<li>Item One</li>`
-  boxes at 125×327 with the test's two-rule shadow style, 468×95 with one rule,
-  and 1008×19 with no style at all, where Chromium's is one line tall.
-  **The cause is not yet identified.** The obvious reading — that the inlined
-  CSS text is laying out — is *wrong*, and worth recording so nobody re-derives
-  it: a shadow style whose whole body is a long comment leaves the host at
-  1008×19, and a `<style>` inside an ordinary rendered `<div>` does not lay out
-  either (120×19). So the size tracks which *rules* the shadow stylesheet
-  carries, not how much text it holds. This is a pre-existing shadow-projection
-  bug that these fixes merely exposed — nothing rendered before, so nothing could
-  be the wrong size — and it is the next thread to pull.
+  reference's 0.1%. **Found and fixed, and it was not a shadow bug at all.** The
+  min/max-content passes (`GetMinMaxSumWords`, `GetMinimumWidth_LongestWord` in
+  Broiler.Layout) walked every child collecting words with no `display:none`
+  guard — while the shrink-to-fit *height* paths beside them had one. So the
+  UA-hidden elements that carry text (`<style>`, `<script>`, `<title>`) were
+  measured, and their **source text set the width of any shrink-to-fit
+  ancestor**. Every shadow host is such a box holding its component's
+  `<style>`, which is why it surfaced here, but a plain
+  `<div style="display:inline-block">` holding one `<li>` and a stylesheet
+  measured 861px wide against 65px without it. A `display:none` box generates no
+  boxes at all (CSS 2.1 §9.2.4), so both passes now skip it. Problem 29 goes
+  **90.5% → 95.7%** and the hosts drop from 7.8% of the canvas to 1.7%.
+- **Two wrong turns on the way, recorded so they are not repeated.** First, the
+  cause was ascribed to the CSS *text length*, then "refuted" by a pure-comment
+  stylesheet that left the host at 1008×19 — but that case had no `:host` rule,
+  so the host was full-width and the comment fit on one line; the test did not
+  discriminate, and the refutation was wrong. Holding `:host` fixed and varying
+  only inert text settles it: a 600-character comment takes the box from 468px to
+  6014px. Second, `getBoundingClientRect` is the bridge's own measurement taken
+  while scripts run, *before* the shadow style is projected, so it reported some
+  cases as unchanged when the render had in fact improved. Measure the render.
 - **A note on where these live.** Items 1–3 are in the runner's browser-API shim,
   which exists only because the bridge implements no custom elements. That is the
   honest fix for a harness bug — the component's own code runs and builds a real
   shadow root — but the durable answer is `customElements` in HtmlBridge proper.
-- **Exit gate:** the shadow projection's inlined `<style>` stops taking part in
-  layout so hosts size to their content, and only then the focus question — a
+- **Exit gate:** the remaining host/item over-size closes (ours 1.7% `#aaa` and
+  2.0% `#eee` against 0.1% and 1.1%), and only then the focus question — a
   focused test for `delegatesFocus` moving focus to the first focusable shadow
   descendant.
 
@@ -645,5 +655,5 @@ feature they test — closing those means rendering less, not more.
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
 | 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — patch 0038 applied; bridge now delegates to it |
 | 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** — patch 0036 applied |
-| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 90.5%** (98.2% from patch 0041 alone); shadow content now renders but hosts are oversized |
+| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 95.7%** with patch 0041; shadow content renders, hosts still slightly oversized |
 | 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** — patches 0036/0037 applied |
