@@ -389,21 +389,22 @@ for an Android head. Release, signing, and update policy are already open items
 under [Release and distribution](#release-and-distribution) and must not be
 forked.
 
-The `android` workload installs cleanly from NuGet and a JDK is present, but the
-Android SDK is served from `dl.google.com`, which the development environment's
-egress policy denies. No `net10.0-android` project can build until that is
-resolved — see
-[the development environment table](architecture/android.md#development-environment).
-This blocks A1, A4, and A5 from being *verified* locally; it does not block the
-neutral work in A2 and A3, which is why the delivered input backends carry no
-Android SDK dependency.
+The container can now build Android. `scripts/install-android-sdk.sh` provisions
+the `android` workload and the Android SDK, a `net10.0-android` project builds,
+and the delivered input backends compile against real `MotionEvent` and
+`KeyEvent` types — so the primitive-forwarding seam is confirmed against the
+actual Android API, not just unit-tested in isolation. Setup details and the
+failure modes worth knowing are in
+[the development environment section](architecture/android.md#development-environment).
+A1, A4, and A5 are no longer blocked on environment access; they are blocked only
+on being written.
 
 **Next actions:**
 
-1. Grant the development and CI environments access to the Android SDK — either
-   allow `dl.google.com` in the egress policy or pre-install the SDK into the
-   image and set `ANDROID_HOME`. Everything else in this phase is blocked on it,
-   and it must not be worked around with a third-party SDK mirror.
+1. Give CI the same Android provisioning the development container now has —
+   `scripts/install-android-sdk.sh`, or the runner's own SDK image — and confirm
+   the CI egress policy allows `dl.google.com`, since the development
+   environment's allowlist does not extend to it.
 2. Add an Android build workflow that provisions the SDK and workload and builds
    the Android solutions on every change to the shared applications, so the port
    does not silently rot.

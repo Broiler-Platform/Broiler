@@ -1,9 +1,11 @@
 # Android application architecture
 
-- **Status:** Proposed, with the input providers implemented. The
-  `Broiler.Input.*.Android` backends exist and are unit-tested; nothing has run
-  on a device. The rest of this document records the target topology and the
-  decisions that must be frozen before the application projects start.
+- **Status:** Proposed, with the input providers implemented and the toolchain
+  working. The `Broiler.Input.*.Android` backends exist, are unit-tested, and
+  compile against real `MotionEvent`/`KeyEvent` types; `net10.0-android` projects
+  build in the container. Nothing has run on a device or an emulator. The rest of
+  this document records the target topology and the decisions that must be frozen
+  before the application projects start.
 - **Last reconciled:** 2026-07-30
 
 This document covers hosting the existing Broiler applications —
@@ -42,31 +44,45 @@ channel policy.
 
 ## Development environment
 
-Verified in this container on 2026-07-30:
+Verified end to end in a container on 2026-07-30: a `net10.0-android` project
+builds, and the `Broiler.Input.*.Android` backends compile against real
+`MotionEvent` and `KeyEvent` types.
 
 | Requirement | State |
 | --- | --- |
-| `android` workload (`Microsoft.Android.Sdk.Linux`, `Microsoft.Android.Ref.36`, runtime packs) | **Installed.** `dotnet workload install android` succeeds; the packs come from `api.nuget.org`, which egress policy allows. |
-| JDK | **Present.** OpenJDK 21, with the proxy truststore already wired through `JAVA_TOOL_OPTIONS`. |
-| Android SDK (`android.jar`, `aapt2`, `d8`, platform-tools) | **Unavailable.** It is served from `dl.google.com`, which this session's egress policy denies with 403. No SDK exists anywhere in the image. |
+| `android` workload (`Microsoft.Android.Sdk.Linux` 36.1.69, `Microsoft.Android.Ref.36`, Mono/CoreCLR/NativeAOT runtime packs) | Installs from `api.nuget.org`. |
+| JDK | Present in the base image (OpenJDK 21), with the proxy truststore wired through `JAVA_TOOL_OPTIONS`. |
+| Android SDK (`android.jar` API 36, build-tools 36.0.0, platform-tools) | Installs from `dl.google.com` via Google's `sdkmanager`. |
 
-The consequence is specific: **no `net10.0-android` project can build here, not even a
-class library with no resources.** `Xamarin.Android.Tooling.targets` fails with
-`XA5300: The Android SDK directory could not be found` before compilation, and
-pointing `AndroidSdkDirectory` at a stub directory does not satisfy it — the
-target validates real SDK contents.
+Neither is in the base image. `scripts/install-android-sdk.sh` provisions both;
+it is idempotent, costs about 4.5 GB, and is deliberately kept out of the
+`SessionStart` hook because most work never touches Android. Export
+`ANDROID_HOME` and `ANDROID_SDK_ROOT` afterwards.
 
-That is why the `Broiler.Input.*.Android` backends target plain `net10.0` and take
-primitive event data: the translation layer is fully buildable and testable in
-this environment, and only the thin host glue needs the workload. It is a
-deliberate mitigation, not a coincidence.
+Three things are worth knowing before repeating this:
 
-Unblocking the application phases is an environment-configuration change, not
-something to work around from inside the container — the same shape as the
-submodule egress caveat in [CLAUDE.md](../../CLAUDE.md). Either add
-`dl.google.com` to the environment's egress allowlist, or pre-install the Android
-SDK into the image and set `ANDROID_HOME`. Do not fetch the SDK from a
-third-party mirror to route around the denial.
+- **Egress policy must allow `dl.google.com`.** When it does not, the SDK
+  download returns 403 and *every* `net10.0-android` project fails with
+  `XA5300: The Android SDK directory could not be found` — including a
+  resource-free class library, and pointing `AndroidSdkDirectory` at a stub
+  directory does not satisfy it, because the target validates real SDK contents.
+  Allowlist changes apply to already-running sessions immediately; no restart is
+  needed. Do not substitute a third-party SDK mirror.
+- **`dotnet build -t:InstallAndroidDependencies` does not work here.** It fails
+  TLS verification against the proxy CA, then on a missing manifest of its own
+  (`AndroidManifestFeed_d18.0.xml`). Google's `sdkmanager` is the working path
+  because it is a Java tool and inherits the container's JVM truststore.
+- **The first `dotnet workload install android` can silently install nothing.**
+  Where a user-level manifest is newer than the SDK's built-in one, the first run
+  downloads packs for the older manifest and then garbage-collects them as
+  unreferenced — while reporting success. Re-running against the resolved
+  manifest installs the right packs. The script detects this by checking for
+  `Mono.Android.dll` rather than trusting the exit code.
+
+None of this changes the input backends' targeting. They stay on plain `net10.0`
+taking primitive event data because that is the right ownership boundary, not
+because the SDK was once unavailable — and it keeps their tests runnable with no
+Android setup at all.
 
 ## Target and ownership
 
