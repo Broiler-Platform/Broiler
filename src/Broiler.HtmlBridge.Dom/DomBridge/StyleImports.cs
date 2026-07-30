@@ -40,17 +40,24 @@ public sealed partial class DomBridge
     private void InlineStyleSheetImports(DomElement root)
     {
         // HTML §4.2.3: <base href> replaces the document URL that a relative
-        // @import resolves against, so the base is folded in before the walk
-        // rather than resolving each import against the page URL. Computed once
-        // for the document. (This transform runs before ApplyBaseHrefToStyleUrls,
-        // so it cannot rely on that pass having rebased anything.)
-        TryFindDocumentBaseHref(root, out var baseHref);
-        var documentBaseUrl = HtmlBaseHref.ResolveDocumentBaseUrl(_pageUrl, baseHref);
+        // @import resolves against, so the base has to be folded in rather than
+        // resolving each import against the page URL. (This transform runs before
+        // ApplyBaseHrefToStyleUrls, so it cannot rely on that pass.)
+        //
+        // Resolved LAZILY, and at most once: finding the base means walking every
+        // descendant, and the overwhelming majority of documents have no @import
+        // at all — they must not pay for a second full-tree scan. A document with
+        // thousands of nodes and no imports is the case that makes this matter.
+        string? documentBaseUrl = null;
+        string ResolveBaseOnce() =>
+            documentBaseUrl ??= HtmlBaseHref.ResolveDocumentBaseUrl(
+                _pageUrl,
+                TryFindDocumentBaseHref(root, out var baseHref) ? baseHref : null);
 
-        InlineStyleSheetImports(root, documentBaseUrl);
+        InlineStyleSheetImports(root, ResolveBaseOnce);
     }
 
-    private void InlineStyleSheetImports(DomElement element, string documentBaseUrl)
+    private void InlineStyleSheetImports(DomElement element, Func<string> documentBaseUrl)
     {
         if (!IsText(element) &&
             element.TagName.Equals("style", StringComparison.OrdinalIgnoreCase))
@@ -59,7 +66,7 @@ public sealed partial class DomBridge
             if (HasLeadingImport(original))
             {
                 var expanded = ExpandCssImports(
-                    original, documentBaseUrl, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0);
+                    original, documentBaseUrl(), new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0);
                 if (!string.Equals(expanded, original, StringComparison.Ordinal))
                     SetElementTextContent(element, expanded);
             }
