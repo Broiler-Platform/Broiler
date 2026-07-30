@@ -197,32 +197,43 @@ every later Android phase cites it instead of re-deciding.
 
 **Owner:** `Broiler.Graphics` (submodule).
 
-**Current evidence:** `LinuxOpenGlRenderer.Render` rasterizes through
-`BImageRenderer.RenderToImage` and presents the bitmap; the GL surface uses only
-texture-upload and framebuffer-blit entry points, with no shader pipeline. That
-makes the Android backend a translation rather than new rendering work. Three
-differences are known and must be handled: Linux binds `EGL_OPENGL_API` with
-`EGL_OPENGL_BIT` where Android needs `EGL_OPENGL_ES_API` and `EGL_OPENGL_ES3_BIT`;
-Linux P/Invokes `libEGL.so.1` where Android's soname is `libEGL.so`; and
-`glBlitFramebuffer` requires GL ES 3.0, which sets the feature floor.
-Separately, `FallbackSystemFont` knows only Linux, Windows, and macOS font paths,
-so an Android build currently has no usable system font.
+**Current evidence:** the backend is written and unit-tested, and is **pending as
+[`patches/0040-graphics-android-opengles-backend.patch`](../patches/README.md)**.
+The push to the `Broiler.Graphics` remote returned 403 — it is outside this
+session's GitHub scope — so the submodule pointer is deliberately unchanged and
+the assembly is absent from every build until a maintainer applies the patch.
+There is no main-repo fallback for this one: the backend is a submodule assembly,
+so unlike the HtmlBridge-shaped patches nothing covers it in the meantime.
+
+The patch adds `Broiler.Graphics.Android` — EGL/GLES3 context, off-screen pbuffer
+surface, on-screen `ANativeWindow` surface, the CPU-frame upload-and-blit present,
+readback, and a dependency probe — plus the `/system/fonts` roots and
+Roboto/Noto/Droid pairs `FallbackSystemFont` was missing, without which an Android
+build finds no face at all and renders no text. Sixteen tests cover geometry,
+pixel orientation, the EGL constants that differ from desktop, the ES3-only
+import surface, the dependency probe, and the detached-surface state machine.
+
+Three differences from the Linux EGL backend are handled and pinned by tests:
+Android binds `EGL_OPENGL_ES_API` (0x30A0) with `EGL_OPENGL_ES3_BIT` (0x40) rather
+than `EGL_OPENGL_API`/`EGL_OPENGL_BIT`; the soname is `libEGL.so` with no `.1`;
+and `glBlitFramebuffer` is ES 3.0, so context creation refuses anything below ES 3
+rather than failing later at present time. The surface lifecycle has no Linux
+equivalent and is the substantive new work: the EGL surface is destroyed and
+rebuilt on every rotation while the context and its GPU resources survive, frames
+arriving while detached are retained on the CPU rather than throwing, and
+`EGL_CONTEXT_LOST` surfaces as the neutral `BDeviceLostException`.
 
 **Next actions:**
 
-1. Add `Broiler.Graphics.Android`: EGL context and window surface over the
-   `ANativeWindow` behind a `SurfaceView`, a surface-sized texture, upload, blit,
-   and swap, plus the off-screen path used by tests.
-2. Implement surface loss and recreation across `SurfaceDestroyed`/`SurfaceCreated`
-   and resize/rotation, reporting device loss through the existing
-   `BDeviceLostException` rather than a new channel.
-3. Add Android system font roots (`/system/fonts`) and a Noto/Roboto candidate
-   set to `FallbackSystemFont`, keeping the existing platform lists intact.
-4. Record the presentation contract: surface format, colour handling, and the
+1. Apply the patch, push the `Broiler.Graphics` commit, and bump the submodule
+   pointer. Until then nothing in this phase is on CI.
+2. Record the presentation contract: surface format, colour handling, and the
    scaling rule when the surface size and the logical viewport disagree.
-5. Follow the submodule mechanics in [CLAUDE.md](../CLAUDE.md) — push to the
-   component remote and bump the pointer, or, on a denied push, land a patch
-   under [`patches/`](../patches/README.md) and leave the pointer untouched.
+3. Run the native path on a device — context creation, upload, blit, swap, and
+   readback are all untested, because they need a real EGL implementation.
+4. Measure rotation, backgrounding, and resize for GPU-resource leaks, and
+   confirm the context genuinely survives surface loss rather than being silently
+   recreated.
 
 **Exit gate:** an Android device presents a frame whose pixels match the CPU
 reference within the established tolerance; rotation, backgrounding, and

@@ -141,21 +141,31 @@ Consequences for Android:
   claims are about *presentation* — colour space, scaling, and surface
   format — not about layout or paint correctness.
 
-`Broiler.Graphics` is a git submodule. The Android backend therefore follows the
-submodule workflow in [CLAUDE.md](../../CLAUDE.md): push to the component remote
-and bump the pointer, or, if that push is denied, deliver the change as a patch
-under [`patches/`](../../patches/README.md) with the pointer left alone.
-`Broiler.UI`, `Broiler.Input`, `Broiler.Documents`, and the application projects
-live in this repository and are ordinary commits.
+`Broiler.Graphics` is a git submodule, and the push to its remote returned 403 —
+it is outside the session's GitHub scope. So the backend ships as
+[`patches/0040-graphics-android-opengles-backend.patch`](../../patches/README.md)
+with the submodule pointer deliberately unchanged, per the workflow in
+[CLAUDE.md](../../CLAUDE.md). `Broiler.Graphics.Android` is therefore absent from
+every build until a maintainer applies it, and no main-repo fallback is possible
+because the backend is a submodule assembly. `Broiler.UI`, `Broiler.Input`,
+`Broiler.Documents`, and the application projects live in this repository and are
+ordinary commits.
 
-Font discovery is the one core-graphics gap. `FallbackSystemFont.KnownFontPairs`
-enumerates Linux, Windows, and macOS paths and `FontRoots()` scans
-`/usr/share/fonts`
-([`FallbackSystemFont.cs:164-190`](../../Broiler.Graphics/Broiler.Graphics/Rendering/FallbackSystemFont.cs));
-neither knows about Android's `/system/fonts` (Roboto/Noto). Text renders through
-Broiler's own TrueType/CFF parsing, so this is a path-list problem, not a text
-engine problem — but until it is fixed, an Android build has no usable system
-font.
+The delivered backend follows the split above: `AndroidOpenGlEsRenderer`
+rasterizes through the shared `BImageRenderer` and presents through
+`AndroidOpenGlEsSurface` (off-screen pbuffer) or `AndroidOpenGlEsWindowSurface`
+(on-screen `ANativeWindow`). The window surface is what encodes the Android
+lifecycle: `AttachNativeWindow`/`DetachNativeWindow` rebuild only the EGL surface
+so the context and its texture survive a rotation, a frame arriving while
+detached is retained on the CPU rather than throwing, and `EGL_CONTEXT_LOST`
+becomes a neutral `BDeviceLostException`.
+
+Font discovery was the one core-graphics gap. `FallbackSystemFont` enumerated only
+Linux, Windows, and macOS paths and scanned only `/usr/share/fonts`, so an Android
+build found no face at all and rendered no text. The same patch adds
+`/system/fonts` as a root and Roboto, Noto, and Droid as candidate pairs. Text
+renders through Broiler's own TrueType/CFF parsing, so this was a path-list
+problem rather than a text-engine one.
 
 ## Host, lifecycle, and scheduling
 
