@@ -100,6 +100,34 @@ internal static class CssBoxHelper
         }
     }
 
+    /// <summary>
+    /// A text box that held nothing but collapsible whitespace: its words were collapsed away, so
+    /// it looks empty to the intrinsic passes even though it still separates its siblings on the
+    /// line. Preserved whitespace (<c>pre</c>, <c>pre-wrap</c>, <c>break-spaces</c>) keeps its
+    /// words and is measured normally, so it is deliberately not matched here.
+    /// </summary>
+    private static bool IsCollapsedWhitespaceSeparator(CssBox box)
+    {
+        if (box.Words.Count > 0 || box.Boxes.Count > 0 || box.HtmlTag != null)
+            return false;
+
+        if (box.WhiteSpace == CssConstants.Pre || box.WhiteSpace == CssConstants.PreWrap
+            || box.WhiteSpace == CssConstants.PreLine)
+            return false;
+
+        var text = box.Text.Span;
+        if (text.Length == 0)
+            return false;
+
+        foreach (char c in text)
+        {
+            if (!char.IsWhiteSpace(c))
+                return false;
+        }
+
+        return true;
+    }
+
     public static void GetMinimumWidth_LongestWord(CssBox box, ref double maxWidth, ref CssRect maxWidthWord)
     {
         // A display:none box generates no boxes at all (CSS 2.1 §9.2.4), so it contributes nothing
@@ -292,6 +320,25 @@ internal static class CssBoxHelper
                 {
                     oldSum = oldSum.HasValue ? Math.Max(oldSum.Value, maxSum) : maxSum;
                     maxSum = marginSum;
+                    continue;
+                }
+
+                // A collapsible space *between* two atomic inline-level siblings is a real advance
+                // on the line: `<span>A</span> <span>B</span>` is one space wider than the same
+                // markup with no space. But that space is a text box of its own, and collapsing
+                // clears its words (a space is normally carried as a HasSpaceBefore/After flag on
+                // an adjacent word, and here the neighbours are in *other* boxes), so the recursion
+                // measured it as zero. The shrink-to-fit container then came out exactly one space
+                // too narrow and the last item wrapped — two 10px inline-blocks measured 20px and
+                // stacked, where they need 24px to sit side by side. Layout itself lays the space
+                // out; only the intrinsic measurement was missing it.
+                if (IsCollapsedWhitespaceSeparator(childBox))
+                {
+                    double space = childBox.ActualWordSpacing;
+                    if (double.IsNaN(space))
+                        space = box.ActualWordSpacing;
+                    if (!double.IsNaN(space))
+                        maxSum += space;
                     continue;
                 }
 

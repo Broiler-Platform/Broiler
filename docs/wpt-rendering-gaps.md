@@ -566,26 +566,23 @@ Four caveats, all learned the hard way:
   which exists only because the bridge implements no custom elements. That is the
   honest fix for a harness bug — the component's own code runs and builds a real
   shadow root — but the durable answer is `customElements` in HtmlBridge proper.
-- **The last of the gap is a third general bug, isolated but not fixed:
-  whitespace between inline-block siblings adds a line.** Ours renders the menu
-  row 46px tall where Chromium renders 18px; delete the whitespace between the
-  items and ours drops to 14px and Chromium's row is covered entirely by its
-  children. Any whitespace does it — a single space, a newline, a newline plus
-  indentation all behave the same — so it is not newline handling but collapsible
-  whitespace failing to join the line box its inline-block siblings are on. This
-  is what is left of problem 29's 3.3%: our hosts are ~2.4 lines tall where
-  Chromium's are one, and the four `<x-menu>` rows stack that error.
-  **The mechanism is exact.** Two 10px inline-blocks separated by a space give a
-  shrink-to-fit row of `20×52` with the second box at `y=34` — directly *below*
-  the first. Give the same row `width: 200px` and they sit side by side at `x=33`
-  and `x=47`, one line, 4px apart. So the line-breaking is right and the *width*
-  is wrong: max-content sums the two boxes but omits the collapsible space
-  between them, making the container exactly one space too narrow, so the last
-  item cannot fit and wraps. The fix belongs in the same `GetMinMaxSumWords`
-  accumulation that the `display:none` guard above went into — inter-item
-  whitespace has to count toward max-content.
-  Reproducible in six lines with no shadow DOM, template or custom element in
-  sight:
+- **A third general bug, also found and fixed here: a collapsible space between
+  inline-block siblings counted as zero.** A space between siblings is normally
+  carried as a flag on an adjacent *word*, but between two inline-blocks the
+  neighbours live in other boxes, so the space is a text box of its own whose
+  words collapsing clears — and the intrinsic pass measured nothing. The
+  shrink-to-fit container then came out exactly one space too narrow and its last
+  child wrapped: two 10px inline-blocks measured 20px and **stacked**, the second
+  at `y=34`, where 24px would have put them side by side. Give the same row
+  `width: 200px` and they sat on one line all along, which is what showed the
+  line-breaking was right and the width was wrong. `GetMinMaxSumWords` now counts
+  a collapsed whitespace separator as one space advance; preserved whitespace
+  (`pre`, `pre-wrap`, `pre-line`) keeps its words and takes the normal path.
+  The row now measures 25px — matching `&nbsp;` and plain text, which always
+  counted the space and are the cross-check for what the collapsible case should
+  have been. Problem 29 goes **95.7% → 97.8%**. Reproducible with no shadow DOM,
+  template or custom element in sight, which is why it is worth fixing on its own
+  account:
 
   ```html
   <style>
@@ -594,13 +591,14 @@ Four caveats, all learned the hard way:
   </style>
   <div class="row"><span>Item One</span> <span>Item Two</span> <span>Item Three</span></div>
   ```
-
-  Every component's markup indents its children, so this hits shadow DOM
-  disproportionately — but like the intrinsic-width bug above it is ordinary
-  inline layout, and worth fixing on its own account rather than for this test.
-- **Exit gate:** whitespace between inline-block siblings stops adding a line, and
-  only then the focus question — a focused test for `delegatesFocus` moving focus
-  to the first focusable shadow descendant.
+- **What is left is not wrapping any more.** The menu rows render 76px tall
+  against Chromium's 54px, where they were 133px. The items no longer wrap; they
+  are simply ~25px tall where Chromium's are ~18px, which is line-height and font
+  metrics — a different class of problem from the three fixed here, and one that
+  will move many tests at once when it is addressed.
+- **Exit gate:** inline-block line height matches the reference (ours ~25px against
+  ~18px), and only then the focus question — a focused test for `delegatesFocus`
+  moving focus to the first focusable shadow descendant.
 
 ## Items that need the WPT server before they can be judged
 
@@ -686,5 +684,5 @@ feature they test — closing those means rendering less, not more.
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
 | 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — patch 0038 applied; bridge now delegates to it |
 | 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** — patch 0036 applied |
-| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 95.7%** with patch 0041; shadow content renders, hosts still slightly oversized |
+| 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 97.8%** with patch 0041; residual is inline-block line height |
 | 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** — patches 0036/0037 applied |
