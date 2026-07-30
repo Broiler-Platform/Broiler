@@ -591,21 +591,22 @@ Four caveats, all learned the hard way:
   </style>
   <div class="row"><span>Item One</span> <span>Item Two</span> <span>Item Three</span></div>
   ```
-- **A fourth general bug fixed: an auto-height inline-block ignored
-  `line-height`.** Its height came from the glyphs, so `line-height: 10px` around
-  a 32px font measured **39px** where every browser gives 10, and the ordinary
-  16px case measured 22px against Chromium's 18. A *block* with the same content
-  already honoured `line-height`, so the two paths disagreed with each other as
-  well as with the reference. An auto-height inline-block holding a single line is
-  now clamped to its line box (CSS 2.1 §10.6.3 with §10.8 — glyphs taller than the
-  line box overflow it rather than growing it). A line holding an atomic
-  inline-level child is deliberately left alone: that child contributes its own
-  margin box and may legitimately make the line taller.
-- **It does not move problem 29, which is worth saying plainly.** The test stays
-  at **97.8%**: its rows nest inline-blocks inside inline-blocks, and the outer
-  host is exactly the case the clamp excludes. Its rows are still 76px against
-  Chromium's 54px. So the last of this test's gap remains open, and the fix above
-  stands on its own correctness rather than on this test.
+- **A fourth bug found here was fixed and then reverted, which is the useful
+  record.** An auto-height inline-block ignored `line-height`: its height came
+  from the glyphs, so `line-height: 10px` around a 32px font measured **39px**
+  where every browser gives 10, and the ordinary 16px case measured 22px against
+  Chromium's 18. A *block* with the same content already honoured `line-height`,
+  so the two paths disagreed with each other as well as with the reference.
+  Clamping a single-line auto-height inline-block to its line box fixed every
+  direct measurement — 10px, 16px, 24px and 40px line-heights all matched
+  Chromium exactly — **and regressed WPT
+  `css-anchor-position/position-area-scrolling-002` to 90.6%**, content shifted
+  left 30px and up 19px. Bisected to the clamp rather than assumed: reverting the
+  `normal` change alone left the failure, reverting the clamp restored the test.
+  So it is out. The diagnosis stands and is worth keeping — an inline-block's
+  height really should be bounded by its line box — but the naive clamp is not the
+  shape of the fix, and whatever replaces it has to keep that anchor-positioning
+  test green.
 - **`line-height: normal` now floors the font height instead of rounding it up.**
   The reference engine builds `normal` from integer ascent and descent, so the sum
   lands on a whole pixel *below* the fractional height measured here. Swept against

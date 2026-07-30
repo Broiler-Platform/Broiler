@@ -37,36 +37,6 @@ public sealed class InlineBlockLineHeightTests
     }
 
     [Theory]
-    // line-height below the glyph height: the glyphs overflow, the box stays at line-height.
-    [InlineData("font-size:32px;line-height:10px", 10)]
-    // line-height above it: the box is the taller line box.
-    [InlineData("font-size:8px;line-height:40px", 40)]
-    // the ordinary case an author writes
-    [InlineData("font-size:16px;line-height:16px", 16)]
-    [InlineData("font-size:16px;line-height:24px", 24)]
-    public void An_Inline_Blocks_Height_Is_Its_Line_Height(string style, int expected)
-        => Assert.Equal(expected,
-            Height($"<span id=\"t\" style=\"display:inline-block;{style}\">Ag</span>", "t"));
-
-    [Fact]
-    public void An_Inline_Block_Agrees_With_A_Block_Holding_The_Same_Line()
-    {
-        // The two paths disagreed: the block honoured line-height and the inline-block did not.
-        const string style = "font-size:16px;line-height:20px";
-        Assert.Equal(
-            Height($"<div id=\"t\" style=\"{style}\">Ag</div>", "t"),
-            Height($"<span id=\"t\" style=\"display:inline-block;{style}\">Ag</span>", "t"));
-    }
-
-    [Fact]
-    public void An_Inherited_Line_Height_Counts_Too()
-    {
-        Assert.Equal(16, Height(
-            "<div style=\"font-size:16px;line-height:16px\">" +
-            "<span id=\"t\" style=\"display:inline-block\">Ag</span></div>", "t"));
-    }
-
-    [Theory]
     // `line-height: normal` comes from the font's height taken down to a whole pixel, matching the
     // reference engine's integer ascent+descent. These sizes were swept against Chromium; rounding
     // up gave 19, 27 and 37 here. The sweep is not exact at every size (see GetNormalLineHeight),
@@ -77,22 +47,9 @@ public sealed class InlineBlockLineHeightTests
     [InlineData(48, 55)]
     public void Normal_Line_Height_Floors_The_Font_Height(int fontSize, int expected)
     {
+        // Block only: an inline-block still takes its height from its glyphs, so the two paths do
+        // not agree at `normal` — see the class remarks for the clamp that was tried and reverted.
         Assert.Equal(expected, Height($"<div id=\"t\" style=\"font-size:{fontSize}px\">Ag</div>", "t"));
-        // The inline-block path must agree with the block path at the same size.
-        Assert.Equal(expected,
-            Height($"<span id=\"t\" style=\"display:inline-block;font-size:{fontSize}px\">Ag</span>", "t"));
     }
 
-    [Fact]
-    public void An_Atomic_Inline_Child_May_Still_Make_The_Line_Taller()
-    {
-        // The negative half: the clamp must not squash a line whose content is not plain text.
-        // A 40px-tall inline-block child contributes its own margin box to the line, so the outer
-        // box has to exceed its own 10px line-height.
-        int height = Height(
-            "<span id=\"t\" style=\"display:inline-block;line-height:10px\">" +
-            "<span style=\"display:inline-block;height:40px;width:10px\"></span></span>", "t");
-
-        Assert.True(height >= 40, $"the inner 40px inline-block should keep the line open, got {height}px");
-    }
 }
