@@ -575,6 +575,15 @@ Four caveats, all learned the hard way:
   whitespace failing to join the line box its inline-block siblings are on. This
   is what is left of problem 29's 3.3%: our hosts are ~2.4 lines tall where
   Chromium's are one, and the four `<x-menu>` rows stack that error.
+  **The mechanism is exact.** Two 10px inline-blocks separated by a space give a
+  shrink-to-fit row of `20×52` with the second box at `y=34` — directly *below*
+  the first. Give the same row `width: 200px` and they sit side by side at `x=33`
+  and `x=47`, one line, 4px apart. So the line-breaking is right and the *width*
+  is wrong: max-content sums the two boxes but omits the collapsible space
+  between them, making the container exactly one space too narrow, so the last
+  item cannot fit and wraps. The fix belongs in the same `GetMinMaxSumWords`
+  accumulation that the `display:none` guard above went into — inter-item
+  whitespace has to count toward max-content.
   Reproducible in six lines with no shadow DOM, template or custom element in
   sight:
 
