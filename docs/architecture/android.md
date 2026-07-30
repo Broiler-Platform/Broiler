@@ -1,8 +1,9 @@
 # Android application architecture
 
-- **Status:** Proposed. No Android code exists in the repository yet; this
-  document records the target topology and the decisions that must be frozen
-  before implementation starts.
+- **Status:** Proposed, with the input providers implemented. The
+  `Broiler.Input.*.Android` backends exist and are unit-tested; nothing has run
+  on a device. The rest of this document records the target topology and the
+  decisions that must be frozen before the application projects start.
 - **Last reconciled:** 2026-07-30
 
 This document covers hosting the existing Broiler applications —
@@ -149,13 +150,22 @@ the host seam itself is not the hard part. The lifecycle is.
 This is the largest genuine gap, and it is a gap in the neutral layer rather
 than in an Android backend.
 
-`Broiler.Input` defines `TouchInputDevice`, `PenInputDevice`, and
-`TextInputDevice`, but **no platform implements any of them** — Windows and Linux
-ship keyboard and mouse providers only, which the component roadmap states
-plainly. Android is therefore the first consumer of the touch, pen, and IME
-contracts, and it will be the first real test of whether they are right.
+`Broiler.Input` defined `TouchInputDevice`, `PenInputDevice`, and
+`TextInputDevice` as abstract contracts that **no platform implemented** —
+Windows and Linux ship keyboard and mouse providers only. The Android backends
+are now the first implementations of all three, so Android is the first real test
+of whether those contracts are right.
 
-Two neutral-layer defects block touch before any Android code is written:
+Those backends target plain `net10.0` and take primitive event data — the `int`
+and `float` values read from `MotionEvent`, `KeyEvent`, and `InputConnection` —
+instead of referencing `Mono.Android`. The host owns the Activity and the View,
+so it is already the only component that can call the Android APIs; having it
+forward primitives keeps `Android.Views` and `Java.Lang` out of the neutral
+contracts by construction, and makes the translation layer testable on any host
+without the workload. A boundary test pins the absence of those references.
+
+Two neutral-layer defects still block touch end to end. The Android backends
+produce contact identity, phase, and pressure; the UI layer throws them away:
 
 1. `UiInputEvent.FromTouchContact` keeps only the position. `ContactId`,
    `TouchContactState`, and `Pressure` are all discarded
@@ -187,6 +197,11 @@ region, and commits or replaces spans. Satisfying it requires an editor-side
 contract that Broiler.UI does not have yet. That contract is not Android-specific
 — it is what Windows TSF and browser composition need too — so it belongs in
 `Broiler.UI`, with `Broiler.Input.Text.Android` supplying the Android half.
+`IAndroidEditorTextSource` and `AndroidTextEditRequest` in that assembly are the
+Android-side statement of the missing contract: the queries an IME makes, and the
+mutations (`deleteSurroundingText`, `setSelection`, `setComposingRegion`) that
+`TextInputDevice` has no way to express. They should collapse into the neutral
+contract once it exists rather than becoming a parallel abstraction.
 Soft-keyboard show/hide, keyboard type selection, and the IME action button are
 host responsibilities driven by editor focus.
 

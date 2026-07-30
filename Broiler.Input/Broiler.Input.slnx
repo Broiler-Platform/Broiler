@@ -1,4 +1,4 @@
-<Solution>
+﻿<Solution>
   <Configurations>
     <BuildType Name="Debug" />
     <BuildType Name="Release" />
@@ -128,6 +128,36 @@
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
+    <Project Path="Broiler.Input.Android/Broiler.Input.Android.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.Input.Keyboard.Android/Broiler.Input.Keyboard.Android.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.Input.Pen.Android/Broiler.Input.Pen.Android.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.Input.Text.Android/Broiler.Input.Text.Android.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="Broiler.Input.Touch.Android/Broiler.Input.Touch.Android.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="Broiler.Input.Touch/Broiler.Input.Touch.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
@@ -149,6 +179,12 @@
       <Build Project="false" Solution="Release|*" />
       <Build Project="false" Solution="Debug-Linux|*" />
       <Build Project="false" Solution="Release-Linux|*" />
+    </Project>
+    <Project Path="Broiler.Input.Android.Tests/Broiler.Input.Android.Tests.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
     <Project Path="Broiler.Input.Linux.Tests/Broiler.Input.Linux.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Windows|*" />

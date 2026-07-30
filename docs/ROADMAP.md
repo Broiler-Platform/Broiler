@@ -145,16 +145,15 @@ from the .NET for Android workload, **no .NET MAUI**, one `Activity` hosting one
 `Broiler.Documents`, `Broiler.Browser.Core`, and `Broiler.Writer.Core` rather
 than a parallel stack.
 
-**Current evidence:** the repository contains no Android code, project, or
-workflow — no source, project, or build file mentions Android, and a
-repository-wide search matches only vendored third-party web assets under
-`src/Broiler.DevSite`. What exists is the seam the port depends on: `IUiHost` is a
-five-member interface with three working implementations (Win32, X11, browser
-Canvas); `Broiler.Graphics` core is platform-neutral, trimmable, and
-AOT-annotated, and the GPU backends only upload and blit a CPU-rasterized frame;
-`Broiler.Documents` and the media codecs are managed, with the one native image
-path (a WIC WebP accelerator) already guarded to Windows and backed by a managed
-decoder. The gaps are equally concrete and are recorded per phase below.
+**Current evidence:** the Android input providers (phase A2) are implemented and
+unit-tested; no other Android code, project, or workflow exists yet. What the
+rest of the port builds on: `IUiHost` is a five-member interface with three
+working implementations (Win32, X11, browser Canvas); `Broiler.Graphics` core is
+platform-neutral, trimmable, and AOT-annotated, and the GPU backends only upload
+and blit a CPU-rasterized frame; `Broiler.Documents` and the media codecs are
+managed, with the one native image path (a WIC WebP accelerator) already guarded
+to Windows and backed by a managed decoder. No Android code has run on a device
+or an emulator. The gaps are equally concrete and are recorded per phase below.
 
 Phases A1–A3 are platform-neutral or backend work that Windows and Linux touch
 support would also need; A4 and A5 are the applications. Writer leads because it
@@ -235,32 +234,45 @@ system font on a clean device.
 **Owner:** `Broiler.Input` for providers, `Broiler.UI` for the neutral event
 surface.
 
-**Current evidence:** `TouchInputDevice`, `PenInputDevice`, and `TextInputDevice`
-are abstract contracts with **no implementation on any platform** — the component
-roadmap already scopes Windows touch/pen and Linux touch/text as unstarted.
-Worse, the neutral UI event drops what a touch backend would provide:
+**Current evidence:** the Android providers are implemented and unit-tested —
+`Broiler.Input.Android` plus the `Touch`, `Pen`, `Keyboard`, and `Text` backends,
+and the neutral provider contracts they needed
+(`ITouchInputProvider`/`TouchOpenOptions` and the pen and text equivalents,
+mirroring the keyboard pattern). These are the **first implementations of
+`TouchInputDevice`, `PenInputDevice`, and `TextInputDevice` on any platform**;
+Windows touch/pen and Linux touch/text remain unstarted.
+`Broiler.Input.Android.Tests` covers pointer-id tracking across a finger lift,
+capture-loss cancellation, tool-type routing, the IME composition state machine,
+provider lifecycle, and an assembly-boundary check, and runs on any host because
+the backends carry no Android SDK reference.
+
+What is delivered is the Input half. Two things still block touch end to end:
+the neutral UI event drops what the backends now produce —
 `UiInputEvent.FromTouchContact` keeps only the position and discards `ContactId`,
-`TouchContactState`, and `Pressure`, and `FromPenContact` does the same. Until
-that is fixed, no backend can express a press, a release, or a second finger.
+`TouchContactState`, and `Pressure`, and `FromPenContact` does the same — and
+`IUiTextInputHost` exposes only `PublishCaret`/`ClearCaret`, which cannot satisfy
+`InputConnection`. Both are Broiler.UI changes. No hardware evidence exists for
+any of it.
 
 **Next actions:**
 
 1. Extend `UiInputEvent` to carry contact identity, phase, pressure, and — for
    pen — tilt and eraser state, without regressing the mouse and keyboard paths
-   that currently construct it.
-2. Add `Broiler.Input.Touch.Android` and `Broiler.Input.Pen.Android` over
-   `MotionEvent`: pointer id → `ContactId`, `ActionMasked` → contact state,
-   `GetPressure` → pressure, `GetToolType` separating finger, stylus, and
-   eraser, including cancellation and capture loss.
-3. Define the editor-side text contract that a real IME needs — text around the
+   that currently construct it. Until this lands, the delivered backends cannot
+   express a second finger to any control.
+2. Define the editor-side text contract that a real IME needs — text around the
    cursor, current selection, composing-region set/clear, and commit — as a
    `Broiler.UI` concern, since Windows TSF and browser composition need the same
-   thing. `IUiTextInputHost` currently exposes only `PublishCaret`/`ClearCaret`.
-4. Add `Broiler.Input.Text.Android` and `Broiler.Input.Keyboard.Android` over
-   `InputConnection` and hardware key events, with soft-keyboard show/hide,
-   keyboard type, and IME action driven by editor focus.
-5. Suppress duplicate compatibility-mouse events so a single tap does not arrive
-   as both a touch contact and a synthesized pointer.
+   thing. `IAndroidEditorTextSource` and `AndroidTextEditRequest` are the
+   Android-side statement of that gap and should collapse into the neutral
+   contract when it exists.
+3. Drive the providers from a real Activity and `SurfaceView`, including
+   soft-keyboard show/hide, keyboard type, and IME action from editor focus.
+4. Populate descriptors from `InputDevice.getDeviceIds()` and
+   `InputManager.InputDeviceListener` so capability reporting and hot-plug
+   reflect the real device set rather than the `RegisterDefault*` fallbacks.
+5. Verify the stylus tilt conversion against a real digitizer; the formula is
+   implemented and self-consistent but its sign convention is unconfirmed.
 
 **Exit gate:** a two-finger gesture is distinguishable from two sequential taps
 at the `Broiler.UI` boundary; a CJK IME composes, converts, and commits into
