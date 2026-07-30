@@ -566,10 +566,32 @@ Four caveats, all learned the hard way:
   which exists only because the bridge implements no custom elements. That is the
   honest fix for a harness bug — the component's own code runs and builds a real
   shadow root — but the durable answer is `customElements` in HtmlBridge proper.
-- **Exit gate:** the remaining host/item over-size closes (ours 1.7% `#aaa` and
-  2.0% `#eee` against 0.1% and 1.1%), and only then the focus question — a
-  focused test for `delegatesFocus` moving focus to the first focusable shadow
-  descendant.
+- **The last of the gap is a third general bug, isolated but not fixed:
+  whitespace between inline-block siblings adds a line.** Ours renders the menu
+  row 46px tall where Chromium renders 18px; delete the whitespace between the
+  items and ours drops to 14px and Chromium's row is covered entirely by its
+  children. Any whitespace does it — a single space, a newline, a newline plus
+  indentation all behave the same — so it is not newline handling but collapsible
+  whitespace failing to join the line box its inline-block siblings are on. This
+  is what is left of problem 29's 3.3%: our hosts are ~2.4 lines tall where
+  Chromium's are one, and the four `<x-menu>` rows stack that error.
+  Reproducible in six lines with no shadow DOM, template or custom element in
+  sight:
+
+  ```html
+  <style>
+    .row { display: inline-block; background-color: #aaa; }
+    .row span { display: inline-block; background-color: #eee; }
+  </style>
+  <div class="row"><span>Item One</span> <span>Item Two</span> <span>Item Three</span></div>
+  ```
+
+  Every component's markup indents its children, so this hits shadow DOM
+  disproportionately — but like the intrinsic-width bug above it is ordinary
+  inline layout, and worth fixing on its own account rather than for this test.
+- **Exit gate:** whitespace between inline-block siblings stops adding a line, and
+  only then the focus question — a focused test for `delegatesFocus` moving focus
+  to the first focusable shadow descendant.
 
 ## Items that need the WPT server before they can be judged
 
