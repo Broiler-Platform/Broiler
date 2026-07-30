@@ -9,6 +9,24 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
+    /// <summary>
+    /// HTMLLinkElement's plain reflected DOMString IDL attributes (HTML §4.2.4), as
+    /// IDL name → content-attribute name. Deliberately partial: <c>type</c> and <c>name</c> are
+    /// already present because the form-control reflectors install on every element; <c>href</c> is
+    /// URL-typed and wired separately; and <c>crossOrigin</c> (nullable + enumerated) and
+    /// <c>disabled</c> (which toggles the sheet rather than the attribute — see
+    /// <c>DomBridge/StyleSheets.cs</c>) are left out rather than approximated as plain strings.
+    /// </summary>
+    private static readonly (string IdlName, string AttributeName)[] LinkReflectedAttributes =
+    [
+        ("rel", "rel"),
+        ("as", "as"),
+        ("media", "media"),
+        ("hreflang", "hreflang"),
+        ("integrity", "integrity"),
+        ("referrerPolicy", "referrerpolicy"),
+    ];
+
     private void AddElementSpecificMembers(JSObject obj, Broiler.Dom.DomElement element)
     {
         // -- Phase 5: HTML DOM Interfaces --
@@ -101,6 +119,32 @@ public sealed partial class DomBridge
                 new JSFunction((in _) => Dom.Features.ElementReflectionBinding.GetHref(this, element, in _), "get href"),
                 new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetHref(element, in a), "set href"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
+        // HTMLLinkElement / HTMLBaseElement — href is a reflected URL, exactly as on <a>/<area>.
+        // Neither had it, so `link.href = "…"` wrote nothing at all: a stylesheet injected the
+        // ordinary way — createElement("link"), set .rel and .href, append — serialized as a bare
+        // <link> with no attributes and never reached the cascade, and the page rendered unstyled
+        // (WPT issue #1497 problem 24, dom/nodes/moveBefore/preserve-render-blocking-style).
+        if (tag is "link" or "base")
+        {
+            obj.FastAddProperty((KeyString)"href",
+                new JSFunction((in _) => Dom.Features.ElementReflectionBinding.GetHref(this, element, in _), "get href"),
+                new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetHref(element, in a), "set href"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
+        // The rest of HTMLLinkElement's plain reflected DOMStrings.
+        if (tag == "link")
+        {
+            foreach (var (idlName, attrName) in LinkReflectedAttributes)
+            {
+                var captured = attrName; // capture for closure
+                obj.FastAddProperty((KeyString)idlName,
+                    new JSFunction((in _) => TryGetAttribute(element, captured, out var v) ? new JSString(v) : new JSString(string.Empty), "get " + idlName),
+                    new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedAttribute(captured, element, in a), "set " + idlName),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
         }
 
         // HTMLImageElement — height/width return computed CSS value or HTML attribute (Phase 3 P3.53:
