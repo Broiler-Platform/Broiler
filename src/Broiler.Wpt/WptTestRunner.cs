@@ -2320,6 +2320,7 @@ internal sealed partial class WptTestRunner
         {
             // Even with no inline scripts, we still need to process anchor
             // positioning, animation snapshots, etc. via the DomBridge.
+            using var microTaskContext2 = MicroTaskSynchronizationContext.Install(microTasks);
             using var context2 = new JSContext();
             var bridge2 = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop };
             bridge2.Attach(context2, html, url);
@@ -2333,6 +2334,10 @@ internal sealed partial class WptTestRunner
             return (bridge2.SerializeToHtml(), assertions2);
         }
 
+        // Current on this thread for the whole of script execution: a promise captures its
+        // synchronization context when it is created, so without this the engine resumes await
+        // continuations on the thread pool, racing this thread's serialize/render.
+        using var microTaskContext = MicroTaskSynchronizationContext.Install(microTasks);
         using var context = new JSContext();
         var bridge = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop };
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
