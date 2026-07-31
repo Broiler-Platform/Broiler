@@ -750,15 +750,36 @@ confirmed or contradicted. Cross-referencing the two lists:
   screenshot is evidence that it does not implement the rule. Ours matches the
   `rel=match` reference. Same shape as problems 14, 15, 18 and 24 above: closing
   it would mean deleting working support. **Leave it failing.**
-- **#1497 problem 16 (`css-view-transitions/names-are-tree-scoped`) is a real gap,
-  not yet opened.** The test hides every captured snapshot with document-scoped
-  `html::view-transition-old(*) { opacity: 0 }` rules, and its point is that those
-  rules must *not* reach a snapshot whose `view-transition-name` came from a
-  shadow tree — so Chromium's reference is a white page with one 100×100 green
-  square (the shadow-scoped capture, still visible). Ours renders a 100% red
-  canvas, which is more wrong than a scoping error alone explains; whatever is
-  painting the light-tree divs full-bleed needs isolating before the tree-scoping
-  question is even reachable.
+- **#1497 problem 16 (`css-view-transitions/names-are-tree-scoped`): the 100% red
+  canvas was page selectors leaking into the pseudo tree — fixed, 0% → 96.19%.**
+  The pseudo tree is materialised as real `<div>`s, so the test's page-level
+  `div { background: red }` matched every box in it, including the viewport-sized
+  overlay root that paints at z-index 2147483646. Each box now re-asserts a
+  transparent background beneath its own base style and the author's
+  `::view-transition*` declarations.
+  - **The interesting part is why the obvious version of this is wrong.** The
+    reset is written as longhands and an author writes the `background`
+    shorthand, so the two land on different keys of the inline-style dict and the
+    longhands win by coming later — silently cancelling
+    `::view-transition { background: lightpink }`. Layering them cost **341 → 264**
+    passing across the 490-test subset, with individual tests falling from 100% to
+    1%; narrowing the reset to backgrounds alone changed nothing (263), which is
+    what identified the shorthand collision rather than the extra properties. The
+    reset has to stand aside entirely when the author paints the box.
+  - **Net: 341 → 341 passing**, one genuine gain
+    (`shadow-part-with-name-overridden-by-important`, 1.3% → 100%) against one
+    apparent loss that is `new-content-transform-change-001` — the flaky test
+    warned about above, which scores 1.03% on three consecutive runs of the
+    *unmodified* build in isolation, identically to the patched one. Worth
+    repeating as a method note: that test appeared in a regression diff for the
+    second time and was again not the change's fault.
+  - **What still keeps the test failing** is separate and unfixed: the captured
+    elements go on painting in place, so ours shows the three light-tree red boxes
+    where the reference shows only the shadow-scoped green snapshot. Per spec a
+    captured element is replaced by its snapshot, not drawn alongside it. Tree
+    scoping proper — that a document-scoped `::view-transition-old(*)` rule must
+    not reach a shadow-scoped name — is still untested here, because it sits
+    behind that.
 - **`css-view-transitions/html-becomes-fixed` (problem 29) does not reproduce
   here** — 99.99% locally against a locally generated reference, where CI reports
   0.4%. Judge it from a CI artifact, not from this container.
