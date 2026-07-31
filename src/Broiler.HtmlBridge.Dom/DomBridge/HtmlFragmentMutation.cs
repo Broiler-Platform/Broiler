@@ -122,6 +122,10 @@ public sealed partial class DomBridge
                 FireSubDocumentOnload(insertedElement);
             else
                 FireDescendantOnloads(insertedElement);
+
+            // A <link rel=stylesheet> only fetches once it is in the document, so insertion — not
+            // createElement — is when its load event becomes due (HTML §4.2.4).
+            FireDescendantStylesheetLinkLoads(insertedElement);
         }
     }
 

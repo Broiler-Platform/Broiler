@@ -70,4 +70,94 @@ document.body.appendChild(out);
 
         Assert.Contains(">resolved=file:///dir/page.html|afterSet=file:///dir/other/deep.html|attr=other/deep.html<", result);
     }
+
+    // WPT issue #1497 problem 24 (dom/nodes/moveBefore/preserve-render-blocking-style): <link> had no
+    // IDL reflectors at all, so the ordinary way to inject a stylesheet — createElement, set .rel and
+    // .href, append — produced a bare <link> with no attributes. Nothing reached the cascade and the
+    // page rendered unstyled. The serialized attributes are the substance: they are what the render
+    // pass reads.
+    [Fact]
+    public void Link_Rel_And_Href_Set_Through_The_Idl_Reach_The_Content_Attributes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<script>
+var link = document.createElement('link');
+link.rel = 'stylesheet';
+link.href = 'sheet.css';
+document.head.appendChild(link);
+</script>
+</head><body></body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///dir/test.html");
+
+        Assert.Contains(@"<link rel=""stylesheet"" href=""sheet.css"">", result);
+    }
+
+    [Fact]
+    public void Link_Href_Getter_Resolves_Against_The_Page_Url()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<script>
+var link = document.createElement('link');
+link.rel = 'stylesheet';
+link.href = 'deep/sheet.css';
+var out = document.createElement('div');
+out.textContent = 'idl=' + link.href + '|attr=' + link.getAttribute('href') + '|rel=' + link.rel;
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///dir/test.html");
+
+        // The IDL getter is a resolved URL; the content attribute keeps what was written.
+        Assert.Contains(">idl=file:///dir/deep/sheet.css|attr=deep/sheet.css|rel=stylesheet<", result);
+    }
+
+    [Fact]
+    public void Link_Reflects_The_Remaining_Plain_String_Idl_Attributes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<script>
+var link = document.createElement('link');
+link.rel = 'preload';
+link.as = 'style';
+link.media = 'print';
+link.hreflang = 'en';
+link.integrity = 'sha384-abc';
+link.referrerPolicy = 'no-referrer';
+document.head.appendChild(link);
+</script>
+</head><body></body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///dir/test.html");
+
+        foreach (var attribute in new[]
+                 {
+                     @"rel=""preload""", @"as=""style""", @"media=""print""", @"hreflang=""en""",
+                     @"integrity=""sha384-abc""", @"referrerpolicy=""no-referrer""",
+                 })
+        {
+            Assert.Contains(attribute, result);
+        }
+    }
+
+    [Fact]
+    public void Base_Href_Set_Through_The_Idl_Reaches_The_Content_Attribute()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<script>
+var b = document.createElement('base');
+b.href = 'sub/';
+document.head.appendChild(b);
+</script>
+</head><body></body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///dir/test.html");
+
+        Assert.Contains(@"<base href=""sub/"">", result);
+    }
 }

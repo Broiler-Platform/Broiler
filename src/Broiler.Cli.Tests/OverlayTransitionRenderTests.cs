@@ -151,4 +151,77 @@ public class OverlayTransitionRenderTests
         var corner = bitmap.GetPixel(5, 5);
         Assert.True(corner is { R: 3, G: 5, B: 7 }, $"corner was {corner.R},{corner.G},{corner.B}");
     }
+
+    // WPT issue #1497 problem 28 (css-position/overlay/overlay-transition-dialog): close() tore a modal
+    // dialog down unconditionally, where hidePopover() had honoured a discrete `overlay` transition
+    // since the popover work. A dialog closed mid-transition must still paint, so the canvas kept the
+    // backdrop instead of going blank.
+    private const string DialogHtml = """
+<!DOCTYPE html>
+<html><head><style>
+  html, body { margin: 0; }
+  dialog { width: 20px; height: 20px; padding: 0; border: none; background-color: rgb(9, 11, 13); }
+  dialog::backdrop { background-color: rgb(3, 5, 7); }
+  dialog.animate { transition: overlay 60s allow-discrete, display 60s allow-discrete; }
+</style></head>
+<body><dialog id="d"></dialog></body></html>
+""";
+
+    [Fact]
+    public void Dialog_Closed_Mid_Overlay_Transition_Still_Paints_With_Its_Backdrop()
+    {
+        using var bitmap = Render(DialogHtml, """
+var d = document.getElementById('d');
+d.showModal();
+d.classList.add('animate');
+d.close();
+""");
+
+        // The backdrop still covers the canvas, and the dialog box itself is still painted over it.
+        var corner = bitmap.GetPixel(150, 150);
+        Assert.True(corner is { R: 3, G: 5, B: 7 }, $"backdrop was {corner.R},{corner.G},{corner.B}");
+    }
+
+    // The negative half: without the discrete transition the same close() tears the dialog down at
+    // once, so neither it nor its backdrop is painted. Without this the test above would pass just as
+    // well against a close() that never did anything.
+    [Fact]
+    public void Dialog_Closed_Without_An_Overlay_Transition_Disappears_Immediately()
+    {
+        using var bitmap = Render(DialogHtml, """
+var d = document.getElementById('d');
+d.showModal();
+d.close();
+""");
+
+        var corner = bitmap.GetPixel(150, 150);
+        Assert.False(corner is { R: 3, G: 5, B: 7 }, "backdrop still painted after a plain close()");
+    }
+
+    // A dialog that transitions `overlay` but NOT `display` stays in the top layer yet generates no
+    // box — the UA sheet's `dialog:not([open]) { display: none }` still applies, so the two halves
+    // must not be collapsed into one flag.
+    [Fact]
+    public void Dialog_Transitioning_Only_Overlay_Generates_No_Box()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><head><style>
+  html, body { margin: 0; }
+  dialog { width: 20px; height: 20px; padding: 0; border: none; background-color: rgb(9, 11, 13); }
+  dialog::backdrop { background-color: rgb(3, 5, 7); }
+  dialog.animate { transition: overlay 60s allow-discrete; }
+</style></head>
+<body><dialog id="d"></dialog></body></html>
+""";
+        using var bitmap = Render(html, """
+var d = document.getElementById('d');
+d.showModal();
+d.classList.add('animate');
+d.close();
+""");
+
+        var box = bitmap.GetPixel(10, 10);
+        Assert.False(box is { R: 9, G: 11, B: 13 }, "dialog box painted with no display transition");
+    }
 }

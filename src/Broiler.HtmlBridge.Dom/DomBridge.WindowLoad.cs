@@ -43,7 +43,12 @@ public sealed partial class DomBridge
         var htmlEl = Elements.FirstOrDefault(e =>
             string.Equals(e.TagName, "html", StringComparison.OrdinalIgnoreCase));
         if (htmlEl != null)
+        {
+            // Stylesheet links first: HTML blocks the document's load event on its render-blocking
+            // sheets, so by the time anything below runs their `load` events have already fired.
+            FireDescendantStylesheetLinkLoads(htmlEl);
             FireDescendantOnloads(htmlEl);
+        }
 
         // 1. Fire window.onload if it was set by script.
         //    In browsers, setting `window.onload = fn` registers a handler

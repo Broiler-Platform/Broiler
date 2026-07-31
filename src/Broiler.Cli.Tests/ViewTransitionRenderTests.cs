@@ -539,4 +539,61 @@ public class ViewTransitionRenderTests
         var below = bitmap.GetPixel(40, 150);
         Assert.True(below is { R: 255, G: 182, B: 193 }, $"below was {below.R},{below.G},{below.B}");
     }
+
+    // WPT issue #1497 problem 16 (css-view-transitions/names-are-tree-scoped): the pseudo tree is
+    // materialised as real <div>s, so an ordinary page-level `div` rule matched them — including the
+    // viewport-sized overlay root that paints above everything. That test's `div { background: red }`
+    // turned the whole canvas red.
+    [Fact]
+    public void A_Page_Level_Div_Rule_Does_Not_Paint_The_Transition_Overlay()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  body { margin: 0; }
+  div { background: red; width: 100px; height: 100px; }
+  #target { view-transition-name: target; }
+  html::view-transition-group(root) { display: none; }
+  html::view-transition-new(target) { animation: unset; opacity: 0; }
+  html::view-transition-old(target) { animation: unset; opacity: 0; }
+</style>
+<div id="target"></div>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition(() => {});");
+
+        // Away from the 100x100 target, the canvas must stay white: the overlay is transparent, not
+        // a viewport-sized red box.
+        var away = bitmap.GetPixel(150, 150);
+        Assert.True(away is { R: 255, G: 255, B: 255 }, $"away was {away.R},{away.G},{away.B}");
+    }
+
+    // The negative half, and the reason the first attempt at the above cost 79 tests: an author
+    // `::view-transition { background: … }` must still paint. The reset is written as longhands and
+    // this is a shorthand, so layering them puts the reset last and cancels the author's colour —
+    // the reset has to stand aside entirely when the author paints the box.
+    [Fact]
+    public void An_Author_Overlay_Background_Still_Paints_Over_The_Reset()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class=reftest-wait>
+<style>
+  body { margin: 0; }
+  div { width: 100px; height: 100px; }
+  #target { background: green; view-transition-name: target; }
+  html::view-transition-group(root) { display: none; }
+  html::view-transition-new(target) { animation: unset; opacity: 0; }
+  html::view-transition-old(target) { animation: unset; opacity: 0; }
+  html::view-transition { background: lightpink; }
+</style>
+<div id="target"></div>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition(() => {});");
+
+        var away = bitmap.GetPixel(150, 150);
+        Assert.True(away is { R: 255, G: 182, B: 193 }, $"away was {away.R},{away.G},{away.B}");
+    }
 }

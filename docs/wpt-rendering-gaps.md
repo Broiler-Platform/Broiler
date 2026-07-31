@@ -16,12 +16,14 @@
   30 are fixed; each section says what landed, what was verified locally, and what
   is left for CI to confirm. Patches `0035`–`0039` — which carried the submodule
   half of 6, 27, 28 and 30 — **have since been applied and their pointers
-  bumped**, so all of those are now live on CI rather than pending. The one fix
-  still waiting on a maintainer are problems 7–10's
-  [`patches/0041`](../patches/README.md) and problem 29's `patches/0042`, whose
-  remote this session cannot push to (403, as documented in `CLAUDE.md`). Neither
-  has a main-repo fallback, so those tests stay at their old numbers on CI until
-  the patches land.
+  bumped**, so all of those are now live on CI rather than pending. So has
+  problem 29's `0042` (confirmed two ways: it reverse-applies to the pinned
+  `Broiler.HTML`, and `TemplateContentInertnessTests`' probe now sees template
+  styles staying inert). The one still waiting on a maintainer is problems 7–10's
+  [`patches/0041`](../patches/README.md), whose remote this session cannot push to
+  (403, as documented in `CLAUDE.md`) — and which **no longer applies to the
+  pinned pointer**, so it needs regenerating before it can be applied at all.
+  Until then those four tests stay at their old numbers on CI.
 - **Four of these tests should not be "fixed".** Problems 14, 15 and 24 pass only
   by rendering *less* than Broiler already does — their Chromium reference was
   produced by an engine that does not implement the feature under test, so the
@@ -401,9 +403,37 @@ Four caveats, all learned the hard way:
      headless render with no retractable UA chrome, so they canonicalise onto it.
      Verified end-to-end: `100vi × 100vb` fills the viewport, a `vertical-rl`
      root swaps the axes, and `100dvw × 50svh` covers half the canvas.
-  2. Lay out and paint a `contain: size` box inside table internals.
-  3. Establish what a vertical-rl root's initial scroll position is and align the
-     canvas extent with it.
+  2. ~~Lay out and paint a `contain: size` box inside table internals.~~
+     **Half done, and the diagnosis was wrong.** `contain: size` is not involved:
+     a `contain: size` box paints fine on its own. Two separate faults sit behind
+     `monolithic-overflow-011`, found by bisecting the test down to
+     `<table style="background: yellow">`:
+     - **A table never painted its own background or borders at all** — CSS2.1
+       §17.5.1 layer 1. The six-layer model covers a table's *internals*, but the
+       painter handed the whole table to that pass (which starts at layer 2) while
+       the background phase skipped `display: table` children outright and the
+       foreground phase suppresses block backgrounds. Nobody emitted layer 1.
+       Diagnosed at the source, not from pixels: the fragment has correct bounds
+       and a computed `background-color` of yellow and still emits no fill.
+       **Fixed** — `patches/0045`, with `TableBackgroundPaintTests` as the landed
+       check. This is ordinary markup, not a paged-media edge case.
+     - **Still open:** a block child of a `display: table-row-group` gets no box.
+       The row-group measures 0×0 and its child computes `display: inline`, so the
+       hotpink rectangle has nowhere to paint and the table is only as tall as its
+       stray text. That is table fixup — a block inside a row group needs wrapping
+       in an anonymous table-cell — and it is what still holds the test at 2.26%.
+  3. ~~Establish what a vertical-rl root's initial scroll position is and align the
+     canvas extent with it.~~ **Done, and `page-margin-002` must not be "fixed":
+     the reference is a screenshot artifact.** The two engines do *not* disagree
+     about layout. Asked directly under Playwright, Chromium puts the yellow
+     `.fullpager` at exactly `(0, 0, 1024, 768)` — filling the viewport — with
+     cyan at `x: -1024`, pink at `x: -2048`, `scrollLeft: 0` and
+     `scrollWidth: 3072`. That is what Broiler renders. But Chromium's own
+     **viewport** screenshot of that same page is 100% white, while its
+     **full-page** screenshot (3072×768) paints all three blocks, yellow at the
+     right. So the blank reference is an artifact of screenshotting a `vertical-rl`
+     root, not evidence about rendering, and matching it would mean drawing
+     nothing. Same category as problems 14, 15, 18, 24 and 25.
 - **Exit gate:** all three tests match on screen, with focused tests for logical
   viewport units and for `contain: size` in table internals — and no paged-media
   work is required to get there. The viewport-unit half of that gate is met (a
@@ -679,6 +709,166 @@ Four caveats, all learned the hard way:
   should drop by exactly the number reclassified, and that drop is not a
   regression.
 
+## The next run (issue #1497, 2026-07-30)
+
+Everything above is scoped to
+[issue #1491](https://github.com/Broiler-Platform/Broiler/issues/1491). The next
+run reported the same shape of tail, and **most of it is the same tests under new
+numbers** — so this section records only what is new, and what the re-run
+confirmed or contradicted. Cross-referencing the two lists:
+
+- **#1497 problems 1 and 2 are one bug, and it was the run's largest.** Both crash
+  signatures — `Worker closed stdout before returning a result` (68 tests) and
+  `Worker exited with code 134` (3 tests) — were a single unbounded recursion in
+  `@container` prelude evaluation. Every `(` was read as the start of a nested
+  condition, so a prelude whose parentheses belong to a *value* function
+  (`(width = calc(100px + 10rem))`) or to a *query* function other than `style()`
+  (`anchored(fallback: --foo)`, `scroll-state(scrollable: block-end)`) handed the
+  tokenizer the identical text at every level. A .NET stack overflow cannot be
+  caught, so it killed the worker outright — which is why the reported signature
+  named the runner rather than the CSS engine. Measured locally over the 302
+  `container-queries` tests in both affected directories: **68 crashes → 0**, no
+  test regressed. Fixed in `Broiler.CSS`; **[`patches/0043`](../patches/README.md)**, with no
+  main-repo fallback. The WPT runner applies it for the run via
+  `scripts/apply-pending-wpt-patches.sh`, so CI's numbers reflect the fix; the
+  pinned pointer still carries the crash until a maintainer lands it.
+- **#1497 problems 3 and 4 are #1491's problems 2 and 3** — the per-element JS
+  wrapper cost, still tracked in [the root roadmap](ROADMAP.md#htmlbridge-runtime).
+- **#1497 problem 24 was recorded here as fixed, and was not.**
+  `dom/nodes/moveBefore/preserve-render-blocking-style` is listed in the table
+  below as "**fixed** — patch 0038 applied", but the re-run still had it at 0.0%,
+  and so did this container. `Node.moveBefore` was only ever half the test. The
+  real gap: **`<link>` had no IDL reflectors at all**, so the ordinary way to
+  inject a stylesheet —
+  `createElement("link")`, set `.rel` and `.href`, append — wrote *nothing*, and
+  the element serialized as a bare `<link>` that never reached the cascade.
+  `setAttribute("rel", …)` worked, which is how it stayed hidden. `<link>`/`<base>`
+  now reflect `href` as a URL like `<a>`/`<area>`, and `<link>` reflects `rel`,
+  `as`, `media`, `hreflang`, `integrity` and `referrerPolicy`. **0.0% → 100%**, in
+  the main repo, so it is on CI immediately. The `?pipe=trickle(d1)` query and the
+  `moveBefore` call in that test were both red herrings — a static `<link>` with
+  the same query already rendered correctly.
+- **#1497 problem 30 is new and is two bugs in one spec rule.**
+  `css/css-transforms/transform-scale-percent-001` uses
+  `transform: scale(50%, 75%)`, and css-transforms-2 makes a scale factor
+  `<number> | <percentage>` where the percentage is *the ratio* — `scale(50%)` is
+  `scale(0.5)`. The paint parser resolved every percentage against the element's
+  box (right for `translate`, wrong for `scale`), so a 100px square came out 50×
+  and filled the canvas; the bridge's geometry parser had no percentage branch for
+  scale at all, so `50%` fell back to `0` and collapsed the box. **0.5% → 99.99%**,
+  and the 939-test `css-transforms` subset goes 376 → 377 passing. Geometry is on
+  CI now; the pixels need **[`patches/0044`](../patches/README.md)**.
+- **#1497 problem 28 was an asymmetry between two code paths that model the same rule.**
+  `hidePopover()` has honoured `transition: overlay allow-discrete` since the
+  popover work — a popover hidden mid-transition stays in the top layer, so a
+  static render still paints it and its `::backdrop`. `close()` did not, and tore
+  a modal dialog down unconditionally, so `overlay-transition-dialog` rendered a
+  blank canvas against a reference showing the dialog over its backdrop. `close()`
+  now applies the same rule, in the two halves the spec actually has: `overlay`
+  keeps the top-layer flag (so the backdrop paints), and `display` keeps the
+  `open` attribute (because the UA sheet's `dialog:not([open]) { display: none }`
+  is what decides whether a box is generated at all). A dialog transitioning
+  `overlay` alone stays in the top layer but generates no box — a third test pins
+  that, so the two halves cannot be collapsed into one flag. **0.4% → 99.89%**,
+  and the 382-test `css-position` subset goes 241 → 242 passing. Main repo.
+- **#1497 problem 25 must not be "fixed" — the reference is the unfeatured render.**
+  `color-scheme-iframe-background-mismatch-dynamic` asserts that a same-origin
+  frame with `color-scheme: light` gets an *opaque* background when its parent
+  switches to dark. Ours renders the frame light; CI and this container both have
+  Chromium rendering it `#121212`. Settled by rendering the test's own
+  `<link rel=match>` target, `support/light-frame-scrolling.html`, in the same
+  Chromium: it comes out **white**, while Chromium's render of the *test* is dark
+  — so **Chromium fails this reftest against its own reference**, and its
+  screenshot is evidence that it does not implement the rule. Ours matches the
+  `rel=match` reference. Same shape as problems 14, 15, 18 and 24 above: closing
+  it would mean deleting working support. **Leave it failing.**
+- **#1497 problem 16 (`css-view-transitions/names-are-tree-scoped`): the 100% red
+  canvas was page selectors leaking into the pseudo tree — fixed, 0% → 96.19%.**
+  The pseudo tree is materialised as real `<div>`s, so the test's page-level
+  `div { background: red }` matched every box in it, including the viewport-sized
+  overlay root that paints at z-index 2147483646. Each box now re-asserts a
+  transparent background beneath its own base style and the author's
+  `::view-transition*` declarations.
+  - **The interesting part is why the obvious version of this is wrong.** The
+    reset is written as longhands and an author writes the `background`
+    shorthand, so the two land on different keys of the inline-style dict and the
+    longhands win by coming later — silently cancelling
+    `::view-transition { background: lightpink }`. Layering them cost **341 → 264**
+    passing across the 490-test subset, with individual tests falling from 100% to
+    1%; narrowing the reset to backgrounds alone changed nothing (263), which is
+    what identified the shorthand collision rather than the extra properties. The
+    reset has to stand aside entirely when the author paints the box.
+  - **Net: 341 → 341 passing**, one genuine gain
+    (`shadow-part-with-name-overridden-by-important`, 1.3% → 100%) against one
+    apparent loss that is `new-content-transform-change-001` — the flaky test
+    warned about above, which scores 1.03% on three consecutive runs of the
+    *unmodified* build in isolation, identically to the patched one. Worth
+    repeating as a method note: that test appeared in a regression diff for the
+    second time and was again not the change's fault.
+  - **What still keeps the test failing** is separate and unfixed: the captured
+    elements go on painting in place, so ours shows the three light-tree red boxes
+    where the reference shows only the shadow-scoped green snapshot. Per spec a
+    captured element is replaced by its snapshot, not drawn alongside it. Tree
+    scoping proper — that a document-scoped `::view-transition-old(*)` rule must
+    not reach a shadow-scoped name — is still untested here, because it sits
+    behind that.
+- **`css-view-transitions/html-becomes-fixed` (problem 29) does not reproduce
+  here** — 99.99% locally against a locally generated reference, where CI reports
+  0.4%. Judge it from a CI artifact, not from this container.
+- **Still unanalysed:** `css-view-transitions/new-content-flat-transform-ancestor`
+  (0.3% locally, so it does reproduce).
+- **`uievents/…/UIEvent.load.stylesheet` (problem 26) was two gaps, and closing
+  both still does not close the test.** It sets `link.href` from `window.onload`
+  and waits for a `load` event on the `<link>` whose `currentTarget` is the link.
+  The reflection fix above got the href to the attribute; the second gap was that
+  **nothing dispatched a stylesheet link's `load` event at all**. It does now —
+  once per href, only for a link in the document, and `error` rather than `load`
+  when the fetch fails, decided by the same CSP gate and fetch the cascade uses
+  (which needs the href resolved against the page URL, since the loader only
+  accepts absolute URLs — skipping that dispatched `error` for every relative href
+  while the sheet applied fine). The test renders `PASS` where it rendered `FAIL`.
+  **Its pixel score barely moves — 97.88% → 97.87% — and it stays under the 99%
+  threshold either way**, because the rest of the difference is bold text.
+- **Neither `font-weight` nor `font-style` changes the rendered face — this is an
+  engine gap, not a container font problem, and it caps every text comparison
+  whose reference contains bold or italic.** Measured rather than eyeballed:
+  rendering `HHHH` at 60px as normal, `bold` and `italic` gives **byte-identical
+  ink (2384 px) and identical advance span (170 px)** for all three, while
+  `monospace` differs (1920 / 134) — so family affects *layout advances* and
+  nothing affects the *face*.
+
+  The chain is intact right up to the last step. `font-weight` reaches
+  `DrawTextItem.FontWeight`
+  ([`PaintWalker.Text.cs`](../Broiler.HTML/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Text.cs)),
+  and `StubImageAdapter.CreateFontInt(family, size, style)` passes the style into
+  `ResolveTypeface`. But
+  [`TrueTypeTypefaceResolver.ResolveTypeface(family, style)`](../Broiler.HTML/Source/Broiler.HTML.Image.Compat/Text/TrueTypeText.cs)
+  — the resolver `StubCompatProvider` actually installs — **ignores its `style`
+  parameter entirely** and looks the family up by name alone. The raster backend
+  then draws from `item.FontHandle`, never from `item.FontWeight`, so the weight
+  that survived the whole pipeline is dropped at the last hop.
+
+  Underneath that, the HTML image backend has **no system-font enumeration at
+  all**: `BroilerFontRegistry` records only fonts registered at runtime, so in the
+  WPT path the "available families" set is empty, every generic-family mapping
+  resolves to nothing, and *every* family falls through to one bundled resource,
+  `Vazirmatn-Regular.ttf`. One regular face draws the entire suite.
+
+  Note this is specific to the HTML render path. `Broiler.Graphics` has the other
+  half already: `FallbackSystemFont` discovers a system regular+bold **pair**
+  (`DejaVuSans.ttf` + `DejaVuSans-Bold.ttf`, both present here) and
+  `BImageRenderer` selects between them on `run.Font.Weight >= BFontWeight.Bold`.
+  Its `BoldPath` has **no consumer outside its own file** — that path serves the
+  UI/Graphics backend, not `HtmlRender`.
+
+  **Not attempted here, deliberately.** Closing it means giving the image backend
+  real system-font enumeration and `(family, weight, style)` matching — a feature,
+  in a submodule this session cannot push to, that would change the face of every
+  text render in the suite and so needs its own before/after sweep. Synthesising
+  bold from the regular outlines would be cheaper but would not match a real bold
+  face, so it would not carry a test over the 99% threshold anyway, and could
+  regress tests that pass today. Worth doing; not worth doing blind.
+
 ## Reported problems, at a glance
 
 Local numbers come from this container against locally generated Chromium
@@ -708,7 +898,7 @@ feature they test — closing those means rendering less, not more.
 | 24 | `canvas/…/manual/dialog-paints-in-top-layer.tentative` | 0.0% | ours dialog, Chromium blank (unsupported) | **fixed** — reclassified Manual |
 | 25 | `the-link-element/stylesheet-with-base` | 0.0% | ours red (trap file), Chromium white | **fixed** — renders green locally |
 | 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
-| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — patch 0038 applied; bridge now delegates to it |
+| 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — but only at the *second* attempt; `moveBefore` (patch 0038) was half of it, and the test stayed at 0.0% until `<link>` got its IDL reflectors. See [the #1497 section](#the-next-run-issue-1497-2026-07-30) |
 | 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** — patch 0036 applied |
 | 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 97.8%** with patch 0042; residual is inline-block line height |
 | 30 | `css-page/page-box-008-print` | 0.0% | ours hotpink, Chromium yellow | **`vb` fixed** — patches 0036/0037 applied |

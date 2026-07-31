@@ -109,8 +109,22 @@ internal sealed class DialogBinding(IDialogHost host)
 
     private JSValue Close(DomElement element, in Arguments a)
     {
-        _host.SetOpenAttribute(element, false);
-        _host.SetDialogModal(element, false);
+        // CSS Position §overlay: closing a dialog whose `overlay` is transitioned with
+        // `transition-behavior: allow-discrete` keeps it in the top layer for the transition's
+        // duration, exactly as HidePopover already does for a popover — a static render snapshots
+        // mid-transition, so the dialog and its ::backdrop must stay rendered. `display` is the
+        // separate half: the UA sheet's `dialog:not([open]) { display: none }` is what decides
+        // whether a box is generated, so the `open` attribute survives only while `display` is
+        // itself mid-discrete-transition. A dialog that transitions `overlay` alone is still in the
+        // top layer but generates no box, which is what the spec asks for.
+        //
+        // Like the popover path, this leaves `dialog.open` reading true for the transition's
+        // duration where the spec clears it synchronously. Only a dialog that declares the discrete
+        // `display` transition is affected, which is exactly the mid-transition snapshot case.
+        if (!_host.DialogKeepsDisplayOnClose(element))
+            _host.SetOpenAttribute(element, false);
+        if (!_host.DialogKeepsOverlayOnClose(element))
+            _host.SetDialogModal(element, false);
         if (a.Length > 0)
             _host.SetReturnValue(element, a[0].ToString());
         _host.InvalidateStyleScope(element);

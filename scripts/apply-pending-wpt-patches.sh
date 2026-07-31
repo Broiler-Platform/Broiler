@@ -30,8 +30,26 @@ set -euo pipefail
 
 # Patches whose fix is not in the pinned submodule pointer and could not be
 # pushed to the submodule remote (push 403 → captured under patches/).
-# Empty by default — add entries here to have CI apply them again.
+#
+# Each was checked against the pinned pointer when it was added here: it does
+# not reverse-apply (so the pointer does not contain it) and does apply cleanly
+# (so it is not stale). The idempotence guard keeps that true — once a
+# maintainer lands one upstream and bumps the pointer, its reverse-apply check
+# starts succeeding and it is skipped rather than re-applied.
+#
+# Deliberately NOT listed:
+#   * 0040 (Broiler.Graphics, Android OpenGL ES backend) — an Android
+#     presentation backend that no WPT test exercises, and it no longer applies
+#     to the pinned pointer either.
+#   * 0041 (Broiler.HTML, animated-image frame at presentation time) — WPT-
+#     relevant (the four css-image-animation *-paused tests) but it NO LONGER
+#     APPLIES: the pinned Broiler.HTML has drifted since it was generated.
+#     Listing it would fail this script and take the whole run down, so it needs
+#     regenerating against the current pointer before it can go back in.
 PENDING_PATCHES=(
+  "Broiler.CSS|patches/0043-css-container-query-value-function-recursion.patch"
+  "Broiler.HTML|patches/0044-html-transform-scale-percentage-is-a-ratio.patch"
+  "Broiler.HTML|patches/0045-html-table-paints-its-own-background.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
