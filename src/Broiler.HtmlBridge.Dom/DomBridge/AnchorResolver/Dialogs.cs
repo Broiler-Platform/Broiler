@@ -468,7 +468,28 @@ public sealed partial class DomBridge
     // `transition-behavior: allow-discrete` (required for a discrete property to transition at all)
     // plus `overlay` (or `all`) in the transitioned-property list. Both may appear folded into the
     // `transition` shorthand. This is the setup an `overlay` transition — in either direction — needs.
-    private bool HasDiscreteOverlayTransition(DomElement element)
+    private bool HasDiscreteOverlayTransition(DomElement element) =>
+        HasDiscreteTransitionOf(element, "overlay");
+
+    // CSS Position §overlay: whether closing this dialog leaves it in the top layer because its
+    // `overlay` is being transitioned out with `transition-behavior: allow-discrete` — the same rule
+    // PopoverKeepsOverlayOnHide applies to a popover. Without it a modal dialog vanished the instant
+    // close() ran, and a static render that snapshots mid-transition lost the dialog and its
+    // ::backdrop (WPT css/css-position/overlay/overlay-transition-dialog).
+    private bool DialogKeepsOverlayOnClose(DomElement element) =>
+        HasDiscreteTransitionOf(element, "overlay");
+
+    // The companion half: `overlay` keeps the dialog in the top layer, but the UA sheet's
+    // `dialog:not([open]) { display: none }` is what decides whether it generates a box at all. A
+    // dialog transitioning `display` with allow-discrete still generates one for the transition's
+    // duration, so the `open` attribute that rule keys on has to survive the close.
+    private bool DialogKeepsDisplayOnClose(DomElement element) =>
+        HasDiscreteTransitionOf(element, "display");
+
+    // The shared shape of both: `transition-behavior: allow-discrete` (required for a discrete
+    // property to transition at all) plus <paramref name="property"/> — or `all` — in the
+    // transitioned-property list. Either may appear folded into the `transition` shorthand.
+    private bool HasDiscreteTransitionOf(DomElement element, string property)
     {
         var props = GetComputedProps(element);
 
@@ -483,7 +504,7 @@ public sealed partial class DomBridge
             props.GetValueOrDefault("transition", string.Empty);
         foreach (var token in transitioned.Split(new[] { ' ', ',', '\t' }, StringSplitOptions.RemoveEmptyEntries))
         {
-            if (token.Equals("overlay", StringComparison.OrdinalIgnoreCase) ||
+            if (token.Equals(property, StringComparison.OrdinalIgnoreCase) ||
                 token.Equals("all", StringComparison.OrdinalIgnoreCase))
                 return true;
         }

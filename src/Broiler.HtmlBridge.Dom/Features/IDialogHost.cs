@@ -43,6 +43,16 @@ internal interface IDialogHost
     /// CSS Position §overlay) — a renderer decision.</summary>
     bool PopoverKeepsOverlayOnHide(DomElement element);
 
+    /// <summary>Whether a closing dialog must stay in the top layer because its <c>overlay</c> is
+    /// transitioned with <c>allow-discrete</c> — the dialog counterpart of
+    /// <see cref="PopoverKeepsOverlayOnHide"/> (CSS Position §overlay).</summary>
+    bool DialogKeepsOverlayOnClose(DomElement element);
+
+    /// <summary>Whether a closing dialog must keep generating a box because its <c>display</c> is
+    /// transitioned with <c>allow-discrete</c>, so the UA sheet's
+    /// <c>dialog:not([open]) { display: none }</c> must not take effect yet.</summary>
+    bool DialogKeepsDisplayOnClose(DomElement element);
+
     /// <summary>Records that <c>hidePopover()</c> left the element in the top layer because its
     /// <c>overlay</c> is transitioning out, so the show-time "held out of the top layer while
     /// <c>overlay</c> transitions in" rule does not misfire on it (CSS Position §overlay).</summary>

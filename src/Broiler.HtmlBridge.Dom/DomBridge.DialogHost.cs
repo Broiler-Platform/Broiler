@@ -63,4 +63,8 @@ public sealed partial class DomBridge : IDialogHost
         FormControlStateFor(element).ReturnValue.Set(value);
 
     bool IDialogHost.PopoverKeepsOverlayOnHide(DomElement element) => PopoverKeepsOverlayOnHide(element);
+
+    bool IDialogHost.DialogKeepsOverlayOnClose(DomElement element) => DialogKeepsOverlayOnClose(element);
+
+    bool IDialogHost.DialogKeepsDisplayOnClose(DomElement element) => DialogKeepsDisplayOnClose(element);
 }
