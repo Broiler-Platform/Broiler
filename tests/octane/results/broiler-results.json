@@ -4,24 +4,25 @@
   "octaneVersion": "9",
   "perSuiteTimeoutSec": 1800,
   "benchmarks": {
-    "Richards": 97.5,
-    "DeltaBlue": 162,
-    "RayTrace": 375,
-    "EarleyBoyer": 360,
-    "RegExp": 87,
-    "Splay": 439,
-    "SplayLatency": 1824,
-    "NavierStokes": 381,
+    "Richards": 108,
+    "DeltaBlue": 171,
+    "RayTrace": 403,
+    "EarleyBoyer": 339,
+    "RegExp": 89.9,
+    "Splay": 283,
+    "SplayLatency": 1539,
+    "NavierStokes": 341,
     "Mandreel": 160,
-    "MandreelLatency": 15.3,
-    "Gameboy": 1049
+    "MandreelLatency": 14.5,
+    "Gameboy": 1041,
+    "Box2D": 584
   },
   "suiteStatus": {
     "Richards": {
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 3924,
+      "durationMs": 3926,
       "filesLoaded": [
         "base.js",
         "richards.js",
@@ -34,7 +35,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 3973,
+      "durationMs": 3961,
       "filesLoaded": [
         "base.js",
         "deltablue.js",
@@ -66,7 +67,7 @@
       },
       "exitCode": null,
       "signal": "SIGABRT",
-      "durationMs": 2680,
+      "durationMs": 2671,
       "filesLoaded": [
         "base.js",
         "crypto.js"
@@ -80,7 +81,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 9213,
+      "durationMs": 8616,
       "filesLoaded": [
         "base.js",
         "raytrace.js",
@@ -93,7 +94,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 30445,
+      "durationMs": 33551,
       "filesLoaded": [
         "base.js",
         "earley-boyer.js",
@@ -106,7 +107,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 22706,
+      "durationMs": 22169,
       "filesLoaded": [
         "base.js",
         "regexp.js",
@@ -119,7 +120,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 5642,
+      "durationMs": 6074,
       "filesLoaded": [
         "base.js",
         "splay.js",
@@ -132,7 +133,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 9329,
+      "durationMs": 10242,
       "filesLoaded": [
         "base.js",
         "navier-stokes.js",
@@ -233,7 +234,7 @@
       },
       "exitCode": 0,
       "signal": null,
-      "durationMs": 7033,
+      "durationMs": 7400,
       "filesLoaded": [
         "base.js",
         "pdfjs.js",
@@ -248,7 +249,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 299131,
+      "durationMs": 313147,
       "filesLoaded": [
         "base.js",
         "mandreel.js",
@@ -261,7 +262,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 12985,
+      "durationMs": 12911,
       "filesLoaded": [
         "base.js",
         "gbemu-part1.js",
@@ -358,7 +359,7 @@
       },
       "exitCode": 0,
       "signal": null,
-      "durationMs": 4328,
+      "durationMs": 4611,
       "filesLoaded": [
         "base.js",
         "code-load.js",
@@ -370,90 +371,17 @@
       "repro": "dotnet /home/runner/work/Broiler/Broiler/Broiler.JS/Broiler.JS/Broiler.JavaScript/bin/Release/net10.0/BroilerJS.dll --script-host /home/runner/work/Broiler/Broiler/tests/octane/logs/broiler/scripts/CodeLoad.js"
     },
     "Box2D": {
-      "status": "error",
-      "error": "System.InvalidProgramException: Common Language Runtime detected an invalid program.",
-      "errorType": "System.InvalidProgramException",
-      "errorKind": "clr",
-      "message": "System.InvalidProgramException: Common Language Runtime detected an invalid program.\n   at inline-box2d.js:213,91(Closures, Arguments&)\n   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849\n   at Broiler.JavaScript.BuiltIns.Function.JSFunction.Apply(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 921\n   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849\n   at inline-box2d.js:22,469(Closures, Arguments&)\n   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849\n   at inline-box2d.js:87,156(Closures, Arguments&)\n   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849\n   at inline-box2d.js:215,71(Closures, Arguments&)\n   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849\n   at inline-box2d.js:246,384(Closures, Arguments&)\n   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849\n   at runBox2D-box2d.js:551,0(Closures, Arguments&)\n   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849\n   at Broiler.JavaScript.BuiltIns.Function.JSFunction.Call(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 913\n   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849\n   at Measure-base.js:299,… [+452 chars]",
-      "clrStack": [
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849",
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.Apply(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 921",
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849",
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849",
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849",
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849",
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849",
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849",
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.Call(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 913",
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849",
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849",
-        "Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849"
-      ],
-      "clrInner": [],
-      "jsStack": [
-        {
-          "fn": "inline",
-          "file": "box2d.js",
-          "line": 213
-        },
-        {
-          "fn": "inline",
-          "file": "box2d.js",
-          "line": 22
-        },
-        {
-          "fn": "inline",
-          "file": "box2d.js",
-          "line": 87
-        },
-        {
-          "fn": "inline",
-          "file": "box2d.js",
-          "line": 215
-        },
-        {
-          "fn": "inline",
-          "file": "box2d.js",
-          "line": 246
-        },
-        {
-          "fn": "runBox2D",
-          "file": "box2d.js",
-          "line": 551
-        },
-        {
-          "fn": "Measure",
-          "file": "base.js",
-          "line": 299
-        },
-        {
-          "fn": "inline",
-          "file": "base.js",
-          "line": 290
-        },
-        {
-          "fn": "RunNextBenchmark",
-          "file": "base.js",
-          "line": 367
-        }
-      ],
-      "failedAt": {
-        "benchmark": "Box2D",
-        "phase": "run",
-        "iteration": 1
-      },
+      "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 3517,
+      "durationMs": 11140,
       "filesLoaded": [
         "base.js",
         "box2d.js",
         "octane-runner.js"
       ],
       "startedRunning": true,
-      "log": "tests/octane/logs/broiler/Box2D.log",
-      "script": "tests/octane/logs/broiler/scripts/Box2D.js",
-      "repro": "dotnet /home/runner/work/Broiler/Broiler/Broiler.JS/Broiler.JS/Broiler.JavaScript/bin/Release/net10.0/BroilerJS.dll --script-host /home/runner/work/Broiler/Broiler/tests/octane/logs/broiler/scripts/Box2D.js"
+      "log": "tests/octane/logs/broiler/Box2D.log"
     },
     "zlib": {
       "status": "error",
@@ -527,7 +455,7 @@
       },
       "exitCode": 0,
       "signal": null,
-      "durationMs": 3617,
+      "durationMs": 3878,
       "filesLoaded": [
         "base.js",
         "zlib.js",
@@ -631,7 +559,7 @@
       },
       "exitCode": 0,
       "signal": null,
-      "durationMs": 17256,
+      "durationMs": 17445,
       "filesLoaded": [
         "base.js",
         "typescript.js",
@@ -645,6 +573,6 @@
       "repro": "dotnet /home/runner/work/Broiler/Broiler/Broiler.JS/Broiler.JS/Broiler.JavaScript/bin/Release/net10.0/BroilerJS.dll --script-host /home/runner/work/Broiler/Broiler/tests/octane/logs/broiler/scripts/Typescript.js"
     }
   },
-  "geomean": 239,
-  "generatedAt": "2026-07-31T19:06:42.889Z"
+  "geomean": 245,
+  "generatedAt": "2026-07-31T20:28:07.637Z"
 }

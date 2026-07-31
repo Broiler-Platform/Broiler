@@ -1,10 +1,10 @@
 # Broiler Octane failure diagnostics
 
-- Generated: `2026-07-31T19:06:42.889Z`
+- Generated: `2026-07-31T20:28:07.637Z`
 - Engine: `Broiler.JS (BroilerJS --script-host)`
 - Per-suite timeout: 1800s
 
-6 of 15 suites did not complete.
+5 of 15 suites did not complete.
 
 Statuses: **error** — Octane caught the throw and scored the rest;
 **crash** — the process died and took the suite with it;
@@ -15,7 +15,6 @@ Statuses: **error** — Octane caught the throw and scored the rest;
 | [Crypto](#crypto) | crash | `Broiler.JavaScript.Runtime.JSException` | benchmark `Encrypt`, phase `run`, iteration 1 |
 | [PdfJS](#pdfjs) | error | `Error` | benchmark `PdfJS`, phase `run`, iteration 1 |
 | [CodeLoad](#codeload) | error | `TypeError` | benchmark `CodeLoadJQuery`, phase `run`, iteration 1 |
-| [Box2D](#box2d) | error | `System.InvalidProgramException` | benchmark `Box2D`, phase `run`, iteration 1 |
 | [zlib](#zlib) | error | `ReferenceError` | benchmark `zlib`, phase `run`, iteration 1 |
 | [Typescript](#typescript) | error | `TypeError` | benchmark `Typescript`, phase `run`, iteration 1 |
 
@@ -53,7 +52,7 @@ Re-run just this suite:
 - **Failing type**: `Error`
 - **Where**: benchmark `PdfJS`, phase `run`, iteration 1
 - **Files evaluated**: base.js → pdfjs.js → octane-runner.js
-- **Ran for**: 7.0s
+- **Ran for**: 7.4s
 - **Full output**: `tests/octane/logs/broiler/PdfJS.log`
 
 ```text
@@ -92,7 +91,7 @@ Re-run just this suite:
 - **Failing type**: `TypeError`
 - **Where**: benchmark `CodeLoadJQuery`, phase `run`, iteration 1
 - **Files evaluated**: base.js → code-load.js → octane-runner.js
-- **Ran for**: 4.3s
+- **Ran for**: 4.6s
 - **Full output**: `tests/octane/logs/broiler/CodeLoad.log`
 
 ```text
@@ -124,80 +123,13 @@ Re-run just this suite:
 ./scripts/run-octane-benchmarks.sh --engines broiler --skip-build --only CodeLoad --verbose
 ```
 
-## Box2D
-
-- **Status**: error (exit code 0)
-- **Failing type**: `System.InvalidProgramException` (.NET exception surfaced through the engine)
-- **Where**: benchmark `Box2D`, phase `run`, iteration 1
-- **Files evaluated**: base.js → box2d.js → octane-runner.js
-- **Ran for**: 3.5s
-- **Full output**: `tests/octane/logs/broiler/Box2D.log`
-
-```text
-System.InvalidProgramException: Common Language Runtime detected an invalid program.
-   at inline-box2d.js:213,91(Closures, Arguments&)
-   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-   at Broiler.JavaScript.BuiltIns.Function.JSFunction.Apply(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 921
-   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-   at inline-box2d.js:22,469(Closures, Arguments&)
-   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-   at inline-box2d.js:87,156(Closures, Arguments&)
-   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-   at inline-box2d.js:215,71(Closures, Arguments&)
-   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-   at inline-box2d.js:246,384(Closures, Arguments&)
-   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-   at runBox2D-box2d.js:551,0(Closures, Arguments&)
-   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-   at Broiler.JavaScript.BuiltIns.Function.JSFunction.Call(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 913
-   at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-   at Measure-base.js:299,… [+14 chars]
-```
-
-**Engine (.NET) stack** — where inside Broiler the fault happened:
-
-```text
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.Apply(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 921
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.Call(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 913
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-    at Broiler.JavaScript.BuiltIns.Function.JSFunction.InvokeFunction(Arguments& a) in /_/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs:line 849
-```
-
-**JavaScript stack** — mapped back to the Octane sources:
-
-```text
-    at inline (box2d.js:213)
-    at inline (box2d.js:22)
-    at inline (box2d.js:87)
-    at inline (box2d.js:215)
-    at inline (box2d.js:246)
-    at runBox2D (box2d.js:551)
-    at Measure (base.js:299)
-    at inline (base.js:290)
-    at RunNextBenchmark (base.js:367)
-```
-
-Re-run just this suite:
-
-```bash
-./scripts/run-octane-benchmarks.sh --engines broiler --skip-build --only Box2D --verbose
-```
-
 ## zlib
 
 - **Status**: error (exit code 0)
 - **Failing type**: `ReferenceError`
 - **Where**: benchmark `zlib`, phase `run`, iteration 1
 - **Files evaluated**: base.js → zlib.js → zlib-data.js → octane-runner.js
-- **Ran for**: 3.6s
+- **Ran for**: 3.9s
 - **Full output**: `tests/octane/logs/broiler/zlib.log`
 
 ```text
@@ -232,7 +164,7 @@ Re-run just this suite:
 - **Failing type**: `TypeError`
 - **Where**: benchmark `Typescript`, phase `run`, iteration 1
 - **Files evaluated**: base.js → typescript.js → typescript-input.js → typescript-compiler.js → octane-runner.js
-- **Ran for**: 17.3s
+- **Ran for**: 17.4s
 - **Full output**: `tests/octane/logs/broiler/Typescript.log`
 
 ```text

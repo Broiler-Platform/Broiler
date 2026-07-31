@@ -1,32 +1,32 @@
 # Octane 2.0 benchmark — Chromium vs Broiler
 
-- Generated: `2026-07-31T19:06:42.889Z`
+- Generated: `2026-07-31T20:28:07.637Z`
 - Octane version: `9`
-- Chromium: `Chromium 149.0.7827.55` — **overall score 58694**
-- Broiler: `Broiler.JS (BroilerJS --script-host)` — **overall score 239**
+- Chromium: `Chromium 149.0.7827.55` — **overall score 57245**
+- Broiler: `Broiler.JS (BroilerJS --script-host)` — **overall score 245**
 
 Higher is better. "Broiler / Chromium" is the ratio of scores on suites both engines completed.
 
 | Benchmark | Chromium | Broiler | Broiler / Chromium |
 |---|--:|--:|--:|
-| Box2D | 104748 | _error_ | — |
-| CodeLoad | 28247 | _error_ | — |
-| Crypto | 42288 | _crash_ | — |
-| DeltaBlue | 106007 | 162 | 0.002 |
-| EarleyBoyer | 87549 | 360 | 0.004 |
-| Gameboy | 99498 | 1049 | 0.011 |
-| Mandreel | 46387 | 160 | 0.003 |
-| MandreelLatency | 67368 | 15.3 | 0.000 |
-| NavierStokes | 38436 | 381 | 0.010 |
-| PdfJS | 62276 | _error_ | — |
-| RayTrace | 113514 | 375 | 0.003 |
-| RegExp | 10313 | 87 | 0.008 |
-| Richards | 38070 | 97.5 | 0.003 |
-| Splay | 45505 | 439 | 0.010 |
-| SplayLatency | 76182 | 1824 | 0.024 |
-| Typescript | 95581 | _error_ | — |
-| zlib | 91233 | _error_ | — |
-| **Overall (geomean)** | **58694** | **239** | 0.004 |
+| Box2D | 99321 | 584 | 0.006 |
+| CodeLoad | 30916 | _error_ | — |
+| Crypto | 38183 | _crash_ | — |
+| DeltaBlue | 102708 | 171 | 0.002 |
+| EarleyBoyer | 91547 | 339 | 0.004 |
+| Gameboy | 90650 | 1041 | 0.011 |
+| Mandreel | 47996 | 160 | 0.003 |
+| MandreelLatency | 67368 | 14.5 | 0.000 |
+| NavierStokes | 35432 | 341 | 0.010 |
+| PdfJS | 58725 | _error_ | — |
+| RayTrace | 117436 | 403 | 0.003 |
+| RegExp | 9890 | 89.9 | 0.009 |
+| Richards | 46754 | 108 | 0.002 |
+| Splay | 43027 | 283 | 0.007 |
+| SplayLatency | 69725 | 1539 | 0.022 |
+| Typescript | 86327 | _error_ | — |
+| zlib | 80514 | _error_ | — |
+| **Overall (geomean)** | **57245** | **245** | 0.004 |
 
 ## Broiler failures
 
@@ -35,7 +35,6 @@ Higher is better. "Broiler / Chromium" is the ratio of scores on suites both eng
 | Crypto | crash | `Broiler.JavaScript.Runtime.JSException` | benchmark `Encrypt`, phase `run`, iteration 1 | Maximum call stack size exceeded |
 | PdfJS | error | `Error` | benchmark `PdfJS`, phase `run`, iteration 1 | Malformed PDF: stream must have data |
 | CodeLoad | error | `TypeError` | benchmark `CodeLoadJQuery`, phase `run`, iteration 1 | Cannot get property userAgent of undefined |
-| Box2D | error | `System.InvalidProgramException` | benchmark `Box2D`, phase `run`, iteration 1 | System.InvalidProgramException: Common Language Runtime detected an invalid program. |
 | zlib | error | `ReferenceError` | benchmark `zlib`, phase `run`, iteration 1 | read is not defined |
 | Typescript | error | `TypeError` | benchmark `Typescript`, phase `run`, iteration 1 | Cannot get property getScopedTypeNameEx of null |
 
