@@ -185,11 +185,21 @@ internal sealed class StyleSheetRuntimeState
     /// </summary>
     public bool? DisabledOverride { get; set; }
 
+    /// <summary>
+    /// The <c>href</c> this <c>&lt;link rel="stylesheet"&gt;</c> last dispatched its
+    /// <c>load</c>/<c>error</c> event for, or <c>null</c> if it never has. HTML §4.2.4 fires the
+    /// event once per fetch, so pointing the link at a *different* sheet must fire again — keying on
+    /// the href rather than a bare bool is what makes a re-point observable while a repeated
+    /// insertion or a second write of the same value stays silent.
+    /// </summary>
+    public string? LoadEventFiredForHref { get; set; }
+
     // The rule list is deep-copied (a fresh List) so the clone's insertRule/deleteRule do not
     // mutate the source sheet; the source text / mutated flag are copied verbatim. The
     // script-set DisabledOverride is deliberately NOT copied: a clone re-derives its disabled
     // state from its own `disabled` content attribute (HTMLLinkElement-disabled: the
-    // "explicitly enabled" state does not persist on clones).
+    // "explicitly enabled" state does not persist on clones). LoadEventFiredForHref is likewise
+    // not copied — a clone has not fetched anything and so has not fired.
     public void CopyTo(StyleSheetRuntimeState target)
     {
         FetchedCss.CopyTo(target.FetchedCss);

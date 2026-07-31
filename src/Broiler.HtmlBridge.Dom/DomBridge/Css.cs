@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
@@ -602,6 +603,79 @@ public sealed partial class DomBridge
 
         var nonce = TryGetAttribute(linkEl, "nonce", out var nonceValue) ? nonceValue : null;
         return Csp.AllowsExternalStyle(href, _pageUrl, nonce);
+    }
+
+    /// <summary>
+    /// Fires the <c>load</c> — or <c>error</c> — event on a <c>&lt;link rel="stylesheet"&gt;</c> whose
+    /// sheet has been fetched, per HTML §4.2.4 "link type stylesheet". Nothing dispatched these at
+    /// all, so a page that waits for <c>link.onload</c> before declaring itself ready never got the
+    /// callback (WPT issue #1497 problem 26,
+    /// <c>uievents/…/UIEvent.load.stylesheet</c>).
+    /// <para>
+    /// Only a link that is <em>in the document</em> fetches, so a detached one stays silent until it
+    /// is inserted. The event fires once per <c>href</c>: re-pointing the link at a different sheet
+    /// is a new fetch and fires again, while re-inserting it, or writing the same href twice, does
+    /// not. Whether the fetch succeeded is decided the same way the cascade decides it — the CSP
+    /// gate, then the resource loader — so the event never disagrees with whether the sheet applied.
+    /// </para>
+    /// </summary>
+    private void FireStylesheetLinkLoad(DomElement element)
+    {
+        if (_jsContext == null || !IsExternalStylesheet(element))
+            return;
+        if (!ReferenceEquals(GetTreeRoot(element), _document))
+            return;
+        if (!TryGetAttribute(element, "href", out var href) || string.IsNullOrWhiteSpace(href))
+            return;
+
+        var state = StyleSheetStateFor(element);
+        if (string.Equals(state.LoadEventFiredForHref, href, StringComparison.Ordinal))
+            return;
+        state.LoadEventFiredForHref = href;
+
+        // The resource loader only takes absolute URLs, so the content attribute is resolved against
+        // the page URL first — the same rebasing the renderer does for a linked sheet. Skipping it
+        // made every relative href look like a failed fetch and dispatched `error` for a sheet that
+        // then applied perfectly well.
+        var loaded = IsExternalStyleAllowedByCsp(element, href) &&
+                     !string.IsNullOrEmpty(FetchExternalStylesheet(ResolveAgainstPageUrl(href)));
+
+        try
+        {
+            var evt = new JSObject();
+            evt.FastAddValue((KeyString)"type",
+                new JSString(loaded ? "load" : "error"), JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+            DispatchEventOnElement(element, evt);
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.FireStylesheetLinkLoad",
+                $"stylesheet load handler error for '{href}': {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>Resolves a content-attribute URL against the page URL, leaving it untouched when the
+    /// page URL is not usable as a base or the value is already absolute.</summary>
+    private string ResolveAgainstPageUrl(string url) =>
+        Uri.TryCreate(_pageUrl, UriKind.Absolute, out var baseUri) &&
+        Uri.TryCreate(baseUri, url, out var resolved)
+            ? resolved.AbsoluteUri
+            : url;
+
+    /// <summary>Fires the stylesheet <c>load</c> event for <paramref name="element"/> and every
+    /// <c>&lt;link rel="stylesheet"&gt;</c> beneath it — the subtree counterpart used when a whole
+    /// fragment is inserted or the document finishes loading.</summary>
+    private void FireDescendantStylesheetLinkLoads(DomElement element)
+    {
+        FireStylesheetLinkLoad(element);
+        // Snapshot before iterating: a load handler can structurally mutate the tree mid-walk, the
+        // same hazard FireDescendantOnloads documents.
+        foreach (var child in SnapshotChildren(element))
+        {
+            if (child is DomElement childElement)
+                FireDescendantStylesheetLinkLoads(childElement);
+        }
     }
 
     /// <summary>

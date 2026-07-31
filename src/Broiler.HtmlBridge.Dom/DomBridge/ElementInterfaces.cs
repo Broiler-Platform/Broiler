@@ -128,21 +128,39 @@ public sealed partial class DomBridge
         // (WPT issue #1497 problem 24, dom/nodes/moveBefore/preserve-render-blocking-style).
         if (tag is "link" or "base")
         {
+            // Writing a live <link>'s href points it at a new sheet, which is a fresh fetch and so a
+            // fresh load event (HTML §4.2.4) — the shape UIEvent.load.stylesheet waits on.
+            var isLink = tag == "link";
             obj.FastAddProperty((KeyString)"href",
                 new JSFunction((in _) => Dom.Features.ElementReflectionBinding.GetHref(this, element, in _), "get href"),
-                new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetHref(element, in a), "set href"),
+                new JSFunction((in a) =>
+                {
+                    var result = Dom.Features.ElementReflectionBinding.SetHref(element, in a);
+                    if (isLink)
+                        FireStylesheetLinkLoad(element);
+                    return result;
+                }, "set href"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
-        // The rest of HTMLLinkElement's plain reflected DOMStrings.
+        // The rest of HTMLLinkElement's plain reflected DOMStrings. `rel` also fires the load event:
+        // a link only becomes a stylesheet once rel says so, so `link.href = …; link.rel = …` has to
+        // work as well as the other order.
         if (tag == "link")
         {
             foreach (var (idlName, attrName) in LinkReflectedAttributes)
             {
                 var captured = attrName; // capture for closure
+                var firesLoad = captured == "rel";
                 obj.FastAddProperty((KeyString)idlName,
                     new JSFunction((in _) => TryGetAttribute(element, captured, out var v) ? new JSString(v) : new JSString(string.Empty), "get " + idlName),
-                    new JSFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedAttribute(captured, element, in a), "set " + idlName),
+                    new JSFunction((in a) =>
+                    {
+                        var result = Dom.Features.ElementReflectionBinding.SetReflectedAttribute(captured, element, in a);
+                        if (firesLoad)
+                            FireStylesheetLinkLoad(element);
+                        return result;
+                    }, "set " + idlName),
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
         }
