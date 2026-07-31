@@ -19,7 +19,7 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"localStorage", Dom.Features.WebStorageBinding.BuildLocalStorage(), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.matchMedia(query) — evaluates basic media queries
-        window.FastAddValue((KeyString)"matchMedia", new JSFunction((in a) => Dom.Features.MatchMediaBinding.MatchMedia(this, in a), "matchMedia", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"matchMedia", new DomFunction((in a) => Dom.Features.MatchMediaBinding.MatchMedia(this, in a), "matchMedia", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.location (read-only)
         var location = new JSObject();
@@ -36,15 +36,15 @@ public sealed partial class DomBridge
 
         // window timers / animation frames — thin adapters over the P2.4 BrowserEventLoop, co-located
         // in the TimerBinding feature module (Phase 3).
-        window.FastAddValue((KeyString)"setTimeout", new JSFunction((in a) => Dom.Features.TimerBinding.SetTimeout(_eventLoop, in a), "setTimeout", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"clearTimeout", new JSFunction((in a) => Dom.Features.TimerBinding.ClearTimeout(_eventLoop, in a), "clearTimeout", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"setInterval", new JSFunction((in a) => Dom.Features.TimerBinding.SetInterval(_eventLoop, in a), "setInterval", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"clearInterval", new JSFunction((in a) => Dom.Features.TimerBinding.ClearInterval(_eventLoop, in a), "clearInterval", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"requestAnimationFrame", new JSFunction((in a) => Dom.Features.TimerBinding.RequestAnimationFrame(_eventLoop, in a), "requestAnimationFrame", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"cancelAnimationFrame", new JSFunction((in a) => Dom.Features.TimerBinding.CancelAnimationFrame(_eventLoop, in a), "cancelAnimationFrame", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"setTimeout", new DomFunction((in a) => Dom.Features.TimerBinding.SetTimeout(_eventLoop, in a), "setTimeout", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"clearTimeout", new DomFunction((in a) => Dom.Features.TimerBinding.ClearTimeout(_eventLoop, in a), "clearTimeout", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"setInterval", new DomFunction((in a) => Dom.Features.TimerBinding.SetInterval(_eventLoop, in a), "setInterval", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"clearInterval", new DomFunction((in a) => Dom.Features.TimerBinding.ClearInterval(_eventLoop, in a), "clearInterval", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"requestAnimationFrame", new DomFunction((in a) => Dom.Features.TimerBinding.RequestAnimationFrame(_eventLoop, in a), "requestAnimationFrame", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"cancelAnimationFrame", new DomFunction((in a) => Dom.Features.TimerBinding.CancelAnimationFrame(_eventLoop, in a), "cancelAnimationFrame", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.alert(msg) — logs to debug output
-        window.FastAddValue((KeyString)"alert", new JSFunction(Dom.Features.WindowDocumentMiscBinding.Alert, "alert", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"alert", new DomFunction(Dom.Features.WindowDocumentMiscBinding.Alert, "alert", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // console object (shared between window.console and global console)
         var console = Dom.Features.ConsoleBinding.Build();
@@ -98,10 +98,10 @@ public sealed partial class DomBridge
         var performanceTimeOrigin = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var performanceObj = new JSObject();
         performanceObj.FastAddValue((KeyString)"timeOrigin", new JSNumber(performanceTimeOrigin), JSPropertyAttributes.EnumerableConfigurableValue);
-        performanceObj.FastAddValue((KeyString)"now", new JSFunction((in _) => Dom.Features.WindowDocumentMiscBinding.PerformanceNow(performanceTimeOrigin, in _), "now", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        performanceObj.FastAddValue((KeyString)"now", new DomFunction((in _) => Dom.Features.WindowDocumentMiscBinding.PerformanceNow(performanceTimeOrigin, in _), "now", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // performance.getEntriesByType() — stub returning empty array
-        performanceObj.FastAddValue((KeyString)"getEntriesByType", new JSFunction((in _) => new JSArray(), "getEntriesByType", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        performanceObj.FastAddValue((KeyString)"getEntriesByType", new DomFunction((in _) => new JSArray(), "getEntriesByType", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // performance.mark() / performance.measure() — no-op stubs
         performanceObj.FastAddValue((KeyString)"mark", UndefinedFunction("mark", 1), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -124,7 +124,7 @@ public sealed partial class DomBridge
         navigatorObj.FastAddValue((KeyString)"vendor", new JSString(""), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // sendBeacon(url, data) — queues a fire-and-forget POST via fetch semantics
-        navigatorObj.FastAddValue((KeyString)"sendBeacon", new JSFunction((in a) => Dom.Features.BeaconBinding.Send(window, in a), "sendBeacon", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        navigatorObj.FastAddValue((KeyString)"sendBeacon", new DomFunction((in a) => Dom.Features.BeaconBinding.Send(window, in a), "sendBeacon", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"navigator", navigatorObj, JSPropertyAttributes.EnumerableConfigurableValue);
 
         context["navigator"] = navigatorObj;
@@ -137,31 +137,31 @@ public sealed partial class DomBridge
         var vpWidth = _viewportWidth;
         var vpHeight = _viewportHeight;
 
-        window.FastAddProperty((KeyString)"innerWidth", new JSFunction((in _) => new JSNumber(vpWidth), "get innerWidth"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        window.FastAddProperty((KeyString)"innerHeight", new JSFunction((in _) => new JSNumber(vpHeight), "get innerHeight"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        window.FastAddProperty((KeyString)"outerWidth", new JSFunction((in _) => new JSNumber(vpWidth), "get outerWidth"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        window.FastAddProperty((KeyString)"outerHeight", new JSFunction((in _) => new JSNumber(vpHeight), "get outerHeight"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        window.FastAddProperty((KeyString)"scrollX", new JSFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: false)), "get scrollX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        window.FastAddProperty((KeyString)"scrollY", new JSFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: true)), "get scrollY"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        window.FastAddProperty((KeyString)"pageXOffset", new JSFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        window.FastAddProperty((KeyString)"pageYOffset", new JSFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"innerWidth", new DomFunction((in _) => new JSNumber(vpWidth), "get innerWidth"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"innerHeight", new DomFunction((in _) => new JSNumber(vpHeight), "get innerHeight"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"outerWidth", new DomFunction((in _) => new JSNumber(vpWidth), "get outerWidth"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"outerHeight", new DomFunction((in _) => new JSNumber(vpHeight), "get outerHeight"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"scrollX", new DomFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: false)), "get scrollX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"scrollY", new DomFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: true)), "get scrollY"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"pageXOffset", new DomFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"pageYOffset", new DomFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // window scroll / scrollTo / scrollBy, co-located in the WindowScrollBinding feature module (Phase 3).
-        window.FastAddValue((KeyString)"scroll", new JSFunction((in a) => Dom.Features.WindowScrollBinding.Scroll(this, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"scrollTo", new JSFunction((in a) => Dom.Features.WindowScrollBinding.ScrollTo(this, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"scrollBy", new JSFunction((in a) => Dom.Features.WindowScrollBinding.ScrollBy(this, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"scroll", new DomFunction((in a) => Dom.Features.WindowScrollBinding.Scroll(this, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"scrollTo", new DomFunction((in a) => Dom.Features.WindowScrollBinding.ScrollTo(this, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"scrollBy", new DomFunction((in a) => Dom.Features.WindowScrollBinding.ScrollBy(this, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         // window addEventListener / removeEventListener / dispatchEvent, co-located in the
         // WindowEventTargetBinding feature module (Phase 3). These reach the global object — so
         // the idiomatic unqualified `addEventListener("load", …)` registers a window listener,
         // as it does in a browser — through MirrorWindowMembersOntoGlobal, which shares the
         // identical function objects so the two spellings address one listener store.
-        window.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.AddEventListener(this, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"dispatchEvent", new JSFunction((in a) => Dom.Features.WindowEventTargetBinding.DispatchEvent(this, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"addEventListener", new DomFunction((in a) => Dom.Features.WindowEventTargetBinding.AddEventListener(this, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"removeEventListener", new DomFunction((in a) => Dom.Features.WindowEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"dispatchEvent", new DomFunction((in a) => Dom.Features.WindowEventTargetBinding.DispatchEvent(this, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         _messaging.RegisterWindowMessaging(window);
 
-        window.FastAddProperty((KeyString)"frames", new JSFunction((in _) => BuildWindowFramesArray(), "get frames"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"frames", new DomFunction((in _) => BuildWindowFramesArray(), "get frames"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
         context["frames"] = BuildWindowFramesArray();
 
         // window.screen — basic stub for screen dimensions
@@ -178,16 +178,16 @@ public sealed partial class DomBridge
 
         var visualViewport = new JSObject();
         _visualViewportJSObject = visualViewport;
-        visualViewport.FastAddProperty((KeyString)"width", new JSFunction((in _) => new JSNumber(GetVisualViewportWidth()), "get width"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        visualViewport.FastAddProperty((KeyString)"height", new JSFunction((in _) => new JSNumber(GetVisualViewportHeight()), "get height"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        visualViewport.FastAddProperty((KeyString)"scale", new JSFunction((in _) => new JSNumber(GetVisualViewportScale()), "get scale"), new JSFunction((in a) => Dom.Features.WindowDocumentMiscBinding.SetVisualViewportScale(this, in a), "set scale"), JSPropertyAttributes.EnumerableConfigurableProperty);
-        visualViewport.FastAddProperty((KeyString)"pageLeft", new JSFunction((in _) => new JSNumber(GetVisualViewportPageOffset(vertical: false)), "get pageLeft"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        visualViewport.FastAddProperty((KeyString)"pageTop", new JSFunction((in _) => new JSNumber(GetVisualViewportPageOffset(vertical: true)), "get pageTop"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty((KeyString)"width", new DomFunction((in _) => new JSNumber(GetVisualViewportWidth()), "get width"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty((KeyString)"height", new DomFunction((in _) => new JSNumber(GetVisualViewportHeight()), "get height"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty((KeyString)"scale", new DomFunction((in _) => new JSNumber(GetVisualViewportScale()), "get scale"), new DomFunction((in a) => Dom.Features.WindowDocumentMiscBinding.SetVisualViewportScale(this, in a), "set scale"), JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty((KeyString)"pageLeft", new DomFunction((in _) => new JSNumber(GetVisualViewportPageOffset(vertical: false)), "get pageLeft"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty((KeyString)"pageTop", new DomFunction((in _) => new JSNumber(GetVisualViewportPageOffset(vertical: true)), "get pageTop"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // visualViewport addEventListener / removeEventListener (scroll), co-located in the
         // VisualViewportEventTargetBinding feature module (Phase 3).
-        visualViewport.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => Dom.Features.VisualViewportEventTargetBinding.AddEventListener(this, in a), "addEventListener", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        visualViewport.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => Dom.Features.VisualViewportEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        visualViewport.FastAddValue((KeyString)"addEventListener", new DomFunction((in a) => Dom.Features.VisualViewportEventTargetBinding.AddEventListener(this, in a), "addEventListener", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        visualViewport.FastAddValue((KeyString)"removeEventListener", new DomFunction((in a) => Dom.Features.VisualViewportEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         window.FastAddValue((KeyString)"visualViewport", visualViewport, JSPropertyAttributes.EnumerableConfigurableValue);
         context["visualViewport"] = visualViewport;

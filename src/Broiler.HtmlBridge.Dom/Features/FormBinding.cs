@@ -32,16 +32,16 @@ internal sealed class FormBinding(IFormHost host)
 
         // elements — the form controls collection (numeric + named access)
         obj.FastAddProperty((KeyString)"elements",
-            new JSFunction((in _) => BuildElementsCollection(element), "get elements"),
+            new DomFunction((in _) => BuildElementsCollection(element), "get elements"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         // length — alias for elements.length
         obj.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => new JSNumber(HtmlElementQueries.CollectFormControls(element).Count), "get length"),
+            new DomFunction((in _) => new JSNumber(HtmlElementQueries.CollectFormControls(element).Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         // action (read/write)
         obj.FastAddProperty((KeyString)"action",
-            new JSFunction((in _) => DomBridge.TryGetAttribute(element, "action", out var act) ? new JSString(act) : new JSString(string.Empty), "get action"),
-            new JSFunction((in a) => SetAction(element, in a), "set action"),
+            new DomFunction((in _) => DomBridge.TryGetAttribute(element, "action", out var act) ? new JSString(act) : new JSString(string.Empty), "get action"),
+            new DomFunction((in a) => SetAction(element, in a), "set action"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 
@@ -57,7 +57,7 @@ internal sealed class FormBinding(IFormHost host)
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
         collection.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => new JSNumber(HtmlElementQueries.CollectFormControls(form).Count), "get length"),
+            new DomFunction((in _) => new JSNumber(HtmlElementQueries.CollectFormControls(form).Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return collection;

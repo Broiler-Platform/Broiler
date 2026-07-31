@@ -29,52 +29,52 @@ internal sealed class FormControlBinding(IFormControlHost host)
         // value (read/write) — for input, textarea, select elements.
         // The IDL 'value' property is NOT reflected as a content attribute for inputs.
         obj.FastAddProperty((KeyString)"value",
-            new JSFunction((in _) => GetValue(element), "get value"),
-            new JSFunction((in a) => SetValue(element, in a), "set value"),
+            new DomFunction((in _) => GetValue(element), "get value"),
+            new DomFunction((in a) => SetValue(element, in a), "set value"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // checked (read/write) — for checkbox and radio inputs. Uses the typed checked-state slot as the
         // "dirty" IDL state that tracks programmatic changes; setAttribute("checked") only sets the
         // content attribute and does NOT affect this IDL state.
         obj.FastAddProperty((KeyString)"checked",
-            new JSFunction((in _) => GetChecked(element), "get checked"),
-            new JSFunction((in a) => SetChecked(element, in a), "set checked"),
+            new DomFunction((in _) => GetChecked(element), "get checked"),
+            new DomFunction((in a) => SetChecked(element, in a), "set checked"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // type (read/write) — for input/button elements; getter returns lowercase.
         obj.FastAddProperty((KeyString)"type",
-            new JSFunction((in _) => GetType(element), "get type"),
-            new JSFunction((in a) => SetType(element, in a), "set type"),
+            new DomFunction((in _) => GetType(element), "get type"),
+            new DomFunction((in a) => SetType(element, in a), "set type"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // name (read/write) — for form elements; syncs with content attribute.
         obj.FastAddProperty((KeyString)"name",
-            new JSFunction((in _) => GetName(element), "get name"),
-            new JSFunction((in a) => SetName(element, in a), "set name"),
+            new DomFunction((in _) => GetName(element), "get name"),
+            new DomFunction((in a) => SetName(element, in a), "set name"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // disabled (read/write) — for form controls.
         obj.FastAddProperty((KeyString)"disabled",
-            new JSFunction((in _) => DomBridge.HasAttr(element, "disabled") ? JSBoolean.True : JSBoolean.False, "get disabled"),
-            new JSFunction((in a) => SetDisabled(element, in a), "set disabled"),
+            new DomFunction((in _) => DomBridge.HasAttr(element, "disabled") ? JSBoolean.True : JSBoolean.False, "get disabled"),
+            new DomFunction((in a) => SetDisabled(element, in a), "set disabled"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // hidden (read/write) — global reflected boolean attribute.
         obj.FastAddProperty((KeyString)"hidden",
-            new JSFunction((in _) => DomBridge.HasAttr(element, "hidden") ? JSBoolean.True : JSBoolean.False, "get hidden"),
-            new JSFunction((in a) => SetHidden(element, in a), "set hidden"),
+            new DomFunction((in _) => DomBridge.HasAttr(element, "hidden") ? JSBoolean.True : JSBoolean.False, "get hidden"),
+            new DomFunction((in a) => SetHidden(element, in a), "set hidden"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // tabIndex (read/write) — global reflected numeric attribute.
         obj.FastAddProperty((KeyString)"tabIndex",
-            new JSFunction((in _) => GetTabIndex(element), "get tabIndex"),
-            new JSFunction((in a) => SetTabIndex(element, in a), "set tabIndex"),
+            new DomFunction((in _) => GetTabIndex(element), "get tabIndex"),
+            new DomFunction((in a) => SetTabIndex(element, in a), "set tabIndex"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // required (read/write) — form validation.
         obj.FastAddProperty((KeyString)"required",
-            new JSFunction((in _) => DomBridge.HasAttr(element, "required") ? JSBoolean.True : JSBoolean.False, "get required"),
-            new JSFunction((in a) => SetRequired(element, in a), "set required"),
+            new DomFunction((in _) => DomBridge.HasAttr(element, "required") ? JSBoolean.True : JSBoolean.False, "get required"),
+            new DomFunction((in a) => SetRequired(element, in a), "set required"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 

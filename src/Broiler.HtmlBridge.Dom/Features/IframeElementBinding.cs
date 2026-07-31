@@ -31,32 +31,32 @@ internal static class IframeElementBinding
             return;
 
         obj.FastAddProperty((KeyString)"contentDocument",
-            new JSFunction((in _) => GetContentDocument(host, element), "get contentDocument"),
+            new DomFunction((in _) => GetContentDocument(host, element), "get contentDocument"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"contentWindow",
-            new JSFunction((in _) => GetContentWindow(host, element), "get contentWindow"),
+            new DomFunction((in _) => GetContentWindow(host, element), "get contentWindow"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // getSVGDocument() — returns contentDocument (same as contentDocument for same-origin)
         obj.FastAddValue((KeyString)"getSVGDocument",
-            new JSFunction((in _) => GetContentDocument(host, element), "getSVGDocument", 0),
+            new DomFunction((in _) => GetContentDocument(host, element), "getSVGDocument", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // src property (read/write) — for iframe elements
         obj.FastAddProperty((KeyString)"src",
-            new JSFunction((in _) => DomBridge.TryGetAttribute(element, "src", out var s) ? new JSString(s) : new JSString(string.Empty), "get src"),
-            new JSFunction((in a) => SetFrameAttribute(host, element, "src", in a), "set src"),
+            new DomFunction((in _) => DomBridge.TryGetAttribute(element, "src", out var s) ? new JSString(s) : new JSString(string.Empty), "get src"),
+            new DomFunction((in a) => SetFrameAttribute(host, element, "src", in a), "set src"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"srcdoc",
-            new JSFunction((in _) => DomBridge.TryGetAttribute(element, "srcdoc", out var s) ? new JSString(s) : new JSString(string.Empty), "get srcdoc"),
-            new JSFunction((in a) => SetFrameAttribute(host, element, "srcdoc", in a), "set srcdoc"),
+            new DomFunction((in _) => DomBridge.TryGetAttribute(element, "srcdoc", out var s) ? new JSString(s) : new JSString(string.Empty), "get srcdoc"),
+            new DomFunction((in a) => SetFrameAttribute(host, element, "srcdoc", in a), "set srcdoc"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // sandbox attribute access
         obj.FastAddProperty((KeyString)"sandbox",
-            new JSFunction((in _) => DomBridge.TryGetAttribute(element, "sandbox", out var sandbox) ? new JSString(sandbox) : new JSString(string.Empty), "get sandbox"),
+            new DomFunction((in _) => DomBridge.TryGetAttribute(element, "sandbox", out var sandbox) ? new JSString(sandbox) : new JSString(string.Empty), "get sandbox"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 

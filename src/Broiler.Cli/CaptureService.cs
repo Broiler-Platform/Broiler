@@ -520,6 +520,9 @@ public class CaptureService
         // plain JSContext and the modules are skipped (unchanged net effect: they did not execute).
         var useEngineModules = moduleRoots.Count > 0 && EngineModuleSupport.Available;
         var microTasks = new MicroTaskQueue();
+        // See MicroTaskSynchronizationContext: without this the engine resumes await continuations
+        // on the thread pool, concurrently with this thread's serialize/render.
+        using var microTaskContext = MicroTaskSynchronizationContext.Install(microTasks);
         using JSContext context = useEngineModules ? new BridgeModuleContext(csp, url) : new JSContext();
         RegisterRuntimeExtensions(context, microTasks, csp);
         var bridge = new DomBridge();

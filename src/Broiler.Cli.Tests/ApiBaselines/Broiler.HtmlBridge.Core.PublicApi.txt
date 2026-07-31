@@ -69,6 +69,14 @@ TYPE Broiler.HtmlBridge.Scripting.MicroTaskQueue
   method System.Collections.Generic.IReadOnlyList<System.Exception> Drain()
   method System.Void Enqueue(System.Action)
   property System.Int32 Count { get; }
+TYPE Broiler.HtmlBridge.Scripting.MicroTaskSynchronizationContext : System.Threading.SynchronizationContext
+  ctor (Broiler.HtmlBridge.Scripting.MicroTaskQueue)
+  method Broiler.HtmlBridge.Scripting.MicroTaskSynchronizationContext+Scope Install(Broiler.HtmlBridge.Scripting.MicroTaskQueue)
+  method System.Threading.SynchronizationContext CreateCopy()
+  method System.Void Post(System.Threading.SendOrPostCallback, System.Object)
+  method System.Void Send(System.Threading.SendOrPostCallback, System.Object)
+TYPE Broiler.HtmlBridge.Scripting.MicroTaskSynchronizationContext+Scope : System.IDisposable
+  method System.Void Dispose()
 TYPE Broiler.HtmlBridge.Scripting.ModuleMap
   ctor ()
   method System.Boolean TryGet(System.String, ref Broiler.HtmlBridge.Scripting.ModuleMapEntry)

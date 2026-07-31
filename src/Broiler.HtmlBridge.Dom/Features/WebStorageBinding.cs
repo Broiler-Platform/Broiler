@@ -24,19 +24,19 @@ internal static class WebStorageBinding
         var store = new Dictionary<string, string>();
 
         storage.FastAddValue((KeyString)"getItem",
-            new JSFunction((in a) => GetItem(store, in a), "getItem", 1),
+            new DomFunction((in a) => GetItem(store, in a), "getItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         storage.FastAddValue((KeyString)"setItem",
-            new JSFunction((in a) => SetItem(storage, store, in a), "setItem", 2),
+            new DomFunction((in a) => SetItem(storage, store, in a), "setItem", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         storage.FastAddValue((KeyString)"removeItem",
-            new JSFunction((in a) => RemoveItem(storage, store, in a), "removeItem", 1),
+            new DomFunction((in a) => RemoveItem(storage, store, in a), "removeItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         storage.FastAddValue((KeyString)"clear",
-            new JSFunction((in a) => Clear(storage, store, in a), "clear", 0),
+            new DomFunction((in a) => Clear(storage, store, in a), "clear", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return storage;

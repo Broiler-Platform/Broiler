@@ -44,62 +44,62 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         _host.RegisterDocumentWrapper(docRoot, doc);
 
         doc.FastAddProperty((KeyString)"documentElement",
-            new JSFunction((in _) => DomBridge.GetDocumentElement(docRoot) is { } de ? _host.ToJSObject(de) : JSNull.Value, "get documentElement"),
+            new DomFunction((in _) => DomBridge.GetDocumentElement(docRoot) is { } de ? _host.ToJSObject(de) : JSNull.Value, "get documentElement"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         doc.FastAddProperty((KeyString)"scrollingElement",
-            new JSFunction((in _) => DomBridge.GetDocumentElement(docRoot) is { } se ? _host.ToJSObject(se) : JSNull.Value, "get scrollingElement"),
+            new DomFunction((in _) => DomBridge.GetDocumentElement(docRoot) is { } se ? _host.ToJSObject(se) : JSNull.Value, "get scrollingElement"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // body
         doc.FastAddProperty((KeyString)"body",
-            new JSFunction((in _) => GetBody(docRoot), "get body"),
+            new DomFunction((in _) => GetBody(docRoot), "get body"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // head
         doc.FastAddProperty((KeyString)"head",
-            new JSFunction((in _) => GetHead(docRoot), "get head"),
+            new DomFunction((in _) => GetHead(docRoot), "get head"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // title (dynamic getter from <title> element in <head>)
         doc.FastAddProperty((KeyString)"title",
-            new JSFunction((in _) => GetTitle(docRoot), "get title"),
-            new JSFunction((in a) => SetTitle(docRoot, in a), "set title"),
+            new DomFunction((in _) => GetTitle(docRoot), "get title"),
+            new DomFunction((in a) => SetTitle(docRoot, in a), "set title"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // forms (dynamic collection of <form> elements)
         doc.FastAddProperty((KeyString)"forms",
-            new JSFunction((in _) => GetForms(docRoot), "get forms"),
+            new DomFunction((in _) => GetForms(docRoot), "get forms"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // childNodes
         doc.FastAddProperty((KeyString)"childNodes",
-            new JSFunction((in _) => GetChildNodes(docRoot), "get childNodes"),
+            new DomFunction((in _) => GetChildNodes(docRoot), "get childNodes"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // firstChild
         doc.FastAddProperty((KeyString)"firstChild",
-            new JSFunction((in _) => docRoot.ChildNodes.Count > 0 ? _host.ToJSObject(DomBridge.ChildAt(docRoot, 0)) : JSNull.Value, "get firstChild"),
+            new DomFunction((in _) => docRoot.ChildNodes.Count > 0 ? _host.ToJSObject(DomBridge.ChildAt(docRoot, 0)) : JSNull.Value, "get firstChild"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // lastChild
         doc.FastAddProperty((KeyString)"lastChild",
-            new JSFunction((in _) => docRoot.ChildNodes.Count > 0 ? _host.ToJSObject(DomBridge.ChildAt(docRoot, ^1)) : JSNull.Value, "get lastChild"),
+            new DomFunction((in _) => docRoot.ChildNodes.Count > 0 ? _host.ToJSObject(DomBridge.ChildAt(docRoot, ^1)) : JSNull.Value, "get lastChild"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // hasChildNodes()
         doc.FastAddValue((KeyString)"hasChildNodes",
-            new JSFunction((in _) => docRoot.ChildNodes.Count > 0 ? JSBoolean.True : JSBoolean.False, "hasChildNodes", 0),
+            new DomFunction((in _) => docRoot.ChildNodes.Count > 0 ? JSBoolean.True : JSBoolean.False, "hasChildNodes", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // nodeType = DOCUMENT_NODE (9)
         doc.FastAddProperty((KeyString)"nodeType",
-            new JSFunction((in _) => new JSNumber(9), "get nodeType"),
+            new DomFunction((in _) => new JSNumber(9), "get nodeType"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // nodeName = "#document"
         doc.FastAddProperty((KeyString)"nodeName",
-            new JSFunction((in _) => new JSString("#document"), "get nodeName"),
+            new DomFunction((in _) => new JSString("#document"), "get nodeName"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // localName = null for document
@@ -109,59 +109,59 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
 
         // getElementById(id)
         doc.FastAddValue((KeyString)"getElementById",
-            new JSFunction((in a) => GetElementById(docRoot, in a), "getElementById", 1),
+            new DomFunction((in a) => GetElementById(docRoot, in a), "getElementById", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getElementsByTagName(tag)
         doc.FastAddValue((KeyString)"getElementsByTagName",
-            new JSFunction((in a) => GetElementsByTagName(docRoot, in a), "getElementsByTagName", 1),
+            new DomFunction((in a) => GetElementsByTagName(docRoot, in a), "getElementsByTagName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createElement(tag)
         doc.FastAddValue((KeyString)"createElement",
-            new JSFunction((in a) => CreateElement(docRoot, in a), "createElement", 1),
+            new DomFunction((in a) => CreateElement(docRoot, in a), "createElement", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createTextNode(text)
         doc.FastAddValue((KeyString)"createTextNode",
-            new JSFunction((in a) => CreateTextNode(docRoot, in a), "createTextNode", 1),
+            new DomFunction((in a) => CreateTextNode(docRoot, in a), "createTextNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createComment(data)
         doc.FastAddValue((KeyString)"createComment",
-            new JSFunction((in a) => CreateComment(docRoot, in a), "createComment", 1),
+            new DomFunction((in a) => CreateComment(docRoot, in a), "createComment", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createElementNS(ns, localName)
         doc.FastAddValue((KeyString)"createElementNS",
-            new JSFunction((in a) => CreateElementNS(docRoot, in a), "createElementNS", 2),
+            new DomFunction((in a) => CreateElementNS(docRoot, in a), "createElementNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createEvent(type)
         doc.FastAddValue((KeyString)"createEvent",
-            new JSFunction((in a) => CreateEvent(in a), "createEvent", 1),
+            new DomFunction((in a) => CreateEvent(in a), "createEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // querySelector / querySelectorAll
         doc.FastAddValue((KeyString)"querySelector",
-            new JSFunction((in a) => QuerySelector(docRoot, in a), "querySelector", 1),
+            new DomFunction((in a) => QuerySelector(docRoot, in a), "querySelector", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         doc.FastAddValue((KeyString)"querySelectorAll",
-            new JSFunction((in a) => QuerySelectorAll(docRoot, in a), "querySelectorAll", 1),
+            new DomFunction((in a) => QuerySelectorAll(docRoot, in a), "querySelectorAll", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         doc.FastAddValue((KeyString)"elementFromPoint",
-            new JSFunction((in a) => ElementFromPoint(docRoot, in a), "elementFromPoint", 2),
+            new DomFunction((in a) => ElementFromPoint(docRoot, in a), "elementFromPoint", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         doc.FastAddValue((KeyString)"elementsFromPoint",
-            new JSFunction((in a) => ElementsFromPoint(docRoot, in a), "elementsFromPoint", 2),
+            new DomFunction((in a) => ElementsFromPoint(docRoot, in a), "elementsFromPoint", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.open()
         doc.FastAddValue((KeyString)"open",
-            new JSFunction((in _) => Open(doc, docRoot), "open", 0),
+            new DomFunction((in _) => Open(doc, docRoot), "open", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.close()
@@ -171,40 +171,40 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
 
         // document.write(html)
         doc.FastAddValue((KeyString)"write",
-            new JSFunction((in a) => Write(docRoot, in a), "write", 1),
+            new DomFunction((in a) => Write(docRoot, in a), "write", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.images
         doc.FastAddProperty((KeyString)"images",
-            new JSFunction((in _) => GetImages(docRoot), "get images"),
+            new DomFunction((in _) => GetImages(docRoot), "get images"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.links
         doc.FastAddProperty((KeyString)"links",
-            new JSFunction((in _) => GetLinks(docRoot), "get links"),
+            new DomFunction((in _) => GetLinks(docRoot), "get links"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.styleSheets
         doc.FastAddProperty((KeyString)"styleSheets",
-            new JSFunction((in _) => _host.BuildStyleSheetsCollection(docRoot), "get styleSheets"),
+            new DomFunction((in _) => _host.BuildStyleSheetsCollection(docRoot), "get styleSheets"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // removeChild on document
         doc.FastAddValue((KeyString)"removeChild",
-            new JSFunction((in a) => RemoveChild(docRoot, in a), "removeChild", 1),
+            new DomFunction((in a) => RemoveChild(docRoot, in a), "removeChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // appendChild on document
         doc.FastAddValue((KeyString)"appendChild",
-            new JSFunction((in a) => AppendChild(docRoot, in a), "appendChild", 1),
+            new DomFunction((in a) => AppendChild(docRoot, in a), "appendChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         doc.FastAddValue((KeyString)"append",
-            new JSFunction((in a) => Append(docRoot, in a), "append", 0),
+            new DomFunction((in a) => Append(docRoot, in a), "append", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         doc.FastAddValue((KeyString)"prepend",
-            new JSFunction((in a) => Prepend(docRoot, in a), "prepend", 0),
+            new DomFunction((in a) => Prepend(docRoot, in a), "prepend", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Node type constants
@@ -221,13 +221,13 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
             DomBridge.TrueFunction("hasFeature", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
         subImpl.FastAddValue((KeyString)"createDocumentType",
-            new JSFunction((in a) => CreateDocumentType(in a), "createDocumentType", 3),
+            new DomFunction((in a) => CreateDocumentType(in a), "createDocumentType", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
         subImpl.FastAddValue((KeyString)"createDocument",
-            new JSFunction((in a) => CreateDocument(in a), "createDocument", 3),
+            new DomFunction((in a) => CreateDocument(in a), "createDocument", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
         subImpl.FastAddValue((KeyString)"createHTMLDocument",
-            new JSFunction((in a) => CreateHTMLDocument(in a), "createHTMLDocument", 1),
+            new DomFunction((in a) => CreateHTMLDocument(in a), "createHTMLDocument", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         doc.FastAddValue((KeyString)"implementation",
             subImpl, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -241,17 +241,17 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
 
         // createTreeWalker(root, whatToShow, filter)
         doc.FastAddValue((KeyString)"createTreeWalker",
-            new JSFunction((in a) => CreateTreeWalker(in a), "createTreeWalker", 3),
+            new DomFunction((in a) => CreateTreeWalker(in a), "createTreeWalker", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createNodeIterator(root, whatToShow, filter)
         doc.FastAddValue((KeyString)"createNodeIterator",
-            new JSFunction((in a) => CreateNodeIterator(in a), "createNodeIterator", 3),
+            new DomFunction((in a) => CreateNodeIterator(in a), "createNodeIterator", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createRange()
         doc.FastAddValue((KeyString)"createRange",
-            new JSFunction((in _) => _host.BuildRange(docRoot), "createRange", 0),
+            new DomFunction((in _) => _host.BuildRange(docRoot), "createRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return doc;

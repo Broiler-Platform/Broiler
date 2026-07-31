@@ -44,8 +44,8 @@ internal sealed class MutationObserverBinding(IMutationObserverHost host)
     /// </summary>
     internal void RegisterDocumentApis(JSContext context)
     {
-        var registerMutationObserverFn = new JSFunction((in a) => RegisterObserver(in a), "__broilerRegisterMutationObserver", 3);
-        var unregisterMutationObserverFn = new JSFunction((in a) => UnregisterObserver(in a), "__broilerUnregisterMutationObserver", 1);
+        var registerMutationObserverFn = new DomFunction((in a) => RegisterObserver(in a), "__broilerRegisterMutationObserver", 3);
+        var unregisterMutationObserverFn = new DomFunction((in a) => UnregisterObserver(in a), "__broilerUnregisterMutationObserver", 1);
         context["__broilerRegisterMutationObserver"] = registerMutationObserverFn;
         context["__broilerUnregisterMutationObserver"] = unregisterMutationObserverFn;
         // MutationObserver — DOM Level 4

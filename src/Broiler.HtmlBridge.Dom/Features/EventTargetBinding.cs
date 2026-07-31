@@ -129,7 +129,7 @@ internal static class EventTargetBinding
                         return JSUndefined.Value;
                     }
 
-                    submitEvt.FastAddValue((KeyString)"preventDefault", new JSFunction(JsJsObjectsPreventDefault100, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    submitEvt.FastAddValue((KeyString)"preventDefault", new DomFunction(JsJsObjectsPreventDefault100, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
                     submitEvt.FastAddValue((KeyString)"stopPropagation", DomBridge.UndefinedFunction("stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
                     submitEvt.FastAddValue((KeyString)"stopImmediatePropagation", DomBridge.UndefinedFunction("stopImmediatePropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
                     host.DispatchEventOnElement(form, submitEvt);

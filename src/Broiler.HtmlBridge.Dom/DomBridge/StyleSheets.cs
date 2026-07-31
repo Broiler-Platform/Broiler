@@ -114,7 +114,7 @@ public sealed partial class DomBridge
         var sheet = new JSObject();
 
         // ownerNode
-        sheet.FastAddProperty((KeyString)"ownerNode", new JSFunction((in _) => ToJSObject(styleElement), "get ownerNode"),
+        sheet.FastAddProperty((KeyString)"ownerNode", new DomFunction((in _) => ToJSObject(styleElement), "get ownerNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // href — null for inline stylesheets
@@ -125,8 +125,8 @@ public sealed partial class DomBridge
         // applying (CSSOM §2.3). Getting reads the effective state (script flag, else the
         // <link disabled> content attribute); setting stores the script flag and re-cascades.
         sheet.FastAddProperty((KeyString)"disabled",
-            new JSFunction((in _) => IsStyleSheetDisabled(styleElement) ? JSBoolean.True : JSBoolean.False, "get disabled"),
-            new JSFunction((in a) => { SetStyleSheetDisabledFlag(styleElement, a.Length > 0 && a[0].BooleanValue); return JSUndefined.Value; }, "set disabled"),
+            new DomFunction((in _) => IsStyleSheetDisabled(styleElement) ? JSBoolean.True : JSBoolean.False, "get disabled"),
+            new DomFunction((in a) => { SetStyleSheetDisabledFlag(styleElement, a.Length > 0 && a[0].BooleanValue); return JSUndefined.Value; }, "set disabled"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // Internal rules storage for this stylesheet — the single shared, mutable
@@ -142,11 +142,11 @@ public sealed partial class DomBridge
         var lastSyncedRuleCount = 0;
         // length is a live getter that always reflects the current rule count
         liveCssRules.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetLength002Core(CurrentRules, in _), "get length"),
+            new DomFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetLength002Core(CurrentRules, in _), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         liveCssRules.FastAddValue((KeyString)"item",
-            new JSFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsItem003Core(SyncLiveCssRulesIndices, liveCssRules, CurrentRules, in a), "item", 1),
+            new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsItem003Core(SyncLiveCssRulesIndices, liveCssRules, CurrentRules, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Syncs indexed properties on the live cssRules object with the shared model
@@ -167,18 +167,18 @@ public sealed partial class DomBridge
 
         // cssRules — returns the live collection, syncing indices on access
         sheet.FastAddProperty((KeyString)"cssRules",
-            new JSFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetCssRules004Core(SyncLiveCssRulesIndices, liveCssRules, in _), "get cssRules"),
+            new DomFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetCssRules004Core(SyncLiveCssRulesIndices, liveCssRules, in _), "get cssRules"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // insertRule(rule, index) — mutates the shared model (marking it mutated so
         // the renderer/engine serialize from it) and resyncs the live collection
         sheet.FastAddValue((KeyString)"insertRule",
-            new JSFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsInsertRule005Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "insertRule", 2),
+            new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsInsertRule005Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "insertRule", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // deleteRule(index) — removes a rule from the shared model
         sheet.FastAddValue((KeyString)"deleteRule",
-            new JSFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsDeleteRule006Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "deleteRule", 1),
+            new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsDeleteRule006Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "deleteRule", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         _styleSheetCache[styleElement] = sheet;

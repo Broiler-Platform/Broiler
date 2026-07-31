@@ -52,7 +52,7 @@ internal static class SvgElementBinding
         {
             var attrName = dimAttr; // capture for closure
             obj.FastAddProperty((KeyString)attrName,
-                new JSFunction((in _) => BuildAnimatedLength(attrName, element), $"get {attrName}"),
+                new DomFunction((in _) => BuildAnimatedLength(attrName, element), $"get {attrName}"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
@@ -60,7 +60,7 @@ internal static class SvgElementBinding
         if (tag == "svg" || tag == "svg:svg")
         {
             obj.FastAddProperty((KeyString)"viewBox",
-                new JSFunction((in _) => GetViewBox(element), "get viewBox"),
+                new DomFunction((in _) => GetViewBox(element), "get viewBox"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
@@ -69,32 +69,32 @@ internal static class SvgElementBinding
             tag == "textpath" || tag == "svg:textpath")
         {
             obj.FastAddValue((KeyString)"getNumberOfChars",
-                new JSFunction((in _) => GetNumberOfChars(element), "getNumberOfChars", 0),
+                new DomFunction((in _) => GetNumberOfChars(element), "getNumberOfChars", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             // getComputedTextLength() — returns estimated total advance width
             obj.FastAddValue((KeyString)"getComputedTextLength",
-                new JSFunction((in _) => GetComputedTextLength(element), "getComputedTextLength", 0),
+                new DomFunction((in _) => GetComputedTextLength(element), "getComputedTextLength", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             // getSubStringLength(charnum, nchars) — returns advance width of substring
             obj.FastAddValue((KeyString)"getSubStringLength",
-                new JSFunction((in a) => GetSubStringLength(element, in a), "getSubStringLength", 2),
+                new DomFunction((in a) => GetSubStringLength(element, in a), "getSubStringLength", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             // getStartPositionOfChar(charnum) — returns SVGPoint {x, y}
             obj.FastAddValue((KeyString)"getStartPositionOfChar",
-                new JSFunction((in a) => GetStartPositionOfChar(element, in a), "getStartPositionOfChar", 1),
+                new DomFunction((in a) => GetStartPositionOfChar(element, in a), "getStartPositionOfChar", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             // getEndPositionOfChar(charnum) — returns SVGPoint {x, y}
             obj.FastAddValue((KeyString)"getEndPositionOfChar",
-                new JSFunction((in a) => GetEndPositionOfChar(element, in a), "getEndPositionOfChar", 1),
+                new DomFunction((in a) => GetEndPositionOfChar(element, in a), "getEndPositionOfChar", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             // getRotationOfChar(charnum) — returns rotation angle in degrees
             obj.FastAddValue((KeyString)"getRotationOfChar",
-                new JSFunction((in a) => GetRotationOfChar(element, in a), "getRotationOfChar", 1),
+                new DomFunction((in a) => GetRotationOfChar(element, in a), "getRotationOfChar", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
@@ -104,11 +104,11 @@ internal static class SvgElementBinding
             double currentTime = 0;
 
             obj.FastAddValue((KeyString)"getCurrentTime",
-                new JSFunction((in _) => new JSNumber(currentTime), "getCurrentTime", 0),
+                new DomFunction((in _) => new JSNumber(currentTime), "getCurrentTime", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             obj.FastAddValue((KeyString)"setCurrentTime",
-                new JSFunction((in a) => SetCurrentTime(ref currentTime, in a), "setCurrentTime", 1),
+                new DomFunction((in a) => SetCurrentTime(ref currentTime, in a), "setCurrentTime", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
 

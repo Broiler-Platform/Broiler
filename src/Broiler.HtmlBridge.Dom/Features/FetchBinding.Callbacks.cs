@@ -158,7 +158,7 @@ internal sealed partial class FetchBinding
             return promise;
         }
 
-        promise.FastAddValue((KeyString)"then", new JSFunction(JsRegistrationThen118, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        promise.FastAddValue((KeyString)"then", new DomFunction(JsRegistrationThen118, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationCatch119(in Arguments catchArgs)
         {
             if (rejected && catchArgs.Length > 0 && catchArgs[0] is JSFunction cb)
@@ -176,7 +176,7 @@ internal sealed partial class FetchBinding
             return promise;
         }
 
-        promise.FastAddValue((KeyString)"catch", new JSFunction(JsRegistrationCatch119, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        promise.FastAddValue((KeyString)"catch", new DomFunction(JsRegistrationCatch119, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         return promise;
     }
 }

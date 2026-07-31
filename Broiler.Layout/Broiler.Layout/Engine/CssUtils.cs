@@ -47,6 +47,7 @@ internal static partial class CssUtils
             "flex-shrink" => cssBox.FlexShrink,
             "flex-basis" => cssBox.FlexBasis,
             "flex-wrap" => cssBox.FlexWrap,
+            "order" => cssBox.Order,
             "justify-content" => cssBox.JustifyContent,
             "justify-items" => cssBox.JustifyItems,
             "align-items" => cssBox.AlignItems,
@@ -284,6 +285,9 @@ internal static partial class CssUtils
                 break;
             case "flex-wrap":
                 cssBox.FlexWrap = value;
+                break;
+            case "order":
+                cssBox.Order = value;
                 break;
             case "justify-content":
                 cssBox.JustifyContent = value;

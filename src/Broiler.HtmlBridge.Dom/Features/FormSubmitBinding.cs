@@ -40,7 +40,7 @@ internal static class FormSubmitBinding
                 return JSUndefined.Value;
             }
 
-            submitEvt.FastAddValue((KeyString)"preventDefault", new JSFunction(PreventDefault, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            submitEvt.FastAddValue((KeyString)"preventDefault", new DomFunction(PreventDefault, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             submitEvt.FastAddValue((KeyString)"stopPropagation", DomBridge.UndefinedFunction("stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             if (host.GetEventListeners(element).TryGetValue("submit", out var submitListeners))
             {

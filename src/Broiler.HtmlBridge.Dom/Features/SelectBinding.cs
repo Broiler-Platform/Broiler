@@ -30,26 +30,26 @@ internal sealed class SelectBinding(ISelectHost host)
         if (tag == "select")
         {
             obj.FastAddValue((KeyString)"add",
-                new JSFunction((in a) => Add(element, in a), "add", 2),
+                new DomFunction((in a) => Add(element, in a), "add", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
             obj.FastAddProperty((KeyString)"options",
-                new JSFunction((in _) => GetOptions(element), "get options"),
+                new DomFunction((in _) => GetOptions(element), "get options"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty((KeyString)"selectedIndex",
-                new JSFunction((in _) => new JSNumber(GetSelectedIndex(element)), "get selectedIndex"),
-                new JSFunction((in a) => SetSelectedIndexCallback(element, in a), "set selectedIndex"),
+                new DomFunction((in _) => new JSNumber(GetSelectedIndex(element)), "get selectedIndex"),
+                new DomFunction((in a) => SetSelectedIndexCallback(element, in a), "set selectedIndex"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty((KeyString)"size",
-                new JSFunction((in _) => GetSize(element), "get size"),
-                new JSFunction((in a) => SetSize(element, in a), "set size"),
+                new DomFunction((in _) => GetSize(element), "get size"),
+                new DomFunction((in a) => SetSize(element, in a), "set size"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         if (tag == "option")
         {
             obj.FastAddProperty((KeyString)"defaultSelected",
-                new JSFunction((in _) => _host.GetOptionDefaultSelected(element) ? JSBoolean.True : JSBoolean.False, "get defaultSelected"),
-                new JSFunction((in a) => SetDefaultSelected(element, in a), "set defaultSelected"),
+                new DomFunction((in _) => _host.GetOptionDefaultSelected(element) ? JSBoolean.True : JSBoolean.False, "get defaultSelected"),
+                new DomFunction((in a) => SetDefaultSelected(element, in a), "set defaultSelected"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
     }
@@ -92,7 +92,7 @@ internal sealed class SelectBinding(ISelectHost host)
                 opts.Add(_host.ToJSObject(c));
         var arr = new JSArray(opts);
         arr.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => new JSNumber(opts.Count), "get length"),
+            new DomFunction((in _) => new JSNumber(opts.Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         return arr;
     }

@@ -184,7 +184,7 @@ public sealed partial class DomBridge
         // skipTransition() ends the transition without animating; the still is already the final
         // state here, so it is a no-op beyond clearing the active state.
         transition.FastAddValue((KeyString)"skipTransition",
-            new JSFunction((in _) => { _activeViewTransition = null; return JSUndefined.Value; }, "skipTransition", 0),
+            new DomFunction((in _) => { _activeViewTransition = null; return JSUndefined.Value; }, "skipTransition", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return transition;
@@ -210,10 +210,10 @@ public sealed partial class DomBridge
             }
             return thenable;
         }
-        thenable.FastAddValue((KeyString)"then", new JSFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        thenable.FastAddValue((KeyString)"catch", new JSFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         thenable.FastAddValue((KeyString)"finally",
-            new JSFunction((in a) => { if (a.Length > 0 && a[0] is JSFunction cb) { try { cb.InvokeFunction(new Arguments(cb)); } catch { } } return thenable; }, "finally", 1),
+            new DomFunction((in a) => { if (a.Length > 0 && a[0] is JSFunction cb) { try { cb.InvokeFunction(new Arguments(cb)); } catch { } } return thenable; }, "finally", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         return thenable;
     }
@@ -257,10 +257,10 @@ public sealed partial class DomBridge
             RunAndMaybeFinish(args.Length > 0 ? args[0] as JSFunction : null);
             return thenable;
         }
-        thenable.FastAddValue((KeyString)"then", new JSFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        thenable.FastAddValue((KeyString)"catch", new JSFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         thenable.FastAddValue((KeyString)"finally",
-            new JSFunction((in a) => { RunAndMaybeFinish(a.Length > 0 ? a[0] as JSFunction : null); return thenable; }, "finally", 1),
+            new DomFunction((in a) => { RunAndMaybeFinish(a.Length > 0 ? a[0] as JSFunction : null); return thenable; }, "finally", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         return thenable;
     }
@@ -294,8 +294,15 @@ public sealed partial class DomBridge
         if (rootName is not null)
         {
             var (l, t, w, h) = GetBoundingClientRectForDomElement(DocumentElement, isRoot: true);
+            // Content-less unless the live page provably cannot stand in for this snapshot — see
+            // RootSnapshotNeedsContent. The fallback fill stays exactly what it was:
+            // AttachSnapshotPaint only uses it when there is no content box, i.e. on the ungated
+            // path, which must keep behaving as before.
             state.OldCaptures[rootName] = new NamedSnapshot(l, t, w, h,
-                rootStyle.GetValueOrDefault("background-color") ?? "transparent");
+                rootStyle.GetValueOrDefault("background-color") ?? "transparent",
+                RootSnapshotNeedsContent(DocumentElement, "old")
+                    ? BuildRootViewTransitionSnapshotContent(rootStyle)
+                    : null);
         }
 
         foreach (var element in DocumentElement.Descendants().OfType<DomElement>())
@@ -479,7 +486,7 @@ public sealed partial class DomBridge
     private void ApplyViewTransitionPseudoTree(DomElement root)
     {
         var pseudoRules = CollectViewTransitionPseudoDeclarations(root);
-        var captures = CollectViewTransitionCaptures(root);
+        var captures = CollectViewTransitionCaptures(root, RootSnapshotNeedsContent(root, "new"));
 
         // A view transition that captured nothing (no element carries a used
         // view-transition-name — e.g. `:root { view-transition-name: none }` with no other
@@ -519,8 +526,27 @@ public sealed partial class DomBridge
         {
             // The group animates old→new geometry; the reftests freeze it at the start, so it sits at
             // the old geometry when the element existed before the transition, else the new.
+            var groupDeclarations = LookupPseudo(pseudoRules, "group", capture);
+            var groupLeft = capture.GroupLeft;
+            var groupTop = capture.GroupTop;
             var groupW = capture.HasOld ? capture.OldWidth : capture.NewWidth;
             var groupH = capture.HasOld ? capture.OldHeight : capture.NewHeight;
+
+            // "Frozen at the start" is the animation's output at time 0, which is not always the old
+            // geometry: an author timing function of the `steps(…, jump-start)` family jumps before it
+            // advances, so at t=0 the group is already part-way to the new geometry. WPT auto-name
+            // pins exactly that with `steps(2, start)` — output 1/2 at t=0 — and its reference is the
+            // two items at the midpoint between their old and new positions. Every other timing
+            // function (linear, the eases, cubic-bezier, the jump-end family) is 0 at t=0 and leaves
+            // the group on the old geometry, which is what it has always done.
+            var progress = FrozenGroupProgress(groupDeclarations);
+            if (progress > 0 && capture.HasOld && capture.HasNew)
+            {
+                groupLeft = Interpolate(capture.OldLeft, capture.NewLeft, progress);
+                groupTop = Interpolate(capture.OldTop, capture.NewTop, progress);
+                groupW = Interpolate(capture.OldWidth, capture.NewWidth, progress);
+                groupH = Interpolate(capture.OldHeight, capture.NewHeight, progress);
+            }
             // The captured position is carried by the group's transform — its UA style, per spec, is
             // `position: absolute; inset: 0` with a transform translating to the snapshot's location.
             // Keeping left/top at 0 lets an author `::view-transition-group(name)` rule that sets
@@ -540,10 +566,10 @@ public sealed partial class DomBridge
 
             var group = CreateStyledBox(BaseStyle(
                 ("position", "absolute"), ("left", "0"), ("top", "0"),
-                ("transform", $"translate({Px(capture.GroupLeft)}, {Px(capture.GroupTop)})"),
+                ("transform", $"translate({Px(groupLeft)}, {Px(groupTop)})"),
                 ("width", Px(groupW)), ("height", Px(groupH)),
                 ("overflow", clipsContent ? "hidden" : "visible")),
-                LookupPseudo(pseudoRules, "group", capture));
+                groupDeclarations);
 
             // Between the group and its two snapshots sits ::view-transition-image-pair, the box the
             // spec gives the old/new pair so a rule can address both at once — WPT
@@ -747,7 +773,16 @@ public sealed partial class DomBridge
     /// snapshot box (100%); positioning, insets, margins, and the outer width/height come from the
     /// captured geometry on that box, not from the element's own computed values.
     /// </summary>
-    private DomElement BuildViewTransitionSnapshotContent(DomElement element)
+    /// <param name="asRootSnapshot">
+    /// This is the whole-page root snapshot rather than one element's. Two things follow: children
+    /// that never paint are not cloned (cloning <c>&lt;head&gt;</c> would re-insert its
+    /// <c>&lt;style&gt;</c>/<c>&lt;script&gt;</c>, duplicating author rules and re-fetching external
+    /// resources), and <c>id</c> attributes are kept so page-level <c>#id</c> rules still match the
+    /// clone — without them a whole page of id-styled content reproduces as blank boxes. Keeping
+    /// them is safe here because the pseudo tree is materialised on a fresh render projection, so
+    /// the duplicate ids never reach the live tree page script can observe.
+    /// </param>
+    private DomElement BuildViewTransitionSnapshotContent(DomElement element, bool asRootSnapshot = false)
     {
         var used = UsedStyleForCapture(element);
 
@@ -782,8 +817,11 @@ public sealed partial class DomBridge
         // Clone the element's content verbatim (text and any descendants) so the snapshot paints it.
         foreach (var child in element.ChildNodes.ToArray())
         {
+            if (asRootSnapshot && IsNonRenderedSnapshotChild(child))
+                continue;
+
             var clone = child.CloneNode(deep: true);
-            StripCapturedIdentifiers(clone);
+            StripCapturedIdentifiers(clone, preserveIds: asRootSnapshot);
             content.AppendChild(clone);
         }
 
@@ -791,20 +829,251 @@ public sealed partial class DomBridge
     }
 
 
+    private static double Interpolate(double from, double to, double progress) =>
+        from + ((to - from) * progress);
+
+    /// <summary>
+    /// The group animation's output at time 0 — the moment the reftests freeze it at. Read from the
+    /// group's <c>animation-timing-function</c>, because an easing function need not be 0 at input 0.
+    /// <para>
+    /// Only the <c>steps()</c> family can be non-zero there. <c>steps(n, jump-start)</c> (and its
+    /// <c>start</c> alias) takes its first jump immediately, so it outputs <c>1/n</c> at input 0;
+    /// <c>jump-both</c> has one extra jump and outputs <c>1/(n+1)</c>; the <c>step-start</c> keyword is
+    /// <c>steps(1, jump-start)</c>, so it is already fully at the new geometry. Everything else — the
+    /// <c>jump-end</c>/<c>end</c>/<c>jump-none</c> steps, <c>linear</c>, the eases,
+    /// <c>cubic-bezier()</c>, and an absent or unparseable value — is 0 at input 0 and leaves the
+    /// group exactly where it has always been placed.
+    /// </para>
+    /// This is a static read of a frozen animation, not a timeline: nothing here advances with time.
+    /// </summary>
+    private static double FrozenGroupProgress(Dictionary<string, string> groupDeclarations)
+    {
+        if (!groupDeclarations.TryGetValue("animation-timing-function", out var raw) ||
+            string.IsNullOrWhiteSpace(raw))
+            return 0;
+
+        // A comma-separated list pairs with animation-name; the group has one animation, so the
+        // first entry governs. Splitting on the top-level comma keeps `steps(2, start)` intact.
+        var value = FirstTopLevelValue(raw).Trim();
+
+        if (value.Equals("step-start", System.StringComparison.OrdinalIgnoreCase))
+            return 1;
+
+        if (!value.StartsWith("steps(", System.StringComparison.OrdinalIgnoreCase) ||
+            !value.EndsWith(")", System.StringComparison.Ordinal))
+            return 0;
+
+        var arguments = value[6..^1].Split(',');
+        if (arguments.Length == 0 ||
+            !int.TryParse(arguments[0].Trim(), System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out var steps) ||
+            steps < 1)
+            return 0;
+
+        var position = arguments.Length > 1 ? arguments[1].Trim() : "end";
+        if (position.Equals("start", System.StringComparison.OrdinalIgnoreCase) ||
+            position.Equals("jump-start", System.StringComparison.OrdinalIgnoreCase))
+            return 1d / steps;
+        if (position.Equals("jump-both", System.StringComparison.OrdinalIgnoreCase))
+            return 1d / (steps + 1);
+
+        return 0;
+    }
+
+    /// <summary>The first entry of a comma-separated CSS value list, ignoring commas nested inside
+    /// functional notation (so <c>steps(2, start)</c> survives as one entry).</summary>
+    private static string FirstTopLevelValue(string value)
+    {
+        var depth = 0;
+        for (var index = 0; index < value.Length; index++)
+        {
+            var character = value[index];
+            if (character == '(') depth++;
+            else if (character == ')') depth--;
+            else if (character == ',' && depth == 0) return value[..index];
+        }
+
+        return value;
+    }
+
+    /// <summary>
+    /// Whether the root's <paramref name="side"/> (<c>old</c> / <c>new</c>) snapshot has to reproduce
+    /// the page rather than let the live page show through it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A root snapshot is normally left content-less: it sits over the live page, which renders the
+    /// same thing pixel-exactly, where a DOM clone is only close. Cloning unconditionally was tried
+    /// and reverted (+8/-7 passing across the 458 local css-view-transitions tests, -79 pixel points
+    /// on <c>root-to-shared-animation-end</c>). So the clone is gated on the page provably not being
+    /// able to stand in, which happens two ways:
+    /// </para>
+    /// <para>
+    /// The author paints the bare <c>::view-transition</c>. That backdrop sits between the page and
+    /// the snapshot, so the page is not visible through it at all and a content-less snapshot leaves
+    /// the backdrop colour flooding the viewport.
+    /// </para>
+    /// <para>
+    /// Or the author gives this side's pseudo an effect that re-renders the snapshot's own pixels —
+    /// <c>filter</c> and friends. The page beneath is not filtered, so even a fully transparent
+    /// snapshot over a perfectly visible page shows the wrong thing: WPT
+    /// <c>{old,new}-content-root-scrollbar-with-fixed-background</c> invert the captured page with
+    /// <c>filter: invert(1)</c> and expect an inverted viewport.
+    /// </para>
+    /// <para>
+    /// <c>opacity</c> is deliberately not in that set, and the distinction is what keeps the old
+    /// regression away: it only composites the snapshot against what is behind it, which is exactly
+    /// what the live page already does. <c>root-to-shared-animation-end</c> pins
+    /// <c>::view-transition-old(*) { opacity: 1 }</c>, and treating that as needing content is
+    /// precisely the -79 case. <c>transform</c> is likewise excluded — the group already carries the
+    /// captured placement — pending a measurement that shows a test needs it.
+    /// </para>
+    /// </remarks>
+    private bool RootSnapshotNeedsContent(DomElement root, string side)
+    {
+        var pseudoRules = CollectViewTransitionPseudoDeclarations(root);
+        if (AuthorPaintsBackground(LookupPseudo(pseudoRules, string.Empty, null)))
+            return true;
+
+        var rootName = ResolveRootViewTransitionName(UsedStyleForCapture(root));
+        return HasSnapshotAlteringEffect(LookupRootPseudo(pseudoRules, side, rootName));
+    }
+
+    /// <summary>The declarations an author aimed at the root's <paramref name="kind"/> pseudo, taking
+    /// both the <c>*</c> and the by-name forms (the root has no <c>view-transition-class</c> path of
+    /// its own to consider).</summary>
+    private static Dictionary<string, string> LookupRootPseudo(
+        Dictionary<string, Dictionary<string, string>> pseudoRules, string kind, string? rootName)
+    {
+        var merged = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+
+        void Merge(string argument)
+        {
+            if (pseudoRules.TryGetValue($"{kind}|{argument}", out var bucket))
+                foreach (var (key, value) in bucket)
+                    merged[key] = value;
+        }
+
+        Merge("*");
+        if (!string.IsNullOrEmpty(rootName))
+            Merge(rootName!);
+
+        return merged;
+    }
+
+    /// <summary>Properties that re-render a snapshot's own pixels, so the live page underneath cannot
+    /// stand in for it however visible that page is. Compositing-only knobs (<c>opacity</c>) and
+    /// placement (<c>transform</c>) are not here — see <see cref="RootSnapshotNeedsContent"/>.</summary>
+    private static readonly string[] SnapshotAlteringProperties =
+    {
+        "filter", "backdrop-filter", "mix-blend-mode", "mask", "mask-image", "clip-path",
+    };
+
+    private static bool HasSnapshotAlteringEffect(Dictionary<string, string> declarations)
+    {
+        foreach (var property in SnapshotAlteringProperties)
+        {
+            if (declarations.TryGetValue(property, out var value) &&
+                !string.IsNullOrWhiteSpace(value) &&
+                !value.Trim().Equals("none", System.StringComparison.OrdinalIgnoreCase) &&
+                !value.Trim().Equals("normal", System.StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Metadata and script children that never paint, so a root snapshot must not clone them:
+    /// re-inserting <c>&lt;style&gt;</c>/<c>&lt;link&gt;</c> would duplicate author rules into the live
+    /// document and <c>&lt;script&gt;</c>/<c>&lt;link&gt;</c> could re-fetch external resources.</summary>
+    private static bool IsNonRenderedSnapshotChild(DomNode node) =>
+        node is DomElement element &&
+        element.TagName is { } tag &&
+        (tag.Equals("head", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("style", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("script", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("link", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("meta", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("title", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("base", System.StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// The old root snapshot's content: the page as it stands before the update callback. Built like
+    /// any other captured element's content box, minus the parts of <c>&lt;html&gt;</c> that never
+    /// paint — cloning <c>&lt;head&gt;</c> would re-insert its <c>&lt;style&gt;</c>/<c>&lt;script&gt;</c>
+    /// into the live document, duplicating author rules (including the <c>::view-transition</c> rules
+    /// driving the transition) and re-fetching external resources.
+    /// </summary>
+    private DomElement BuildRootViewTransitionSnapshotContent(Dictionary<string, string> rootStyle)
+    {
+        var content = BuildViewTransitionSnapshotContent(DocumentElement, asRootSnapshot: true);
+        // The root snapshot captures the viewport, so it paints the canvas background rather than
+        // the root box's own — which is usually `transparent`, and would let the ::view-transition
+        // background behind the snapshot show through the captured page.
+        InlineStyle(content)["background-color"] = ResolveCapturedCanvasBackground(rootStyle);
+        return content;
+    }
+
+    /// <summary>
+    /// The canvas background at capture time, per the CSS 2.1 §14.2 propagation model: the root's own
+    /// background when it paints one, else the body's (which propagates to the canvas), else the
+    /// UA default. A root snapshot must be opaque — it stands in for the whole viewport.
+    /// </summary>
+    private string ResolveCapturedCanvasBackground(Dictionary<string, string> rootStyle)
+    {
+        if (PaintsBackground(rootStyle.GetValueOrDefault("background-color")) is { } rootBackground)
+            return rootBackground;
+
+        foreach (var element in DocumentElement.Descendants().OfType<DomElement>())
+        {
+            if (!string.Equals(element.TagName, "body", System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (PaintsBackground(UsedStyleForCapture(element).GetValueOrDefault("background-color")) is { } body)
+                return body;
+            break;
+        }
+
+        return "white";
+    }
+
+    /// <summary>The colour when it actually paints, or null when it is absent or fully transparent
+    /// (<c>transparent</c> and the <c>rgba(…, 0)</c> the computed-style engine serializes it as).</summary>
+    private static string? PaintsBackground(string? value)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrEmpty(trimmed) ||
+            trimmed.Equals("transparent", System.StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("none", System.StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        // rgba(…, 0) / rgb(… / 0) — a fully transparent computed colour paints nothing.
+        var lastComma = trimmed.LastIndexOf(',');
+        if (trimmed.EndsWith(")", System.StringComparison.Ordinal) && lastComma >= 0)
+        {
+            var alpha = trimmed[(lastComma + 1)..].TrimEnd(')').Trim();
+            if (double.TryParse(alpha, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsed) && parsed == 0)
+                return null;
+        }
+
+        return trimmed;
+    }
+
     /// <summary>Strips identity/capture markers from a cloned snapshot subtree: <c>id</c> (so the
     /// clone does not duplicate a live element's id) and any inline <c>view-transition-name</c> (so a
     /// re-serialize cannot capture the clone as a named element).</summary>
-    private void StripCapturedIdentifiers(DomNode node)
+    private void StripCapturedIdentifiers(DomNode node, bool preserveIds = false)
     {
         if (node is DomElement element)
         {
-            if (element.HasAttribute("id"))
+            if (!preserveIds && element.HasAttribute("id"))
                 element.RemoveAttribute("id");
             InlineStyle(element).Remove("view-transition-name");
         }
 
         foreach (var child in node.ChildNodes.ToArray())
-            StripCapturedIdentifiers(child);
+            StripCapturedIdentifiers(child, preserveIds);
     }
 
     /// <summary>
@@ -836,19 +1105,25 @@ public sealed partial class DomBridge
 
     private readonly record struct ViewTransitionCapture(
         string Name,
+        // The captured element's `view-transition-class` list, matched by a pseudo argument's
+        // `.class` part (css-view-transitions-2 <pt-class-selector>). Empty when it has none.
+        string Classes,
         double GroupLeft, double GroupTop,
-        bool HasOld, double OldWidth, double OldHeight, string OldBackground, DomElement? OldContent,
-        bool HasNew, double NewWidth, double NewHeight, string NewBackground, DomElement? NewContent);
+        bool HasOld, double OldLeft, double OldTop, double OldWidth, double OldHeight, string OldBackground, DomElement? OldContent,
+        bool HasNew, double NewLeft, double NewTop, double NewWidth, double NewHeight, string NewBackground, DomElement? NewContent);
 
     /// <summary>
     /// The captured names, each pairing the "old" snapshot (from before the update callback) with the
     /// "new" one (the element as it stands now), in old-then-new document order. Names appearing only
     /// on one side keep just that snapshot; the group is placed at the old geometry when present.
     /// </summary>
-    private List<ViewTransitionCapture> CollectViewTransitionCaptures(DomElement root)
+    private List<ViewTransitionCapture> CollectViewTransitionCaptures(DomElement root, bool newRootNeedsContent = false)
     {
         var newCaptures = new Dictionary<string, NamedSnapshot>(System.StringComparer.Ordinal);
         var order = new List<string>();
+        // `view-transition-class` per captured name, so ::view-transition-group(*.item) can address a
+        // group by class rather than by name (css-view-transitions-2).
+        var classesByName = new Dictionary<string, string>(System.StringComparer.Ordinal);
 
         void AddNew(string name, NamedSnapshot snapshot)
         {
@@ -861,13 +1136,13 @@ public sealed partial class DomBridge
         if (rootName is not null)
         {
             var (l, t, w, h) = GetBoundingClientRectForDomElement(root, isRoot: true);
-            // Only the *old* root snapshot is reproduced by cloning. The new one is left
-            // content-less on purpose: it sits over the live page, which is the same content it
-            // would be reproducing — and the real rendering is exact where a DOM clone is only
-            // close. Cloning it too cost 7 tests between 0.8 and 4 pixel-points, and 79 on
-            // root-to-shared-animation-end, for no test it alone fixed.
+            // Content-less unless the live page provably cannot stand in for this snapshot — see
+            // RootSnapshotNeedsContent for the two ways that happens and why cloning it
+            // unconditionally was reverted.
             AddNew(rootName, new NamedSnapshot(l, t, w, h,
-                rootStyle.GetValueOrDefault("background-color") ?? "transparent"));
+                rootStyle.GetValueOrDefault("background-color") ?? "transparent",
+                newRootNeedsContent ? BuildRootViewTransitionSnapshotContent(rootStyle) : null));
+            classesByName[rootName] = rootStyle.GetValueOrDefault("view-transition-class") ?? string.Empty;
         }
 
         foreach (var element in root.Descendants().OfType<DomElement>())
@@ -881,6 +1156,7 @@ public sealed partial class DomBridge
             AddNew(name, new NamedSnapshot(l, t, w, h,
                 style.GetValueOrDefault("background-color") ?? "transparent",
                 BuildViewTransitionSnapshotContent(element)));
+            classesByName.TryAdd(name, style.GetValueOrDefault("view-transition-class") ?? string.Empty);
         }
 
         var oldCaptures = _activeViewTransition!.OldCaptures;
@@ -896,9 +1172,9 @@ public sealed partial class DomBridge
             var hasNew = newCaptures.TryGetValue(name, out var @new);
             var anchor = hasOld ? old : @new; // group start geometry
             captures.Add(new ViewTransitionCapture(
-                name, anchor.Left, anchor.Top,
-                hasOld, old.Width, old.Height, old.BackgroundColor, old.Content,
-                hasNew, @new.Width, @new.Height, @new.BackgroundColor, @new.Content));
+                name, classesByName.GetValueOrDefault(name) ?? string.Empty, anchor.Left, anchor.Top,
+                hasOld, old.Left, old.Top, old.Width, old.Height, old.BackgroundColor, old.Content,
+                hasNew, @new.Left, @new.Top, @new.Width, @new.Height, @new.BackgroundColor, @new.Content));
         }
 
         return captures;
@@ -1046,9 +1322,74 @@ public sealed partial class DomBridge
             return merged;
         }
 
+        // css-view-transitions-2 lets a pseudo argument select by class as well as by name —
+        // `::view-transition-group(*.item)`, and the name-less `.item` shorthand — where the classes
+        // come from the captured element's `view-transition-class`. Merge least-specific first so a
+        // more specific rule wins: `*`, then class-only rules, then the exact name (with or without
+        // classes of its own). WPT auto-name drives its whole transition off `(.item)`.
         Merge("*");
+
+        var classes = SplitViewTransitionClasses(capture.Value.Classes);
+        var prefix = $"{kind}|";
+        foreach (var key in pseudoRules.Keys)
+        {
+            if (!key.StartsWith(prefix, System.StringComparison.Ordinal))
+                continue;
+
+            var argument = key[prefix.Length..];
+            if (argument.Length == 0 || argument == "*" || argument == capture.Value.Name)
+                continue; // handled by the explicit merges around this loop
+
+            var (nameSelector, requiredClasses) = ParsePseudoArgument(argument);
+            if (requiredClasses.Count == 0)
+                continue; // a plain name that is not this capture's
+
+            if (nameSelector is not "*" && !string.Equals(nameSelector, capture.Value.Name, System.StringComparison.Ordinal))
+                continue;
+
+            if (requiredClasses.All(required => classes.Contains(required)))
+                Merge(argument);
+        }
+
         Merge(capture.Value.Name);
         return merged;
+    }
+
+    /// <summary>Splits a <c>view-transition-class</c> value into its idents. <c>none</c> (the initial
+    /// value) contributes nothing.</summary>
+    private static HashSet<string> SplitViewTransitionClasses(string? value)
+    {
+        var classes = new HashSet<string>(System.StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(value))
+            return classes;
+
+        foreach (var token in value.Split((char[]?)null, System.StringSplitOptions.RemoveEmptyEntries))
+            if (!token.Equals("none", System.StringComparison.OrdinalIgnoreCase))
+                classes.Add(token);
+
+        return classes;
+    }
+
+    /// <summary>
+    /// Splits a <c>::view-transition-*()</c> argument into its name selector and class selectors —
+    /// <c>&lt;pt-name-selector&gt;&lt;pt-class-selector&gt;?</c>. A leading <c>.</c> means the name
+    /// selector was omitted, which is the same as <c>*</c>.
+    /// </summary>
+    private static (string Name, List<string> Classes) ParsePseudoArgument(string argument)
+    {
+        var trimmed = argument.Trim();
+        var dot = trimmed.IndexOf('.');
+        if (dot < 0)
+            return (trimmed, []);
+
+        var name = dot == 0 ? "*" : trimmed[..dot];
+        var classes = trimmed[(dot + 1)..]
+            .Split('.', System.StringSplitOptions.RemoveEmptyEntries)
+            .Select(static part => part.Trim())
+            .Where(static part => part.Length > 0)
+            .ToList();
+
+        return (name, classes);
     }
 
     /// <summary>

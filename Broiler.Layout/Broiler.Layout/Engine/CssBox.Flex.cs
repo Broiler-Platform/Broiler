@@ -39,6 +39,66 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
     private bool IsFlexContainer() => Display is "flex" or "inline-flex";
 
+    /// <summary>
+    /// CSS Flexbox §5.4 / CSS Display §3: reorders this container's children into <em>order-modified
+    /// document order</em> — ascending <c>order</c>, document order preserved within an ordinal group.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Done by sorting <see cref="CssBoxProperties.Boxes"/> in place rather than inside one layout
+    /// algorithm, because the children reach the page by several routes: a row flex container walks
+    /// this list itself, a column one falls through to ordinary block/inline flow over the same list
+    /// (the line-break-per-item path in <c>CssLayoutEngine</c>), and painting walks it too. `order`
+    /// is defined to affect layout *and* paint order, so moving the boxes once serves all three.
+    /// </para>
+    /// <para>
+    /// The sort is stable, so equal <c>order</c> keeps document order, and it is idempotent: a list
+    /// already in order-modified order re-sorts to itself, which matters because layout runs more
+    /// than once per render. Boxes whose <c>order</c> is absent or not an integer count as 0, the
+    /// initial value.
+    /// </para>
+    /// </remarks>
+    private void ApplyOrderModifiedDocumentOrder()
+    {
+        if (Boxes.Count < 2)
+            return;
+
+        var orders = new int[Boxes.Count];
+        var reordered = false;
+        for (var index = 0; index < Boxes.Count; index++)
+        {
+            orders[index] = ParseOrder(Boxes[index].Order);
+            if (index > 0 && orders[index] < orders[index - 1])
+                reordered = true;
+        }
+
+        if (!reordered)
+            return;
+
+        // List<T>.Sort is unstable, so pair each box with its document index and break ties on it.
+        var sorted = new List<CssBox>(Boxes.Count);
+        var indices = new List<int>(Boxes.Count);
+        for (var index = 0; index < Boxes.Count; index++)
+            indices.Add(index);
+
+        indices.Sort((left, right) =>
+        {
+            var byOrder = orders[left].CompareTo(orders[right]);
+            return byOrder != 0 ? byOrder : left.CompareTo(right);
+        });
+
+        foreach (var index in indices)
+            sorted.Add(Boxes[index]);
+
+        Boxes.Clear();
+        Boxes.AddRange(sorted);
+    }
+
+    private static int ParseOrder(string? value) =>
+        int.TryParse((value ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var order)
+            ? order
+            : 0;
+
     internal bool IsRowFlexContainer()
     {
         if (!IsFlexContainer())

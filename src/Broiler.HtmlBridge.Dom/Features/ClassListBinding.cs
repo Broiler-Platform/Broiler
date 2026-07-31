@@ -26,23 +26,23 @@ internal static class ClassListBinding
         var classList = new JSObject();
 
         classList.FastAddValue((KeyString)"contains",
-            new JSFunction((in a) => Contains(element, in a), "contains", 1),
+            new DomFunction((in a) => Contains(element, in a), "contains", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         classList.FastAddValue((KeyString)"add",
-            new JSFunction((in a) => Add(element, onClassChanged, in a), "add"),
+            new DomFunction((in a) => Add(element, onClassChanged, in a), "add"),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         classList.FastAddValue((KeyString)"remove",
-            new JSFunction((in a) => Remove(element, onClassChanged, in a), "remove"),
+            new DomFunction((in a) => Remove(element, onClassChanged, in a), "remove"),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         classList.FastAddValue((KeyString)"toggle",
-            new JSFunction((in a) => Toggle(element, onClassChanged, in a), "toggle", 1),
+            new DomFunction((in a) => Toggle(element, onClassChanged, in a), "toggle", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         classList.FastAddValue((KeyString)"replace",
-            new JSFunction((in a) => Replace(element, onClassChanged, in a), "replace", 2),
+            new DomFunction((in a) => Replace(element, onClassChanged, in a), "replace", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return classList;

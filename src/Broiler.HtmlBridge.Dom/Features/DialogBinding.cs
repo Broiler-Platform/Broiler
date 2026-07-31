@@ -30,23 +30,23 @@ internal sealed class DialogBinding(IDialogHost host)
         if (tag == "details")
         {
             obj.FastAddProperty((KeyString)"open",
-                new JSFunction((in _) => _host.HasOpenAttribute(element) ? JSBoolean.True : JSBoolean.False, "get open"),
-                new JSFunction((in a) => SetOpenState(element, in a), "set open"),
+                new DomFunction((in _) => _host.HasOpenAttribute(element) ? JSBoolean.True : JSBoolean.False, "get open"),
+                new DomFunction((in a) => SetOpenState(element, in a), "set open"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         if (tag == "dialog")
         {
-            obj.FastAddValue((KeyString)"showModal", new JSFunction((in _) => ShowModal(element), "showModal", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"show", new JSFunction((in _) => Show(element), "show", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"close", new JSFunction((in a) => Close(element, in a), "close", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"showModal", new DomFunction((in _) => ShowModal(element), "showModal", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"show", new DomFunction((in _) => Show(element), "show", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"close", new DomFunction((in a) => Close(element, in a), "close", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             obj.FastAddProperty((KeyString)"open",
-                new JSFunction((in _) => _host.HasOpenAttribute(element) ? JSBoolean.True : JSBoolean.False, "get open"),
-                new JSFunction((in a) => SetOpenState(element, in a), "set open"),
+                new DomFunction((in _) => _host.HasOpenAttribute(element) ? JSBoolean.True : JSBoolean.False, "get open"),
+                new DomFunction((in a) => SetOpenState(element, in a), "set open"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty((KeyString)"returnValue",
-                new JSFunction((in _) => new JSString(_host.GetReturnValue(element)), "get returnValue"),
-                new JSFunction((in a) => SetReturnValue(element, in a), "set returnValue"),
+                new DomFunction((in _) => new JSString(_host.GetReturnValue(element)), "get returnValue"),
+                new DomFunction((in a) => SetReturnValue(element, in a), "set returnValue"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
@@ -54,8 +54,8 @@ internal sealed class DialogBinding(IDialogHost host)
         // carrying the global `popover` attribute, not tied to a tag.
         if (hasPopover)
         {
-            obj.FastAddValue((KeyString)"showPopover", new JSFunction((in _) => ShowPopover(element), "showPopover", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"hidePopover", new JSFunction((in _) => HidePopover(element), "hidePopover", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"showPopover", new DomFunction((in _) => ShowPopover(element), "showPopover", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"hidePopover", new DomFunction((in _) => HidePopover(element), "hidePopover", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         }
     }
 

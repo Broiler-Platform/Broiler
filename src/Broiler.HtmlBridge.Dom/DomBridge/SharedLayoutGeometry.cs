@@ -65,7 +65,34 @@ public sealed partial class DomBridge
     /// </summary>
     private bool TryGetSharedLayoutGeometry(DomElement element, out BoxGeometry geometry)
     {
-        var snapshot = _sharedGeometrySnapshot ??= BuildSharedGeometrySnapshot();
+        // The lazy build must run marked as a geometry pass, exactly as WithLayoutGeometryCache
+        // marks its own. Building the snapshot creates a render projection, and that projection
+        // materialises a running view transition's pseudo tree — which measures the captured
+        // elements, i.e. asks for geometry again. ApplyViewTransitionRendering skips itself while a
+        // pass is active, so the flag is what terminates the cycle; without it this path recursed
+        // BuildSharedGeometrySnapshot → view-transition pseudo tree → getBoundingClientRect →
+        // BuildSharedGeometrySnapshot until the stack overflowed.
+        //
+        // Latent until an await continuation could reach a geometry query mid-transition (the
+        // reactions used to race away on the thread pool), and reachable from any non-pass shared
+        // query, so it is guarded here rather than at the caller.
+        var snapshot = _sharedGeometrySnapshot;
+        if (snapshot is null)
+        {
+            var owner = !_layoutGeometryPassActive;
+            if (owner)
+                _layoutGeometryPassActive = true;
+            try
+            {
+                snapshot = _sharedGeometrySnapshot ??= BuildSharedGeometrySnapshot();
+            }
+            finally
+            {
+                if (owner)
+                    _layoutGeometryPassActive = false;
+            }
+        }
+
         return snapshot.TryGetValue(ResolveRenderSource(element), out geometry);
     }
 

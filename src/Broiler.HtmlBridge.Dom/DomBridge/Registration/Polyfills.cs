@@ -21,8 +21,8 @@ public sealed partial class DomBridge
         var cookieStore = "";
         document.FastAddProperty(
             (KeyString)"cookie",
-            new JSFunction((in _) => new JSString(cookieStore), "get cookie"),
-            new JSFunction((in a) => Dom.Features.WindowDocumentMiscBinding.SetCookie(ref cookieStore, in a), "set cookie"),
+            new DomFunction((in _) => new JSString(cookieStore), "get cookie"),
+            new DomFunction((in a) => Dom.Features.WindowDocumentMiscBinding.SetCookie(ref cookieStore, in a), "set cookie"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 

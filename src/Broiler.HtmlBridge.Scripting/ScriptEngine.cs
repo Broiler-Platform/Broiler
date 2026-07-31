@@ -150,6 +150,10 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
 
         try
         {
+            // Current on this thread for the whole of script execution, because a promise captures
+            // its synchronization context when it is created, not when it settles. Without it the
+            // engine resumes continuations on the thread pool, concurrently with this thread.
+            using var microTaskContext = MicroTaskSynchronizationContext.Install(MicroTasks);
             using JSContext context = moduleContext ?? new JSContext();
             RegisterRuntimeExtensions(context);
             var bridge = _domBridgeFactory.Create();
@@ -313,6 +317,11 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
         // disposes both. If setup throws before the session is built, the catch disposes them so a
         // failed ExecuteInteractive never leaks a JS context or an event loop (Phase 8 item 2). The
         // CSP is restored in the finally on every path.
+        // Scoped to setup: the promises created while the page's scripts run capture it here. A
+        // later session Step() runs on the caller's thread, which installs nothing — the interactive
+        // path drains explicitly between steps, so a reaction that lands on the pool there is the
+        // caller's own pacing rather than a race against a render.
+        using var microTaskContext = MicroTaskSynchronizationContext.Install(MicroTasks);
         JSContext context = moduleContext ?? new JSContext();
         IDomBridgeRuntime? bridge = null;
         try

@@ -47,41 +47,41 @@ internal static partial class StyleDeclarationBinding
         var style = new CssStyleDeclaration(host, element, onMutation, onPositionAreaInvalidate);
 
         style.FastAddProperty((KeyString)"cssText",
-            new JSFunction((in a) => InlineGetCssText(host, element, in a), "get cssText"),
-            new JSFunction((in a) => InlineSetCssText(host, element, onMutation, in a), "set cssText"),
+            new DomFunction((in a) => InlineGetCssText(host, element, in a), "get cssText"),
+            new DomFunction((in a) => InlineSetCssText(host, element, onMutation, in a), "set cssText"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         style.FastAddValue((KeyString)"setProperty",
-            new JSFunction((in a) => InlineSetProperty(host, element, onMutation, in a), "setProperty", 2),
+            new DomFunction((in a) => InlineSetProperty(host, element, onMutation, in a), "setProperty", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue((KeyString)"getPropertyValue",
-            new JSFunction((in a) => InlineGetPropertyValue(host, element, in a), "getPropertyValue", 1),
+            new DomFunction((in a) => InlineGetPropertyValue(host, element, in a), "getPropertyValue", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue((KeyString)"removeProperty",
-            new JSFunction((in a) => InlineRemoveProperty(host, element, onMutation, in a), "removeProperty", 1),
+            new DomFunction((in a) => InlineRemoveProperty(host, element, onMutation, in a), "removeProperty", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddProperty((KeyString)"cssFloat",
-            new JSFunction((in a) => InlineGetCssFloat(host, element, in a), "get cssFloat"),
-            new JSFunction((in a) => InlineSetCssFloat(host, element, onMutation, in a), "set cssFloat"),
+            new DomFunction((in a) => InlineGetCssFloat(host, element, in a), "get cssFloat"),
+            new DomFunction((in a) => InlineSetCssFloat(host, element, onMutation, in a), "set cssFloat"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         style.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => new JSNumber(GetStylePropertyNames(host, element).Count), "get length"),
+            new DomFunction((in _) => new JSNumber(GetStylePropertyNames(host, element).Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         style.FastAddValue((KeyString)"item",
-            new JSFunction((in a) => InlineItem(host, element, in a), "item", 1),
+            new DomFunction((in a) => InlineItem(host, element, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue((KeyString)"getPropertyPriority",
-            new JSFunction((in a) => InlineGetPropertyPriority(host, element, in a), "getPropertyPriority", 1),
+            new DomFunction((in a) => InlineGetPropertyPriority(host, element, in a), "getPropertyPriority", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddProperty((KeyString)"parentRule",
-            new JSFunction((in _) => parentRule ?? JSNull.Value, "get parentRule"),
+            new DomFunction((in _) => parentRule ?? JSNull.Value, "get parentRule"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return style;
@@ -94,41 +94,41 @@ internal static partial class StyleDeclarationBinding
         var style = new CssRuleStyleDeclaration(styleMap);
 
         style.FastAddProperty((KeyString)"cssText",
-            new JSFunction((in _) => RuleGetCssText(styleMap, in _), "get cssText"),
-            new JSFunction((in a) => RuleSetCssText(styleMap, in a), "set cssText"),
+            new DomFunction((in _) => RuleGetCssText(styleMap, in _), "get cssText"),
+            new DomFunction((in a) => RuleSetCssText(styleMap, in a), "set cssText"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         style.FastAddValue((KeyString)"setProperty",
-            new JSFunction((in a) => RuleSetProperty(styleMap, in a), "setProperty", 2),
+            new DomFunction((in a) => RuleSetProperty(styleMap, in a), "setProperty", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue((KeyString)"getPropertyValue",
-            new JSFunction((in a) => RuleGetPropertyValue(styleMap, in a), "getPropertyValue", 1),
+            new DomFunction((in a) => RuleGetPropertyValue(styleMap, in a), "getPropertyValue", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue((KeyString)"removeProperty",
-            new JSFunction((in a) => RuleRemoveProperty(styleMap, in a), "removeProperty", 1),
+            new DomFunction((in a) => RuleRemoveProperty(styleMap, in a), "removeProperty", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddProperty((KeyString)"cssFloat",
-            new JSFunction((in _) => RuleGetCssFloat(styleMap, in _), "get cssFloat"),
-            new JSFunction((in a) => RuleSetCssFloat(styleMap, in a), "set cssFloat"),
+            new DomFunction((in _) => RuleGetCssFloat(styleMap, in _), "get cssFloat"),
+            new DomFunction((in a) => RuleSetCssFloat(styleMap, in a), "set cssFloat"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         style.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => new JSNumber(GetStylePropertyNames(styleMap).Count), "get length"),
+            new DomFunction((in _) => new JSNumber(GetStylePropertyNames(styleMap).Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         style.FastAddValue((KeyString)"item",
-            new JSFunction((in a) => RuleItem(styleMap, in a), "item", 1),
+            new DomFunction((in a) => RuleItem(styleMap, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddValue((KeyString)"getPropertyPriority",
-            new JSFunction((in a) => RuleGetPropertyPriority(styleMap, in a), "getPropertyPriority", 1),
+            new DomFunction((in a) => RuleGetPropertyPriority(styleMap, in a), "getPropertyPriority", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         style.FastAddProperty((KeyString)"parentRule",
-            new JSFunction((in _) => parentRule ?? JSNull.Value, "get parentRule"),
+            new DomFunction((in _) => parentRule ?? JSNull.Value, "get parentRule"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return style;
@@ -153,11 +153,11 @@ internal static partial class StyleDeclarationBinding
         }
 
         // getPropertyValue method (supports both kebab-case and camelCase lookups)
-        obj.FastAddValue((KeyString)"getPropertyValue", new JSFunction((in a) => ComputedGetPropertyValue(computed, in a), "getPropertyValue", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        obj.FastAddProperty((KeyString)"length", new JSFunction((in _) => new JSNumber(propertyNames.Count), "get length"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        obj.FastAddValue((KeyString)"getPropertyValue", new DomFunction((in a) => ComputedGetPropertyValue(computed, in a), "getPropertyValue", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddProperty((KeyString)"length", new DomFunction((in _) => new JSNumber(propertyNames.Count), "get length"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        obj.FastAddValue((KeyString)"item", new JSFunction((in a) => ComputedItem(propertyNames, in a), "item", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        obj.FastAddValue((KeyString)"getPropertyPriority", new JSFunction((in _) => new JSString(string.Empty), "getPropertyPriority", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"item", new DomFunction((in a) => ComputedItem(propertyNames, in a), "item", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"getPropertyPriority", new DomFunction((in _) => new JSString(string.Empty), "getPropertyPriority", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddProperty((KeyString)"parentRule", DomBridge.NullFunction("get parentRule"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 

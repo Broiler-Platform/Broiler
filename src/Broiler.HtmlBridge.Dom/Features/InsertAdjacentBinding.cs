@@ -24,15 +24,15 @@ internal static class InsertAdjacentBinding
     public static void Install(IInsertAdjacentHost host, JSObject obj, DomElement element)
     {
         obj.FastAddValue((KeyString)"insertAdjacentElement",
-            new JSFunction((in a) => InsertAdjacentElement(host, element, in a), "insertAdjacentElement", 2),
+            new DomFunction((in a) => InsertAdjacentElement(host, element, in a), "insertAdjacentElement", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"insertAdjacentText",
-            new JSFunction((in a) => InsertAdjacentText(host, element, in a), "insertAdjacentText", 2),
+            new DomFunction((in a) => InsertAdjacentText(host, element, in a), "insertAdjacentText", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"insertAdjacentHTML",
-            new JSFunction((in a) => InsertAdjacentHtml(host, element, in a), "insertAdjacentHTML", 2),
+            new DomFunction((in a) => InsertAdjacentHtml(host, element, in a), "insertAdjacentHTML", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
 

@@ -53,15 +53,15 @@ internal sealed class MessagingBinding(IMessagingHost host, EventTargetRegistry 
     internal void InstallEventTargetApi(JSObject target, string logContext)
     {
         target.FastAddValue((KeyString)"addEventListener",
-            new JSFunction((in a) => AddEventListener(target, in a), "addEventListener", 3),
+            new DomFunction((in a) => AddEventListener(target, in a), "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         target.FastAddValue((KeyString)"removeEventListener",
-            new JSFunction((in a) => RemoveEventListener(target, in a), "removeEventListener", 3),
+            new DomFunction((in a) => RemoveEventListener(target, in a), "removeEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         target.FastAddValue((KeyString)"dispatchEvent",
-            new JSFunction((in a) => DispatchEvent(logContext, target, in a), "dispatchEvent", 1),
+            new DomFunction((in a) => DispatchEvent(logContext, target, in a), "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
@@ -124,29 +124,29 @@ internal sealed class MessagingBinding(IMessagingHost host, EventTargetRegistry 
         evt[(KeyString)"defaultPrevented"] = prevented ? JSBoolean.True : JSBoolean.False;
 
         evt.FastAddValue((KeyString)"stopPropagation",
-            new JSFunction((in _) => StopPropagation(ref legacyCancelBubble, in _), "stopPropagation", 0),
+            new DomFunction((in _) => StopPropagation(ref legacyCancelBubble, in _), "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         evt.FastAddValue((KeyString)"stopImmediatePropagation",
-            new JSFunction((in _) => StopImmediatePropagation(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
+            new DomFunction((in _) => StopImmediatePropagation(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         evt.FastAddValue((KeyString)"preventDefault",
-            new JSFunction((in _) => PreventDefault(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
+            new DomFunction((in _) => PreventDefault(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         evt.FastAddProperty((KeyString)"cancelBubble",
-            new JSFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
-            new JSFunction((in setArgs) => SetCancelBubble(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
+            new DomFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
+            new DomFunction((in setArgs) => SetCancelBubble(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         evt.FastAddProperty((KeyString)"returnValue",
-            new JSFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
-            new JSFunction((in setArgs) => SetReturnValue(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
+            new DomFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
+            new DomFunction((in setArgs) => SetReturnValue(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         evt.FastAddValue((KeyString)"composedPath",
-            new JSFunction((in _) => new JSArray(target), "composedPath", 0),
+            new DomFunction((in _) => new JSArray(target), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         InvokeEventTargetHandler(target, eventType, evt, logContext);
@@ -248,7 +248,7 @@ internal sealed class MessagingBinding(IMessagingHost host, EventTargetRegistry 
     {
         window.FastAddValue(
             (KeyString)"postMessage",
-            new JSFunction((in a) => WindowPostMessage(window, in a), "postMessage", 2),
+            new DomFunction((in a) => WindowPostMessage(window, in a), "postMessage", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
@@ -462,20 +462,20 @@ internal sealed class MessagingBinding(IMessagingHost host, EventTargetRegistry 
         JSValue onMessageHandler = JSNull.Value;
 
         port.FastAddValue((KeyString)"postMessage",
-            new JSFunction((in a) => PortPostMessage(port, in a), "postMessage", 1),
+            new DomFunction((in a) => PortPostMessage(port, in a), "postMessage", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         port.FastAddProperty((KeyString)"onmessage",
-            new JSFunction((in _) => onMessageHandler, "get onmessage"),
-            new JSFunction((in a) => SetOnMessage(ref onMessageHandler, port, in a), "set onmessage"),
+            new DomFunction((in _) => onMessageHandler, "get onmessage"),
+            new DomFunction((in a) => SetOnMessage(ref onMessageHandler, port, in a), "set onmessage"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         port.FastAddValue((KeyString)"start",
-            new JSFunction((in a) => StartPort(port, in a), "start", 0),
+            new DomFunction((in a) => StartPort(port, in a), "start", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         port.FastAddValue((KeyString)"close",
-            new JSFunction((in a) => ClosePort(port, in a), "close", 0),
+            new DomFunction((in a) => ClosePort(port, in a), "close", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return port;

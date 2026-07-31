@@ -105,18 +105,18 @@ public sealed partial class DomBridge
         var animationState = AnimationStateFor(element);
         animation.FastAddProperty(
             (KeyString)"currentTime",
-            new JSFunction((in _) => Dom.Features.AnimationObjectBinding.GetCurrentTime(animationState, in _), "get currentTime"),
-            new JSFunction((in a) => Dom.Features.AnimationObjectBinding.SetCurrentTime(animationState, in a), "set currentTime"),
+            new DomFunction((in _) => Dom.Features.AnimationObjectBinding.GetCurrentTime(animationState, in _), "get currentTime"),
+            new DomFunction((in a) => Dom.Features.AnimationObjectBinding.SetCurrentTime(animationState, in a), "set currentTime"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         var ready = new JSObject();
         ready.FastAddValue(
             (KeyString)"then",
-            new JSFunction((in a) => Dom.Features.AnimationObjectBinding.Then(ready, in a), "then", 1),
+            new DomFunction((in a) => Dom.Features.AnimationObjectBinding.Then(ready, in a), "then", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         ready.FastAddValue(
             (KeyString)"catch",
-            new JSFunction((in _) => ready, "catch", 1),
+            new DomFunction((in _) => ready, "catch", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         animation.FastAddValue((KeyString)"ready", ready, JSPropertyAttributes.EnumerableConfigurableValue);
