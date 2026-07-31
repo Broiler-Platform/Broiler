@@ -4,71 +4,101 @@
   "octaneVersion": "9",
   "perSuiteTimeoutSec": 1800,
   "benchmarks": {
-    "Richards": 37755,
-    "DeltaBlue": 105313,
-    "Crypto": 42286,
-    "RayTrace": 116326,
-    "EarleyBoyer": 87203,
-    "RegExp": 10243,
-    "Splay": 47599,
-    "SplayLatency": 68249,
-    "NavierStokes": 38359,
-    "PdfJS": 58491,
-    "Mandreel": 47035,
+    "Richards": 38070,
+    "DeltaBlue": 106007,
+    "Crypto": 42288,
+    "RayTrace": 113514,
+    "EarleyBoyer": 87549,
+    "RegExp": 10313,
+    "Splay": 45505,
+    "SplayLatency": 76182,
+    "NavierStokes": 38436,
+    "PdfJS": 62276,
+    "Mandreel": 46387,
     "MandreelLatency": 67368,
-    "Gameboy": 99399,
-    "CodeLoad": 28062,
-    "Box2D": 105186,
-    "zlib": 91070,
-    "Typescript": 91271
+    "Gameboy": 99498,
+    "CodeLoad": 28247,
+    "Box2D": 104748,
+    "zlib": 91233,
+    "Typescript": 95581
   },
   "suiteStatus": {
     "Richards": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 2123,
+      "log": "tests/octane/logs/chromium/Richards.log"
     },
     "DeltaBlue": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 2110,
+      "log": "tests/octane/logs/chromium/DeltaBlue.log"
     },
     "Crypto": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 4190,
+      "log": "tests/octane/logs/chromium/Crypto.log"
     },
     "RayTrace": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 2120,
+      "log": "tests/octane/logs/chromium/RayTrace.log"
     },
     "EarleyBoyer": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 4203,
+      "log": "tests/octane/logs/chromium/EarleyBoyer.log"
     },
     "RegExp": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 2157,
+      "log": "tests/octane/logs/chromium/RegExp.log"
     },
     "Splay": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 2162,
+      "log": "tests/octane/logs/chromium/Splay.log"
     },
     "NavierStokes": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 2114,
+      "log": "tests/octane/logs/chromium/NavierStokes.log"
     },
     "PdfJS": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 1425,
+      "log": "tests/octane/logs/chromium/PdfJS.log"
     },
     "Mandreel": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 1760,
+      "log": "tests/octane/logs/chromium/Mandreel.log"
     },
     "Gameboy": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 1154,
+      "log": "tests/octane/logs/chromium/Gameboy.log"
     },
     "CodeLoad": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 2198,
+      "log": "tests/octane/logs/chromium/CodeLoad.log"
     },
     "Box2D": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 1128,
+      "log": "tests/octane/logs/chromium/Box2D.log"
     },
     "zlib": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 1795,
+      "log": "tests/octane/logs/chromium/zlib.log"
     },
     "Typescript": {
-      "status": "ok"
+      "status": "ok",
+      "durationMs": 1621,
+      "log": "tests/octane/logs/chromium/Typescript.log"
     }
   },
-  "geomean": 58116,
-  "generatedAt": "2026-07-31T16:28:18.358Z"
+  "geomean": 58694,
+  "generatedAt": "2026-07-31T19:06:42.889Z"
 }

@@ -1,103 +1,106 @@
 {
-  "generatedAt": "2026-07-31T16:28:18.358Z",
+  "generatedAt": "2026-07-31T19:06:42.889Z",
   "octaneVersion": "9",
   "engines": {
     "chromium": {
       "label": "Chromium 149.0.7827.55",
-      "geomean": 58116
+      "geomean": 58694
     },
     "broiler": {
       "label": "Broiler.JS (BroilerJS --script-host)",
-      "geomean": 155
+      "geomean": 239
     }
   },
   "benchmarks": [
     {
       "name": "Box2D",
       "chromium": {
-        "score": 105186,
+        "score": 104748,
         "status": "ok"
       },
       "broiler": {
         "score": null,
         "status": "error",
-        "error": "System.InvalidProgramException: Common Language Runtime detected an invalid program."
+        "error": "System.InvalidProgramException: Common Language Runtime detected an invalid program.",
+        "errorType": "System.InvalidProgramException"
       },
       "broilerVsChromium": null
     },
     {
       "name": "CodeLoad",
       "chromium": {
-        "score": 28062,
+        "score": 28247,
         "status": "ok"
       },
       "broiler": {
         "score": null,
         "status": "error",
-        "error": "System.Collections.Generic.KeyNotFoundException: The given key 'Context59' was not present in the dictionary."
+        "error": "Cannot get property userAgent of undefined",
+        "errorType": "TypeError"
       },
       "broilerVsChromium": null
     },
     {
       "name": "Crypto",
       "chromium": {
-        "score": 42286,
+        "score": 42288,
         "status": "ok"
       },
       "broiler": {
         "score": null,
         "status": "crash",
-        "error": "Unhandled exception. Broiler.JavaScript.Runtime.JSException: Object reference not set to an instance of an object."
+        "error": "Maximum call stack size exceeded",
+        "errorType": "Broiler.JavaScript.Runtime.JSException"
       },
       "broilerVsChromium": null
     },
     {
       "name": "DeltaBlue",
       "chromium": {
-        "score": 105313,
+        "score": 106007,
         "status": "ok"
       },
       "broiler": {
-        "score": 76.6,
+        "score": 162,
         "status": "ok"
       },
-      "broilerVsChromium": 0.001
+      "broilerVsChromium": 0.002
     },
     {
       "name": "EarleyBoyer",
       "chromium": {
-        "score": 87203,
+        "score": 87549,
         "status": "ok"
       },
       "broiler": {
-        "score": 184,
+        "score": 360,
         "status": "ok"
       },
-      "broilerVsChromium": 0.002
+      "broilerVsChromium": 0.004
     },
     {
       "name": "Gameboy",
       "chromium": {
-        "score": 99399,
+        "score": 99498,
         "status": "ok"
       },
       "broiler": {
-        "score": 758,
+        "score": 1049,
         "status": "ok"
       },
-      "broilerVsChromium": 0.008
+      "broilerVsChromium": 0.011
     },
     {
       "name": "Mandreel",
       "chromium": {
-        "score": 47035,
+        "score": 46387,
         "status": "ok"
       },
       "broiler": {
-        "score": 97.3,
+        "score": 160,
         "status": "ok"
       },
-      "broilerVsChromium": 0.002
+      "broilerVsChromium": 0.003
     },
     {
       "name": "MandreelLatency",
@@ -106,7 +109,7 @@
         "status": "ok"
       },
       "broiler": {
-        "score": 15.1,
+        "score": 15.3,
         "status": "ok"
       },
       "broilerVsChromium": 0
@@ -114,48 +117,49 @@
     {
       "name": "NavierStokes",
       "chromium": {
-        "score": 38359,
+        "score": 38436,
         "status": "ok"
       },
       "broiler": {
-        "score": 300,
+        "score": 381,
         "status": "ok"
       },
-      "broilerVsChromium": 0.008
+      "broilerVsChromium": 0.01
     },
     {
       "name": "PdfJS",
       "chromium": {
-        "score": 58491,
+        "score": 62276,
         "status": "ok"
       },
       "broiler": {
         "score": null,
         "status": "error",
-        "error": "Malformed PDF: stream must have data"
+        "error": "Malformed PDF: stream must have data",
+        "errorType": "Error"
       },
       "broilerVsChromium": null
     },
     {
       "name": "RayTrace",
       "chromium": {
-        "score": 116326,
+        "score": 113514,
         "status": "ok"
       },
       "broiler": {
-        "score": 198,
+        "score": 375,
         "status": "ok"
       },
-      "broilerVsChromium": 0.002
+      "broilerVsChromium": 0.003
     },
     {
       "name": "RegExp",
       "chromium": {
-        "score": 10243,
+        "score": 10313,
         "status": "ok"
       },
       "broiler": {
-        "score": 79.1,
+        "score": 87,
         "status": "ok"
       },
       "broilerVsChromium": 0.008
@@ -163,62 +167,64 @@
     {
       "name": "Richards",
       "chromium": {
-        "score": 37755,
+        "score": 38070,
         "status": "ok"
       },
       "broiler": {
-        "score": 52.8,
+        "score": 97.5,
         "status": "ok"
       },
-      "broilerVsChromium": 0.001
+      "broilerVsChromium": 0.003
     },
     {
       "name": "Splay",
       "chromium": {
-        "score": 47599,
+        "score": 45505,
         "status": "ok"
       },
       "broiler": {
-        "score": 238,
+        "score": 439,
         "status": "ok"
       },
-      "broilerVsChromium": 0.005
+      "broilerVsChromium": 0.01
     },
     {
       "name": "SplayLatency",
       "chromium": {
-        "score": 68249,
+        "score": 76182,
         "status": "ok"
       },
       "broiler": {
-        "score": 1359,
+        "score": 1824,
         "status": "ok"
       },
-      "broilerVsChromium": 0.02
+      "broilerVsChromium": 0.024
     },
     {
       "name": "Typescript",
       "chromium": {
-        "score": 91271,
+        "score": 95581,
         "status": "ok"
       },
       "broiler": {
         "score": null,
         "status": "error",
-        "error": "Cannot get property getScopedTypeNameEx of null"
+        "error": "Cannot get property getScopedTypeNameEx of null",
+        "errorType": "TypeError"
       },
       "broilerVsChromium": null
     },
     {
       "name": "zlib",
       "chromium": {
-        "score": 91070,
+        "score": 91233,
         "status": "ok"
       },
       "broiler": {
         "score": null,
         "status": "error",
-        "error": "System.Collections.Generic.KeyNotFoundException: The given key 'Context50' was not present in the dictionary."
+        "error": "read is not defined",
+        "errorType": "ReferenceError"
       },
       "broilerVsChromium": null
     }
