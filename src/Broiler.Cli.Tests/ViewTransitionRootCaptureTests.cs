@@ -8,13 +8,18 @@ namespace Broiler.Cli.Tests;
 /// The name the <em>document</em> is captured under, and the box the spec puts between a group and
 /// its two snapshots.
 /// <para>
-/// Neither closes WPT issue #1491 problems 19, 21 or 23 on its own. Those need the root snapshot to
-/// reproduce the page, and reproducing it by cloning the DOM was tried and reverted: it is close but
-/// not exact, and where the old root snapshot is genuinely visible "close" scores worse than the
+/// A root snapshot reproduces the page by cloning the DOM only when the author paints
+/// <c>::view-transition</c>. Cloning it unconditionally was tried and reverted: the clone is close
+/// but not exact, and wherever the page shows through the overlay "close" scores worse than the
 /// transparent box it replaced, because the live page underneath is pixel-exact. Measured over the
-/// 458 local <c>css-view-transitions</c> tests it was +8 passing / −7 passing, and it cost 79 pixel
-/// points on <c>root-to-shared-animation-end</c>. A real capture wants a rasterised snapshot from
-/// the renderer, not a DOM clone — see <c>docs/wpt-rendering-gaps.md</c>.
+/// 458 local <c>css-view-transitions</c> tests that was +8 passing / −7 passing, and it cost 79
+/// pixel points on <c>root-to-shared-animation-end</c>. The gate keeps that exact path for every
+/// test that leaves the overlay transparent, and only clones where the page cannot show through at
+/// all — there a content-less snapshot leaves the backdrop colour flooding the viewport, which is
+/// how WPT <c>old-content-captures-root</c>, <c>new-content-captures-root</c> and
+/// <c>root-captured-as-different-tag</c> (issue #1500 problems 13, 15 and 17) rendered as a flat
+/// pink page. A capture that is exact in both cases wants a rasterised snapshot from the renderer,
+/// not a DOM clone — see <c>docs/wpt-rendering-gaps.md</c>.
 /// </para>
 /// </summary>
 public class ViewTransitionRootCaptureTests
@@ -61,9 +66,68 @@ public class ViewTransitionRootCaptureTests
         using var bitmap = Render(html, "document.startViewTransition(() => { document.body.style.background = 'red'; });");
 
         // The `(root)` rule must not have matched: its `background: red` would fill the group over
-        // the whole viewport. What shows instead is the ::view-transition backdrop, because the root
-        // snapshot itself is not reproduced (see the class remarks).
-        AssertPixel(bitmap, 150, 150, 255, 192, 203, "the backdrop, not the (root) rule's red");
+        // the whole viewport. What shows instead is the captured page — this test paints
+        // `::view-transition`, so the root snapshot reproduces the page rather than letting it show
+        // through (see the class remarks).
+        AssertPixel(bitmap, 150, 150, 255, 255, 255, "the captured canvas, not the (root) rule's red");
+        AssertPixel(bitmap, 50, 50, 0, 0, 255, "the captured pre-callback box");
+    }
+
+    // With the overlay painted, the page cannot show through, so the old root snapshot has to
+    // reproduce it — including content the callback has since changed (WPT old-content-captures-root).
+    [Fact]
+    public void Painted_Overlay_Makes_The_Old_Root_Snapshot_Reproduce_The_Page()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<style>
+  body { background: white; margin: 0; }
+  #box { position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; background: blue; }
+  html::view-transition { background: pink; }
+  html::view-transition-old(root) { animation: unset; opacity: 1; }
+  html::view-transition-new(root) { animation: unset; opacity: 0; }
+</style>
+<div id="box"></div>
+</html>
+""";
+        using var bitmap = Render(html,
+            "document.startViewTransition(() => {" +
+            "  document.getElementById('box').style.background = 'red';" +
+            "  document.body.style.background = 'lime'; });");
+
+        // Pre-callback state, not the live page and not the backdrop: the box is still blue, the
+        // canvas still white. Without a content box the whole viewport came out pink.
+        AssertPixel(bitmap, 50, 50, 0, 0, 255, "the captured pre-callback box");
+        AssertPixel(bitmap, 150, 150, 255, 255, 255, "the captured canvas");
+    }
+
+    // The gate matters as much as the capture: cloning the root unconditionally was measured at
+    // +8/-7 passing and reverted (see the class remarks), because a transparent snapshot over the
+    // live page is pixel-exact where a clone is only close. With no author background on
+    // ::view-transition the snapshot must stay content-less and let the page through.
+    [Fact]
+    public void Transparent_Overlay_Leaves_The_Root_Snapshot_Content_Less()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<style>
+  body { background: white; margin: 0; }
+  #box { position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; background: blue; }
+  html::view-transition-old(root) { animation: unset; opacity: 1; }
+  html::view-transition-new(root) { animation: unset; opacity: 0; }
+</style>
+<div id="box"></div>
+</html>
+""";
+        using var bitmap = Render(html,
+            "document.startViewTransition(() => {" +
+            "  document.getElementById('box').style.background = 'red'; });");
+
+        // What shows is the live page — the box the callback turned red — through a snapshot that
+        // reproduced nothing. A clone here would have shown the stale blue.
+        AssertPixel(bitmap, 50, 50, 255, 0, 0, "the live page through the empty snapshot");
     }
 
     // ::view-transition-image-pair is the box the spec puts between a group and its old/new pair, so

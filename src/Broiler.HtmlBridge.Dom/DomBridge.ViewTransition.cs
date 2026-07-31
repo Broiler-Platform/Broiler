@@ -294,8 +294,25 @@ public sealed partial class DomBridge
         if (rootName is not null)
         {
             var (l, t, w, h) = GetBoundingClientRectForDomElement(DocumentElement, isRoot: true);
+            // A root snapshot is normally left content-less and the live page under the overlay
+            // stands in for it — pixel-exact where a DOM clone is only close. Reproducing it by
+            // cloning unconditionally was tried and reverted (+8/-7 passing over the 458 local
+            // css-view-transitions tests, -79 pixel points on root-to-shared-animation-end), and
+            // for good reason: wherever the page shows through, "close" scores worse than exact.
+            //
+            // But the page can only stand in while it is actually visible. Once the author gives
+            // `::view-transition` a background, that overlay paints between the page and the
+            // snapshot, and a content-less snapshot leaves the backdrop colour flooding the
+            // viewport — WPT old-content-captures-root, new-content-captures-root and
+            // root-captured-as-different-tag all render as a flat pink page. Clone only in that
+            // case, so every test that does not paint the overlay keeps the exact live-page path.
+            // The fallback fill stays exactly what it was: AttachSnapshotPaint only uses it when
+            // there is no content box, i.e. on the ungated path, which must keep behaving as before.
             state.OldCaptures[rootName] = new NamedSnapshot(l, t, w, h,
-                rootStyle.GetValueOrDefault("background-color") ?? "transparent");
+                rootStyle.GetValueOrDefault("background-color") ?? "transparent",
+                RootOverlayOccludesPage(DocumentElement)
+                    ? BuildRootViewTransitionSnapshotContent(rootStyle)
+                    : null);
         }
 
         foreach (var element in DocumentElement.Descendants().OfType<DomElement>())
@@ -479,7 +496,8 @@ public sealed partial class DomBridge
     private void ApplyViewTransitionPseudoTree(DomElement root)
     {
         var pseudoRules = CollectViewTransitionPseudoDeclarations(root);
-        var captures = CollectViewTransitionCaptures(root);
+        var captures = CollectViewTransitionCaptures(
+            root, AuthorPaintsBackground(LookupPseudo(pseudoRules, "", null)));
 
         // A view transition that captured nothing (no element carries a used
         // view-transition-name — e.g. `:root { view-transition-name: none }` with no other
@@ -747,7 +765,16 @@ public sealed partial class DomBridge
     /// snapshot box (100%); positioning, insets, margins, and the outer width/height come from the
     /// captured geometry on that box, not from the element's own computed values.
     /// </summary>
-    private DomElement BuildViewTransitionSnapshotContent(DomElement element)
+    /// <param name="asRootSnapshot">
+    /// This is the whole-page root snapshot rather than one element's. Two things follow: children
+    /// that never paint are not cloned (cloning <c>&lt;head&gt;</c> would re-insert its
+    /// <c>&lt;style&gt;</c>/<c>&lt;script&gt;</c>, duplicating author rules and re-fetching external
+    /// resources), and <c>id</c> attributes are kept so page-level <c>#id</c> rules still match the
+    /// clone — without them a whole page of id-styled content reproduces as blank boxes. Keeping
+    /// them is safe here because the pseudo tree is materialised on a fresh render projection, so
+    /// the duplicate ids never reach the live tree page script can observe.
+    /// </param>
+    private DomElement BuildViewTransitionSnapshotContent(DomElement element, bool asRootSnapshot = false)
     {
         var used = UsedStyleForCapture(element);
 
@@ -782,8 +809,11 @@ public sealed partial class DomBridge
         // Clone the element's content verbatim (text and any descendants) so the snapshot paints it.
         foreach (var child in element.ChildNodes.ToArray())
         {
+            if (asRootSnapshot && IsNonRenderedSnapshotChild(child))
+                continue;
+
             var clone = child.CloneNode(deep: true);
-            StripCapturedIdentifiers(clone);
+            StripCapturedIdentifiers(clone, preserveIds: asRootSnapshot);
             content.AppendChild(clone);
         }
 
@@ -791,20 +821,106 @@ public sealed partial class DomBridge
     }
 
 
+    /// <summary>
+    /// Whether the author's bare <c>::view-transition</c> declarations paint a backdrop between the
+    /// live page and the snapshots above it. While they do not, a root snapshot can stay
+    /// content-less and let the page show through — the exact rendering. Once they do, the page is
+    /// hidden and the snapshot has to reproduce it (see the callers).
+    /// </summary>
+    private bool RootOverlayOccludesPage(DomElement root) =>
+        AuthorPaintsBackground(LookupPseudo(CollectViewTransitionPseudoDeclarations(root), "", null));
+
+    /// <summary>Metadata and script children that never paint, so a root snapshot must not clone them:
+    /// re-inserting <c>&lt;style&gt;</c>/<c>&lt;link&gt;</c> would duplicate author rules into the live
+    /// document and <c>&lt;script&gt;</c>/<c>&lt;link&gt;</c> could re-fetch external resources.</summary>
+    private static bool IsNonRenderedSnapshotChild(DomNode node) =>
+        node is DomElement element &&
+        element.TagName is { } tag &&
+        (tag.Equals("head", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("style", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("script", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("link", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("meta", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("title", System.StringComparison.OrdinalIgnoreCase) ||
+         tag.Equals("base", System.StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// The old root snapshot's content: the page as it stands before the update callback. Built like
+    /// any other captured element's content box, minus the parts of <c>&lt;html&gt;</c> that never
+    /// paint — cloning <c>&lt;head&gt;</c> would re-insert its <c>&lt;style&gt;</c>/<c>&lt;script&gt;</c>
+    /// into the live document, duplicating author rules (including the <c>::view-transition</c> rules
+    /// driving the transition) and re-fetching external resources.
+    /// </summary>
+    private DomElement BuildRootViewTransitionSnapshotContent(Dictionary<string, string> rootStyle)
+    {
+        var content = BuildViewTransitionSnapshotContent(DocumentElement, asRootSnapshot: true);
+        // The root snapshot captures the viewport, so it paints the canvas background rather than
+        // the root box's own — which is usually `transparent`, and would let the ::view-transition
+        // background behind the snapshot show through the captured page.
+        InlineStyle(content)["background-color"] = ResolveCapturedCanvasBackground(rootStyle);
+        return content;
+    }
+
+    /// <summary>
+    /// The canvas background at capture time, per the CSS 2.1 §14.2 propagation model: the root's own
+    /// background when it paints one, else the body's (which propagates to the canvas), else the
+    /// UA default. A root snapshot must be opaque — it stands in for the whole viewport.
+    /// </summary>
+    private string ResolveCapturedCanvasBackground(Dictionary<string, string> rootStyle)
+    {
+        if (PaintsBackground(rootStyle.GetValueOrDefault("background-color")) is { } rootBackground)
+            return rootBackground;
+
+        foreach (var element in DocumentElement.Descendants().OfType<DomElement>())
+        {
+            if (!string.Equals(element.TagName, "body", System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (PaintsBackground(UsedStyleForCapture(element).GetValueOrDefault("background-color")) is { } body)
+                return body;
+            break;
+        }
+
+        return "white";
+    }
+
+    /// <summary>The colour when it actually paints, or null when it is absent or fully transparent
+    /// (<c>transparent</c> and the <c>rgba(…, 0)</c> the computed-style engine serializes it as).</summary>
+    private static string? PaintsBackground(string? value)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrEmpty(trimmed) ||
+            trimmed.Equals("transparent", System.StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("none", System.StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        // rgba(…, 0) / rgb(… / 0) — a fully transparent computed colour paints nothing.
+        var lastComma = trimmed.LastIndexOf(',');
+        if (trimmed.EndsWith(")", System.StringComparison.Ordinal) && lastComma >= 0)
+        {
+            var alpha = trimmed[(lastComma + 1)..].TrimEnd(')').Trim();
+            if (double.TryParse(alpha, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsed) && parsed == 0)
+                return null;
+        }
+
+        return trimmed;
+    }
+
     /// <summary>Strips identity/capture markers from a cloned snapshot subtree: <c>id</c> (so the
     /// clone does not duplicate a live element's id) and any inline <c>view-transition-name</c> (so a
     /// re-serialize cannot capture the clone as a named element).</summary>
-    private void StripCapturedIdentifiers(DomNode node)
+    private void StripCapturedIdentifiers(DomNode node, bool preserveIds = false)
     {
         if (node is DomElement element)
         {
-            if (element.HasAttribute("id"))
+            if (!preserveIds && element.HasAttribute("id"))
                 element.RemoveAttribute("id");
             InlineStyle(element).Remove("view-transition-name");
         }
 
         foreach (var child in node.ChildNodes.ToArray())
-            StripCapturedIdentifiers(child);
+            StripCapturedIdentifiers(child, preserveIds);
     }
 
     /// <summary>
@@ -845,7 +961,7 @@ public sealed partial class DomBridge
     /// "new" one (the element as it stands now), in old-then-new document order. Names appearing only
     /// on one side keep just that snapshot; the group is placed at the old geometry when present.
     /// </summary>
-    private List<ViewTransitionCapture> CollectViewTransitionCaptures(DomElement root)
+    private List<ViewTransitionCapture> CollectViewTransitionCaptures(DomElement root, bool rootOverlayOccludesPage = false)
     {
         var newCaptures = new Dictionary<string, NamedSnapshot>(System.StringComparer.Ordinal);
         var order = new List<string>();
@@ -861,13 +977,17 @@ public sealed partial class DomBridge
         if (rootName is not null)
         {
             var (l, t, w, h) = GetBoundingClientRectForDomElement(root, isRoot: true);
-            // Only the *old* root snapshot is reproduced by cloning. The new one is left
-            // content-less on purpose: it sits over the live page, which is the same content it
-            // would be reproducing — and the real rendering is exact where a DOM clone is only
-            // close. Cloning it too cost 7 tests between 0.8 and 4 pixel-points, and 79 on
-            // root-to-shared-animation-end, for no test it alone fixed.
+            // The new root snapshot is normally left content-less on purpose: it sits over the live
+            // page, which is the same content it would be reproducing — and the real rendering is
+            // exact where a DOM clone is only close. Cloning it unconditionally cost 7 tests between
+            // 0.8 and 4 pixel-points, and 79 on root-to-shared-animation-end, for no test it alone
+            // fixed. But the live page can only stand in for it while nothing paints in between:
+            // once the author gives `::view-transition` a background, that overlay hides the page
+            // and a content-less snapshot leaves the backdrop colour flooding the viewport (WPT
+            // new-content-captures-root rendered as flat pink). Clone it only in that case.
             AddNew(rootName, new NamedSnapshot(l, t, w, h,
-                rootStyle.GetValueOrDefault("background-color") ?? "transparent"));
+                rootStyle.GetValueOrDefault("background-color") ?? "transparent",
+                rootOverlayOccludesPage ? BuildRootViewTransitionSnapshotContent(rootStyle) : null));
         }
 
         foreach (var element in root.Descendants().OfType<DomElement>())

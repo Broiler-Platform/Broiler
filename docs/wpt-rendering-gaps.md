@@ -184,23 +184,45 @@ Four caveats, all learned the hard way:
      computed style, so it re-asserted `visibility: visible` (the initial value
      nearly everything has) *over* the pair's inherited `hidden`. Only a
      non-initial `visibility` is carried now.
-- **What did *not* work, and why it is worth knowing.** The remaining gap is that
-  the root capture carries only a background colour, no content, so
-  `::view-transition-old(root)` is transparent and the author backdrop shows
-  through the page. Reproducing the page by **cloning the DOM** into the snapshot
-  box was implemented, measured, and reverted. It did fix problems 19, 21 and 23
-  outright (0.0% → 100%), but across the 458 local `css-view-transitions` tests it
-  was **+8 passing / −7 passing** — and it cost 79 pixel points on
-  `root-to-shared-animation-end` (82.7% → 3.1%) and ~4 on
-  `content-with-transform-old-/new-image`. Restricting the clone to the *old*
-  snapshot did not rescue those. The reason is structural, not a missing detail: a
-  DOM clone re-lays-out and is only *close*, while the transparent box let the
-  **live page** show through — and the live page is pixel-exact. Anywhere the old
-  root snapshot is genuinely visible, exact beats close. **A root capture needs a
-  rasterised snapshot from the renderer, which is a `Broiler.HTML` capability, not
-  something the bridge can synthesise from the DOM.** That is what the original
-  "capture the old and new snapshots as images" next action asked for, and it
-  still stands.
+- **What did *not* work, and why it is worth knowing.** The root capture used to
+  carry only a background colour, no content, so `::view-transition-old(root)` was
+  transparent and the author backdrop showed through the page. Reproducing the
+  page by **cloning the DOM** into the snapshot box was implemented, measured, and
+  reverted. It did fix problems 19, 21 and 23 outright (0.0% → 100%), but across
+  the 458 local `css-view-transitions` tests it was **+8 passing / −7 passing** —
+  and it cost 79 pixel points on `root-to-shared-animation-end` (82.7% → 3.1%) and
+  ~4 on `content-with-transform-old-/new-image`. Restricting the clone to the
+  *old* snapshot did not rescue those. The reason is structural, not a missing
+  detail: a DOM clone re-lays-out and is only *close*, while the transparent box
+  let the **live page** show through — and the live page is pixel-exact. Anywhere
+  the old root snapshot is genuinely visible, exact beats close.
+- **What did work: gate the clone on whether the page can show through at all.**
+  The two cases are distinguishable without a rasteriser. The live page can only
+  stand in for the snapshot while nothing paints between them; once the author
+  gives the bare `::view-transition` a background, that backdrop hides the page
+  and a content-less snapshot has nothing left to fall back on — which is exactly
+  when the viewport comes out a flat wash of the backdrop colour. So the root
+  snapshot now clones **only when `::view-transition` paints a background**
+  (`RootOverlayOccludesPage`), and every test that leaves the overlay transparent
+  keeps the untouched, pixel-exact live-page path. That is why this does not
+  reintroduce the −7: `root-to-shared-animation-end` and
+  `content-with-transform-old-/new-image` set no `::view-transition` background,
+  so the gate is false for them. It closes issue #1500 problems 13, 15 and 17
+  (`new-content-captures-root`, `old-content-captures-root`,
+  `root-captured-as-different-tag`), all three of which had rendered as a flat
+  pink page. Two details the clone needs to be worth anything: it must skip
+  `<head>`/`<style>`/`<script>`/`<link>` (re-inserting them duplicates author
+  rules into the document and re-fetches resources) and it must **keep `id`
+  attributes**, which the per-element snapshot path strips — a whole page of
+  id-styled content otherwise reproduces as unstyled boxes. Keeping them is safe
+  because the pseudo tree is materialised on a fresh render projection, so the
+  duplicate ids never reach the tree page script observes.
+- **Still open where the overlay is transparent.** The gated clone says nothing
+  about the cases the live page already covers, and it is still a clone: **a root
+  capture that is exact in both cases needs a rasterised snapshot from the
+  renderer, which is a `Broiler.HTML` capability, not something the bridge can
+  synthesise from the DOM.** That is what the original "capture the old and new
+  snapshots as images" next action asked for, and it still stands.
 - **A trap the attempt uncovered, worth keeping for whoever does the raster
   version.** The overlay serializes after `</body>` and the HTML parser
   foster-parents it back *inside* `<body>`, so a rule anchored on an ancestor
