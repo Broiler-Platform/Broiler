@@ -630,17 +630,67 @@ public sealed partial class DomBridge
         return style;
     }
 
+    /// <summary>
+    /// Initial values re-asserted on every box of the pseudo tree so a page-level author rule cannot
+    /// paint it. Each box below is materialised as a real <c>&lt;div&gt;</c>, so an ordinary
+    /// <c>div { … }</c> or <c>* { … }</c> rule matches it — but these are <c>::view-transition*</c>
+    /// pseudo-elements, which such a rule must never reach. WPT
+    /// <c>css-view-transitions/names-are-tree-scoped</c> is the case that exposed it: its
+    /// <c>div { background: red }</c> matched the viewport-sized overlay root, which paints above the
+    /// page at z-index 2147483646, and turned the whole canvas solid red.
+    /// <para>
+    /// Applied <em>under</em> each box's own base style and the author's <c>::view-transition*</c>
+    /// declarations, so both still win — an author <c>::view-transition { background: red }</c> is
+    /// still honoured. Geometry is not reset: every box already sets its own position/size
+    /// explicitly. <c>visibility</c> is deliberately absent — re-asserting the initial value there is
+    /// exactly what previously stopped an image-pair's <c>visibility: hidden</c> from reaching the
+    /// snapshots it wraps (see <see cref="SnapshotPaintProperties"/>).
+    /// </para>
+    /// </summary>
+    private static readonly (string Key, string Value)[] PseudoBoxAuthorReset =
+    [
+        ("background-color", "transparent"), ("background-image", "none"),
+    ];
+
+    /// <summary>
+    /// Whether the author's <c>::view-transition*</c> declarations paint this box's background
+    /// themselves, in which case the reset must stand aside entirely rather than merge with them.
+    /// The two cannot be layered: the reset is written as longhands and an author almost always
+    /// writes the <c>background</c> shorthand, so they occupy different keys in the inline-style dict
+    /// and the longhands win by coming later — which silently cancelled
+    /// <c>::view-transition { background: lightpink }</c> and cost 79 tests the first time this was
+    /// tried.
+    /// </summary>
+    private static bool AuthorPaintsBackground(Dictionary<string, string> pseudoDeclarations)
+    {
+        foreach (var key in pseudoDeclarations.Keys)
+        {
+            if (key.StartsWith("background", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
     /// <summary>Creates a bridge <c>&lt;div&gt;</c> whose inline style is <paramref name="baseStyle"/>
-    /// with the pseudo-element's author declarations layered on top (author values win). Stored in the
-    /// inline-style dict, not the attribute, so it survives <c>ReflectRenderState</c> on the render
-    /// path and serializes normally.</summary>
+    /// with the pseudo-element's author declarations layered on top (author values win), over a reset
+    /// (<see cref="PseudoBoxAuthorReset"/>) that keeps page-level selectors out of the pseudo tree.
+    /// Stored in the inline-style dict, not the attribute, so it survives <c>ReflectRenderState</c> on
+    /// the render path and serializes normally.</summary>
     private DomElement CreateStyledBox(Dictionary<string, string> baseStyle, Dictionary<string, string> pseudoDeclarations)
     {
+        var authorPaintsBackground = AuthorPaintsBackground(pseudoDeclarations);
+
         foreach (var (key, value) in pseudoDeclarations)
             baseStyle[key] = value;
 
         var box = CreateBridgeElement("div");
         var inline = InlineStyle(box);
+        if (!authorPaintsBackground)
+        {
+            foreach (var (key, value) in PseudoBoxAuthorReset)
+                inline[key] = value;
+        }
         foreach (var (key, value) in baseStyle)
             inline[key] = value;
         return box;
