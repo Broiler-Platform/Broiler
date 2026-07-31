@@ -726,12 +726,44 @@ confirmed or contradicted. Cross-referencing the two lists:
   scale at all, so `50%` fell back to `0` and collapsed the box. **0.5% → 99.99%**,
   and the 939-test `css-transforms` subset goes 376 → 377 passing. Geometry is on
   CI now; the pixels need **[`patches/0044`](../patches/README.md)**.
-- **Still unanalysed**, and genuinely new to this run rather than renumbered:
-  `css-view-transitions/names-are-tree-scoped`,
-  `css-color-adjust/…/color-scheme-iframe-background-mismatch-dynamic`,
-  `css-view-transitions/new-content-flat-transform-ancestor` (0.3%),
-  `css-position/overlay/overlay-transition-dialog` (0.4%), and
-  `css-view-transitions/html-becomes-fixed` (0.4%).
+- **#1497 problem 28 was an asymmetry between two code paths that model the same rule.**
+  `hidePopover()` has honoured `transition: overlay allow-discrete` since the
+  popover work — a popover hidden mid-transition stays in the top layer, so a
+  static render still paints it and its `::backdrop`. `close()` did not, and tore
+  a modal dialog down unconditionally, so `overlay-transition-dialog` rendered a
+  blank canvas against a reference showing the dialog over its backdrop. `close()`
+  now applies the same rule, in the two halves the spec actually has: `overlay`
+  keeps the top-layer flag (so the backdrop paints), and `display` keeps the
+  `open` attribute (because the UA sheet's `dialog:not([open]) { display: none }`
+  is what decides whether a box is generated at all). A dialog transitioning
+  `overlay` alone stays in the top layer but generates no box — a third test pins
+  that, so the two halves cannot be collapsed into one flag. **0.4% → 99.89%**,
+  and the 382-test `css-position` subset goes 241 → 242 passing. Main repo.
+- **#1497 problem 25 must not be "fixed" — the reference is the unfeatured render.**
+  `color-scheme-iframe-background-mismatch-dynamic` asserts that a same-origin
+  frame with `color-scheme: light` gets an *opaque* background when its parent
+  switches to dark. Ours renders the frame light; CI and this container both have
+  Chromium rendering it `#121212`. Settled by rendering the test's own
+  `<link rel=match>` target, `support/light-frame-scrolling.html`, in the same
+  Chromium: it comes out **white**, while Chromium's render of the *test* is dark
+  — so **Chromium fails this reftest against its own reference**, and its
+  screenshot is evidence that it does not implement the rule. Ours matches the
+  `rel=match` reference. Same shape as problems 14, 15, 18 and 24 above: closing
+  it would mean deleting working support. **Leave it failing.**
+- **#1497 problem 16 (`css-view-transitions/names-are-tree-scoped`) is a real gap,
+  not yet opened.** The test hides every captured snapshot with document-scoped
+  `html::view-transition-old(*) { opacity: 0 }` rules, and its point is that those
+  rules must *not* reach a snapshot whose `view-transition-name` came from a
+  shadow tree — so Chromium's reference is a white page with one 100×100 green
+  square (the shadow-scoped capture, still visible). Ours renders a 100% red
+  canvas, which is more wrong than a scoping error alone explains; whatever is
+  painting the light-tree divs full-bleed needs isolating before the tree-scoping
+  question is even reachable.
+- **`css-view-transitions/html-becomes-fixed` (problem 29) does not reproduce
+  here** — 99.99% locally against a locally generated reference, where CI reports
+  0.4%. Judge it from a CI artifact, not from this container.
+- **Still unanalysed:** `css-view-transitions/new-content-flat-transform-ancestor`
+  (0.3% locally, so it does reproduce).
 - **`uievents/…/UIEvent.load.stylesheet` is a `load`-event gap, not a style gap.**
   The test sets `link.href` from `window.onload` and waits for a `load` event on
   the `<link>`. With the reflection fix the href now reaches the attribute and the
