@@ -300,6 +300,7 @@ public sealed partial class DomBridge
             return;
 
         DispatchElementEvent(element, "scroll");
+        DispatchViewportScrollEventToWindow(element, "scroll");
     }
 
     private void DispatchScrollEndEventIfNeeded(DomElement element, double previousLeft, double previousTop)
@@ -309,6 +310,31 @@ public sealed partial class DomBridge
             return;
 
         DispatchElementEvent(element, "scrollend");
+        DispatchViewportScrollEventToWindow(element, "scrollend");
+    }
+
+    /// <summary>
+    /// Also delivers a viewport scroll to <c>window</c>'s listeners.
+    /// </summary>
+    /// <remarks>
+    /// CSSOM View fires a scrolling event at the <em>Document</em> when the scrolling box is the
+    /// viewport, so it reaches the window through the propagation path — which is why
+    /// <c>addEventListener("scroll", …)</c> at global scope (a window listener, the idiomatic
+    /// spelling) is how pages observe page scrolling. This bridge dispatches the event on the
+    /// document element and marks it non-bubbling, so a window listener never saw it and
+    /// <c>document.documentElement.scrollTop = N</c> looked like it scrolled silently: the offset
+    /// changed and the render moved, but nothing was notified. WPT
+    /// <c>css-view-transitions/*-root-scrollbar-with-fixed-background</c> awaits exactly such a
+    /// listener before it starts its transition, so the test simply stopped there.
+    /// <para>
+    /// Delivered in addition to the element dispatch rather than instead of it, so element-level
+    /// and <c>onscroll</c> listeners keep seeing what they saw before.
+    /// </para>
+    /// </remarks>
+    private void DispatchViewportScrollEventToWindow(DomElement element, string eventType)
+    {
+        if (ReferenceEquals(element, DocumentElement))
+            DispatchWindowEvent(eventType);
     }
 
     private void DispatchElementEvent(DomElement element, string eventType)
