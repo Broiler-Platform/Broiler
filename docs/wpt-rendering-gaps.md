@@ -776,15 +776,45 @@ confirmed or contradicted. Cross-referencing the two lists:
   while the sheet applied fine). The test renders `PASS` where it rendered `FAIL`.
   **Its pixel score barely moves — 97.88% → 97.87% — and it stays under the 99%
   threshold either way**, because the rest of the difference is bold text.
-- **Bold text does not render in this container at all**, which caps several text
-  comparisons below threshold and is worth knowing before attributing a residual
-  to an engine gap. `font-weight: bold`, `font-weight: 700`, `bolder`, `<b>`,
-  `<strong>` and `<h3>` all come out at regular weight, for every family tried
-  (`DejaVu Serif`, `Liberation Sans`, `sans-serif`, the default) — even though
-  `fc-list` shows 22 bold faces installed. Whether that is a font-configuration
-  difference in this image or a real face-selection gap is **not settled here**;
-  it needs its own investigation and a CI comparison, and nothing above depends
-  on the answer.
+- **Neither `font-weight` nor `font-style` changes the rendered face — this is an
+  engine gap, not a container font problem, and it caps every text comparison
+  whose reference contains bold or italic.** Measured rather than eyeballed:
+  rendering `HHHH` at 60px as normal, `bold` and `italic` gives **byte-identical
+  ink (2384 px) and identical advance span (170 px)** for all three, while
+  `monospace` differs (1920 / 134) — so family affects *layout advances* and
+  nothing affects the *face*.
+
+  The chain is intact right up to the last step. `font-weight` reaches
+  `DrawTextItem.FontWeight`
+  ([`PaintWalker.Text.cs`](../Broiler.HTML/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Text.cs)),
+  and `StubImageAdapter.CreateFontInt(family, size, style)` passes the style into
+  `ResolveTypeface`. But
+  [`TrueTypeTypefaceResolver.ResolveTypeface(family, style)`](../Broiler.HTML/Source/Broiler.HTML.Image.Compat/Text/TrueTypeText.cs)
+  — the resolver `StubCompatProvider` actually installs — **ignores its `style`
+  parameter entirely** and looks the family up by name alone. The raster backend
+  then draws from `item.FontHandle`, never from `item.FontWeight`, so the weight
+  that survived the whole pipeline is dropped at the last hop.
+
+  Underneath that, the HTML image backend has **no system-font enumeration at
+  all**: `BroilerFontRegistry` records only fonts registered at runtime, so in the
+  WPT path the "available families" set is empty, every generic-family mapping
+  resolves to nothing, and *every* family falls through to one bundled resource,
+  `Vazirmatn-Regular.ttf`. One regular face draws the entire suite.
+
+  Note this is specific to the HTML render path. `Broiler.Graphics` has the other
+  half already: `FallbackSystemFont` discovers a system regular+bold **pair**
+  (`DejaVuSans.ttf` + `DejaVuSans-Bold.ttf`, both present here) and
+  `BImageRenderer` selects between them on `run.Font.Weight >= BFontWeight.Bold`.
+  Its `BoldPath` has **no consumer outside its own file** — that path serves the
+  UI/Graphics backend, not `HtmlRender`.
+
+  **Not attempted here, deliberately.** Closing it means giving the image backend
+  real system-font enumeration and `(family, weight, style)` matching — a feature,
+  in a submodule this session cannot push to, that would change the face of every
+  text render in the suite and so needs its own before/after sweep. Synthesising
+  bold from the regular outlines would be cheaper but would not match a real bold
+  face, so it would not carry a test over the 99% threshold anyway, and could
+  regress tests that pass today. Worth doing; not worth doing blind.
 
 ## Reported problems, at a glance
 
