@@ -2,25 +2,25 @@
   "engine": "chromium",
   "engineLabel": "Chromium 149.0.7827.55",
   "octaneVersion": "9",
-  "perSuiteTimeoutSec": 180,
+  "perSuiteTimeoutSec": 1800,
   "benchmarks": {
-    "Richards": 37978,
-    "DeltaBlue": 101696,
-    "Crypto": 42165,
-    "RayTrace": 115808,
-    "EarleyBoyer": 84735,
-    "RegExp": 10082,
-    "Splay": 48349,
-    "SplayLatency": 71998,
-    "NavierStokes": 38584,
-    "PdfJS": 58374,
-    "Mandreel": 46755,
-    "MandreelLatency": 68290,
-    "Gameboy": 101309,
-    "CodeLoad": 28359,
-    "Box2D": 105834,
-    "zlib": 91178,
-    "Typescript": 93823
+    "Richards": 37755,
+    "DeltaBlue": 105313,
+    "Crypto": 42286,
+    "RayTrace": 116326,
+    "EarleyBoyer": 87203,
+    "RegExp": 10243,
+    "Splay": 47599,
+    "SplayLatency": 68249,
+    "NavierStokes": 38359,
+    "PdfJS": 58491,
+    "Mandreel": 47035,
+    "MandreelLatency": 67368,
+    "Gameboy": 99399,
+    "CodeLoad": 28062,
+    "Box2D": 105186,
+    "zlib": 91070,
+    "Typescript": 91271
   },
   "suiteStatus": {
     "Richards": {
@@ -69,6 +69,6 @@
       "status": "ok"
     }
   },
-  "geomean": 58335,
-  "generatedAt": "2026-07-18T18:36:35.964Z"
+  "geomean": 58116,
+  "generatedAt": "2026-07-31T16:28:18.358Z"
 }

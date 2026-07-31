@@ -2,17 +2,19 @@
   "engine": "broiler",
   "engineLabel": "Broiler.JS (BroilerJS --script-host)",
   "octaneVersion": "9",
-  "perSuiteTimeoutSec": 180,
+  "perSuiteTimeoutSec": 1800,
   "benchmarks": {
-    "Richards": 55.9,
-    "DeltaBlue": 78.5,
-    "RayTrace": 208,
+    "Richards": 52.8,
+    "DeltaBlue": 76.6,
+    "RayTrace": 198,
     "EarleyBoyer": 184,
-    "RegExp": 78.4,
-    "Splay": 207,
-    "SplayLatency": 1265,
-    "NavierStokes": 301,
-    "Gameboy": 737
+    "RegExp": 79.1,
+    "Splay": 238,
+    "SplayLatency": 1359,
+    "NavierStokes": 300,
+    "Mandreel": 97.3,
+    "MandreelLatency": 15.1,
+    "Gameboy": 758
   },
   "suiteStatus": {
     "Richards": {
@@ -45,7 +47,7 @@
       "error": "Malformed PDF: stream must have data"
     },
     "Mandreel": {
-      "status": "timeout"
+      "status": "ok"
     },
     "Gameboy": {
       "status": "ok"
@@ -67,6 +69,6 @@
       "error": "Cannot get property getScopedTypeNameEx of null"
     }
   },
-  "geomean": 209,
-  "generatedAt": "2026-07-18T18:36:35.964Z"
+  "geomean": 155,
+  "generatedAt": "2026-07-31T16:28:18.358Z"
 }
