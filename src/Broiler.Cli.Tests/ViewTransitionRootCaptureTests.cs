@@ -130,6 +130,59 @@ public class ViewTransitionRootCaptureTests
         AssertPixel(bitmap, 50, 50, 255, 0, 0, "the live page through the empty snapshot");
     }
 
+    // The overlay backdrop is not the only way the live page stops being able to stand in for the
+    // snapshot. An effect on the snapshot re-renders its pixels, and the page beneath is not
+    // affected by it — so a transparent snapshot over a perfectly visible page shows the wrong
+    // thing. WPT {old,new}-content-root-scrollbar-with-fixed-background invert the captured page.
+    [Fact]
+    public void A_Filter_On_The_Old_Snapshot_Makes_It_Reproduce_The_Page()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<style>
+  body { background: white; margin: 0; }
+  #box { position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; background: blue; }
+  html::view-transition-old(root) { animation: unset; filter: invert(1); }
+  html::view-transition-new(root) { animation: unset; opacity: 0; }
+</style>
+<div id="box"></div>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition(() => { document.body.style.background = 'lime'; });");
+
+        // Blue inverted is yellow, and the white canvas inverts to black. Without content the
+        // snapshot had nothing to invert and the un-inverted live page showed through instead.
+        AssertPixel(bitmap, 50, 50, 255, 255, 0, "the captured box, inverted");
+        AssertPixel(bitmap, 150, 150, 0, 0, 0, "the captured canvas, inverted");
+    }
+
+    // The counterpart, and the reason the effect list is not simply "any author declaration":
+    // opacity only composites the snapshot against what is behind it, which is exactly what the live
+    // page already does. root-to-shared-animation-end pins `::view-transition-old(*) { opacity: 1 }`
+    // and cost 79 pixel points the one time this was treated as needing content.
+    [Fact]
+    public void Opacity_Alone_Leaves_The_Snapshot_Content_Less()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<style>
+  body { background: white; margin: 0; }
+  #box { position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; background: blue; }
+  html::view-transition-old(root) { animation: unset; opacity: 1; }
+  html::view-transition-new(root) { animation: unset; opacity: 0; }
+</style>
+<div id="box"></div>
+</html>
+""";
+        using var bitmap = Render(html,
+            "document.startViewTransition(() => { document.getElementById('box').style.background = 'red'; });");
+
+        // The live page — the box the callback turned red — shows through, as before.
+        AssertPixel(bitmap, 50, 50, 255, 0, 0, "the live page through the empty snapshot");
+    }
+
     // ::view-transition-image-pair is the box the spec puts between a group and its old/new pair, so
     // a rule can address both at once. old-content-captures-root hides an entire group with it.
     [Fact]
