@@ -764,12 +764,27 @@ confirmed or contradicted. Cross-referencing the two lists:
   0.4%. Judge it from a CI artifact, not from this container.
 - **Still unanalysed:** `css-view-transitions/new-content-flat-transform-ancestor`
   (0.3% locally, so it does reproduce).
-- **`uievents/…/UIEvent.load.stylesheet` is a `load`-event gap, not a style gap.**
-  The test sets `link.href` from `window.onload` and waits for a `load` event on
-  the `<link>`. With the reflection fix the href now reaches the attribute and the
-  sheet applies — the body background matches the reference — but no `load` event
-  is dispatched for a stylesheet, so the page still renders `FAIL`. That needs
-  resource-load events on `<link>`, which nothing here provides yet.
+- **`uievents/…/UIEvent.load.stylesheet` (problem 26) was two gaps, and closing
+  both still does not close the test.** It sets `link.href` from `window.onload`
+  and waits for a `load` event on the `<link>` whose `currentTarget` is the link.
+  The reflection fix above got the href to the attribute; the second gap was that
+  **nothing dispatched a stylesheet link's `load` event at all**. It does now —
+  once per href, only for a link in the document, and `error` rather than `load`
+  when the fetch fails, decided by the same CSP gate and fetch the cascade uses
+  (which needs the href resolved against the page URL, since the loader only
+  accepts absolute URLs — skipping that dispatched `error` for every relative href
+  while the sheet applied fine). The test renders `PASS` where it rendered `FAIL`.
+  **Its pixel score barely moves — 97.88% → 97.87% — and it stays under the 99%
+  threshold either way**, because the rest of the difference is bold text.
+- **Bold text does not render in this container at all**, which caps several text
+  comparisons below threshold and is worth knowing before attributing a residual
+  to an engine gap. `font-weight: bold`, `font-weight: 700`, `bolder`, `<b>`,
+  `<strong>` and `<h3>` all come out at regular weight, for every family tried
+  (`DejaVu Serif`, `Liberation Sans`, `sans-serif`, the default) — even though
+  `fc-list` shows 22 bold faces installed. Whether that is a font-configuration
+  difference in this image or a real face-selection gap is **not settled here**;
+  it needs its own investigation and a CI comparison, and nothing above depends
+  on the answer.
 
 ## Reported problems, at a glance
 
