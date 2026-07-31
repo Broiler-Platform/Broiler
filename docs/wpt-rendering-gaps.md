@@ -16,12 +16,14 @@
   30 are fixed; each section says what landed, what was verified locally, and what
   is left for CI to confirm. Patches `0035`–`0039` — which carried the submodule
   half of 6, 27, 28 and 30 — **have since been applied and their pointers
-  bumped**, so all of those are now live on CI rather than pending. The one fix
-  still waiting on a maintainer are problems 7–10's
-  [`patches/0041`](../patches/README.md) and problem 29's `patches/0042`, whose
-  remote this session cannot push to (403, as documented in `CLAUDE.md`). Neither
-  has a main-repo fallback, so those tests stay at their old numbers on CI until
-  the patches land.
+  bumped**, so all of those are now live on CI rather than pending. So has
+  problem 29's `0042` (confirmed two ways: it reverse-applies to the pinned
+  `Broiler.HTML`, and `TemplateContentInertnessTests`' probe now sees template
+  styles staying inert). The one still waiting on a maintainer is problems 7–10's
+  [`patches/0041`](../patches/README.md), whose remote this session cannot push to
+  (403, as documented in `CLAUDE.md`) — and which **no longer applies to the
+  pinned pointer**, so it needs regenerating before it can be applied at all.
+  Until then those four tests stay at their old numbers on CI.
 - **Four of these tests should not be "fixed".** Problems 14, 15 and 24 pass only
   by rendering *less* than Broiler already does — their Chromium reference was
   produced by an engine that does not implement the feature under test, so the
@@ -726,8 +728,10 @@ confirmed or contradicted. Cross-referencing the two lists:
   caught, so it killed the worker outright — which is why the reported signature
   named the runner rather than the CSS engine. Measured locally over the 302
   `container-queries` tests in both affected directories: **68 crashes → 0**, no
-  test regressed. Fixed in `Broiler.CSS`; **pending [`patches/0043`](../patches/README.md)**,
-  with no main-repo fallback, so CI keeps crashing until it lands.
+  test regressed. Fixed in `Broiler.CSS`; **[`patches/0043`](../patches/README.md)**, with no
+  main-repo fallback. The WPT runner applies it for the run via
+  `scripts/apply-pending-wpt-patches.sh`, so CI's numbers reflect the fix; the
+  pinned pointer still carries the crash until a maintainer lands it.
 - **#1497 problems 3 and 4 are #1491's problems 2 and 3** — the per-element JS
   wrapper cost, still tracked in [the root roadmap](ROADMAP.md#htmlbridge-runtime).
 - **#1497 problem 24 was recorded here as fixed, and was not.**

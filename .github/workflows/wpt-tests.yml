@@ -191,16 +191,21 @@ jobs:
 
       # Apply any submodule fix that could not be pushed to its remote (push 403
       # → captured under patches/) and is NOT yet in the pinned pointer, so the
-      # runner exercises it. Currently a no-op: the script's PENDING_PATCHES list
-      # is empty, so CI runs strictly against the pinned submodule pointers and
-      # applies no patches. The step (and script) are retained as intact
-      # infrastructure — a future pending patch is re-enabled by adding its entry
-      # to scripts/apply-pending-wpt-patches.sh, no workflow change required. When
-      # patches are configured the mechanism is idempotent (fixes already in the
-      # pinned pointer are detected and skipped) and the build compiles submodule
-      # source in place, so patching the checked-out working tree is sufficient —
-      # no pointer bump. Only Broiler's render is affected; Chromium reference
-      # generation is untouched.
+      # runner exercises it. Live again as of issue #1497: PENDING_PATCHES carries
+      # 0043 (Broiler.CSS — the @container recursion that crashed the worker and
+      # gated 68 tests), 0044 and 0045 (Broiler.HTML — percentage scale factors,
+      # and a table painting its own background). Without this step those three
+      # fixes are absent from the run no matter how many times the suite is
+      # re-run, because their remotes are outside the session's GitHub scope.
+      # Entries are added only after checking they do not reverse-apply to the
+      # pinned pointer and do apply cleanly; the mechanism is idempotent, so an
+      # entry stops applying by itself once a maintainer lands the fix upstream
+      # and bumps the pointer. A patch that has gone stale against a drifted
+      # pointer fails this step loudly rather than being skipped — that is
+      # deliberate, since silently dropping a fix is what the step exists to
+      # prevent. The build compiles submodule source in place, so patching the
+      # checked-out working tree is sufficient — no pointer bump. Only Broiler's
+      # render is affected; Chromium reference generation is untouched.
       - name: Apply pending submodule patches
         shell: bash
         run: bash scripts/apply-pending-wpt-patches.sh
