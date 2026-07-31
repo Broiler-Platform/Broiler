@@ -1,11 +1,31 @@
 // run-octane.mjs — run the Octane 2.0 benchmark suite under Chromium (V8 via
 // Playwright) and/or Broiler (the BroilerJS --script-host shell), then emit a
-// per-engine result file and a comparison report.
+// per-engine result file, a comparison report, and a failure diagnostics report.
 //
 // Each Octane suite is executed in isolation — a fresh Chromium page or a fresh
 // Broiler process — so a crash, hang, or error in one suite never discards the
 // others. This matters because Broiler is an experimental engine: some suites
 // score, some throw a catchable error, and some abort the whole process.
+//
+// ── Diagnostics ────────────────────────────────────────────────────────────
+// A score of "error" or "crash" is a bug report with the evidence removed, so
+// every failing suite is captured in full:
+//
+//   * The child's entire stdout/stderr is written to <log-dir>/<engine>/<suite>.log
+//     along with the exit code, signal, duration, and a copy-pasteable repro
+//     command. Broiler prints a JS stack trace on an unhandled throw, and
+//     surfaces a CLR fault as a catchable JS error whose *message* carries the
+//     .NET exception type and its whole managed stack — both are kept verbatim.
+//   * Stack traces are mapped back to Octane sources. Broiler runs one
+//     concatenated script per suite, so its traces cite lines in a temporary
+//     file; every such line is rewritten to the file and line it came from
+//     (base.js:371, crypto.js:104, …) using the offsets recorded when the
+//     script was built.
+//   * scripts/octane-runner.js streams breadcrumbs as it runs, so a suite that
+//     aborts the process — and therefore never reports a result — is still
+//     localized to a benchmark, phase, and iteration.
+//   * The combined script for a failing suite is kept next to its log, so the
+//     failure can be re-run by hand without re-deriving how it was built.
 //
 // Usage:
 //   node run-octane.mjs --octane-dir <dir> [options]
@@ -16,19 +36,36 @@
 //   --broiler-dll <path>   BroilerJS.dll to run with `dotnet ... --script-host`.
 //                          Required when broiler is in --engines.
 //   --out-dir <dir>        Where result JSON/MD are written (default: tests/octane/results)
+//   --log-dir <dir>        Where per-suite logs are written (default: tests/octane/logs)
 //   --suites <path>        Suite manifest (default: scripts/octane-suites.json)
 //   --runner <path>        Shared runner JS (default: scripts/octane-runner.js)
 //   --timeout <sec>        Per-suite timeout in seconds (default: 180)
+//   --only <list>          Comma-separated suite names to run (default: all).
+//                          Results go to <log-dir>/partial/ so a debugging run
+//                          never overwrites the committed full-run results.
+//   --verbose              Stream each child's stdout/stderr live, line-prefixed.
+//   --keep-scripts         Keep the combined script for every suite, not just
+//                          the failing ones.
+//   --no-trace             Disable the runner's breadcrumbs (for a timing run
+//                          that must not be perturbed at all).
+//   --broiler-env K=V      Extra environment variable for the Broiler child
+//                          (repeatable), e.g. BROILER_GENERATE_IL_LOGS=1.
 
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, dirname, resolve } from 'node:path';
+import { spawn } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { join, dirname, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
+
+// Caps. The log files get everything; these bound only what is copied into the
+// committed JSON/Markdown reports.
+const MAX_CAPTURED_CHARS = 24 * 1024 * 1024; // per stream, per suite
+const REPORT_MESSAGE_CHARS = 2000;
+const REPORT_JS_FRAMES = 15;
+const REPORT_CLR_FRAMES = 30;
 
 function parseArgs(argv) {
   const opts = {
@@ -36,9 +73,15 @@ function parseArgs(argv) {
     engines: 'chromium,broiler',
     broilerDll: null,
     outDir: join(REPO_ROOT, 'tests', 'octane', 'results'),
+    logDir: join(REPO_ROOT, 'tests', 'octane', 'logs'),
     suites: join(__dirname, 'octane-suites.json'),
     runner: join(__dirname, 'octane-runner.js'),
     timeout: 180,
+    only: null,
+    verbose: false,
+    keepScripts: false,
+    trace: true,
+    broilerEnv: {},
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -48,15 +91,369 @@ function parseArgs(argv) {
       case '--engines': opts.engines = next(); break;
       case '--broiler-dll': opts.broilerDll = next(); break;
       case '--out-dir': opts.outDir = next(); break;
+      case '--log-dir': opts.logDir = next(); break;
       case '--suites': opts.suites = next(); break;
       case '--runner': opts.runner = next(); break;
       case '--timeout': opts.timeout = parseInt(next(), 10); break;
+      case '--only': opts.only = next().split(',').map((s) => s.trim()).filter(Boolean); break;
+      case '--verbose': opts.verbose = true; break;
+      case '--keep-scripts': opts.keepScripts = true; break;
+      case '--no-trace': opts.trace = false; break;
+      case '--broiler-env': {
+        const kv = next();
+        const eq = kv.indexOf('=');
+        if (eq < 1) throw new Error(`--broiler-env expects KEY=VALUE, got: ${kv}`);
+        opts.broilerEnv[kv.slice(0, eq)] = kv.slice(eq + 1);
+        break;
+      }
       default: throw new Error(`Unknown argument: ${a}`);
     }
   }
   if (!opts.octaneDir) throw new Error('--octane-dir is required');
   return opts;
 }
+
+function selectSuites(manifest, only) {
+  if (!only || only.length === 0) return manifest.suites;
+  const wanted = new Set(only.map((s) => s.toLowerCase()));
+  const picked = manifest.suites.filter((s) => wanted.has(s.name.toLowerCase()));
+  const known = new Set(picked.map((s) => s.name.toLowerCase()));
+  const missing = only.filter((s) => !known.has(s.toLowerCase()));
+  if (missing.length) {
+    throw new Error(
+      `--only names no such suite: ${missing.join(', ')}. ` +
+      `Known suites: ${manifest.suites.map((s) => s.name).join(', ')}`);
+  }
+  return picked;
+}
+
+// ── Combined-script assembly and line mapping ───────────────────────────────
+// Broiler runs one script per suite, so base.js, the benchmark file(s), and the
+// runner are concatenated. Recording where each part landed is what later lets
+// a trace line in the combined file be reported against its real source.
+
+function countNewlines(s) {
+  let n = 0;
+  let i = -1;
+  while ((i = s.indexOf('\n', i + 1)) !== -1) n++;
+  return n;
+}
+
+function loadMarker(file) {
+  // Announces that `file` finished evaluating. In a multi-file suite this is
+  // what identifies the file a load-time failure happened in — the runner
+  // itself never gets to execute in that case.
+  //
+  // The `window` test matches octane-runner.js: in a browser `print` is the
+  // print dialog, so the shell's print() is only reachable when there is no
+  // window at all.
+  const emit = "(typeof window==='undefined'&&typeof print==='function'?print:console.log)";
+  return `;try{${emit}('OCTANE_FILE_LOADED ${JSON.stringify(file).slice(1, -1)}');}catch(e){}`;
+}
+
+export function buildCombinedScript(parts, config) {
+  let text = '';
+  let line = 1;
+  const segments = [];
+  const push = (file, body, kind) => {
+    const normalized = body.endsWith('\n') ? body : body + '\n';
+    const count = countNewlines(normalized);
+    segments.push({ file, kind, outStart: line, outEnd: line + count - 1 });
+    text += normalized;
+    line += count;
+  };
+
+  push('<harness config>', `var __octaneConfig = ${JSON.stringify(config)};`, 'harness');
+  for (const part of parts) {
+    push(part.file, part.text, part.kind ?? 'source');
+    push('<harness marker>', loadMarker(part.file), 'harness');
+  }
+  return { text, segments };
+}
+
+export function mapCombinedLine(segments, line) {
+  for (const seg of segments) {
+    if (line >= seg.outStart && line <= seg.outEnd) {
+      return { file: seg.file, line: line - seg.outStart + 1, kind: seg.kind };
+    }
+  }
+  return null;
+}
+
+// Matches a path separator as it may appear in captured output: a forward
+// slash, a backslash, or — inside the JSON diagnostic lines the runner prints —
+// a backslash that JSON escaping has doubled. The doubled form must come first
+// so it wins the alternation.
+const SEP = '(?:\\\\\\\\|\\\\|/)';
+
+// Escape a filesystem path for use in a RegExp, accepting any of those
+// separator spellings so one pattern matches however the path was written.
+function pathPattern(p) {
+  let out = '';
+  for (const ch of p) {
+    if (ch === '\\' || ch === '/') out += SEP;
+    else if ('.*+?^${}()|[]'.includes(ch)) out += `\\${ch}`;
+    else out += ch;
+  }
+  return out;
+}
+
+// Rewrite every `<combined>:<line>` / `<combined>:line <n>` citation to the
+// Octane source it came from. Broiler emits both spellings — the first in the
+// managed stack frames it synthesizes for JS functions, the second in the JS
+// stack trace it prints for an unhandled throw.
+export function annotateCombinedPaths(text, combinedPath, segments) {
+  if (!text) return text;
+  const re = new RegExp(`${pathPattern(combinedPath)}(?::line[ \\t]+(\\d+)|:(\\d+)(?:,(\\d+))?)`, 'gi');
+  return text.replace(re, (match, lineForm, plainLine, column) => {
+    const n = Number(lineForm ?? plainLine);
+    const mapped = mapCombinedLine(segments, n);
+    if (!mapped) return match;
+    return column != null ? `${mapped.file}:${mapped.line},${column}` : `${mapped.file}:${mapped.line}`;
+  });
+}
+
+// Engine frames cite absolute paths into the checkout; trimming the repo root
+// keeps them readable without losing which file they name.
+export function shortenEnginePaths(text, root = REPO_ROOT) {
+  if (!text) return text;
+  const re = new RegExp(pathPattern(root) + SEP, 'gi');
+  return text.replace(re, '');
+}
+
+// ── Failure parsing ─────────────────────────────────────────────────────────
+
+function tryJson(s) {
+  try { return JSON.parse(s); } catch { return null; }
+}
+
+// Read back the diagnostic lines octane-runner.js streamed. Works on partial
+// output, which is the point: a killed process still tells us how far it got.
+export function parseDiagnostics(stdout) {
+  const out = { start: null, traces: [], errors: [], fatal: null, loaded: [], notes: [], result: null };
+  if (!stdout) return out;
+  for (const line of String(stdout).replace(/\r/g, '').split('\n')) {
+    if (line.startsWith('OCTANE_TRACE ')) {
+      const v = tryJson(line.slice('OCTANE_TRACE '.length));
+      if (v) out.traces.push(v);
+    } else if (line.startsWith('OCTANE_ERROR ')) {
+      const v = tryJson(line.slice('OCTANE_ERROR '.length));
+      if (v) out.errors.push(v);
+    } else if (line.startsWith('OCTANE_FATAL ')) {
+      out.fatal = tryJson(line.slice('OCTANE_FATAL '.length)) ?? out.fatal;
+    } else if (line.startsWith('OCTANE_START ')) {
+      out.start = tryJson(line.slice('OCTANE_START '.length)) ?? out.start;
+    } else if (line.startsWith('OCTANE_FILE_LOADED ')) {
+      out.loaded.push(line.slice('OCTANE_FILE_LOADED '.length).trim());
+    } else if (line.startsWith('OCTANE_NOTE ')) {
+      out.notes.push(line.slice('OCTANE_NOTE '.length));
+    } else if (line.includes('OCTANE_RESULT_JSON')) {
+      out.result = tryJson(line.slice(line.indexOf('{'))) ?? out.result;
+    }
+  }
+  return out;
+}
+
+const CLR_HEADER = /^(?:Unhandled exception\.\s*)?((?:[A-Za-z_][\w`+]*\.)+[A-Za-z_][\w`+]*(?:Exception|Error))\s*:\s*(.*)$/;
+
+// A managed frame names a method with an argument list — `Type.Method(args)`,
+// optionally followed by ` in <file>.cs:line N`. Broiler also renders *JS*
+// frames into a stack trace, and those have no argument list; requiring one is
+// what keeps the two kinds of frame from being reported as each other.
+const MANAGED_FRAME = /^[\w.`+<>[\]]+\(/;
+
+// Pull the .NET exception out of a blob of text — whether it arrived as an
+// unhandled-exception dump on stderr or inside a caught JS error's message.
+// Returns null when the text carries no managed exception at all.
+export function parseClrException(text) {
+  if (!text) return null;
+  const lines = String(text).replace(/\r/g, '').split('\n');
+  let outer = null;
+  const inner = [];
+  const frames = [];
+  for (const line of lines) {
+    const nested = /^\s*--->\s*(.*)$/.exec(line);
+    const candidate = nested ? nested[1] : line;
+    const header = CLR_HEADER.exec(candidate.trim());
+    if (header) {
+      const record = { type: header[1], message: header[2] };
+      if (!outer) outer = record;
+      else inner.push(record);
+      continue;
+    }
+    const frame = /^\s+at\s+(\S.*)$/.exec(line);
+    if (frame && outer && MANAGED_FRAME.test(frame[1].trim())) frames.push(frame[1].trim());
+  }
+  if (!outer) return null;
+  return { ...outer, inner, frames };
+}
+
+// Broiler spells a JS frame three ways, and each one localizes a different
+// class of failure — so all three are recognized:
+//
+//   at <fn>:<file>:<line>,<col>          the trace attached to a caught error
+//   at <fn> in <file>:line <n>           the dump printed for an unhandled throw
+//   at <fn>-<file>:<line>,<col>(<args>)  a JS frame rendered into a managed
+//                                        stack, which is the only place a fault
+//                                        inside generated code is pinpointed
+//
+// The function/file split is non-greedy, so it lands on the first separator —
+// a JS function name cannot contain `-`, but a file name can (`zlib-data.js`).
+//
+// An unhandled throw prints the same trace twice, in two of those spellings,
+// separated by a blank line — so collecting stops at the first blank line after
+// a frame rather than reporting every frame a second time.
+export function parseJsStack(text) {
+  if (!text) return [];
+  const frames = [];
+  for (const line of String(text).replace(/\r/g, '').split('\n')) {
+    const m = /^\s*at\s+(.+?)(?:\s+in\s+|[:-])(\S.*?)(?::line[ \t]+(\d+)|:(\d+))(?:,(\d+))?(?:\([^)]*\))?\s*$/.exec(line);
+    if (m) {
+      if (MANAGED_FRAME.test(line.trim().replace(/^at\s+/, ''))) continue;
+      frames.push({ fn: m[1].trim(), file: m[2].trim(), line: Number(m[3] ?? m[4]) });
+      continue;
+    }
+    if (frames.length && line.trim() === '') break;
+  }
+  return frames;
+}
+
+// Everything from the engine's unhandled-exception banner onward — the fullest
+// account of a hard crash, since the process died before anything in-engine
+// could describe it.
+export function extractUnhandledBlock(stderr) {
+  if (!stderr) return null;
+  const text = String(stderr).replace(/\r/g, '');
+  const at = text.indexOf('Unhandled exception.');
+  return at === -1 ? null : text.slice(at).trimEnd();
+}
+
+// Exit statuses that mean something specific on a crash. Node reports the
+// Windows codes unsigned, which is why they are matched as decimals here.
+const EXIT_CODES = new Map([
+  [0xE0434352, '.NET unhandled managed exception'],
+  [0xC0000005, 'access violation'],
+  [0xC00000FD, 'stack overflow'],
+  [0xC0000409, 'fast fail / stack buffer overrun'],
+  [0xC000012D, 'out of memory (commit limit)'],
+  [134, 'SIGABRT — abort()'],
+  [137, 'SIGKILL — killed, often by the OOM killer'],
+  [139, 'SIGSEGV — segmentation fault'],
+]);
+
+export function describeExitCode(code) {
+  if (code == null) return '(none)';
+  const meaning = EXIT_CODES.get(code);
+  if (!meaning) return String(code);
+  const hex = code > 0xFFFF ? ` (0x${code.toString(16).toUpperCase()})` : '';
+  return `${code}${hex} — ${meaning}`;
+}
+
+function formatFrames(frames, limit) {
+  const shown = frames.slice(0, limit);
+  const lines = shown.map((f) => (typeof f === 'string' ? `    at ${f}` : `    at ${f.fn} (${f.file}:${f.line})`));
+  if (frames.length > limit) lines.push(`    … ${frames.length - limit} more frames (see the suite log)`);
+  return lines;
+}
+
+// ── Child process capture ───────────────────────────────────────────────────
+
+// Bounded accumulator: keeps the head and the tail so both the start of a run
+// and whatever preceded the failure survive a pathologically chatty suite.
+function createCapture(limit) {
+  const half = Math.floor(limit / 2);
+  let head = '';
+  let tail = '';
+  let dropped = 0;
+  return {
+    push(chunk) {
+      if (head.length < half) {
+        const room = half - head.length;
+        head += chunk.slice(0, room);
+        chunk = chunk.slice(room);
+        if (!chunk) return;
+      }
+      tail += chunk;
+      if (tail.length > half) {
+        const excess = tail.length - half;
+        tail = tail.slice(excess);
+        dropped += excess;
+      }
+    },
+    text() {
+      return dropped ? `${head}\n… [${dropped} characters elided] …\n${tail}` : head + tail;
+    },
+  };
+}
+
+// Streams output line-by-line to stderr under --verbose, so a hang shows its
+// last breadcrumb live instead of only after the timeout fires. `transform`
+// gets the same path mapping applied that the log file receives, so a trace
+// read live cites Octane sources rather than the temporary combined script.
+function createLineStreamer(prefix, transform = (l) => l) {
+  let pending = '';
+  return (chunk) => {
+    pending += chunk;
+    let nl;
+    while ((nl = pending.indexOf('\n')) !== -1) {
+      process.stderr.write(`${prefix}${transform(pending.slice(0, nl))}\n`);
+      pending = pending.slice(nl + 1);
+    }
+  };
+}
+
+function runProcess(cmd, args, { timeoutMs, env, onStdout, onStderr }) {
+  return new Promise((res) => {
+    const startedAt = Date.now();
+    const stdout = createCapture(MAX_CAPTURED_CHARS);
+    const stderr = createCapture(MAX_CAPTURED_CHARS);
+    let timedOut = false;
+    let child;
+    try {
+      child = spawn(cmd, args, { env, windowsHide: true });
+    } catch (err) {
+      res({ spawnError: err, stdout: '', stderr: '', timedOut: false, code: null, signal: null, durationMs: 0 });
+      return;
+    }
+    let settled = false;
+    let timer = null;
+    let giveUp = null;
+
+    const finish = (extra) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (giveUp) clearTimeout(giveUp);
+      res({
+        stdout: stdout.text(),
+        stderr: stderr.text(),
+        timedOut,
+        code: null,
+        signal: null,
+        durationMs: Date.now() - startedAt,
+        ...extra,
+      });
+    };
+
+    timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+      // A killed child whose pipes are still held open would never emit
+      // 'close', hanging the whole run on one bad suite. Report what was
+      // captured instead.
+      giveUp = setTimeout(() => finish({ code: null, signal: 'SIGKILL' }), 10_000);
+    }, timeoutMs);
+
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (d) => { stdout.push(d); onStdout?.(d); });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (d) => { stderr.push(d); onStderr?.(d); });
+    child.on('error', (err) => finish({ spawnError: err }));
+    child.on('close', (code, signal) => finish({ code, signal }));
+  });
+}
+
+// ── Result normalization ────────────────────────────────────────────────────
 
 // Pull the numeric benchmark scores out of a raw Octane result object,
 // classifying the suite as ok/error and computing its geometric mean.
@@ -73,7 +470,7 @@ function normalizeRaw(raw) {
       else errors[k] = `non-numeric score: ${v}`;
     }
   }
-  return { benchmarks, errors, version: raw.__version__ ?? null };
+  return { benchmarks, errors, version: raw.__version__ ?? null, details: raw.__errors__ ?? [] };
 }
 
 function geomean(values) {
@@ -83,46 +480,130 @@ function geomean(values) {
   return Math.round(Math.exp(sumLn / xs.length));
 }
 
+function clamp(text, limit) {
+  const s = String(text ?? '');
+  return s.length <= limit ? s : `${s.slice(0, limit)}… [+${s.length - limit} chars]`;
+}
+
+// The last breadcrumb before the engine stopped reporting — for a crash or a
+// hang this is the only thing that says where it happened.
+function lastPhaseOf(diag) {
+  const t = diag.traces.length ? diag.traces[diag.traces.length - 1] : null;
+  if (!t) return null;
+  return { suite: t.suite, benchmark: t.benchmark, phase: t.phase, iteration: t.iteration };
+}
+
+function describeWhere(where) {
+  if (!where) return null;
+  const parts = [];
+  if (where.benchmark) parts.push(`benchmark \`${where.benchmark}\``);
+  if (where.phase) parts.push(`phase \`${where.phase}\``);
+  if (where.phase === 'run' && where.iteration) parts.push(`iteration ${where.iteration}`);
+  return parts.length ? parts.join(', ') : null;
+}
+
+// ── Per-suite log file ──────────────────────────────────────────────────────
+
+function writeSuiteLog(path, sections) {
+  const lines = [];
+  for (const [title, body] of sections) {
+    lines.push(`===== ${title} ${'='.repeat(Math.max(0, 72 - title.length))}`);
+    lines.push(body === '' || body == null ? '(empty)' : String(body).replace(/\s+$/, ''));
+    lines.push('');
+  }
+  writeFileSync(path, `${lines.join('\n')}\n`);
+}
+
 // ── Broiler: one isolated `dotnet … --script-host <combined>` process per suite
-function runBroiler(opts, manifest, baseJs, runnerJs) {
+async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
   if (!opts.broilerDll) throw new Error('--broiler-dll is required for the broiler engine');
-  const work = mkdtempSync(join(tmpdir(), 'octane-broiler-'));
+  const logDir = join(dirs.logDir, 'broiler');
+  const scriptDir = join(logDir, 'scripts');
+  mkdirSync(scriptDir, { recursive: true });
+
   const benchmarks = {};
   const suiteStatus = {};
   let octaneVersion = null;
 
-  for (const suite of manifest.suites) {
-    const parts = [baseJs];
-    for (const f of suite.files) parts.push(readFileSync(join(opts.octaneDir, f), 'utf8'));
-    parts.push(runnerJs);
-    const combined = join(work, `${suite.name}.js`);
-    writeFileSync(combined, parts.join('\n'));
+  for (const suite of suites) {
+    const parts = [{ file: 'base.js', text: baseJs }];
+    for (const f of suite.files) parts.push({ file: f, text: readFileSync(join(opts.octaneDir, f), 'utf8') });
+    parts.push({ file: 'octane-runner.js', text: runnerJs, kind: 'harness' });
+
+    const { text, segments } = buildCombinedScript(parts, { trace: opts.trace });
+    const combined = join(scriptDir, `${suite.name}.js`);
+    writeFileSync(combined, text);
+
+    const args = [opts.broilerDll, '--script-host', combined];
+    const repro = `dotnet ${opts.broilerDll} --script-host ${combined}`;
+
+    // Map every citation of the combined script back to the Octane source, and
+    // trim the repo root off engine frames, before anything is read or shown.
+    const clean = (t) => shortenEnginePaths(annotateCombinedPaths(t, combined, segments));
 
     process.stderr.write(`[broiler] ${suite.name} … `);
-    const res = spawnSync('dotnet', [opts.broilerDll, '--script-host', combined], {
-      encoding: 'utf8',
-      timeout: opts.timeout * 1000,
-      maxBuffer: 64 * 1024 * 1024,
+    if (opts.verbose) process.stderr.write('\n');
+
+    const res = await runProcess('dotnet', args, {
+      timeoutMs: opts.timeout * 1000,
+      env: { ...process.env, ...opts.broilerEnv },
+      onStdout: opts.verbose ? createLineStreamer(`[broiler:${suite.name}] `, clean) : null,
+      onStderr: opts.verbose ? createLineStreamer(`[broiler:${suite.name}!] `, clean) : null,
     });
 
-    const line = (res.stdout || '').split('\n').find((l) => l.includes('OCTANE_RESULT_JSON'));
-    if (line) {
-      const raw = JSON.parse(line.slice(line.indexOf('{')));
-      const { benchmarks: b, errors, version } = normalizeRaw(raw);
+    const stdout = clean(res.stdout);
+    const stderr = clean(res.stderr);
+    const mapped = { ...res, stdout, stderr };
+    const diag = parseDiagnostics(stdout);
+
+    const status = classifyBroilerSuite(mapped, diag, {
+      combined,
+      repro,
+      log: relative(REPO_ROOT, join(logDir, `${suite.name}.log`)),
+      script: relative(REPO_ROOT, combined),
+    });
+
+    if (diag.result) {
+      const { benchmarks: b, version } = normalizeRaw(diag.result);
       octaneVersion ??= version;
       Object.assign(benchmarks, b);
-      const ok = Object.keys(errors).length === 0;
-      suiteStatus[suite.name] = ok
-        ? { status: 'ok' }
-        : { status: 'error', error: Object.values(errors)[0] };
-      process.stderr.write(ok ? `ok\n` : `error\n`);
-    } else if (res.error && res.error.code === 'ETIMEDOUT') {
-      suiteStatus[suite.name] = { status: 'timeout' };
-      process.stderr.write(`timeout\n`);
-    } else {
-      const stderr = (res.stderr || '').replace(/\r/g, '').split('\n').find((l) => l.includes('Exception')) || '';
-      suiteStatus[suite.name] = { status: 'crash', error: stderr.slice(0, 300) };
-      process.stderr.write(`crash\n`);
+    }
+    suiteStatus[suite.name] = status;
+
+    writeSuiteLog(join(logDir, `${suite.name}.log`), [
+      ['suite', `${suite.name} (${suite.files.join(', ')})`],
+      ['status', [
+        `status      : ${status.status}`,
+        `exit code   : ${describeExitCode(res.code)}${res.signal ? ` signal ${res.signal}` : ''}`,
+        `duration    : ${(res.durationMs / 1000).toFixed(1)}s${res.timedOut ? ` (timed out at ${opts.timeout}s)` : ''}`,
+        `files loaded: ${diag.loaded.length ? diag.loaded.join(', ') : '(none — failed before any file finished evaluating)'}`,
+        `failed at   : ${describeWhere(status.failedAt) ?? '(unknown)'}`,
+        res.spawnError ? `spawn error : ${res.spawnError.message}` : null,
+      ].filter(Boolean).join('\n')],
+      ['repro', repro],
+      ['error', status.message ?? status.error ?? '(none)'],
+      ['stderr', stderr],
+      ['stdout', stdout],
+    ]);
+
+    // Keep the combined script only where it is useful — a failing suite is
+    // reproducible by hand; a passing one is 25 MB of noise. Drop the repro
+    // command with it rather than leaving one that names a deleted file.
+    if (status.status === 'ok' && !opts.keepScripts) {
+      rmSync(combined, { force: true });
+      delete status.script;
+      delete status.repro;
+    }
+
+    if (!opts.verbose) process.stderr.write(`${status.status}\n`);
+    else process.stderr.write(`[broiler] ${suite.name} … ${status.status}\n`);
+    if (status.status !== 'ok') {
+      const where = describeWhere(status.failedAt);
+      const detail = clamp(status.error ?? '', 160);
+      const type = status.errorType && !detail.startsWith(status.errorType) ? `${status.errorType}: ` : '';
+      process.stderr.write(`           ${type}${detail}\n`);
+      if (where) process.stderr.write(`           at ${where}\n`);
+      process.stderr.write(`           log: ${status.log}\n`);
     }
   }
 
@@ -137,13 +618,104 @@ function runBroiler(opts, manifest, baseJs, runnerJs) {
   };
 }
 
+// Turn a finished child process into a suite verdict plus everything needed to
+// act on it. The status vocabulary (ok/error/timeout/crash) is unchanged; the
+// surrounding detail is what is new.
+function classifyBroilerSuite(res, diag, paths) {
+  const base = {
+    exitCode: res.code ?? null,
+    signal: res.signal ?? null,
+    durationMs: res.durationMs,
+    filesLoaded: diag.loaded,
+    startedRunning: Boolean(diag.start),
+    log: paths.log,
+    script: paths.script,
+    repro: paths.repro,
+  };
+
+  // Reported a result — Octane itself caught anything that went wrong.
+  if (diag.result) {
+    const { errors, details } = normalizeRaw(diag.result);
+    if (Object.keys(errors).length === 0) return { status: 'ok', ...base };
+    const detail = details[0] ?? null;
+    const summary = detail?.summary ?? Object.values(errors)[0];
+    const clr = parseClrException(detail?.message);
+    return {
+      status: 'error',
+      error: summary,
+      ...describeFailure(detail, clr),
+      failedAt: detail ? { benchmark: detail.benchmark, phase: detail.phase, iteration: detail.iteration } : lastPhaseOf(diag),
+      ...base,
+    };
+  }
+
+  // No result. Either it was killed mid-run or it died.
+  const fatal = diag.fatal ?? diag.errors[diag.errors.length - 1] ?? null;
+  const clrFromStderr = parseClrException(res.stderr);
+  const clr = parseClrException(fatal?.message) ?? clrFromStderr;
+  const status = res.timedOut ? 'timeout' : 'crash';
+
+  const error = res.timedOut
+    ? `no result within the per-suite timeout${diag.start ? '' : ' (never finished loading)'}`
+    : (fatal?.summary ?? clr?.message ?? firstInterestingStderrLine(res.stderr) ?? `exited with code ${res.code}`);
+
+  // A hard crash usually kills the process before the runner can describe
+  // anything, so fall back to what the engine dumped on stderr.
+  const reported = parseJsStack(fatal?.stack);
+  const jsStack = reported.length ? reported : parseJsStack(res.stderr);
+  const unhandled = extractUnhandledBlock(res.stderr);
+
+  return {
+    status,
+    error,
+    ...describeFailure(fatal, clr),
+    message: fatal?.message
+      ? clamp(fatal.message, REPORT_MESSAGE_CHARS)
+      : (unhandled ? clamp(unhandled, REPORT_MESSAGE_CHARS) : null),
+    jsStack: jsStack.slice(0, REPORT_JS_FRAMES),
+    failedAt: fatal
+      ? { benchmark: fatal.benchmark, phase: fatal.phase, iteration: fatal.iteration }
+      : lastPhaseOf(diag),
+    ...base,
+  };
+}
+
+function describeFailure(detail, clr) {
+  // Two places carry JS frames, and which one is useful depends on the fault.
+  // An error's own `.stack` stops at the harness when the throw came from
+  // inside generated code; the managed trace in its *message* is what names the
+  // offending JavaScript (box2d.js:213, zlib-data.js:65). Take whichever
+  // actually reached further.
+  const fromMessage = parseJsStack(detail?.message);
+  const fromStack = parseJsStack(detail?.stack);
+  const jsStack = fromMessage.length > fromStack.length ? fromMessage : fromStack;
+
+  return {
+    errorType: clr?.type ?? detail?.name ?? detail?.constructor ?? null,
+    errorKind: clr ? 'clr' : (detail ? 'js' : null),
+    message: detail?.message ? clamp(detail.message, REPORT_MESSAGE_CHARS) : (clr ? clamp(`${clr.type}: ${clr.message}`, REPORT_MESSAGE_CHARS) : null),
+    clrStack: clr ? clr.frames.slice(0, REPORT_CLR_FRAMES) : [],
+    clrInner: clr?.inner ?? [],
+    jsStack: jsStack.slice(0, REPORT_JS_FRAMES),
+  };
+}
+
+function firstInterestingStderrLine(stderr) {
+  if (!stderr) return null;
+  const lines = String(stderr).replace(/\r/g, '').split('\n').map((l) => l.trim()).filter(Boolean);
+  return lines.find((l) => /exception|error|fatal|abort|stack overflow/i.test(l)) ?? lines[0] ?? null;
+}
+
 // ── Chromium: one isolated Playwright page per suite (real V8 in a browser) ──
-async function runChromium(opts, manifest, baseJs, runnerJs) {
+async function runChromium(opts, suites, baseJs, runnerJs, dirs) {
   // Playwright is installed under tests/octane/node_modules by the orchestrator.
   // ESM bare-specifier resolution ignores NODE_PATH, so resolve it explicitly
   // from that install location.
   const requireFrom = createRequire(join(REPO_ROOT, 'tests', 'octane', 'package.json'));
   const { chromium } = requireFrom('playwright');
+  const logDir = join(dirs.logDir, 'chromium');
+  mkdirSync(logDir, { recursive: true });
+
   const browser = await chromium.launch();
   const engineLabel = `Chromium ${browser.version()}`;
   const benchmarks = {};
@@ -151,34 +723,87 @@ async function runChromium(opts, manifest, baseJs, runnerJs) {
   let octaneVersion = null;
 
   try {
-    for (const suite of manifest.suites) {
+    for (const suite of suites) {
       process.stderr.write(`[chromium] ${suite.name} … `);
       const context = await browser.newContext();
       const page = await context.newPage();
+      const startedAt = Date.now();
+
+      // A browser reports out of band: console output (which carries the
+      // runner's breadcrumbs), uncaught page errors, and renderer crashes.
+      const consoleLines = [];
+      const pageErrors = [];
+      page.on('console', (m) => consoleLines.push(`[${m.type()}] ${m.text()}`));
+      page.on('pageerror', (e) => pageErrors.push(e.stack || String(e)));
+      page.on('crash', () => pageErrors.push('the page crashed'));
+
+      let status;
+      let loadFailure = null;
       try {
         await page.setContent('<!doctype html><html><head></head><body></body></html>');
+        await page.addScriptTag({ content: `var __octaneConfig = ${JSON.stringify({ trace: opts.trace })};` });
         await page.addScriptTag({ content: baseJs });
         for (const f of suite.files) {
-          await page.addScriptTag({ content: readFileSync(join(opts.octaneDir, f), 'utf8') });
+          try {
+            await page.addScriptTag({ content: readFileSync(join(opts.octaneDir, f), 'utf8') });
+          } catch (e) {
+            loadFailure = `${f}: ${e.message}`;
+            throw e;
+          }
         }
         await page.addScriptTag({ content: runnerJs });
         const raw = await Promise.race([
           page.evaluate(() => new Promise((res) => { window.__octaneRun(res); })),
           new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), opts.timeout * 1000)),
         ]);
-        const { benchmarks: b, errors, version } = normalizeRaw(raw);
+        const { benchmarks: b, errors, version, details } = normalizeRaw(raw);
         octaneVersion ??= version;
         Object.assign(benchmarks, b);
-        const ok = Object.keys(errors).length === 0;
-        suiteStatus[suite.name] = ok
-          ? { status: 'ok' }
-          : { status: 'error', error: Object.values(errors)[0] };
-        process.stderr.write(ok ? `ok\n` : `error\n`);
+        if (Object.keys(errors).length === 0) {
+          status = { status: 'ok' };
+        } else {
+          const detail = details[0] ?? null;
+          // V8 spells stack frames differently from Broiler, so the trace is
+          // kept as text rather than parsed into frames.
+          const message = [detail?.message, detail?.stack].filter(Boolean).join('\n');
+          status = {
+            status: 'error',
+            error: detail?.summary ?? Object.values(errors)[0],
+            errorType: detail?.name ?? null,
+            errorKind: 'js',
+            message: message ? clamp(message, REPORT_MESSAGE_CHARS) : null,
+            jsStack: [],
+            clrStack: [],
+            failedAt: detail ? { benchmark: detail.benchmark, phase: detail.phase, iteration: detail.iteration } : null,
+          };
+        }
       } catch (e) {
-        const status = String(e.message).includes('timeout') ? 'timeout' : 'crash';
-        suiteStatus[suite.name] = { status, error: String(e.message).slice(0, 300) };
-        process.stderr.write(`${status}\n`);
+        const timedOut = String(e.message).includes('timeout');
+        const diag = parseDiagnostics(consoleLines.map((l) => l.replace(/^\[\w+\] /, '')).join('\n'));
+        status = {
+          status: timedOut ? 'timeout' : 'crash',
+          error: clamp(loadFailure ?? pageErrors[0] ?? e.message, 300),
+          errorType: null,
+          errorKind: 'js',
+          message: clamp([loadFailure, ...pageErrors, e.stack ?? e.message].filter(Boolean).join('\n'), REPORT_MESSAGE_CHARS),
+          jsStack: [],
+          clrStack: [],
+          failedAt: lastPhaseOf(diag),
+        };
       } finally {
+        status ??= { status: 'crash', error: 'no verdict' };
+        status.durationMs = Date.now() - startedAt;
+        status.log = relative(REPO_ROOT, join(logDir, `${suite.name}.log`));
+        writeSuiteLog(join(logDir, `${suite.name}.log`), [
+          ['suite', `${suite.name} (${suite.files.join(', ')})`],
+          ['status', `status  : ${status.status}\nduration: ${(status.durationMs / 1000).toFixed(1)}s`],
+          ['error', status.message ?? status.error ?? '(none)'],
+          ['page errors', pageErrors.join('\n\n')],
+          ['console', consoleLines.join('\n')],
+        ]);
+        suiteStatus[suite.name] = status;
+        process.stderr.write(`${status.status}\n`);
+        if (status.status !== 'ok') process.stderr.write(`           log: ${status.log}\n`);
         await context.close();
       }
     }
@@ -214,7 +839,7 @@ function buildComparison(results, generatedAt) {
     if (!r) return { score: null, status: 'n/a' };
     if (name in r.benchmarks) return { score: r.benchmarks[name], status: r.suiteStatus[name]?.status ?? 'ok' };
     const st = r.suiteStatus[name];
-    return { score: null, status: st ? st.status : 'n/a', error: st?.error };
+    return { score: null, status: st ? st.status : 'n/a', error: st?.error, errorType: st?.errorType };
   }
 
   const comparison = {
@@ -234,7 +859,7 @@ function buildComparison(results, generatedAt) {
   return comparison;
 }
 
-function renderMarkdown(cmp) {
+function renderMarkdown(cmp, broiler) {
   const c = cmp.engines.chromium;
   const b = cmp.engines.broiler;
   const fmt = (cell) => {
@@ -260,12 +885,22 @@ function renderMarkdown(cmp) {
   }
   lines.push(`| **Overall (geomean)** | **${c?.geomean ?? '—'}** | **${b?.geomean ?? '—'}** | ${c?.geomean && b?.geomean ? (b.geomean / c.geomean).toFixed(3) : '—'} |`);
   lines.push('');
-  // Non-ok suite notes.
-  const notes = cmp.benchmarks.filter((r) => r.broiler.status && !['ok', 'n/a'].includes(r.broiler.status) && r.broiler.error);
-  if (notes.length) {
+
+  const failures = Object.entries(broiler?.suiteStatus ?? {}).filter(([, s]) => s.status !== 'ok');
+  if (failures.length) {
     lines.push('## Broiler failures');
     lines.push('');
-    for (const n of notes) lines.push(`- **${n.name}** (${n.broiler.status}): ${n.broiler.error}`);
+    lines.push('| Suite | Status | Failing type | Where | Detail |');
+    lines.push('|---|---|---|---|---|');
+    for (const [name, s] of failures) {
+      const where = describeWhere(s.failedAt)?.replace(/\|/g, '\\|') ?? '—';
+      const type = s.errorType ? `\`${s.errorType}\`` : '—';
+      const detail = clamp(s.error ?? '', 140).replace(/\|/g, '\\|');
+      lines.push(`| ${name} | ${s.status} | ${type} | ${where} | ${detail} |`);
+    }
+    lines.push('');
+    lines.push('Stack traces, the phase each failure reached, and a repro command are in');
+    lines.push('[`diagnostics.md`](diagnostics.md); full per-suite output is under `tests/octane/logs/`.');
     lines.push('');
   }
   lines.push('---');
@@ -274,41 +909,162 @@ function renderMarkdown(cmp) {
   return lines.join('\n');
 }
 
+// ── Diagnostics report ──────────────────────────────────────────────────────
+// The artifact a person actually reads to fix a failing suite: what broke,
+// where it broke, the stack on both sides of the JS/CLR boundary, and how to
+// re-run just that suite.
+function renderDiagnostics(broiler, generatedAt) {
+  const lines = [];
+  lines.push('# Broiler Octane failure diagnostics');
+  lines.push('');
+  lines.push(`- Generated: \`${generatedAt}\``);
+  lines.push(`- Engine: \`${broiler.engineLabel}\``);
+  lines.push(`- Per-suite timeout: ${broiler.perSuiteTimeoutSec}s`);
+  lines.push('');
+
+  const entries = Object.entries(broiler.suiteStatus);
+  const failures = entries.filter(([, s]) => s.status !== 'ok');
+  if (!failures.length) {
+    lines.push('All suites completed. Nothing to diagnose.');
+    lines.push('');
+    return lines.join('\n');
+  }
+
+  lines.push(`${failures.length} of ${entries.length} suites did not complete.`);
+  lines.push('');
+  lines.push('Statuses: **error** — Octane caught the throw and scored the rest;');
+  lines.push('**crash** — the process died and took the suite with it;');
+  lines.push('**timeout** — no result within the per-suite timeout.');
+  lines.push('');
+  lines.push('| Suite | Status | Failing type | Where |');
+  lines.push('|---|---|---|---|');
+  for (const [name, s] of failures) {
+    lines.push(`| [${name}](#${name.toLowerCase()}) | ${s.status} | ${s.errorType ? `\`${s.errorType}\`` : '—'} | ${describeWhere(s.failedAt)?.replace(/\|/g, '\\|') ?? '—'} |`);
+  }
+  lines.push('');
+
+  for (const [name, s] of failures) {
+    lines.push(`## ${name}`);
+    lines.push('');
+    lines.push(`- **Status**: ${s.status}${s.exitCode != null ? ` (exit code ${describeExitCode(s.exitCode)}${s.signal ? `, signal ${s.signal}` : ''})` : ''}`);
+    if (s.errorType) lines.push(`- **Failing type**: \`${s.errorType}\`${s.errorKind === 'clr' ? ' (.NET exception surfaced through the engine)' : ''}`);
+    lines.push(`- **Where**: ${describeWhere(s.failedAt) ?? 'unknown — no breadcrumb was reached'}`);
+    if (s.filesLoaded) {
+      lines.push(`- **Files evaluated**: ${s.filesLoaded.length ? s.filesLoaded.join(' → ') : '_none — failed while loading the first file_'}`);
+    }
+    if (s.durationMs != null) lines.push(`- **Ran for**: ${(s.durationMs / 1000).toFixed(1)}s`);
+    if (s.log) lines.push(`- **Full output**: \`${s.log}\``);
+    lines.push('');
+
+    if (s.message) {
+      lines.push('```text');
+      lines.push(clamp(s.message, REPORT_MESSAGE_CHARS).replace(/```/g, "'''"));
+      lines.push('```');
+      lines.push('');
+    } else if (s.error) {
+      lines.push(`> ${s.error}`);
+      lines.push('');
+    }
+
+    if (s.clrStack?.length) {
+      lines.push('**Engine (.NET) stack** — where inside Broiler the fault happened:');
+      lines.push('');
+      lines.push('```text');
+      lines.push(...formatFrames(s.clrStack, REPORT_CLR_FRAMES));
+      lines.push('```');
+      lines.push('');
+    }
+    if (s.jsStack?.length) {
+      lines.push('**JavaScript stack** — mapped back to the Octane sources:');
+      lines.push('');
+      lines.push('```text');
+      lines.push(...formatFrames(s.jsStack, REPORT_JS_FRAMES));
+      lines.push('```');
+      lines.push('');
+    }
+    if (s.clrInner?.length) {
+      lines.push(`**Inner exceptions**: ${s.clrInner.map((i) => `\`${i.type}\`: ${clamp(i.message, 160)}`).join('; ')}`);
+      lines.push('');
+    }
+
+    lines.push('Re-run just this suite:');
+    lines.push('');
+    lines.push('```bash');
+    lines.push(`./scripts/run-octane-benchmarks.sh --engines broiler --skip-build --only ${name} --verbose`);
+    lines.push('```');
+    lines.push('');
+  }
+
+  lines.push('---');
+  lines.push('_Generated by `scripts/run-octane.mjs`. Re-runs of a single suite write to `tests/octane/logs/partial/`._');
+  lines.push('');
+  return lines.join('\n');
+}
+
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const manifest = JSON.parse(readFileSync(opts.suites, 'utf8'));
+  const suites = selectSuites(manifest, opts.only);
   const baseJs = readFileSync(join(opts.octaneDir, 'base.js'), 'utf8');
   const runnerJs = readFileSync(opts.runner, 'utf8');
   const engines = opts.engines.split(',').map((s) => s.trim()).filter(Boolean);
   const generatedAt = new Date().toISOString();
 
-  mkdirSync(opts.outDir, { recursive: true });
-  const results = {};
+  // A partial run must never overwrite the committed full-run results, so it
+  // writes everything under the (gitignored) log directory instead.
+  const partial = Boolean(opts.only);
+  const outDir = partial ? join(opts.logDir, 'partial') : opts.outDir;
+  const dirs = { logDir: partial ? join(opts.logDir, 'partial') : opts.logDir };
+  mkdirSync(outDir, { recursive: true });
+  mkdirSync(dirs.logDir, { recursive: true });
 
+  if (partial) {
+    process.stderr.write(`[octane] --only ${opts.only.join(',')}: writing to ${outDir} (committed results left alone)\n`);
+  }
+
+  const results = {};
   for (const engine of engines) {
     let r;
-    if (engine === 'broiler') r = runBroiler(opts, manifest, baseJs, runnerJs);
-    else if (engine === 'chromium') r = await runChromium(opts, manifest, baseJs, runnerJs);
+    if (engine === 'broiler') r = await runBroiler(opts, suites, baseJs, runnerJs, dirs);
+    else if (engine === 'chromium') r = await runChromium(opts, suites, baseJs, runnerJs, dirs);
     else throw new Error(`Unknown engine: ${engine}`);
     r.generatedAt = generatedAt;
     results[engine] = r;
-    const out = join(opts.outDir, `${engine}-results.json`);
-    writeFileSync(out, JSON.stringify(r, null, 2) + '\n');
+    const out = join(outDir, `${engine}-results.json`);
+    writeFileSync(out, `${JSON.stringify(r, null, 2)}\n`);
     process.stderr.write(`[${engine}] wrote ${out} (overall score: ${r.geomean ?? 'n/a'})\n`);
+  }
+
+  if (results.broiler) {
+    const diagnostics = join(outDir, 'diagnostics.md');
+    writeFileSync(diagnostics, renderDiagnostics(results.broiler, generatedAt));
+    const failed = Object.values(results.broiler.suiteStatus).filter((s) => s.status !== 'ok').length;
+    process.stderr.write(`[broiler] wrote ${diagnostics} (${failed} failing suite${failed === 1 ? '' : 's'})\n`);
+  }
+
+  // A partial run compares nothing: its suite set is a subset, so folding it
+  // into the full comparison would silently drop every suite it skipped.
+  if (partial) {
+    process.stderr.write('[compare] skipped — partial run\n');
+    return;
   }
 
   // Fold in any per-engine result already on disk so a single-engine run still
   // refreshes the comparison against the other engine's last result.
   for (const engine of ['chromium', 'broiler']) {
     if (results[engine]) continue;
-    const p = join(opts.outDir, `${engine}-results.json`);
+    const p = join(outDir, `${engine}-results.json`);
     if (existsSync(p)) results[engine] = JSON.parse(readFileSync(p, 'utf8'));
   }
 
   const cmp = buildComparison(results, generatedAt);
-  writeFileSync(join(opts.outDir, 'comparison.json'), JSON.stringify(cmp, null, 2) + '\n');
-  writeFileSync(join(opts.outDir, 'comparison.md'), renderMarkdown(cmp));
-  process.stderr.write(`[compare] wrote comparison.json + comparison.md\n`);
+  writeFileSync(join(outDir, 'comparison.json'), `${JSON.stringify(cmp, null, 2)}\n`);
+  writeFileSync(join(outDir, 'comparison.md'), renderMarkdown(cmp, results.broiler));
+  process.stderr.write('[compare] wrote comparison.json + comparison.md\n');
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Guarded so the parsing helpers above can be imported by the harness self-test
+// without launching a benchmark run.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}
