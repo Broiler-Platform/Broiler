@@ -999,6 +999,14 @@ internal abstract partial class CssBoxProperties
     public string FlexBasis { get; set; } = "auto";
     public string FlexWrap { get; set; } = "nowrap";
 
+    /// <summary>
+    /// CSS Display §3 / Flexbox §5.4 <c>order</c>: an integer (initial <c>0</c>) that places a flex
+    /// or grid item into an ordinal group. Items are laid out and painted in <em>order-modified
+    /// document order</em> — ascending <c>order</c>, document order within a group — rather than
+    /// plain document order.
+    /// </summary>
+    public string Order { get; set; } = "0";
+
     // CSS Box Alignment §8: the initial value of justify-content is 'normal',
     // not 'flex-start'. In a flex container 'normal' behaves as 'flex-start'
     // (packed at the main-start edge), so flex layout is unchanged; in a grid
@@ -2536,6 +2544,7 @@ internal abstract partial class CssBoxProperties
         FlexShrink = p.FlexShrink;
         FlexBasis = p.FlexBasis;
         FlexWrap = p.FlexWrap;
+        Order = p.Order;
         JustifyContent = p.JustifyContent;
         JustifyItems = p.JustifyItems;
         AlignItems = p.AlignItems;

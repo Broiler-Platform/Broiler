@@ -537,8 +537,27 @@ public sealed partial class DomBridge
         {
             // The group animates old→new geometry; the reftests freeze it at the start, so it sits at
             // the old geometry when the element existed before the transition, else the new.
+            var groupDeclarations = LookupPseudo(pseudoRules, "group", capture);
+            var groupLeft = capture.GroupLeft;
+            var groupTop = capture.GroupTop;
             var groupW = capture.HasOld ? capture.OldWidth : capture.NewWidth;
             var groupH = capture.HasOld ? capture.OldHeight : capture.NewHeight;
+
+            // "Frozen at the start" is the animation's output at time 0, which is not always the old
+            // geometry: an author timing function of the `steps(…, jump-start)` family jumps before it
+            // advances, so at t=0 the group is already part-way to the new geometry. WPT auto-name
+            // pins exactly that with `steps(2, start)` — output 1/2 at t=0 — and its reference is the
+            // two items at the midpoint between their old and new positions. Every other timing
+            // function (linear, the eases, cubic-bezier, the jump-end family) is 0 at t=0 and leaves
+            // the group on the old geometry, which is what it has always done.
+            var progress = FrozenGroupProgress(groupDeclarations);
+            if (progress > 0 && capture.HasOld && capture.HasNew)
+            {
+                groupLeft = Interpolate(capture.OldLeft, capture.NewLeft, progress);
+                groupTop = Interpolate(capture.OldTop, capture.NewTop, progress);
+                groupW = Interpolate(capture.OldWidth, capture.NewWidth, progress);
+                groupH = Interpolate(capture.OldHeight, capture.NewHeight, progress);
+            }
             // The captured position is carried by the group's transform — its UA style, per spec, is
             // `position: absolute; inset: 0` with a transform translating to the snapshot's location.
             // Keeping left/top at 0 lets an author `::view-transition-group(name)` rule that sets
@@ -558,10 +577,10 @@ public sealed partial class DomBridge
 
             var group = CreateStyledBox(BaseStyle(
                 ("position", "absolute"), ("left", "0"), ("top", "0"),
-                ("transform", $"translate({Px(capture.GroupLeft)}, {Px(capture.GroupTop)})"),
+                ("transform", $"translate({Px(groupLeft)}, {Px(groupTop)})"),
                 ("width", Px(groupW)), ("height", Px(groupH)),
                 ("overflow", clipsContent ? "hidden" : "visible")),
-                LookupPseudo(pseudoRules, "group", capture));
+                groupDeclarations);
 
             // Between the group and its two snapshots sits ::view-transition-image-pair, the box the
             // spec gives the old/new pair so a rule can address both at once — WPT
@@ -821,6 +840,73 @@ public sealed partial class DomBridge
     }
 
 
+    private static double Interpolate(double from, double to, double progress) =>
+        from + ((to - from) * progress);
+
+    /// <summary>
+    /// The group animation's output at time 0 — the moment the reftests freeze it at. Read from the
+    /// group's <c>animation-timing-function</c>, because an easing function need not be 0 at input 0.
+    /// <para>
+    /// Only the <c>steps()</c> family can be non-zero there. <c>steps(n, jump-start)</c> (and its
+    /// <c>start</c> alias) takes its first jump immediately, so it outputs <c>1/n</c> at input 0;
+    /// <c>jump-both</c> has one extra jump and outputs <c>1/(n+1)</c>; the <c>step-start</c> keyword is
+    /// <c>steps(1, jump-start)</c>, so it is already fully at the new geometry. Everything else — the
+    /// <c>jump-end</c>/<c>end</c>/<c>jump-none</c> steps, <c>linear</c>, the eases,
+    /// <c>cubic-bezier()</c>, and an absent or unparseable value — is 0 at input 0 and leaves the
+    /// group exactly where it has always been placed.
+    /// </para>
+    /// This is a static read of a frozen animation, not a timeline: nothing here advances with time.
+    /// </summary>
+    private static double FrozenGroupProgress(Dictionary<string, string> groupDeclarations)
+    {
+        if (!groupDeclarations.TryGetValue("animation-timing-function", out var raw) ||
+            string.IsNullOrWhiteSpace(raw))
+            return 0;
+
+        // A comma-separated list pairs with animation-name; the group has one animation, so the
+        // first entry governs. Splitting on the top-level comma keeps `steps(2, start)` intact.
+        var value = FirstTopLevelValue(raw).Trim();
+
+        if (value.Equals("step-start", System.StringComparison.OrdinalIgnoreCase))
+            return 1;
+
+        if (!value.StartsWith("steps(", System.StringComparison.OrdinalIgnoreCase) ||
+            !value.EndsWith(")", System.StringComparison.Ordinal))
+            return 0;
+
+        var arguments = value[6..^1].Split(',');
+        if (arguments.Length == 0 ||
+            !int.TryParse(arguments[0].Trim(), System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out var steps) ||
+            steps < 1)
+            return 0;
+
+        var position = arguments.Length > 1 ? arguments[1].Trim() : "end";
+        if (position.Equals("start", System.StringComparison.OrdinalIgnoreCase) ||
+            position.Equals("jump-start", System.StringComparison.OrdinalIgnoreCase))
+            return 1d / steps;
+        if (position.Equals("jump-both", System.StringComparison.OrdinalIgnoreCase))
+            return 1d / (steps + 1);
+
+        return 0;
+    }
+
+    /// <summary>The first entry of a comma-separated CSS value list, ignoring commas nested inside
+    /// functional notation (so <c>steps(2, start)</c> survives as one entry).</summary>
+    private static string FirstTopLevelValue(string value)
+    {
+        var depth = 0;
+        for (var index = 0; index < value.Length; index++)
+        {
+            var character = value[index];
+            if (character == '(') depth++;
+            else if (character == ')') depth--;
+            else if (character == ',' && depth == 0) return value[..index];
+        }
+
+        return value;
+    }
+
     /// <summary>
     /// Whether the author's bare <c>::view-transition</c> declarations paint a backdrop between the
     /// live page and the snapshots above it. While they do not, a root snapshot can stay
@@ -952,9 +1038,12 @@ public sealed partial class DomBridge
 
     private readonly record struct ViewTransitionCapture(
         string Name,
+        // The captured element's `view-transition-class` list, matched by a pseudo argument's
+        // `.class` part (css-view-transitions-2 <pt-class-selector>). Empty when it has none.
+        string Classes,
         double GroupLeft, double GroupTop,
-        bool HasOld, double OldWidth, double OldHeight, string OldBackground, DomElement? OldContent,
-        bool HasNew, double NewWidth, double NewHeight, string NewBackground, DomElement? NewContent);
+        bool HasOld, double OldLeft, double OldTop, double OldWidth, double OldHeight, string OldBackground, DomElement? OldContent,
+        bool HasNew, double NewLeft, double NewTop, double NewWidth, double NewHeight, string NewBackground, DomElement? NewContent);
 
     /// <summary>
     /// The captured names, each pairing the "old" snapshot (from before the update callback) with the
@@ -965,6 +1054,9 @@ public sealed partial class DomBridge
     {
         var newCaptures = new Dictionary<string, NamedSnapshot>(System.StringComparer.Ordinal);
         var order = new List<string>();
+        // `view-transition-class` per captured name, so ::view-transition-group(*.item) can address a
+        // group by class rather than by name (css-view-transitions-2).
+        var classesByName = new Dictionary<string, string>(System.StringComparer.Ordinal);
 
         void AddNew(string name, NamedSnapshot snapshot)
         {
@@ -988,6 +1080,7 @@ public sealed partial class DomBridge
             AddNew(rootName, new NamedSnapshot(l, t, w, h,
                 rootStyle.GetValueOrDefault("background-color") ?? "transparent",
                 rootOverlayOccludesPage ? BuildRootViewTransitionSnapshotContent(rootStyle) : null));
+            classesByName[rootName] = rootStyle.GetValueOrDefault("view-transition-class") ?? string.Empty;
         }
 
         foreach (var element in root.Descendants().OfType<DomElement>())
@@ -1001,6 +1094,7 @@ public sealed partial class DomBridge
             AddNew(name, new NamedSnapshot(l, t, w, h,
                 style.GetValueOrDefault("background-color") ?? "transparent",
                 BuildViewTransitionSnapshotContent(element)));
+            classesByName.TryAdd(name, style.GetValueOrDefault("view-transition-class") ?? string.Empty);
         }
 
         var oldCaptures = _activeViewTransition!.OldCaptures;
@@ -1016,9 +1110,9 @@ public sealed partial class DomBridge
             var hasNew = newCaptures.TryGetValue(name, out var @new);
             var anchor = hasOld ? old : @new; // group start geometry
             captures.Add(new ViewTransitionCapture(
-                name, anchor.Left, anchor.Top,
-                hasOld, old.Width, old.Height, old.BackgroundColor, old.Content,
-                hasNew, @new.Width, @new.Height, @new.BackgroundColor, @new.Content));
+                name, classesByName.GetValueOrDefault(name) ?? string.Empty, anchor.Left, anchor.Top,
+                hasOld, old.Left, old.Top, old.Width, old.Height, old.BackgroundColor, old.Content,
+                hasNew, @new.Left, @new.Top, @new.Width, @new.Height, @new.BackgroundColor, @new.Content));
         }
 
         return captures;
@@ -1166,9 +1260,74 @@ public sealed partial class DomBridge
             return merged;
         }
 
+        // css-view-transitions-2 lets a pseudo argument select by class as well as by name —
+        // `::view-transition-group(*.item)`, and the name-less `.item` shorthand — where the classes
+        // come from the captured element's `view-transition-class`. Merge least-specific first so a
+        // more specific rule wins: `*`, then class-only rules, then the exact name (with or without
+        // classes of its own). WPT auto-name drives its whole transition off `(.item)`.
         Merge("*");
+
+        var classes = SplitViewTransitionClasses(capture.Value.Classes);
+        var prefix = $"{kind}|";
+        foreach (var key in pseudoRules.Keys)
+        {
+            if (!key.StartsWith(prefix, System.StringComparison.Ordinal))
+                continue;
+
+            var argument = key[prefix.Length..];
+            if (argument.Length == 0 || argument == "*" || argument == capture.Value.Name)
+                continue; // handled by the explicit merges around this loop
+
+            var (nameSelector, requiredClasses) = ParsePseudoArgument(argument);
+            if (requiredClasses.Count == 0)
+                continue; // a plain name that is not this capture's
+
+            if (nameSelector is not "*" && !string.Equals(nameSelector, capture.Value.Name, System.StringComparison.Ordinal))
+                continue;
+
+            if (requiredClasses.All(required => classes.Contains(required)))
+                Merge(argument);
+        }
+
         Merge(capture.Value.Name);
         return merged;
+    }
+
+    /// <summary>Splits a <c>view-transition-class</c> value into its idents. <c>none</c> (the initial
+    /// value) contributes nothing.</summary>
+    private static HashSet<string> SplitViewTransitionClasses(string? value)
+    {
+        var classes = new HashSet<string>(System.StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(value))
+            return classes;
+
+        foreach (var token in value.Split((char[]?)null, System.StringSplitOptions.RemoveEmptyEntries))
+            if (!token.Equals("none", System.StringComparison.OrdinalIgnoreCase))
+                classes.Add(token);
+
+        return classes;
+    }
+
+    /// <summary>
+    /// Splits a <c>::view-transition-*()</c> argument into its name selector and class selectors —
+    /// <c>&lt;pt-name-selector&gt;&lt;pt-class-selector&gt;?</c>. A leading <c>.</c> means the name
+    /// selector was omitted, which is the same as <c>*</c>.
+    /// </summary>
+    private static (string Name, List<string> Classes) ParsePseudoArgument(string argument)
+    {
+        var trimmed = argument.Trim();
+        var dot = trimmed.IndexOf('.');
+        if (dot < 0)
+            return (trimmed, []);
+
+        var name = dot == 0 ? "*" : trimmed[..dot];
+        var classes = trimmed[(dot + 1)..]
+            .Split('.', System.StringSplitOptions.RemoveEmptyEntries)
+            .Select(static part => part.Trim())
+            .Where(static part => part.Length > 0)
+            .ToList();
+
+        return (name, classes);
     }
 
     /// <summary>

@@ -1097,6 +1097,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 {
                     TextAlign = CssConstants.Right;
                 }
+
+                ApplyOrderModifiedDocumentOrder();
             }
 
             if (IsRowFlexContainer())
