@@ -27,6 +27,18 @@ on:
         description: Git ref of chromium/octane to benchmark.
         required: false
         default: 'master'
+      only:
+        description: >-
+          Comma-separated suites to run (e.g. Crypto,zlib). Leave empty for all.
+          A partial run writes to tests/octane/logs/partial and never overwrites
+          the committed results.
+        required: false
+        default: ''
+      verbose:
+        description: Stream each engine process's output into the job log.
+        type: boolean
+        required: false
+        default: false
       commit_results:
         description: Commit the refreshed results back to the branch.
         type: boolean
@@ -64,24 +76,42 @@ jobs:
           node-version: '20'
 
       - name: Run Octane benchmarks
+        env:
+          ONLY: ${{ github.event.inputs.only }}
+          VERBOSE: ${{ github.event.inputs.verbose }}
         run: |
-          bash scripts/run-octane-benchmarks.sh \
-            --engines "${{ github.event.inputs.engines || 'chromium,broiler' }}" \
-            --timeout "${{ github.event.inputs.timeout_seconds || '180' }}" \
+          args=(
+            --engines "${{ github.event.inputs.engines || 'chromium,broiler' }}"
+            --timeout "${{ github.event.inputs.timeout_seconds || '180' }}"
             --octane-ref "${{ github.event.inputs.octane_ref || 'master' }}"
+          )
+          [ -n "$ONLY" ] && args+=(--only "$ONLY")
+          [ "$VERBOSE" = "true" ] && args+=(--verbose)
+          bash scripts/run-octane-benchmarks.sh "${args[@]}"
 
-      - name: Publish comparison to job summary
+      - name: Publish comparison and failure diagnostics to job summary
         if: always()
         run: |
-          if [ -f tests/octane/results/comparison.md ]; then
-            cat tests/octane/results/comparison.md >> "$GITHUB_STEP_SUMMARY"
-          fi
+          for f in tests/octane/results/comparison.md tests/octane/results/diagnostics.md; do
+            [ -f "$f" ] && cat "$f" >> "$GITHUB_STEP_SUMMARY"
+          done
+          exit 0
 
       - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: octane-results
           path: tests/octane/results/
+
+      # The per-suite logs hold the whole story for a failing suite — full
+      # stdout/stderr, the exit code, the phase it died in, and the combined
+      # script that reproduces it. They are gitignored, so CI keeps them here.
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: octane-logs
+          path: tests/octane/logs/
+          if-no-files-found: ignore
 
       - name: Commit results
         if: ${{ github.event.inputs.commit_results != 'false' }}
