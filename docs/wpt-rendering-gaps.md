@@ -401,9 +401,37 @@ Four caveats, all learned the hard way:
      headless render with no retractable UA chrome, so they canonicalise onto it.
      Verified end-to-end: `100vi × 100vb` fills the viewport, a `vertical-rl`
      root swaps the axes, and `100dvw × 50svh` covers half the canvas.
-  2. Lay out and paint a `contain: size` box inside table internals.
-  3. Establish what a vertical-rl root's initial scroll position is and align the
-     canvas extent with it.
+  2. ~~Lay out and paint a `contain: size` box inside table internals.~~
+     **Half done, and the diagnosis was wrong.** `contain: size` is not involved:
+     a `contain: size` box paints fine on its own. Two separate faults sit behind
+     `monolithic-overflow-011`, found by bisecting the test down to
+     `<table style="background: yellow">`:
+     - **A table never painted its own background or borders at all** — CSS2.1
+       §17.5.1 layer 1. The six-layer model covers a table's *internals*, but the
+       painter handed the whole table to that pass (which starts at layer 2) while
+       the background phase skipped `display: table` children outright and the
+       foreground phase suppresses block backgrounds. Nobody emitted layer 1.
+       Diagnosed at the source, not from pixels: the fragment has correct bounds
+       and a computed `background-color` of yellow and still emits no fill.
+       **Fixed** — `patches/0045`, with `TableBackgroundPaintTests` as the landed
+       check. This is ordinary markup, not a paged-media edge case.
+     - **Still open:** a block child of a `display: table-row-group` gets no box.
+       The row-group measures 0×0 and its child computes `display: inline`, so the
+       hotpink rectangle has nowhere to paint and the table is only as tall as its
+       stray text. That is table fixup — a block inside a row group needs wrapping
+       in an anonymous table-cell — and it is what still holds the test at 2.26%.
+  3. ~~Establish what a vertical-rl root's initial scroll position is and align the
+     canvas extent with it.~~ **Done, and `page-margin-002` must not be "fixed":
+     the reference is a screenshot artifact.** The two engines do *not* disagree
+     about layout. Asked directly under Playwright, Chromium puts the yellow
+     `.fullpager` at exactly `(0, 0, 1024, 768)` — filling the viewport — with
+     cyan at `x: -1024`, pink at `x: -2048`, `scrollLeft: 0` and
+     `scrollWidth: 3072`. That is what Broiler renders. But Chromium's own
+     **viewport** screenshot of that same page is 100% white, while its
+     **full-page** screenshot (3072×768) paints all three blocks, yellow at the
+     right. So the blank reference is an artifact of screenshotting a `vertical-rl`
+     root, not evidence about rendering, and matching it would mean drawing
+     nothing. Same category as problems 14, 15, 18, 24 and 25.
 - **Exit gate:** all three tests match on screen, with focused tests for logical
   viewport units and for `contain: size` in table internals — and no paged-media
   work is required to get there. The viewport-unit half of that gate is met (a
