@@ -66,14 +66,14 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"stopPropagation", new JSFunction(JsRegistrationStopPropagation018, "stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"stopPropagation", new DomFunction(JsRegistrationStopPropagation018, "stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationStopImmediatePropagation019(in Arguments _)
         {
             legacyCancelBubble = true;
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"stopImmediatePropagation", new JSFunction(JsRegistrationStopImmediatePropagation019, "stopImmediatePropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"stopImmediatePropagation", new DomFunction(JsRegistrationStopImmediatePropagation019, "stopImmediatePropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationPreventDefault020(in Arguments _)
         {
             var cancelable = evt[(KeyString)"cancelable"];
@@ -82,7 +82,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"preventDefault", new JSFunction(JsRegistrationPreventDefault020, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"preventDefault", new DomFunction(JsRegistrationPreventDefault020, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationGetCancelBubble021(in Arguments _)
         {
             return legacyCancelBubble ? JSBoolean.True : JSBoolean.False;
@@ -95,7 +95,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddProperty((KeyString)"cancelBubble", new JSFunction(JsRegistrationGetCancelBubble021, "get cancelBubble"), new JSFunction(JsRegistrationSetCancelBubble022, "set cancelBubble"), JSPropertyAttributes.EnumerableConfigurableProperty);
+        evt.FastAddProperty((KeyString)"cancelBubble", new DomFunction(JsRegistrationGetCancelBubble021, "get cancelBubble"), new DomFunction(JsRegistrationSetCancelBubble022, "set cancelBubble"), JSPropertyAttributes.EnumerableConfigurableProperty);
         JSValue JsRegistrationGetReturnValue023(in Arguments _)
         {
             return evt[(KeyString)"defaultPrevented"].BooleanValue ? JSBoolean.False : JSBoolean.True;
@@ -109,7 +109,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddProperty((KeyString)"returnValue", new JSFunction(JsRegistrationGetReturnValue023, "get returnValue"), new JSFunction(JsRegistrationSetReturnValue024, "set returnValue"), JSPropertyAttributes.EnumerableConfigurableProperty);
+        evt.FastAddProperty((KeyString)"returnValue", new DomFunction(JsRegistrationGetReturnValue023, "get returnValue"), new DomFunction(JsRegistrationSetReturnValue024, "set returnValue"), JSPropertyAttributes.EnumerableConfigurableProperty);
         JSValue JsRegistrationInitEvent025(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -121,7 +121,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initEvent", new JSFunction(JsRegistrationInitEvent025, "initEvent", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initEvent", new DomFunction(JsRegistrationInitEvent025, "initEvent", 3), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitUIEvent026(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -137,7 +137,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initUIEvent", new JSFunction(JsRegistrationInitUIEvent026, "initUIEvent", 5), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initUIEvent", new DomFunction(JsRegistrationInitUIEvent026, "initUIEvent", 5), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitInputEvent027(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -157,7 +157,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initInputEvent", new JSFunction(JsRegistrationInitInputEvent027, "initInputEvent", 7), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initInputEvent", new DomFunction(JsRegistrationInitInputEvent027, "initInputEvent", 7), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitCustomEvent028(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -170,7 +170,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initCustomEvent", new JSFunction(JsRegistrationInitCustomEvent028, "initCustomEvent", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initCustomEvent", new DomFunction(JsRegistrationInitCustomEvent028, "initCustomEvent", 4), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitFocusEvent029(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -188,7 +188,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initFocusEvent", new JSFunction(JsRegistrationInitFocusEvent029, "initFocusEvent", 6), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initFocusEvent", new DomFunction(JsRegistrationInitFocusEvent029, "initFocusEvent", 6), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitKeyboardEvent030(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -231,7 +231,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initKeyboardEvent", new JSFunction(JsRegistrationInitKeyboardEvent030, "initKeyboardEvent", 13), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initKeyboardEvent", new DomFunction(JsRegistrationInitKeyboardEvent030, "initKeyboardEvent", 13), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitMouseEvent031(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -286,7 +286,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initMouseEvent", new JSFunction(JsRegistrationInitMouseEvent031, "initMouseEvent", 15), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initMouseEvent", new DomFunction(JsRegistrationInitMouseEvent031, "initMouseEvent", 15), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitWheelEvent032(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -339,7 +339,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initWheelEvent", new JSFunction(JsRegistrationInitWheelEvent032, "initWheelEvent", 16), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initWheelEvent", new DomFunction(JsRegistrationInitWheelEvent032, "initWheelEvent", 16), JSPropertyAttributes.EnumerableConfigurableValue);
         return evt;
     }
 }

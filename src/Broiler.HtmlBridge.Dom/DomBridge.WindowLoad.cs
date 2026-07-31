@@ -185,26 +185,26 @@ public sealed partial class DomBridge
         var legacyCancelBubble = false;
         evt[(KeyString)"defaultPrevented"] = prevented ? JSBoolean.True : JSBoolean.False;
         evt.FastAddValue((KeyString)"stopPropagation",
-            new JSFunction((in _) => JsCallbackStopPropagation001Core(ref legacyCancelBubble, in _), "stopPropagation", 0),
+            new DomFunction((in _) => JsCallbackStopPropagation001Core(ref legacyCancelBubble, in _), "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"stopImmediatePropagation",
-            new JSFunction((in _) => JsCallbackStopImmediatePropagation002Core(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
+            new DomFunction((in _) => JsCallbackStopImmediatePropagation002Core(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"preventDefault",
-            new JSFunction((in _) => JsCallbackPreventDefault003Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
+            new DomFunction((in _) => JsCallbackPreventDefault003Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddProperty(
             (KeyString)"cancelBubble",
-            new JSFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
-            new JSFunction((in setArgs) => JsCallbackSetCancelBubble005Core(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
+            new DomFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
+            new DomFunction((in setArgs) => JsCallbackSetCancelBubble005Core(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
         evt.FastAddProperty(
             (KeyString)"returnValue",
-            new JSFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
-            new JSFunction((in setArgs) => JsCallbackSetReturnValue007Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
+            new DomFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
+            new DomFunction((in setArgs) => JsCallbackSetReturnValue007Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
         evt.FastAddValue((KeyString)"composedPath",
-            new JSFunction((in _) => new JSArray(_windowJSObject), "composedPath", 0),
+            new DomFunction((in _) => new JSArray(_windowJSObject), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         if (_eventTargets.TryGetWindowListeners(eventType, out var listeners))

@@ -35,29 +35,29 @@ internal sealed class AttributesBinding(IAttributesHost host)
         var map = new JSObject();
 
         // length — number of attributes
-        map.FastAddProperty((KeyString)"length", new JSFunction((in _) => new JSNumber(element.Attributes.Count), "get length"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        map.FastAddProperty((KeyString)"length", new DomFunction((in _) => new JSNumber(element.Attributes.Count), "get length"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // getNamedItem(name) — returns Attr node or null
-        map.FastAddValue((KeyString)"getNamedItem", new JSFunction((in a) => GetNamedItem(element, ownerObj, in a), "getNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        map.FastAddValue((KeyString)"getNamedItemNS", new JSFunction((in a) => GetNamedItemNS(element, ownerObj, in a), "getNamedItemNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"getNamedItem", new DomFunction((in a) => GetNamedItem(element, ownerObj, in a), "getNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"getNamedItemNS", new DomFunction((in a) => GetNamedItemNS(element, ownerObj, in a), "getNamedItemNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // setNamedItem(attr) — adds/replaces attribute from Attr node, returns old Attr or null
-        map.FastAddValue((KeyString)"setNamedItem", new JSFunction((in a) => SetNamedItem(element, ownerObj, in a), "setNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        map.FastAddValue((KeyString)"setNamedItemNS", new JSFunction((in a) => SetNamedItemNS(element, ownerObj, in a), "setNamedItemNS", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"setNamedItem", new DomFunction((in a) => SetNamedItem(element, ownerObj, in a), "setNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"setNamedItemNS", new DomFunction((in a) => SetNamedItemNS(element, ownerObj, in a), "setNamedItemNS", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // removeNamedItem(name) — removes and returns the Attr node
-        map.FastAddValue((KeyString)"removeNamedItem", new JSFunction((in a) => RemoveNamedItem(element, ownerObj, in a), "removeNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        map.FastAddValue((KeyString)"removeNamedItemNS", new JSFunction((in a) => RemoveNamedItemNS(element, ownerObj, in a), "removeNamedItemNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"removeNamedItem", new DomFunction((in a) => RemoveNamedItem(element, ownerObj, in a), "removeNamedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"removeNamedItemNS", new DomFunction((in a) => RemoveNamedItemNS(element, ownerObj, in a), "removeNamedItemNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // item(index) — returns Attr node at position
-        map.FastAddValue((KeyString)"item", new JSFunction((in a) => Item(element, ownerObj, in a), "item", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        map.FastAddValue((KeyString)"item", new DomFunction((in a) => Item(element, ownerObj, in a), "item", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Numeric index access — expose each attribute by index
         var attrKeys = DomBridge.AttributeNames(element).ToList();
         for (var i = 0; i < attrKeys.Count; i++)
         {
             var idx = i;
-            map.FastAddProperty((KeyString)idx.ToString(), new JSFunction((in _) => IndexedItem(element, idx, ownerObj, in _), "get " + idx), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+            map.FastAddProperty((KeyString)idx.ToString(), new DomFunction((in _) => IndexedItem(element, idx, ownerObj, in _), "get " + idx), null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         return map;

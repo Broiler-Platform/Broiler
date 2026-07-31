@@ -35,87 +35,87 @@ internal static class ElementGeometryBinding
         var isViewportElement = host.IsViewportElementForMetrics(element);
 
         obj.FastAddProperty((KeyString)"clientTop",
-            new JSFunction((in _) => new JSNumber(host.GetClientTopForDomElement(element)), "get clientTop"),
+            new DomFunction((in _) => new JSNumber(host.GetClientTopForDomElement(element)), "get clientTop"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"clientLeft",
-            new JSFunction((in _) => new JSNumber(host.GetClientLeftForDomElement(element)), "get clientLeft"),
+            new DomFunction((in _) => new JSNumber(host.GetClientLeftForDomElement(element)), "get clientLeft"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"clientWidth",
-            new JSFunction((in _) => new JSNumber(host.GetClientWidthForDomElement(element, isViewportElement)), "get clientWidth"),
+            new DomFunction((in _) => new JSNumber(host.GetClientWidthForDomElement(element, isViewportElement)), "get clientWidth"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"clientHeight",
-            new JSFunction((in _) => new JSNumber(host.GetClientHeightForDomElement(element, isViewportElement)), "get clientHeight"),
+            new DomFunction((in _) => new JSNumber(host.GetClientHeightForDomElement(element, isViewportElement)), "get clientHeight"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"offsetWidth",
-            new JSFunction((in _) => new JSNumber(host.GetOffsetWidthForDomElement(element, isViewportElement)), "get offsetWidth"),
+            new DomFunction((in _) => new JSNumber(host.GetOffsetWidthForDomElement(element, isViewportElement)), "get offsetWidth"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"offsetHeight",
-            new JSFunction((in _) => new JSNumber(host.GetOffsetHeightForDomElement(element, isViewportElement)), "get offsetHeight"),
+            new DomFunction((in _) => new JSNumber(host.GetOffsetHeightForDomElement(element, isViewportElement)), "get offsetHeight"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"scrollWidth",
-            new JSFunction((in _) => new JSNumber(host.GetScrollWidthForDomElement(element, isViewportElement)), "get scrollWidth"),
+            new DomFunction((in _) => new JSNumber(host.GetScrollWidthForDomElement(element, isViewportElement)), "get scrollWidth"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"scrollHeight",
-            new JSFunction((in _) => new JSNumber(host.GetScrollHeightForDomElement(element, isViewportElement)), "get scrollHeight"),
+            new DomFunction((in _) => new JSNumber(host.GetScrollHeightForDomElement(element, isViewportElement)), "get scrollHeight"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"scrollTop",
-            new JSFunction((in _) => GetScrollTop(host, element), "get scrollTop"),
-            new JSFunction((in a) => SetScrollTop(host, element, in a), "set scrollTop"),
+            new DomFunction((in _) => GetScrollTop(host, element), "get scrollTop"),
+            new DomFunction((in a) => SetScrollTop(host, element, in a), "set scrollTop"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"scrollLeft",
-            new JSFunction((in _) => GetScrollLeft(host, element), "get scrollLeft"),
-            new JSFunction((in a) => SetScrollLeft(host, element, in a), "set scrollLeft"),
+            new DomFunction((in _) => GetScrollLeft(host, element), "get scrollLeft"),
+            new DomFunction((in a) => SetScrollLeft(host, element, in a), "set scrollLeft"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"offsetTop",
-            new JSFunction((in _) => new JSNumber(host.GetOffsetTopForDomElement(element)), "get offsetTop"),
+            new DomFunction((in _) => new JSNumber(host.GetOffsetTopForDomElement(element)), "get offsetTop"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"offsetLeft",
-            new JSFunction((in _) => new JSNumber(host.GetOffsetLeftForDomElement(element)), "get offsetLeft"),
+            new DomFunction((in _) => new JSNumber(host.GetOffsetLeftForDomElement(element)), "get offsetLeft"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"offsetParent",
-            new JSFunction((in _) => GetOffsetParent(host, element), "get offsetParent"),
+            new DomFunction((in _) => GetOffsetParent(host, element), "get offsetParent"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // getBoundingClientRect() — returns DOMRect-like object
         obj.FastAddValue((KeyString)"getBoundingClientRect",
-            new JSFunction((in _) => GetBoundingClientRect(host, element, isViewportElement), "getBoundingClientRect", 0),
+            new DomFunction((in _) => GetBoundingClientRect(host, element, isViewportElement), "getBoundingClientRect", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getClientRects() — returns array with one DOMRect for root elements
         obj.FastAddValue((KeyString)"getClientRects",
-            new JSFunction((in a2) => GetClientRects(host, element, isViewportElement), "getClientRects", 0),
+            new DomFunction((in a2) => GetClientRects(host, element, isViewportElement), "getClientRects", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"scrollIntoView",
-            new JSFunction((in a) => ScrollIntoView(host, element, in a), "scrollIntoView", 1),
+            new DomFunction((in a) => ScrollIntoView(host, element, in a), "scrollIntoView", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"scroll",
-            new JSFunction((in a) => Scroll(host, element, in a), "scroll", 2),
+            new DomFunction((in a) => Scroll(host, element, in a), "scroll", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"scrollTo",
-            new JSFunction((in a) => Scroll(host, element, in a), "scrollTo", 2),
+            new DomFunction((in a) => Scroll(host, element, in a), "scrollTo", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"scrollBy",
-            new JSFunction((in a) => ScrollBy(host, element, in a), "scrollBy", 2),
+            new DomFunction((in a) => ScrollBy(host, element, in a), "scrollBy", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"scrollParent",
-            new JSFunction((in _) => GetScrollParent(host, element), "scrollParent", 0),
+            new DomFunction((in _) => GetScrollParent(host, element), "scrollParent", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
 

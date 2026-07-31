@@ -25,14 +25,14 @@ internal static class ElementContentBinding
     {
         // innerHTML (read/write)
         obj.FastAddProperty((KeyString)"innerHTML",
-            new JSFunction((in _) => new JSString(host.SerializeChildrenToHtml(element)), "get innerHTML"),
-            new JSFunction((in a) => SetInnerHtml(host, element, in a), "set innerHTML"),
+            new DomFunction((in _) => new JSString(host.SerializeChildrenToHtml(element)), "get innerHTML"),
+            new DomFunction((in a) => SetInnerHtml(host, element, in a), "set innerHTML"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // outerHTML (read/write)
         obj.FastAddProperty((KeyString)"outerHTML",
-            new JSFunction((in _) => new JSString(host.SerializeElementToHtml(element)), "get outerHTML"),
-            new JSFunction((in a) => SetOuterHtml(host, element, in a), "set outerHTML"),
+            new DomFunction((in _) => new JSString(host.SerializeElementToHtml(element)), "get outerHTML"),
+            new DomFunction((in a) => SetOuterHtml(host, element, in a), "set outerHTML"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 
@@ -41,16 +41,16 @@ internal static class ElementContentBinding
     {
         // textContent (read/write)
         obj.FastAddProperty((KeyString)"textContent",
-            new JSFunction((in _) => host.GetNodeTextValue(element), "get textContent"),
-            new JSFunction((in a) => SetTextContent(host, element, in a), "set textContent"),
+            new DomFunction((in _) => host.GetNodeTextValue(element), "get textContent"),
+            new DomFunction((in a) => SetTextContent(host, element, in a), "set textContent"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"innerText",
-            new JSFunction((in _) => host.GetNodeTextValue(element), "get innerText"),
+            new DomFunction((in _) => host.GetNodeTextValue(element), "get innerText"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"outerText",
-            new JSFunction((in _) => host.GetNodeTextValue(element), "get outerText"),
+            new DomFunction((in _) => host.GetNodeTextValue(element), "get outerText"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 

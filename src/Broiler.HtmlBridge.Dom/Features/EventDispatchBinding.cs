@@ -64,30 +64,30 @@ internal sealed class EventDispatchBinding(IEventDispatchHost host)
         evt[(KeyString)"eventPhase"] = new JSNumber(0);
 
         evt.FastAddValue((KeyString)"stopPropagation",
-            new JSFunction((in _) => EventStopPropagation(ref legacyCancelBubble, ref stopped, in _), "stopPropagation", 0),
+            new DomFunction((in _) => EventStopPropagation(ref legacyCancelBubble, ref stopped, in _), "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         evt.FastAddValue((KeyString)"stopImmediatePropagation",
-            new JSFunction((in _) => EventStopImmediatePropagation(ref immediateStopped, ref legacyCancelBubble, ref stopped, in _), "stopImmediatePropagation", 0),
+            new DomFunction((in _) => EventStopImmediatePropagation(ref immediateStopped, ref legacyCancelBubble, ref stopped, in _), "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         evt.FastAddValue((KeyString)"preventDefault",
-            new JSFunction((in _) => EventPreventDefault(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
+            new DomFunction((in _) => EventPreventDefault(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         evt.FastAddProperty(
             (KeyString)"cancelBubble",
-            new JSFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
-            new JSFunction((in setArgs) => EventSetCancelBubble(ref legacyCancelBubble, ref stopped, in setArgs), "set cancelBubble"),
+            new DomFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
+            new DomFunction((in setArgs) => EventSetCancelBubble(ref legacyCancelBubble, ref stopped, in setArgs), "set cancelBubble"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         evt.FastAddProperty((KeyString)"returnValue",
-            new JSFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
-            new JSFunction((in setArgs) => EventSetReturnValue(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
+            new DomFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
+            new DomFunction((in setArgs) => EventSetReturnValue(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         evt.FastAddValue((KeyString)"composedPath",
-            new JSFunction((in _) => BuildComposedPathValue(target, path), "composedPath", 0),
+            new DomFunction((in _) => BuildComposedPathValue(target, path), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Phase 1: Capture (root → parent of target)

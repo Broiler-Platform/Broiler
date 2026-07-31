@@ -59,22 +59,22 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
         // document.createTreeWalker(root, whatToShow, filter)
         document.FastAddValue(
             (KeyString)"createTreeWalker",
-            new JSFunction((in a) => CreateTreeWalker(in a), "createTreeWalker", 3),
+            new DomFunction((in a) => CreateTreeWalker(in a), "createTreeWalker", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // document.createNodeIterator(root, whatToShow, filter)
         document.FastAddValue(
             (KeyString)"createNodeIterator",
-            new JSFunction((in a) => CreateNodeIterator(in a), "createNodeIterator", 3),
+            new DomFunction((in a) => CreateNodeIterator(in a), "createNodeIterator", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // document.createRange()
         document.FastAddValue(
             (KeyString)"createRange",
-            new JSFunction((in _) => BuildRange(), "createRange", 0),
+            new DomFunction((in _) => BuildRange(), "createRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // document.createComment(data)
         document.FastAddValue(
             (KeyString)"createComment",
-            new JSFunction((in a) => CreateComment(in a), "createComment", 1),
+            new DomFunction((in a) => CreateComment(in a), "createComment", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
@@ -159,8 +159,8 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         tw.FastAddProperty((KeyString)"currentNode",
-            new JSFunction((in a) => _host.ToJSObject(walker.CurrentNode), "get currentNode"),
-            new JSFunction((in a) =>
+            new DomFunction((in a) => _host.ToJSObject(walker.CurrentNode), "get currentNode"),
+            new DomFunction((in a) =>
             {
                 if (a.Length > 0 && a[0] is JSObject nodeObject &&
                     _host.FindDomNodeByJSObject(nodeObject) is { } node)
@@ -176,27 +176,27 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         tw.FastAddValue((KeyString)"parentNode",
-            new JSFunction((in a) => ToTraversalJsValue(walker.ParentNode()), "parentNode", 0),
+            new DomFunction((in a) => ToTraversalJsValue(walker.ParentNode()), "parentNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         tw.FastAddValue((KeyString)"firstChild",
-            new JSFunction((in a) => ToTraversalJsValue(walker.FirstChild()), "firstChild", 0),
+            new DomFunction((in a) => ToTraversalJsValue(walker.FirstChild()), "firstChild", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         tw.FastAddValue((KeyString)"lastChild",
-            new JSFunction((in a) => ToTraversalJsValue(walker.LastChild()), "lastChild", 0),
+            new DomFunction((in a) => ToTraversalJsValue(walker.LastChild()), "lastChild", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         tw.FastAddValue((KeyString)"nextSibling",
-            new JSFunction((in a) => ToTraversalJsValue(walker.NextSibling()), "nextSibling", 0),
+            new DomFunction((in a) => ToTraversalJsValue(walker.NextSibling()), "nextSibling", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         tw.FastAddValue((KeyString)"previousSibling",
-            new JSFunction((in a) => ToTraversalJsValue(walker.PreviousSibling()), "previousSibling", 0),
+            new DomFunction((in a) => ToTraversalJsValue(walker.PreviousSibling()), "previousSibling", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // nextNode() — depth-first pre-order traversal forward
         tw.FastAddValue((KeyString)"nextNode",
-            new JSFunction((in a) => ToTraversalJsValue(walker.NextNode()), "nextNode", 0),
+            new DomFunction((in a) => ToTraversalJsValue(walker.NextNode()), "nextNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // previousNode() — depth-first pre-order traversal backward
         tw.FastAddValue((KeyString)"previousNode",
-            new JSFunction((in a) => ToTraversalJsValue(walker.PreviousNode()), "previousNode", 0),
+            new DomFunction((in a) => ToTraversalJsValue(walker.PreviousNode()), "previousNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return tw;
@@ -226,21 +226,21 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         iter.FastAddProperty((KeyString)"referenceNode",
-            new JSFunction((in a) => ToTraversalJsValue(iterator.ReferenceNode), "get referenceNode"),
+            new DomFunction((in a) => ToTraversalJsValue(iterator.ReferenceNode), "get referenceNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         iter.FastAddProperty((KeyString)"pointerBeforeReferenceNode",
-            new JSFunction((in a) => iterator.PointerBeforeReferenceNode ? JSBoolean.True : JSBoolean.False, "get pointerBeforeReferenceNode"),
+            new DomFunction((in a) => iterator.PointerBeforeReferenceNode ? JSBoolean.True : JSBoolean.False, "get pointerBeforeReferenceNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         iter.FastAddValue((KeyString)"nextNode",
-            new JSFunction((in a) => ToTraversalJsValue(iterator.NextNode()), "nextNode", 0),
+            new DomFunction((in a) => ToTraversalJsValue(iterator.NextNode()), "nextNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         iter.FastAddValue((KeyString)"previousNode",
-            new JSFunction((in a) => ToTraversalJsValue(iterator.PreviousNode()), "previousNode", 0),
+            new DomFunction((in a) => ToTraversalJsValue(iterator.PreviousNode()), "previousNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         iter.FastAddValue((KeyString)"detach",
-            new JSFunction((in a) =>
+            new DomFunction((in a) =>
             {
                 iterator.Dispose();
                 return JSUndefined.Value;
@@ -263,80 +263,80 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
         var state = new BridgeDomRange(_host, docRoot);
 
         range.FastAddProperty((KeyString)"startContainer",
-            new JSFunction((in a) => _host.ToJSObject(state.StartContainer), "get startContainer"),
+            new DomFunction((in a) => _host.ToJSObject(state.StartContainer), "get startContainer"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         range.FastAddProperty((KeyString)"startOffset",
-            new JSFunction((in a) => new JSNumber(state.StartOffset), "get startOffset"),
+            new DomFunction((in a) => new JSNumber(state.StartOffset), "get startOffset"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         range.FastAddProperty((KeyString)"endContainer",
-            new JSFunction((in a) => _host.ToJSObject(state.EndContainer), "get endContainer"),
+            new DomFunction((in a) => _host.ToJSObject(state.EndContainer), "get endContainer"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         range.FastAddProperty((KeyString)"endOffset",
-            new JSFunction((in a) => new JSNumber(state.EndOffset), "get endOffset"),
+            new DomFunction((in a) => new JSNumber(state.EndOffset), "get endOffset"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         range.FastAddProperty((KeyString)"collapsed",
-            new JSFunction((in a) => state.Collapsed ? JSBoolean.True : JSBoolean.False, "get collapsed"),
+            new DomFunction((in a) => state.Collapsed ? JSBoolean.True : JSBoolean.False, "get collapsed"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         range.FastAddProperty((KeyString)"commonAncestorContainer",
-            new JSFunction((in a) => RangeGetCommonAncestorContainer(state, in a), "get commonAncestorContainer"),
+            new DomFunction((in a) => RangeGetCommonAncestorContainer(state, in a), "get commonAncestorContainer"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         range.FastAddValue((KeyString)"getBoundingClientRect",
-            new JSFunction((in _) => RangeGetBoundingClientRect(state, in _), "getBoundingClientRect", 0),
+            new DomFunction((in _) => RangeGetBoundingClientRect(state, in _), "getBoundingClientRect", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"getClientRects",
-            new JSFunction((in _) => RangeGetClientRects(state, in _), "getClientRects", 0),
+            new DomFunction((in _) => RangeGetClientRects(state, in _), "getClientRects", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"setStart",
-            new JSFunction((in a) => RangeSetStart(state, in a), "setStart", 2),
+            new DomFunction((in a) => RangeSetStart(state, in a), "setStart", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"setEnd",
-            new JSFunction((in a) => RangeSetEnd(state, in a), "setEnd", 2),
+            new DomFunction((in a) => RangeSetEnd(state, in a), "setEnd", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"setStartBefore",
-            new JSFunction((in a) => RangeSetStartBefore(state, in a), "setStartBefore", 1),
+            new DomFunction((in a) => RangeSetStartBefore(state, in a), "setStartBefore", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"setStartAfter",
-            new JSFunction((in a) => RangeSetStartAfter(state, in a), "setStartAfter", 1),
+            new DomFunction((in a) => RangeSetStartAfter(state, in a), "setStartAfter", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"setEndBefore",
-            new JSFunction((in a) => RangeSetEndBefore(state, in a), "setEndBefore", 1),
+            new DomFunction((in a) => RangeSetEndBefore(state, in a), "setEndBefore", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"setEndAfter",
-            new JSFunction((in a) => RangeSetEndAfter(state, in a), "setEndAfter", 1),
+            new DomFunction((in a) => RangeSetEndAfter(state, in a), "setEndAfter", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"collapse",
-            new JSFunction((in a) => RangeCollapse(state, in a), "collapse", 1),
+            new DomFunction((in a) => RangeCollapse(state, in a), "collapse", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"selectNode",
-            new JSFunction((in a) => RangeSelectNode(state, in a), "selectNode", 1),
+            new DomFunction((in a) => RangeSelectNode(state, in a), "selectNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"selectNodeContents",
-            new JSFunction((in a) => RangeSelectNodeContents(state, in a), "selectNodeContents", 1),
+            new DomFunction((in a) => RangeSelectNodeContents(state, in a), "selectNodeContents", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"cloneContents",
-            new JSFunction((in a) => RangeCloneContents(state, in a), "cloneContents", 0),
+            new DomFunction((in a) => RangeCloneContents(state, in a), "cloneContents", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"extractContents",
-            new JSFunction((in a) => RangeExtractContents(state, in a), "extractContents", 0),
+            new DomFunction((in a) => RangeExtractContents(state, in a), "extractContents", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"deleteContents",
-            new JSFunction((in a) => RangeDeleteContents(state, in a), "deleteContents", 0),
+            new DomFunction((in a) => RangeDeleteContents(state, in a), "deleteContents", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"insertNode",
-            new JSFunction((in a) => RangeInsertNode(state, in a), "insertNode", 1),
+            new DomFunction((in a) => RangeInsertNode(state, in a), "insertNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"surroundContents",
-            new JSFunction((in a) => RangeSurroundContents(state, in a), "surroundContents", 1),
+            new DomFunction((in a) => RangeSurroundContents(state, in a), "surroundContents", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"cloneRange",
-            new JSFunction((in a) => RangeCloneRange(state, in a), "cloneRange", 0),
+            new DomFunction((in a) => RangeCloneRange(state, in a), "cloneRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"compareBoundaryPoints",
-            new JSFunction((in a) => RangeCompareBoundaryPoints(state, in a), "compareBoundaryPoints", 2),
+            new DomFunction((in a) => RangeCompareBoundaryPoints(state, in a), "compareBoundaryPoints", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
         range.FastAddValue((KeyString)"toString",
-            new JSFunction((in a) => RangeToString(state, in a), "toString", 0),
+            new DomFunction((in a) => RangeToString(state, in a), "toString", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Range comparison constants

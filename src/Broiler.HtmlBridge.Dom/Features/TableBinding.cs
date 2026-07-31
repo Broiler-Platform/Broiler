@@ -31,37 +31,37 @@ internal sealed class TableBinding(ITableHost host)
         // HTMLTableElement interface
         if (tag == "table")
         {
-            obj.FastAddProperty((KeyString)"caption", new JSFunction((in _) => GetCaption(element), "get caption"), DomBridge.UndefinedFunction("set caption"), JSPropertyAttributes.EnumerableConfigurableProperty);
-            obj.FastAddProperty((KeyString)"tHead", new JSFunction((in _) => GetTHead(element), "get tHead"), DomBridge.UndefinedFunction("set tHead"), JSPropertyAttributes.EnumerableConfigurableProperty);
-            obj.FastAddProperty((KeyString)"tFoot", new JSFunction((in _) => GetTFoot(element), "get tFoot"), DomBridge.UndefinedFunction("set tFoot"), JSPropertyAttributes.EnumerableConfigurableProperty);
-            obj.FastAddProperty((KeyString)"tBodies", new JSFunction((in _) => GetTBodies(element), "get tBodies"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty((KeyString)"caption", new DomFunction((in _) => GetCaption(element), "get caption"), DomBridge.UndefinedFunction("set caption"), JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty((KeyString)"tHead", new DomFunction((in _) => GetTHead(element), "get tHead"), DomBridge.UndefinedFunction("set tHead"), JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty((KeyString)"tFoot", new DomFunction((in _) => GetTFoot(element), "get tFoot"), DomBridge.UndefinedFunction("set tFoot"), JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty((KeyString)"tBodies", new DomFunction((in _) => GetTBodies(element), "get tBodies"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
             // rows (read-only) — all <tr> in spec order: thead rows, then tbody/direct-tr rows, then tfoot rows
-            obj.FastAddProperty((KeyString)"rows", new JSFunction((in _) => BuildTableRows(element), "get rows"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-            obj.FastAddValue((KeyString)"createCaption", new JSFunction((in _) => CreateCaption(element), "createCaption", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"createTHead", new JSFunction((in _) => CreateTHead(element), "createTHead", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"createTFoot", new JSFunction((in _) => CreateTFoot(element), "createTFoot", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"deleteCaption", new JSFunction((in _) => DeleteCaption(element), "deleteCaption", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"deleteTHead", new JSFunction((in _) => DeleteTHead(element), "deleteTHead", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"deleteTFoot", new JSFunction((in _) => DeleteTFoot(element), "deleteTFoot", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"insertRow", new JSFunction((in a) => TableInsertRow(element, in a), "insertRow", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"deleteRow", new JSFunction((in a) => TableDeleteRow(element, in a), "deleteRow", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddProperty((KeyString)"rows", new DomFunction((in _) => BuildTableRows(element), "get rows"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddValue((KeyString)"createCaption", new DomFunction((in _) => CreateCaption(element), "createCaption", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"createTHead", new DomFunction((in _) => CreateTHead(element), "createTHead", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"createTFoot", new DomFunction((in _) => CreateTFoot(element), "createTFoot", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"deleteCaption", new DomFunction((in _) => DeleteCaption(element), "deleteCaption", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"deleteTHead", new DomFunction((in _) => DeleteTHead(element), "deleteTHead", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"deleteTFoot", new DomFunction((in _) => DeleteTFoot(element), "deleteTFoot", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"insertRow", new DomFunction((in a) => TableInsertRow(element, in a), "insertRow", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"deleteRow", new DomFunction((in a) => TableDeleteRow(element, in a), "deleteRow", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // HTMLTableSectionElement (thead, tbody, tfoot) — rows and insertRow
         if (tag == "thead" || tag == "tbody" || tag == "tfoot")
         {
-            obj.FastAddProperty((KeyString)"rows", new JSFunction((in _) => SectionGetRows(element), "get rows"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-            obj.FastAddValue((KeyString)"insertRow", new JSFunction((in a) => SectionInsertRow(element, in a), "insertRow", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddProperty((KeyString)"rows", new DomFunction((in _) => SectionGetRows(element), "get rows"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddValue((KeyString)"insertRow", new DomFunction((in a) => SectionInsertRow(element, in a), "insertRow", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // HTMLTableRowElement (tr) — rowIndex, sectionRowIndex, cells, insertCell, deleteCell
         if (tag == "tr")
         {
-            obj.FastAddProperty((KeyString)"rowIndex", new JSFunction((in _) => RowGetRowIndex(element), "get rowIndex"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-            obj.FastAddProperty((KeyString)"sectionRowIndex", new JSFunction((in _) => RowGetSectionRowIndex(element), "get sectionRowIndex"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-            obj.FastAddProperty((KeyString)"cells", new JSFunction((in _) => RowGetCells(element), "get cells"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-            obj.FastAddValue((KeyString)"insertCell", new JSFunction((in a) => RowInsertCell(element, in a), "insertCell", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddValue((KeyString)"deleteCell", new JSFunction((in a) => RowDeleteCell(element, in a), "deleteCell", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddProperty((KeyString)"rowIndex", new DomFunction((in _) => RowGetRowIndex(element), "get rowIndex"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty((KeyString)"sectionRowIndex", new DomFunction((in _) => RowGetSectionRowIndex(element), "get sectionRowIndex"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty((KeyString)"cells", new DomFunction((in _) => RowGetCells(element), "get cells"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddValue((KeyString)"insertCell", new DomFunction((in a) => RowInsertCell(element, in a), "insertCell", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"deleteCell", new DomFunction((in a) => RowDeleteCell(element, in a), "deleteCell", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         }
     }
 
@@ -278,7 +278,7 @@ internal sealed class TableBinding(ITableHost host)
     private static JSObject WithLength(JSArray array, int length)
     {
         array.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => new JSNumber(length), "get length"),
+            new DomFunction((in _) => new JSNumber(length), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         return array;
     }

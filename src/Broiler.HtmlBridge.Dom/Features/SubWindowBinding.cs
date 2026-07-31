@@ -53,7 +53,7 @@ internal sealed class SubWindowBinding(
         _messaging.RegisterWindowMessaging(subWindow);
 
         subWindow.FastAddProperty((KeyString)"document",
-            new JSFunction((in _) => _host.GetOrCreateSubDocument(containerElement), "get document"),
+            new DomFunction((in _) => _host.GetOrCreateSubDocument(containerElement), "get document"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         var locationHref = GetSubWindowLocationHref(containerElement);
@@ -77,14 +77,14 @@ internal sealed class SubWindowBinding(
         }
         subWindow.FastAddValue((KeyString)"location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
 
-        subWindow.FastAddProperty((KeyString)"scrollX", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get scrollX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"scrollY", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get scrollY"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"pageXOffset", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"pageYOffset", new JSFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty((KeyString)"scrollX", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get scrollX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty((KeyString)"scrollY", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get scrollY"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty((KeyString)"pageXOffset", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty((KeyString)"pageYOffset", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        subWindow.FastAddValue((KeyString)"scroll", new JSFunction((in a) => Scroll(containerElement, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue((KeyString)"scrollTo", new JSFunction((in a) => ScrollTo(containerElement, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue((KeyString)"scrollBy", new JSFunction((in a) => ScrollBy(containerElement, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue((KeyString)"scroll", new DomFunction((in a) => Scroll(containerElement, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue((KeyString)"scrollTo", new DomFunction((in a) => ScrollTo(containerElement, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue((KeyString)"scrollBy", new DomFunction((in a) => ScrollBy(containerElement, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         subWindow.FastAddValue((KeyString)"self", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
         subWindow.FastAddValue((KeyString)"window", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -112,7 +112,7 @@ internal sealed class SubWindowBinding(
         // window.getComputedStyle — sub-window needs its own copy so that
         // doc.defaultView.getComputedStyle(node, "") resolves CSS rules from
         // the sub-document's <style> elements rather than the main document.
-        subWindow.FastAddValue((KeyString)"getComputedStyle", new JSFunction((in a) => GetComputedStyle(in a), "getComputedStyle", 2),
+        subWindow.FastAddValue((KeyString)"getComputedStyle", new DomFunction((in a) => GetComputedStyle(in a), "getComputedStyle", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return subWindow;

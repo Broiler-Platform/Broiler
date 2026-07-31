@@ -32,7 +32,7 @@ internal static class CanvasBinding
     public static void Install(JSObject obj, DomElement element)
     {
         obj.FastAddValue((KeyString)"getContext",
-            new JSFunction((in a) => GetContext(element, in a), "getContext", 1),
+            new DomFunction((in a) => GetContext(element, in a), "getContext", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
@@ -70,70 +70,70 @@ internal static class CanvasBinding
 
         // fillStyle (get/set)
         ctx.FastAddProperty((KeyString)"fillStyle",
-            new JSFunction((in _) => new JSString(context2d.FillStyle), "get fillStyle"),
-            new JSFunction((in a) => SetFillStyle(context2d, in a), "set fillStyle"),
+            new DomFunction((in _) => new JSString(context2d.FillStyle), "get fillStyle"),
+            new DomFunction((in a) => SetFillStyle(context2d, in a), "set fillStyle"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // strokeStyle (get/set)
         ctx.FastAddProperty((KeyString)"strokeStyle",
-            new JSFunction((in _) => new JSString(context2d.StrokeStyle), "get strokeStyle"),
-            new JSFunction((in a) => SetStrokeStyle(context2d, in a), "set strokeStyle"),
+            new DomFunction((in _) => new JSString(context2d.StrokeStyle), "get strokeStyle"),
+            new DomFunction((in a) => SetStrokeStyle(context2d, in a), "set strokeStyle"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // lineWidth (get/set)
         ctx.FastAddProperty((KeyString)"lineWidth",
-            new JSFunction((in _) => new JSNumber(context2d.LineWidth), "get lineWidth"),
-            new JSFunction((in a) => SetLineWidth(context2d, in a), "set lineWidth"),
+            new DomFunction((in _) => new JSNumber(context2d.LineWidth), "get lineWidth"),
+            new DomFunction((in a) => SetLineWidth(context2d, in a), "set lineWidth"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // font (get/set)
         ctx.FastAddProperty((KeyString)"font",
-            new JSFunction((in _) => new JSString(context2d.Font), "get font"),
-            new JSFunction((in a) => SetFont(context2d, in a), "set font"),
+            new DomFunction((in _) => new JSString(context2d.Font), "get font"),
+            new DomFunction((in a) => SetFont(context2d, in a), "set font"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // globalAlpha (get/set)
         ctx.FastAddProperty((KeyString)"globalAlpha",
-            new JSFunction((in _) => new JSNumber(context2d.GlobalAlpha), "get globalAlpha"),
-            new JSFunction((in a) => SetGlobalAlpha(context2d, in a), "set globalAlpha"),
+            new DomFunction((in _) => new JSNumber(context2d.GlobalAlpha), "get globalAlpha"),
+            new DomFunction((in a) => SetGlobalAlpha(context2d, in a), "set globalAlpha"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // canvas property
         ctx.FastAddProperty((KeyString)"canvas",
-            new JSFunction((in _) => new JSObject(), "get canvas"),
+            new DomFunction((in _) => new JSObject(), "get canvas"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // Drawing methods
-        ctx.FastAddValue((KeyString)"fillRect", new JSFunction((in a) => FillRect(context2d, in a), "fillRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"fillRect", new DomFunction((in a) => FillRect(context2d, in a), "fillRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"strokeRect", new JSFunction((in a) => StrokeRect(context2d, in a), "strokeRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"strokeRect", new DomFunction((in a) => StrokeRect(context2d, in a), "strokeRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"clearRect", new JSFunction((in a) => ClearRect(context2d, in a), "clearRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"clearRect", new DomFunction((in a) => ClearRect(context2d, in a), "clearRect", 4), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"beginPath", new JSFunction((in _) => BeginPath(context2d, in _), "beginPath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"beginPath", new DomFunction((in _) => BeginPath(context2d, in _), "beginPath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"moveTo", new JSFunction((in a) => MoveTo(context2d, in a), "moveTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"moveTo", new DomFunction((in a) => MoveTo(context2d, in a), "moveTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"lineTo", new JSFunction((in a) => LineTo(context2d, in a), "lineTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"lineTo", new DomFunction((in a) => LineTo(context2d, in a), "lineTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"arc", new JSFunction((in a) => Arc(context2d, in a), "arc", 5), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"arc", new DomFunction((in a) => Arc(context2d, in a), "arc", 5), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"closePath", new JSFunction((in _) => ClosePath(context2d, in _), "closePath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"closePath", new DomFunction((in _) => ClosePath(context2d, in _), "closePath", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"fill", new JSFunction((in _) => Fill(context2d, in _), "fill", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"fill", new DomFunction((in _) => Fill(context2d, in _), "fill", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"stroke", new JSFunction((in _) => Stroke(context2d, in _), "stroke", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"stroke", new DomFunction((in _) => Stroke(context2d, in _), "stroke", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"fillText", new JSFunction((in a) => FillText(context2d, in a), "fillText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"fillText", new DomFunction((in a) => FillText(context2d, in a), "fillText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"strokeText", new JSFunction((in a) => StrokeText(context2d, in a), "strokeText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"strokeText", new DomFunction((in a) => StrokeText(context2d, in a), "strokeText", 3), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"save", new JSFunction((in _) => Save(context2d, in _), "save", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"save", new DomFunction((in _) => Save(context2d, in _), "save", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        ctx.FastAddValue((KeyString)"restore", new JSFunction((in _) => Restore(context2d, in _), "restore", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"restore", new DomFunction((in _) => Restore(context2d, in _), "restore", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // measureText(text) — returns { width: ... }
-        ctx.FastAddValue((KeyString)"measureText", new JSFunction((in a) => MeasureText(in a), "measureText", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        ctx.FastAddValue((KeyString)"measureText", new DomFunction((in a) => MeasureText(in a), "measureText", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         return ctx;
     }

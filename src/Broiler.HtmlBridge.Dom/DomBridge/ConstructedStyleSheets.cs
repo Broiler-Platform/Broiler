@@ -57,17 +57,17 @@ public sealed partial class DomBridge
         // disabled — a script flag on the sheet; a disabled adopted sheet does not apply.
         var disabled = false;
         sheet.FastAddProperty((KeyString)"disabled",
-            new JSFunction((in _) => disabled ? JSBoolean.True : JSBoolean.False, "get disabled"),
-            new JSFunction((in a) => { disabled = a.Length > 0 && a[0].BooleanValue; return JSUndefined.Value; }, "set disabled"),
+            new DomFunction((in _) => disabled ? JSBoolean.True : JSBoolean.False, "get disabled"),
+            new DomFunction((in a) => { disabled = a.Length > 0 && a[0].BooleanValue; return JSUndefined.Value; }, "set disabled"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         var liveCssRules = new JSObject();
         var lastSyncedRuleCount = 0;
         liveCssRules.FastAddProperty((KeyString)"length",
-            new JSFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetLength002Core(CurrentRules, in _), "get length"),
+            new DomFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetLength002Core(CurrentRules, in _), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         liveCssRules.FastAddValue((KeyString)"item",
-            new JSFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsItem003Core(SyncLiveCssRulesIndices, liveCssRules, CurrentRules, in a), "item", 1),
+            new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsItem003Core(SyncLiveCssRulesIndices, liveCssRules, CurrentRules, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         void SyncLiveCssRulesIndices()
@@ -83,13 +83,13 @@ public sealed partial class DomBridge
         }
 
         sheet.FastAddProperty((KeyString)"cssRules",
-            new JSFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetCssRules004Core(SyncLiveCssRulesIndices, liveCssRules, in _), "get cssRules"),
+            new DomFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetCssRules004Core(SyncLiveCssRulesIndices, liveCssRules, in _), "get cssRules"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         sheet.FastAddValue((KeyString)"insertRule",
-            new JSFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsInsertRule005Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "insertRule", 2),
+            new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsInsertRule005Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "insertRule", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
         sheet.FastAddValue((KeyString)"deleteRule",
-            new JSFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsDeleteRule006Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "deleteRule", 1),
+            new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsDeleteRule006Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "deleteRule", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // replaceSync(text) — replace all rules from a CSS string (any @import is dropped per
@@ -107,10 +107,10 @@ public sealed partial class DomBridge
         }
 
         sheet.FastAddValue((KeyString)"replaceSync",
-            new JSFunction((in a) => { ReplaceFromText(a.Length > 0 ? a[0].ToString() : string.Empty); return JSUndefined.Value; }, "replaceSync", 1),
+            new DomFunction((in a) => { ReplaceFromText(a.Length > 0 ? a[0].ToString() : string.Empty); return JSUndefined.Value; }, "replaceSync", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         sheet.FastAddValue((KeyString)"replace",
-            new JSFunction((in a) => { ReplaceFromText(a.Length > 0 ? a[0].ToString() : string.Empty); return ResolvedThenableWith(sheet); }, "replace", 1),
+            new DomFunction((in a) => { ReplaceFromText(a.Length > 0 ? a[0].ToString() : string.Empty); return ResolvedThenableWith(sheet); }, "replace", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return sheet;
@@ -130,10 +130,10 @@ public sealed partial class DomBridge
             }
             return thenable;
         }
-        thenable.FastAddValue((KeyString)"then", new JSFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        thenable.FastAddValue((KeyString)"catch", new JSFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         thenable.FastAddValue((KeyString)"finally",
-            new JSFunction((in a) => { if (a.Length > 0 && a[0] is JSFunction cb) { try { cb.InvokeFunction(new Arguments(cb)); } catch { } } return thenable; }, "finally", 1),
+            new DomFunction((in a) => { if (a.Length > 0 && a[0] is JSFunction cb) { try { cb.InvokeFunction(new Arguments(cb)); } catch { } } return thenable; }, "finally", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         return thenable;
     }

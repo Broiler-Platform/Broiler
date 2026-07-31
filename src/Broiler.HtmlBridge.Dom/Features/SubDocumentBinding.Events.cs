@@ -60,21 +60,21 @@ internal sealed partial class SubDocumentBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"stopPropagation", new JSFunction(StopPropagation, "stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"stopPropagation", new DomFunction(StopPropagation, "stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue StopImmediatePropagation(in Arguments __)
         {
             legacyCancelBubble = true;
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"stopImmediatePropagation", new JSFunction(StopImmediatePropagation, "stopImmediatePropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"stopImmediatePropagation", new DomFunction(StopImmediatePropagation, "stopImmediatePropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue PreventDefault(in Arguments __)
         {
             evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"preventDefault", new JSFunction(PreventDefault, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"preventDefault", new DomFunction(PreventDefault, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue GetCancelBubble(in Arguments __)
         {
             return legacyCancelBubble ? JSBoolean.True : JSBoolean.False;
@@ -87,7 +87,7 @@ internal sealed partial class SubDocumentBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddProperty((KeyString)"cancelBubble", new JSFunction(GetCancelBubble, "get cancelBubble"), new JSFunction(SetCancelBubble, "set cancelBubble"), JSPropertyAttributes.EnumerableConfigurableProperty);
+        evt.FastAddProperty((KeyString)"cancelBubble", new DomFunction(GetCancelBubble, "get cancelBubble"), new DomFunction(SetCancelBubble, "set cancelBubble"), JSPropertyAttributes.EnumerableConfigurableProperty);
         JSValue GetReturnValue(in Arguments __)
         {
             return evt[(KeyString)"defaultPrevented"].BooleanValue ? JSBoolean.False : JSBoolean.True;
@@ -100,7 +100,7 @@ internal sealed partial class SubDocumentBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddProperty((KeyString)"returnValue", new JSFunction(GetReturnValue, "get returnValue"), new JSFunction(SetReturnValue, "set returnValue"), JSPropertyAttributes.EnumerableConfigurableProperty);
+        evt.FastAddProperty((KeyString)"returnValue", new DomFunction(GetReturnValue, "get returnValue"), new DomFunction(SetReturnValue, "set returnValue"), JSPropertyAttributes.EnumerableConfigurableProperty);
         JSValue InitEvent(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -112,7 +112,7 @@ internal sealed partial class SubDocumentBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initEvent", new JSFunction(InitEvent, "initEvent", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initEvent", new DomFunction(InitEvent, "initEvent", 3), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue InitUIEvent(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -128,7 +128,7 @@ internal sealed partial class SubDocumentBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initUIEvent", new JSFunction(InitUIEvent, "initUIEvent", 5), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initUIEvent", new DomFunction(InitUIEvent, "initUIEvent", 5), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue InitCustomEvent(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -141,7 +141,7 @@ internal sealed partial class SubDocumentBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initCustomEvent", new JSFunction(InitCustomEvent, "initCustomEvent", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initCustomEvent", new DomFunction(InitCustomEvent, "initCustomEvent", 4), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue InitFocusEvent(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -159,7 +159,7 @@ internal sealed partial class SubDocumentBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initFocusEvent", new JSFunction(InitFocusEvent, "initFocusEvent", 6), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initFocusEvent", new DomFunction(InitFocusEvent, "initFocusEvent", 6), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue InitKeyboardEvent(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -202,7 +202,7 @@ internal sealed partial class SubDocumentBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initKeyboardEvent", new JSFunction(InitKeyboardEvent, "initKeyboardEvent", 13), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initKeyboardEvent", new DomFunction(InitKeyboardEvent, "initKeyboardEvent", 13), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue InitMouseEvent(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -257,7 +257,7 @@ internal sealed partial class SubDocumentBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initMouseEvent", new JSFunction(InitMouseEvent, "initMouseEvent", 15), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initMouseEvent", new DomFunction(InitMouseEvent, "initMouseEvent", 15), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue InitWheelEvent(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -310,7 +310,7 @@ internal sealed partial class SubDocumentBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initWheelEvent", new JSFunction(InitWheelEvent, "initWheelEvent", 16), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"initWheelEvent", new DomFunction(InitWheelEvent, "initWheelEvent", 16), JSPropertyAttributes.EnumerableConfigurableValue);
         return evt;
     }
 }
