@@ -84,8 +84,92 @@ public sealed partial class DomBridge
                 CSS.Dom.CssOrigin.Author,
                 GetAttr(styleEl, "media")));
 
+        AppendOuterPartRules(docRoot, sources);
+
         var (vpWidth, vpHeight) = GetViewportForDocRoot(docRoot);
         return scope.ScopeBuilder.Sync(sources, new CssEnvironment(vpWidth, vpHeight));
+    }
+
+    /// <summary>
+    /// Adds the enclosing tree's <c>::part()</c> rules to a shadow tree's style scope.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A shadow tree gets its own scope holding only the sheets inside it, which is exactly the
+    /// encapsulation the spec asks for — with one sanctioned exception. <c>::part()</c> (CSS Shadow
+    /// Parts) is how the outer tree styles elements the shadow tree deliberately exposes, so those
+    /// rules, and only those, have to cross the boundary. Without this a document-level
+    /// <c>::part(name)</c> rule painted correctly (the renderer sees the tree already flattened) yet
+    /// was invisible to <c>getComputedStyle</c> and to everything reading computed values — which is
+    /// how WPT auto-name-from-id-shadow lost the <c>view-transition-name</c> its part rule sets, and
+    /// with it the element's whole view-transition capture.
+    /// </para>
+    /// <para>
+    /// Appended after the shadow tree's own sheets: per CSS Scoping, declarations from the outer
+    /// tree win over the inner tree's at equal specificity.
+    /// </para>
+    /// </remarks>
+    private void AppendOuterPartRules(DomElement docRoot, List<CssStyleScopeBuilder.StyleSource> sources)
+    {
+        if (!docRoot.TagName.StartsWith('#') || ParentEl(docRoot) is not { } shadowHost)
+            return;
+
+        var outerStyles = new List<DomElement>();
+        CollectStyleElementsInTree(GetDocumentRootFor(shadowHost), outerStyles);
+
+        foreach (var styleEl in outerStyles)
+        {
+            var partRules = ExtractPartRules(GetStyleElementCssText(styleEl));
+            if (partRules.Length > 0)
+                sources.Add(new CssStyleScopeBuilder.StyleSource(
+                    partRules, CSS.Dom.CssOrigin.Author, GetAttr(styleEl, "media")));
+        }
+    }
+
+    /// <summary>
+    /// The <c>::part()</c> rules of a stylesheet, returned as CSS text. A brace-depth scan rather
+    /// than a parse: it keeps each qualifying rule's own text verbatim, so the cascade sees exactly
+    /// what the author wrote. Rules nested in an at-rule (<c>@media</c> …) are not lifted out — a
+    /// <c>::part()</c> inside one still will not cross into a shadow tree.
+    /// </summary>
+    private static string ExtractPartRules(string css)
+    {
+        if (string.IsNullOrEmpty(css) || css.IndexOf("::part(", StringComparison.OrdinalIgnoreCase) < 0)
+            return string.Empty;
+
+        var kept = new System.Text.StringBuilder();
+        var depth = 0;
+        var ruleStart = 0;
+        var preludeEnd = -1;
+
+        for (var index = 0; index < css.Length; index++)
+        {
+            var character = css[index];
+            if (character == '{')
+            {
+                if (depth == 0)
+                    preludeEnd = index;
+                depth++;
+            }
+            else if (character == '}')
+            {
+                depth--;
+                if (depth != 0)
+                    continue;
+
+                if (preludeEnd > ruleStart &&
+                    css.AsSpan(ruleStart, preludeEnd - ruleStart)
+                        .IndexOf("::part(", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    kept.Append(css, ruleStart, index - ruleStart + 1).Append('\n');
+                }
+
+                ruleStart = index + 1;
+                preludeEnd = -1;
+            }
+        }
+
+        return kept.ToString();
     }
 
     /// <summary>

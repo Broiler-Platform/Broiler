@@ -85,10 +85,93 @@ public sealed partial class DomBridge
         if (!_document.ChildNodes.Contains(DocumentElement))
             _document.AppendChild(DocumentElement);
 
+        AttachDeclarativeShadowRoots(DocumentElement);
+
 
         // Stylesheet discovery is document-scoped and lazy through the shared
         // CssStyleEngine. A rebuilt document must not retain the prior engines.
         ResetComputedStyleEngines();
+    }
+
+    /// <summary>
+    /// HTML §4.12.3: turns every <c>&lt;template shadowrootmode="open|closed"&gt;</c> into a real
+    /// shadow root on its parent — the declarative counterpart of <c>attachShadow()</c>. The template
+    /// contributes its children to the new root and is then dropped from the tree.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The spec does this inside the tree builder, as the template's end tag is seen. Doing it as a
+    /// pass over the finished tree is equivalent for a parsed document — nothing observes the
+    /// intermediate state, because script has not run yet — and keeps the shared
+    /// <c>HtmlDocumentParser</c> free of a bridge-only concept.
+    /// </para>
+    /// <para>
+    /// Only the shadow root is new here: everything downstream of it (styling the shadow tree,
+    /// flattening the <c>#shadow-root</c> wrapper for the renderer, capturing it in a view
+    /// transition) is the same machinery <c>attachShadow()</c> already drove, which is why
+    /// imperative shadow content rendered while declarative content did not.
+    /// </para>
+    /// </remarks>
+    private void AttachDeclarativeShadowRoots(DomElement root)
+    {
+        // Depth-first with an explicit stack: a shadow tree may itself contain declarative shadow
+        // roots, and those templates only become reachable once their content has been moved.
+        var pending = new Stack<DomElement>();
+        pending.Push(root);
+
+        while (pending.Count > 0)
+        {
+            var element = pending.Pop();
+
+            for (var index = element.ChildNodes.Count - 1; index >= 0; index--)
+            {
+                if (element.ChildNodes[index] is not DomElement child)
+                    continue;
+
+                if (!TryTakeDeclarativeShadowRoot(element, child, index, out var shadowRoot))
+                {
+                    pending.Push(child);
+                    continue;
+                }
+
+                pending.Push(shadowRoot);
+            }
+        }
+    }
+
+    /// <summary>
+    /// When <paramref name="child"/> is a declarative shadow-root template of <paramref name="host"/>,
+    /// moves its children into a freshly attached shadow root, removes the template, and returns the
+    /// root. Returns <see langword="false"/> for anything else, leaving the tree untouched.
+    /// </summary>
+    private bool TryTakeDeclarativeShadowRoot(
+        DomElement host, DomElement child, int childIndex, out DomElement shadowRoot)
+    {
+        shadowRoot = null!;
+
+        if (!string.Equals(child.TagName, "template", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var mode = child.GetAttribute("shadowrootmode")?.Trim();
+        if (!string.Equals(mode, "open", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(mode, "closed", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // "Only the first declarative shadow root wins": a second template on the same host is an
+        // ordinary inert <template>, per the spec's already-has-a-shadow-root check.
+        if (GetShadowRoot(host) is not null)
+            return false;
+
+        shadowRoot = ((Dom.Features.IShadowDomHost)this).AttachShadowRoot(host, mode!.ToLowerInvariant());
+
+        foreach (var content in child.ChildNodes.ToArray())
+        {
+            SetParent(content, shadowRoot);
+            shadowRoot.AppendChild(content);
+        }
+
+        RemoveNthChild(host, childIndex);
+        return true;
     }
 
     /// <summary>
