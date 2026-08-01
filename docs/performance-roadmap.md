@@ -285,6 +285,13 @@ These were paid for once each. They apply to every phase below.
   present and working — while being exactly right about the symptom it predicted. *An item
   can be worth doing and still be wrong about why; a control run tells you which half you
   have.*
+- **A deferral is a claim too, and it needs a citation.** 2-4 shipped its update half with a
+  written reason for not doing the compound half: an abstraction the compound path "goes
+  through". It does not — that abstraction serves the *identifier* form, and the member form was
+  three lines below the branch the item had just edited. *A sentence explaining why work was
+  skipped will be read as a finding by whoever arrives next, so it needs the same file-and-line
+  backing as one explaining why work was done.* The cost here was small; the deferral was mine
+  and I returned to it. Aimed at a stranger it is a dead end with a plausible-sounding sign on it.
 - **"Pure removal" is a claim about the code, and it is usually wrong.** 2-3 proposed deleting
   one of two stores. They serve different access paths, so neither can go; the item's real
   content was a storage-layer redesign, and its measured ceiling was 3% of the most favourable
@@ -310,6 +317,12 @@ These were paid for once each. They apply to every phase below.
   reasoning from spec text. Two of the five contradicted a test262 vector the engine
   passes. Separately, three *harness* defects produced five failures that looked like
   engine defects and were not.
+- **Check how much of the probe the change can reach.** 2-4's compound half first measured
+  0.915 with two of eleven pairs the wrong way, on a *top-level* `o.x += 1` loop that spends most
+  of its time resolving a global binding the change never touches. The same change on the
+  in-function shape: 0.903, seven of eight the same direction, against a control at 1.002. *A
+  probe whose bulk is inert dilutes the effect and keeps all of the noise* — and it fails
+  downward, so it reads as "the change barely helps" rather than as a broken measurement.
 - **Interleave, at process granularity.** Sub-1.5% effects are only visible ABBA-
   interleaved across independent builds, ten runs each, medians compared.
 - **The local suite will not catch a lifetime bug.** All three frame-recycling defects
@@ -967,7 +980,7 @@ Landed as `patches/0051-js-store-cache-property-creation.patch`, which applies o
 |---|---|---|---|---|---|
 | **2-2** | **Widen shape eligibility** past `GetType() == typeof(JSObject)` — *arrays landed (2-2), functions landed (2-8)* | P1-4 | `Runtime/JSObject.cs` — `SupportsShapeTracking`; `BuiltIns/Array/JSArray.cs` | `JSArray`, `JSFunction` and every built-in exotic were excluded wholesale — **measured 0 hits / 200 000 for every named access on one.** Arrays now opt in (**0 → 199 999**). The function half is blocked and is now 2-8 | M |
 | **2-3** | **Remove the double storage** — *re-specified and re-sized; see below* | P1-4 | `Runtime/JSObject.cs:97,:188` — `TrackShapeDataProperty` | Every tracked object writes each value into `shapeSlots` *and* the `PropertySequence`. **Not a pure removal, and its throughput case is ~3% of a worst-case loop.** The dominant per-object cost is elsewhere — see 2-3 below and 2-7 | ~~S~~ **M** |
-| **2-4** | **Extend the store cache** to `o.x++` ✅, `o.x += 1`, computed keys, `super`, optional chains, private names | P1-3 | `.Compiler` lowering | Measured: these reached **neither** cache — 0 hits *and* 0 misses, the counters never saw them. `o.x++`/`o.x--` now take both (**0 → 199 999** each side); `o.x += 1` needs `EvalShadowBuilder` to grow a cached form; computed keys and optional chains stay out on purpose | M |
+| **2-4** | **Extend the store cache** to `o.x++` ✅, `o.x += 1` ✅, computed keys, `super`, optional chains, private names | P1-3 | `.Compiler` lowering | Measured: these reached **neither** cache — 0 hits *and* 0 misses, the counters never saw them. `o.x++`/`o.x--` and `o.x op= rhs` now take both (**0 → 199 999** each side, on twelve operators); `&&=`/`||=`/`??=` stay out because their write is conditional, and computed keys, `super`, optional chains and private names stay out on purpose | M |
 | **2-5** | ~~**Get strictness off the property-write path**~~ — **measured; closed, no work worth doing** | P0-2 | `Engine/Core/JSEngine.cs:225`; `JSValue` set accessors | Removing **all 13** resolutions from the write path moves a 30 M-write all-misses loop by **nothing** — median paired ratio 1.013, i.e. marginally the wrong way. P0-2 already took the expensive half (the ExecutionContext *write*); what remains is a read that does not cost. See below | ~~M~~ **closed** |
 | **2-6** | ~~**Monomorphic call-site caching**~~ — **measured; folded into 4-1** | new | `BuiltIns/Function/JSFunction.cs` — `InvokeFunction`, `SelectInvocationDelegate` | "Callee resolution repeats per call" does not describe this engine: the callee is already resolved by the cached property read, and `SelectInvocationDelegate` is a volatile read plus a null check. A call costs **~250–300 ns**, and a call-site cache removes none of it. Its surviving clause — feedback for phase 4's inlining — is **4-1**. See below | ~~M~~ **folded** |
 
@@ -1046,49 +1059,96 @@ tests across 13 projects, 0 failures.**
 
 Landed as `patches/0053-js-array-shape-eligibility.patch`, on top of `0051`.
 
-### 2-4 · `obj.name++` through both caches — **the update form landed**
+### 2-4 · `obj.name++` and `obj.name op= rhs` through both caches — **landed, both halves**
 
-An update expression reads and writes the same property, and both halves went through one
-assignable index reference. Measured, that reference reaches **neither** cache — not a poor
-hit rate, no counter at all:
+A read-modify-write on a member reads and writes the same property, and both halves went
+through one assignable index reference. Measured, that reference reaches **neither** cache —
+not a poor hit rate, no counter at all:
 
 | Site | Before | After |
 |---|---|---|
 | `increment-store` — `o.x++` | 0 hits, 0 misses, 0 stores | **199 999 read hits / 2**, **199 999 store hits / 1** |
-| `compound-assign-store` — `o.x += 1` | 0 / 0 | 0 / 0 — *not landed, see below* |
+| `compound-assign-store` — `o.x += 1` | 0 / 0 | **199 999 / 2**, **199 999 / 1** |
 | `computed-key-read` — `o[k]` | 0 / 0 | 0 / 0 — excluded on purpose |
 | `optional-chain-read` — `o?.x` | 0 / 0 | 0 / 0 — excluded on purpose |
 | `monomorphic-store` — `o.x = i` (control) | 199 999 | 199 999 |
 
-Eligible on exactly `TryCreateCachedMemberStore`'s terms — constant `KeyString`, ordinary
-base, no `super`, no optional chain, no private name — because the reasons are the same: a
-computed key would drive one site through every key the expression produces, and a private
-name is a brand check rather than an ordinary [[Get]]/[[Set]]. Both forms end in the same
+Both forms are eligible on exactly `TryCreateCachedMemberStore`'s terms — constant `KeyString`,
+ordinary base, no `super`, no optional chain, no private name — because the reasons are the
+same: a computed key would drive one site through every key the expression produces, and a
+private name is a brand check rather than an ordinary [[Get]]/[[Set]]. Both end in the same
 `JSValue` indexer on a miss, so strict-mode reporting and a refused write's silent failure are
-unchanged, and the observable sequence is untouched: base once, `ToNumeric` once, getter once,
-setter once.
+unchanged, and the observable sequence is untouched: base once, the coercion once, getter once,
+setter once. The compound form carries one further restriction, below.
 
 Wall clock on a 20 M-iteration `o.x++` loop, same build with only the eligibility call
 differing, five interleaved pairs: **median of paired ratios 0.944**, every pair the same
 direction. Modest, and it should be — the cache removes the two property resolutions, not the
 `ToNumeric` or the boxing around them. That remainder is B1, not this.
 
-**`o.x += 1` is deliberately not included.** Compound assignment goes through
-`EvalShadowBuilder`'s captured-reference abstraction, which exists so a direct `eval` on the
-right-hand side cannot redirect the write (§13.15.2). Teaching *that* a cached form is a
-separate change and a more delicate one — the abstraction's whole purpose is the thing a
-cache would have to preserve. It remains at 0 / 0 and is worth doing next in this item.
+#### The compound form, and a correction
 
-**Verify.** 15 test cases in `PropertyStoreCacheTests` (8 facts and a 7-case theory): hit
-rates; prefix and postfix values for `++` and `--`; string and BigInt operands, where
-`ToNumeric` coercing once means a postfix update yields the *number*; `undefined` giving NaN;
-an inherited getter/setter pair each running exactly once per iteration through a warmed site;
-a non-writable property refused in sloppy mode and throwing in strict; the base evaluated
-exactly once; a Proxy firing both traps; every excluded form still correct; and an update
-interleaved with a plain store on the same property agreeing. Suite: **7 334 tests across 13
-projects, 0 failures.**
+The 0054 note in this section said compound assignment was excluded because it "goes through
+`EvalShadowBuilder`'s captured-reference abstraction". **That was wrong.** `EvalShadowBuilder`
+handles the *identifier* case (`x += 1`), where a direct `eval` on the right-hand side can
+redirect which binding the write lands on. The *member* case is a plain `CreateMemberExpression`
+plus `Assign`, three lines below the branch 0054 had already changed — and `objectTemp` there
+already evaluates the base exactly once, which is the only thing the read and the write have to
+agree on. The deferral was reasoning about a neighbouring code path, not the one in front of it.
 
-Landed as `patches/0054-js-update-expression-cache.patch`, on top of `0053`.
+`o.x op= rhs` now emits a cached read, the operator, and a cached write, for the **twelve**
+operators `CompoundAssignmentToBinaryOperator` maps. `CachedStore` takes the computed value as
+its last argument, so the read stays inside it and cannot float past the right-hand side —
+§13.15.2 reads the old value *before* evaluating the RHS, and a test asserts exactly that with
+an RHS that overwrites the property being compounded.
+
+**`&&=`, `||=` and `??=` keep the ordinary reference, and this is the one guard that is
+load-bearing rather than defensive.** For them the write is conditional on the value read, so a
+cached store would perform it unconditionally. `CompoundAssignmentToBinaryOperator` currently
+throws for all three, which makes the exclusion look redundant — a probe settles it: complete
+that operator table the way it reads like it wants to be completed, widen the gate to match, and
+`o.a &&= 1` against a falsy getter fires the setter **300 times instead of 0**. Silent, and a
+spec violation. The eligibility set is the only thing standing between those two edits and that
+bug.
+
+Wall clock, 20 M iterations of `o.x += 1` inside a function, eight interleaved pairs with only
+the eligibility call differing: **median of paired ratios 0.903**, seven of eight the same
+direction. The control is the point — `o.x = o.x + 1`, which does the same three operations and
+already took both caches, measures **1.002** across the same builds, so the machine is not
+drifting under the compound number. Stated within one build: `o.x += 1` cost **1.163×** the
+spelled-out form before and **1.043×** after, closing about three quarters of the gap. Across
+operator shapes the medians were 0.86 (`+= 1`), 0.91 (`+= d`), 0.89 (`-=`) and 0.93 (`|=`).
+
+> **The first version of this measurement was worth less and did not look it.** The same change
+> measured on a *top-level* `o.x += 1` loop gave 0.915 with two of eleven pairs the wrong way.
+> That loop spends most of its time resolving a global binding, which the change cannot touch, so
+> the signal arrived diluted and buried in noise. Moving the loop inside a function and adding a
+> control the change provably cannot reach turned a soft 0.915/11 into a clean 0.903/8 at 1.002.
+> *Check what fraction of the probe the change can actually reach before trusting its ratio.*
+
+**Verify.** 15 test cases for the update form in `PropertyStoreCacheTests` (8 facts and a
+7-case theory): hit rates; prefix and postfix values for `++` and `--`; string and BigInt
+operands, where `ToNumeric` coercing once means a postfix update yields the *number*;
+`undefined` giving NaN; an inherited getter/setter pair each running exactly once per iteration
+through a warmed site; a non-writable property refused in sloppy mode and throwing in strict;
+the base evaluated exactly once; a Proxy firing both traps; every excluded form still correct;
+and an update interleaved with a plain store on the same property agreeing.
+
+**37 more for the compound form** (19 facts and an 18-case theory), weighted to the order and
+to the ways a write can be refused: all twelve operators' values, including `>>>=` on a negative
+and the string/number asymmetry the `+= <literal>` fast paths preserve; the old value read
+before the RHS, proven with an RHS that overwrites the very property being compounded; an RHS
+that moves the receiver's shape every iteration; the three short-circuiting forms neither
+writing nor mis-valuing;
+a refused write still evaluating to the *computed* value; a nullish base throwing before the RHS
+runs; a primitive base silently discarding in sloppy mode and throwing in strict; a getter-only
+property likewise; nested compound assignments not sharing a base temporary; and the compound,
+update and plain-store forms agreeing on one property. Suite: **7 385 tests across 13 projects,
+0 failures.**
+
+Landed as `patches/0054-js-update-expression-cache.patch` (the update form) and
+`patches/0056-js-compound-assignment-cache.patch` (the compound form), on top of `0053` and
+`0055` respectively.
 
 ### 2-8 · Functions track their named properties by shape — **landed**
 
@@ -1344,12 +1404,13 @@ wall-clock benchmark reports, and it exists because 2-3 could not be decided wit
 item's *only* surviving justification was memory, and there was no way to measure memory per
 object from a clean checkout. Both 2-3's re-sizing and 2-7 came out of its first run.
 
-**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4's update form ✅ → 2-8 ✅; **2-5 closed** and
-**2-6 folded into 4-1**, both on measurements. What is left of this phase is **2-4's
-compound-assignment half** (small, needs `EvalShadowBuilder` to grow a cached form), with 2-3
-re-specified and 2-7 waiting on its distribution measurement — with **2-3 removed from the near list**
-(re-specified, M, superseded in value by 2-7) and **2-7 needing its distribution measurement
-before it can be picked up**.
+**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ (both halves) → 2-8 ✅; **2-5 closed** and
+**2-6 folded into 4-1**, both on measurements. **Every listed item in this phase is now either
+landed or closed.** What remains is not implementation: **2-3 is re-specified** (M, and
+superseded in value by 2-7) and **2-7 needs an object-size distribution from an Octane run before
+it can be picked up**. The phase's own exit gate — test262 `properties-proxy` and `strict-mode`,
+now covering 2-1, 2-2, 2-4 and 2-8 — and 0-6's CI Octane run are what stand between "landed" and
+"closed".
 
 **Verify — per item, not per phase.**
 
@@ -1519,7 +1580,7 @@ pinned RegExp corpus is clean.
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 (update form ✅) → 2-8 ✅; 2-5 closed, 2-6 folded into 4-1; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-8 ✅; 2-5 closed, 2-6 folded into 4-1; 2-3 re-specified (M), 2-7 needs its measurement. **No listed item is still open** | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1, 2-2, 2-4 and 2-8**; **DeltaBlue and Richards inside 200×** |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
@@ -1686,7 +1747,7 @@ Where each item came from, so existing cross-references still resolve.
 | 1-2 real fix | — | 1-2 | Open — repair `StackGuard`, which cannot fire today |
 | 2-0 | — (P1-2's guard, reached in a state it cannot recognise) | — | **Landed** — `patches/0050`, pending submodule push |
 | 2-1 | P1-3 remainder | 2-1 | **Landed** — `patches/0051`, pending submodule push; **test262 owed** |
-| 2-4 | P1-3 remainder | 2-4 | **`o.x++` landed** — `patches/0054`; `o.x += 1`, computed keys and optional chains still open |
+| 2-4 | P1-3 remainder | 2-4 | **Landed, both halves** — `patches/0054` (`o.x++`) and `patches/0056` (`o.x op= rhs`), pending submodule push; computed keys, `super`, optional chains, private names and the three short-circuiting compound forms stay out on purpose |
 | 2-2 | P1-4 remainder | 2-2 | **Landed for arrays** — `patches/0053`, pending submodule push; its four named benchmarks were the wrong targets |
 | 2-8 | — (the blocked half of 2-2) | — | **Landed** — `patches/0055`, pending submodule push; both prerequisites fixed |
 | 2-3 | P1-4 remainder | 2-3 | **Re-specified** — not a pure removal, ~3% ceiling, S → M, superseded in value by 2-7 |
