@@ -13,7 +13,14 @@
 #     --out-dir <dir>      Results directory (default: tests/octane/results)
 #     --log-dir <dir>      Per-suite diagnostic logs (default: tests/octane/logs)
 #     --engines <list>     Comma-separated engines to run (default: chromium,broiler)
-#     --timeout <sec>      Per-suite timeout in seconds (default: 180)
+#     --timeout <sec>      Per-suite timeout floor in seconds (default: 180). A
+#                          slow suite may raise its own budget in
+#                          scripts/octane-suites.json.
+#     --repetitions <n>    Run each suite n times, report the median score and
+#                          the observed spread (default: 1). A single run cannot
+#                          tell a real change from run-to-run noise.
+#     --noise-band <pct>   Spread above which a benchmark is flagged as noisy
+#                          (default: 7.5)
 #     --octane-ref <ref>   Git ref of chromium/octane to check out (default: master)
 #     --skip-build         Do not rebuild BroilerJS (reuse an existing Release build)
 #     --only <list>        Comma-separated suites to run, e.g. --only Crypto,zlib.
@@ -59,6 +66,8 @@ while [[ $# -gt 0 ]]; do
         --log-dir) LOG_DIR="$2"; shift 2 ;;
         --engines) ENGINES="$2"; shift 2 ;;
         --timeout) TIMEOUT="$2"; shift 2 ;;
+        --repetitions) EXTRA_ARGS+=(--repetitions "$2"); shift 2 ;;
+        --noise-band) EXTRA_ARGS+=(--noise-band "$2"); shift 2 ;;
         --octane-ref) OCTANE_REF="$2"; shift 2 ;;
         --skip-build) SKIP_BUILD=true; shift ;;
         --only) ONLY="$2"; EXTRA_ARGS+=(--only "$2"); shift 2 ;;

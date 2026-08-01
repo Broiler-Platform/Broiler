@@ -1,5 +1,17 @@
 # Octane 2.0 benchmark — Chromium vs Broiler
 
+> ⚠ **These results are stale.** They were generated against a `Broiler.JS`
+> pointer that predated the engine fixes for the five failing suites. Those
+> fixes landed at `7ef80c03` and the pointer was bumped to `cdb2fd41` in
+> `2d9f39ca` on 2026-08-01 11:45 — about 15 hours after this run. Crypto,
+> PdfJS, CodeLoad, zlib and Typescript are shown failing on an engine that no
+> longer has those defects; measured on the fixed engine they score 127, 321,
+> 83.4, 237 and 1009 respectively.
+>
+> The Octane workflow needs a re-run. This banner is hand-added and disappears
+> the moment the results are regenerated — see
+> [`../roadmap.md`](../roadmap.md) §2.6.
+
 - Generated: `2026-07-31T20:28:07.637Z`
 - Octane version: `9`
 - Chromium: `Chromium 149.0.7827.55` — **overall score 57245**

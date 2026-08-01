@@ -14,14 +14,19 @@
 
 import {
   annotateCombinedPaths,
+  bandPercent,
   buildCombinedScript,
+  buildComparison,
   describeExitCode,
   extractUnhandledBlock,
   mapCombinedLine,
+  median,
   parseClrException,
   parseDiagnostics,
   parseJsStack,
+  renderMarkdown,
   shortenEnginePaths,
+  suiteTimeoutSec,
 } from '../../scripts/run-octane.mjs';
 
 let failures = 0;
@@ -220,6 +225,63 @@ check('exit: stack overflow', describeExitCode(0xC00000FD), '3221225725 (0xC0000
 check('exit: SIGSEGV', describeExitCode(139), '139 — SIGSEGV — segmentation fault');
 check('exit: ordinary status', describeExitCode(1), '1');
 check('exit: killed before exiting', describeExitCode(null), '(none)');
+
+// ── Per-suite budgets ───────────────────────────────────────────────────────
+// A suite may raise its own timeout; --timeout stays a floor for every suite so
+// a debugging run can widen everything at once without editing the manifest.
+
+check('budget: default when the suite asks for nothing', suiteTimeoutSec({ name: 'Richards' }, { timeout: 180 }), 180);
+check('budget: the manifest raises it', suiteTimeoutSec({ name: 'zlib', timeoutSec: 1800 }, { timeout: 180 }), 1800);
+check('budget: --timeout is a floor, not an override', suiteTimeoutSec({ name: 'zlib', timeoutSec: 1800 }, { timeout: 3600 }), 3600);
+
+// ── Repetition summary ──────────────────────────────────────────────────────
+
+check('median: odd count', median([3, 1, 2]), 2);
+check('median: even count averages the middle pair', median([1, 2, 3, 4]), 2.5);
+check('median: no samples', median([]), null);
+check('band: a single sample has no spread to report', bandPercent([100]), null);
+check('band: spread is a percentage of the median', bandPercent([90, 100, 110]), 20);
+check('band: identical samples', bandPercent([100, 100]), 0);
+
+// ── Comparison summary ──────────────────────────────────────────────────────
+// The three numbers comparison.md is read for. Coverage and spread are here
+// because the geomean hides both: a run that drops suites still reports one,
+// and one catastrophic score reads much like an evenly-bad profile.
+
+const cmp = buildComparison({
+  chromium: {
+    engineLabel: 'Chromium test', geomean: 50000, repetitions: 1,
+    benchmarks: { Richards: 40000, Splay: 40000, zlib: 80000 },
+    suiteStatus: { Richards: { status: 'ok' }, Splay: { status: 'ok' }, zlib: { status: 'ok' } },
+  },
+  broiler: {
+    engineLabel: 'Broiler test', geomean: 200, repetitions: 3, noiseBandPercent: 7.5,
+    benchmarks: { Richards: 100, Splay: 400 },
+    stability: { Richards: { samples: [90, 100, 110], bandPercent: 20 }, Splay: { samples: [399, 400, 401], bandPercent: 0.5 } },
+    suiteStatus: { Richards: { status: 'ok' }, Splay: { status: 'ok' }, zlib: { status: 'error' } },
+  },
+}, '2026-01-01T00:00:00.000Z');
+
+check('compare: coverage counts what each engine actually scored', cmp.summary.scoresReported, { chromium: 3, broiler: 2, expected: 3 });
+check('compare: x-slower is reported alongside the ratio', cmp.benchmarks.find((r) => r.name === 'Richards').broilerTimesSlower, 400);
+check('compare: a suite only one engine scored has no ratio', cmp.benchmarks.find((r) => r.name === 'zlib').broilerTimesSlower, null);
+check('compare: spread is worst over best', cmp.summary.spread.factor, 4);
+check('compare: spread names the best suite', cmp.summary.spread.best, { name: 'Splay', timesSlower: 100 });
+check('compare: spread names the worst suite', cmp.summary.spread.worst, { name: 'Richards', timesSlower: 400 });
+
+const md = renderMarkdown(cmp, null);
+checkTrue('render: coverage is stated', md.includes('| Scores reported (of 3) | 3 | 2 |'), md.slice(0, 400));
+checkTrue('render: spread is stated', md.includes('| Spread (worst ÷ best suite) | — | 4× |'), md.slice(0, 800));
+checkTrue('render: a noisy benchmark is flagged', md.includes('20%'), md);
+checkTrue('render: the noise flag marks only the out-of-band one', /Richards.*20%\s*⚠/.test(md) && !/Splay.*⚠/.test(md), md);
+
+// A single-repetition run must not grow a spread column it has no data for.
+const single = buildComparison({
+  chromium: { engineLabel: 'c', geomean: 100, repetitions: 1, benchmarks: { Richards: 100 }, suiteStatus: { Richards: { status: 'ok' } } },
+  broiler: { engineLabel: 'b', geomean: 1, repetitions: 1, benchmarks: { Richards: 1 }, suiteStatus: { Richards: { status: 'ok' } } },
+}, '2026-01-01T00:00:00.000Z');
+checkTrue('render: one repetition says so plainly', renderMarkdown(single, null).includes('cannot be distinguished from noise'));
+checkTrue('render: one repetition has no spread column', !renderMarkdown(single, null).includes('Broiler spread'));
 
 // ── Report ──────────────────────────────────────────────────────────────────
 
