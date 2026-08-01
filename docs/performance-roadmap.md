@@ -409,7 +409,7 @@ onto benchmarks. → **phase 2**
 
 | Gap | Hits |
 |---|---|
-| Shape eligibility is `GetType() == typeof(JSObject)` — `JSArray`, `JSFunction`, every exotic excluded | Crypto, NavierStokes, Gameboy, zlib |
+| Shape eligibility is `GetType() == typeof(JSObject)` — `JSArray`, `JSFunction`, every exotic excluded | **Arrays fixed (2-2). The four benchmarks named here were the wrong ones** — they reach arrays by element and by `length`, neither of which a shape can hold. The idiom that pays is statics on a constructor function, and **DeltaBlue at 601× is the case**; see 2-8 |
 | No shape-transition cache — *creating* a property misses every time | Richards, DeltaBlue, RayTrace, Box2D |
 | `o.x++`, `o.x += 1`, computed keys, `super`, optional chains, private names keep the old lowering | Richards, Gameboy, Box2D |
 | Double storage in `TrackShapeDataProperty` | everything — but **measured at ~3% of a worst-case store loop and 4.5% of an object's bytes**; see 2-3, which is re-specified, and 2-7, which is where the memory actually goes |
@@ -948,7 +948,7 @@ Landed as `patches/0051-js-store-cache-property-creation.patch`, which applies o
 
 | # | Item | Origin | Where | Why it matters here | Size |
 |---|---|---|---|---|---|
-| **2-2** | **Widen shape eligibility** past `GetType() == typeof(JSObject)` | P1-4 | `Runtime/JSObject.cs:203` — `TryGetShapeSlot` | `JSArray`, `JSFunction` and every built-in exotic are excluded wholesale. **Start with `JSArray`** — it is on the hot path of five benchmarks | M |
+| **2-2** | **Widen shape eligibility** past `GetType() == typeof(JSObject)` — *arrays landed; see below* | P1-4 | `Runtime/JSObject.cs` — `SupportsShapeTracking`; `BuiltIns/Array/JSArray.cs` | `JSArray`, `JSFunction` and every built-in exotic were excluded wholesale — **measured 0 hits / 200 000 for every named access on one.** Arrays now opt in (**0 → 199 999**). The function half is blocked and is now 2-8 | M |
 | **2-3** | **Remove the double storage** — *re-specified and re-sized; see below* | P1-4 | `Runtime/JSObject.cs:97,:188` — `TrackShapeDataProperty` | Every tracked object writes each value into `shapeSlots` *and* the `PropertySequence`. **Not a pure removal, and its throughput case is ~3% of a worst-case loop.** The dominant per-object cost is elsewhere — see 2-3 below and 2-7 | ~~S~~ **M** |
 | **2-4** | **Extend the store cache** to `o.x++`, `o.x += 1`, computed keys, `super`, optional chains, private names | P1-3 | `.Compiler` lowering; `Runtime/ObjectShape.cs` | All keep the old uncached lowering. `o.x++` measured the most expensive and is pervasive in Gameboy and Box2D | M |
 | **2-5** | **Get strictness off the property-write path** | P0-2 | `Engine/Core/JSEngine.cs:223`; `JSValue` set accessors | P0-2 removed the redundant *writes*, but set accessors still **resolve** an `AsyncLocal<bool>` per write. The preferred fix — threading the compiler's static knowledge into the emitted set helpers so the hot path reads nothing — is not started | M |
@@ -966,7 +966,102 @@ Landed as `patches/0051-js-store-cache-property-creation.patch`, which applies o
 > property *creation*, which is what landed — the item above says what it took. The lesson is
 > in §3.5: an item can be worth doing and still be wrong about why.
 
-### 2-3 · Remove the double storage — **re-specified; do not start as written**
+### 2-2 · Widen shape eligibility — **arrays landed; the item's own targets were wrong**
+
+Shape eligibility was an exact `GetType() == typeof(JSObject)` test in six places, so a
+`JSArray`, a `JSFunction` and every built-in exotic had no shape and therefore no
+inline-cache entry. Measured first, and the exclusion is total — **0 hits out of 200 000 on
+every named access to one:**
+
+| Site | Before | After |
+|---|--:|--:|
+| `array-named-read` — `a.tag` in a loop | 0 / 200 000 | **199 999 / 1** |
+| `array-named-store` — `a.tag = i` | 0 / 200 001 | **199 999 / 2** |
+| `array-length-read` — `a.length` | 0 / 200 000 | 0 / 200 000 — *unchanged, and cannot change* |
+| `array-element-read` — `a[1]` (control) | 0 / 0 | 0 / 0 — never cached, by design |
+| `function-named-read`, sloppy / strict / class static | 0 / 200 000 | 0 / 200 000 — *not opted in; see 2-8* |
+| `typed-array-length-read` | 0 / 200 000 | 0 / 200 000 |
+
+Wall clock on a 10 M-iteration loop reading and writing one named property on an array, same
+build with only the override differing, **eight** interleaved pairs: median of paired ratios
+**0.93**, seven of eight in the same direction and one pair 11% *against*. Read that as
+directional rather than as a figure — the hit-rate rows above are exact and deterministic, the
+wall clock on this container is not, and eight pairs were needed before the median stopped
+moving.
+
+**What landed.** The gate became a virtual `JSObject.SupportsShapeTracking`, following the
+`SupportsOrdinaryIndexedWrite` pattern the class already uses, with `JSArray` overriding it. It
+is an opt-**in**, and the remarks say what a subclass has to earn: *while an object is in
+shape mode, the shape's tracked keys must be its complete set of own named properties.*
+`GetPrototypeLookupShapeId` reads "key absent from the shape" as "no own property shadows the
+prototype's", and 2-1's `TryCreateShapeSlot` reads it as "creating this key is safe" — so a
+subclass that violates it does not merely fail to help, it breaks both.
+
+**Three things the measurement changed about the item.**
+
+- **`a.length` can never be cached by this.** It is computed from the element store by an
+  exotic override rather than held as a data property, so there is no slot for it to occupy —
+  and there should not be, since its value moves whenever the array does. Unchanged at
+  0 / 200 000, and now pinned by a test so its absence reads as designed.
+- **"On the hot path of five benchmarks" does not survive.** The item names Crypto,
+  NavierStokes, Gameboy and zlib, but what those do with arrays is *elements* and *length* —
+  elements bypass the cache by design (the control row) and length cannot be cached. In the
+  corpus, **NavierStokes and zlib contain no `.length` at all**; Crypto has 28 and Gameboy 21,
+  none of them named data properties. A named expando on an array is a real pattern in real
+  JavaScript, which is why this is worth having, but it is not what those four benchmarks do.
+- **The type that would have paid is `JSFunction`, and it is blocked.** See 2-8.
+
+**What it buys is bounded, and the bound is deliberate.**
+`GetOwnProperties(create: true)` abandons the shape whenever another assembly asks for a
+mutable ref to the property store, because such a ref could add a named property without
+telling the tracker. `a.push(...)` goes through it, so **an array that grows through the
+built-ins loses its named-property cache at the first growth** — one dictionary fallback, then
+correctness unaffected and hits gone. Measured and pinned rather than discovered later.
+
+**Verify.** 12 tests in `PropertyShapeCacheTests`: the hit rate itself; elements and named
+properties staying distinct; `length` tracking `push` while a named property is tracked;
+`Object.defineProperty(a, 'length', …)` materializing length without confusing the shape;
+delete revealing an `Array.prototype` property; a prototype mutation mid-loop; `join`/`forEach`
+/`slice`/`reverse`/`JSON.stringify`/`indexOf` after tracking; a frozen array refusing both
+kinds of write; a sparse array keeping its holes; an `extends Array` instance; a typed array
+staying untracked; and two arrays reaching the same shape staying distinct. Suite: **7 319
+tests across 13 projects, 0 failures.**
+
+Landed as `patches/0053-js-array-shape-eligibility.patch`, on top of `0051`.
+
+### 2-8 · Functions cannot be opted in until their own properties are tracked — **blocked, with the fix named**
+
+The half of 2-2 that would have paid, and the reason it cannot be done by flipping the same
+switch. **DeltaBlue is the worst throughput score in the suite at 601×, and it reads
+`Strength.stronger`, `Strength.REQUIRED` and `Strength.WEAKEST` in its hot path** —
+`deltablue.js:104` defines `Strength` as a **function**, so every one of those is a named read
+on a `JSFunction`, measured at **0 hits / 200 000**. (`Direction.NONE` alongside it is
+`new Object()` and already caches.) Richards, RayTrace and Box2D use the same
+statics-on-a-constructor idiom.
+
+**Why the switch is not enough — and why flipping it would be a correctness bug, not a
+no-op.** `JSFunction` installs `length`, `name` and `prototype` with bare
+`ownProperties.Put` calls that never reach `TrackShapeDataProperty`. Opt it in and its shape
+claims a key set missing three keys every function has, which is exactly the invariant
+`GetPrototypeLookupShapeId` and `TryCreateShapeSlot` depend on. A scratch build confirmed the
+hazard is currently masked by accident: every function row reported one dictionary fallback,
+so the shape was abandoned before it could be trusted — luck, not design.
+
+**Prerequisites, in order.**
+
+1. Route `length`, `name` and `prototype` through `TrackShapeDataProperty`, or serve them from
+   overrides the way `JSArray` serves `length`. The second is the better shape and also
+   removes three property-map entries per function object, which is 2-7's currency.
+2. Decide the Annex B `caller`/`arguments` pair. Every ordinary non-strict function carries
+   them as deferred cells from birth (P0-3), and a deferred cell abandons the shape — so
+   without this, opting in helps strict functions and classes only, and DeltaBlue's `Strength`
+   is sloppy. Serving them from an override rather than storing them would fix this and
+   prerequisite 1 together, but P0-3 deliberately preserved their Annex B descriptor shape and
+   that must not regress.
+3. Only then override `SupportsShapeTracking`, and re-measure the three function rows.
+
+**Size: M**, and it is the highest-value remaining item in phase 2 on the evidence — it is
+the only one of them that touches the 601× score directly.
 
 Measured before starting, and the item does not survive it. Three things are wrong.
 
@@ -1064,9 +1159,10 @@ wall-clock benchmark reports, and it exists because 2-3 could not be decided wit
 item's *only* surviving justification was memory, and there was no way to measure memory per
 object from a clean checkout. Both 2-3's re-sizing and 2-7 came out of its first run.
 
-**Sequence.** 2-0 ✅ → 2-1 ✅, then 2-2, 2-4, 2-5, 2-6 — with **2-3 removed from the near
-list** (re-specified, M, and superseded in value by 2-7) and **2-7 needing its distribution
-measurement before it can be picked up**.
+**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅, then **2-8** (the only remaining item that touches the
+601× score directly), then 2-4, 2-5, 2-6 — with **2-3 removed from the near list**
+(re-specified, M, superseded in value by 2-7) and **2-7 needing its distribution measurement
+before it can be picked up**.
 
 **Verify — per item, not per phase.**
 
@@ -1236,7 +1332,7 @@ pinned RegExp corpus is clean.
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → **2-2** → 2-4 → 2-5 → 2-6; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → **2-8** → 2-4 → 2-5 → 2-6; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
@@ -1404,7 +1500,8 @@ Where each item came from, so existing cross-references still resolve.
 | 2-0 | — (P1-2's guard, reached in a state it cannot recognise) | — | **Landed** — `patches/0050`, pending submodule push |
 | 2-1 | P1-3 remainder | 2-1 | **Landed** — `patches/0051`, pending submodule push; **test262 owed** |
 | 2-4 | P1-3 remainder | 2-4 | Open |
-| 2-2 | P1-4 remainder | 2-2 | Open |
+| 2-2 | P1-4 remainder | 2-2 | **Landed for arrays** — `patches/0053`, pending submodule push; its four named benchmarks were the wrong targets |
+| 2-8 | — (the blocked half of 2-2) | — | **Blocked, prerequisites named** — functions install `length`/`name`/`prototype` untracked; DeltaBlue's 601× depends on it |
 | 2-3 | P1-4 remainder | 2-3 | **Re-specified** — not a pure removal, ~3% ceiling, S → M, superseded in value by 2-7 |
 | 2-7 | — (found measuring 2-3) | — | **Sized, not started** — needs an object-size distribution from an Octane run |
 | 2-5 | P0-2 remainder | 2-5 | Open |
