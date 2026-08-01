@@ -22,8 +22,36 @@ public class WptTestRunnerTests : IDisposable
     public void Dispose()
     {
         Program.ResetTestHooks();
-        if (Directory.Exists(_tempDir))
-            Directory.Delete(_tempDir, recursive: true);
+        if (!Directory.Exists(_tempDir))
+            return;
+
+        // Best-effort cleanup. A test that has just rendered a document can still hold an
+        // open handle to a sub-resource it loaded (a background-image SVG, say) when the
+        // recursive delete reaches it, and on Windows that fails the *test* with an
+        // IOException from RemoveDirectoryRecursive rather than reporting anything about
+        // what the test actually asserted. Leaving a directory under %TEMP% behind is not a
+        // test failure; losing the assertion result to a teardown race is. Retry briefly to
+        // let the handle drop, then give up quietly.
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                Directory.Delete(_tempDir, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < 4)
+            {
+                Thread.Sleep(50);
+            }
+            catch (UnauthorizedAccessException) when (attempt < 4)
+            {
+                Thread.Sleep(50);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return;
+            }
+        }
     }
 
     private WptTestResult RunTempMatchTest(string testHtml, string referenceHtml, string namePrefix)
