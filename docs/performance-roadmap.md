@@ -290,10 +290,18 @@ These were paid for once each. They apply to every phase below.
   content was a storage-layer redesign, and its measured ceiling was 3% of the most favourable
   workload available. *Before writing "pure removal", delete the thing in a scratch build and
   see what breaks — here it took one probe, and the wrong answer it returned was the proof.*
-- **An item can be overtaken by the items after it.** 2-3 was written when a store cost two
-  key lookups; P1-3 and 2-1 removed the second, so most of its value was collected before
-  anyone reached it. *Re-measure an item's premise when the work before it lands, not only
-  when it is written.*
+- **An item can be overtaken by the items before it, and it has happened twice.** 2-3 was
+  written when a store cost two key lookups; P1-3 and 2-1 removed the second, so most of its
+  value was collected before anyone reached it. 2-5 was written against "an `AsyncLocal` per
+  write" when P0-2 had already removed the expensive half — the ExecutionContext *write* — and
+  left only a read that measures at 0%. Both were re-measured on arrival and neither survived.
+  *Re-measure an item's premise when the work before it lands, not only when it is written* —
+  and note that in both cases the item was inheriting a cost description from the campaign that
+  had already fixed it.
+- **Name the half you mean.** "The `AsyncLocal` is on the hot path" was true of 2-5 and told
+  nobody that the write was the cost and the read was not. An item that says which operation,
+  on which population, at what frequency can be checked in one probe; one that names a mechanism
+  cannot be checked at all until someone rebuilds the reasoning.
 - **Compare against the right pair.** Pooling frames measured as "no cost" against
   *allocating* them. Against an array slot it was worth 11%. The first comparison
   showed recycling costs about what allocating costs — not that either is free.
@@ -443,10 +451,16 @@ the clearest browser relevance: it is page load time. → **phase 1**
 each pattern. RegExp is 110× off *against Octane's lowest reference baseline*, and the
 same engine sits on PdfJS's and Typescript's critical path. → **phase 5**
 
-**B6 · Ambient state on hot paths.** `JSEngine` holds the current context and the
-strict-mode flag in `AsyncLocal<T>`. P0-2 removed the redundant *writes*; `JSValue`'s
-set accessors still **resolve** strictness through the `AsyncLocal<bool>` on every
-property write. → **phase 2 (2-5)**
+**B6 · Ambient state on hot paths — *the write half was the blocker, and it is gone*.**
+`JSEngine` holds the current context and the strict-mode flag in `AsyncLocal<T>`. P0-2 removed
+the redundant *writes*, which is where the cost was: a write allocated a fresh
+`ExecutionContext`. `JSValue`'s set accessors do still **resolve** strictness through the
+`AsyncLocal<bool>` on every uncached property write — and **that read measures at 0%**. Removing
+all 13 resolutions moved a 30 M-write all-misses loop by nothing (median paired ratio 1.013).
+So this is no longer a blocker on the write path; **2-5 is closed on that measurement.** What
+remains under B6 is the *context* `AsyncLocal`, which nothing here has measured — it is read on
+paths this blocker never quantified, and it should be measured before it is claimed. → **2-5
+closed; the context read is unmeasured**
 
 **B7 · GC — *not* a primary blocker.** Stated explicitly to keep it off the list.
 SplayLatency at 45× is the *best* result in the suite and Splay's throughput at 152×
@@ -803,13 +817,14 @@ that *is* called still pays this.
 
 ## Phase 2 — the call and property paths
 
-**Targets: DeltaBlue (601×), Richards (433×), Box2D (170×).** Blockers **B3** and
-**B6**.
+**Targets: DeltaBlue (601×), Richards (433×), Box2D (170×).** Blocker **B3**; **B6 is closed on
+the write path** — 2-5 measured its remaining half at 0%.
 
-This phase is exactly the "engineering deliberately left behind" table from the engine
-engine §8.1 — a set of contained changes to structures that already exist and
-already work on the sites they cover. **Best effort-to-value ratio on the list after
-phase 1.**
+This phase is exactly the "engineering deliberately left behind" table from engine §8.1 — a set
+of contained changes to structures that already exist and already work on the sites they cover.
+**Best effort-to-value ratio on the list after phase 1**, and it has held up: five items landed,
+every one of them measured, and three of the eight turned out to be mis-specified rather than
+merely undone (2-2's targets, 2-3, 2-5).
 
 Owner assemblies: `Broiler.JavaScript.Runtime`, `.Compiler`, `.Engine`.
 
@@ -951,7 +966,7 @@ Landed as `patches/0051-js-store-cache-property-creation.patch`, which applies o
 | **2-2** | **Widen shape eligibility** past `GetType() == typeof(JSObject)` — *arrays landed (2-2), functions landed (2-8)* | P1-4 | `Runtime/JSObject.cs` — `SupportsShapeTracking`; `BuiltIns/Array/JSArray.cs` | `JSArray`, `JSFunction` and every built-in exotic were excluded wholesale — **measured 0 hits / 200 000 for every named access on one.** Arrays now opt in (**0 → 199 999**). The function half is blocked and is now 2-8 | M |
 | **2-3** | **Remove the double storage** — *re-specified and re-sized; see below* | P1-4 | `Runtime/JSObject.cs:97,:188` — `TrackShapeDataProperty` | Every tracked object writes each value into `shapeSlots` *and* the `PropertySequence`. **Not a pure removal, and its throughput case is ~3% of a worst-case loop.** The dominant per-object cost is elsewhere — see 2-3 below and 2-7 | ~~S~~ **M** |
 | **2-4** | **Extend the store cache** to `o.x++` ✅, `o.x += 1`, computed keys, `super`, optional chains, private names | P1-3 | `.Compiler` lowering | Measured: these reached **neither** cache — 0 hits *and* 0 misses, the counters never saw them. `o.x++`/`o.x--` now take both (**0 → 199 999** each side); `o.x += 1` needs `EvalShadowBuilder` to grow a cached form; computed keys and optional chains stay out on purpose | M |
-| **2-5** | **Get strictness off the property-write path** — *measure its premise first* | P0-2 | `Engine/Core/JSEngine.cs:223`; `JSValue` set accessors | P0-2 removed the redundant *writes*, but set accessors still **resolve** an `AsyncLocal<bool>` per write. **2-1 has probably already collected most of this**: a store-cache hit never consults strict mode, so the `AsyncLocal` read now happens only on a miss. Measure what is left before starting — 2-3 was re-specified for exactly this reason | M |
+| **2-5** | ~~**Get strictness off the property-write path**~~ — **measured; closed, no work worth doing** | P0-2 | `Engine/Core/JSEngine.cs:225`; `JSValue` set accessors | Removing **all 13** resolutions from the write path moves a 30 M-write all-misses loop by **nothing** — median paired ratio 1.013, i.e. marginally the wrong way. P0-2 already took the expensive half (the ExecutionContext *write*); what remains is a read that does not cost. See below | ~~M~~ **closed** |
 | **2-6** | **Monomorphic call-site caching** | new | `BuiltIns/Function/JSFunction.cs` — `InvokeFunction`, `SelectInvocationDelegate` | Callee resolution repeats per call. **Prerequisite for inlining in phase 4** | M |
 
 > **2-1 was named after the wrong missing thing.** It called for "a shape-transition cache
@@ -1138,6 +1153,49 @@ revealing an inherited static. Suite: **7 347 tests across 13 projects, 0 failur
 
 Landed as `patches/0055-js-function-shape-eligibility.patch`, on top of `0054`.
 
+### 2-5 · Get strictness off the property-write path — **measured; closed**
+
+The item's claim was that `JSValue`'s set accessors "**resolve** an `AsyncLocal<bool>` per
+write". True, and it costs nothing. Measured before starting, as this item's own note asked.
+
+**The probe.** A build with all 13 `IsStrictModeEnabled?.Invoke()` sites replaced by `false` —
+not shippable, since strict-mode error reporting goes with them, but it removes the read
+entirely and so bounds the win from above. Run against a loop where **every** store is a
+store-cache miss and therefore does resolve the flag: five shapes on one emitted site retires
+it, so all 30 000 000 writes go through the indexer.
+
+| | base | no resolution at all |
+|---|--:|--:|
+| 30 M-write all-misses loop, five interleaved pairs (median) | 16 017 ms | **16 222 ms** |
+
+**Median of paired ratios 1.013** — the build with the work removed is *marginally slower*,
+which is another way of saying the difference is container noise. The broader sweep agrees and
+says something stronger: across five write shapes the deltas ranged 0–6% in **both**
+directions, and the shape that should have gained most (all misses, 10 M resolutions) gained
+least, while the shape that performs **no** resolutions at all — a constant-key store, which
+hits the cache — showed the largest apparent delta. A causal effect does not distribute itself
+inversely to its own cause.
+
+**Why the premise was wrong, and it is worth knowing which half.** P0-2 is quoted in this
+document as having removed the redundant strict-mode *writes*, and that was the whole cost: a
+write allocated a fresh `ExecutionContext` on every call, which is why P0-2 made the scope write
+only on a transition. What it left behind is a *read*, and an `AsyncLocal<T>.Value` read is not
+a map walk — .NET keeps one to three async-locals in a specialized holder, so it is a field
+access and a type check. This engine has a handful. The item inherited "AsyncLocal is
+expensive" from the campaign that fixed the expensive part.
+
+**Closed rather than deferred.** The stated fix — "threading the compiler's static knowledge
+into the emitted set helpers so the hot path reads nothing" — is a compiler change, and it is
+being asked to buy 0%. 2-1 also narrowed the exposure independently: a store-cache *hit* never
+consults strict mode at all, so the read only survives on misses, which is the population the
+probe above measured directly.
+
+**Bounded claim.** Measured in the script host, where the engine holds few async-locals. An
+embedding that stacks many `AsyncLocal`s on the same execution context could in principle push
+the read into a slower path; if that is ever suspected, the reproduction is the probe above and
+it takes one build to re-run. Nothing in this document should be read as saying the read is
+free in every host — only that it is free in the one the roadmap measures on.
+
 ### 2-3 · Remove the double storage — **re-specified; do not start as written**
 
 Measured before starting, and the item does not survive it. Three things are wrong.
@@ -1236,9 +1294,8 @@ wall-clock benchmark reports, and it exists because 2-3 could not be decided wit
 item's *only* surviving justification was memory, and there was no way to measure memory per
 object from a clean checkout. Both 2-3's re-sizing and 2-7 came out of its first run.
 
-**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4's update form ✅ → 2-8 ✅, then **2-5** — and read its
-note first, because 2-1 has probably already collected most of it — then 2-6 and 2-4's
-compound-assignment half — with **2-3 removed from the near list**
+**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4's update form ✅ → 2-8 ✅, **2-5 closed on a
+measurement**, then **2-6** and 2-4's compound-assignment half — with **2-3 removed from the near list**
 (re-specified, M, superseded in value by 2-7) and **2-7 needing its distribution measurement
 before it can be picked up**.
 
@@ -1410,7 +1467,7 @@ pinned RegExp corpus is clean.
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 (update form ✅) → 2-8 ✅ → **2-5** → 2-6; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 (update form ✅) → 2-8 ✅ → 2-5 closed → **2-6**; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
@@ -1582,7 +1639,7 @@ Where each item came from, so existing cross-references still resolve.
 | 2-8 | — (the blocked half of 2-2) | — | **Landed** — `patches/0055`, pending submodule push; both prerequisites fixed |
 | 2-3 | P1-4 remainder | 2-3 | **Re-specified** — not a pure removal, ~3% ceiling, S → M, superseded in value by 2-7 |
 | 2-7 | — (found measuring 2-3) | — | **Sized, not started** — needs an object-size distribution from an Octane run |
-| 2-5 | P0-2 remainder | 2-5 | Open |
+| 2-5 | P0-2 remainder | 2-5 | **Closed** — measured at 0%; P0-2 had already taken the cost, and 2-1 narrowed what was left |
 | 2-6 | — | 2-6 | Open |
 | 3-1, 3-2 | — | 3-1, 3-2 | Open |
 | 3-3 | P2-2 item 3 remainder | 3-3 | Open |
