@@ -525,7 +525,12 @@ public class CaptureService
         using var microTaskContext = MicroTaskSynchronizationContext.Install(microTasks);
         using JSContext context = useEngineModules ? new BridgeModuleContext(csp, url) : new JSContext();
         RegisterRuntimeExtensions(context, microTasks, csp);
-        var bridge = new DomBridge();
+        // Disposed with this call, and declared after the context so it is torn down first: the
+        // bridge owns a per-document session — the headless layout view and its HtmlContainer
+        // (hence the whole box tree and every sub-resource its image load handlers hold), timer
+        // and animation queues, listener stores, observers and message ports. Only the serialized
+        // HTML string outlives this scope, so there is nothing to keep the session alive for.
+        using var bridge = new DomBridge();
         bridge.Csp = csp;
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
         // Attach enforces the CSP style-src family on the parsed DOM itself (it runs

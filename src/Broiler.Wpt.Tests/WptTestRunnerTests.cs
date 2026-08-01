@@ -25,13 +25,15 @@ public class WptTestRunnerTests : IDisposable
         if (!Directory.Exists(_tempDir))
             return;
 
-        // Best-effort cleanup. A test that has just rendered a document can still hold an
-        // open handle to a sub-resource it loaded (a background-image SVG, say) when the
-        // recursive delete reaches it, and on Windows that fails the *test* with an
-        // IOException from RemoveDirectoryRecursive rather than reporting anything about
-        // what the test actually asserted. Leaving a directory under %TEMP% behind is not a
-        // test failure; losing the assertion result to a teardown race is. Retry briefly to
-        // let the handle drop, then give up quietly.
+        // Best-effort cleanup. This used to fail for a reason of our own making: the renderer
+        // held an open handle to every image sub-resource it had loaded (a background-image
+        // SVG, say) for as long as the box tree lived, so the recursive delete hit a file the
+        // engine still had open. That is fixed at the source — ImageLoadHandler now closes the
+        // file as soon as the image is decoded, and the WPT runner disposes the DomBridge whose
+        // layout view owned the box tree — so nothing here should be locked any more.
+        // The retry stays only for locks outside our control (a virus scanner or the search
+        // indexer transiently opening a file we just wrote). Leaving a directory under %TEMP%
+        // behind is not a test failure; losing the assertion result to a teardown race is.
         for (var attempt = 0; ; attempt++)
         {
             try
