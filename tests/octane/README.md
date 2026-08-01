@@ -8,6 +8,11 @@ benchmark suite under two engines and produces a side-by-side comparison:
 | **Chromium** | Real V8 in a headless browser, driven by Playwright. |
 | **Broiler** | The `BroilerJS --script-host` shell (the Broiler.JS engine). |
 
+This file covers *how* the harness runs. For what each benchmark actually does,
+which engine subsystem it loads, and where Broiler's time goes on it, see
+[`benchmarks.md`](benchmarks.md); for the plan that follows from those findings,
+[`roadmap.md`](roadmap.md).
+
 ## Running
 
 ```bash
@@ -21,6 +26,37 @@ benchmark suite under two engines and produces a side-by-side comparison:
 In CI the [Octane Benchmarks workflow](../../.github/workflows/octane-benchmarks.yml)
 (`workflow_dispatch`) runs both engines and commits the refreshed results. It
 also uploads the per-suite logs as an `octane-logs` artifact.
+
+### Measuring, rather than just running
+
+A single run tells you whether a suite completes. It does **not** tell you
+whether a score moved — run-to-run variance is comfortably larger than most
+changes worth making. To get a number a change can be judged against:
+
+```bash
+./scripts/run-octane-benchmarks.sh --repetitions 3
+```
+
+Each suite runs three times; `comparison.md` reports the **median** score per
+benchmark and the observed **spread**, flagging with `⚠` anything outside the
+noise band (`--noise-band`, default 7.5%, matching the baseline profile in
+`Broiler.JS/eng/performance/phase0.json`). Every repetition keeps its own log
+(`<suite>.rep1.log`, …), and a suite that passes some repetitions and fails
+others is reported as **flaky** rather than averaged into a pass.
+
+The comparison also leads with the three numbers the run is read for: how many
+of the expected scores were reported, the geomean, and the **spread between the
+best and worst suite** — the last being the one [`roadmap.md`](roadmap.md) is
+organized around.
+
+### Per-suite time budgets
+
+`--timeout` (default 180 s) is a **floor**. A suite that genuinely needs longer
+raises its own budget with `timeoutSec` in
+[`scripts/octane-suites.json`](../../scripts/octane-suites.json) — currently
+Mandreel (1200 s) and zlib (1800 s), which measured 313 s and 647 s under
+Broiler. Raising `--timeout` still widens every suite at once for a debugging
+run. The budget a suite ran under is recorded in its log and its status entry.
 
 ## How it works
 

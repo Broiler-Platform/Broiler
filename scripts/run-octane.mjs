@@ -39,7 +39,15 @@
 //   --log-dir <dir>        Where per-suite logs are written (default: tests/octane/logs)
 //   --suites <path>        Suite manifest (default: scripts/octane-suites.json)
 //   --runner <path>        Shared runner JS (default: scripts/octane-runner.js)
-//   --timeout <sec>        Per-suite timeout in seconds (default: 180)
+//   --timeout <sec>        Per-suite timeout in seconds (default: 180). A suite
+//                          may raise its own budget with "timeoutSec" in the
+//                          manifest; this option is the floor for every suite.
+//   --repetitions <n>      Run each suite n times and report the median score
+//                          per benchmark plus the observed spread (default: 1).
+//                          A single run cannot tell a real change from noise.
+//   --noise-band <pct>     Spread above which a benchmark is flagged as noisy
+//                          in the comparison (default: 7.5, matching the
+//                          baseline profile in eng/performance/phase0.json).
 //   --only <list>          Comma-separated suite names to run (default: all).
 //                          Results go to <log-dir>/partial/ so a debugging run
 //                          never overwrites the committed full-run results.
@@ -77,6 +85,8 @@ function parseArgs(argv) {
     suites: join(__dirname, 'octane-suites.json'),
     runner: join(__dirname, 'octane-runner.js'),
     timeout: 180,
+    repetitions: 1,
+    noiseBand: 7.5,
     only: null,
     verbose: false,
     keepScripts: false,
@@ -95,6 +105,8 @@ function parseArgs(argv) {
       case '--suites': opts.suites = next(); break;
       case '--runner': opts.runner = next(); break;
       case '--timeout': opts.timeout = parseInt(next(), 10); break;
+      case '--repetitions': opts.repetitions = parseInt(next(), 10); break;
+      case '--noise-band': opts.noiseBand = Number(next()); break;
       case '--only': opts.only = next().split(',').map((s) => s.trim()).filter(Boolean); break;
       case '--verbose': opts.verbose = true; break;
       case '--keep-scripts': opts.keepScripts = true; break;
@@ -110,7 +122,66 @@ function parseArgs(argv) {
     }
   }
   if (!opts.octaneDir) throw new Error('--octane-dir is required');
+  if (!Number.isInteger(opts.repetitions) || opts.repetitions < 1) {
+    throw new Error(`--repetitions expects a positive integer, got: ${opts.repetitions}`);
+  }
   return opts;
+}
+
+// ── Per-suite budgets and repeatability ─────────────────────────────────────
+// Two suites are far slower than the rest — Mandreel and zlib run for minutes,
+// not seconds — so a single global timeout is either too tight for them or too
+// slack to catch a hang anywhere else. The manifest may raise a suite's budget;
+// it may never lower it below the global value, so --timeout stays a floor and
+// a debugging run can still widen everything at once.
+
+export function suiteTimeoutSec(suite, opts) {
+  return Math.max(opts.timeout, suite.timeoutSec ?? 0);
+}
+
+export function median(values) {
+  const s = [...values].sort((a, b) => a - b);
+  if (s.length === 0) return null;
+  const mid = s.length >> 1;
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+// Spread as a percentage of the median. Reported rather than smoothed away: a
+// wide band on a latency benchmark is itself a pause-distribution result, and a
+// wide band anywhere else means the delta that run is being read for is noise.
+export function bandPercent(values) {
+  if (values.length < 2) return null;
+  const m = median(values);
+  if (!m) return null;
+  return Number((((Math.max(...values) - Math.min(...values)) / m) * 100).toFixed(1));
+}
+
+// Collapse a benchmark's samples across repetitions into the reported score.
+// With one repetition this is the identity, so a default run is byte-identical
+// to what the harness produced before repetitions existed.
+function summarizeSamples(samplesByBenchmark) {
+  const benchmarks = {};
+  const stability = {};
+  for (const [name, values] of Object.entries(samplesByBenchmark)) {
+    if (!values.length) continue;
+    benchmarks[name] = values.length === 1 ? values[0] : Number(median(values).toFixed(1));
+    if (values.length > 1) stability[name] = { samples: values, bandPercent: bandPercent(values) };
+  }
+  return { benchmarks, stability };
+}
+
+// A suite is only `ok` if it was `ok` every time. Anything else reports the
+// first bad run — a suite that fails one run in three is a flake, and averaging
+// it into a pass is exactly the kind of quiet dishonesty this harness avoids.
+function summarizeStatuses(statuses) {
+  const bad = statuses.find((s) => s.status !== 'ok');
+  const worst = bad ?? statuses[statuses.length - 1];
+  if (statuses.length > 1) {
+    worst.repetitions = statuses.length;
+    worst.statusPerRepetition = statuses.map((s) => s.status);
+    if (bad && statuses.some((s) => s.status === 'ok')) worst.flaky = true;
+  }
+  return worst;
 }
 
 function selectSuites(manifest, only) {
@@ -522,6 +593,7 @@ async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
   mkdirSync(scriptDir, { recursive: true });
 
   const benchmarks = {};
+  const stability = {};
   const suiteStatus = {};
   let octaneVersion = null;
 
@@ -541,50 +613,81 @@ async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
     // trim the repo root off engine frames, before anything is read or shown.
     const clean = (t) => shortenEnginePaths(annotateCombinedPaths(t, combined, segments));
 
-    process.stderr.write(`[broiler] ${suite.name} … `);
-    if (opts.verbose) process.stderr.write('\n');
+    const timeoutSec = suiteTimeoutSec(suite, opts);
+    const samples = {};
+    const statuses = [];
 
-    const res = await runProcess('dotnet', args, {
-      timeoutMs: opts.timeout * 1000,
-      env: { ...process.env, ...opts.broilerEnv },
-      onStdout: opts.verbose ? createLineStreamer(`[broiler:${suite.name}] `, clean) : null,
-      onStderr: opts.verbose ? createLineStreamer(`[broiler:${suite.name}!] `, clean) : null,
-    });
+    for (let rep = 1; rep <= opts.repetitions; rep++) {
+      // One log per repetition, so a flake keeps the evidence of the run that
+      // failed instead of having it overwritten by the run that passed. The
+      // single-repetition name is unchanged.
+      const logName = opts.repetitions === 1 ? `${suite.name}.log` : `${suite.name}.rep${rep}.log`;
+      const label = opts.repetitions === 1 ? suite.name : `${suite.name} (${rep}/${opts.repetitions})`;
 
-    const stdout = clean(res.stdout);
-    const stderr = clean(res.stderr);
-    const mapped = { ...res, stdout, stderr };
-    const diag = parseDiagnostics(stdout);
+      process.stderr.write(`[broiler] ${label} … `);
+      if (opts.verbose) process.stderr.write('\n');
 
-    const status = classifyBroilerSuite(mapped, diag, {
-      combined,
-      repro,
-      log: relative(REPO_ROOT, join(logDir, `${suite.name}.log`)),
-      script: relative(REPO_ROOT, combined),
-    });
+      const res = await runProcess('dotnet', args, {
+        timeoutMs: timeoutSec * 1000,
+        env: { ...process.env, ...opts.broilerEnv },
+        onStdout: opts.verbose ? createLineStreamer(`[broiler:${suite.name}] `, clean) : null,
+        onStderr: opts.verbose ? createLineStreamer(`[broiler:${suite.name}!] `, clean) : null,
+      });
 
-    if (diag.result) {
-      const { benchmarks: b, version } = normalizeRaw(diag.result);
-      octaneVersion ??= version;
-      Object.assign(benchmarks, b);
+      const stdout = clean(res.stdout);
+      const stderr = clean(res.stderr);
+      const mapped = { ...res, stdout, stderr };
+      const diag = parseDiagnostics(stdout);
+
+      const status = classifyBroilerSuite(mapped, diag, {
+        combined,
+        repro,
+        log: relative(REPO_ROOT, join(logDir, logName)),
+        script: relative(REPO_ROOT, combined),
+      });
+      status.timeoutSec = timeoutSec;
+
+      if (diag.result) {
+        const { benchmarks: b, version } = normalizeRaw(diag.result);
+        octaneVersion ??= version;
+        for (const [name, score] of Object.entries(b)) (samples[name] ??= []).push(score);
+      }
+      statuses.push(status);
+
+      writeSuiteLog(join(logDir, logName), [
+        ['suite', `${suite.name} (${suite.files.join(', ')})${opts.repetitions === 1 ? '' : ` — repetition ${rep} of ${opts.repetitions}`}`],
+        ['status', [
+          `status      : ${status.status}`,
+          `exit code   : ${describeExitCode(res.code)}${res.signal ? ` signal ${res.signal}` : ''}`,
+          `duration    : ${(res.durationMs / 1000).toFixed(1)}s${res.timedOut ? ` (timed out at ${timeoutSec}s)` : ''}`,
+          `budget      : ${timeoutSec}s${suite.timeoutSec ? ' (raised by the suite manifest)' : ''}`,
+          `files loaded: ${diag.loaded.length ? diag.loaded.join(', ') : '(none — failed before any file finished evaluating)'}`,
+          `failed at   : ${describeWhere(status.failedAt) ?? '(unknown)'}`,
+          res.spawnError ? `spawn error : ${res.spawnError.message}` : null,
+        ].filter(Boolean).join('\n')],
+        ['repro', repro],
+        ['error', status.message ?? status.error ?? '(none)'],
+        ['stderr', stderr],
+        ['stdout', stdout],
+      ]);
+
+      if (!opts.verbose) process.stderr.write(`${status.status}\n`);
+      else process.stderr.write(`[broiler] ${label} … ${status.status}\n`);
+      if (status.status !== 'ok') {
+        const where = describeWhere(status.failedAt);
+        const detail = clamp(status.error ?? '', 160);
+        const type = status.errorType && !detail.startsWith(status.errorType) ? `${status.errorType}: ` : '';
+        process.stderr.write(`           ${type}${detail}\n`);
+        if (where) process.stderr.write(`           at ${where}\n`);
+        process.stderr.write(`           log: ${status.log}\n`);
+      }
     }
-    suiteStatus[suite.name] = status;
 
-    writeSuiteLog(join(logDir, `${suite.name}.log`), [
-      ['suite', `${suite.name} (${suite.files.join(', ')})`],
-      ['status', [
-        `status      : ${status.status}`,
-        `exit code   : ${describeExitCode(res.code)}${res.signal ? ` signal ${res.signal}` : ''}`,
-        `duration    : ${(res.durationMs / 1000).toFixed(1)}s${res.timedOut ? ` (timed out at ${opts.timeout}s)` : ''}`,
-        `files loaded: ${diag.loaded.length ? diag.loaded.join(', ') : '(none — failed before any file finished evaluating)'}`,
-        `failed at   : ${describeWhere(status.failedAt) ?? '(unknown)'}`,
-        res.spawnError ? `spawn error : ${res.spawnError.message}` : null,
-      ].filter(Boolean).join('\n')],
-      ['repro', repro],
-      ['error', status.message ?? status.error ?? '(none)'],
-      ['stderr', stderr],
-      ['stdout', stdout],
-    ]);
+    const summary = summarizeSamples(samples);
+    Object.assign(benchmarks, summary.benchmarks);
+    Object.assign(stability, summary.stability);
+    const status = summarizeStatuses(statuses);
+    suiteStatus[suite.name] = status;
 
     // Keep the combined script only where it is useful — a failing suite is
     // reproducible by hand; a passing one is 25 MB of noise. Drop the repro
@@ -595,15 +698,8 @@ async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
       delete status.repro;
     }
 
-    if (!opts.verbose) process.stderr.write(`${status.status}\n`);
-    else process.stderr.write(`[broiler] ${suite.name} … ${status.status}\n`);
-    if (status.status !== 'ok') {
-      const where = describeWhere(status.failedAt);
-      const detail = clamp(status.error ?? '', 160);
-      const type = status.errorType && !detail.startsWith(status.errorType) ? `${status.errorType}: ` : '';
-      process.stderr.write(`           ${type}${detail}\n`);
-      if (where) process.stderr.write(`           at ${where}\n`);
-      process.stderr.write(`           log: ${status.log}\n`);
+    if (status.flaky) {
+      process.stderr.write(`           flaky: ${status.statusPerRepetition.join(', ')}\n`);
     }
   }
 
@@ -612,7 +708,10 @@ async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
     engineLabel: 'Broiler.JS (BroilerJS --script-host)',
     octaneVersion,
     perSuiteTimeoutSec: opts.timeout,
+    repetitions: opts.repetitions,
+    noiseBandPercent: opts.noiseBand,
     benchmarks,
+    stability,
     suiteStatus,
     geomean: geomean(Object.values(benchmarks)),
   };
@@ -719,92 +818,110 @@ async function runChromium(opts, suites, baseJs, runnerJs, dirs) {
   const browser = await chromium.launch();
   const engineLabel = `Chromium ${browser.version()}`;
   const benchmarks = {};
+  const stability = {};
   const suiteStatus = {};
   let octaneVersion = null;
 
   try {
     for (const suite of suites) {
-      process.stderr.write(`[chromium] ${suite.name} … `);
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      const startedAt = Date.now();
+      const timeoutSec = suiteTimeoutSec(suite, opts);
+      const samples = {};
+      const statuses = [];
+      for (let rep = 1; rep <= opts.repetitions; rep++) {
+        const label = opts.repetitions === 1 ? suite.name : `${suite.name} (${rep}/${opts.repetitions})`;
+        const logName = opts.repetitions === 1 ? `${suite.name}.log` : `${suite.name}.rep${rep}.log`;
+        process.stderr.write(`[chromium] ${label} … `);
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        const startedAt = Date.now();
 
-      // A browser reports out of band: console output (which carries the
-      // runner's breadcrumbs), uncaught page errors, and renderer crashes.
-      const consoleLines = [];
-      const pageErrors = [];
-      page.on('console', (m) => consoleLines.push(`[${m.type()}] ${m.text()}`));
-      page.on('pageerror', (e) => pageErrors.push(e.stack || String(e)));
-      page.on('crash', () => pageErrors.push('the page crashed'));
+        // A browser reports out of band: console output (which carries the
+        // runner's breadcrumbs), uncaught page errors, and renderer crashes.
+        const consoleLines = [];
+        const pageErrors = [];
+        page.on('console', (m) => consoleLines.push(`[${m.type()}] ${m.text()}`));
+        page.on('pageerror', (e) => pageErrors.push(e.stack || String(e)));
+        page.on('crash', () => pageErrors.push('the page crashed'));
 
-      let status;
-      let loadFailure = null;
-      try {
-        await page.setContent('<!doctype html><html><head></head><body></body></html>');
-        await page.addScriptTag({ content: `var __octaneConfig = ${JSON.stringify({ trace: opts.trace })};` });
-        await page.addScriptTag({ content: baseJs });
-        for (const f of suite.files) {
-          try {
-            await page.addScriptTag({ content: readFileSync(join(opts.octaneDir, f), 'utf8') });
-          } catch (e) {
-            loadFailure = `${f}: ${e.message}`;
-            throw e;
+        let status;
+        let loadFailure = null;
+        try {
+          await page.setContent('<!doctype html><html><head></head><body></body></html>');
+          await page.addScriptTag({ content: `var __octaneConfig = ${JSON.stringify({ trace: opts.trace })};` });
+          await page.addScriptTag({ content: baseJs });
+          for (const f of suite.files) {
+            try {
+              await page.addScriptTag({ content: readFileSync(join(opts.octaneDir, f), 'utf8') });
+            } catch (e) {
+              loadFailure = `${f}: ${e.message}`;
+              throw e;
+            }
           }
-        }
-        await page.addScriptTag({ content: runnerJs });
-        const raw = await Promise.race([
-          page.evaluate(() => new Promise((res) => { window.__octaneRun(res); })),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), opts.timeout * 1000)),
-        ]);
-        const { benchmarks: b, errors, version, details } = normalizeRaw(raw);
-        octaneVersion ??= version;
-        Object.assign(benchmarks, b);
-        if (Object.keys(errors).length === 0) {
-          status = { status: 'ok' };
-        } else {
-          const detail = details[0] ?? null;
-          // V8 spells stack frames differently from Broiler, so the trace is
-          // kept as text rather than parsed into frames.
-          const message = [detail?.message, detail?.stack].filter(Boolean).join('\n');
+          await page.addScriptTag({ content: runnerJs });
+          const raw = await Promise.race([
+            page.evaluate(() => new Promise((res) => { window.__octaneRun(res); })),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutSec * 1000)),
+          ]);
+          const { benchmarks: b, errors, version, details } = normalizeRaw(raw);
+          octaneVersion ??= version;
+          for (const [name, score] of Object.entries(b)) (samples[name] ??= []).push(score);
+          if (Object.keys(errors).length === 0) {
+            status = { status: 'ok' };
+          } else {
+            const detail = details[0] ?? null;
+            // V8 spells stack frames differently from Broiler, so the trace is
+            // kept as text rather than parsed into frames.
+            const message = [detail?.message, detail?.stack].filter(Boolean).join('\n');
+            status = {
+              status: 'error',
+              error: detail?.summary ?? Object.values(errors)[0],
+              errorType: detail?.name ?? null,
+              errorKind: 'js',
+              message: message ? clamp(message, REPORT_MESSAGE_CHARS) : null,
+              jsStack: [],
+              clrStack: [],
+              failedAt: detail ? { benchmark: detail.benchmark, phase: detail.phase, iteration: detail.iteration } : null,
+            };
+          }
+        } catch (e) {
+          const timedOut = String(e.message).includes('timeout');
+          const diag = parseDiagnostics(consoleLines.map((l) => l.replace(/^\[\w+\] /, '')).join('\n'));
           status = {
-            status: 'error',
-            error: detail?.summary ?? Object.values(errors)[0],
-            errorType: detail?.name ?? null,
+            status: timedOut ? 'timeout' : 'crash',
+            error: clamp(loadFailure ?? pageErrors[0] ?? e.message, 300),
+            errorType: null,
             errorKind: 'js',
-            message: message ? clamp(message, REPORT_MESSAGE_CHARS) : null,
+            message: clamp([loadFailure, ...pageErrors, e.stack ?? e.message].filter(Boolean).join('\n'), REPORT_MESSAGE_CHARS),
             jsStack: [],
             clrStack: [],
-            failedAt: detail ? { benchmark: detail.benchmark, phase: detail.phase, iteration: detail.iteration } : null,
+            failedAt: lastPhaseOf(diag),
           };
+        } finally {
+          status ??= { status: 'crash', error: 'no verdict' };
+          status.durationMs = Date.now() - startedAt;
+          status.timeoutSec = timeoutSec;
+          status.log = relative(REPO_ROOT, join(logDir, logName));
+          writeSuiteLog(join(logDir, logName), [
+            ['suite', `${suite.name} (${suite.files.join(', ')})${opts.repetitions === 1 ? '' : ` — repetition ${rep} of ${opts.repetitions}`}`],
+            ['status', `status  : ${status.status}\nduration: ${(status.durationMs / 1000).toFixed(1)}s\nbudget  : ${timeoutSec}s`],
+            ['error', status.message ?? status.error ?? '(none)'],
+            ['page errors', pageErrors.join('\n\n')],
+            ['console', consoleLines.join('\n')],
+          ]);
+          statuses.push(status);
+          process.stderr.write(`${status.status}\n`);
+          if (status.status !== 'ok') process.stderr.write(`           log: ${status.log}\n`);
+          await context.close();
         }
-      } catch (e) {
-        const timedOut = String(e.message).includes('timeout');
-        const diag = parseDiagnostics(consoleLines.map((l) => l.replace(/^\[\w+\] /, '')).join('\n'));
-        status = {
-          status: timedOut ? 'timeout' : 'crash',
-          error: clamp(loadFailure ?? pageErrors[0] ?? e.message, 300),
-          errorType: null,
-          errorKind: 'js',
-          message: clamp([loadFailure, ...pageErrors, e.stack ?? e.message].filter(Boolean).join('\n'), REPORT_MESSAGE_CHARS),
-          jsStack: [],
-          clrStack: [],
-          failedAt: lastPhaseOf(diag),
-        };
-      } finally {
-        status ??= { status: 'crash', error: 'no verdict' };
-        status.durationMs = Date.now() - startedAt;
-        status.log = relative(REPO_ROOT, join(logDir, `${suite.name}.log`));
-        writeSuiteLog(join(logDir, `${suite.name}.log`), [
-          ['suite', `${suite.name} (${suite.files.join(', ')})`],
-          ['status', `status  : ${status.status}\nduration: ${(status.durationMs / 1000).toFixed(1)}s`],
-          ['error', status.message ?? status.error ?? '(none)'],
-          ['page errors', pageErrors.join('\n\n')],
-          ['console', consoleLines.join('\n')],
-        ]);
-        suiteStatus[suite.name] = status;
-        process.stderr.write(`${status.status}\n`);
-        if (status.status !== 'ok') process.stderr.write(`           log: ${status.log}\n`);
-        await context.close();
+      }
+
+      const summary = summarizeSamples(samples);
+      Object.assign(benchmarks, summary.benchmarks);
+      Object.assign(stability, summary.stability);
+      const suiteVerdict = summarizeStatuses(statuses);
+      suiteStatus[suite.name] = suiteVerdict;
+      if (suiteVerdict.flaky) {
+        process.stderr.write(`           flaky: ${suiteVerdict.statusPerRepetition.join(', ')}\n`);
       }
     }
   } finally {
@@ -816,14 +933,17 @@ async function runChromium(opts, suites, baseJs, runnerJs, dirs) {
     engineLabel,
     octaneVersion,
     perSuiteTimeoutSec: opts.timeout,
+    repetitions: opts.repetitions,
+    noiseBandPercent: opts.noiseBand,
     benchmarks,
+    stability,
     suiteStatus,
     geomean: geomean(Object.values(benchmarks)),
   };
 }
 
 // ── Comparison report ───────────────────────────────────────────────────────
-function buildComparison(results, generatedAt) {
+export function buildComparison(results, generatedAt) {
   const chromium = results.chromium;
   const broiler = results.broiler;
   const names = new Set();
@@ -853,13 +973,53 @@ function buildComparison(results, generatedAt) {
       const c = cell(chromium, name);
       const b = cell(broiler, name);
       const ratio = c.score && b.score ? Number((b.score / c.score).toFixed(3)) : null;
-      return { name, chromium: c, broiler: b, broilerVsChromium: ratio };
+      const slower = c.score && b.score ? Number((c.score / b.score).toFixed(1)) : null;
+      return {
+        name,
+        chromium: c,
+        broiler: b,
+        broilerVsChromium: ratio,
+        broilerTimesSlower: slower,
+        stability: {
+          chromium: chromium?.stability?.[name] ?? null,
+          broiler: broiler?.stability?.[name] ?? null,
+        },
+      };
     }),
   };
+  comparison.summary = summarize(comparison, { chromium, broiler });
   return comparison;
 }
 
-function renderMarkdown(cmp, broiler) {
+// The three numbers this comparison is read for. Coverage and spread are here
+// because the geomean alone hides both: a run that drops five suites still
+// reports a geomean, and a profile with one catastrophic score reports much the
+// same total as an evenly-bad one while being a completely different problem.
+function summarize(cmp, { chromium, broiler }) {
+  const scored = cmp.benchmarks.filter((r) => r.broilerTimesSlower != null);
+  const factors = scored.map((r) => r.broilerTimesSlower);
+  const best = scored.find((r) => r.broilerTimesSlower === Math.min(...factors)) ?? null;
+  const worst = scored.find((r) => r.broilerTimesSlower === Math.max(...factors)) ?? null;
+  const count = (r) => (r ? Object.keys(r.benchmarks).length : 0);
+  const expected = new Set(cmp.benchmarks.map((r) => r.name)).size;
+  return {
+    scoresReported: { chromium: count(chromium), broiler: count(broiler), expected },
+    geomean: { chromium: chromium?.geomean ?? null, broiler: broiler?.geomean ?? null },
+    // "Smoothness": how far apart the best and worst suites are. A uniformly
+    // slow engine is a healthier engine than a mostly-fine one with an outlier,
+    // because the outlier is a single subsystem failing rather than a broad
+    // deficit — see tests/octane/roadmap.md §1.
+    spread: scored.length < 2 ? null : {
+      factor: Number((Math.max(...factors) / Math.min(...factors)).toFixed(1)),
+      best: best && { name: best.name, timesSlower: best.broilerTimesSlower },
+      worst: worst && { name: worst.name, timesSlower: worst.broilerTimesSlower },
+    },
+    repetitions: broiler?.repetitions ?? chromium?.repetitions ?? 1,
+    noiseBandPercent: broiler?.noiseBandPercent ?? chromium?.noiseBandPercent ?? null,
+  };
+}
+
+export function renderMarkdown(cmp, broiler) {
   const c = cmp.engines.chromium;
   const b = cmp.engines.broiler;
   const fmt = (cell) => {
@@ -874,17 +1034,45 @@ function renderMarkdown(cmp, broiler) {
   lines.push(`- Octane version: \`${cmp.octaneVersion ?? 'unknown'}\``);
   if (c) lines.push(`- Chromium: \`${c.label}\` — **overall score ${c.geomean ?? 'n/a'}**`);
   if (b) lines.push(`- Broiler: \`${b.label}\` — **overall score ${b.geomean ?? 'n/a'}**`);
-  lines.push('');
+  const s = cmp.summary;
+  if (s) {
+    lines.push(`- Repetitions per suite: ${s.repetitions}${s.repetitions === 1 ? ' — **a single run; deltas against it cannot be distinguished from noise**' : ` (median reported; noise band ${s.noiseBandPercent}%)`}`);
+    lines.push('');
+    lines.push('| | Chromium | Broiler |');
+    lines.push('|---|--:|--:|');
+    lines.push(`| Scores reported (of ${s.scoresReported.expected}) | ${s.scoresReported.chromium} | ${s.scoresReported.broiler} |`);
+    lines.push(`| Overall (geomean) | ${s.geomean.chromium ?? '—'} | ${s.geomean.broiler ?? '—'} |`);
+    if (s.spread) {
+      lines.push(`| Spread (worst ÷ best suite) | — | ${s.spread.factor}× |`);
+    }
+    lines.push('');
+    if (s.spread) {
+      lines.push(`Broiler's best suite is **${s.spread.best.name}** at ${s.spread.best.timesSlower}× slower ` +
+        `and its worst is **${s.spread.worst.name}** at ${s.spread.worst.timesSlower}×. The spread between them ` +
+        'is the "smoothness" number — a large one means a single subsystem is pathological rather than the ' +
+        'engine being uniformly behind. See [`../roadmap.md`](../roadmap.md).');
+      lines.push('');
+    }
+  }
   lines.push('Higher is better. "Broiler / Chromium" is the ratio of scores on suites both engines completed.');
   lines.push('');
-  lines.push('| Benchmark | Chromium | Broiler | Broiler / Chromium |');
-  lines.push('|---|--:|--:|--:|');
+  const noisy = (st) => (st && st.bandPercent != null && cmp.summary && st.bandPercent > cmp.summary.noiseBandPercent ? ' ⚠' : '');
+  const showBand = cmp.summary && cmp.summary.repetitions > 1;
+  lines.push(`| Benchmark | Chromium | Broiler |${showBand ? ' Broiler spread |' : ''} Broiler / Chromium | × slower |`);
+  lines.push(`|---|--:|--:|${showBand ? '--:|' : ''}--:|--:|`);
   for (const row of cmp.benchmarks) {
     const ratio = row.broilerVsChromium != null ? row.broilerVsChromium.toFixed(3) : '—';
-    lines.push(`| ${row.name} | ${fmt(row.chromium)} | ${fmt(row.broiler)} | ${ratio} |`);
+    const slower = row.broilerTimesSlower != null ? `${row.broilerTimesSlower}×` : '—';
+    const st = row.stability?.broiler;
+    const band = showBand ? ` ${st?.bandPercent != null ? `${st.bandPercent}%${noisy(st)}` : '—'} |` : '';
+    lines.push(`| ${row.name} | ${fmt(row.chromium)} | ${fmt(row.broiler)} |${band} ${ratio} | ${slower} |`);
   }
-  lines.push(`| **Overall (geomean)** | **${c?.geomean ?? '—'}** | **${b?.geomean ?? '—'}** | ${c?.geomean && b?.geomean ? (b.geomean / c.geomean).toFixed(3) : '—'} |`);
+  lines.push(`| **Overall (geomean)** | **${c?.geomean ?? '—'}** | **${b?.geomean ?? '—'}** |${showBand ? ' |' : ''} ${c?.geomean && b?.geomean ? (b.geomean / c.geomean).toFixed(3) : '—'} | ${c?.geomean && b?.geomean ? `${(c.geomean / b.geomean).toFixed(0)}×` : '—'} |`);
   lines.push('');
+  if (showBand) {
+    lines.push(`⚠ marks a benchmark whose spread across ${cmp.summary.repetitions} repetitions exceeded the ${cmp.summary.noiseBandPercent}% band.`);
+    lines.push('');
+  }
 
   const failures = Object.entries(broiler?.suiteStatus ?? {}).filter(([, s]) => s.status !== 'ok');
   if (failures.length) {
@@ -919,7 +1107,8 @@ function renderDiagnostics(broiler, generatedAt) {
   lines.push('');
   lines.push(`- Generated: \`${generatedAt}\``);
   lines.push(`- Engine: \`${broiler.engineLabel}\``);
-  lines.push(`- Per-suite timeout: ${broiler.perSuiteTimeoutSec}s`);
+  lines.push(`- Per-suite timeout: ${broiler.perSuiteTimeoutSec}s (floor; a suite may raise its own — the budget each ran under is in its section below)`);
+  if ((broiler.repetitions ?? 1) > 1) lines.push(`- Repetitions per suite: ${broiler.repetitions}`);
   lines.push('');
 
   const entries = Object.entries(broiler.suiteStatus);

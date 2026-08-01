@@ -20,9 +20,18 @@ on:
         required: false
         default: 'chromium,broiler'
       timeout_seconds:
-        description: Per-suite timeout in seconds.
+        description: >-
+          Per-suite timeout floor in seconds. A slow suite (Mandreel, zlib) raises
+          its own budget in scripts/octane-suites.json.
         required: false
         default: '180'
+      repetitions:
+        description: >-
+          Run each suite this many times and report the median score plus the
+          observed spread. 1 is a single measurement — enough to see whether a
+          suite completes, not enough to call a score change real.
+        required: false
+        default: '1'
       octane_ref:
         description: Git ref of chromium/octane to benchmark.
         required: false
@@ -83,6 +92,7 @@ jobs:
           args=(
             --engines "${{ github.event.inputs.engines || 'chromium,broiler' }}"
             --timeout "${{ github.event.inputs.timeout_seconds || '180' }}"
+            --repetitions "${{ github.event.inputs.repetitions || '1' }}"
             --octane-ref "${{ github.event.inputs.octane_ref || 'master' }}"
           )
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
