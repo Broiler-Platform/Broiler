@@ -409,7 +409,7 @@ onto benchmarks. → **phase 2**
 
 | Gap | Hits |
 |---|---|
-| Shape eligibility is `GetType() == typeof(JSObject)` — `JSArray`, `JSFunction`, every exotic excluded | **Arrays fixed (2-2). The four benchmarks named here were the wrong ones** — they reach arrays by element and by `length`, neither of which a shape can hold. The idiom that pays is statics on a constructor function, and **DeltaBlue at 601× is the case**; see 2-8 |
+| Shape eligibility is `GetType() == typeof(JSObject)` — `JSArray`, `JSFunction`, every exotic excluded | **Fixed for arrays (2-2) and functions (2-8).** The four benchmarks named here were the wrong ones — they reach arrays by element and by `length`, neither of which a shape can hold. The idiom that pays is statics on a constructor function, and **DeltaBlue at 601× was the case** — 2-8 took it from 0 to 199 999 hits |
 | No shape-transition cache — *creating* a property misses every time | Richards, DeltaBlue, RayTrace, Box2D |
 | `o.x++`, `o.x += 1`, computed keys, `super`, optional chains, private names keep the old lowering | Richards, Gameboy, Box2D |
 | Double storage in `TrackShapeDataProperty` | everything — but **measured at ~3% of a worst-case store loop and 4.5% of an object's bytes**; see 2-3, which is re-specified, and 2-7, which is where the memory actually goes |
@@ -948,10 +948,10 @@ Landed as `patches/0051-js-store-cache-property-creation.patch`, which applies o
 
 | # | Item | Origin | Where | Why it matters here | Size |
 |---|---|---|---|---|---|
-| **2-2** | **Widen shape eligibility** past `GetType() == typeof(JSObject)` — *arrays landed; see below* | P1-4 | `Runtime/JSObject.cs` — `SupportsShapeTracking`; `BuiltIns/Array/JSArray.cs` | `JSArray`, `JSFunction` and every built-in exotic were excluded wholesale — **measured 0 hits / 200 000 for every named access on one.** Arrays now opt in (**0 → 199 999**). The function half is blocked and is now 2-8 | M |
+| **2-2** | **Widen shape eligibility** past `GetType() == typeof(JSObject)` — *arrays landed (2-2), functions landed (2-8)* | P1-4 | `Runtime/JSObject.cs` — `SupportsShapeTracking`; `BuiltIns/Array/JSArray.cs` | `JSArray`, `JSFunction` and every built-in exotic were excluded wholesale — **measured 0 hits / 200 000 for every named access on one.** Arrays now opt in (**0 → 199 999**). The function half is blocked and is now 2-8 | M |
 | **2-3** | **Remove the double storage** — *re-specified and re-sized; see below* | P1-4 | `Runtime/JSObject.cs:97,:188` — `TrackShapeDataProperty` | Every tracked object writes each value into `shapeSlots` *and* the `PropertySequence`. **Not a pure removal, and its throughput case is ~3% of a worst-case loop.** The dominant per-object cost is elsewhere — see 2-3 below and 2-7 | ~~S~~ **M** |
 | **2-4** | **Extend the store cache** to `o.x++` ✅, `o.x += 1`, computed keys, `super`, optional chains, private names | P1-3 | `.Compiler` lowering | Measured: these reached **neither** cache — 0 hits *and* 0 misses, the counters never saw them. `o.x++`/`o.x--` now take both (**0 → 199 999** each side); `o.x += 1` needs `EvalShadowBuilder` to grow a cached form; computed keys and optional chains stay out on purpose | M |
-| **2-5** | **Get strictness off the property-write path** | P0-2 | `Engine/Core/JSEngine.cs:223`; `JSValue` set accessors | P0-2 removed the redundant *writes*, but set accessors still **resolve** an `AsyncLocal<bool>` per write. The preferred fix — threading the compiler's static knowledge into the emitted set helpers so the hot path reads nothing — is not started | M |
+| **2-5** | **Get strictness off the property-write path** — *measure its premise first* | P0-2 | `Engine/Core/JSEngine.cs:223`; `JSValue` set accessors | P0-2 removed the redundant *writes*, but set accessors still **resolve** an `AsyncLocal<bool>` per write. **2-1 has probably already collected most of this**: a store-cache hit never consults strict mode, so the `AsyncLocal` read now happens only on a miss. Measure what is left before starting — 2-3 was re-specified for exactly this reason | M |
 | **2-6** | **Monomorphic call-site caching** | new | `BuiltIns/Function/JSFunction.cs` — `InvokeFunction`, `SelectInvocationDelegate` | Callee resolution repeats per call. **Prerequisite for inlining in phase 4** | M |
 
 > **2-1 was named after the wrong missing thing.** It called for "a shape-transition cache
@@ -1073,39 +1073,72 @@ projects, 0 failures.**
 
 Landed as `patches/0054-js-update-expression-cache.patch`, on top of `0053`.
 
-### 2-8 · Functions cannot be opted in until their own properties are tracked — **blocked, with the fix named**
+### 2-8 · Functions track their named properties by shape — **landed**
 
-The half of 2-2 that would have paid, and the reason it cannot be done by flipping the same
-switch. **DeltaBlue is the worst throughput score in the suite at 601×, and it reads
-`Strength.stronger`, `Strength.REQUIRED` and `Strength.WEAKEST` in its hot path** —
-`deltablue.js:104` defines `Strength` as a **function**, so every one of those is a named read
-on a `JSFunction`, measured at **0 hits / 200 000**. (`Direction.NONE` alongside it is
-`new Object()` and already caches.) Richards, RayTrace and Box2D use the same
-statics-on-a-constructor idiom.
+The half of 2-2 that would pay, and the reason it needed its own item. **DeltaBlue is the worst
+throughput score in the suite at 601×, and it reads `Strength.stronger`, `Strength.REQUIRED`
+and `Strength.WEAKEST` in its hot path** — `deltablue.js:104` defines `Strength` as a
+*function*, so every one of those was a named read on a `JSFunction`. Richards, RayTrace and
+Box2D use the same statics-on-a-constructor idiom.
 
-**Why the switch is not enough — and why flipping it would be a correctness bug, not a
-no-op.** `JSFunction` installs `length`, `name` and `prototype` with bare
-`ownProperties.Put` calls that never reach `TrackShapeDataProperty`. Opt it in and its shape
-claims a key set missing three keys every function has, which is exactly the invariant
-`GetPrototypeLookupShapeId` and `TryCreateShapeSlot` depend on. A scratch build confirmed the
-hazard is currently masked by accident: every function row reported one dictionary fallback,
-so the shape was abandoned before it could be trusted — luck, not design.
+| Site | Before | After |
+|---|--:|--:|
+| `sloppy-function-static-read` — DeltaBlue's exact shape | 0 / 200 000 | **199 999 / 1** |
+| `strict-function-static-read` | 0 / 200 000 | **199 999 / 1** |
+| `class-static-read` | 0 / 200 000 | **199 999 / 1** |
+| `function-named-read` | 0 / 200 000 | **199 999 / 1** |
+| dictionary fallbacks, whole corpus | one per function | **0** |
 
-**Prerequisites, in order.**
+Wall clock on a 10 M-iteration loop shaped like DeltaBlue's `satisfy()` — two static reads and
+a static method call per iteration — five interleaved pairs with only the overrides differing:
+**median of paired ratios 0.905**, every pair the same direction.
 
-1. Route `length`, `name` and `prototype` through `TrackShapeDataProperty`, or serve them from
-   overrides the way `JSArray` serves `length`. The second is the better shape and also
-   removes three property-map entries per function object, which is 2-7's currency.
-2. Decide the Annex B `caller`/`arguments` pair. Every ordinary non-strict function carries
-   them as deferred cells from birth (P0-3), and a deferred cell abandons the shape — so
-   without this, opting in helps strict functions and classes only, and DeltaBlue's `Strength`
-   is sloppy. Serving them from an override rather than storing them would fix this and
-   prerequisite 1 together, but P0-3 deliberately preserved their Annex B descriptor shape and
-   that must not regress.
-3. Only then override `SupportsShapeTracking`, and re-measure the three function rows.
+**Two prerequisites had to land first, and flipping the gate without them would have been a
+correctness bug rather than a no-op** — a scratch build confirmed the hazard was masked only by
+an accidental dictionary fallback.
 
-**Size: M**, and it is the highest-value remaining item in phase 2 on the evidence — it is
-the only one of them that touches the 601× score directly.
+1. **A function's own properties were invisible to the shape.** `length`, `name` and
+   `prototype` went in through a bare `ownProperties.Put`, and four constructors additionally
+   took a mutable ref through `GetOwnProperties()`, which abandons the layout on the spot. All
+   are routed through `FastAddValue` now; the four refs were dead once their uses were
+   converted.
+2. **Every ordinary non-strict function carries the Annex B `caller`/`arguments` as deferred
+   cells from birth** (P0-3), and a deferred cell abandoned the shape. Fixed by recording such a
+   key **with a null slot** instead. The shape makes two claims and only one needs the value:
+   *presence* — "key K is at slot N" — is what `TryReadShapeSlot` and `TryWriteShapeSlot` use;
+   *absence* — "the shape does not carry K, so this object does not own K" — is what
+   `GetPrototypeLookupShapeId` and `TryCreateShapeSlot` use. A key present with a null slot
+   keeps **both** true: absence reasoning sees the key and declines, and all three fast paths
+   already reject a null slot or a descriptor whose value is not a `JSValue`, so the read or
+   write falls through to the generic path that realizes the cell. A private name still
+   abandons — it is per-class-evaluation, so admitting one would mint a shape per instantiation
+   instead of sharing a chain.
+
+Without prerequisite 2 this would have helped strict functions and classes only, and the
+motivating case is sloppy: neither `deltablue.js` nor `richards.js` contains `"use strict"`.
+
+**Verify.** 13 test cases in `PropertyShapeCacheTests`, and the ones that matter are the Annex B
+surface rather than the hit rates: `caller`/`arguments` keeping the non-writable,
+non-enumerable, non-configurable **data** descriptor P0-3 preserved; reading `caller` while the
+function is on the stack; the `Function.prototype` poison pills still throwing; and a null-slot
+key still reading through the generic path after its site is warmed. Plus a function's own
+`length`/`name`/`prototype` values, attributes and enumeration order unchanged, redefining them,
+a bound function's name and length, a static redefined as an accessor mid-loop, and `delete`
+revealing an inherited static. Suite: **7 347 tests across 13 projects, 0 failures.**
+
+> **One pre-existing test changed with it, and the change is worth reading.**
+> `AnInheritedAccessorIsNotSlotCached` asserted *zero* cache hits for a script that also called
+> `Object.create` — itself a named read on a function object, which this item makes cacheable,
+> so it was quietly supplying one hit. The assertion was a proxy for "the accessor site does not
+> hit", and the proxy went stale the moment function statics started caching. Fixed by linking
+> the prototype with `__proto__` in the literal so the script performs no other cacheable read,
+> which keeps the exact assertion instead of loosening it. **A test that reads a process-wide
+> counter is coupled to everything else in its script** — worth remembering for the next item
+> that widens what can be cached.
+
+Landed as `patches/0055-js-function-shape-eligibility.patch`, on top of `0054`.
+
+### 2-3 · Remove the double storage — **re-specified; do not start as written**
 
 Measured before starting, and the item does not survive it. Three things are wrong.
 
@@ -1203,8 +1236,9 @@ wall-clock benchmark reports, and it exists because 2-3 could not be decided wit
 item's *only* surviving justification was memory, and there was no way to measure memory per
 object from a clean checkout. Both 2-3's re-sizing and 2-7 came out of its first run.
 
-**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4's update form ✅, then **2-8** (the only remaining
-item that touches the 601× score directly), then 2-4's compound-assignment half, 2-5, 2-6 — with **2-3 removed from the near list**
+**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4's update form ✅ → 2-8 ✅, then **2-5** — and read its
+note first, because 2-1 has probably already collected most of it — then 2-6 and 2-4's
+compound-assignment half — with **2-3 removed from the near list**
 (re-specified, M, superseded in value by 2-7) and **2-7 needing its distribution measurement
 before it can be picked up**.
 
@@ -1376,7 +1410,7 @@ pinned RegExp corpus is clean.
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 (update form ✅) → **2-8** → 2-5 → 2-6; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 (update form ✅) → 2-8 ✅ → **2-5** → 2-6; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
@@ -1545,7 +1579,7 @@ Where each item came from, so existing cross-references still resolve.
 | 2-1 | P1-3 remainder | 2-1 | **Landed** — `patches/0051`, pending submodule push; **test262 owed** |
 | 2-4 | P1-3 remainder | 2-4 | **`o.x++` landed** — `patches/0054`; `o.x += 1`, computed keys and optional chains still open |
 | 2-2 | P1-4 remainder | 2-2 | **Landed for arrays** — `patches/0053`, pending submodule push; its four named benchmarks were the wrong targets |
-| 2-8 | — (the blocked half of 2-2) | — | **Blocked, prerequisites named** — functions install `length`/`name`/`prototype` untracked; DeltaBlue's 601× depends on it |
+| 2-8 | — (the blocked half of 2-2) | — | **Landed** — `patches/0055`, pending submodule push; both prerequisites fixed |
 | 2-3 | P1-4 remainder | 2-3 | **Re-specified** — not a pure removal, ~3% ceiling, S → M, superseded in value by 2-7 |
 | 2-7 | — (found measuring 2-3) | — | **Sized, not started** — needs an object-size distribution from an Octane run |
 | 2-5 | P0-2 remainder | 2-5 | Open |
