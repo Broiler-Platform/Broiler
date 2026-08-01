@@ -14,6 +14,7 @@ conformance, and implementation work belongs with that component.
 | [HtmlBridge architecture](architecture/htmlbridge.md) | Current bridge assemblies, ownership boundaries, and public seams |
 | [Browser WebAssembly architecture](architecture/browser-webassembly.md) | Current browser-host, rendering, input, and support decisions |
 | [Android application architecture](architecture/android.md) | Proposed Android host topology, platform baseline, and ownership boundaries |
+| [Multithreading analysis and roadmap](architecture/multithreading.md) | Where concurrency can and cannot speed up each component, and the order the work has to happen in |
 
 Completed migration plans, delivery logs, and investigation journals remain
 available in Git history. They are not the current backlog; durable decisions
