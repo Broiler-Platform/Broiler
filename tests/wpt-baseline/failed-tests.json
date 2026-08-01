@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 20418,
+    "failed": 20413,
     "skipped": 0,
-    "total": 20418
+    "total": 20413
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -14,7 +14,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 14585,
+      "count": 14581,
       "examples": [
         "accname/name/comp_tooltip.html",
         "appmanifest/icons-member/icons-member-cors-fail-manual.sub.html",
@@ -26,7 +26,7 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 2800,
+      "count": 2799,
       "examples": [
         "css/compositing/Blending_in_a_group_with_filter.html",
         "css/compositing/mix-blend-mode/mix-blend-mode-blended-element-with-transparent-pixels.html",
@@ -50,7 +50,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 996,
+      "count": 995,
       "examples": [
         "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
         "css/compositing/mix-blend-mode/mix-blend-mode-parent-with-text.html",
@@ -62,7 +62,7 @@
       "label": "Timeout",
       "category": "Timeout",
       "subCategory": null,
-      "count": 72,
+      "count": 73,
       "examples": [
         "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
         "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html",
@@ -137,11 +137,11 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      20000
+      19994
     ],
     [
       "Timeout",
-      72
+      73
     ],
     [
       "MemoryLimitExceeded",
@@ -151,7 +151,7 @@
   "droppedDeclarations": [],
   "exceptionSignatures": [
     [
-      "Program.Main \u2014 Test aborted after exceeding the 4096 MiB per-test memory limit (grew from 3051.3 MiB to 7270 MiB, +\u2026",
+      "Program.Main \u2014 Test aborted after exceeding the 4096 MiB per-test memory limit (grew from 2092.7 MiB to 6584.4 MiB,\u2026",
       1
     ]
   ],
@@ -286,7 +286,7 @@
       "severity": 1,
       "impact": 1,
       "title": "Crash gating 1 test(s)",
-      "detail": "Program.Main \u2014 Test aborted after exceeding the 4096 MiB per-test memory limit (grew from 3051.3 MiB to 7270 MiB, +\u2026",
+      "detail": "Program.Main \u2014 Test aborted after exceeding the 4096 MiB per-test memory limit (grew from 2092.7 MiB to 6584.4 MiB,\u2026",
       "examples": [
         "editing/crashtests/insertparagraph-in-listitem-in-svg-followed-by-collapsible-spaces.html"
       ]
@@ -79538,8 +79538,7 @@
       "relativeTestPath": "css/css-scroll-snap/scroll-margin-overflow-ancestor.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "category": "Timeout"
     },
     {
       "relativeTestPath": "css/css-scroll-snap/scroll-margin.html",
@@ -79798,7 +79797,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-scroll-snap/snap-after-relayout/remove-current-target.html",
@@ -99102,7 +99101,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-view-transitions/backdrop-filter-while-promise-pending.html",
@@ -99946,13 +99945,6 @@
     },
     {
       "relativeTestPath": "css/css-view-transitions/scoped/implicit-contain.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/scoped/ink-overflow-on-target.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -110253,13 +110245,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/selectors/user-invalid-form-submission-invalidation.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/selectors/user-invalid.html",
@@ -129814,7 +129799,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/editing/dnd/svg/041.xhtml",
@@ -140585,20 +140570,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "svg/animations/correct-events-for-short-animations-with-syncbases.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "svg/animations/cyclic-syncbase-2.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
       "relativeTestPath": "svg/animations/end-attribute-change-end-time.html",
       "passed": false,
       "skipped": false,
@@ -140611,13 +140582,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "svg/animations/invalid-attribute-type-does-not-block-begin-event.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "svg/animations/invalid-attribute-type-does-not-block-other-animations.html",
