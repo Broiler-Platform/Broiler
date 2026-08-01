@@ -950,7 +950,7 @@ Landed as `patches/0051-js-store-cache-property-creation.patch`, which applies o
 |---|---|---|---|---|---|
 | **2-2** | **Widen shape eligibility** past `GetType() == typeof(JSObject)` — *arrays landed; see below* | P1-4 | `Runtime/JSObject.cs` — `SupportsShapeTracking`; `BuiltIns/Array/JSArray.cs` | `JSArray`, `JSFunction` and every built-in exotic were excluded wholesale — **measured 0 hits / 200 000 for every named access on one.** Arrays now opt in (**0 → 199 999**). The function half is blocked and is now 2-8 | M |
 | **2-3** | **Remove the double storage** — *re-specified and re-sized; see below* | P1-4 | `Runtime/JSObject.cs:97,:188` — `TrackShapeDataProperty` | Every tracked object writes each value into `shapeSlots` *and* the `PropertySequence`. **Not a pure removal, and its throughput case is ~3% of a worst-case loop.** The dominant per-object cost is elsewhere — see 2-3 below and 2-7 | ~~S~~ **M** |
-| **2-4** | **Extend the store cache** to `o.x++`, `o.x += 1`, computed keys, `super`, optional chains, private names | P1-3 | `.Compiler` lowering; `Runtime/ObjectShape.cs` | All keep the old uncached lowering. `o.x++` measured the most expensive and is pervasive in Gameboy and Box2D | M |
+| **2-4** | **Extend the store cache** to `o.x++` ✅, `o.x += 1`, computed keys, `super`, optional chains, private names | P1-3 | `.Compiler` lowering | Measured: these reached **neither** cache — 0 hits *and* 0 misses, the counters never saw them. `o.x++`/`o.x--` now take both (**0 → 199 999** each side); `o.x += 1` needs `EvalShadowBuilder` to grow a cached form; computed keys and optional chains stay out on purpose | M |
 | **2-5** | **Get strictness off the property-write path** | P0-2 | `Engine/Core/JSEngine.cs:223`; `JSValue` set accessors | P0-2 removed the redundant *writes*, but set accessors still **resolve** an `AsyncLocal<bool>` per write. The preferred fix — threading the compiler's static knowledge into the emitted set helpers so the hot path reads nothing — is not started | M |
 | **2-6** | **Monomorphic call-site caching** | new | `BuiltIns/Function/JSFunction.cs` — `InvokeFunction`, `SelectInvocationDelegate` | Callee resolution repeats per call. **Prerequisite for inlining in phase 4** | M |
 
@@ -1028,6 +1028,50 @@ staying untracked; and two arrays reaching the same shape staying distinct. Suit
 tests across 13 projects, 0 failures.**
 
 Landed as `patches/0053-js-array-shape-eligibility.patch`, on top of `0051`.
+
+### 2-4 · `obj.name++` through both caches — **the update form landed**
+
+An update expression reads and writes the same property, and both halves went through one
+assignable index reference. Measured, that reference reaches **neither** cache — not a poor
+hit rate, no counter at all:
+
+| Site | Before | After |
+|---|---|---|
+| `increment-store` — `o.x++` | 0 hits, 0 misses, 0 stores | **199 999 read hits / 2**, **199 999 store hits / 1** |
+| `compound-assign-store` — `o.x += 1` | 0 / 0 | 0 / 0 — *not landed, see below* |
+| `computed-key-read` — `o[k]` | 0 / 0 | 0 / 0 — excluded on purpose |
+| `optional-chain-read` — `o?.x` | 0 / 0 | 0 / 0 — excluded on purpose |
+| `monomorphic-store` — `o.x = i` (control) | 199 999 | 199 999 |
+
+Eligible on exactly `TryCreateCachedMemberStore`'s terms — constant `KeyString`, ordinary
+base, no `super`, no optional chain, no private name — because the reasons are the same: a
+computed key would drive one site through every key the expression produces, and a private
+name is a brand check rather than an ordinary [[Get]]/[[Set]]. Both forms end in the same
+`JSValue` indexer on a miss, so strict-mode reporting and a refused write's silent failure are
+unchanged, and the observable sequence is untouched: base once, `ToNumeric` once, getter once,
+setter once.
+
+Wall clock on a 20 M-iteration `o.x++` loop, same build with only the eligibility call
+differing, five interleaved pairs: **median of paired ratios 0.944**, every pair the same
+direction. Modest, and it should be — the cache removes the two property resolutions, not the
+`ToNumeric` or the boxing around them. That remainder is B1, not this.
+
+**`o.x += 1` is deliberately not included.** Compound assignment goes through
+`EvalShadowBuilder`'s captured-reference abstraction, which exists so a direct `eval` on the
+right-hand side cannot redirect the write (§13.15.2). Teaching *that* a cached form is a
+separate change and a more delicate one — the abstraction's whole purpose is the thing a
+cache would have to preserve. It remains at 0 / 0 and is worth doing next in this item.
+
+**Verify.** 15 test cases in `PropertyStoreCacheTests` (8 facts and a 7-case theory): hit
+rates; prefix and postfix values for `++` and `--`; string and BigInt operands, where
+`ToNumeric` coercing once means a postfix update yields the *number*; `undefined` giving NaN;
+an inherited getter/setter pair each running exactly once per iteration through a warmed site;
+a non-writable property refused in sloppy mode and throwing in strict; the base evaluated
+exactly once; a Proxy firing both traps; every excluded form still correct; and an update
+interleaved with a plain store on the same property agreeing. Suite: **7 334 tests across 13
+projects, 0 failures.**
+
+Landed as `patches/0054-js-update-expression-cache.patch`, on top of `0053`.
 
 ### 2-8 · Functions cannot be opted in until their own properties are tracked — **blocked, with the fix named**
 
@@ -1159,8 +1203,8 @@ wall-clock benchmark reports, and it exists because 2-3 could not be decided wit
 item's *only* surviving justification was memory, and there was no way to measure memory per
 object from a clean checkout. Both 2-3's re-sizing and 2-7 came out of its first run.
 
-**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅, then **2-8** (the only remaining item that touches the
-601× score directly), then 2-4, 2-5, 2-6 — with **2-3 removed from the near list**
+**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4's update form ✅, then **2-8** (the only remaining
+item that touches the 601× score directly), then 2-4's compound-assignment half, 2-5, 2-6 — with **2-3 removed from the near list**
 (re-specified, M, superseded in value by 2-7) and **2-7 needing its distribution measurement
 before it can be picked up**.
 
@@ -1332,7 +1376,7 @@ pinned RegExp corpus is clean.
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → **2-8** → 2-4 → 2-5 → 2-6; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 (update form ✅) → **2-8** → 2-5 → 2-6; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
@@ -1499,7 +1543,7 @@ Where each item came from, so existing cross-references still resolve.
 | 1-2 real fix | — | 1-2 | Open — repair `StackGuard`, which cannot fire today |
 | 2-0 | — (P1-2's guard, reached in a state it cannot recognise) | — | **Landed** — `patches/0050`, pending submodule push |
 | 2-1 | P1-3 remainder | 2-1 | **Landed** — `patches/0051`, pending submodule push; **test262 owed** |
-| 2-4 | P1-3 remainder | 2-4 | Open |
+| 2-4 | P1-3 remainder | 2-4 | **`o.x++` landed** — `patches/0054`; `o.x += 1`, computed keys and optional chains still open |
 | 2-2 | P1-4 remainder | 2-2 | **Landed for arrays** — `patches/0053`, pending submodule push; its four named benchmarks were the wrong targets |
 | 2-8 | — (the blocked half of 2-2) | — | **Blocked, prerequisites named** — functions install `length`/`name`/`prototype` untracked; DeltaBlue's 601× depends on it |
 | 2-3 | P1-4 remainder | 2-3 | **Re-specified** — not a pure removal, ~3% ceiling, S → M, superseded in value by 2-7 |

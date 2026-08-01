@@ -1,0 +1,337 @@
+From 9c83989b8140be2495f38d343ec3ebca04761735 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 1 Aug 2026 21:58:31 +0000
+Subject: [PATCH] Route obj.name++ through the property inline caches
+
+An update expression reads and writes the same property, and both halves went
+through one assignable index reference. That reference reaches neither cache -
+measured with --cache-metrics, `o.x++` in a 200 000-iteration loop reported 0
+hits AND 0 misses, so the counters never saw it at all, against 199 999 store
+hits for the plain `o.x = i` beside it.
+
+Take the read through the read cache and the write-back through the store
+cache, for the case that qualifies: a constant KeyString key, an ordinary base,
+no super and no optional chain, and not a private name - exactly the terms
+TryCreateCachedMemberStore already uses, and for the same reasons. A computed
+key would drive one site through every key the expression produces, and a
+private name is a brand check rather than an ordinary [[Get]]/[[Set]]. The base
+is already evaluated once into a temp before either half runs, so the key is
+the only thing left to decide.
+
+Now 199 999 read hits and 199 999 store hits. Wall clock on a 20 M-iteration
+`o.x++` loop, same build with only the eligibility call differing, five
+interleaved pairs: median of paired ratios 0.944, every pair the same
+direction. Modest because the cache removes the two property resolutions and
+not the ToNumeric or the boxing around them.
+
+Both forms end in the same JSValue indexer on a miss, so strict-mode reporting
+and the silent-failure behaviour of a refused write are unchanged, and a hit
+skips it. The observable sequence is untouched: the base once, ToNumeric once,
+the getter once, the setter once, and the prefix/postfix result unchanged.
+
+`o.x += 1` is NOT included and still reports 0/0. Compound assignment goes
+through EvalShadowBuilder's captured-reference abstraction, which exists so a
+direct eval on the right-hand side cannot redirect the write (13.15.2);
+teaching that abstraction a cached form is a separate and more delicate change
+than this one, and the roadmap says so.
+
+Fifteen test cases in PropertyStoreCacheTests - eight facts and a seven-case
+theory: the hit rates; prefix and postfix values for increment and decrement;
+string and BigInt operands, where ToNumeric coerces once so a postfix update
+yields the number; undefined giving NaN; an inherited getter/setter pair each
+running exactly once per iteration through a warmed site; a non-writable
+property refused in sloppy mode and throwing in strict; the base evaluated
+exactly once; a Proxy firing both traps; the excluded forms (computed key,
+super member, private field, array expando) still correct; and an update
+interleaved with a plain store on the same property agreeing.
+---
+ .../PropertyStoreCacheTests.cs                | 131 ++++++++++++++++++
+ .../FastCompiler.InternalUpdateExpression.cs  |  58 +++++++-
+ .../InlineCacheMetrics.cs                     |  28 ++++
+ 3 files changed, 214 insertions(+), 3 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyStoreCacheTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyStoreCacheTests.cs
+index 9d62df62..bc143608 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyStoreCacheTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyStoreCacheTests.cs
+@@ -390,6 +390,137 @@ public class PropertyStoreCacheTests
+             n;
+             """));
+ 
++    // ── update expressions go through both caches (item 2-4) ──────────────────────────
++    //
++    // `obj.name++` reads and writes the same property, and both halves used one assignable
++    // index reference that reached NEITHER cache — measured at 0 hits and 0 misses, so the
++    // counters never saw it at all, against 199 999 hits for the plain assignment beside it.
++    // The read now goes through the read cache and the write-back through the store cache.
++    // What must not change is the order and the count of the observable steps: the base once,
++    // ToNumeric once, the getter once, the setter once, and the same value out.
++
++    [Fact]
++    public void AnIncrementOnAMemberGoesThroughBothCaches()
++    {
++        var (result, stats) = Measure("""
++            var o = { x: 0 };
++            for (var i = 0; i < 500; i++) o.x++;
++            o.x;
++            """);
++
++        Assert.Equal("500", result);
++        Assert.True(stats.CacheHits >= 499, $"expected read hits, got {stats.CacheHits}/{stats.CacheMisses}");
++        Assert.True(stats.StoreCacheHits >= 499, $"expected store hits, got {stats.StoreCacheHits}/{stats.StoreCacheMisses}");
++    }
++
++    [Theory]
++    [InlineData("var o = { x: 5 }; var r = o.x++; r + '|' + o.x;", "5|6")]
++    [InlineData("var o = { x: 5 }; var r = ++o.x; r + '|' + o.x;", "6|6")]
++    [InlineData("var o = { x: 5 }; var r = o.x--; r + '|' + o.x;", "5|4")]
++    [InlineData("var o = { x: 5 }; var r = --o.x; r + '|' + o.x;", "4|4")]
++    // ToNumeric coerces once, so a postfix update on a string yields the NUMBER.
++    [InlineData("var o = { x: '1' }; var r = o.x++; (typeof r) + '|' + r + '|' + o.x;", "number|1|2")]
++    [InlineData("var o = { x: 5n }; var r = o.x++; (typeof r) + '|' + r + '|' + o.x;", "bigint|5|6")]
++    [InlineData("var o = { x: undefined }; var r = o.x++; r + '|' + o.x;", "NaN|NaN")]
++    public void AnUpdateExpressionStillYieldsTheRightValues(string source, string expected)
++        => Assert.Equal(expected, Eval(source));
++
++    [Fact]
++    public void AnUpdateThroughAWarmedSiteStillRunsTheAccessorsOnce()
++        => Assert.Equal("400|400|400", Eval("""
++            var gets = 0, sets = 0, last = 0;
++            var proto = {
++                get x() { gets++; return 1; },
++                set x(v) { sets++; last = v; }
++            };
++            var o = Object.create(proto);
++            o.own = 1;
++            for (var i = 0; i < 400; i++) o.x++;
++            [gets, sets, last === 2 ? 400 : last].join('|');
++            """));
++
++    [Fact]
++    public void AnUpdateOnANonWritablePropertyIsRefused()
++        => Assert.Equal("1|false", Eval("""
++            var o = {};
++            Object.defineProperty(o, 'x', { value: 1, writable: false, configurable: true });
++            for (var i = 0; i < 300; i++) o.x++;
++            o.x + '|' + Object.getOwnPropertyDescriptor(o, 'x').writable;
++            """));
++
++    [Fact]
++    public void AnUpdateOnANonWritablePropertyThrowsInStrictMode()
++        => Assert.Equal("200|200", Eval("""
++            function bump(o) { 'use strict'; o.x++; }
++            var made = 0, thrown = 0;
++            for (var i = 0; i < 400; i++) {
++                var o = { x: 1 };
++                if (i >= 200) Object.freeze(o);
++                try { bump(o); made++; } catch (e) { if (e instanceof TypeError) thrown++; }
++            }
++            made + '|' + thrown;
++            """));
++
++    [Fact]
++    public void TheBaseOfAnUpdateIsEvaluatedExactlyOnce()
++        => Assert.Equal("300|300", Eval("""
++            var n = 0;
++            var o = { x: 0 };
++            function base() { n++; return o; }
++            for (var i = 0; i < 300; i++) base().x++;
++            n + '|' + o.x;
++            """));
++
++    [Fact]
++    public void ExcludedUpdateFormsStillWork()
++        => Assert.Equal("300|7,8,7|300|300", Eval("""
++            // A computed key, a private field and a super member all keep the ordinary
++            // reference; only their correctness is asserted here.
++            var k = 'x';
++            var computed = { x: 0 };
++            for (var i = 0; i < 300; i++) computed[k]++;
++
++            // `super.v++` reads from the home object's prototype and writes to the RECEIVER,
++            // so every iteration reads 7 and rewrites an own 8 - the prototype never moves and
++            // the read never sees what the write created.
++            class P {}
++            P.prototype.v = 7;
++            class C extends P { bumpSuper() { return super.v++; } }
++            var c = new C();
++            var superLast = 0;
++            for (var i = 0; i < 300; i++) superLast = c.bumpSuper();
++
++            class Priv { #n = 0; bump() { return ++this.#n; } get n() { return this.#n; } }
++            var p = new Priv();
++            for (var i = 0; i < 300; i++) p.bump();
++
++            var arr = []; arr.tag = 0;
++            for (var i = 0; i < 300; i++) arr.tag++;
++
++            [computed.x, superLast + ',' + c.v + ',' + P.prototype.v, p.n, arr.tag].join('|');
++            """));
++
++    [Fact]
++    public void AnUpdateOnAProxyStillFiresBothTraps()
++        => Assert.Equal("300|300|300", Eval("""
++            var gets = 0, sets = 0;
++            var target = { x: 0 };
++            var p = new Proxy(target, {
++                get: function (t, k, r) { gets++; return Reflect.get(t, k); },
++                set: function (t, k, v, r) { sets++; return Reflect.set(t, k, v); }
++            });
++            for (var i = 0; i < 300; i++) p.x++;
++            [gets, sets, target.x].join('|');
++            """));
++
++    [Fact]
++    public void AnUpdateAndAPlainStoreOnTheSamePropertyAgree()
++        => Assert.Equal("900", Eval("""
++            var o = { x: 0 };
++            for (var i = 0; i < 300; i++) { o.x++; o.x = o.x + 1; o.x++; }
++            o.x;
++            """));
++
+     // ── the transition form: a store that CREATES its property (item 2-1) ─────────────
+     //
+     // The entries above all describe overwriting a slot that exists. A store that adds one
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.InternalUpdateExpression.cs b/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.InternalUpdateExpression.cs
+index 96a6a7eb..72e1939b 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.InternalUpdateExpression.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.InternalUpdateExpression.cs
+@@ -28,6 +28,41 @@ partial class FastCompiler
+     /// update clause. It lets a numeric local's `i++` compile to a bare double add with no
+     /// boxing at all, which is the whole point of holding the counter unboxed.
+     /// </param>
++    /// <summary>
++    /// The constant <see cref="KeyString"/> for an <c>obj.name++</c> whose read and write-back
++    /// may go through the property inline caches, or <c>null</c> when they may not.
++    /// </summary>
++    /// <remarks>
++    /// Item 2-4 of <c>docs/performance-roadmap.md</c>. An update expression reads and writes the
++    /// same property, and both halves used one assignable index reference, which reaches neither
++    /// cache — measured at 0 hits AND 0 misses, so the counters never even saw it, against
++    /// 199 999 hits for the plain <c>obj.name = value</c> beside it.
++    /// <para>
++    /// Eligible on exactly the terms <see cref="TryCreateCachedMemberStore"/> uses, and for the
++    /// same reasons: a constant key, an ordinary base, no <c>super</c> and no optional chain. A
++    /// private name is a brand check rather than an ordinary [[Get]]/[[Set]], and a computed key
++    /// would drive one site through every key the expression produces. The caller has already
++    /// evaluated the base into a temp, so the key is the only thing left to decide.
++    /// </para>
++    /// </remarks>
++    private BExpression TryCreateCachedUpdateKey(AstMemberExpression member)
++    {
++        if (member.Computed
++            || member.Coalesce
++            || member.InOptionalChain
++            || member.Object == null
++            || member.Object.Type == FastNodeType.Super)
++        {
++            return null;
++        }
++
++        if (member.Property is AstIdentifier { Name.Length: > 0 } id && id.Name.Value[0] == '#')
++            return null;
++
++        var key = CreatePropertyKeyExpression(member.Property, false);
++        return key.Type == typeof(KeyString) ? key : null;
++    }
++
+     private BExpression InternalVisitUpdateExpression(AstUnaryExpression updateExpression, bool discardResult = false)
+     {
+         // added support for a++, a--
+@@ -198,6 +233,12 @@ partial class FastCompiler
+         FastFunctionScope.VariableScope key = null;
+         FastFunctionScope.VariableScope superBase = null;
+         FastFunctionScope.VariableScope @return = null;
++
++        // Set for `obj.name++` and `obj.name--` on a constant key, where the read and the
++        // write-back can each go through their inline cache instead of an assignable index
++        // reference. See TryCreateCachedUpdateKey; null means the ordinary reference is used.
++        BExpression cachedKey = null;
++
+         var right = VisitExpression(updateExpression.Argument);
+ 
+         if (updateExpression.Argument is AstMemberExpression memberExpression)
+@@ -246,7 +287,10 @@ partial class FastCompiler
+             }
+             else
+             {
+-                right = CreateMemberExpression(target.Expression, memberExpression.Property, false);
++                cachedKey = TryCreateCachedUpdateKey(memberExpression);
++                right = cachedKey != null
++                    ? JSValueBuilder.CachedIndex(target.Expression, cachedKey)
++                    : CreateMemberExpression(target.Expression, memberExpression.Property, false);
+             }
+         }
+ 
+@@ -274,6 +318,14 @@ partial class FastCompiler
+             ? JSValueBuilder.Increment(coerced.Expression)
+             : JSValueBuilder.Decrement(coerced.Expression);
+ 
++        // The write-back, through the store cache when the read went through the read cache.
++        // Both forms end in the same JSValue indexer on a miss, so strict-mode reporting and
++        // the silent-failure behaviour below are unchanged; a hit skips it.
++        BExpression WriteBack(BExpression value)
++            => cachedKey != null
++                ? JSValueBuilder.CachedStore(target.Expression, cachedKey, value)
++                : BExpression.Assign(right, value);
++
+         if (updateExpression.Prefix)
+         {
+             // For prefix update on member expressions, save the computed new value
+@@ -281,12 +333,12 @@ partial class FastCompiler
+             // property in sloppy mode), but the expression must return the new value.
+             @return = scope.Top.GetTempVariable(typeof(JSValue));
+             list.Add(BExpression.Assign(@return.Variable, newValue));
+-            list.Add(BExpression.Assign(right, @return.Variable));
++            list.Add(WriteBack(@return.Variable));
+         }
+         else
+         {
+             // Postfix: the coerced old value is the result; write the new value back.
+-            list.Add(BExpression.Assign(right, newValue));
++            list.Add(WriteBack(newValue));
+             @return = coerced;
+         }
+ 
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/InlineCacheMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/InlineCacheMetrics.cs
+index f0ccea33..d70513d6 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/InlineCacheMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/InlineCacheMetrics.cs
+@@ -156,6 +156,34 @@ internal static class InlineCacheMetrics
+             200_000,
+             "item 2-2: a class static, which is always strict"),
+ 
++        // Item 2-4's premise. The store cache is installed for a constant-key ASSIGNMENT; the
++        // item says compound assignment, increment, computed keys and optional chains all keep
++        // an older lowering that never reaches it. Each of these performs the same work as
++        // `monomorphic-store` above, which hits 199 999 times.
++        new(
++            "compound-assign-store",
++            "(function () { var o = { x: 0 }; for (var i = 0; i < 200000; i++) { o.x += 1; } return o.x; })",
++            200_000,
++            "item 2-4: `o.x += 1` - one read and one write, both on a constant key"),
++
++        new(
++            "increment-store",
++            "(function () { var o = { x: 0 }; for (var i = 0; i < 200000; i++) { o.x++; } return o.x; })",
++            200_000,
++            "item 2-4: `o.x++`, which the item calls the most expensive of the group"),
++
++        new(
++            "computed-key-read",
++            "(function () { var o = { x: 1 }; var k = 'x'; var s = 0; for (var i = 0; i < 200000; i++) { s = s + o[k]; } return s; })",
++            200_000,
++            "item 2-4: a computed key is not a constant key, so no site is allocated for it"),
++
++        new(
++            "optional-chain-read",
++            "(function () { var o = { x: 1 }; var s = 0; for (var i = 0; i < 200000; i++) { s = s + o?.x; } return s; })",
++            200_000,
++            "item 2-4: `o?.x` - a constant key reached through a different lowering"),
++
+         new(
+             "typed-array-length-read",
+             "(function () { var a = new Float64Array(4); var s = 0; for (var i = 0; i < 200000; i++) { s = s + a.length; } return s; })",
+-- 
+2.43.0
+
