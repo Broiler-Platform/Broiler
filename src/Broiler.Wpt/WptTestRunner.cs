@@ -2322,7 +2322,7 @@ internal sealed partial class WptTestRunner
             // positioning, animation snapshots, etc. via the DomBridge.
             using var microTaskContext2 = MicroTaskSynchronizationContext.Install(microTasks);
             using var context2 = new JSContext();
-            var bridge2 = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop };
+            using var bridge2 = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop };
             bridge2.Attach(context2, html, url);
             // Inject browser API stubs so onload handlers etc. can reference them.
             try { context2.Eval(BrowserApiStubs); } catch { /* best-effort */ }
@@ -2339,7 +2339,11 @@ internal sealed partial class WptTestRunner
         // continuations on the thread pool, racing this thread's serialize/render.
         using var microTaskContext = MicroTaskSynchronizationContext.Install(microTasks);
         using var context = new JSContext();
-        var bridge = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop };
+        // Disposed with this call: the bridge owns a per-document session — the headless layout
+        // view and its HtmlContainer (hence the whole box tree and every sub-resource its image
+        // load handlers hold), timer/animation queues, listener stores and observers. Leaving it
+        // to the GC kept one of those sessions alive per rendered document.
+        using var bridge = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop };
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
         {
