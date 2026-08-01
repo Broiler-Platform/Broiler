@@ -47,9 +47,6 @@ set -euo pipefail
 #     Listing it would fail this script and take the whole run down, so it needs
 #     regenerating against the current pointer before it can go back in.
 PENDING_PATCHES=(
-  "Broiler.CSS|patches/0043-css-container-query-value-function-recursion.patch"
-  "Broiler.HTML|patches/0044-html-transform-scale-percentage-is-a-ratio.patch"
-  "Broiler.HTML|patches/0045-html-table-paints-its-own-background.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
