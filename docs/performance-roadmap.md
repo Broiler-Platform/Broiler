@@ -21,13 +21,17 @@ so only the parent can hold the combined view.
 - **Acceptance protocol:** unchanged and unchallenged —
   [`Broiler.JS/docs/performance.md`](../Broiler.JS/docs/performance.md) governs what
   may be *claimed*. **Nothing in this document closes on the numbers it quotes.**
-- **Provenance:** the pinned submodule pointer is **`b3f53dcc`**, checked 2026-08-01.
-  Both source documents say `cdb2fd41`; that is stale by 7 commits, though `cdb2fd41`,
-  `7ef80c03` and `8228b0da` all remain ancestors, so item 0-1's substance holds.
-  **Measurements and the test262 run in §4.1 and §3.4 were taken at `cdb2fd41` and have
-  not been repeated at `b3f53dcc`** — which now also carries a string-allocation fix
-  (#936). Octane code sites verified at `45f4f679`. Item rows were checked against the
-  tree rather than inherited from the prose above them; doing that is what caught this.
+- **Provenance:** the pinned submodule pointer is **`685026c0`**, checked 2026-08-01 —
+  two commits past the `b3f53dcc` this document named a revision ago and nine past the
+  `cdb2fd41` both source documents name; `cdb2fd41`, `7ef80c03` and `8228b0da` all remain
+  ancestors, so item 0-1's substance holds. Those two commits are item 0-9's probe corpus
+  (`aa2b1562`, #938), which means the corpus 0-9 describes is now *in* the pointer rather
+  than pending against it. **Measurements and the test262 run in §4.1 and §3.4 were taken
+  at `cdb2fd41` and have not been repeated at `685026c0`** — which also carries a
+  string-allocation fix (#936). Octane code sites verified at `45f4f679`. Item rows were
+  checked against the tree rather than inherited from the prose above them; doing that is
+  what caught this, and this time it also caught that **item 1-2's acceptance criterion
+  already passed before any work** (phase 1).
 
 > **Path convention.** Because this document moved up a level, every path is written
 > **relative to the repository root**. Paths carrying a `Broiler.JS/` prefix are inside
@@ -261,6 +265,15 @@ These were paid for once each. They apply to every phase below.
   built the fast path, measured it, and found no signal — the scopes never allocated.
   The real cost was an 80-byte activation record they were hiding. *Measure before
   implementing, and be willing to throw the implementation away.*
+- **An acceptance criterion is a claim too — run it before the work.** 1-2's was "a
+  generated 200k-line single-function script compiles without overflow", and it passed on
+  the untouched tree: the item had inherited *size* from the line count of the function it
+  was found on, when the cause was *nesting*. A criterion that passes before the change
+  measures nothing and hides the real one. *Write the failing case first, and check that it
+  fails.*
+- **Reproduce on the platform you will close on.** 1-2's repro was a win-x64 Octane run.
+  The same suite completes on linux-x64 at the same pointer, so the CI run that was meant
+  to confirm it never could. *A one-platform repro dates the item to that platform.*
 - **Compare against the right pair.** Pooling frames measured as "no cost" against
   *allocating* them. Against an array slot it was worth 11%. The first comparison
   showed recycling costs about what allocating costs — not that either is free.
@@ -382,11 +395,22 @@ onto benchmarks. → **phase 2**
 | Double storage in `TrackShapeDataProperty` | everything |
 
 **B4 · Compile time and latency on large machine-generated code.** Compilation is
-eager; expression trees are an expensive, non-incremental intermediate; and the
-compiler recurses over the AST — Mandreel's `global_init`, one generated function of
-**152,948 lines**, has overflowed the CLR stack during *compilation* with a JavaScript
-stack eight frames deep. The blocker with the clearest browser relevance: it is page
-load time. → **phase 1**
+eager; expression trees are an expensive, non-incremental intermediate; and the front end
+recurses over nested source. A measured floor for the first two: compiling
+`return a + <i>;` through the `Function` constructor costs **~7.5 ms**, and that is three
+compilations rather than one — §20.2.1.1.1 requires the parameter text and the body text to
+be validated separately, so `JSFunction` compiles each alone before the assembled source
+(the `Evaluate` that follows hits the cache). So **~2.5 ms to compile one trivial
+expression.** That is the number 1-3 was told to go and measure, and it is large enough
+that it will still be there after 1-1 stops compiling what is never called.
+
+The recursion is a separate, sharper problem: it aborts the process rather than costing
+time, it lives in three passes across `.Parser`, `.Compiler` and `.ExpressionCompiler`,
+and it follows source **nesting** rather than source **size** — a flat 200 000-statement
+function is fine while ~19 400 nested operators is not. Mitigated at `685026c0` by giving
+compilation a stack the engine sizes; see 1-2, which also records that the Mandreel
+failure this blocker was written around does not reproduce on linux-x64. The blocker with
+the clearest browser relevance: it is page load time. → **phase 1**
 
 **B5 · The regex engine is a backtracking interpreter.** `Broiler.Regex`'s
 `Matching/Matcher.cs` has no compilation to native code; V8's Irregexp JIT-compiles
@@ -436,8 +460,8 @@ said so independently (§1.2). This phase contains no engineering.
 
 | # | Item | State |
 |---|---|---|
-| **0-1** | Land the pending `Broiler.JS` patches | **Already landed, and the pointer has since advanced.** It is now `b3f53dcc`, 7 commits past the `cdb2fd41` both source documents name; `cdb2fd41` (0048), `7ef80c03` (0046) and `8228b0da` (0047) are all still ancestors, verified with `merge-base --is-ancestor`. `patches/` holds only its `README.md`, consistent with the three patch files having been removed after the bump. Independently confirmed: `ff819e06` refreshed the WPT baseline right after for a **net 36 fewer failures** — those patches changed `+`, `==`, the `for` head and `eval` scoping, exactly the surface WPT exercises indirectly, and it moved the right way |
-| **0-2** | Stack reserve on by default in the shell | **Already on.** `Program.cs` runs script-host JS on a 16 MiB thread it sizes itself. See B8 for why this is not a Crypto-specific fix |
+| **0-1** | Land the pending `Broiler.JS` patches | **Already landed, and the pointer has since advanced twice.** It is now `685026c0` — `b3f53dcc` plus 0-9's probe corpus — 9 commits past the `cdb2fd41` both source documents name; `cdb2fd41` (0048), `7ef80c03` (0046) and `8228b0da` (0047) are all still ancestors, verified with `merge-base --is-ancestor`. `patches/` held only its `README.md` when this was checked, consistent with the three patch files having been removed after the bump; it now carries `0049` for 1-2. Independently confirmed: `ff819e06` refreshed the WPT baseline right after for a **net 36 fewer failures** — those patches changed `+`, `==`, the `for` head and `eval` scoping, exactly the surface WPT exercises indirectly, and it moved the right way |
+| **0-2** | Stack reserve on by default in the shell | **Already on.** `Program.cs` runs script-host JS on a 16 MiB thread it sizes itself. See B8 for why this is not a Crypto-specific fix. As of 1-2 that thread no longer carries *compilation* as well, so the 12 MiB JavaScript budget is no longer spent on compiler recursion — which is what the Mandreel signature below was |
 | **0-3** | Record each suite's real time budget | **Implemented.** `timeoutSec` per suite; `--timeout` became a floor. Mandreel 1200 s, zlib 1800 s |
 | **0-4** | Quantify run-to-run noise | **Implemented.** `--repetitions`, median + spread, `--noise-band`, per-repetition logs, `flaky` status (§3.2) |
 | **0-5** | Check the code cache against CodeLoad's intent | **Checked; no problem.** `DictionaryCodeCache.Current = new AssemblyCodeCache();` is present but **commented out** in `Program.cs`, so `--script-host` compiles from source every time and **CodeLoad is a genuine compile-throughput measurement.** Re-check if that line is ever uncommented — the shell would then be measuring cache lookup, and this is not the kind of change that announces itself in a score |
@@ -528,17 +552,21 @@ RangeError: Maximum call stack size exceeded
   … 6 JavaScript frames total, in phase `Setup`, after 375.5 s (budget 1200 s)
 ```
 
-That is **item 1-2's exact signature**: the guard fires with a JavaScript stack only six
-frames deep, so what exhausted the budget is not the program recursing but the engine
-recursing over `global_init`'s 152,948 lines. 1-2 previously had no live repro; it has
-one now, and this raises its mitigation step (compile on a thread with a chosen stack
-size) from "worth landing on its own" to the thing standing between the suite and 17/17.
+That was read as **item 1-2's exact signature**: the guard fires with a JavaScript stack
+only six frames deep, so what exhausted the budget is the engine recursing over
+`global_init`, not the program recursing. It is **not** the old failure mode: exit code was
+0, the suite was reported rather than killed, and the other 14 were unaffected. That
+containment is 0-2 and B8 working as designed — the same overflow used to take a whole
+suite down.
 
-Two things this does **not** establish. Whether it is a regression in the 7 commits since
-`cdb2fd41` or a platform difference (the committed run is Linux CI; this is win-x64) —
-only 0-6 can separate those. And it is **not** the old failure mode: exit code was 0, the
-suite was reported rather than killed, and the other 14 were unaffected. That containment
-is 0-2 and B8 working as designed — the same overflow used to take a whole suite down.
+> **Superseded in part.** The same suite was re-run on **linux-x64 at `685026c0`** against
+> upstream `chromium/octane` while working 1-2, and **Mandreel completes** — `status: ok`,
+> 365.5 s of its 1 200 s budget, with 1-2's mitigation disabled so the engine is the one
+> described here. So this is a win-x64 failure, not a property of the engine at this
+> pointer, and the "15 of 17 scores" above is a win-x64 count. It still does not separate
+> regression from platform difference — the two runs differ in both — but it does mean
+> **0-6 will not reproduce it**, because CI is Linux. 1-2 carries the corrected diagnosis
+> and a repro that exists on both platforms.
 
 For 0-6:
 
@@ -622,29 +650,106 @@ cache confirmed off (0-5).
 
 **Size: XL.** The only item here that is a genuine sub-project.
 
-### 1-2 · Stop AST-recursive compilation from overflowing — **has a live repro**
+### 1-2 · Stop recursive compilation from overflowing — **mitigation landed**
 
-**Target.** Mandreel, which today can die outright (B4) — and does: the local pass in
-Phase 0 loses Mandreel *and* MandreelLatency to exactly this, `EnsureWithinStackBudget`
-firing in `Setup` with a six-frame JavaScript stack. **This is the only thing between the
-suite and 17 of 17 scores**, which makes the mitigation step below the highest-value
-small change on the whole roadmap.
+**The diagnosis this item carried was wrong about its own cause, and its acceptance
+criterion passed before any work was done.** Both were settled by measurement at
+`685026c0`, and the corrected item is below. What was wrong:
 
-**Where.** `Broiler.JavaScript.Compiler/FastCompiler*.cs` visitors;
-`Broiler.JavaScript/Program.cs` for the mitigation.
+| This item said | Measured |
+|---|---|
+| The trigger is source **size** — `global_init`'s 152,948 lines | A **flat 200 000-statement** function compiles and runs (30 s). Size is not the trigger; **nesting depth** is: a `1+1+…` chain overflows between 10 000 (passes) and 20 000 (aborts) operators |
+| The failure is `EnsureWithinStackBudget` — a catchable `RangeError` | On linux-x64 it is a **hard CLR stack overflow that aborts the process**. Not catchable, no `try` reaches it, and no JavaScript stack is involved at all |
+| One site: the compiler's AST visitors | **Three passes**, in three assemblies. The *parser* is one of them — upstream of the compiler entirely |
+| Verify: "a generated 200k-line single-function script compiles … without overflow" | **Already passed at `685026c0` before the change.** As written the criterion certified nothing |
 
-**Work.** Two steps, and the first is worth landing on its own:
+The three passes, each reached in turn as the one above it was given more stack:
 
-1. **Mitigation (S).** Compile on a thread with a chosen stack size, exactly as the
-   shell already does for *execution* (0-2). Turns a crash into a slow success.
-2. **Real fix (M).** An explicit worklist in the visitor for the shapes that nest
-   without bound — long statement lists, deep binary-expression chains, giant
-   `switch`. **Compiler stack depth should be a function of source *nesting*, not
-   source *size*.**
+| Pass | Assembly | Overflows on |
+|---|---|---|
+| `FastParser` recursive descent (via `FastScanner.Commit`) | `.Parser` | a right-nested conditional, 20 000 levels |
+| `AstReduce.VisitBinaryExpression` under `SyntaxValidation.StrictModeValidator` | `.Compiler` | a left-nested `+` chain — the abort trace shows ~19 400 levels of its three-frame cycle on the stack, ~845 B per level |
+| `ILCodeGenerator.VisitBinary` / `VisitCall` | `.ExpressionCompiler` | the same chain, reached only once the front end survives it |
 
-**Verify.** A generated 200k-line single-function script compiles at the default shell
-stack size without overflow. Add it as a compiler test fixture — exactly the kind of
-thing that silently regresses.
+All three measured on the script host's 16 MiB thread. The ~845 B per level is what makes
+the ceiling predictable: it scales with the stack, so the same shapes abort at ~1 200 levels
+on a 1 MiB Windows main thread and ~9 700 on an 8 MiB Linux one.
+
+**Target.** Any deeply nested source, which is a *correctness* result before it is a
+performance one: a syntactically valid script takes the host process down. Machine-
+generated code is where nesting gets deep without anyone intending it, which is how this
+reached the roadmap through Mandreel — but see the repro note below, because Mandreel is
+not the demonstration this item thought it was.
+
+**Where.** `Broiler.JavaScript.ExpressionCompiler/CompilationStack.cs` (new);
+`Broiler.JavaScript.Runtime/CoreScript.cs`, `.../DictionaryCodeCache.cs`,
+`Broiler.JavaScript.Compiler/DirectEvalSupport.cs`,
+`Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeAssembly.cs` for the boundary;
+`Broiler.JavaScript.ExpressionCompiler/StackGuard.cs` for the real fix.
+
+**Work.**
+
+1. **Mitigation (S) — landed as `patches/0049-js-compilation-stack.patch`.** Compilation
+   runs on a thread the engine sizes (`CompilationStack`, 64 MiB, settable via
+   `SizeBytes` or `BROILER_JS_COMPILE_STACK_BYTES`; `0` compiles in place). The boundary
+   sits at the point each `ICodeCache` starts a compilation, so parse, validation, tree
+   construction and IL emission share one crossing, with catch-alls in `CoreScript` and
+   `RuntimeAssembly` for a host that brings its own cache. Two details are what make it
+   affordable:
+   - **Workers are parked and reused.** A thread per compilation costs ~300 µs — the
+     reservation is a kernel mapping, not bookkeeping — which measured **+27%** on a
+     compile-only loop. Renting leaves two semaphore handoffs.
+   - **Short sources stay put.** Nesting depth cannot exceed source length, so a source
+     under 512 characters cannot exhaust even a 1 MiB stack and is compiled where it
+     stands. This is a bound, not a heuristic, and it is what takes the remaining cost to
+     nothing: the handoff is a fixed ~180 µs, which is unmeasurable against a large
+     compile and unaffordable against `eval` of one expression.
+
+   Cost, measured ABBA-interleaved at process granularity over five pairs of a
+   5 000-compile loop, on **one build with the environment variable as the only
+   difference** — comparing two builds cannot separate this from anything else that
+   changed: **+1.5% by median of paired ratios, +3.2% comparing medians, and one pair of
+   five negative.** Inside this container's noise band, and the loop is the worst case
+   (pure compilation, no execution). All four nesting shapes that aborted now compile. With
+   `BROILER_JS_COMPILE_STACK_BYTES=0` the fixtures below abort the test run, which is what
+   makes them decisive rather than merely green.
+2. **Real fix (M) — still open, and it is a repair, not a new mechanism.**
+   `Broiler.JavaScript.ExpressionCompiler/StackGuard.cs` already exists to segment the
+   emitter's recursion and **cannot fire**: it tests `address - start > MaxStackSize` on a
+   stack that grows *downwards*, so the difference is negative and the branch is
+   unreachable. It also truncates stack addresses to `int` and would hop every 1 024
+   bytes if it did fire. `CallFrames.EnsureWithinStackBudget` gets the direction right and
+   says so in a comment; this one does not. Repair it, give it a threshold in megabytes,
+   and hand its segments a sized thread rather than a thread-pool thread — then extend
+   the same treatment to the parser and the validator. **Compiler stack depth should be a
+   function of source *nesting*, not source *size*,** and it still is not.
+
+**Verify.** `Broiler.JavaScript.Compiler.Tests/DeeplyNestedSourceTests.cs` — a nested `+`
+chain, a nested conditional, a long flat statement list (kept, so the size case cannot be
+re-diagnosed from length again), and a syntax error in deeply nested source reporting the
+same type as one in shallow source. They assert values, not exceptions, because the
+failure being pinned is the test host *aborting*. Repository suite at the patched tree:
+**7 288 tests across 13 projects, 0 failures** — the three failures §4.1 attributes to the
+host environment are win-x64 ones and do not reproduce on Linux.
+
+> **The repro is win-x64 only, and that is a finding.** Phase 0's local pass lost Mandreel
+> and MandreelLatency to `EnsureWithinStackBudget` on win-x64. Run here on linux-x64 at
+> `685026c0` against upstream `chromium/octane`, **Mandreel completes either way**:
+>
+> | Mitigation | Status | Mandreel | MandreelLatency | Duration (budget 1 200 s) |
+> |---|---|--:|--:|--:|
+> | disabled (`…STACK_BYTES=0`) | `ok` | 138 | 12.6 | 365.5 s |
+> | default (64 MiB) | `ok` | 123 | 13.3 | 355.5 s |
+>
+> So "this is the only thing between the suite and 17 of 17 scores" was a win-x64
+> statement; on Linux the suite is not blocked on it, and the mitigation neither fixes nor
+> breaks it there. **Read no score movement into those two rows** — one repetition each,
+> the two metrics move in *opposite* directions, and §3.2 says a single run cannot tell a
+> change from noise. This also does not separate regression from platform difference (the
+> two runs differ in both commit and platform), but it does bound the question: whatever
+> fires on win-x64 does not fire on linux-x64 at this pointer, so **0-6 will not reproduce
+> it and CI cannot be the instrument that closes it.** The synthetic shapes above are the
+> repro that exists on both, and they are what the fixtures pin.
 
 ### 1-3 · Reduce compile cost per byte — *only after 1-1*
 
@@ -653,6 +758,12 @@ remaining throughput may not justify a pipeline change. Measure first with
 `ParserCompilerBenchmarks`, splitting the cost three ways: parse, expression-tree
 construction, IL emission. The measurement names the target; committing to one now
 would be guessing. **Size: unknown by construction.**
+
+There is now one datapoint to start from, taken while working 1-2: **~2.5 ms to compile
+`return a + <i>;`** (B4). It is a whole-pipeline figure, so it does not yet split three
+ways — but it does say the per-compile floor is milliseconds for a trivial body, which is
+the part 1-1 cannot remove. A body that is never called costs nothing after 1-1; the one
+that *is* called still pays this.
 
 ---
 
@@ -847,7 +958,7 @@ pinned RegExp corpus is clean.
 | Phase | Order within it | Size | Unblocks / expected effect | Exit gate |
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
-| **1** | 1-2 mitigation → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
+| **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | **2-1** → 2-3 → 2-2 → 2-4 → 2-5 → 2-6 | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode; **DeltaBlue and Richards inside 200×** |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
@@ -934,8 +1045,14 @@ note the counters default to **off** since P0-1 and need an `Enable()` scope.
 Real-world scripts are the repository's own
 `Broiler.JS/OtherTests/JIntPerfTests/Scripts/*.js`, each in a fresh `JSContext`.
 
-**These probes have no permanent home — that is item 0-9.** Until they are wired into
-`Broiler.JS/eng/performance/phase0.json`, every number in §4.1 is a one-off observation.
+**These probes now have a permanent home** — `HotPathProbeBenchmarks` in
+`Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks`, wired into all three
+`Broiler.JS/eng/performance/phase0.json` profiles, with phase C's hit rates on their own
+`--cache-metrics` emitter (item 0-9). That landed in `aa2b1562` and is carried by the
+pinned pointer, so this appendix is the description of the corpus rather than the only copy
+of it. §4.1's figures are still one-off *observations* — they were taken by the ad-hoc
+harness, and the corpus has since contradicted two of its rows (see 0-9) — but they are now
+checkable from a clean checkout, which is the part that was missing.
 
 ### Octane
 
@@ -1004,7 +1121,9 @@ Where each item came from, so existing cross-references still resolve.
 | 0-6 | — | Octane §2.6 | **Owed** |
 | 0-7, 0-8, 0-9 | engine §8.1 acceptance evidence | — | **Owed** |
 | 0-10, 0-11 | engine §8.1, §8.2 | — | Done |
-| 1-1 … 1-3 | *excluded by engine §9* | 1-1 … 1-3 | Open — superseded, see §1.1 |
+| 1-1, 1-3 | *excluded by engine §9* | 1-1, 1-3 | Open — superseded, see §1.1 |
+| 1-2 mitigation | *excluded by engine §9* | 1-2 | **Landed** — `patches/0049`, pending submodule push |
+| 1-2 real fix | — | 1-2 | Open — repair `StackGuard`, which cannot fire today |
 | 2-1, 2-4 | P1-3 remainders | 2-1, 2-4 | Open |
 | 2-2, 2-3 | P1-4 remainders | 2-2, 2-3 | Open |
 | 2-5 | P0-2 remainder | 2-5 | Open |
@@ -1015,6 +1134,15 @@ Where each item came from, so existing cross-references still resolve.
 | 4-1 … 4-4 | *excluded by engine §9* | 4-1 … 4-4 | Open — superseded, see §1.1 |
 | 5 | — | Octane §7 "regex, until late" | Open |
 | Lazy frame materialization | P3 remainder | — | Candidate, not a task — no measured cost to remove |
+
+**Status of the three source documents.**
+[`Broiler.JS/docs/performance-roadmap.md`](../Broiler.JS/docs/performance-roadmap.md) and
+[`tests/octane/roadmap.md`](../tests/octane/roadmap.md) are **archives** — superseded plans
+kept for what they contributed, carrying diagnoses this document has since corrected, and
+**not back-ported**. `tests/octane/roadmap.md` now says so at the top; the engine one is
+labelled only here, because it is inside the submodule and this repository cannot annotate
+it without a pointer bump. `tests/octane/benchmarks.md` is different: it is a *reference*,
+not a plan, and stays live as the per-benchmark description.
 
 **Dropped in the merge, deliberately:** the engine roadmap's detailed defect
 narratives (the `SAUint32Map<T>` sentinel, the Debug-build stack-trace-on-throw, the

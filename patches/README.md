@@ -21,8 +21,15 @@ Delete the patch file and its row below once the pointer is bumped.
 
 ## Index
 
-**None pending.** Every patch this directory carried has been applied and its
-submodule pointer bumped.
+| Patch | Submodule | Targets | Note |
+| --- | --- | --- | --- |
+| `0049-js-compilation-stack` | `Broiler.JS` | [`docs/performance-roadmap.md`](../docs/performance-roadmap.md) item 1-2, mitigation step | Compilation runs on a thread the engine sizes (`CompilationStack`, 64 MiB, `BROILER_JS_COMPILE_STACK_BYTES` to change, `0` to opt out), so deeply nested source no longer aborts the process. **Three** passes overflowed, in three assemblies — `FastParser`'s recursive descent, `SyntaxValidation`/`AstReduce`, and `ILCodeGenerator` — at ~19 400 nested operators on the shell's 16 MiB thread. Workers are parked and reused, and a source under 512 characters compiles in place (nesting depth cannot exceed source length), which is what keeps the cost inside the noise band. Adds `DeeplyNestedSourceTests`; repository suite 7 288 tests, 0 failures. |
+
+**No main-repo fallback exists for 0049**, unlike #1119's: every pass that overflows
+is inside `Broiler.JS`, so there is no outer layer that can stand in. Until the patch
+is applied, deeply nested source still aborts the process on any host whose JavaScript
+thread is smaller than the source's nesting depth needs — which on the evidence to hand
+is win-x64 rather than the Linux CI, so the workflow will not show it.
 
 ## Recently cleared
 
@@ -50,5 +57,6 @@ removed, 14 added).
 **The committed Octane results in `tests/octane/results/` predate the pointer
 bump** (generated 2026-07-31 20:28, bumped 2026-08-01 11:45) and still show the
 five suites failing. They are stale, not wrong about the engine as it was; the
-Octane workflow needs a re-run. See
-[`tests/octane/roadmap.md`](../tests/octane/roadmap.md) §2.
+Octane workflow needs a re-run — item 0-6 in
+[`docs/performance-roadmap.md`](../docs/performance-roadmap.md), which is the plan of
+record now that `tests/octane/roadmap.md` has been merged into it.
