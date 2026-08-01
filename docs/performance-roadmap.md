@@ -858,9 +858,87 @@ primitive-`prototype` forms. Suite: **7 290 tests across 13 projects, 0 failures
 
 Landed as `patches/0050-js-construct-prototype-invalidation.patch`.
 
+### 2-1 · A store-cache entry that can describe a property *creation* — **landed**
+
+**Measured before: 0 store-cache hits against 600 000 misses**, for 200 000 constructions of
+a three-field object. A property-creating store could not hit *even once*, ever, because
+`PropertyStoreInlineCache` only recorded `(shapeAfterTheWrite, slot)` and hit through
+`TryWriteShapeSlot`, which requires the property to exist already — so the next object
+presented the *predecessor* shape and missed. Every constructor that builds an object
+field-by-field missed on every field of every object it ever built: Richards'
+`TaskControlBlock`, DeltaBlue's constraints, RayTrace's `Vector`, Box2D's `b2Vec2`.
+
+**After: 599 997 hits against 3 misses** — one cold miss per field to install the entry, and
+nothing after. The read site inside an allocating loop went the same way (0 / 200 002 →
+200 000 / 2). Wall clock on a 2 M-iteration constructor loop, interleaved four pairs:
+**~20% faster** (median of paired ratios 0.797, every pair the same direction, spread
+0.777–0.840).
+
+**What was built.** A second entry form on the same store cache, discriminated by a null
+`FromShape` exactly as the read cache discriminates own from prototype entries:
+
+| Form | Guard | Action |
+|---|---|---|
+| overwrite (existing) | shape id | write `Slot` |
+| **transition (new)** | `FromShape` identity, receiver-prototype identity, global prototype version, extensibility | create the property in `Slot` and advance the shape to `ToShape` |
+
+plus `JSObject.TransitionShape` (the shape a transition may be recorded out of) and
+`JSObject.TryCreateShapeSlot`, which performs the same three steps
+`DefineReceiverDataProperty` does — `ownProperties.Put`, shape update, `PropertyChanged` —
+with the shape advanced to the recorded successor rather than re-derived. That is where the
+saving is: `TrackShapeDataProperty` would look the key up in the current shape, miss, then
+look it up again in that shape's transition table to find the very shape and slot the entry
+already holds.
+
+**Three things make it safe, and none of them is the shape id alone.**
+
+- **A concrete shape proves the key is absent.** While an object is in shape mode its tracked
+  keys *are* its complete set of own named properties — every untrackable addition (private
+  name, accessor, non-default attributes, deferred cell) calls `AbandonObjectShape` first.
+  The entry holds the `ObjectShape` **by reference**, not by id, so the test is identity.
+- **The prototype chain is walked once, at install, and required to be free of the key.** A
+  creation is only what `OrdinarySetWithOwnDescriptor` would do while the chain supplies
+  nothing: a setter there has to run, an inherited non-writable data property has to reject
+  the write. Two guards keep that answer true at every later hit — the receiver still
+  pointing at the same prototype *by reference*, and the global prototype-mutation version,
+  which any addition to any object used as a prototype publishes. **These are the same two
+  the read cache's prototype form uses, and they are only affordable because of 2-0**: before
+  it, the version advanced once per `new`, so a transition entry retired on the very next
+  object the loop built. 2-1 does not work without 2-0.
+- **Extensibility is re-checked on every hit**, unlike the overwrite form which deliberately
+  omits it. `preventExtensions`, `seal` and `freeze` all set `NonExtensible`, so one test
+  covers all three.
+
+Everything else falls through to the unchanged generic path, which is the property that
+bounds the risk: a guard failing costs a miss, never a wrong answer. The only way to be
+wrong is a **false positive**, and each guard above closes one.
+
+**How a creation is even detected.** By the shape *changing* across the store. A shape is
+immutable, so a receiver reporting a different one has gained a tracked property, and the
+only one it can have gained at this site is this key. No extra pre-lookup of the key is
+needed — which matters, because that lookup would be paid on every miss.
+
+**Verify.** 17 tests in `PropertyStoreCacheTests`, each warming the site on the fast path
+first: a prototype setter present from the start and added mid-loop; an inherited read-only
+data property, sloppy and strict; a non-extensible receiver, sloppy and strict; a frozen
+receiver; two receivers sharing a shape but not a prototype; `setPrototypeOf` mid-loop;
+`__proto__` still reaching the inherited accessor; a dictionary-mode receiver; a Proxy as
+receiver and in the chain; `delete` then re-create; attributes and key order; and the
+hit-rate guard for the fix itself. **Removing the two hit-time prototype guards fails four
+of them**, which is what makes them load-bearing rather than decorative. Suite: **7 307 tests
+across 13 projects, 0 failures.**
+
+> **test262 has not been run for this item.** §3.4's protocol and this phase's exit gate both
+> require `test262-properties-proxy` and `test262-strict-mode` for anything touching
+> `OrdinarySetWithOwnDescriptor`, and 2-1 touches its last step. The repository suite and the
+> targeted battery above are what *has* been run. **The two manifests are owed before this
+> closes** — this is the gate the phase-2 exit criterion names, not an optional extra.
+
+Landed as `patches/0051-js-store-cache-property-creation.patch`, which applies on top of
+`0050`.
+
 | # | Item | Origin | Where | Why it matters here | Size |
 |---|---|---|---|---|---|
-| **2-1** | **A store-cache entry that can describe a property *creation*** — `(shapeIdBefore → slot, shapeIdAfter)` | P1-3 | `Runtime/ObjectShape.cs`, `Runtime/JSObject.PropertyStorage.cs` | *Creating* a property misses every time, so every constructor that builds an object field-by-field misses on **every field**. **Measured: 0 hits / 600 000 misses** for 200 000 three-field constructions. Richards' `TaskControlBlock`, DeltaBlue's constraints, RayTrace's `Vector`, Box2D's `b2Vec2` are all exactly this shape | M |
 | **2-2** | **Widen shape eligibility** past `GetType() == typeof(JSObject)` | P1-4 | `Runtime/JSObject.cs:203` — `TryGetShapeSlot` | `JSArray`, `JSFunction` and every built-in exotic are excluded wholesale. **Start with `JSArray`** — it is on the hot path of five benchmarks | M |
 | **2-3** | **Remove the double storage** | P1-4 | `Runtime/JSObject.cs:97,:188` — `TrackShapeDataProperty` | Every tracked object writes each value into `shapeSlots` *and* the `PropertySequence`, storing twice and paying to keep them in sync. Pure removal | S |
 | **2-4** | **Extend the store cache** to `o.x++`, `o.x += 1`, computed keys, `super`, optional chains, private names | P1-3 | `.Compiler` lowering; `Runtime/ObjectShape.cs` | All keep the old uncached lowering. `o.x++` measured the most expensive and is pervasive in Gameboy and Box2D | M |
@@ -874,22 +952,13 @@ Landed as `patches/0050-js-construct-prototype-invalidation.patch`.
 > it. The measurement shows it working — 200 000 three-field constructions produce **3**
 > shape transitions in total, one per field, not 600 000.
 >
-> The item's *rationale* is nevertheless exactly right, and measured: **0 store-cache hits
-> against 600 000 misses.** What is absent is a **store-site** entry that can describe a
-> property *creation*. `PropertyStoreInlineCache` only ever records
-> `(shapeIdAfterTheWrite, slot)` and hits through `TryWriteShapeSlot`, which requires the
-> property to exist already — so on the next object the site sees the *predecessor* shape and
-> misses, forever. The fix is a second entry form keyed on the shape *before* the write.
->
-> Its guards are the work, not the entry: creating a property is
-> `OrdinarySetWithOwnDescriptor` reaching `CreateDataProperty`, so a hit must also establish
-> that the receiver is extensible and that nothing on the prototype chain supplies a setter
-> or a non-writable data property for the key. The read cache's prototype form already
-> carries exactly those guards (receiver-prototype identity plus the global version), and
-> 2-0 is what makes them worth having — until now that version advanced on every allocation.
+> The item's *rationale* was nevertheless exactly right, and measured: **0 store-cache hits
+> against 600 000 misses.** What was absent is a **store-site** entry that can describe a
+> property *creation*, which is what landed — the item above says what it took. The lesson is
+> in §3.5: an item can be worth doing and still be wrong about why.
 
-**Sequence.** 2-0 ✅, then 2-1 (largest single win, and the missing half of a structure that
-otherwise works), then 2-3 (pure removal, near-zero risk), then 2-2, 2-4, 2-5, 2-6.
+**Sequence.** 2-0 ✅ → 2-1 ✅, then 2-3 (pure removal, near-zero risk), then 2-2, 2-4, 2-5,
+2-6.
 
 **Verify — per item, not per phase.**
 
@@ -1059,7 +1128,7 @@ pinned RegExp corpus is clean.
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → **2-1** → 2-3 → 2-2 → 2-4 → 2-5 → 2-6 | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode; **DeltaBlue and Richards inside 200×** |
+| **2** | 2-0 ✅ → 2-1 ✅ → **2-3** → 2-2 → 2-4 → 2-5 → 2-6 | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
@@ -1225,7 +1294,8 @@ Where each item came from, so existing cross-references still resolve.
 | 1-2 mitigation | *excluded by engine §9* | 1-2 | **Landed** — `patches/0049`, pending submodule push |
 | 1-2 real fix | — | 1-2 | Open — repair `StackGuard`, which cannot fire today |
 | 2-0 | — (P1-2's guard, reached in a state it cannot recognise) | — | **Landed** — `patches/0050`, pending submodule push |
-| 2-1, 2-4 | P1-3 remainders | 2-1, 2-4 | Open — 2-1's premise measured, its stated mechanism corrected |
+| 2-1 | P1-3 remainder | 2-1 | **Landed** — `patches/0051`, pending submodule push; **test262 owed** |
+| 2-4 | P1-3 remainder | 2-4 | Open |
 | 2-2, 2-3 | P1-4 remainders | 2-2, 2-3 | Open |
 | 2-5 | P0-2 remainder | 2-5 | Open |
 | 2-6 | — | 2-6 | Open |
