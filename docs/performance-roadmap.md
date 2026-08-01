@@ -274,6 +274,17 @@ These were paid for once each. They apply to every phase below.
 - **Reproduce on the platform you will close on.** 1-2's repro was a win-x64 Octane run.
   The same suite completes on linux-x64 at the same pointer, so the CI run that was meant
   to confirm it never could. *A one-platform repro dates the item to that platform.*
+- **A conservative bug passes its own tests.** 2-0 invalidated too much, never too little,
+  so every staleness test in `PropertyShapeCacheTests` was green — and green for a reason
+  none of them was checking. A correctness suite cannot find an
+  over-invalidation, only a hit-rate counter can, which is why 0-9's emitter found in one
+  run what twenty tests had been sitting on. *Fixing an over-invalidation invalidates the
+  tests that covered it: re-check each path in the condition the fix creates.*
+- **Verify a premise before building on it, and separate it from its explanation.** 2-1
+  named the wrong missing structure — the shape-transition cache it called absent is
+  present and working — while being exactly right about the symptom it predicted. *An item
+  can be worth doing and still be wrong about why; a control run tells you which half you
+  have.*
 - **Compare against the right pair.** Pooling frames measured as "no cost" against
   *allocating* them. Against an array slot it was worth 11%. The first comparison
   showed recycling costs about what allocating costs — not that either is free.
@@ -394,6 +405,12 @@ onto benchmarks. → **phase 2**
 | `o.x++`, `o.x += 1`, computed keys, `super`, optional chains, private names keep the old lowering | Richards, Gameboy, Box2D |
 | Double storage in `TrackShapeDataProperty` | everything |
 
+A fifth gap belongs on that list and is **fixed**: every `new` published a global
+prototype-mutation notice, so a prototype-keyed entry could not survive a loop that
+allocated — which is every loop in Richards, DeltaBlue, RayTrace and Box2D. It was worth
+half the hit rate at an inherited-method site. See 2-0; the structures were fine, nothing
+was allowed to stay warm.
+
 **B4 · Compile time and latency on large machine-generated code.** Compilation is
 eager; expression trees are an expensive, non-incremental intermediate; and the front end
 recurses over nested source. A measured floor for the first two: compiling
@@ -496,6 +513,14 @@ That is the first result in this document that is reproducible from a clean chec
 rather than from a harness that no longer exists. It does not *close* phase C — closing
 still needs the RID matrix (0-8) — but it removes the specific risk engine §8.1 was
 worried about, which is that the one-off observation could not be checked at all.
+
+**And it has since earned its keep twice over.** Three sites were added to it while working
+phase 2, and between them they measured a premise (2-1: 0 store hits against 600 000
+misses), identified a defect nobody had filed (2-0: 200 001 prototype invalidations for
+200 000 allocations) and supplied the control that pinned its cause (the same objects as
+literals invalidate nothing). None of that is visible in a correctness suite or in wall
+clock, which is the argument for a hit-rate emitter existing at all — and it took one run,
+not a campaign.
 
 #### What the corpus caught on its first run
 
@@ -779,16 +804,91 @@ phase 1.**
 
 Owner assemblies: `Broiler.JavaScript.Runtime`, `.Compiler`, `.Engine`.
 
+### 2-0 · `new` retired every prototype-keyed cache entry in the process — **landed**
+
+Numbered 2-0 because it was not on this list: it was found while measuring 2-1's premise,
+and it lands before it. `OrdinaryCreateFromConstructor` installed the instance prototype by
+**overwriting the one the `JSObject` constructor had just set**. The second write is what
+matters: by then `prototypeChain` was no longer null, so the guard could only read it as a
+`[[SetPrototypeOf]]` on a live object, and it published the global prototype-mutation
+notice. Every prototype-keyed inline-cache entry in the process was retired — **once per
+`new`.**
+
+This is the defect P1-2's guard exists to prevent. Its comment in
+`JSObject.BasePrototypeObject` states the failure mode precisely ("would leave any
+prototype-keyed cache permanently invalid in a loop that allocates") and the guard is
+correct; the construct path simply reached it in a state it cannot recognise. Measured with
+`--cache-metrics` (0-9's emitter), 200 000 allocations of a three-field object:
+
+| Site | Prototype invalidations | Cache hits / misses |
+|---|--:|---|
+| `constructor-field-creation` — 200 000 × `new T(a,b,c)` | **200 001** → **1** | — |
+| `literal-field-creation` — the same objects as literals (control) | 0 → 0 | — |
+| `inherited-method-call` — read site, allocation hoisted out of the loop | 2 → 1 | 399 998 / 3 |
+| `inherited-method-call-while-allocating` — same site, allocation inside | 200 002 → **1** | **199 999 / 200 002 → 399 998 / 3** |
+
+The control row is what identifies the cause: the same number of property creations on the
+same number of objects invalidates nothing when built by a literal, so it is `new` and not
+property creation. The last row is the consequence — a warm inherited-method site ran at a
+**50% hit rate purely because the loop also allocated**, and now matches the hoisted
+control. Wall clock on a 2 M-iteration allocate-and-call loop, interleaved four pairs:
+**~11% faster** (median of paired ratios 0.89, all four pairs the same direction), which is
+the weaker of the two results — the hit-rate figures are exact and deterministic.
+
+**Fix.** Install the prototype *by construction* at the two sites that allocate an instance
+— `BuiltIns/Function/JSFunction.cs` (`OrdinaryCreateFromConstructor`) and
+`BuiltIns/Class/JSClass.cs` — instead of by an initializer that overwrites it. There is
+already a prototype-taking `JSObject` constructor, and `Runtime` exposes internals to
+`BuiltIns`, so this routes the construct path through the *existing* guard rather than
+adding one. The end state of the object graph is byte-for-byte the same; only the spurious
+notice is gone. `JSClass`'s null branch is kept verbatim, because assigning null through
+the setter clears the chain whereas passing null to the constructor substitutes
+`%Object.prototype%`.
+
+**Why the local suite did not catch it, and what now does.** The invalidation was
+*conservative* — it retired too much, never too little — so every staleness test in
+`PropertyShapeCacheTests` passed for a reason unrelated to what it checked. Removing it
+means those paths need re-checking with an allocation in the loop, where previously there
+was nothing left to invalidate: `PropertyShapeCacheTests` gains that combination for
+prototype mutation, `setPrototypeOf`, own-property shadowing and accessor redefinition,
+plus `InheritedReadInAnAllocatingLoop_IsCached` as the guard for the fix itself (**501/501
+hits before, ≥999 after**) and `AClassInstanceStillGetsItsNewTargetPrototype` for the
+prototype the construct paths install, including the subclass, `Reflect.construct` and
+primitive-`prototype` forms. Suite: **7 290 tests across 13 projects, 0 failures.**
+
+Landed as `patches/0050-js-construct-prototype-invalidation.patch`.
+
 | # | Item | Origin | Where | Why it matters here | Size |
 |---|---|---|---|---|---|
-| **2-1** | **Shape-transition cache** — an `oldShapeId → (newShape, slot)` entry. Absent entirely | P1-3 | `Runtime/ObjectShape.cs`, `Runtime/JSObject.PropertyStorage.cs` | *Creating* a property misses every time, so every constructor that builds an object field-by-field misses on **every field**. Richards' `TaskControlBlock`, DeltaBlue's constraints, RayTrace's `Vector`, Box2D's `b2Vec2` are all exactly this shape | M |
+| **2-1** | **A store-cache entry that can describe a property *creation*** — `(shapeIdBefore → slot, shapeIdAfter)` | P1-3 | `Runtime/ObjectShape.cs`, `Runtime/JSObject.PropertyStorage.cs` | *Creating* a property misses every time, so every constructor that builds an object field-by-field misses on **every field**. **Measured: 0 hits / 600 000 misses** for 200 000 three-field constructions. Richards' `TaskControlBlock`, DeltaBlue's constraints, RayTrace's `Vector`, Box2D's `b2Vec2` are all exactly this shape | M |
 | **2-2** | **Widen shape eligibility** past `GetType() == typeof(JSObject)` | P1-4 | `Runtime/JSObject.cs:203` — `TryGetShapeSlot` | `JSArray`, `JSFunction` and every built-in exotic are excluded wholesale. **Start with `JSArray`** — it is on the hot path of five benchmarks | M |
 | **2-3** | **Remove the double storage** | P1-4 | `Runtime/JSObject.cs:97,:188` — `TrackShapeDataProperty` | Every tracked object writes each value into `shapeSlots` *and* the `PropertySequence`, storing twice and paying to keep them in sync. Pure removal | S |
 | **2-4** | **Extend the store cache** to `o.x++`, `o.x += 1`, computed keys, `super`, optional chains, private names | P1-3 | `.Compiler` lowering; `Runtime/ObjectShape.cs` | All keep the old uncached lowering. `o.x++` measured the most expensive and is pervasive in Gameboy and Box2D | M |
 | **2-5** | **Get strictness off the property-write path** | P0-2 | `Engine/Core/JSEngine.cs:223`; `JSValue` set accessors | P0-2 removed the redundant *writes*, but set accessors still **resolve** an `AsyncLocal<bool>` per write. The preferred fix — threading the compiler's static knowledge into the emitted set helpers so the hot path reads nothing — is not started | M |
 | **2-6** | **Monomorphic call-site caching** | new | `BuiltIns/Function/JSFunction.cs` — `InvokeFunction`, `SelectInvocationDelegate` | Callee resolution repeats per call. **Prerequisite for inlining in phase 4** | M |
 
-**Sequence.** 2-1 first (largest single win, and the missing half of a structure that
+> **2-1 was named after the wrong missing thing.** It called for "a shape-transition cache
+> — an `oldShapeId → (newShape, slot)` entry. Absent entirely." That cache **is present**:
+> `ObjectShape.Add` memoizes each transition in a `ConcurrentDictionary<uint, ObjectShape>`,
+> so adding `x` to a given shape always yields the same successor shape without rebuilding
+> it. The measurement shows it working — 200 000 three-field constructions produce **3**
+> shape transitions in total, one per field, not 600 000.
+>
+> The item's *rationale* is nevertheless exactly right, and measured: **0 store-cache hits
+> against 600 000 misses.** What is absent is a **store-site** entry that can describe a
+> property *creation*. `PropertyStoreInlineCache` only ever records
+> `(shapeIdAfterTheWrite, slot)` and hits through `TryWriteShapeSlot`, which requires the
+> property to exist already — so on the next object the site sees the *predecessor* shape and
+> misses, forever. The fix is a second entry form keyed on the shape *before* the write.
+>
+> Its guards are the work, not the entry: creating a property is
+> `OrdinarySetWithOwnDescriptor` reaching `CreateDataProperty`, so a hit must also establish
+> that the receiver is extensible and that nothing on the prototype chain supplies a setter
+> or a non-writable data property for the key. The read cache's prototype form already
+> carries exactly those guards (receiver-prototype identity plus the global version), and
+> 2-0 is what makes them worth having — until now that version advanced on every allocation.
+
+**Sequence.** 2-0 ✅, then 2-1 (largest single win, and the missing half of a structure that
 otherwise works), then 2-3 (pure removal, near-zero risk), then 2-2, 2-4, 2-5, 2-6.
 
 **Verify — per item, not per phase.**
@@ -959,7 +1059,7 @@ pinned RegExp corpus is clean.
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | **2-1** → 2-3 → 2-2 → 2-4 → 2-5 → 2-6 | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode; **DeltaBlue and Richards inside 200×** |
+| **2** | 2-0 ✅ → **2-1** → 2-3 → 2-2 → 2-4 → 2-5 → 2-6 | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode; **DeltaBlue and Richards inside 200×** |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
@@ -1124,7 +1224,8 @@ Where each item came from, so existing cross-references still resolve.
 | 1-1, 1-3 | *excluded by engine §9* | 1-1, 1-3 | Open — superseded, see §1.1 |
 | 1-2 mitigation | *excluded by engine §9* | 1-2 | **Landed** — `patches/0049`, pending submodule push |
 | 1-2 real fix | — | 1-2 | Open — repair `StackGuard`, which cannot fire today |
-| 2-1, 2-4 | P1-3 remainders | 2-1, 2-4 | Open |
+| 2-0 | — (P1-2's guard, reached in a state it cannot recognise) | — | **Landed** — `patches/0050`, pending submodule push |
+| 2-1, 2-4 | P1-3 remainders | 2-1, 2-4 | Open — 2-1's premise measured, its stated mechanism corrected |
 | 2-2, 2-3 | P1-4 remainders | 2-2, 2-3 | Open |
 | 2-5 | P0-2 remainder | 2-5 | Open |
 | 2-6 | — | 2-6 | Open |
