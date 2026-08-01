@@ -299,21 +299,21 @@ internal static partial class Program
             MeasureNanosecondsPerOperation("css.selector-match", "Run repeated Selectors Level 4 matches through querySelectorAll", 12, 1000, () =>
             {
                 using var context = new JSContext();
-                var bridge = new DomBridge();
+                using var bridge = new DomBridge();
                 bridge.Attach(context, BenchmarkSamples.CssBridgeDocument, "https://example.test/");
                 context.Eval("for (var i = 0; i < 1000; i++) document.querySelectorAll('#host > .card[data-state=\"active\"]:nth-child(2)');");
             }),
             MeasureNanosecondsPerOperation("css.computed-style", "Resolve and read a cached computed style through the bridge", 12, 1000, () =>
             {
                 using var context = new JSContext();
-                var bridge = new DomBridge();
+                using var bridge = new DomBridge();
                 bridge.Attach(context, BenchmarkSamples.CssBridgeDocument, "https://example.test/");
                 context.Eval("var target = document.getElementById('target'); for (var i = 0; i < 1000; i++) window.getComputedStyle(target).getPropertyValue('margin-left');");
             }),
             MeasureNanosecondsPerOperation("css.invalidation", "Invalidate class-dependent style and recompute it through the bridge", 12, 250, () =>
             {
                 using var context = new JSContext();
-                var bridge = new DomBridge();
+                using var bridge = new DomBridge();
                 bridge.Attach(context, BenchmarkSamples.CssBridgeDocument, "https://example.test/");
                 context.Eval("var target = document.getElementById('target'); for (var i = 0; i < 250; i++) { target.className = i % 2 ? 'card active' : 'card'; window.getComputedStyle(target).getPropertyValue('color'); }");
             }),
@@ -325,28 +325,28 @@ internal static partial class Program
             MeasureNanosecondsPerOperation("bridge.dom-call", "Repeated document.getElementById().getAttribute() calls", 12, 2000, () =>
             {
                 using var context = new JSContext();
-                var bridge = new DomBridge();
+                using var bridge = new DomBridge();
                 bridge.Attach(context, BenchmarkSamples.BridgeDocument, "https://example.test/");
                 context.Eval("for (var i = 0; i < 2000; i++) { document.getElementById('target').getAttribute('data-value'); }");
             }),
             MeasureNanosecondsPerOperation("bridge.mutation", "Repeated textContent mutations through the DOM bridge", 12, 500, () =>
             {
                 using var context = new JSContext();
-                var bridge = new DomBridge();
+                using var bridge = new DomBridge();
                 bridge.Attach(context, BenchmarkSamples.BridgeDocument, "https://example.test/");
                 context.Eval(@"var host = document.getElementById('host'); for (var i = 0; i < 500; i++) { var item = document.createElement('span'); item.textContent = 'node-' + i; host.appendChild(item); }");
             }),
             MeasureMilliseconds("bridge.serialize", "Attach and serialize the bridge-owned DOM", 15, () =>
             {
                 using var context = new JSContext();
-                var bridge = new DomBridge();
+                using var bridge = new DomBridge();
                 bridge.Attach(context, BenchmarkSamples.HtmlDocument, "https://example.test/");
                 _ = bridge.SerializeToHtml();
             }),
             MeasureMilliseconds("bridge.render-handoff", "Serialize the bridge-owned DOM and reparse it for raster rendering", 10, () =>
             {
                 using var context = new JSContext();
-                var bridge = new DomBridge();
+                using var bridge = new DomBridge();
                 bridge.Attach(context, BenchmarkSamples.HtmlDocument, "https://example.test/");
                 var serialized = bridge.SerializeToHtml();
                 using var bitmap = HtmlRender.RenderToImageWithStyleSet(
@@ -355,7 +355,7 @@ internal static partial class Program
             MeasureMilliseconds("bridge.typed-render-handoff", "Hand the canonical DOM directly to layout without serialization or reparsing", 10, () =>
             {
                 using var context = new JSContext();
-                var bridge = new DomBridge();
+                using var bridge = new DomBridge();
                 bridge.Attach(context, BenchmarkSamples.HtmlDocument, "https://example.test/");
                 using var container = CreateHtmlContainer();
                 container.MaxSize = new SizeF(1024, 768);

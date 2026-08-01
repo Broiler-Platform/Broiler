@@ -157,21 +157,35 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             using JSContext context = moduleContext ?? new JSContext();
             RegisterRuntimeExtensions(context);
             var bridge = _domBridgeFactory.Create();
-            bridge.Csp = Csp;
-            bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
+            try
+            {
+                bridge.Csp = Csp;
+                bridge.TaskCheckpointCallback = () => MicroTasks.Drain();
 
-            if (!string.IsNullOrEmpty(url))
-                bridge.Attach(context, html, url);
-            else
-                bridge.Attach(context, html);
+                if (!string.IsNullOrEmpty(url))
+                    bridge.Attach(context, html, url);
+                else
+                    bridge.Attach(context, html);
 
-            // Event-loop ordering (EL-3): run the synchronous script phases (regular → deferred → modules)
-            // with only microtask checkpoints between them, then — after the window load event — drain the
-            // timer queue to completion. So a timer scheduled by an early script fires after all script
-            // execution (in deadline order), not eagerly between scripts, matching the HTML task model.
-            RunPageScripts(context, bridge, moduleContext, scripts, deferredScripts, url, roots,
-                _ => MicroTasks.Drain(), DrainAsyncWork, "ScriptEngine.Execute");
-            return createResult(bridge);
+                // Event-loop ordering (EL-3): run the synchronous script phases (regular → deferred → modules)
+                // with only microtask checkpoints between them, then — after the window load event — drain the
+                // timer queue to completion. So a timer scheduled by an early script fires after all script
+                // execution (in deadline order), not eagerly between scripts, matching the HTML task model.
+                RunPageScripts(context, bridge, moduleContext, scripts, deferredScripts, url, roots,
+                    _ => MicroTasks.Drain(), DrainAsyncWork, "ScriptEngine.Execute");
+                return createResult(bridge);
+            }
+            finally
+            {
+                // This path owns the bridge — unlike ExecuteInteractive, which hands it to the
+                // returned InteractiveSession — so the per-document session (layout view and its
+                // container, timers, listeners, observers) is released here instead of leaking one
+                // per executed page. `createResult` has already run, and it yields either
+                // serialized HTML or an isolated render projection; neither reads bridge state
+                // afterwards. Runs before the enclosing `using` releases the borrowed JSContext.
+                // The cast is because IDomBridgeRuntime is not IDisposable (see DomBridge.Lifetime).
+                (bridge as IDisposable)?.Dispose();
+            }
         }
         finally
         {
