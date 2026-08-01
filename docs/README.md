@@ -10,6 +10,7 @@ conformance, and implementation work belongs with that component.
 | Document | Purpose |
 | --- | --- |
 | [Root roadmap](ROADMAP.md) | The unfinished cross-repository work and its exit gates |
+| [Performance and benchmark roadmap](performance-roadmap.md) | JavaScript execution speed: the phased plan, the Octane and probe metrics it is judged on, and the evidence each phase still owes. Spans the `tests/octane` harness and the `Broiler.JS` engine |
 | [WPT rendering gaps](wpt-rendering-gaps.md) | The worst-scoring WPT pixel mismatches, the capability each one is missing, and its owning component |
 | [HtmlBridge architecture](architecture/htmlbridge.md) | Current bridge assemblies, ownership boundaries, and public seams |
 | [Browser WebAssembly architecture](architecture/browser-webassembly.md) | Current browser-host, rendering, input, and support decisions |
