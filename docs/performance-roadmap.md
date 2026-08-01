@@ -409,7 +409,9 @@ machine code comes out, so this is not "an interpreter" — but it is compiled o
 generically, with no knowledge of the types that will flow through it. Every `+` is a
 runtime helper implementing the full §13.15 algorithm. **No JS-into-JS inlining is the
 sharpest sub-case**: Richards and DeltaBlue are built out of one-line methods, which
-is why they have the worst throughput ratios. → **phase 4**
+is why they have the worst throughput ratios. Now with a number on it — **a call costs
+~250–300 ns, about thirteen times the entire loop body it replaces**, and none of that is
+callee resolution (2-6). → **phase 4**
 
 **B3 · Shapes and inline caches cover only a slice of the object model.** The
 structures work well on the sites they cover; what they do not cover maps one-to-one
@@ -967,7 +969,7 @@ Landed as `patches/0051-js-store-cache-property-creation.patch`, which applies o
 | **2-3** | **Remove the double storage** — *re-specified and re-sized; see below* | P1-4 | `Runtime/JSObject.cs:97,:188` — `TrackShapeDataProperty` | Every tracked object writes each value into `shapeSlots` *and* the `PropertySequence`. **Not a pure removal, and its throughput case is ~3% of a worst-case loop.** The dominant per-object cost is elsewhere — see 2-3 below and 2-7 | ~~S~~ **M** |
 | **2-4** | **Extend the store cache** to `o.x++` ✅, `o.x += 1`, computed keys, `super`, optional chains, private names | P1-3 | `.Compiler` lowering | Measured: these reached **neither** cache — 0 hits *and* 0 misses, the counters never saw them. `o.x++`/`o.x--` now take both (**0 → 199 999** each side); `o.x += 1` needs `EvalShadowBuilder` to grow a cached form; computed keys and optional chains stay out on purpose | M |
 | **2-5** | ~~**Get strictness off the property-write path**~~ — **measured; closed, no work worth doing** | P0-2 | `Engine/Core/JSEngine.cs:225`; `JSValue` set accessors | Removing **all 13** resolutions from the write path moves a 30 M-write all-misses loop by **nothing** — median paired ratio 1.013, i.e. marginally the wrong way. P0-2 already took the expensive half (the ExecutionContext *write*); what remains is a read that does not cost. See below | ~~M~~ **closed** |
-| **2-6** | **Monomorphic call-site caching** | new | `BuiltIns/Function/JSFunction.cs` — `InvokeFunction`, `SelectInvocationDelegate` | Callee resolution repeats per call. **Prerequisite for inlining in phase 4** | M |
+| **2-6** | ~~**Monomorphic call-site caching**~~ — **measured; folded into 4-1** | new | `BuiltIns/Function/JSFunction.cs` — `InvokeFunction`, `SelectInvocationDelegate` | "Callee resolution repeats per call" does not describe this engine: the callee is already resolved by the cached property read, and `SelectInvocationDelegate` is a volatile read plus a null check. A call costs **~250–300 ns**, and a call-site cache removes none of it. Its surviving clause — feedback for phase 4's inlining — is **4-1**. See below | ~~M~~ **folded** |
 
 > **2-1 was named after the wrong missing thing.** It called for "a shape-transition cache
 > — an `oldShapeId → (newShape, slot)` entry. Absent entirely." That cache **is present**:
@@ -1153,6 +1155,54 @@ revealing an inherited static. Suite: **7 347 tests across 13 projects, 0 failur
 
 Landed as `patches/0055-js-function-shape-eligibility.patch`, on top of `0054`.
 
+### 2-6 · Monomorphic call-site caching — **measured; folded into 4-1**
+
+The item's stated reason was "callee resolution repeats per call". Read against the code, it
+does not: at a method call site the callee comes from the **cached property read** (measured
+199 999 hits out of 200 000 for `p.get()`), and `SelectInvocationDelegate` is a
+`Volatile.Read` plus a null check on `tieringState`, which is null unless tiering is enabled.
+There is no repeated resolution for a cache to remove.
+
+**What a call actually costs, which this document did not have.** 20 M iterations, script host:
+
+| Shape | Total | Per call |
+|---|--:|--:|
+| `no-call-control` — `s = s + i`, same loop, no call | 399 ms | — |
+| `plain-call` — `s = s + f(i)` | 5 514 ms | **~255 ns** |
+| `method-call` — `s = s + o.m(i)` | 5 059 ms | ~235 ns |
+| `proto-call` — `s = s + p.m(i)` | 5 963 ms | ~280 ns |
+
+**A call costs about thirteen times the entire loop body it replaces.** That ratio is far
+outside any noise this container produces, and it is the concrete number behind B2 — the reason
+Richards and DeltaBlue, which are built out of one-line methods, have the worst throughput
+ratios in the suite.
+
+**Where that quarter-microsecond is, and where it is not.** Not in resolving the callee. It is
+the per-call prologue and epilogue: five `using` scopes (`EnterRealm`, `EnterStrictMode`,
+`SuspendWithScopes`, `PushWithFallbackScopes`, `PushWithScopes`), the `Arguments` construction,
+the frame, the delegate dispatch, and the boxing of the argument and the return. A cost probe
+that removes **all five scopes** — not shippable, they carry realm, strict-mode and `with`
+semantics — moves a call loop by a **single-digit** percentage, and at the load this container
+reached during the run that was not cleanly separable from its own variance (one pair of four
+went 26% the other way). Reported as single-digit and no more precisely than that. The
+remainder is `Arguments`, the frame and the boxing, which is **B1 and phase F territory, not a
+call-site cache**.
+
+> **This refines P3's finding rather than contradicting it.** §3.5 records that P3 "blamed the
+> five `using` scopes around every call, built the fast path, measured it, and found no signal —
+> the scopes never allocated". That was an *allocation* result and it still stands. The probe
+> here is a *time* result on an engine phase F has since changed underneath, and it finds a small
+> but non-zero cost. Both readings agree on the conclusion P3 drew: the scopes are not where the
+> call's cost lives.
+
+**Folded into 4-1, not deferred.** The item's last clause is the part that survives —
+"prerequisite for inlining in phase 4" — and phase 4 already carries it: **4-1 · Type feedback
+collection** says "record and retain observed shapes, **callee identities**, and
+numeric-vs-generic outcomes per site". Recording callee identity is feedback collection, it is
+only useful once 4-2 and 4-4 can consume it, and keeping a duplicate of it in phase 2 as a
+*throughput* item invites someone to build it for a win that is not there. Phase 2 keeps no
+call-path item; the call path is B2, and B2 is phase 4.
+
 ### 2-5 · Get strictness off the property-write path — **measured; closed**
 
 The item's claim was that `JSValue`'s set accessors "**resolve** an `AsyncLocal<bool>` per
@@ -1294,8 +1344,10 @@ wall-clock benchmark reports, and it exists because 2-3 could not be decided wit
 item's *only* surviving justification was memory, and there was no way to measure memory per
 object from a clean checkout. Both 2-3's re-sizing and 2-7 came out of its first run.
 
-**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4's update form ✅ → 2-8 ✅, **2-5 closed on a
-measurement**, then **2-6** and 2-4's compound-assignment half — with **2-3 removed from the near list**
+**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4's update form ✅ → 2-8 ✅; **2-5 closed** and
+**2-6 folded into 4-1**, both on measurements. What is left of this phase is **2-4's
+compound-assignment half** (small, needs `EvalShadowBuilder` to grow a cached form), with 2-3
+re-specified and 2-7 waiting on its distribution measurement — with **2-3 removed from the near list**
 (re-specified, M, superseded in value by 2-7) and **2-7 needing its distribution measurement
 before it can be picked up**.
 
@@ -1418,9 +1470,9 @@ and tested; what is missing is the part that makes entering tier-2 worth anythin
 | # | Item | Where | Note | Size |
 |---|---|---|---|---|
 | **4-3** | **Deoptimization** — **do this first** | `Runtime/FunctionTiering.cs`, `Engine/CallFrames.cs` | The safety net that makes everything else legal. Must bail out **mid-function** when a guard fails; the current model can only swap the delegate for the *next* call. The gating item for the entire phase | XL |
-| **4-1** | **Type feedback collection** | `Runtime/ObjectShape.cs`, `.Compiler` sites | The inline caches already observe shapes at property sites. Extend to record and retain observed shapes, callee identities, and numeric-vs-generic outcomes per site | L |
+| **4-1** | **Type feedback collection** — *now also carries what was 2-6* | `Runtime/ObjectShape.cs`, `.Compiler` sites | The inline caches already observe shapes at property sites. Extend to record and retain observed shapes, **callee identities**, and numeric-vs-generic outcomes per site. Callee identity was phase 2's 2-6 until that item was measured: there is no repeated callee resolution to remove, so recording it is feedback and nothing else, and it pays only once 4-2 and 4-4 consume it | L |
 | **4-2** | **A specializing tier-2 compile** | `BuiltIns/Function/JSFunction.cs` — replace the `numericPlan == null` branch | Consume 4-1's feedback: monomorphic property access → shape check plus direct slot read; arithmetic → raw `double`/`int` where feedback says so | XL |
-| **4-4** | **Inlining of small JS callees** at monomorphic sites | `.Compiler` | What Richards and DeltaBlue actually need. Strictly downstream of 4-3, 4-1, 4-2, **and of 2-6** | XL |
+| **4-4** | **Inlining of small JS callees** at monomorphic sites | `.Compiler` | What Richards and DeltaBlue actually need, and the measurement says why: **a call costs ~250 ns, about thirteen times the loop body it replaces** (2-6). Strictly downstream of 4-3, 4-1 and 4-2 — the callee-identity feedback it needs is 4-1's, not a separate phase-2 item | XL |
 
 **Do not start 4-2 before 4-3 has a design.** Speculation without a mid-function
 bailout is either unsound or restricted to functions with no observable side effect
@@ -1467,7 +1519,7 @@ pinned RegExp corpus is clean.
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 (update form ✅) → 2-8 ✅ → 2-5 closed → **2-6**; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 (update form ✅) → 2-8 ✅; 2-5 closed, 2-6 folded into 4-1; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
@@ -1477,11 +1529,11 @@ pinned RegExp corpus is clean.
 - Phase 0 gates every claim in phases 1–5 *and* retroactively gates closing A–F.
 - Phases 1 and 2 are independent of each other and of phase 5, and can run in parallel.
 - 3-2 is cheaper after 2-1.
-- Phase 4 depends on 2-6 (for 4-4), on 4-3 (for everything else in the phase), and
+- Phase 4 depends on 4-3 (for everything in the phase) and on 4-1 for 4-4's callee feedback — what was 2-6 is now inside 4-1 — and
   benefits from 3-1/3-2 having established unboxed representations to speculate into.
 
 **The bolded item in each phase is the one to start with**, and in three of the five it
-is not the one that sounds most important: 1-1 over 1-3, 2-1 over 2-6, 4-3 over 4-2.
+is not the one that sounds most important: 1-1 over 1-3, 2-1 over 2-2, 4-3 over 4-2.
 Each ordering is argued where the item is described.
 
 **Every phase closes under
@@ -1640,7 +1692,7 @@ Where each item came from, so existing cross-references still resolve.
 | 2-3 | P1-4 remainder | 2-3 | **Re-specified** — not a pure removal, ~3% ceiling, S → M, superseded in value by 2-7 |
 | 2-7 | — (found measuring 2-3) | — | **Sized, not started** — needs an object-size distribution from an Octane run |
 | 2-5 | P0-2 remainder | 2-5 | **Closed** — measured at 0%; P0-2 had already taken the cost, and 2-1 narrowed what was left |
-| 2-6 | — | 2-6 | Open |
+| 2-6 | — | 2-6 | **Folded into 4-1** — no callee resolution to cache; a call costs ~250 ns and a call-site cache removes none of it |
 | 3-1, 3-2 | — | 3-1, 3-2 | Open |
 | 3-3 | P2-2 item 3 remainder | 3-3 | Open |
 | 3-4 | — (`tagged-js-value` in ownership.json) | 3-4 | Cost, do not start |
