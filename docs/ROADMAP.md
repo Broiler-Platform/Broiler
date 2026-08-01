@@ -2,7 +2,7 @@
 
 - **Status:** Active preview
 - **Scope:** Only unfinished work that crosses component or application boundaries
-- **Last reconciled:** 2026-07-30
+- **Last reconciled:** 2026-08-01
 
 Component-local work is tracked in the roadmaps linked from
 [the documentation index](README.md). This file does not repeat completed
@@ -106,6 +106,74 @@ The current WPT artifacts remain the evidence source:
 **Exit gate:** every published claim names its corpus revision, environment,
 metric, tolerances, skips, and reproducible command; regressions are assigned to
 one owning component.
+
+### Bound what a large text node costs to render
+
+**Current evidence:** the WPT runner charges each test the *growth* of the
+rendering process's resident set and aborts it past
+`BROILER_WPT_MEMORY_LIMIT_MB` (default 1024 MiB; see
+[`WptMemoryGuard`](../src/Broiler.Wpt/WptMemoryGuard.cs)).
+`editing/crashtests/insertparagraph-in-listitem-in-svg-followed-by-collapsible-spaces.html`
+tripped it in the 2026-08-01 run
+([issue #1508](https://github.com/Broiler-Platform/Broiler/issues/1508) problem
+1), growing from 2092.7 MiB to 6584.4 MiB against a 4096 MiB cap. The test
+creates no elements from script: it builds one text node of 336,860,180 spaces —
+a **642 MiB** string — and the pipeline was carrying roughly eight copies of it.
+
+Attribution was measured stage by stage with `GC.GetTotalAllocatedBytes` on a
+scaled-down payload, since the cost is linear in the text: **10.8 bytes
+allocated per byte of text** before the change, **6.8 after**. Per byte of text,
+*peak* resident set fell from **7.75× to 6.01×** (slope across 8M/32M/64M-space
+documents). Three redundant copies were removed. The stages below account for
+10.1× and 6.1× of those totals; the small remainder is fixed engine startup,
+which does not scale with the text:
+
+| Stage | Before | After | Owner |
+| --- | --- | --- | --- |
+| Script execution + DOM build | 4.0× | 2.0× | `Broiler.JS` |
+| `SerializeToHtml` | 2.0× | 2.0× | HtmlBridge |
+| `HtmlPostProcessor.Process` | 1.0× | 1.0× | main repo |
+| Parse + layout + paint | 3.1× | 1.1× | `Broiler.DOM` |
+
+`String.prototype.repeat` and the template-literal builder each filled a
+`StringBuilder` and then materialised it, peaking at two full-size buffers; both
+now allocate once. The tokenizer's data state appended character data one
+character at a time, paying both the builder's copy and the string made from it;
+whole runs are now taken in one step and emitted straight from the input.
+End to end on the test itself, peak fell **4775.2 MiB → 3959.8 MiB (−17%)** and
+wall time **6.7 s → 3.1 s**.
+
+**That clears the 4096 MiB cap that run used by only about 9%, and does not
+bring the test within the workflow's default 1024 MiB cap** — the JavaScript
+string alone is 642 MiB before the DOM holds a copy, so no amount of copy
+removal reaches 1024 MiB. Closing the gap needs fewer pipeline stages, not
+cheaper ones.
+
+**Next actions:**
+
+1. Render from the projected `DomDocument` rather than round-tripping through an
+   HTML string. `DomBridge.GetRenderDocument` and
+   `HtmlParser.ParseDocument(DomDocument, …)` already exist, so the string form
+   is avoidable; it currently costs 2× to serialize, 1× to post-process and 1×
+   to re-parse. This is the single largest remaining item — about 4 of the
+   6 copies — and it is the same seam as Phase 0 action 2's neutral render input,
+   so sequence it with that rather than duplicating the work.
+2. Give `HtmlPostProcessor.Process` a DOM-based path, or confirm every pass is a
+   no-op that returns its input unchanged, so a document that needs no rewrite is
+   not copied. Today one pass matches and copies the whole document.
+3. Decide the policy for a legitimately enormous DOM string. The guard's cap is
+   growth-based and per test, and a 642 MiB text node is legal content; either
+   raise the cap for `/crashtests/` (whose contract is only "must not crash"), or
+   record such tests as expected `MemoryLimitExceeded` so the number stops moving
+   with unrelated work.
+4. Re-run the suite and confirm the test's reported growth against the cap the
+   workflow actually uses, rather than inferring it from the local figures above.
+
+**Exit gate:** rendering a document costs a bounded, documented multiple of its
+text — no pipeline stage copies the document more than once — and every memory
+abort in a published run names the measured cause, distinguishing string-copy
+cost from the per-element wrapper cost in
+[Phase 0](#phase-0--trustworthy-gates-and-a-non-destructive-seam).
 
 ## Browser WebAssembly
 
@@ -605,37 +673,43 @@ public neutral `Broiler.HTML` contract.
    channels with immutable layout-request/session options.
 4. Record HTML, geometry, and pixel parity baselines for the projection cutover.
    Do not add new one-shot serialization transforms.
-- Give the element JS wrapper a shared prototype instead of a per-instance
-  surface. `DomBridge.ToJSObject` installs the whole element API — every
-  reflector, method, `style`, `classList`, `dataset` — onto each wrapper object,
-  so one script-created element costs **~550 KiB** of retained memory. Measured
-  on this container (peak RSS of `Broiler.Wpt --render`, 107 MiB baseline):
+5. Give the element JS wrapper a shared prototype instead of a per-instance
+   surface. `DomBridge.ToJSObject` installs the whole element API — every
+   reflector, method, `style`, `classList`, `dataset` — onto each wrapper object,
+   so one script-created element costs **~550 KiB** of retained memory. Measured
+   on this container (peak RSS of `Broiler.Wpt --render`, 107 MiB baseline):
+
+   | Page | Peak RSS |
+   | --- | --- |
+   | 10 000 `<span>`s in the markup (no wrapper) | 223 MiB |
+   | 4 000 `document.createElement("span")`, never inserted | 2 290 MiB |
+   | 4 000 created and appended | 2 294 MiB |
+
+   The cost is linear per created element and attaches to `createElement` itself,
+   not to insertion, layout, or style: creating the wrapper is what allocates. It
+   crosses the bridge and the JS engine's object model, so it cannot be fixed
+   inside either alone. `css/css-variables/url-syntax-crash.html` (issue #1491
+   problem 2) is a test the guard aborts for this reason; the custom property in
+   it is incidental, since a bare 10 000-span loop blows the same limit.
+
+   **This is not the only cause of a memory abort, and one test was filed here
+   wrongly.** `editing/crashtests/insertparagraph-in-listitem-in-svg-followed-by-collapsible-spaces.html`
+   was recorded as the same wrapper cost. It is not: the test creates no elements
+   from script at all — it builds a single text node of 336,860,180 spaces, and
+   what the guard was charging it for is the render pipeline copying that string.
+   That is tracked separately in
+   [Bound what a large text node costs to render](#bound-what-a-large-text-node-costs-to-render),
+   and reducing the string copies moved it while the wrapper cost was untouched.
+   Attribute a memory abort by measuring it before adding it to either item.
 
 **Exit gate:** all repaired guards pass; two simultaneous sessions can use
-different renderer/layout configuration; a render pass is non-destructive; and
-old and new projection paths have recorded HTML, geometry, and pixel baselines.
-  | Page | Peak RSS |
-  | --- | --- |
-  | 10 000 `<span>`s in the markup (no wrapper) | 223 MiB |
-  | 4 000 `document.createElement("span")`, never inserted | 2 290 MiB |
-  | 4 000 created and appended | 2 294 MiB |
-
-  The cost is linear per created element and attaches to `createElement` itself,
-  not to insertion, layout, or style: creating the wrapper is what allocates.
-  This is what the WPT runner's per-test memory guard reports as
-  `Program.Main — Test aborted after exceeding the … per-test memory limit`
-  (issue #1491 problems 2 and 3: `css/css-variables/url-syntax-crash.html` and
-  `editing/crashtests/insertparagraph-in-listitem-in-svg-followed-by-collapsible-spaces.html`,
-  both of which create ~10 000 elements from script — the custom property in the
-  first is incidental, a bare 10 000-span loop blows the same limit). It crosses
-  the bridge and the JS engine's object model, so it cannot be fixed inside
-  either alone.
-
-**Exit gate:** all execution surfaces use the same ordered scheduling model,
-session dependencies are instance-scoped, native zoom/top-layer behavior is
-enabled for every supported consumer, a script-created element's wrapper costs a
-constant handful of bytes over its canonical node, and focused plus broad
-regression gates remain green.
+different renderer/layout configuration; a render pass is non-destructive; old
+and new projection paths have recorded HTML, geometry, and pixel baselines; all
+execution surfaces use the same ordered scheduling model; session dependencies
+are instance-scoped; native zoom/top-layer behavior is enabled for every
+supported consumer; a script-created element's wrapper costs a constant handful
+of bytes over its canonical node; and focused plus broad regression gates remain
+green.
 
 #### Phase 1 — pure promotions and quick deletions
 
