@@ -285,6 +285,15 @@ These were paid for once each. They apply to every phase below.
   present and working — while being exactly right about the symptom it predicted. *An item
   can be worth doing and still be wrong about why; a control run tells you which half you
   have.*
+- **"Pure removal" is a claim about the code, and it is usually wrong.** 2-3 proposed deleting
+  one of two stores. They serve different access paths, so neither can go; the item's real
+  content was a storage-layer redesign, and its measured ceiling was 3% of the most favourable
+  workload available. *Before writing "pure removal", delete the thing in a scratch build and
+  see what breaks — here it took one probe, and the wrong answer it returned was the proof.*
+- **An item can be overtaken by the items after it.** 2-3 was written when a store cost two
+  key lookups; P1-3 and 2-1 removed the second, so most of its value was collected before
+  anyone reached it. *Re-measure an item's premise when the work before it lands, not only
+  when it is written.*
 - **Compare against the right pair.** Pooling frames measured as "no cost" against
   *allocating* them. Against an array slot it was worth 11%. The first comparison
   showed recycling costs about what allocating costs — not that either is free.
@@ -403,7 +412,7 @@ onto benchmarks. → **phase 2**
 | Shape eligibility is `GetType() == typeof(JSObject)` — `JSArray`, `JSFunction`, every exotic excluded | Crypto, NavierStokes, Gameboy, zlib |
 | No shape-transition cache — *creating* a property misses every time | Richards, DeltaBlue, RayTrace, Box2D |
 | `o.x++`, `o.x += 1`, computed keys, `super`, optional chains, private names keep the old lowering | Richards, Gameboy, Box2D |
-| Double storage in `TrackShapeDataProperty` | everything |
+| Double storage in `TrackShapeDataProperty` | everything — but **measured at ~3% of a worst-case store loop and 4.5% of an object's bytes**; see 2-3, which is re-specified, and 2-7, which is where the memory actually goes |
 
 A fifth gap belongs on that list and is **fixed**: every `new` published a global
 prototype-mutation notice, so a prototype-keyed entry could not survive a loop that
@@ -940,7 +949,7 @@ Landed as `patches/0051-js-store-cache-property-creation.patch`, which applies o
 | # | Item | Origin | Where | Why it matters here | Size |
 |---|---|---|---|---|---|
 | **2-2** | **Widen shape eligibility** past `GetType() == typeof(JSObject)` | P1-4 | `Runtime/JSObject.cs:203` — `TryGetShapeSlot` | `JSArray`, `JSFunction` and every built-in exotic are excluded wholesale. **Start with `JSArray`** — it is on the hot path of five benchmarks | M |
-| **2-3** | **Remove the double storage** | P1-4 | `Runtime/JSObject.cs:97,:188` — `TrackShapeDataProperty` | Every tracked object writes each value into `shapeSlots` *and* the `PropertySequence`, storing twice and paying to keep them in sync. Pure removal | S |
+| **2-3** | **Remove the double storage** — *re-specified and re-sized; see below* | P1-4 | `Runtime/JSObject.cs:97,:188` — `TrackShapeDataProperty` | Every tracked object writes each value into `shapeSlots` *and* the `PropertySequence`. **Not a pure removal, and its throughput case is ~3% of a worst-case loop.** The dominant per-object cost is elsewhere — see 2-3 below and 2-7 | ~~S~~ **M** |
 | **2-4** | **Extend the store cache** to `o.x++`, `o.x += 1`, computed keys, `super`, optional chains, private names | P1-3 | `.Compiler` lowering; `Runtime/ObjectShape.cs` | All keep the old uncached lowering. `o.x++` measured the most expensive and is pervasive in Gameboy and Box2D | M |
 | **2-5** | **Get strictness off the property-write path** | P0-2 | `Engine/Core/JSEngine.cs:223`; `JSValue` set accessors | P0-2 removed the redundant *writes*, but set accessors still **resolve** an `AsyncLocal<bool>` per write. The preferred fix — threading the compiler's static knowledge into the emitted set helpers so the hot path reads nothing — is not started | M |
 | **2-6** | **Monomorphic call-site caching** | new | `BuiltIns/Function/JSFunction.cs` — `InvokeFunction`, `SelectInvocationDelegate` | Callee resolution repeats per call. **Prerequisite for inlining in phase 4** | M |
@@ -957,8 +966,107 @@ Landed as `patches/0051-js-store-cache-property-creation.patch`, which applies o
 > property *creation*, which is what landed — the item above says what it took. The lesson is
 > in §3.5: an item can be worth doing and still be wrong about why.
 
-**Sequence.** 2-0 ✅ → 2-1 ✅, then 2-3 (pure removal, near-zero risk), then 2-2, 2-4, 2-5,
-2-6.
+### 2-3 · Remove the double storage — **re-specified; do not start as written**
+
+Measured before starting, and the item does not survive it. Three things are wrong.
+
+**It is not a pure removal.** The two stores serve two different access paths. A cached read
+takes `shapeSlots[slot]` — an array index; the generic path takes `ownProperties`, a radix
+trie keyed by *name*. Deleting `shapeSlots` would put a trie walk back on the path phases C
+and D exist to keep off it, and deleting the value from `ownProperties` would put a shape
+lookup on every generic read, every descriptor query and every enumeration. Neither is a
+deletion. *Demonstrated, not argued*: a cost probe that removed only the `ownProperties`
+write left the store loop's own answer correct and made a later cold read of the same
+property return the **stale** value, because that read resolved generically.
+
+**Its throughput case is ~3%, of the most store-heavy workload that exists.** Same build,
+one line differing, four interleaved pairs of a 20 M-iteration pure-overwrite loop: **median
+of paired ratios 0.971**, every pair the same direction. That is the ceiling, not the
+expected win — and it is unreachable anyway, because the write cannot simply be removed.
+
+**Most of what it was aiming at has already been collected.** The item was written when a
+store cost *two* key lookups: `ownProperties.Put` walked the trie and then
+`TrackShapeDataProperty` looked the key up again in the shape. P1-3 and 2-1 removed the
+second from both cached paths — `TryWriteShapeSlot` and `TryCreateShapeSlot` each do one trie
+access plus a cached slot. The double *lookup* is gone from the hot paths. Only the double
+*storage* remains, which is a memory question.
+
+**So it is a memory item, and the memory is not where the item said.** Measured with the new
+`--object-alloc` emitter (below), a `JSValue[4]` slot array is ~56 B of a 1 256 B
+constructor-built three-field object — **4.5%**. What the same measurement found instead is
+2-7.
+
+**If someone does take it on**, the only shape that stores the value once while keeping O(1)
+slot access is for a slot to hold a stable `PropertySequence` node index rather than the value
+itself, so `shapeSlots` becomes a `uint[]` and the read is one more indirection. Node indices
+are stable — `PropertySequence` already uses them as its `Previous`/`Next` links — but the
+backing `VirtualMemory<T>` relocates on growth, so a `ref` is not. That is a storage-layer
+change with real questions about node identity across trie restructuring, deletes and
+deferred cells. **M, not S**, and it should be re-justified against 2-7 first.
+
+### 2-7 · The property map's 16-node floor costs ~1 KB per object — **sized, not started**
+
+Numbered 2-7 because it was not on this list either; it came out of measuring 2-3. Bytes per
+object, warmed then measured after a forced gen2 collection, field values small integer
+constants so a row difference is structure rather than contents:
+
+| Object | B/object |
+|---|--:|
+| `{}` | 192 |
+| `{ a: 1, b: 2, c: 3 }` | 1 168 |
+| `new T()`, empty body | 216 |
+| `new T()`, **one** field | **1 256** |
+| `new T()`, **three** fields | **1 256** |
+| `new T()`, eight fields | 2 712 |
+| `class C`, three fields | 1 448 |
+| `Object.create(null)` + three fields | 1 224 |
+
+**One field costs the same as three, and both cost ~1 040 B more than no fields at all.** The
+per-object cost is a fixed block, not per-field storage: `SAUint32Map` allocates its trie
+nodes from a `VirtualMemory<T>` whose first allocation rounds up to **16 nodes**, and a node
+is a whole `JSObjectProperty` — a descriptor plus two link fields. One property therefore
+reserves sixteen descriptors' worth of memory and uses one. The block covers the first four
+node groups, which is why fields two and three are free, and the step to eight fields is the
+next block.
+
+**This is a trade, not an oversight, which is why it is sized rather than started.** Two
+alternative growth policies, measured:
+
+| Policy | 1 field | 3 fields | 8 fields |
+|---|--:|--:|--:|
+| round up to 16 (current) | 1 256 | 1 256 | 2 712 |
+| round up to 4 | **584** (−53%) | **1 056** (−16%) | 3 432 (**+27%**) |
+| minimum 4, then double capacity | **584** | **1 056** | 3 880 (**+43%**) |
+
+A smaller floor makes a one-field object less than half the cost and a three-field object 16%
+cheaper, and makes an eight-field object worse by paying repeated resize-and-copy. The 16-node
+floor is buying amortized growth for medium objects with memory that small objects do not use.
+
+**What decides it is the size distribution of real objects, which no synthetic probe can
+supply.** Every object phase 2 names is small — Richards' `TaskControlBlock`, DeltaBlue's
+constraints, RayTrace's `Vector` (3), Box2D's `b2Vec2` (2) — which argues for the smaller
+floor. But "small objects dominate" is exactly the kind of premise this document has now been
+wrong about twice. **Instrument the distribution over an Octane run first**, then pick the
+floor, and consider a policy that is small at the bottom and geometric only after the first
+block rather than one constant for both. Related to **B1**: this is a large part of what makes
+the allocation rate severe, and unlike B1 proper it needs no change to value representation.
+
+**Size: S for the change, M for the measurement that justifies it.**
+
+#### `--object-alloc`, and why the corpus grew again
+
+`ObjectAllocationMetrics` in `Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks`
+emits the table above as JSON, by the Appendix A method — forced gen2 collection, then
+`GC.GetAllocatedBytesForCurrentThread()` deltas over 50 000 objects, warmed first so
+compilation, key strings, shapes and cache entries land outside the measured run. It joins
+`--cache-metrics` (hit rates) and `--sparse-metrics` as a standing emitter for a quantity no
+wall-clock benchmark reports, and it exists because 2-3 could not be decided without it: the
+item's *only* surviving justification was memory, and there was no way to measure memory per
+object from a clean checkout. Both 2-3's re-sizing and 2-7 came out of its first run.
+
+**Sequence.** 2-0 ✅ → 2-1 ✅, then 2-2, 2-4, 2-5, 2-6 — with **2-3 removed from the near
+list** (re-specified, M, and superseded in value by 2-7) and **2-7 needing its distribution
+measurement before it can be picked up**.
 
 **Verify — per item, not per phase.**
 
@@ -1128,7 +1236,7 @@ pinned RegExp corpus is clean.
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → **2-3** → 2-2 → 2-4 → 2-5 → 2-6 | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
+| **2** | 2-0 ✅ → 2-1 ✅ → **2-2** → 2-4 → 2-5 → 2-6; 2-3 re-specified (M), 2-7 needs its measurement | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1**; **DeltaBlue and Richards inside 200×** |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
@@ -1296,7 +1404,9 @@ Where each item came from, so existing cross-references still resolve.
 | 2-0 | — (P1-2's guard, reached in a state it cannot recognise) | — | **Landed** — `patches/0050`, pending submodule push |
 | 2-1 | P1-3 remainder | 2-1 | **Landed** — `patches/0051`, pending submodule push; **test262 owed** |
 | 2-4 | P1-3 remainder | 2-4 | Open |
-| 2-2, 2-3 | P1-4 remainders | 2-2, 2-3 | Open |
+| 2-2 | P1-4 remainder | 2-2 | Open |
+| 2-3 | P1-4 remainder | 2-3 | **Re-specified** — not a pure removal, ~3% ceiling, S → M, superseded in value by 2-7 |
+| 2-7 | — (found measuring 2-3) | — | **Sized, not started** — needs an object-size distribution from an Octane run |
 | 2-5 | P0-2 remainder | 2-5 | Open |
 | 2-6 | — | 2-6 | Open |
 | 3-1, 3-2 | — | 3-1, 3-2 | Open |
