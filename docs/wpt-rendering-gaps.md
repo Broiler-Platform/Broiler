@@ -7,9 +7,14 @@
   problem.
 - **Not in scope:** problem 1 (the `DomDocument.CreateElement` crash) is fixed —
   frames no longer parse a non-HTML resource as markup, and `patches/0035-…`
-  carried the DOM-layer fix (since applied). Problems 2 and 3 (per-test memory
-  aborts) are the per-element JS wrapper cost, tracked in
-  [the root roadmap](ROADMAP.md#htmlbridge-runtime).
+  carried the DOM-layer fix (since applied). Problems 2 and 3 are both per-test
+  memory aborts but have **different causes**, each tracked in the root roadmap:
+  problem 2 (`css/css-variables/url-syntax-crash.html`) is the per-element JS
+  wrapper cost, in [HtmlBridge runtime](ROADMAP.md#htmlbridge-runtime); problem 3
+  (`editing/crashtests/insertparagraph-in-listitem-in-svg-followed-by-collapsible-spaces.html`)
+  creates no elements from script and is the render pipeline copying a 642 MiB
+  text node, in
+  [Bound what a large text node costs to render](ROADMAP.md#bound-what-a-large-text-node-costs-to-render).
 - **Companion documents:** [root roadmap](ROADMAP.md) for cross-component work;
   the component roadmaps own the implementation once an item below names them.
 - **Progress:** problems 6, 7–10, 24, 25, 27, 28 and the `vb` half of
