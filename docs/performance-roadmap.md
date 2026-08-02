@@ -274,6 +274,14 @@ These were paid for once each. They apply to every phase below.
 - **Reproduce on the platform you will close on.** 1-2's repro was a win-x64 Octane run.
   The same suite completes on linux-x64 at the same pointer, so the CI run that was meant
   to confirm it never could. *A one-platform repro dates the item to that platform.*
+- **A formula's stated intent is not its behaviour.** 2-7 read the property map's 16-node floor as
+  "buying amortized growth for medium objects with memory small objects do not use", and sized two
+  alternatives against that reading. The rounding it describes only applies while
+  `last * 2 <= max`, so past the first block the rule grew **linearly** and paid *more* copies than
+  doubling. The floor bought nothing for medium objects; it overcharged small ones, and the
+  replacement won on memory *and* time — including on the suite whose objects were supposed to be
+  the reason for keeping it. *Trace the branch with real numbers before describing what a policy is
+  for.*
 - **A benchmark named as an item's justification is a test that item has to pass.** 2-8 existed
   because of DeltaBlue's 601× score, was measured with a loop written to look like DeltaBlue's hot
   path, and **broke DeltaBlue** — the real suite threw before scoring. The loop reproduced the
@@ -1273,8 +1281,9 @@ corrected in place.
 
 **Octane runs again: 17 of the 18 benchmarks pass.** The one failure — RegExp's
 `Error: Wrong checksum.` — fails identically on a pristine build at the pinned pointer, so it is
-not from this patch. Mandreel exceeded the 300 s smoke budget rather than failing;
-`scripts/octane-suites.json` already gives it 1 200 s for that reason.
+not from this patch. Mandreel passes too — it exceeded a 300 s smoke budget rather than
+failing, and completes on both this build and a pristine one when given the 900 s that
+`scripts/octane-suites.json` already budgets it.
 
 **The fix costs nothing measurable.** All 22 `--cache-metrics` rows are byte-identical before and
 after, including all four function rows at 199 999 — the exclusion is one key wide and the win is
@@ -1440,7 +1449,7 @@ backing `VirtualMemory<T>` relocates on growth, so a `ref` is not. That is a sto
 change with real questions about node identity across trie restructuring, deletes and
 deferred cells. **M, not S**, and it should be re-justified against 2-7 first.
 
-### 2-7 · The property map's 16-node floor costs ~1 KB per object — **instrumented; awaiting its distribution**
+### 2-7 · The property map's 16-node floor costs ~1 KB per object — **landed**
 
 Numbered 2-7 because it was not on this list either; it came out of measuring 2-3. Bytes per
 object, warmed then measured after a forced gen2 collection, field values small integer
@@ -1512,14 +1521,74 @@ for any object carrying a named property, and one field and three fields both la
 block. It also confirmed the trie allocates in groups of four, and that the first block covers four
 groups.
 
-**Still open: the distribution itself, at a sample worth deciding on.** A 3-runs-per-benchmark smoke
-produced only 65 property maps for Richards — Richards creates a handful of `TaskControlBlock`s and
-then passes messages, so map *allocations* are rare even though the suite is long. The run of record
-needs a larger sample and a check that the shares do not move with the run count. **Do not pick a
-floor before that number exists** — this item's whole reason for being sized rather than started is
-that the answer is a distribution, and a converged one is the only kind that settles a trade.
-
 Instrumentation landed as `patches/0057-js-property-map-distribution-metrics.patch`.
+
+#### The distribution, and what it decided — **landed**
+
+14 Octane suites, 30 runs per benchmark, **47 482 058 property maps** (Mandreel set aside for run
+length, not for cause):
+
+| A map's life ends at | Share |
+|---|--:|
+| **1 group** — 4 nodes needed, 16 reserved | **43.9%** |
+| 2 groups | 38.1% |
+| ≤ 4 groups — *inside the old floor* | **87.3%** |
+
+**The reservation was almost never used.** Per-suite spread is wide and worth keeping: EarleyBoyer
+96.4% at one group, Splay 48.6%, PdfJS 47.2%, Typescript 24.8%, RayTrace 4.9%, RegExp 0.1%. The
+aggregate is dominated by Typescript, PdfJS and EarleyBoyer, which supply 41 M of the 47 M maps.
+
+**Converged, checked rather than assumed.** Tripling the sample (16.2 M → 47.5 M maps) moves the
+one-group share from 43.86% to 43.87% and the within-floor share from 87.66% to 87.34%. Only suites
+with a few hundred maps move at all.
+
+| Policy | Live bytes | vs current | Allocated | vs current |
+|---|--:|--:|--:|--:|
+| `round-up-16` — as written | 17.0 GB | 1.000 | 20.7 GB | 1.000 |
+| `round-up-8` | 13.8 GB | 0.813 | 21.8 GB | 1.053 |
+| `round-up-4` | 12.5 GB | 0.733 | 22.4 GB | 1.087 |
+| **`min-4-then-double`** | **9.5 GB** | **0.560** | **16.8 GB** | **0.815** |
+
+**This overturns the table above it, and the reasoning that produced it.** That table predicted
+`min-4-then-double` would be the *worst* option for eight fields (+43%) and read the 16-node floor as
+"buying amortized growth for medium objects". It is not: `((max / N) + 1) * N` only applies while
+`last * 2 <= max`, so past the first block the old rule grew by a **fixed increment — linearly** —
+and paid more copies than doubling, not fewer. The floor was buying nothing for medium objects; it
+was overcharging small ones. Against the real distribution the smaller floor wins on **both** axes.
+
+**The model was validated against reality, not trusted.** Changing the floor for real and re-running
+`--object-alloc`: `ctor-1` goes **1 256.5 → 584.4 B**, a 672.1 B saving against a predicted
+920 → 248 = 672 B, with the 120 B of non-map overhead identical in both builds. The per-shape trade
+the item predicted is confirmed exactly: 1 field **−53%**, 3 fields **−16%**, 8 fields **+27%**.
+
+**Wall clock, four interleaved rounds** (first discarded as warm-up — one `min4` round ran 4× long):
+
+| Workload | Ratio |
+|---|--:|
+| 3-field object literal, 3 M | **0.729** |
+| 3-field constructor, 3 M | **0.800** |
+| 1-field constructor, 3 M | **0.847** |
+| hot property read, 20 M (control) | 1.013 |
+| local arithmetic, 20 M (control) | 1.007 |
+| **8-field constructor, 1.5 M** | **1.193** |
+
+**And on the real suites, which is what settles the tail.** The four suites that build the most
+maps, two interleaved rounds each, whole-process: Typescript **0.916**, Box2D **0.937**, PdfJS
+1.013, EarleyBoyer 1.020. **Typescript has by far the worst tail — a third of its maps outgrow the
+old floor — and it is the suite that gains most.** That is the geometric-growth half paying for the
+smaller-floor half. Nothing among them regresses worth the name. The Octane *correctness* smoke was
+re-run on this build too, not only the unit suite — the lesson 2-8 paid for.
+
+So the trade is real, its losing side is real, and it is worth taking: an 8-field object pays ~27%
+more bytes and ~19% more time, against 43.9% of all maps costing 248 B instead of 920.
+
+**Verify.** Five test cases in `StorageTests`: the first allocation reserving exactly what was asked
+(was 16), a sub-group request still getting a whole group, growth being geometric rather than a fixed
+increment, every slot's contents surviving 50 growths — the policy is only safe because a resize
+copies — and `SAUint32Map` keeping all 2 000 entries across the many resizes the new policy forces. Suite:
+**7 397 tests across 13 projects, 0 failures.**
+
+Landed as `patches/0058-js-property-map-growth-policy.patch`.
 
 #### `--object-alloc`, and why the corpus grew again
 
@@ -1879,7 +1948,7 @@ Where each item came from, so existing cross-references still resolve.
 | 2-2 | P1-4 remainder | 2-2 | **Landed for arrays** — `patches/0053`, pending submodule push; its four named benchmarks were the wrong targets |
 | 2-8 | — (the blocked half of 2-2) | — | **Landed** — `patches/0055`, pending submodule push; both prerequisites fixed. **Shipped a regression that broke DeltaBlue** (a cached store to `f.prototype` bypassed `JSFunction`'s cached-field sync); the gate that fixes it is folded into the same patch |
 | 2-3 | P1-4 remainder | 2-3 | **Re-specified** — not a pure removal, ~3% ceiling, S → M, superseded in value by 2-7 |
-| 2-7 | — (found measuring 2-3) | — | **Instrumented** — `patches/0057` adds `--property-map-distribution`; the floor is 920 B per object with a named property. Still needs the distribution itself at a converged sample before a floor is chosen |
+| 2-7 | — (found measuring 2-3) | — | **Landed** — `patches/0057` (the measurement) and `patches/0058` (the policy), pending submodule push. 43.9% of 47 M real maps never outgrow one four-node group; live map bytes 0.56x, allocated 0.82x, Typescript 0.92x |
 | 2-5 | P0-2 remainder | 2-5 | **Closed** — measured at 0%; P0-2 had already taken the cost, and 2-1 narrowed what was left |
 | 2-6 | — | 2-6 | **Folded into 4-1** — no callee resolution to cache; a call costs ~250 ns and a call-site cache removes none of it |
 | 3-1, 3-2 | — | 3-1, 3-2 | Open |
