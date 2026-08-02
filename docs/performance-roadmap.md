@@ -53,9 +53,9 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | Phase | State |
 |---|---|
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is the critical path** — it is what phases A–F need to close on, and what phase 2's exit criterion is measured by. 0-7, 0-8 follow it |
-| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`). 1-1 open; 1-2's real fix open (`StackGuard` cannot fire today). 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
-| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; only 0-6's CI Octane run is outstanding |
-| **3** — arithmetic | Open. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. The same probe found **3-0** — an indexed access boxes its index, ~32 B on every array read and write — which is larger, has no read-side cost, and goes first. 3-4 is a cost, not a task |
+| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix landed for the validator and emitter passes** (`StackGuard` had three defects and could not fire) — `FastParser` still unguarded. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
+| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
+| **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3 is next.** 3-4 is a cost, not a task |
 | **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
 | **5** — regex | Open. Profile before rewriting |
 
@@ -70,7 +70,7 @@ wall-clock figure is a median of interleaved process-granularity pairs against a
 | 2-4 | `o.x++` and `o.x op= rhs` reached **neither** cache — 0 hits *and* 0 misses. Both now take both, **0 → 199 999** on each side; the compound form went from costing 1.163x the spelled-out equivalent to 1.043x |
 | 2-7 | The property map reserved 16 trie nodes for the first property of any object — **920 B unused**. 43.9% of 47 M real maps never outgrow one four-node group: **live map bytes 0.56x, allocated 0.82x**, and Typescript, the suite with the worst tail, gains most |
 | 2-8 | Statics on a constructor function were a 100% miss — DeltaBlue's hot path — **0 → 199 999**, ~10% on a DeltaBlue-shaped loop. **This item also shipped a regression that broke DeltaBlue outright; the fix is folded into the same patch** |
-| 2-9 | A shape-tracked property cost ~150 B of radix trie to store an 8-byte reference. The trie is no longer written at all while an object is shape-tracked — **a three-field object is 0.36x and an eight-field one 0.15x**, against **+8 B on every object** for the attribute array. Over an Octane run **six in seven property maps are never built**: 16.2 M → 2.5 M, live map bytes 0.15x. All 22 cache rows byte-identical |
+| 2-9 | A shape-tracked property cost ~150 B of radix trie to store an 8-byte reference. The trie is no longer written at all while an object is shape-tracked — **a three-field object is 0.36x and an eight-field one 0.15x**, against **+8 B on every object** for the attribute array. Over an Octane run **six in seven property maps are never built**: 16.2 M → 2.5 M, live map bytes 0.15x. All 22 cache rows byte-identical. **Losing side, measured against a built control: ~20% on compile-and-first-run**, corroborated by Octane CodeLoad at 0.844 |
 
 **Owed.** One thing now gates "landed" becoming "closed":
 
@@ -856,16 +856,40 @@ not the demonstration this item thought it was.
    (pure compilation, no execution). All four nesting shapes that aborted now compile. With
    `BROILER_JS_COMPILE_STACK_BYTES=0` the fixtures below abort the test run, which is what
    makes them decisive rather than merely green.
-2. **Real fix (M) — still open, and it is a repair, not a new mechanism.**
-   `Broiler.JavaScript.ExpressionCompiler/StackGuard.cs` already exists to segment the
-   emitter's recursion and **cannot fire**: it tests `address - start > MaxStackSize` on a
-   stack that grows *downwards*, so the difference is negative and the branch is
-   unreachable. It also truncates stack addresses to `int` and would hop every 1 024
-   bytes if it did fire. `CallFrames.EnsureWithinStackBudget` gets the direction right and
-   says so in a comment; this one does not. Repair it, give it a threshold in megabytes,
-   and hand its segments a sized thread rather than a thread-pool thread — then extend
-   the same treatment to the parser and the validator. **Compiler stack depth should be a
-   function of source *nesting*, not source *size*,** and it still is not.
+2. **Real fix (M) — landed for the two visitor passes; the parser is still open.**
+   `StackGuard` existed to segment the emitter's recursion and **could not fire**, for three
+   independent reasons any one of which was fatal: it tested `address - start > MaxStackSize`
+   on a stack that grows *downwards*, so the difference was negative and the branch
+   unreachable; it truncated 64-bit stack addresses to `int`; and its threshold was **1 024
+   bytes**, so with the sign corrected it would have hopped threads every few frames.
+
+   The rules now live in `ExpressionCompiler/StackSegment.cs` and are shared, because they are
+   exactly what a copy-per-pass got wrong: anchor high, measure `anchor - current` the way
+   `CallFrames.EnsureWithinStackBudget` does, read it unsigned so an upward-growing stack
+   degrades to *never segments* rather than *always*, and hold the threshold in megabytes
+   (4 MiB, `BROILER_JS_VISITOR_SEGMENT_BYTES`, `0` to disable).
+
+   **Two things had to be discovered rather than designed.** Segmentation goes through a new
+   `CompilationStack.RunOnFreshStack`, not `Run`, because `Run` returns *inline* whenever a
+   compilation boundary is already established on the thread — and a segmenter only ever fires
+   from inside one, so routing it through `Run` would have segmented nothing. And the pass that
+   actually overflows first is **not** the emitter: it is `AstReduce.VisitBinaryExpression`
+   under `SyntaxValidation.StrictModeValidator`, whose base `AstMapVisitor<T>` never derived
+   from `StackGuard` at all. Repairing `StackGuard` alone therefore did not move the repro;
+   the same guard had to be put on `AstMapVisitor.Visit`. **`FastParser`'s recursive descent is
+   the third pass and is still unguarded** — that half of the item remains open.
+
+   **Verified by turning each mechanism off independently**, which is the only way to tell which
+   one is doing the work. A 20 000-operator chain through the script host: mitigation on / guard
+   on completes, **mitigation off / guard on completes** — the guard alone — mitigation on /
+   guard off completes, and with **both off the process aborts**. That last row is what makes
+   the other three mean anything. Cost, interleaved on one build with only the environment
+   variable differing: **median paired ratio 1.0027**, i.e. nothing.
+
+   *No unit test pins the guard-alone row.* Doing so means setting `CompilationStack.SizeBytes`
+   to 0, which is a process-wide static that xUnit's parallel classes would race on, so it needs
+   process isolation the fixtures do not have. The four-way matrix above is a manual result, and
+   saying so is better than a test that appears to cover it and does not.
 
 **Verify.** `Broiler.JavaScript.Compiler.Tests/DeeplyNestedSourceTests.cs` — a nested `+`
 chain, a nested conditional, a long flat statement list (kept, so the size case cannot be
@@ -1623,6 +1647,44 @@ word. **An empty object pays 8 bytes; a three-field one saves 680.**
 `--cache-metrics` rows are byte-identical to the pre-change build — every hit, miss, dictionary
 fallback and shape transition — so nothing phase 2 landed is paid for here.
 
+#### It has a losing side, and it is compile throughput
+
+**Measured against a freshly built control at `a6f101cc`, on an idle machine, alternating between
+the two builds so that machine drift could not masquerade as a result:**
+
+| Workload | Control | With 2-9 | Ratio |
+|---|--:|--:|--:|
+| 4 000 × `new Function(…)` **and call each once** | 20 943 ms | 25 780 ms | **1.23** |
+| 2 000 × `new Function(…)`, never called | 5 137 ms | 5 307 ms | 1.03 |
+| 500 000 closure creations | 967 ms | 1 044 ms | 1.05 |
+
+**So the cost is not in compiling — it is in compiling and then running the result once**, which
+is the shape of a define-many-call-few workload. Octane agrees from the other direction:
+**CodeLoad is 0.844**, and CodeLoad is the suite built to measure exactly that (jQuery defines
+thousands of functions and calls almost none of them). Isolated by bisection: the same loop on
+the 2-9-only commit measures 27 358 ms, so this is 2-9 and not 3-0 or 1-2 — 3-0 wins part of it
+back.
+
+**The likely mechanism, stated as a hypothesis because it is not yet proven.** Every ordinary
+non-strict function carries the Annex B `caller`/`arguments` as deferred cells from birth (P0-3),
+a deferred cell cannot be described from a slot, and `TrackShapeKeyWithoutSlotValue` therefore
+materializes. So a function does the shape work *and* the trie rebuild where before it did the
+trie work alone. That predicts the cost lands on functions and on whatever they drag in on first
+call, which is where it is — but the +3% on function creation measured alone is smaller than the
+hypothesis wants, so something on the first-call path is carrying the rest and has not been
+identified. **Do not treat the mechanism as settled.**
+
+**Taken anyway, on the same terms 2-7 was.** A real trade with a real losing side: six in seven
+property maps never built and a three-field object at 0.36x, against ~20% on compile-and-first-run.
+Octane's own verdict at 14 of 15 suites is mixed-to-positive on a single run — Splay 1.86 and
+EarleyBoyer 1.27, the two suites whose map counts fell furthest, against CodeLoad 0.844 — but
+**a single run per side cannot separate a change from noise (§3.2), so none of those score
+movements is claimed here.** What is claimed is the allocation result, which is deterministic,
+and the compile-throughput cost, which reproduced across three separate measurement rounds.
+**The right follow-up is to stop materializing for a deferred cell** — the null-slot key it
+records needs its descriptor somewhere other than the trie — which would test the hypothesis and,
+if it holds, remove the loss.
+
 #### It holds on real programs — `--property-map-distribution`, before and after
 
 The rows above are synthetic sites, and the open question they cannot answer is how much of a
@@ -1990,7 +2052,7 @@ after a forced gen2 collection, every row net of an inert no-array loop control:
 came out of one probe run. §3.5's rule about a premise not being a finding, applied to an item
 that was right about its premise and wrong about its consequence.*
 
-### 3-0 · Stop boxing the index of an indexed access — **found measuring 3-1; do this first**
+### 3-0 · Stop boxing the index of an indexed access — **landed, both halves**
 
 **Measured, not proposed.** `a[0] = t` allocates **0.00 B/element** and `a[i] = t` allocates
 **52.65**; the read side is **0.00** against **31.67**. The array, the element and the value are
@@ -1999,24 +2061,79 @@ index, and on the read path it is *the whole cost*. It is charged to every index
 engine performs, on reference arrays as much as numeric ones, which is why it is worth more than
 3-1 and costs less to take.
 
-**Why it happens** (to be confirmed at the source before the fix is designed, not assumed): a
-loop counter eligible for P2-2's unboxed-`double` locals is held raw, and using it as an index
-requires a `JSValue` to go through `ToKey()`. The fast path wants to take the raw numeric local
-straight to a `uint` index without materializing the `JSNumber` in between.
+**Why it happens — confirmed at the source, and the code already said so.**
+`FastFunctionScope` builds a numeric local's readable expression as `JSNumberBuilder.New(pe)`
+over its raw `double` storage, under a comment that reads *"A numeric local's readable Expression
+BOXES its storage, so every consumer that expects a JSValue keeps working"*. An index expression
+was one of those consumers, so `a[i]` allocated a `JSNumber` purely to name a slot. The literal
+form never did: `a[0]` lowers to a constant `uint` key, which is exactly why it measured at
+0.00 B.
 
-**Where.** `Broiler.JavaScript.Compiler`'s index-expression lowering and `JSValue`'s indexers —
-the same eligibility question 2-4 answered for member stores, asked for element access.
+**What landed.** `JSValue.GetElementByNumber(double)` reads the element straight from the raw
+double and `SetElementByNumber(double, JSValue)` writes it, emitted by `VisitMemberExpression`
+and by a new `TryCreateNumericIndexStore` lowering for a computed key that resolves to a numeric
+local. `--element-alloc`'s constant-index rows were already the floor both had to reach, and both
+reach it:
 
-**Why it is *not* a wash, unlike 3-1.** There is no read-side counterpart: the index is consumed
-as a number and never handed back, so removing its boxing adds nothing anywhere. **Pure removal
-in the sense 2-3 was not** — and per §3.5 that phrase now has to be demonstrated rather than
-asserted, so the first step is a scratch build that removes it and shows what breaks.
+| Site | Read before | Read after | Write before | Write after |
+|---|--:|--:|--:|--:|
+| `a[i] = i + 0.5` — numeric | 31.67 | **0.00** | 84.69 | **52.98** |
+| `a[i] = t` — reference | 31.67 | **0.00** | 52.65 | **20.98** |
+| `a[0] = t` — constant index (floor) | 0.00 | 0.00 | 0.00 | 0.00 |
 
-**Verify.** `test262-arrays`; `IndexedWriteAndLengthTests`; and the negative cases an index fast
-path must still refuse — a non-integer index, a negative one, one past 2^32-2, `-0`, a string
-index that only looks canonical, and a Proxy or typed-array receiver. **Report allocation per
-element alongside time**, using `--element-alloc`'s constant-index rows as the floor.
-**Size: M.**
+**Indexed reads now allocate nothing at all**, and a write loses ~32 B. A write-once-read-once
+numeric element goes **116.36 → 52.98 B (0.46x)** and a reference one **84.32 → 20.98 (0.25x)**.
+What is left is exactly the two things 3-0 is not about: the value's own `JSNumber` (32 B, which
+is 3-1's territory) and the amortized backing growth (~21 B). It applies to **reference arrays as
+much as numeric ones**, which is the half a typed backing store could never have served.
+
+**The guard is the item.** Only a non-negative integral double at most **2^32-2** names an array
+index; everything else is an ordinary string-keyed property, so `a[1.5]` is the property `"1.5"`,
+`a[-1]` is `"-1"`, and `a[4294967295]` is a string key — 2^32-1 being the one canonical numeric
+string above the range. `-0` is deliberately admitted, because `ToString(-0)` is `"0"` and slot 0
+is the right answer; NaN fails the lower comparison and every infinity fails the upper. **Each
+rejection falls back to exactly the boxed path that ran before, so a guard that is too strict
+costs an allocation and never a wrong answer** — which is what bounds the risk of the whole item.
+
+**A guarded access is a CALL, and that is what shapes the item.** Three places need an index
+*node* and therefore cannot have one: `CreateMemberAssignmentTarget` is assigned through,
+`InternalUpdateExpression` switches on `right.NodeType` and takes a different branch for anything
+that is not `BExpressionType.Index`, and a **compound** assignment reads and writes through a
+single reference. So the fast path is offered to exactly two lowerings — the plain read and the
+plain write — and `a[i] += v` keeps its boxed index; splitting it would evaluate the base twice
+unless the whole form were rebuilt around a temp, which is more than this item. A test pins that
+the base is still evaluated once.
+
+*The first attempt hooked `CreateMemberExpression`, which is on the assignable path.* It compiles
+cleanly either way — an expression tree only rejects the assignment later — so the callers had to
+be read rather than the build trusted. Two of the three pass `computed: false` and so could not
+have reached it, **but destructuring passes `property.Computed` straight through and would have.**
+
+**The write path goes through `SetValue`, not the `uint` indexer, and that is deliberate.**
+Measuring first turned up a pre-existing split in the error messages: `null[0] = 1` reports
+*"Cannot get property 0 of null"* through `JSUndefined`'s `this[uint]` override, while
+`null[i] = 1` reports *"Cannot set properties of null"* through the `JSValue` setter — because a
+constant index has always lowered to a `uint` key and a variable one never did. Routing integer
+indices to the `uint` indexer would have silently moved every variable index onto the other
+message. Copying the `JSValue` setter's failure handling keeps both exactly where they were; a
+test pins them, so reconciling that split later has to be a deliberate act rather than a side
+effect.
+
+**Verify.** 42 test cases in `NumericIndexKeyTests`, weighted to the keys the fast path must
+*refuse*. Reads: the nine index values above, a hole still reaching the prototype chain, an index
+accessor still running, string and typed-array receivers, a Proxy still seeing the key as a string
+through its `get` trap, `'0'` and `'00'` staying distinct properties, and an optional-chain read
+still taking the excluded path. Writes: each of the eight keys **read back through its string
+form** rather than through the numeric local, so the two halves cannot agree on a shared bug; an
+index setter running; a frozen array refusing silently in sloppy mode and throwing in strict; a
+Proxy `set` trap seeing a string key; typed-array writes discarding an out-of-range index rather
+than landing elsewhere; the null and undefined messages above; the assignment evaluating to its
+right-hand side; and §13.15.2 ordering, proven with a right-hand side that reassigns the index
+mid-assignment. Repository suite: **7 463 tests across 13 projects, 3 failures**, all three the
+pre-existing win-x64 host-environment ones. **test262 over all four pinned manifests is unchanged
+— 8 220 / 84 / 9, no test on a different side than before the item.**
+
+**Size: M**, and it landed at that size.
 
 ### 3-2 · Unboxed doubles in shape slots
 
@@ -2133,7 +2250,7 @@ pinned RegExp corpus is clean.
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
-| **3** | **3-0** (found measuring 3-1) → 3-3 → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
+| **3** | 3-0 ✅ (both halves) → **3-3** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
 
@@ -2307,7 +2424,7 @@ Where each item came from, so existing cross-references still resolve.
 | 2-7 | — (found measuring 2-3) | — | **Landed** — `55c6b1fb` (the measurement) and `a6f101cc` (the policy), both in the pinned pointer. 43.9% of 47 M real maps never outgrow one four-node group; live map bytes 0.56x, allocated 0.82x, Typescript 0.92x |
 | 2-5 | P0-2 remainder | 2-5 | **Closed** — measured at 0%; P0-2 had already taken the cost, and 2-1 narrowed what was left |
 | 2-6 | — | 2-6 | **Folded into 4-1** — no callee resolution to cache; a call costs ~250 ns and a call-site cache removes none of it |
-| 3-0 | — (found measuring 3-1) | — | **Open, and 3-1's replacement as the phase opener** — an indexed access boxes its index: ~32 B on every array read and write, all of the read cost, and no read-side penalty to removing it. M |
+| 3-0 | — (found measuring 3-1) | — | **Landed, both halves** — an indexed access boxed its index. A read now allocates **0.00 B/element** against 31.67 and a write loses ~32 B; write-once-read-once goes 0.46x for a numeric element and 0.25x for a reference one. Compound assignment keeps its boxed index, on purpose |
 | 3-1 | — | 3-1 | **Open, re-specified on a measurement** — trades 32 B of write allocation for 32 B of read allocation, so it is a live-memory item (a resident `double[1e6]` ~0.2x) whose throughput case is contingent on 3-4 |
 | 3-2 | — | 3-2 | Open |
 | 3-3 | P2-2 item 3 remainder | 3-3 | Open |
