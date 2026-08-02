@@ -28,7 +28,10 @@ so only the parent can hold the combined view.
   (`aa2b1562`, #938), which means the corpus 0-9 describes is now *in* the pointer rather
   than pending against it. **Measurements and the test262 run in §4.1 and §3.4 were taken
   at `cdb2fd41` and have not been repeated at `685026c0`** — which also carries a
-  string-allocation fix (#936). Octane code sites verified at `45f4f679`. Item rows were
+  string-allocation fix (#936). Octane code sites verified at `45f4f679`. **Phase 2's own
+  measurements — §0, and each 2-x section — were all taken at `685026c0` plus the pending
+  `patches/0050`–`0058`**, the tree those patches reproduce and the only tree they describe.
+  Item rows were
   checked against the tree rather than inherited from the prose above them; doing that is
   what caught this, and this time it also caught that **item 1-2's acceptance criterion
   already passed before any work** (phase 1).
@@ -38,6 +41,50 @@ so only the parent can hold the combined view.
 > the submodule — the source documents wrote those without it. Source *files* named in
 > the item tables (`Runtime/ObjectShape.cs`, `BuiltIns/Function/JSFunction.cs`, …) are
 > relative to `Broiler.JS/Broiler.JavaScript.*`, as they were in the original.
+
+---
+
+## 0. Status
+
+**Last updated 2026-08-02.** Snapshot of where the campaign stands; every claim is detailed in
+the item's own section below, and nothing here is *closed* — see the acceptance protocol in §3.
+
+| Phase | State |
+|---|---|
+| **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is the critical path** — it is what phases A–F need to close on, and what phase 2's exit criterion is measured by. 0-7, 0-8 follow it |
+| **1** — compile-time | 1-2's mitigation ✅ (`patches/0049`). 1-1 open; 1-2's real fix open (`StackGuard` cannot fire today). 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
+| **2** — property access | **Complete as a ledger.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ landed; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1; **2-9** specified, spiked and startable. Nine patches, `0050`–`0058` |
+| **3** — arithmetic | Open. 3-1 first; 3-4 is a cost, not a task |
+| **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
+| **5** — regex | Open. Profile before rewriting |
+
+**What phase 2 changed, measured.** Every figure is a median of interleaved
+process-granularity pairs against a control, per §3:
+
+| Item | Result |
+|---|---|
+| 2-0 | `new` published a global prototype-mutation notice per allocation, retiring every prototype-keyed cache entry: **200 001 invalidations per 200 000 allocations → 3**. An inherited-method site inside an allocating loop went from a 50% hit rate to matching its hoisted control |
+| 2-1 | A store that *creates* its property could never hit the store cache — **0 hits against 600 000 misses → 599 997 / 3**, and ~20% faster on a constructor loop |
+| 2-2 | Named properties on a `JSArray` were a 100% miss: **0 → 199 999** |
+| 2-4 | `o.x++` and `o.x op= rhs` reached **neither** cache — 0 hits *and* 0 misses. Both now take both, **0 → 199 999** on each side; the compound form went from costing 1.163x the spelled-out equivalent to 1.043x |
+| 2-7 | The property map reserved 16 trie nodes for the first property of any object — **920 B unused**. 43.9% of 47 M real maps never outgrow one four-node group: **live map bytes 0.56x, allocated 0.82x**, and Typescript, the suite with the worst tail, gains most |
+| 2-8 | Statics on a constructor function were a 100% miss — DeltaBlue's hot path — **0 → 199 999**, ~10% on a DeltaBlue-shaped loop. **This item also shipped a regression that broke DeltaBlue outright; the fix is folded into the same patch** |
+
+**Owed, and not obtainable from a container.** Three things gate "landed" becoming "closed":
+
+1. **test262 `properties-proxy` and `strict-mode`** — phase 2's exit gate, now covering 2-1,
+   2-2, 2-4 and 2-8, all of which touch `OrdinarySetWithOwnDescriptor`.
+2. **0-6's CI Octane run** — the only measurement of phase 2's real exit criterion, *DeltaBlue
+   and Richards inside 200x*. The committed results in `tests/octane/results/` predate the
+   pointer bump and are stale.
+3. **The patch handoff.** `patches/0050`–`0058` apply in order from the pinned pointer and
+   reproduce the verified tree exactly. The submodule pointer is deliberately **not** bumped:
+   the `Broiler.JS` remote is outside this session's GitHub scope and returns 403, and a pointer
+   at a commit CI cannot clone would break the build.
+
+**Two pre-existing defects found in passing**, both reproducing on a pristine build at the
+pinned pointer, neither owned by this campaign: a refused write to a function's `prototype`
+still redirects `[[Construct]]`, and Octane's RegExp suite fails its own checksum.
 
 ---
 
@@ -356,7 +403,7 @@ These were paid for once each. They apply to every phase below.
 
 ## 4. Where the engine stands
 
-### 4.1 Completed — phases A–F (implemented, none *closed*)
+### 4.1 Completed — phases A–F and 2 (implemented, none *closed*)
 
 Every item below is implemented and covered by repository tests. **None is closed**,
 for the reason Phase 0 exists: the acceptance evidence has not been collected.
@@ -369,6 +416,7 @@ for the reason Phase 0 exists: the acceptance evidence has not been collected.
 | **D** | P1-2, P1-3 | Prototype and class method calls now hit the cache (**0 → ~400k hits**); constant-key stores go through a store cache (2.1×, or 3.6× when the key is not one-character early-interned) |
 | **E** | P2-1, P2-2 | Descriptor-free `push`; per-thread small-integer cache; unboxed `double` locals. Plus two array defects found by measuring: **repeated `pop` was quadratic (729×)** and array fill went **1 350 B → 145 B per element** |
 | **F** | P2-3, P2-4, P3 | Dense element = one reference, not a 32-byte descriptor (`new Array(1000)` −73%); string concatenation no longer quadratic (**150×** on the accumulation loop); the per-call activation record became a slot in a context-owned array addressed by a struct token — an argument-less call allocates **nothing**, and call-heavy code runs **3–15% faster** (median ≈11%) |
+| **2** | 2-0, 2-1, 2-2, 2-4, 2-7, 2-8 | Every remaining way a constant-key property access missed its cache, closed: allocation no longer retires prototype-keyed entries, a store that *creates* a property can hit, arrays and functions track named properties by shape, and `++`/`op=` take both caches. **Six sites went 0 → 199 999 hits.** Plus 2-7, which is memory rather than hit rate: the property map's 16-node floor charged **920 B of unused trie** to every object's first property — **live map bytes 0.56x**. Delivered as `patches/0050`–`0058`, pointer not bumped |
 
 Headline before/after on the probes:
 
@@ -2068,4 +2116,5 @@ which remains the archive of record; only their transferable lessons were lifted
 
 _Merged 2026-08-01 from `tests/octane/roadmap.md`, `tests/octane/benchmarks.md` and
 `Broiler.JS/docs/performance-roadmap.md`. Engine facts verified against `Broiler.JS` at
-`cdb2fd41`; Octane code sites at `45f4f679`._
+`cdb2fd41`; Octane code sites at `45f4f679`. Phase 2 worked and measured 2026-08-01/02 at
+pointer `685026c0` plus `patches/0050`–`0058`; status summary in §0._
