@@ -21,7 +21,9 @@ set -uo pipefail
 SDK_DIR="${ANDROID_SDK_HOME:-/root/android-sdk}"
 
 # Versions verified together on 2026-07-30. The API level and build-tools track
-# the workload's Microsoft.Android.Sdk major (36); bump them together.
+# the workload's Microsoft.Android.Sdk major (36); bump them together. CI pins the
+# same pair in the ANDROID_API_LEVEL/ANDROID_BUILD_TOOLS env of the Android job in
+# .github/workflows/broiler-preview-package.yml — bump that with them.
 CMDLINE_TOOLS_BUILD="${ANDROID_CMDLINE_TOOLS_BUILD:-15859902}"
 ANDROID_API="${ANDROID_API_LEVEL:-36}"
 BUILD_TOOLS="${ANDROID_BUILD_TOOLS:-36.0.0}"
