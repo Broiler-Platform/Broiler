@@ -491,6 +491,13 @@ These were paid for once each. They apply to every phase below.
   wrong-answer bug to two more declaration forms rather than exposing it. *A gate is only as
   sound as the analysis behind it, and the cheapest time to audit that analysis is while you
   still think of it as someone else's.*
+- **A per-unit figure cannot tell a fixed cost from a scaling one, and it reads as scaling.**
+  Phase 5's profile reported `exec` at 0.22 bytes per subject character, which sounds like
+  something walking the subject; measured per CALL at three subject lengths it is ~1 950 bytes
+  FLAT plus 0.02 B/char. The normalization that made the first finding legible — bytes per
+  character, which is how the per-match subject copy was spotted — made the second one
+  invisible. *Normalize by the thing you think is driving the cost, then vary that thing to
+  check.*
 - **An item can be written from another engine's architecture.** 4-3 asked for a mid-function
   bailout that "reconstructs an interpreter frame from a specialized one" — the V8 model, with a
   stack map naming where each value lives. This engine has no interpreter frame to reconstruct:
@@ -2882,9 +2889,35 @@ somebody reads one, and almost nothing ever does — they are a deprecated compa
 | every **miss** row | 0.01 – 0.02 | **unchanged** | — |
 
 The miss rows are the control and they do not move by a byte, which is what identifies the cost
-as *per successful match* rather than per scan. Note what is **not** claimed: the remaining
-504 B/char is the exec result object itself — an array plus `index`, `input` and `groups`, built
-once per match by the generic `@@replace` path — and that is the next layer, not this one.
+as *per successful match* rather than per scan.
+
+**What remains, decomposed — and the per-character framing was hiding it.** A `--regex-profile`
+scaling section now reports bytes **per call** at three subject lengths, because 4 400 bytes on a
+20 000-character subject reads as 0.22 B/char whether it scales with the subject or not:
+
+| Operation | 5 000 | 20 000 | 80 000 | Reading |
+|---|--:|--:|--:|---|
+| `test`, matching | 2 051 | 2 351 | 3 551 | **~1 950 B fixed** + 0.02 B/char |
+| `exec`, matching | 1 995 | 2 295 | 3 495 | the same, and the result array is nearly all of it |
+| `replace`, **one** match | 22 635 | 82 935 | 324 135 | **~4 B per subject character** |
+
+So `exec` is **not** proportional to the subject — it is a flat ~2 KB per call, which is the
+result array plus its `index` / `input` / `groups` properties. And a *single* non-global
+`replace` costs four bytes per subject character, which is **two full UTF-16 copies**: the
+`StringBuilder`'s chunks and then its `ToString()`.
+
+Two follow-ups, both sized by those rows and neither started:
+
+- **The single-match replace should not use a builder at all.** `input[0..pos] + replacement +
+  input[end..]` is one `string.Concat` over three spans and one allocation, halving 4 B/char
+  to 2. *Pre-sizing the builder was tried first and is worth 0.2%* — .NET's `StringBuilder`
+  is a chunk list, not a doubling array, so there was no reallocation waste to remove. The
+  change was reverted rather than kept for a rationale that turned out to be wrong.
+- **A global replace retains every result before it builds anything.** §22.2.6.11 collects all
+  matches in step 14 and reads their properties in step 16, so 5 000 matches means 5 000 live
+  result arrays — 5 000 × ~2 KB, which is exactly the ~10 MB per call still measured. Streaming
+  them would change the observable order of `exec` calls against capture reads, so it is only
+  available on a fast path where nothing is patched.
 
 **One hazard the change introduced and closed.** Deferring the slice means `Update` publishes a
 subject and two indices that must agree; three separate field writes would let a reader on
