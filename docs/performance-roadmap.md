@@ -63,7 +63,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
-| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and **4× against** on the seventh. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time** |
+| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time** |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
 wall-clock figure is a median of interleaved process-granularity pairs against a control, per §3:
@@ -2760,8 +2760,8 @@ the same treatment.
 1. **Stop allocating per match on the `replace`/`exec` result path — landed, see below.**
    Largest measured cost by three orders of magnitude, and it is the one that reaches PdfJS and
    Typescript — which is what this phase claimed to care about.
-2. **Decide `RegexOptions.Compiled` per pattern**, on use count. ~2× on six of seven real
-   patterns, 4× *against* on the seventh, so it is a policy and not a flag.
+2. **Decide `RegexOptions.Compiled` per pattern** — measured further, and **a use count is not
+   enough to decide it**. See below.
 3. **Only then consider compiling `Broiler.Regex`.** It is correctness-critical for the gap
    cases and it should stay, but no measurement here puts it on a hot path, and B5's ranking of
    it was never checked against the routing.
@@ -2832,6 +2832,42 @@ failure record byte-identical to the earlier runs.
 > figure, which is deterministic and exact. The scores are recorded as corroboration and as a
 > reason for 0-6 to look at them.
 
+#### Item 2 measured — and the obvious policy is the wrong one
+
+The single-run table above had one pattern losing badly under `Compiled`. Repeated three times
+it is **stable, not noise**: `/^[\s ]+|[\s ]+$/` — an ordinary *trim* — measures
+**0.236, 0.225, 0.237**, consistently about **4.3× slower compiled**, while the other six sit
+between 1.7× and 2.3× faster.
+
+That kills "compile after N uses", which is the policy this item was about to specify: a trim is
+exactly the kind of pattern a program runs hundreds of thousands of times, so a use counter would
+find it first and make it four times worse.
+
+**So the loss was characterized rather than guessed at**, with four probes decomposing the
+pattern (they are kept in the emitter, since the next attempt needs them):
+
+| Probe | Speedup | |
+|---|--:|---|
+| `^[\s ]+` — anchor + class quantifier | 0.366, 0.365 | **loss** |
+| `[\s ]+$` — the other anchor | 0.464, 0.419 | **loss** |
+| `[\s ]+\|zzz` — **same class, no anchor** | 2.758, 2.938 | big win |
+| `^a+\|b+$` — **anchored alternation, literals** | 3.425, 2.765 | big win |
+
+**It is neither alternation nor anchoring**, which were the two obvious readings — an anchored
+alternation of literal quantifiers is one of the *best* rows in the set. What loses is
+specifically an **anchored character-class quantifier**, and the `trim` pattern is that shape
+twice over.
+
+**No policy is shipped, on purpose.** The rule above is drawn from eleven patterns on one
+runtime, and turning it into "compile unless the pattern begins with an anchored class
+quantifier" would be exactly the kind of heuristic §3.5 warns about — a branch described from
+its intent rather than traced with real numbers. What the next attempt needs, in order: the same
+comparison over a corpus far wider than Octane's, an explanation of *why* the compiled path
+loses that shape (it is .NET's codegen, not this engine's), and only then a predicate. A
+per-pattern decision made by measuring both forms once on the real subject — the way tiering
+already reasons about functions — is the design most likely to survive that, because it needs no
+predicate at all.
+
 > **The RegExp checksum failure 2-8 recorded did not reproduce.** All three Octane runs this
 > session scored it (131, 126, 132) rather than failing `Error: Wrong checksum.`. Left as an
 > observation, not a claim: those are single runs on a different platform from the one that
@@ -2848,7 +2884,7 @@ failure record byte-identical to the earlier runs.
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
 | **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
-| **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → **`Compiled` per pattern** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
+| **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
 **Dependencies.**
 
