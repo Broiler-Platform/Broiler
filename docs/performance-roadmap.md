@@ -1577,7 +1577,9 @@ maps, two interleaved rounds each, whole-process: Typescript **0.916**, Box2D **
 1.013, EarleyBoyer 1.020. **Typescript has by far the worst tail — a third of its maps outgrow the
 old floor — and it is the suite that gains most.** That is the geometric-growth half paying for the
 smaller-floor half. Nothing among them regresses worth the name. The Octane *correctness* smoke was
-re-run on this build too, not only the unit suite — the lesson 2-8 paid for.
+re-run on this build too, not only the unit suite — the lesson 2-8 paid for — and returns **exactly
+the set it returned before the change**: 17 of 18 benchmarks pass, Mandreel included once given a
+real budget, with RegExp's pre-existing checksum failure the only one out.
 
 So the trade is real, its losing side is real, and it is worth taking: an 8-field object pays ~27%
 more bytes and ~19% more time, against 43.9% of all maps costing 248 B instead of 920.
