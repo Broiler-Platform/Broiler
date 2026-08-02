@@ -1,0 +1,108 @@
+name: Android Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-build.yml'
+      - 'Broiler.Graphics/**'
+      - 'Broiler.Input/**'
+      - 'Broiler.UI/**'
+      - 'src/Broiler.App.Android/**'
+      - 'src/Broiler.Browser.Android/**'
+      - 'src/Broiler.Browser.Core/**'
+      - 'src/Broiler.Writer.Android/**'
+      - 'src/Broiler.Writer/**'
+      - 'eng/solutions.json'
+      - 'Broiler.Android.*.slnx'
+  pull_request:
+    paths:
+      - '.github/workflows/android-build.yml'
+      - 'Broiler.Graphics/**'
+      - 'Broiler.Input/**'
+      - 'Broiler.UI/**'
+      - 'src/Broiler.App.Android/**'
+      - 'src/Broiler.Browser.Android/**'
+      - 'src/Broiler.Browser.Core/**'
+      - 'src/Broiler.Writer.Android/**'
+      - 'src/Broiler.Writer/**'
+      - 'eng/solutions.json'
+      - 'Broiler.Android.*.slnx'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+jobs:
+  build:
+    name: Build and test Android heads
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      ANDROID_SDK_HOME: ${{ runner.temp }}/android-sdk
+      ANDROID_HOME: ${{ runner.temp }}/android-sdk
+      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+
+    steps:
+      - name: Checkout recursively
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Provision Android workload and SDK
+        shell: bash
+        run: ./scripts/install-android-sdk.sh
+
+      - name: Verify generated workspaces
+        shell: pwsh
+        run: ./scripts/update-solutions.ps1 -Verify
+
+      - name: Run host Android backend tests
+        shell: bash
+        run: |
+          dotnet run --project Broiler.Input/Broiler.Input.Android.Tests/Broiler.Input.Android.Tests.csproj
+          dotnet run --project Broiler.Graphics/Broiler.Graphics.Android.Tests/Broiler.Graphics.Android.Tests.csproj
+
+      - name: Run Android-facing UI tests
+        shell: bash
+        run: |
+          dotnet test Broiler.UI/tests/Foundation/Broiler.UI.Tests/Broiler.UI.Tests.csproj
+          dotnet test Broiler.UI/tests/Foundation/Broiler.UI.Standard.Tests/Broiler.UI.Standard.Tests.csproj
+          dotnet test Broiler.UI/tests/Text/Broiler.UI.RichEdit.Standard.Tests/Broiler.UI.RichEdit.Standard.Tests.csproj
+
+      - name: Build debug APKs
+        shell: bash
+        run: |
+          dotnet build src/Broiler.Writer.Android/Broiler.Writer.Android.csproj --configuration Debug
+          dotnet build src/Broiler.Browser.Android/Broiler.Browser.Android.csproj --configuration Debug
+
+      - name: Upload debug APKs
+        uses: actions/upload-artifact@v6
+        with:
+          name: broiler-android-debug-apks
+          path: |
+            src/Broiler.Writer.Android/bin/Debug/net10.0-android36.0/**/*.apk
+            src/Broiler.Browser.Android/bin/Debug/net10.0-android36.0/**/*.apk
+          if-no-files-found: error
