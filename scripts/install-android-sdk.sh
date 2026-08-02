@@ -38,7 +38,8 @@ fail() { echo "[install-android-sdk] ERROR: $*" >&2; exit 1; }
 # against the now-resolved manifest installs the matching packs. Checking for the
 # reference assembly is what makes this detectable rather than silent.
 android_ref_present() {
-  compgen -G "${HOME}/.dotnet/packs/Microsoft.Android.Ref.*/*/ref/*/Mono.Android.dll" >/dev/null 2>&1 ||
+  { [ -n "${DOTNET_ROOT:-}" ] && compgen -G "${DOTNET_ROOT}/packs/Microsoft.Android.Ref.*/*/ref/*/Mono.Android.dll" >/dev/null 2>&1; } ||
+    compgen -G "${HOME}/.dotnet/packs/Microsoft.Android.Ref.*/*/ref/*/Mono.Android.dll" >/dev/null 2>&1 ||
     compgen -G "/usr/lib/dotnet/packs/Microsoft.Android.Ref.*/*/ref/*/Mono.Android.dll" >/dev/null 2>&1
 }
 

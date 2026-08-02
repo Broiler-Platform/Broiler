@@ -41,4 +41,8 @@
     <InternalsVisibleTo Include="Broiler.Browser.Linux" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.Browser.Android" />
+  </ItemGroup>
+
 </Project>

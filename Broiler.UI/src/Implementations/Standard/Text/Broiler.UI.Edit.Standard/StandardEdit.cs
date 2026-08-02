@@ -8,7 +8,7 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.Edit.Standard;
 
-public sealed class StandardEdit : UiEdit, IStandardThemedControl
+public sealed class StandardEdit : UiEdit, IStandardThemedControl, IUiTextEditor
 {
     public void ApplyTheme(StandardThemeTokens theme)
     {
@@ -102,6 +102,58 @@ public sealed class StandardEdit : UiEdit, IStandardThemedControl
         bool changed = ReplaceSelection(text);
         EnsureCaretVisible();
         return changed;
+    }
+
+    public UiTextEditorState GetTextEditorState()
+    {
+        string text = IsPassword ? string.Empty : Text;
+        int selectionStart = IsPassword ? 0 : SelectionStart;
+        int selectionEnd = IsPassword ? 0 : SelectionEnd;
+        int composingStart = _compositionText.Length > 0 && !IsPassword ? CaretIndex : -1;
+        int composingEnd = composingStart < 0 ? -1 : composingStart + _compositionText.Length;
+        return new UiTextEditorState(text, selectionStart, selectionEnd, composingStart, composingEnd);
+    }
+
+    public bool DeleteSurroundingText(int beforeLength, int afterLength)
+    {
+        if (IsReadOnly || !IsEnabled)
+            return false;
+
+        int caret = CaretIndex;
+        int start = Math.Max(0, caret - Math.Max(0, beforeLength));
+        int end = Math.Min(Text.Length, caret + Math.Max(0, afterLength));
+        if (HasSelection)
+        {
+            start = Math.Min(start, SelectionStart);
+            end = Math.Max(end, SelectionEnd);
+        }
+        if (end <= start)
+            return false;
+
+        PushUndo();
+        bool changed = DeleteRange(start, end - start);
+        EnsureCaretVisible();
+        return changed;
+    }
+
+    public bool SetEditorSelection(int start, int end)
+    {
+        int clampedStart = Math.Clamp(Math.Min(start, end), 0, Text.Length);
+        int clampedEnd = Math.Clamp(Math.Max(start, end), clampedStart, Text.Length);
+        SetSelection(clampedStart, clampedEnd - clampedStart);
+        EnsureCaretVisible();
+        return true;
+    }
+
+    public bool SetComposingRegion(int start, int end) => SetEditorSelection(start, end);
+
+    public bool PerformEditorAction(UiTextEditorAction action)
+    {
+        if (action == UiTextEditorAction.None)
+            return false;
+
+        Submit();
+        return true;
     }
 
     protected override BSize MeasureCore(BSize availableSize)

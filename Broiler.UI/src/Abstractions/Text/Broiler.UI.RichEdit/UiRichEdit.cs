@@ -370,6 +370,9 @@ public abstract class UiRichEdit : UiElement
         return true;
     }
 
+    /// <summary>Deletes the current selection through the shared document undo model.</summary>
+    protected bool DeleteCurrentSelection() => RunEditorEdit(static editor => editor.Delete());
+
     private InlineStyle CurrentInlineStyle => _editor.Selection.IsEmpty
         ? _editor.CaretInlineStyle
         : _editor.Document.InlineStyleAt(_editor.Selection.End);

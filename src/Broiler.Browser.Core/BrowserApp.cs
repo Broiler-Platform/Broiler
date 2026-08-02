@@ -7,6 +7,7 @@ using Broiler.HTML.Graphics;
 using Broiler.HtmlBridge;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
+using Broiler.Input.Touch;
 using Broiler.UI;
 using Broiler.UI.Button.Standard;
 using Broiler.UI.Edit.Standard;
@@ -149,6 +150,15 @@ internal sealed class BrowserApp : IDisposable
     {
         _viewport.ReleaseGraphicsResources();
         _host.RequestInvalidate();
+    }
+
+    public bool TryGoBack()
+    {
+        if (_historyIndex <= 0)
+            return false;
+
+        GoHistory(-1);
+        return true;
     }
 
     public BColor ResolveClearColor() => BrowserPalette.Canvas;
@@ -692,6 +702,7 @@ internal sealed class BrowserApp : IDisposable
         private readonly BrowserViewport _viewport;
         private readonly StandardLabel _status;
         private readonly List<StandardButton> _favorites = [];
+        private bool _isCompact;
 
         public BrowserContent(
             StandardButton backButton,
@@ -745,8 +756,8 @@ internal sealed class BrowserApp : IDisposable
 
         protected override BSize MeasureCore(BSize availableSize)
         {
-            double width = double.IsInfinity(availableSize.Width) ? MinWidth : Math.Max(MinWidth, availableSize.Width);
-            double height = double.IsInfinity(availableSize.Height) ? MinHeight : Math.Max(MinHeight, availableSize.Height);
+            double width = double.IsInfinity(availableSize.Width) ? MinWidth : Math.Max(0, availableSize.Width);
+            double height = double.IsInfinity(availableSize.Height) ? MinHeight : Math.Max(0, availableSize.Height);
             double addressWidth = Math.Max(90, width - 4 * NavButtonWidth - StopButtonWidth - StarWidth - GoButtonWidth - 9 * Margin);
             BSize controlSize = new(double.PositiveInfinity, ControlHeight);
 
@@ -768,30 +779,52 @@ internal sealed class BrowserApp : IDisposable
 
         protected override void ArrangeCore(BRect finalRect)
         {
+            bool compact = finalRect.Width < 600;
+            _isCompact = compact;
+            _forwardButton.Visibility = compact ? UiVisibility.Collapsed : UiVisibility.Visible;
+            _refreshButton.Visibility = compact ? UiVisibility.Collapsed : UiVisibility.Visible;
+            _stopButton.Visibility = compact ? UiVisibility.Collapsed : UiVisibility.Visible;
+            _starButton.Visibility = compact ? UiVisibility.Collapsed : UiVisibility.Visible;
+
             double x = finalRect.Left + Margin;
             double y = finalRect.Top + (ToolbarHeight - ControlHeight) / 2;
 
-            _backButton.Arrange(new BRect(x, y, NavButtonWidth, ControlHeight));
-            x += NavButtonWidth + Margin;
-            _forwardButton.Arrange(new BRect(x, y, NavButtonWidth, ControlHeight));
-            x += NavButtonWidth + Margin;
-            _refreshButton.Arrange(new BRect(x, y, NavButtonWidth + 24, ControlHeight));
-            x += NavButtonWidth + 24 + Margin;
-            _stopButton.Arrange(new BRect(x, y, StopButtonWidth, ControlHeight));
-            x += StopButtonWidth + Margin;
+            double navWidth = compact ? 44 : NavButtonWidth;
+            double controlHeight = compact ? 36 : ControlHeight;
+            y = finalRect.Top + (ToolbarHeight - controlHeight) / 2;
+            _backButton.Arrange(new BRect(x, y, navWidth, controlHeight));
+            x += navWidth + Margin;
+            if (!compact)
+            {
+                _forwardButton.Arrange(new BRect(x, y, NavButtonWidth, ControlHeight));
+                x += NavButtonWidth + Margin;
+                _refreshButton.Arrange(new BRect(x, y, NavButtonWidth + 24, ControlHeight));
+                x += NavButtonWidth + 24 + Margin;
+                _stopButton.Arrange(new BRect(x, y, StopButtonWidth, ControlHeight));
+                x += StopButtonWidth + Margin;
+            }
 
-            double rightControls = StarWidth + GoButtonWidth + 2 * Margin;
+            double rightControls = (compact ? 0 : StarWidth + Margin) + GoButtonWidth + Margin;
             double addressWidth = Math.Max(90, finalRect.Right - Margin - x - rightControls);
-            _address.Arrange(new BRect(x, y, addressWidth, ControlHeight));
+            _address.Arrange(new BRect(x, y, addressWidth, controlHeight));
             x += addressWidth + Margin;
-            _starButton.Arrange(new BRect(x, y, StarWidth, ControlHeight));
-            x += StarWidth + Margin;
-            _goButton.Arrange(new BRect(x, y, GoButtonWidth, ControlHeight));
+            if (!compact)
+            {
+                _starButton.Arrange(new BRect(x, y, StarWidth, ControlHeight));
+                x += StarWidth + Margin;
+            }
+            _goButton.Arrange(new BRect(x, y, GoButtonWidth, controlHeight));
 
             double favoriteX = finalRect.Left + Margin;
             double favoriteY = finalRect.Top + ToolbarHeight + (FavoritesBarHeight - ControlHeight) / 2;
             foreach (StandardButton button in _favorites)
             {
+                if (compact)
+                {
+                    button.Visibility = UiVisibility.Collapsed;
+                    continue;
+                }
+
                 double width = Math.Min(button.DesiredSize.Width, Math.Max(0, finalRect.Right - Margin - favoriteX));
                 if (width < 24)
                 {
@@ -804,7 +837,8 @@ internal sealed class BrowserApp : IDisposable
                 favoriteX += width + Margin;
             }
 
-            double contentTop = finalRect.Top + ToolbarHeight + FavoritesBarHeight;
+            double favoritesHeight = compact ? 0 : FavoritesBarHeight;
+            double contentTop = finalRect.Top + ToolbarHeight + favoritesHeight;
             double statusTop = Math.Max(contentTop, finalRect.Bottom - StatusBarHeight);
             _viewport.Arrange(new BRect(finalRect.Left, contentTop, finalRect.Width, Math.Max(0, statusTop - contentTop)));
             _status.Arrange(new BRect(finalRect.Left + Margin, statusTop, Math.Max(0, finalRect.Width - 2 * Margin), StatusBarHeight));
@@ -812,11 +846,14 @@ internal sealed class BrowserApp : IDisposable
 
         protected override void RenderCore(UiRenderContext context)
         {
+            double favoritesHeight = _isCompact ? 0 : FavoritesBarHeight;
             context.RenderList.FillRect(Bounds, BrowserPalette.Canvas);
             context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top, Bounds.Width, ToolbarHeight), BrowserPalette.Toolbar);
-            context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top + ToolbarHeight, Bounds.Width, FavoritesBarHeight), BrowserPalette.Canvas);
+            if (favoritesHeight > 0)
+                context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top + ToolbarHeight, Bounds.Width, favoritesHeight), BrowserPalette.Canvas);
             context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top + ToolbarHeight - 1, Bounds.Width, 1), BrowserPalette.ToolbarRule);
-            context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top + ToolbarHeight + FavoritesBarHeight - 1, Bounds.Width, 1), BrowserPalette.ToolbarRule);
+            if (favoritesHeight > 0)
+                context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top + ToolbarHeight + favoritesHeight - 1, Bounds.Width, 1), BrowserPalette.ToolbarRule);
             context.RenderList.FillRect(new BRect(Bounds.Left, Math.Max(Bounds.Top, Bounds.Bottom - StatusBarHeight), Bounds.Width, StatusBarHeight), BrowserPalette.Status);
             context.RenderList.FillRect(new BRect(Bounds.Left, Math.Max(Bounds.Top, Bounds.Bottom - StatusBarHeight), Bounds.Width, 1), BrowserPalette.ToolbarRule);
             base.RenderCore(context);
@@ -837,7 +874,15 @@ internal sealed class BrowserApp : IDisposable
         private bool _suppressNavigation;
         private float _contentHeight;
         private float _scrollY;
+        private readonly Dictionary<long, BPoint> _touches = [];
+        private BPoint _touchStart;
+        private BPoint _touchLast;
+        private bool _isTouchPanning;
+        private double _lastPinchDistance;
+        private float _viewportZoom = 1f;
         private BSize _lastLayoutSize;
+
+        private const double TouchPanThreshold = 6;
 
         public BrowserViewport(Func<IBroilerRenderer?> getRenderer)
         {
@@ -864,6 +909,7 @@ internal sealed class BrowserApp : IDisposable
             _interactiveSession = interactiveSession;
             BaseUrl = baseUrl ?? string.Empty;
             _scrollY = 0;
+            _viewportZoom = 1f;
             MarkLayoutDirty();
         }
 
@@ -944,7 +990,9 @@ internal sealed class BrowserApp : IDisposable
                 return;
 
             context.RenderList.PushClip(Bounds);
-            context.RenderList.PushTransform(BMatrix3x2.Translation(Bounds.Left, Bounds.Top));
+            context.RenderList.PushTransform(
+                BMatrix3x2.Scale(_viewportZoom, _viewportZoom) *
+                BMatrix3x2.Translation(Bounds.Left, Bounds.Top));
             ReplayCommands(context.RenderList, htmlList.Commands);
             context.RenderList.PopTransform();
             context.RenderList.PopClip();
@@ -960,6 +1008,8 @@ internal sealed class BrowserApp : IDisposable
                     return HandlePointerMove(input);
                 case UiInputEventKind.PointerWheel:
                     return HandleWheel(input);
+                case UiInputEventKind.TouchContact:
+                    return HandleTouch(input);
                 case UiInputEventKind.KeyboardKey:
                     return HandleKeyboard(input);
                 default:
@@ -993,7 +1043,7 @@ internal sealed class BrowserApp : IDisposable
                 _container.Location = PointF.Empty;
                 _container.MaxSize = new SizeF(viewportWidth, viewportHeight);
                 _container.PerformLayout(new RectangleF(0, 0, viewportWidth, viewportHeight));
-                _contentHeight = _container.ActualSize.Height;
+                _contentHeight = _container.ActualSize.Height * _viewportZoom;
                 _layoutDirty = false;
                 _renderDirty = true;
                 _lastLayoutSize = viewportSize;
@@ -1002,7 +1052,7 @@ internal sealed class BrowserApp : IDisposable
             ClampScroll(viewportHeight);
             if (_renderDirty || _renderList is null)
             {
-                _container.ScrollOffset = new PointF(0, -_scrollY);
+                _container.ScrollOffset = new PointF(0, -_scrollY / _viewportZoom);
                 DisposeRenderList();
                 _renderList = HtmlGraphicsRenderListBuilder.Build(
                     renderer,
@@ -1052,6 +1102,101 @@ internal sealed class BrowserApp : IDisposable
 
             ScrollBy(-(float)(input.WheelDeltaNotches * WheelScrollStep));
             return true;
+        }
+
+        private bool HandleTouch(UiInputEvent input)
+        {
+            if (input.TouchContactState is not TouchContactState state)
+                return false;
+
+            if (state == TouchContactState.Pressed)
+            {
+                _touches[input.ContactId] = input.Position;
+                if (_touches.Count == 1)
+                {
+                    _touchStart = input.Position;
+                    _touchLast = input.Position;
+                    _isTouchPanning = false;
+                    return false;
+                }
+
+                _lastPinchDistance = ActiveTouchDistance();
+                _isTouchPanning = true;
+                return true;
+            }
+
+            if (!_touches.ContainsKey(input.ContactId))
+                return false;
+
+            if (state == TouchContactState.Moved)
+            {
+                _touches[input.ContactId] = input.Position;
+                if (_touches.Count >= 2)
+                {
+                    double distance = ActiveTouchDistance();
+                    if (_lastPinchDistance > 0 && distance > 0)
+                    {
+                        float nextZoom = (float)Math.Clamp(_viewportZoom * (distance / _lastPinchDistance), 0.5, 4.0);
+                        if (Math.Abs(nextZoom - _viewportZoom) > 0.001f)
+                        {
+                            _viewportZoom = nextZoom;
+                            _contentHeight = _container.ActualSize.Height * nextZoom;
+                            InvalidateRenderedContent();
+                        }
+                    }
+
+                    _lastPinchDistance = distance;
+                    return true;
+                }
+
+                double totalX = input.Position.X - _touchStart.X;
+                double totalY = input.Position.Y - _touchStart.Y;
+                if (!_isTouchPanning && Math.Sqrt((totalX * totalX) + (totalY * totalY)) >= TouchPanThreshold)
+                    _isTouchPanning = true;
+                if (!_isTouchPanning)
+                {
+                    _touchLast = input.Position;
+                    return false;
+                }
+
+                ScrollBy((float)(_touchLast.Y - input.Position.Y));
+                _touchLast = input.Position;
+                return true;
+            }
+
+            if (state is TouchContactState.Released or TouchContactState.Cancelled)
+            {
+                bool handled = _isTouchPanning || _touches.Count > 1;
+                _touches.Remove(input.ContactId);
+                _lastPinchDistance = _touches.Count >= 2 ? ActiveTouchDistance() : 0;
+                if (_touches.Count == 1)
+                {
+                    _touchStart = _touches.Values.First();
+                    _touchLast = _touchStart;
+                }
+                else if (_touches.Count == 0)
+                {
+                    _isTouchPanning = false;
+                }
+
+                return handled;
+            }
+
+            return false;
+        }
+
+        private double ActiveTouchDistance()
+        {
+            using IEnumerator<BPoint> points = _touches.Values.GetEnumerator();
+            if (!points.MoveNext())
+                return 0;
+            BPoint first = points.Current;
+            if (!points.MoveNext())
+                return 0;
+            BPoint second = points.Current;
+            double x = second.X - first.X;
+            double y = second.Y - first.Y;
+            return Math.Sqrt((x * x) + (y * y));
         }
 
         private bool HandleKeyboard(UiInputEvent input)
@@ -1142,7 +1287,7 @@ internal sealed class BrowserApp : IDisposable
         }
 
         private PointF ToLocalPoint(BPoint point) =>
-            new((float)(point.X - Bounds.Left), (float)(point.Y - Bounds.Top));
+            new((float)((point.X - Bounds.Left) / _viewportZoom), (float)((point.Y - Bounds.Top) / _viewportZoom));
 
         private static void ReplayCommands(BRenderList target, IReadOnlyList<BRenderCommand> commands)
         {

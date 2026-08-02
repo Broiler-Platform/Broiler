@@ -10,6 +10,9 @@ internal sealed class BrowserUiHost : IUiHost, IUiClipboardHost, IUiTextInputHos
     private readonly Action _invalidate;
     private readonly Action<BRenderList> _present;
     private readonly Func<Action, bool> _post;
+    private readonly Func<string?>? _getClipboardText;
+    private readonly Action<string>? _setClipboardText;
+    private readonly Action<UiTextCaretInfo?>? _caretChanged;
     private string _clipboardText = string.Empty;
 
     public BrowserUiHost(
@@ -17,13 +20,19 @@ internal sealed class BrowserUiHost : IUiHost, IUiClipboardHost, IUiTextInputHos
         Func<double> getScale,
         Action invalidate,
         Action<BRenderList> present,
-        Func<Action, bool> post)
+        Func<Action, bool> post,
+        Func<string?>? getClipboardText = null,
+        Action<string>? setClipboardText = null,
+        Action<UiTextCaretInfo?>? caretChanged = null)
     {
         _getViewportSize = getViewportSize ?? throw new ArgumentNullException(nameof(getViewportSize));
         _getScale = getScale ?? throw new ArgumentNullException(nameof(getScale));
         _invalidate = invalidate ?? throw new ArgumentNullException(nameof(invalidate));
         _present = present ?? throw new ArgumentNullException(nameof(present));
         _post = post ?? throw new ArgumentNullException(nameof(post));
+        _getClipboardText = getClipboardText;
+        _setClipboardText = setClipboardText;
+        _caretChanged = caretChanged;
     }
 
     public BSize ViewportSize => _getViewportSize();
@@ -57,18 +66,36 @@ internal sealed class BrowserUiHost : IUiHost, IUiClipboardHost, IUiTextInputHos
 
     public bool TryGetText(out string text)
     {
+        if (_getClipboardText is not null)
+        {
+            text = _getClipboardText() ?? string.Empty;
+            return text.Length > 0;
+        }
+
         text = _clipboardText;
         return _clipboardText.Length > 0;
     }
 
-    public void SetText(string text) => _clipboardText = text ?? string.Empty;
+    public void SetText(string text)
+    {
+        text ??= string.Empty;
+        _clipboardText = text;
+        _setClipboardText?.Invoke(text);
+    }
 
-    public void PublishCaret(UiTextCaretInfo caret) => LastCaret = caret;
+    public void PublishCaret(UiTextCaretInfo caret)
+    {
+        LastCaret = caret;
+        _caretChanged?.Invoke(caret);
+    }
 
     public void ClearCaret(UiElement owner)
     {
         if (LastCaret?.Owner == owner)
+        {
             LastCaret = null;
+            _caretChanged?.Invoke(null);
+        }
     }
 
     public void Dispose()

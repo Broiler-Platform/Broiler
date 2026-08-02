@@ -1,0 +1,31 @@
+<Solution>
+  <!-- Generated from eng/solutions.json by scripts/update-solutions.ps1. -->
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+  </Configurations>
+  <Folder Name="/Entry points/">
+    <Project Path="Broiler.Graphics/Broiler.Graphics.Android.Tests/Broiler.Graphics.Android.Tests.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Android.Tests/Broiler.Input.Android.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Dependencies/Broiler.Graphics/">
+    <Project Path="Broiler.Graphics/Broiler.Graphics.Android/Broiler.Graphics.Android.csproj" />
+    <Project Path="Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj" />
+  </Folder>
+  <Folder Name="/Dependencies/Broiler.Input/">
+    <Project Path="Broiler.Input/Broiler.Input.Android/Broiler.Input.Android.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Keyboard.Android/Broiler.Input.Keyboard.Android.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Keyboard/Broiler.Input.Keyboard.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Pen.Android/Broiler.Input.Pen.Android.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Pen/Broiler.Input.Pen.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Text.Android/Broiler.Input.Text.Android.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Text/Broiler.Input.Text.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Touch.Android/Broiler.Input.Touch.Android.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input.Touch/Broiler.Input.Touch.csproj" />
+    <Project Path="Broiler.Input/Broiler.Input/Broiler.Input.csproj" />
+  </Folder>
+  <Folder Name="/Dependencies/Broiler.Media/">
+    <Project Path="Broiler.Media/Broiler.Media.Image/Broiler.Media.Image.csproj" />
+    <Project Path="Broiler.Media/Broiler.Media/Broiler.Media.csproj" />
+  </Folder>
+</Solution>

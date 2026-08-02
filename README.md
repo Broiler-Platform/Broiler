@@ -22,8 +22,8 @@ lineage comes from [Yantra JS](https://github.com/yantrajs/yantra).
 | `Broiler.JS` | JavaScript parser, compiler, runtime, built-ins, and host integration; derived in part from Yantra JS |
 | `Broiler.HtmlBridge` | DOM, renderer, and JavaScript integration |
 | `Broiler.App` | WPF browser application |
-| `Broiler.Browser.Windows` / `Broiler.Browser.Linux` | Platform-specific browser applications sharing `Broiler.Browser.Core` |
-| `Broiler.Writer.Windows` / `Broiler.Writer.Linux` / `Broiler.Writer.WebAssembly` | Platform-specific Writer applications sharing the desktop `Broiler.Writer.Core` |
+| `Broiler.Browser.Windows` / `Broiler.Browser.Linux` / `Broiler.Browser.Android` | Platform-specific browser applications sharing `Broiler.Browser.Core` |
+| `Broiler.Writer.Windows` / `Broiler.Writer.Linux` / `Broiler.Writer.WebAssembly` / `Broiler.Writer.Android` | Platform-specific Writer applications sharing `Broiler.Writer.Core` |
 | `Broiler.Cli`, `Broiler.Wpt` | Rendering and web-platform-test tooling |
 | `Broiler.DevConsole`, `Broiler.DevSite` | Development and diagnostics tools |
 
@@ -110,6 +110,7 @@ Requirements:
 - .NET 10 SDK
 - Git
 - Windows for WPF and Direct2D applications
+- .NET Android workload, JDK 21, and Android SDK API 36 for Android applications
 - Node.js only for the Broiler.HTML JavaScript-based WPT tooling
 
 Choose the solution for the product, platform, or validation slice you are working on:
@@ -117,6 +118,7 @@ Choose the solution for the product, platform, or validation slice you are worki
 ```bash
 dotnet build Broiler.Windows.Browser.slnx
 dotnet build Broiler.Linux.Writer.slnx
+dotnet build Broiler.Android.Writer.slnx -p:AndroidSdkDirectory="C:\Program Files (x86)\Android\android-sdk"
 dotnet test Broiler.Tests.slnx
 ```
 
@@ -125,13 +127,13 @@ platform backends, tests, samples, generators, and benchmarks:
 
 | Scope | Solution |
 |---|---|
-| Browser applications | `Broiler.Windows.Browser.slnx`, `Broiler.Linux.Browser.slnx` |
-| Writer applications | `Broiler.Windows.Writer.slnx`, `Broiler.Linux.Writer.slnx`, `Broiler.WebAssembly.Writer.slnx` |
+| Browser applications | `Broiler.Windows.Browser.slnx`, `Broiler.Linux.Browser.slnx`, `Broiler.Android.Browser.slnx` |
+| Writer applications | `Broiler.Windows.Writer.slnx`, `Broiler.Linux.Writer.slnx`, `Broiler.WebAssembly.Writer.slnx`, `Broiler.Android.Writer.slnx` |
 | Hosted Writer | `Broiler.Office.Server.slnx` |
 | Rendering and WPT tools | `Broiler.Cli.slnx`, `Broiler.Wpt.slnx` |
 | Developer tooling | `Broiler.Tooling.slnx` |
 | Integration tests | `Broiler.Tests.slnx` |
-| Platform tests | `Broiler.Windows.Tests.slnx`, `Broiler.Linux.Tests.slnx`, `Broiler.WebAssembly.Tests.slnx` |
+| Platform tests | `Broiler.Windows.Tests.slnx`, `Broiler.Linux.Tests.slnx`, `Broiler.WebAssembly.Tests.slnx`, `Broiler.Android.Tests.slnx` |
 | Performance harnesses | `Broiler.Benchmarks.slnx` |
 
 Each root solution contains only its declared entry points and their transitive
@@ -152,6 +154,12 @@ Run the Win32/Direct2D application on Windows:
 ```bash
 dotnet run --project src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj --configuration Debug-Windows
 ```
+
+Android is currently an emulator-verified preview; physical-device validation is
+still pending. Writer and Browser target API 36 with a minimum of API 24, produce
+self-contained debug APKs and Release AABs, and ship `android-arm64` plus
+`android-x64` for emulator use. See
+[the Android architecture and remaining device gates](docs/architecture/android.md).
 
 Each submodule README contains its standalone build and test commands. Broiler.HTML also
 has repository-specific WPT tooling, while Broiler.JS documents its test262 workflow.

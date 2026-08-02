@@ -39,6 +39,9 @@ internal sealed class WriterApp : IDisposable
 {
     private readonly WriterUiHost _host;
     private readonly Action _requestClose;
+    private readonly Action? _requestOpenDocument;
+    private readonly Action<string, bool>? _requestSaveDocument;
+    private readonly bool _compactMode;
     private readonly UiSession _session;
     private readonly StandardWindow _rootWindow;
     private readonly StandardRichEdit _editor;
@@ -86,10 +89,18 @@ internal sealed class WriterApp : IDisposable
         new("Markdown (*.md)", "*.md;*.markdown", ".md"),
     ];
 
-    public WriterApp(WriterUiHost host, Action requestClose)
+    public WriterApp(
+        WriterUiHost host,
+        Action requestClose,
+        Action? requestOpenDocument = null,
+        Action<string, bool>? requestSaveDocument = null,
+        bool compactMode = false)
     {
         _host = host ?? throw new ArgumentNullException(nameof(host));
         _requestClose = requestClose ?? throw new ArgumentNullException(nameof(requestClose));
+        _requestOpenDocument = requestOpenDocument;
+        _requestSaveDocument = requestSaveDocument;
+        _compactMode = compactMode;
         _session = new StandardUiSessionBuilder()
             .WithDispatcher(new ImmediateUiDispatcher())
             .Build(_host);
@@ -157,6 +168,8 @@ internal sealed class WriterApp : IDisposable
         };
         _content = new WriterContent(
             _menu, _toolbar, _title, _editor, _formatCodesSplitter, _formatCodesView, _status);
+        if (compactMode)
+            _content.IsFormatCodesVisible = false;
         _rootWindow.AddChild(_content);
 
         SeedDocument();
@@ -212,6 +225,65 @@ internal sealed class WriterApp : IDisposable
     }
 
     public void Invalidate() => _host.RequestInvalidate();
+
+    public bool LoadDocument(Stream stream, string displayName)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        displayName = string.IsNullOrWhiteSpace(displayName) ? "Untitled.rtf" : displayName;
+
+        try
+        {
+            using var copy = new MemoryStream();
+            stream.CopyTo(copy);
+            DocumentReadResult result = ReadDocument(displayName, copy.ToArray());
+            _currentDocumentPath = displayName;
+            _title.Text = Path.GetFileName(displayName);
+            _lastAction = result.Diagnostics.Count == 0
+                ? "Opened " + Path.GetFileName(displayName)
+                : "Opened " + Path.GetFileName(displayName) + " with " + result.Diagnostics.Count.ToString(CultureInfo.InvariantCulture) + " note(s)";
+            _editor.Document = result.Document;
+            _editor.Selection = RichTextRange.Caret(_editor.Document.Start);
+            _session.SetFocus(_editor);
+            RefreshUi();
+            return true;
+        }
+        catch (Exception ex) when (IsFileOperationException(ex))
+        {
+            _lastAction = "Open failed: " + ex.Message;
+            RefreshUi();
+            return false;
+        }
+    }
+
+    public bool WriteDocument(Stream stream, string displayName, bool updateIdentity = true)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        displayName = string.IsNullOrWhiteSpace(displayName) ? "Untitled.rtf" : displayName;
+
+        try
+        {
+            DocumentWriteResult result = WriteDocument(displayName, _editor.Document, out byte[] bytes);
+            stream.Write(bytes, 0, bytes.Length);
+            stream.Flush();
+            if (updateIdentity)
+            {
+                _currentDocumentPath = displayName;
+                _title.Text = Path.GetFileName(displayName);
+                _lastAction = result.Diagnostics.Count == 0
+                    ? "Saved " + Path.GetFileName(displayName)
+                    : "Saved " + Path.GetFileName(displayName) + " with " + result.Diagnostics.Count.ToString(CultureInfo.InvariantCulture) + " note(s)";
+                _session.SetFocus(_editor);
+                RefreshUi();
+            }
+            return true;
+        }
+        catch (Exception ex) when (IsFileOperationException(ex))
+        {
+            _lastAction = "Save failed: " + ex.Message;
+            RefreshUi();
+            return false;
+        }
+    }
 
     public void Dispose()
     {
@@ -314,9 +386,9 @@ internal sealed class WriterApp : IDisposable
         var menu = new StandardMenu
         {
             PresentationMode = UiMenuPresentationMode.MenuBar,
-            PreferredSize = new BSize(360, 30),
-            MenuBarHeight = 30,
-            ItemHeight = 28,
+            PreferredSize = new BSize(360, _compactMode ? 40 : 30),
+            MenuBarHeight = _compactMode ? 40 : 30,
+            ItemHeight = _compactMode ? 44 : 28,
             PopupWidth = 210,
             Font = new BFontStyle("Segoe UI", 14),
             Background = WriterPalette.MenuSurface,
@@ -362,7 +434,7 @@ internal sealed class WriterApp : IDisposable
         var toolbar = new StandardToolbar
         {
             Title = "Document toolbar",
-            PreferredSize = new BSize(0, 42),
+            PreferredSize = new BSize(0, _compactMode ? 50 : 42),
             Orientation = UiToolbarOrientation.Horizontal,
             Padding = 5,
             Spacing = 4,
@@ -395,27 +467,37 @@ internal sealed class WriterApp : IDisposable
         toolbar.AddChild(newButton);
         toolbar.AddChild(openButton);
         toolbar.AddChild(saveButton);
-        toolbar.AddChild(saveAsButton);
+        if (!_compactMode)
+            toolbar.AddChild(saveAsButton);
         toolbar.AddChild(undoButton);
-        toolbar.AddChild(redoButton);
-        toolbar.AddChild(fontButton);
+        if (!_compactMode)
+        {
+            toolbar.AddChild(redoButton);
+            toolbar.AddChild(fontButton);
+        }
         toolbar.AddChild(boldButton);
         toolbar.AddChild(italicButton);
         toolbar.AddChild(underlineButton);
-        toolbar.AddChild(strikeButton);
-        toolbar.AddChild(clearButton);
-        toolbar.AddChild(leftButton);
-        toolbar.AddChild(centerButton);
-        toolbar.AddChild(rightButton);
-        toolbar.AddChild(bulletsButton);
-        toolbar.AddChild(numberedButton);
-        toolbar.AddChild(indentButton);
-        toolbar.AddChild(outdentButton);
+        if (!_compactMode)
+        {
+            toolbar.AddChild(strikeButton);
+            toolbar.AddChild(clearButton);
+            toolbar.AddChild(leftButton);
+            toolbar.AddChild(centerButton);
+            toolbar.AddChild(rightButton);
+            toolbar.AddChild(bulletsButton);
+            toolbar.AddChild(numberedButton);
+            toolbar.AddChild(indentButton);
+            toolbar.AddChild(outdentButton);
+        }
 
         toolbar.SetSeparatorBefore(undoButton, true);
-        toolbar.SetSeparatorBefore(fontButton, true);
-        toolbar.SetSeparatorBefore(leftButton, true);
-        toolbar.SetSeparatorBefore(indentButton, true);
+        if (!_compactMode)
+        {
+            toolbar.SetSeparatorBefore(fontButton, true);
+            toolbar.SetSeparatorBefore(leftButton, true);
+            toolbar.SetSeparatorBefore(indentButton, true);
+        }
 
         return toolbar;
     }
@@ -449,7 +531,7 @@ internal sealed class WriterApp : IDisposable
         var button = new StandardToggleButton
         {
             Text = text,
-            PreferredSize = new BSize(width, 30),
+            PreferredSize = new BSize(width, _compactMode ? 40 : 30),
             Font = new BFontStyle("Segoe UI", 13, weight, slant),
             PaddingX = 8,
             PaddingY = 5,
@@ -469,11 +551,11 @@ internal sealed class WriterApp : IDisposable
         return button;
     }
 
-    private static StandardButton CreateToolbarButton(string text, double width) =>
+    private StandardButton CreateToolbarButton(string text, double width) =>
         new()
         {
             Text = text,
-            PreferredSize = new BSize(width, 30),
+            PreferredSize = new BSize(width, _compactMode ? 40 : 30),
             Font = new BFontStyle("Segoe UI", 13),
             PaddingX = 8,
             PaddingY = 5,
@@ -522,6 +604,14 @@ internal sealed class WriterApp : IDisposable
 
     private void ShowOpenDialog()
     {
+        if (_requestOpenDocument is not null)
+        {
+            _requestOpenDocument();
+            _lastAction = "Open document";
+            RefreshUi();
+            return;
+        }
+
         var dialog = new StandardFileDialog
         {
             Mode = UiFileDialogMode.Open,
@@ -543,6 +633,12 @@ internal sealed class WriterApp : IDisposable
 
     private void SaveDocument()
     {
+        if (_requestSaveDocument is not null)
+        {
+            _requestSaveDocument(SuggestedDocumentName(), false);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_currentDocumentPath))
         {
             ShowSaveDialog();
@@ -554,6 +650,14 @@ internal sealed class WriterApp : IDisposable
 
     private void ShowSaveDialog()
     {
+        if (_requestSaveDocument is not null)
+        {
+            _requestSaveDocument(SuggestedDocumentName(), true);
+            _lastAction = "Save document as";
+            RefreshUi();
+            return;
+        }
+
         string fileName = _currentDocumentPath is null
             ? "Untitled"
             : Path.GetFileNameWithoutExtension(_currentDocumentPath);
@@ -735,6 +839,12 @@ internal sealed class WriterApp : IDisposable
         }
 
         return Directory.Exists(_lastDirectory) ? _lastDirectory : Environment.CurrentDirectory;
+    }
+
+    private string SuggestedDocumentName()
+    {
+        string name = Path.GetFileName(_currentDocumentPath ?? string.Empty);
+        return string.IsNullOrWhiteSpace(name) ? "Untitled.rtf" : name;
     }
 
     private static int GetFileTypeFilterIndex(IReadOnlyList<UiFileDialogFilter> filters, string? path)
@@ -946,7 +1056,6 @@ internal sealed class WriterApp : IDisposable
     {
         private const double Margin = 24;
         private const double TitleTop = 18;
-        private const double ToolbarHeight = 42;
         private const double StatusHeight = 24;
         private const double MinWidth = 900;
         private const double MinHeight = 620;
@@ -1002,12 +1111,12 @@ internal sealed class WriterApp : IDisposable
 
         protected override BSize MeasureCore(BSize availableSize)
         {
-            double width = double.IsInfinity(availableSize.Width) ? MinWidth : Math.Max(MinWidth, availableSize.Width);
-            double height = double.IsInfinity(availableSize.Height) ? MinHeight : Math.Max(MinHeight, availableSize.Height);
+            double width = double.IsInfinity(availableSize.Width) ? MinWidth : Math.Max(0, availableSize.Width);
+            double height = double.IsInfinity(availableSize.Height) ? MinHeight : Math.Max(0, availableSize.Height);
             double contentWidth = Math.Max(0, width - (Margin * 2));
 
             _menu.Measure(new BSize(width, _menu.MenuBarHeight));
-            _toolbar.Measure(new BSize(width, ToolbarHeight));
+            _toolbar.Measure(new BSize(width, _toolbar.PreferredSize.Height));
             _title.Measure(new BSize(contentWidth, double.PositiveInfinity));
             _editor.Measure(new BSize(contentWidth, Math.Max(240, height - 182)));
             if (_isFormatCodesVisible)
@@ -1022,17 +1131,19 @@ internal sealed class WriterApp : IDisposable
 
         protected override void ArrangeCore(BRect finalRect)
         {
+            double toolbarHeight = _toolbar.PreferredSize.Height;
             _menu.Arrange(new BRect(finalRect.Left, finalRect.Top, finalRect.Width, _menu.MenuBarHeight));
-            _toolbar.Arrange(new BRect(finalRect.Left, finalRect.Top + _menu.MenuBarHeight, finalRect.Width, ToolbarHeight));
+            _toolbar.Arrange(new BRect(finalRect.Left, finalRect.Top + _menu.MenuBarHeight, finalRect.Width, toolbarHeight));
 
-            double x = finalRect.Left + Margin;
-            double y = finalRect.Top + _menu.MenuBarHeight + ToolbarHeight + TitleTop;
-            double width = Math.Max(0, finalRect.Width - (Margin * 2));
+            double margin = finalRect.Width < 600 ? 12 : Margin;
+            double x = finalRect.Left + margin;
+            double y = finalRect.Top + _menu.MenuBarHeight + toolbarHeight + TitleTop;
+            double width = Math.Max(0, finalRect.Width - (margin * 2));
 
             _title.Arrange(new BRect(x, y, width, _title.DesiredSize.Height));
             y += _title.DesiredSize.Height + 14;
 
-            double statusTop = finalRect.Bottom - Margin - StatusHeight;
+            double statusTop = finalRect.Bottom - margin - StatusHeight;
             double workspaceHeight = Math.Max(0, statusTop - y - 14);
             WriterFormatCodesLayoutResult layout = WriterFormatCodesLayout.Calculate(
                 workspaceHeight, _formatCodesSplitter.Value, _isFormatCodesVisible);
@@ -1053,7 +1164,7 @@ internal sealed class WriterApp : IDisposable
             context.RenderList.FillRect(Bounds, WriterPalette.Canvas);
             context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top, Bounds.Width, _menu.MenuBarHeight), WriterPalette.MenuSurface);
             context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top + _menu.MenuBarHeight, Bounds.Width, 1), WriterPalette.MenuRule);
-            context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top + _menu.MenuBarHeight + ToolbarHeight, Bounds.Width, 1), WriterPalette.MenuRule);
+            context.RenderList.FillRect(new BRect(Bounds.Left, Bounds.Top + _menu.MenuBarHeight + _toolbar.PreferredSize.Height, Bounds.Width, 1), WriterPalette.MenuRule);
             base.RenderCore(context);
         }
     }

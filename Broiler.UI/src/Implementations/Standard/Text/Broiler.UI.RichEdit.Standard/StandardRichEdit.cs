@@ -6,6 +6,7 @@ using Broiler.Graphics;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
 using Broiler.Input.Text;
+using Broiler.Input.Touch;
 using Broiler.UI.Standard;
 
 namespace Broiler.UI.RichEdit.Standard;
@@ -19,7 +20,7 @@ namespace Broiler.UI.RichEdit.Standard;
 /// through the <see cref="UiRichEdit"/> command surface and its single undo model.
 /// No native control or OS API is used.
 /// </summary>
-public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
+public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTextEditor
 {
     public void ApplyTheme(StandardThemeTokens theme)
     {
@@ -46,6 +47,12 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
     private string _compositionText = string.Empty;
     private bool _isDraggingScrollbar;
     private double _scrollbarDragOffset;
+    private long? _touchContactId;
+    private BPoint _touchStart;
+    private BPoint _touchLast;
+    private bool _isTouchScrolling;
+
+    private const double TouchScrollThreshold = 6;
 
     public BColor Background { get; set; } = StandardControlPaint.Surface;
 
@@ -85,6 +92,63 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
     public string CompositionText => _compositionText;
 
     protected override bool IsCompositionActive => _compositionText.Length > 0;
+
+    public UiTextEditorState GetTextEditorState()
+    {
+        string text = Document.PlainText;
+        int start = FlatIndex(Selection.Start);
+        int end = FlatIndex(Selection.End);
+        int compositionStart = _compositionText.Length > 0 ? FlatIndex(Selection.Focus) : -1;
+        int compositionEnd = compositionStart < 0 ? -1 : compositionStart + _compositionText.Length;
+        return new UiTextEditorState(text, start, end, compositionStart, compositionEnd);
+    }
+
+    public bool DeleteSurroundingText(int beforeLength, int afterLength)
+    {
+        if (IsReadOnly || !IsEnabled)
+            return false;
+
+        string text = Document.PlainText;
+        int caret = FlatIndex(Selection.Focus);
+        int start = Math.Max(0, caret - Math.Max(0, beforeLength));
+        int end = Math.Min(text.Length, caret + Math.Max(0, afterLength));
+        if (!Selection.IsEmpty)
+        {
+            start = Math.Min(start, FlatIndex(Selection.Start));
+            end = Math.Max(end, FlatIndex(Selection.End));
+        }
+        if (end <= start)
+            return false;
+
+        Selection = new RichTextRange(PositionFromFlatIndex(start), PositionFromFlatIndex(end));
+        bool changed = DeleteCurrentSelection();
+        EnsureCaretVisible();
+        return changed;
+    }
+
+    public bool SetEditorSelection(int start, int end)
+    {
+        int textLength = Document.PlainText.Length;
+        int clampedStart = Math.Clamp(Math.Min(start, end), 0, textLength);
+        int clampedEnd = Math.Clamp(Math.Max(start, end), clampedStart, textLength);
+        Selection = new RichTextRange(PositionFromFlatIndex(clampedStart), PositionFromFlatIndex(clampedEnd));
+        EnsureCaretVisible();
+        return true;
+    }
+
+    public bool SetComposingRegion(int start, int end) => SetEditorSelection(start, end);
+
+    public bool PerformEditorAction(UiTextEditorAction action)
+    {
+        if (action == UiTextEditorAction.None)
+            return false;
+
+        if (AcceptsReturn && action is not UiTextEditorAction.Next and not UiTextEditorAction.Previous)
+            return RunCommand(RichEditCommand.InsertParagraphBreak);
+
+        Submit();
+        return true;
+    }
 
     protected override BSize MeasureCore(BSize availableSize)
     {
@@ -133,6 +197,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
             UiInputEventKind.PointerButton => HandlePointerButton(input),
             UiInputEventKind.PointerMove => HandlePointerMove(input),
             UiInputEventKind.PointerWheel => HandleWheel(input),
+            UiInputEventKind.TouchContact => HandleTouch(input),
             UiInputEventKind.TextInput => HandleTextInput(input),
             UiInputEventKind.TextComposition => HandleTextComposition(input),
             UiInputEventKind.KeyboardKey => HandleKeyboard(input),
@@ -435,6 +500,55 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
         _scrollY = newScroll;
         Invalidate(UiInvalidationKind.Render);
         return true;
+    }
+
+    private bool HandleTouch(UiInputEvent input)
+    {
+        if (input.TouchContactState is not TouchContactState state)
+            return false;
+
+        if (state == TouchContactState.Pressed)
+        {
+            if (_touchContactId is not null)
+                return false;
+
+            _touchContactId = input.ContactId;
+            _touchStart = input.Position;
+            _touchLast = input.Position;
+            _isTouchScrolling = false;
+            return false;
+        }
+
+        if (_touchContactId != input.ContactId)
+            return false;
+
+        if (state == TouchContactState.Moved)
+        {
+            double totalX = input.Position.X - _touchStart.X;
+            double totalY = input.Position.Y - _touchStart.Y;
+            if (!_isTouchScrolling && Math.Sqrt((totalX * totalX) + (totalY * totalY)) >= TouchScrollThreshold)
+                _isTouchScrolling = true;
+
+            if (!_isTouchScrolling)
+            {
+                _touchLast = input.Position;
+                return false;
+            }
+
+            SetVerticalScroll(_scrollY + (_touchLast.Y - input.Position.Y));
+            _touchLast = input.Position;
+            return true;
+        }
+
+        if (state is TouchContactState.Released or TouchContactState.Cancelled)
+        {
+            bool handled = _isTouchScrolling;
+            _touchContactId = null;
+            _isTouchScrolling = false;
+            return handled;
+        }
+
+        return false;
     }
 
     private bool TryBeginScrollbarInteraction(BPoint position)
@@ -847,6 +961,21 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl
         for (int i = 0; i < position.ParagraphIndex; i++)
             flat += document.Paragraphs[i].Length + 1;
         return flat + position.Offset;
+    }
+
+    private RichTextPosition PositionFromFlatIndex(int flatIndex)
+    {
+        flatIndex = Math.Clamp(flatIndex, 0, Document.PlainText.Length);
+        for (int paragraphIndex = 0; paragraphIndex < Document.ParagraphCount; paragraphIndex++)
+        {
+            RichTextParagraph paragraph = Document.Paragraphs[paragraphIndex];
+            if (flatIndex <= paragraph.Length || paragraphIndex == Document.ParagraphCount - 1)
+                return new RichTextPosition(paragraphIndex, Math.Min(flatIndex, paragraph.Length));
+
+            flatIndex -= paragraph.Length + 1;
+        }
+
+        return Document.End;
     }
 
     // --- Layout ------------------------------------------------------------

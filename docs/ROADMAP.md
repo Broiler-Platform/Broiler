@@ -213,7 +213,25 @@ from the .NET for Android workload, **no .NET MAUI**, one `Activity` hosting one
 `Broiler.Documents`, `Broiler.Browser.Core`, and `Broiler.Writer.Core` rather
 than a parallel stack.
 
-**Current evidence:** the Android input providers (phase A2) are implemented and
+**Implementation update (2026-08-01):** phases A0 through the emulator-testable
+portions of A6 are now implemented. The repository has a shared .NET Android
+host, direct hardware-Canvas presentation, touch/pen/keyboard/IME integration,
+touch scrolling and Browser
+pinch zoom, Writer Storage Access Framework open/save plus recovery, compact
+Writer and Browser heads, and generated Android app/test solutions. Both app
+heads build against API 36 without Android-project diagnostics, and
+host-runnable Android/UI tests pass; a clean Browser closure still reports
+pre-existing warnings from the CSS/HTML/JS submodules.
+An API 36 x86_64 emulator now passes launch/render/touch and system-inset smoke;
+the hardware Canvas cutover reduced Writer's measured cold Debug present from
+11.1 seconds to 77 ms, with steady input frames normally inside 16 ms. Remaining
+gates are physical-device rotation/lifecycle stress, IME/stylus validation,
+long-running performance/memory evidence, and externally signed delivery
+artifacts. The older evidence paragraphs retained
+under each phase describe the starting point and are superseded by this update
+and [the reconciled architecture](architecture/android.md).
+
+**Historical evidence (superseded 2026-08-01):** the Android input providers (phase A2) are implemented and
 unit-tested; no other Android code, project, or workflow exists yet. What the
 rest of the port builds on: `IUiHost` is a five-member interface with three
 working implementations (Win32, X11, browser Canvas); `Broiler.Graphics` core is
@@ -231,7 +249,7 @@ needs no JS engine, no network policy, and no engine-scale surface.
 
 **Owner:** root, with `Broiler.Graphics` and `Broiler.Input` consulted.
 
-**Current evidence:** no target framework, ABI, API level, runtime, linker, or
+**Historical evidence (superseded 2026-08-01):** no target framework, ABI, API level, runtime, linker, or
 signing decision exists for Android. The desktop applications pin
 `net10.0` with `Debug-Linux`/`Release-Linux`-style configurations and explicit
 runtime identifiers; the WebAssembly Writer shows the established pattern for a
@@ -265,7 +283,7 @@ every later Android phase cites it instead of re-deciding.
 
 **Owner:** `Broiler.Graphics` (submodule).
 
-**Current evidence:** the backend is written and unit-tested, and is **pending as
+**Historical evidence (superseded 2026-08-01):** the backend is written and unit-tested, and is **pending as
 [`patches/0040-graphics-android-opengles-backend.patch`](../patches/README.md)**.
 The push to the `Broiler.Graphics` remote returned 403 — it is outside this
 session's GitHub scope — so the submodule pointer is deliberately unchanged and
@@ -313,7 +331,7 @@ system font on a clean device.
 **Owner:** `Broiler.Input` for providers, `Broiler.UI` for the neutral event
 surface.
 
-**Current evidence:** the Android providers are implemented and unit-tested —
+**Historical evidence (superseded 2026-08-01):** the Android providers are implemented and unit-tested —
 `Broiler.Input.Android` plus the `Touch`, `Pen`, `Keyboard`, and `Text` backends,
 and the neutral provider contracts they needed
 (`ITouchInputProvider`/`TouchOpenOptions` and the pen and text equivalents,
@@ -362,7 +380,7 @@ contract; no Android type appears in `Broiler.Input` core or `Broiler.UI`.
 
 **Owner:** `Broiler.UI`.
 
-**Current evidence:** no control consumes `UiInputEventKind.TouchContact`.
+**Historical evidence (superseded 2026-08-01):** no control consumes `UiInputEventKind.TouchContact`.
 `StandardScrollView` scrolls by wheel or by dragging the scrollbar thumb/track,
 and its pointer path requires `MouseButton.Left`, which a touch-derived event
 does not carry — so the primary scrolling gesture on a touch device does
@@ -398,7 +416,7 @@ Windows touch device once those providers exist.
 
 **Owner:** `Broiler.Writer.Android`, reusing `Broiler.Writer.Core`.
 
-**Current evidence:** `WriterApp` is shared and already runs under three hosts.
+**Historical evidence (superseded 2026-08-01):** `WriterApp` is shared and already runs under three hosts.
 Its document I/O is desktop-shaped: `StandardFileDialog` builds places from
 `Environment.SpecialFolder` and `Directory.GetLogicalDrives`, and open/save use
 `File.ReadAllBytes`/`File.WriteAllBytes` against full paths. Under Android
@@ -430,7 +448,7 @@ with an attached keyboard.
 
 **Owner:** `Broiler.Browser.Android`, reusing `Broiler.Browser.Core`.
 
-**Current evidence:** `BrowserApp` is shared and host-agnostic, and fetches
+**Historical evidence (superseded 2026-08-01):** `BrowserApp` is shared and host-agnostic, and fetches
 through `HttpClient`, which needs the `INTERNET` permission and an explicit
 cleartext policy. The desktop runner polls a 16 ms `PeriodicTimer`, which is not
 an acceptable handheld frame loop. The preview safety notice already states that
@@ -462,7 +480,7 @@ is claimed that the security posture does not support.
 
 **Owner:** root.
 
-**Current evidence:** the four existing workflows cover preview packaging, NuGet,
+**Historical evidence (superseded 2026-08-01):** the four existing workflows cover preview packaging, NuGet,
 Octane, and WPT; none provisions an Android SDK, and no `.slnx` workspace exists
 for an Android head. Release, signing, and update policy are already open items
 under [Release and distribution](#release-and-distribution) and must not be

@@ -23,6 +23,16 @@
       ]
     },
     {
+      "path": "Broiler.Android.Browser.slnx",
+      "description": "Android browser application and its transitive dependencies.",
+      "roots": [
+        "src/Broiler.Browser.Android/Broiler.Browser.Android.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"
+      ]
+    },
+    {
       "path": "Broiler.Windows.Writer.slnx",
       "description": "Windows Writer application and its transitive dependencies.",
       "roots": [
@@ -42,6 +52,16 @@
       "forbiddenProjectPatterns": [
         "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation)[^/]*\\.csproj$",
         "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.Android.Writer.slnx",
+      "description": "Android Writer application and its transitive dependencies.",
+      "roots": [
+        "src/Broiler.Writer.Android/Broiler.Writer.Android.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"
       ]
     },
     {
@@ -139,6 +159,17 @@
       ],
       "forbiddenProjectPatterns": [
         "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux)[^/]*\\.csproj$"
+      ]
+    },
+    {
+      "path": "Broiler.Android.Tests.slnx",
+      "description": "Host-runnable Android input and graphics backend contract tests.",
+      "roots": [
+        "Broiler.Graphics/Broiler.Graphics.Android.Tests/Broiler.Graphics.Android.Tests.csproj",
+        "Broiler.Input/Broiler.Input.Android.Tests/Broiler.Input.Android.Tests.csproj"
+      ],
+      "forbiddenProjectPatterns": [
+        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"
       ]
     },
     {

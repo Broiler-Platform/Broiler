@@ -171,6 +171,20 @@ public sealed class Phase2StandardServicesTests
 #pragma warning restore CS0618
     }
 
+    [Fact]
+    public void Touch_And_Pen_Events_Preserve_Contact_Data_At_The_UI_Boundary()
+    {
+        UiInputEvent touch = UiInputEvent.FromTouchContact(CreateTouch(11, 12));
+        UiInputEvent pen = UiInputEvent.FromPenContact(CreatePen(13, 14));
+
+        Assert.Equal(7, touch.ContactId);
+        Assert.Equal(TouchContactState.Pressed, touch.TouchContactState);
+        Assert.Equal(0.5, touch.Pressure);
+        Assert.Equal(PenContactState.Pressed, pen.PenContactState);
+        Assert.Equal(PenButtons.Barrel, pen.PenButtons);
+        Assert.Equal(0.6, pen.Pressure);
+    }
+
     private static UiSession CreateSession(Phase2Host host, out ManualClock clock)
     {
         clock = new ManualClock();

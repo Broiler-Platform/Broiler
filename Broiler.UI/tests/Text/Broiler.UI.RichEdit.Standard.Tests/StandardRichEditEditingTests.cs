@@ -46,6 +46,26 @@ public sealed class StandardRichEditEditingTests
     }
 
     [Fact]
+    public void Platform_Text_Editor_Contract_Queries_Selects_And_Deletes()
+    {
+        RichEditScene scene = Focused("abcdef");
+        IUiTextEditor editor = scene.Edit;
+
+        Assert.True(editor.SetEditorSelection(2, 4));
+        UiTextEditorState selected = editor.GetTextEditorState();
+        Assert.Equal("abcdef", selected.Text);
+        Assert.Equal(2, selected.SelectionStart);
+        Assert.Equal(4, selected.SelectionEnd);
+
+        Assert.True(editor.DeleteSurroundingText(1, 1));
+        Assert.Equal("abf", scene.Edit.GetPlainText());
+        UiTextEditorState deleted = editor.GetTextEditorState();
+        Assert.Equal(2, deleted.SelectionStart);
+        Assert.Equal(2, deleted.SelectionEnd);
+        scene.Session.Dispose();
+    }
+
+    [Fact]
     public void Control_Characters_In_Committed_Text_Are_Dropped()
     {
         RichEditScene scene = Focused();

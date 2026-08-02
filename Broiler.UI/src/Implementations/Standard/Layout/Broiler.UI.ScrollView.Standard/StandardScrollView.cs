@@ -2,6 +2,7 @@ using System;
 using Broiler.Graphics;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
+using Broiler.Input.Touch;
 using Broiler.UI.Standard;
 
 namespace Broiler.UI.ScrollView.Standard;
@@ -17,6 +18,12 @@ public sealed class StandardScrollView : UiScrollView
     private bool _showScrollbars = true;
     private ScrollbarAxis _dragAxis = ScrollbarAxis.None;
     private double _dragPointerOffsetWithinThumb;
+    private long? _touchContactId;
+    private BPoint _touchStart;
+    private BPoint _touchLast;
+    private bool _isTouchDragging;
+
+    private const double TouchDragThreshold = 6;
 
     public BColor Background { get; set; } = BColor.Transparent;
 
@@ -141,9 +148,61 @@ public sealed class StandardScrollView : UiScrollView
             UiInputEventKind.PointerMove => HandlePointerMove(input),
             UiInputEventKind.PointerButton => HandlePointerButton(input),
             UiInputEventKind.PointerWheel => HandleWheel(input),
+            UiInputEventKind.TouchContact => HandleTouch(input),
             UiInputEventKind.KeyboardKey => HandleKeyboard(input),
             _ => false,
         };
+    }
+
+    private bool HandleTouch(UiInputEvent input)
+    {
+        if (input.TouchContactState is not TouchContactState state)
+            return false;
+
+        if (state == TouchContactState.Pressed)
+        {
+            if (_touchContactId is not null)
+                return false;
+
+            _touchContactId = input.ContactId;
+            _touchStart = input.Position;
+            _touchLast = input.Position;
+            _isTouchDragging = false;
+            return false;
+        }
+
+        if (_touchContactId != input.ContactId)
+            return false;
+
+        if (state == TouchContactState.Moved)
+        {
+            double totalX = input.Position.X - _touchStart.X;
+            double totalY = input.Position.Y - _touchStart.Y;
+            if (!_isTouchDragging && Math.Sqrt((totalX * totalX) + (totalY * totalY)) >= TouchDragThreshold)
+                _isTouchDragging = true;
+
+            if (!_isTouchDragging)
+            {
+                _touchLast = input.Position;
+                return false;
+            }
+
+            double deltaX = _touchLast.X - input.Position.X;
+            double deltaY = _touchLast.Y - input.Position.Y;
+            _touchLast = input.Position;
+            _ = ScrollBy(deltaX, deltaY);
+            return true;
+        }
+
+        if (state is TouchContactState.Released or TouchContactState.Cancelled)
+        {
+            bool handled = _isTouchDragging;
+            _touchContactId = null;
+            _isTouchDragging = false;
+            return handled;
+        }
+
+        return false;
     }
 
     protected override bool ShouldHitTestChildren(BPoint point) =>

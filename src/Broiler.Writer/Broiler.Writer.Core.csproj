@@ -43,6 +43,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Broiler.Writer.Windows" />
     <InternalsVisibleTo Include="Broiler.Writer.Linux" />
+    <InternalsVisibleTo Include="Broiler.Writer.Android" />
     <InternalsVisibleTo Include="Broiler.Writer.FormatCodes.Tests" />
   </ItemGroup>
 

@@ -1,6 +1,8 @@
 using Broiler.Graphics;
 using Broiler.Input;
 using Broiler.Input.Mouse;
+using Broiler.Input.Touch;
+using Broiler.UI.Button.Standard;
 using Broiler.UI.ScrollView;
 using Broiler.UI.ScrollView.Standard;
 
@@ -111,6 +113,44 @@ public sealed class ScrollViewControlTests
         Assert.Equal(76.5, scrollView.VerticalOffset);
     }
 
+    [Fact]
+    public void Standard_ScrollView_Pans_Content_From_A_Touch_Drag()
+    {
+        var scrollView = new StandardScrollView
+        {
+            HorizontalScrollBarVisibility = UiScrollBarVisibility.Hidden,
+        };
+        scrollView.AddChild(new FixedElement(new BSize(80, 300)));
+
+        using UiSession session = AttachAndRender(scrollView, new BSize(100, 100), out _);
+
+        Assert.False(scrollView.DispatchInput(Touch(50, 70, 1, TouchContactState.Pressed)));
+        Assert.True(scrollView.DispatchInput(Touch(50, 30, 2, TouchContactState.Moved)));
+        Assert.Equal(40, scrollView.VerticalOffset);
+        Assert.True(scrollView.DispatchInput(Touch(50, 30, 3, TouchContactState.Released)));
+    }
+
+    [Fact]
+    public void Touch_Scroll_Cancels_The_Pointer_Fallback_Without_Clicking_A_Child_Button()
+    {
+        var scrollView = new StandardScrollView
+        {
+            HorizontalScrollBarVisibility = UiScrollBarVisibility.Hidden,
+        };
+        var content = new ButtonContent();
+        int clicks = 0;
+        content.Button.Clicked += (_, _) => clicks++;
+        scrollView.AddChild(content);
+
+        using UiSession session = AttachAndRender(scrollView, new BSize(100, 100), out _);
+
+        Assert.True(session.DispatchInput(Touch(40, 40, 1, TouchContactState.Pressed)));
+        Assert.True(session.DispatchInput(Touch(40, 30, 2, TouchContactState.Moved)));
+        Assert.True(session.DispatchInput(Touch(40, 30, 3, TouchContactState.Released)));
+        Assert.Equal(0, clicks);
+        Assert.Null(session.CapturedElement);
+    }
+
     private static UiSession AttachAndRender(StandardScrollView scrollView, BSize viewportSize, out BRenderList renderList)
     {
         var host = new TestHost(viewportSize);
@@ -148,6 +188,16 @@ public sealed class ScrollViewControlTests
                 MouseButtons.Left,
                 InputEventSource.Synthetic));
 
+    private static UiInputEvent Touch(double x, double y, long sequence, TouchContactState state) =>
+        UiInputEvent.FromTouchContact(
+            new TouchContactEvent(
+                Header(sequence),
+                42,
+                InputPoint.ClientDeviceIndependentPixels(x, y),
+                state,
+                1,
+                InputEventSource.Synthetic));
+
     private static InputEventHeader Header(long sequence) =>
         new(
             InputDeviceId.FromOpaqueValue("mouse"),
@@ -177,6 +227,26 @@ public sealed class ScrollViewControlTests
             InputCount++;
             return HandlesInput;
         }
+    }
+
+    private sealed class ButtonContent : UiElement
+    {
+        public ButtonContent()
+        {
+            Button = new StandardButton { Text = "Touch target" };
+            AddChild(Button);
+        }
+
+        public StandardButton Button { get; }
+
+        protected override BSize MeasureCore(BSize availableSize)
+        {
+            Button.Measure(new BSize(80, 80));
+            return new BSize(80, 300);
+        }
+
+        protected override void ArrangeCore(BRect finalRect) =>
+            Button.Arrange(new BRect(finalRect.Left, finalRect.Top, 80, 80));
     }
 
     private sealed class TestHost : IUiHost

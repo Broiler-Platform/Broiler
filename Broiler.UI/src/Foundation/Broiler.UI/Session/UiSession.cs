@@ -9,6 +9,7 @@ public sealed class UiSession : IDisposable
     private readonly List<UiElement> _roots = [];
     private readonly List<UiInvalidation> _invalidations = [];
     private readonly List<UiElement> _modalElements = [];
+    private readonly Dictionary<long, TouchRoute> _touchRoutes = [];
     private UiElement? _lastPointerTarget;
     private bool _isDisposed;
 
@@ -65,7 +66,7 @@ public sealed class UiSession : IDisposable
             return false;
 
         if (FocusedElement is not null && (ReferenceEquals(FocusedElement, root) || FocusedElement.IsDescendantOf(root)))
-            FocusedElement = null;
+            SetFocus(null);
         if (CapturedElement is not null && (ReferenceEquals(CapturedElement, root) || CapturedElement.IsDescendantOf(root)))
             CapturedElement = null;
         if (_lastPointerTarget is not null && (ReferenceEquals(_lastPointerTarget, root) || _lastPointerTarget.IsDescendantOf(root)))
@@ -105,6 +106,15 @@ public sealed class UiSession : IDisposable
         ThrowIfDisposed();
         if (element is not null && element.Session != this)
             throw new InvalidOperationException("Focused elements must belong to this session.");
+
+        UiElement? previous = FocusedElement;
+        if (ReferenceEquals(previous, element))
+            return;
+
+        if (previous is not null && Host is IUiTextInputHost textInputHost)
+            textInputHost.ClearCaret(previous);
+        if (previous is not null)
+            Invalidate(previous, UiInvalidationKind.Semantic | UiInvalidationKind.Render);
 
         FocusedElement = element;
         if (element is not null)
@@ -186,6 +196,9 @@ public sealed class UiSession : IDisposable
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(input);
 
+        if (input.Kind == UiInputEventKind.TouchContact)
+            return DispatchTouchContact(input);
+
         if (input.Kind == UiInputEventKind.PointerMove)
             return DispatchPointerMove(input);
 
@@ -235,6 +248,9 @@ public sealed class UiSession : IDisposable
         if (_isDisposed)
             return;
 
+        if (FocusedElement is not null && Host is IUiTextInputHost textInputHost)
+            textInputHost.ClearCaret(FocusedElement);
+
         foreach (UiElement root in _roots.ToArray())
             root.Dispose();
         _roots.Clear();
@@ -242,6 +258,7 @@ public sealed class UiSession : IDisposable
         FocusedElement = null;
         CapturedElement = null;
         _modalElements.Clear();
+        _touchRoutes.Clear();
         _lastPointerTarget = null;
         _isDisposed = true;
     }
@@ -257,6 +274,64 @@ public sealed class UiSession : IDisposable
             handled = previous.DispatchInput(input);
 
         return DispatchToTarget(input, target) || handled;
+    }
+
+    private bool DispatchTouchContact(UiInputEvent input)
+    {
+        if (input.TouchContactState is not Broiler.Input.Touch.TouchContactState state)
+            return false;
+
+        TouchRoute route;
+        if (state == Broiler.Input.Touch.TouchContactState.Pressed)
+        {
+            UiElement? hit = ResolveDispatchTarget(input);
+            route = new TouchRoute(hit, PointerFallbackStarted: false, PointerFallbackCancelled: false);
+            _touchRoutes[input.ContactId] = route;
+        }
+        else if (!_touchRoutes.TryGetValue(input.ContactId, out route))
+        {
+            route = new TouchRoute(ResolveDispatchTarget(input), PointerFallbackStarted: false, PointerFallbackCancelled: false);
+        }
+
+        bool handled = DispatchToTarget(input, route.Target);
+
+        if (state == Broiler.Input.Touch.TouchContactState.Pressed && !handled)
+        {
+            UiInputEvent pointer = input.AsTouchPointerFallback();
+            handled = DispatchToTarget(pointer, route.Target);
+            route = route with { PointerFallbackStarted = true };
+            _touchRoutes[input.ContactId] = route;
+            _lastPointerTarget = route.Target;
+        }
+        else if (state == Broiler.Input.Touch.TouchContactState.Moved && route.PointerFallbackStarted && !route.PointerFallbackCancelled)
+        {
+            if (handled)
+            {
+                _ = DispatchToTarget(input.AsTouchPointerCancellation(), route.Target);
+                route = route with { PointerFallbackCancelled = true };
+                _touchRoutes[input.ContactId] = route;
+            }
+            else
+            {
+                handled = DispatchToTarget(input.AsTouchPointerFallback(), route.Target);
+            }
+        }
+        else if (state is Broiler.Input.Touch.TouchContactState.Released or Broiler.Input.Touch.TouchContactState.Cancelled)
+        {
+            // Always balance a synthetic pointer down, even when a parent consumed the gesture as
+            // a scroll. Otherwise the original child would retain pointer capture indefinitely.
+            if (route.PointerFallbackStarted && !route.PointerFallbackCancelled)
+            {
+                UiInputEvent pointer = handled
+                    ? input.AsTouchPointerCancellation()
+                    : input.AsTouchPointerFallback();
+                handled = DispatchToTarget(pointer, route.Target) || handled;
+            }
+
+            _touchRoutes.Remove(input.ContactId);
+        }
+
+        return handled;
     }
 
     private static bool DispatchToTarget(UiInputEvent input, UiElement? target)
@@ -302,4 +377,9 @@ public sealed class UiSession : IDisposable
         ReferenceEquals(element, root) || element.IsDescendantOf(root);
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_isDisposed, this);
+
+    private readonly record struct TouchRoute(
+        UiElement? Target,
+        bool PointerFallbackStarted,
+        bool PointerFallbackCancelled);
 }
