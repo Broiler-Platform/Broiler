@@ -61,7 +61,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is the critical path** — it is what phases A–F need to close on, and what phase 2's exit criterion is measured by. 0-7, 0-8 follow it |
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix landed for the validator and emitter passes** (`StackGuard` had three defects and could not fire) — `FastParser` still unguarded. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
-| **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. Its `let`/`const` half is unstarted and now outranks what landed. 3-4 is a cost, not a task |
+| **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
 | **5** — regex | Open. Profile before rewriting |
 
@@ -453,6 +453,30 @@ These were paid for once each. They apply to every phase below.
   were written down. The measurement also *reversed* it: the three that were deferred can reach
   the numeric tier and the one that was promoted cannot. *An ordering with no number behind it
   will be followed anyway, because it reads like a conclusion.*
+- **A comment that says "missing one here is a miscompile" is a checklist, and it has to be run
+  against every member of its family.** `AstReduce` leaves `ObjectProperty`, `VariableDeclarator`
+  and `Case` as leaves for its rewriting visitors. Two of the three walkers that must not accept
+  that carry an override for each and a comment saying why. The third, `NameCollector` — which
+  backs the *only* rejection path in `NumericLocalAnalysis` — carried none, so every name bound
+  through an object pattern was invisible to every rejection at once: `var { a: s } = o` aborted
+  compilation of the whole script with an unhandled `NotImplementedException`, and
+  `({ a: s } = o)` returned NaN. *The hazard was known, written down and fixed twice; nobody
+  grepped for the third case. When a comment explains a trap, search for every class that can
+  fall into it before writing the comment again.*
+- **A green single run is not a green feature when the bug needs two.** 3-3's `let`/`const` half
+  passed every script-host check, every single-test run, and its own allocation measurement — and
+  miscompiled the moment a second compilation happened in the same process. The script host
+  evaluates one file per process, so it is structurally incapable of seeing a defect of that
+  shape, and the unit tests only caught it because xUnit happens to reuse one process across test
+  methods. *When a change touches state that outlives a compilation, the smallest honest test is
+  two compilations — and if the harness you reach for runs one, it is not the harness.*
+- **Probe the analysis you are about to extend, before extending it.** 3-3's successor widens
+  `NumericLocalAnalysis` from `var` to `let`/`const`. Ten minutes of probing what the existing
+  analysis does with unusual *writes* found two it could not see at all — one of them a
+  process abort on valid JavaScript, shipped since P2-2. Extending first would have widened a
+  wrong-answer bug to two more declaration forms rather than exposing it. *A gate is only as
+  sound as the analysis behind it, and the cheapest time to audit that analysis is while you
+  still think of it as someone else's.*
 - **Interleave, at process granularity.** Sub-1.5% effects are only visible ABBA-
   interleaved across independent builds, ten runs each, medians compared.
 - **Hold the call site fixed when the callee is what changed.** Sizing a parameter's cost by
@@ -2358,6 +2382,51 @@ moved since the last one was taken.*
 > by `KnownGap_AParameterNamedUndefinedDoesNotShadowTheGlobal` rather than left to be
 > rediscovered — a fix flips a failing assertion instead of passing unnoticed.
 
+#### A correctness fix the successor needed first — two writes the analysis could not see
+
+**Found by probing `NumericLocalAnalysis` before extending it, and it is a wrong-answer bug in
+shipped code** — present since `a746f82d` landed P2-2 item 3, on every platform, in ordinary
+JavaScript. The analysis proves a `var` only ever holds a number and then the compiler keeps it
+in a raw CLR `double`. Two ways of writing that binding were invisible to the proof:
+
+| Invisible write | Why | What happened |
+|---|---|---|
+| A `var` **re-declared** below the function body's own statement list — inside a block, `if`, loop, `while`, `try`, `switch` | it names the same function-scoped binding, but only the *top-level* declarations were recorded as stores; the collector's `VisitVariableDeclarator` visited the initializer as a read and recorded nothing | `var s = 0; { var s = 'x'; } return s` → **NaN** |
+| Any name bound through an **object destructuring pattern**, in a declaration *or* an assignment | `AstReduce` treats `ObjectProperty` as a leaf, and `NameCollector` — the walker behind every `RejectEveryNameIn` call — never overrode it | `({ a: s } = { a: 'x' })` → **NaN**; `var { a: s } = …` → **the process aborts** |
+
+**The second failure mode is the serious one, and it is not a wrong answer — it is an unhandled
+`System.NotImplementedException`** (*"Assignment target Call (BCallExpression) is not
+supported"*) out of `ILCodeGenerator.VisitAssign`, which kills compilation of the whole script
+and cannot be caught from JavaScript. That is precisely what the numeric local's own remarks
+predict: its readable `Expression` is a **boxing read**, so writing through it is an assignment
+to a method call. Three shapes reach it — `var { a: s } = o`, the same nested in a block, and
+`for (var { a: s } of …)`. A fourth, `[...s] = ['a']`, threw a bogus `undefined is not a
+function`.
+
+**One root cause is shared and it is worth naming.** `ScalarReplacementHazardDetector` and
+`NestedFunctionScanner` both carry a comment explaining that `AstReduce` leaves `ObjectProperty`,
+`VariableDeclarator` and `Case` as leaves, and both override all three — *"Missing one here is
+not a missed optimization but a miscompile."* `NameCollector` is the third walker in the same
+family and had none of them. The comment was right, was written twice, and was not applied to
+the class that needed it most: `RejectEveryNameIn` is the analysis's only *rejection* path, so a
+name it cannot see is a name nothing else will reject either.
+
+**The fix costs nothing measurable**, which is the expected result and worth stating because it
+is checkable: all fourteen `--local-alloc` rows are byte-identical before and after and every
+numeric-local count is unchanged, because the names now rejected are exactly the ones that were
+being compiled wrongly. Ordinary code loses no specialization — `a[i] = v` and `o.x = i` are
+asserted by count, not just by answer, since the over-broad version of the pattern rule would
+have silently undone 3-0's unboxed index while still computing the right values.
+
+**Verify.** 35 test cases in `NumericLocalWriteVisibilityTests`, written as ordinary JavaScript
+answers because every one of them is a value the engine got wrong or refused to compile.
+**18 of the 35 fail on the build without the fix**, four of those by aborting the test host —
+which is what makes them a pin rather than a description. Repository suite: **7 560 tests across
+13 projects, 3 failures**, the pre-existing win-x64 host ones.
+
+*This is why the successor could not start first.* Extending the same analysis to `let`/`const`
+without this would have widened a silent-NaN miscompilation to two more declaration forms.
+
 #### What is left of 3-3, and it now outranks what landed
 
 `let`/`const` and the block-scoped `var` are still ineligible, and the measurement moves them
@@ -2373,10 +2442,74 @@ moved since the last one was taken.*
   downstream of it, which is the 1 → 3 in the table above.
 
 So the successor item is **`let`/`const` at the numeric tier first**, then the block-scoped
-`var` (which does need the definite-assignment analysis the item names), and it should be
-sized against `--local-alloc`'s existing rows rather than re-derived. `const` is the cheaper
-half and worth separating: it cannot be reassigned at all, so the analysis reduces to
-checking its initializer.
+`var` (which does need the definite-assignment analysis the item names).
+
+#### `let`/`const` was attempted and **withdrawn**, and the reproduction is the deliverable
+
+It was built, it measured exactly as predicted, and it miscompiles. Recorded here rather than
+left as a branch, because the next attempt should start from the evidence.
+
+**What worked.** Offering a function-body-top-level `let`/`const` to `NumericLocalAnalysis` and
+admitting a lexical name in the function body block only:
+
+| Site | Before | After |
+|---|--:|--:|
+| `let-binding` | 31.98 B/iter, 1 numeric local | **0.00 B/iter, 3** |
+| `const-binding` | 31.98 B/iter, 1 numeric local | **0.00 B/iter, 3** |
+
+— identical to `top-level-var`, the eligible floor, with **every other `--local-alloc` row
+unchanged**. The multiplier the section above predicts is visible in the second column: one
+binding re-qualified, and the accumulator and counter that read it came with it. Semantics held
+in single-compilation runs: the `const` reassignment `TypeError`, the `let` TDZ
+`ReferenceError`, and the nested-shadowing dead zone all still fired, byte-identical to the
+baseline.
+
+**Two obligations it had to discharge, and both were fine.** The **TDZ** is discharged by the
+dominance argument the analysis already makes — a name with any reference before its
+declaration is rejected, so the throw is unreachable rather than removed. **Const-ness** needed
+one addition: a write to a const is a `TypeError` raised by the binding's *cell*, so a const
+written anywhere was rejected outright rather than specialized into a silent store.
+
+**What is wrong.** After **any** earlier compilation in the same process — a different
+`JSContext`, a different source — a `let` declared in a *nested block* reads back as an
+uninitialized double:
+
+```js
+// First, in one JSContext:
+(function () { let v = 3.5; v = v + 1; return v; })()      // → 4.5, correct
+
+// Then, in a fresh JSContext in the same process:
+(function () { let v = 1; { let v = 2; return v; } })()    // → 2.0000000074796844
+(function () { { let v = 2; return v; } })()               // → 2.0000000074796844
+(function () { let v = 1; { let w = 2; return w; } })()    // → 2.0000000074796844
+```
+
+**The tell is the third line: none of those nested bindings is one the gate admits.** A lexical
+name is applied in the function body block only, so `{ let v = 2; }` must get a cell — and it
+does not. **So a lexical binding's storage is decided somewhere other than that gate**, and
+until that is found no amount of tightening the gate is a fix. Three hypotheses were eliminated:
+it is not a specific predecessor (any one will do), not a compile count (64 preceding
+compilations in a fresh context each are harmless), and not repetition of the same source. The
+value's shape is a clue worth keeping — the high bits read as the right integer and the low
+mantissa bits are garbage, which is a slot written narrower than it is read.
+
+**One real bug was found and fixed on the way there**, which is why the attempt was worth
+making even though it did not land: the lexical declaration path assigns through the binding's
+value setter, and for a numeric local that setter is a **boxing read** — so the first build of
+this threw `System.NotImplementedException: Assignment target Call (BCallExpression) is not
+supported` out of `ILCodeGenerator.VisitAssign`. That is patch 0047's hazard family, exactly
+where this item's own *Watch* note said to look, and the fix is to test `NumericStorage` before
+the lexical branch rather than after it.
+
+**For the next attempt**, in order: find what else decides a lexical binding's storage (start at
+`VisitBlock`'s `CreateVariable` and `FastFunctionScope.variableScopeList` — the block scope is
+constructed fresh, so the leak is below it); keep the `NumericStorage`-before-lexical ordering
+in `VisitVariableDeclaration`; keep the const-write rejection; and re-run the reproduction above
+**as two evaluations in one process**, because a single one is green and the script host is
+therefore not an instrument that can see this.
+
+`const` remains the cheaper half and worth separating once the storage question is answered: it
+cannot be reassigned at all, so its analysis reduces to checking the initializer.
 
 ### 3-4 · A tagged value representation — *scope and cost, do not start*
 
@@ -2621,7 +2754,7 @@ Where each item came from, so existing cross-references still resolve.
 | §4.1 phase B | P0-2 | — | Implemented, not closed |
 | §4.1 phase C | P1-1, P1-4 | — | Implemented, not closed |
 | §4.1 phase D | P1-2, P1-3 | — | Implemented, not closed |
-| §4.1 phase E | P2-1, P2-2 (+ engine §6.5 array defects) | — | Implemented, not closed |
+| §4.1 phase E | P2-1, P2-2 (+ engine §6.5 array defects) | — | Implemented, not closed. **P2-2 item 3 shipped a wrong-answer bug**, found and fixed while working 3-3's successor: two writes to a numeric local were invisible to the analysis proving it numeric — a `var` re-declared in a nested statement, and any name bound through an object destructuring pattern. The first returned NaN; the second aborted compilation of the whole script with an unhandled `NotImplementedException`. See 3-3 |
 | §4.1 phase F | P2-3, P2-4, P3 | — | Implemented, not closed |
 | 0-1 … 0-5 | — | 0-1 … 0-5 | Implemented |
 | 0-6 | — | Octane §2.6 | **Owed** |
