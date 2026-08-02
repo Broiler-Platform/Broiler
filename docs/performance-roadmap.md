@@ -63,7 +63,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
-| **5** — regex | Open. Profile before rewriting |
+| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and **4× against** on the seventh. Largest regex cost measured is neither: `replace` with a global flag allocates **~42 KB per match** |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
 wall-clock figure is a median of interleaved process-granularity pairs against a control, per §3:
@@ -201,6 +201,7 @@ half in the column it was not looking at.
 | Did this operation get cheaper? | In-process probes, Appendix A |
 | What does an object or an element cost in bytes? | `--object-alloc`, `--element-alloc` |
 | What does a local, a binding or a parameter cost? | `--local-alloc`, which reports the compiler's own eligibility counts beside the bytes |
+| What does a regex cost, and which engine ran it? | `--regex-profile` |
 | Did the cache actually start hitting? | `PropertyOptimizationDiagnostics.Snapshot()` |
 | Did real programs get faster? | Octane, ≥3 repetitions, median + spread |
 | Is the engine still correct? | test262 over the pinned manifests |
@@ -490,6 +491,13 @@ These were paid for once each. They apply to every phase below.
   wrong-answer bug to two more declaration forms rather than exposing it. *A gate is only as
   sound as the analysis behind it, and the cheapest time to audit that analysis is while you
   still think of it as someone else's.*
+- **Check which component actually runs before profiling the one the plan names.** Phase 5 is
+  written about `Broiler.Regex`'s closure matcher, and B5 ranked it as sitting on PdfJS's and
+  Typescript's critical path. It does not: `JSRegExp` routes only semantic-gap patterns to it,
+  and Octane's corpus has no look-behind and no `u` flag, so the suite the phase is justified by
+  never reaches the component the phase is about. The engine that does serve it was one grep away
+  — `new Regex(pattern, options)` with no `RegexOptions.Compiled`. *A blocker that names a file
+  is making a routing claim, and routing is cheaper to check than to profile.*
 - **Interleave, at process granularity.** Sub-1.5% effects are only visible ABBA-
   interleaved across independent builds, ten runs each, medians compared.
 - **Hold the call site fixed when the callee is what changed.** Sizing a parameter's cost by
@@ -635,10 +643,16 @@ compilation a stack the engine sizes; see 1-2, which also records that the Mandr
 failure this blocker was written around does not reproduce on linux-x64. The blocker with
 the clearest browser relevance: it is page load time. → **phase 1**
 
-**B5 · The regex engine is a backtracking interpreter.** `Broiler.Regex`'s
-`Matching/Matcher.cs` has no compilation to native code; V8's Irregexp JIT-compiles
-each pattern. RegExp is 110× off *against Octane's lowest reference baseline*, and the
-same engine sits on PdfJS's and Typescript's critical path. → **phase 5**
+**B5 · The regex engine is a backtracking interpreter — *and it is not the engine Octane
+runs*.** `Broiler.Regex`'s `Matching/Matcher.cs` has no compilation to native code; V8's
+Irregexp JIT-compiles each pattern. RegExp is 110× off *against Octane's lowest reference
+baseline*. **The second half of that sentence — "the same engine sits on PdfJS's and
+Typescript's critical path" — is wrong, and phase 5's profile is what found it:** `JSRegExp`
+keeps `System.Text.RegularExpressions` as the default engine and routes only semantic-gap
+patterns to `Broiler.Regex`, and Octane's corpus contains no look-behind and no `u` flag, so
+it never gets there. The engine that does serve those suites is built **interpreted** — no
+`RegexOptions.Compiled` anywhere on the user-regex path. **This blocker names the wrong
+component**; see phase 5 for what the measurement puts in its place. → **phase 5**
 
 **B6 · Ambient state on hot paths — *the write half was the blocker, and it is gone*.**
 `JSEngine` holds the current context and the strict-mode flag in `AsyncLocal<T>`. P0-2 removed
@@ -2672,6 +2686,87 @@ implements and tests, compare both backends during expansion, move `Exec`, `Spli
 `Replace` to one match-data abstraction, and retire the .NET translator only after the
 pinned RegExp corpus is clean.
 
+### The gate is satisfied, and it overturns the phase — **`Matcher.cs` is not on this path**
+
+Profiled with `--regex-profile` (new; `RegexProfileMetrics`), and the first thing the profile
+established is that **the engine this phase is written about barely runs**.
+
+**`Broiler.Regex` is not the default engine, by design.** `JSRegExp.Broiler.cs` says so in its
+own header — *"JSRegExp keeps the mature .NET translator as the default engine and routes ONLY
+gap-feature patterns that Broiler.Regex can fully handle through it"* — and `GapScan` defines
+"gap" precisely: an astral or lone-surrogate atom under `u`, a back-reference inside a
+look-behind or in Unicode mode, a capturing group inside a look-behind, or a nullable quantifier
+that can repeat. **Octane's `regexp.js` contains no look-behind and no `u` flag at all**, so
+essentially none of the suite reaches `Matching/Matcher.cs`. B5's sentence — *"`Broiler.Regex`'s
+`Matching/Matcher.cs` has no compilation to native code … the same engine sits on PdfJS's and
+Typescript's critical path"* — is describing a component those workloads route around.
+
+**What does serve them is `System.Text.RegularExpressions`, built INTERPRETED.**
+`JSRegExp.ParseFlags` starts from `RegexOptions.ECMAScript` and the pattern is constructed as
+`new Regex(pattern, options)`; **`RegexOptions.Compiled` appears nowhere on the user-regex
+path**, though the engine does use it for `Intl` and `DateParser`. So the phase's own plan —
+"compile the common subset, keeping the interpreter as the fallback" — would be building a
+compiler for a path the benchmark never takes, while the path it *does* take has compilation
+available behind one flag.
+
+**Measured, on seven patterns lifted from `regexp.js` itself**, 200 000 matches each, the same
+`RegexOptions.ECMAScript` the engine ships against that plus `Compiled`:
+
+| Pattern | Interpreted | Compiled | Speedup | Build (interp → compiled) |
+|---|--:|--:|--:|--:|
+| `^ba` | 10.19 ms | 4.72 ms | **2.16×** | 1.2 µs → 6.8 µs |
+| `,` | 9.53 | 4.67 | **2.04×** | 1.0 → 6.3 |
+| `(-[a-z])` | 14.38 | 7.69 | **1.87×** | 2.4 → 13.4 |
+| `[+, ]` | 9.48 | 5.01 | **1.89×** | 1.3 → 6.6 |
+| `TNQP=([^;]*)` | 16.98 | 8.41 | **2.02×** | 1.6 → 12.1 |
+| `[<>]` | 9.27 | 5.01 | **1.85×** | 1.4 → 6.7 |
+| **`^[\s\xa0]+\|[\s\xa0]+$`** | 17.95 | **71.54** | **0.25× — four times SLOWER** | 4.2 → 25.9 |
+
+**Six of seven are worth about 2×, and the seventh is a 4× regression** — which is exactly why
+this is a measurement and not a flag to set globally. Construction costs 5–6× more compiled, but
+in absolute terms 7–26 µs against a pattern Octane builds once and matches hundreds of thousands
+of times, so the trade is not close *where it wins*. A per-pattern decision — compile on the
+second or third use, the way tiering already reasons about functions — is the shape this wants,
+not a blanket option.
+
+**And the largest regex-shaped cost in the engine is not matching at all.** Nine JS-level shapes
+over a 20 000-character subject, net of an inert loop:
+
+| Shape | ns/char | B/char |
+|---|--:|--:|
+| `re.test` miss — literal, class, alternation | 0.13 – 0.35 | ~0.02 |
+| `re.exec` hit with eight captures | 0.80 | 2.23 |
+| `/a*b/` quantifier walk, fails at every position | 0.95 | 0.02 |
+| `String.indexOf` for the same literal *(floor)* | 15.94 | 0.00 |
+| **`subject.replace(/[aeiou]/g, 'x')`** | **1 318** | **10 522** |
+
+The miss rows cost *less than `indexOf`*, which is the clearest possible statement that matching
+is not where the time goes. `replace` with a global flag is **~3 800× the next row in time and
+~4 700× in bytes**: 20 calls allocated **4.21 GB**, i.e. **210 MB per call and ~42 KB per match**
+on a 40 KB subject with 5 000 matches. Time scales only mildly superlinearly (2.3× for a doubled
+subject), so this is **allocation per match**, not an algorithmic blow-up — a match-result object
+built per match, which is the same shape as phase E's quadratic string concatenation and wants
+the same treatment.
+
+**So phase 5 is re-specified, and re-ordered against itself:**
+
+1. **Stop allocating per match on the `replace`/`exec` result path.** Largest measured cost by
+   three orders of magnitude, and it is the one that reaches PdfJS and Typescript — which is
+   what this phase claimed to care about.
+2. **Decide `RegexOptions.Compiled` per pattern**, on use count. ~2× on six of seven real
+   patterns, 4× *against* on the seventh, so it is a policy and not a flag.
+3. **Only then consider compiling `Broiler.Regex`.** It is correctness-critical for the gap
+   cases and it should stay, but no measurement here puts it on a hot path, and B5's ranking of
+   it was never checked against the routing.
+
+**RegExp's 110× is therefore not evidence about `Matcher.cs`**, and the score should not be
+quoted as if it were until something establishes which engine produced it.
+
+> **The RegExp checksum failure 2-8 recorded did not reproduce.** All three Octane runs this
+> session scored it (131, 126, 132) rather than failing `Error: Wrong checksum.`. Left as an
+> observation, not a claim: those are single runs on a different platform from the one that
+> recorded the failure, and nothing here was aimed at it.
+
 ---
 
 ## Sequencing
@@ -2683,7 +2778,7 @@ pinned RegExp corpus is clean.
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
 | **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
-| **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
+| **5** | profile ✅ → **stop allocating per match on `replace`/`exec`** → `Compiled` per pattern → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
 **Dependencies.**
 
@@ -2861,7 +2956,7 @@ Where each item came from, so existing cross-references still resolve.
 | 3-3 | P2-2 item 3 remainder | 3-3 | **Parameters landed; `let`/`const` and block `var` open and re-ranked ahead of them.** Measured before starting, and the item was right about the target and wrong about the tier: a parameter was excluded from the *scalar* gate, not the numeric one, so it allocated a `JSVariable` cell on every call — **56 B per parameter, a three-parameter call 230.2 → 62.2 B**. The numeric tier cannot be widened to parameters at all, because the caller picks the type; that is phase 4. All four ineligible categories cost the same per site, so the item's ordering was never a cost claim |
 | 3-4 | — (`tagged-js-value` in ownership.json) | 3-4 | Cost, do not start |
 | 4-1 … 4-4 | *excluded by engine §9* | 4-1 … 4-4 | Open — superseded, see §1.1 |
-| 5 | — | Octane §7 "regex, until late" | Open |
+| 5 | — | Octane §7 "regex, until late" | **Profiled — gate satisfied, phase re-specified.** `Matching/Matcher.cs` is not on the Octane path at all (only semantic-gap patterns route to it); the default engine is .NET's, built without `RegexOptions.Compiled`. B5's ranking of the closure matcher was never checked against the routing |
 | Lazy frame materialization | P3 remainder | — | Candidate, not a task — no measured cost to remove |
 
 **Status of the three source documents.**
