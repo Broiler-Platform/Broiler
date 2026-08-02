@@ -18,6 +18,10 @@ concurrency:
 env:
   WINDOWS_CONFIGURATION: Release-Windows
   LINUX_CONFIGURATION: Release-Linux
+  # Plain Release, not a Release-Android to match the desktop pair: the Android heads switch
+  # AndroidPackageFormat to aab on '$(Configuration)' == 'Release' exactly, so any other
+  # configuration name quietly produces an APK instead.
+  ANDROID_CONFIGURATION: Release
   DOTNET_NOLOGO: 'true'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
@@ -527,12 +531,222 @@ jobs:
           path: ${{ runner.temp }}/release-assets/BPP-Linux-self-contained.tar.*
           if-no-files-found: error
 
+  build-android-preview-package:
+    name: Build BPP Android Package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      BROWSER_PROJECT_PATH: src/Broiler.Browser.Android/Broiler.Browser.Android.csproj
+      WRITER_PROJECT_PATH: src/Broiler.Writer.Android/Broiler.Writer.Android.csproj
+      # The compile API and the build-tools track the android workload's Microsoft.Android.Sdk
+      # major; bump them together with scripts/install-android-sdk.sh.
+      ANDROID_API_LEVEL: '36'
+      ANDROID_BUILD_TOOLS: 36.0.0
+
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Setup the JDK the Android SDK tooling runs on
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install the Android build workload
+        shell: pwsh
+        run: |
+          # net10.0-android needs the android workload: the Mono runtime packs for the device ABIs
+          # plus the MSBuild targets that turn a publish into an app bundle.
+          dotnet workload install android
+          if ($LASTEXITCODE -ne 0) {
+            throw "dotnet workload install android exited with code $LASTEXITCODE."
+          }
+
+      - name: Provision the Android SDK
+        shell: pwsh
+        run: |
+          # ubuntu-24.04 runners ship an Android SDK, but not necessarily the API level the heads
+          # compile against — install what is missing rather than a second SDK beside it.
+          $sdkRoot = $env:ANDROID_HOME
+          if ([string]::IsNullOrWhiteSpace($sdkRoot)) {
+            $sdkRoot = $env:ANDROID_SDK_ROOT
+          }
+          if ([string]::IsNullOrWhiteSpace($sdkRoot)) {
+            throw "Neither ANDROID_HOME nor ANDROID_SDK_ROOT is set; this runner has no Android SDK."
+          }
+
+          $platformJar = Join-Path $sdkRoot "platforms/android-$env:ANDROID_API_LEVEL/android.jar"
+          if (-not (Test-Path -LiteralPath $platformJar)) {
+            $sdkManager = Join-Path $sdkRoot 'cmdline-tools/latest/bin/sdkmanager'
+            if (-not (Test-Path -LiteralPath $sdkManager)) {
+              throw "The Android SDK at $sdkRoot has no API $env:ANDROID_API_LEVEL and no sdkmanager to install it with."
+            }
+
+            # The runner image pre-accepts licenses; feeding 'y' anyway keeps a package the image
+            # has not seen from blocking on a prompt.
+            ("y`n" * 50) | & $sdkManager --sdk_root="$sdkRoot" --licenses | Out-Null
+            & $sdkManager --sdk_root="$sdkRoot" `
+              "platforms;android-$env:ANDROID_API_LEVEL" `
+              "build-tools;$env:ANDROID_BUILD_TOOLS"
+          }
+
+          if (-not (Test-Path -LiteralPath $platformJar)) {
+            throw "android.jar is missing after provisioning: $platformJar"
+          }
+
+          "ANDROID_HOME=$sdkRoot" >> $env:GITHUB_ENV
+          "ANDROID_SDK_ROOT=$sdkRoot" >> $env:GITHUB_ENV
+
+      - name: Restore Android runtime graphs
+        shell: pwsh
+        run: |
+          # No --runtime: the heads declare RuntimeIdentifiers (android-arm64;android-x64) and one
+          # bundle carries both ABIs, so the restore has to cover the whole set.
+          dotnet restore $env:BROWSER_PROJECT_PATH -p:Configuration=$env:ANDROID_CONFIGURATION
+          dotnet restore $env:WRITER_PROJECT_PATH -p:Configuration=$env:ANDROID_CONFIGURATION
+
+      - name: Publish Android app bundles
+        shell: pwsh
+        run: |
+          $publishRoot = Join-Path $env:RUNNER_TEMP 'android-publish'
+
+          dotnet publish $env:BROWSER_PROJECT_PATH `
+            --configuration $env:ANDROID_CONFIGURATION `
+            --no-restore `
+            --output (Join-Path $publishRoot 'browser')
+
+          dotnet publish $env:WRITER_PROJECT_PATH `
+            --configuration $env:ANDROID_CONFIGURATION `
+            --no-restore `
+            --output (Join-Path $publishRoot 'writer')
+
+      - name: Collect and verify the Android app bundles
+        shell: pwsh
+        run: |
+          # A Release publish leaves three packages side by side: the unsigned <applicationId>.aab
+          # plus -Signed.aab and -Signed.apk, both signed with the workload's debug key. Only the
+          # unsigned bundle may ship — a debug-signed one looks release-ready and is not.
+          function Get-UnsignedBundle {
+            param(
+              [Parameter(Mandatory=$true)][string]$PublishDirectory,
+              [Parameter(Mandatory=$true)][string]$ApplicationId
+            )
+
+            $bundle = Join-Path $PublishDirectory "$ApplicationId.aab"
+            if (-not (Test-Path -LiteralPath $bundle)) {
+              $produced = @(Get-ChildItem -LiteralPath $PublishDirectory -Filter *.aab -ErrorAction SilentlyContinue |
+                ForEach-Object { $_.Name })
+              $found = if ($produced) { $produced -join ', ' } else { '(none)' }
+              throw "Expected $ApplicationId.aab in $PublishDirectory. Bundles produced: $found"
+            }
+
+            return $bundle
+          }
+
+          function Assert-AndroidAppBundle {
+            param([Parameter(Mandatory=$true)][string]$Path)
+
+            $archive = [System.IO.Compression.ZipFile]::OpenRead($Path)
+            try {
+              $entries = @($archive.Entries | ForEach-Object { $_.FullName })
+            }
+            finally {
+              $archive.Dispose()
+            }
+
+            # An .aab is a protobuf bundle, not an APK. BundleConfig.pb and the base/ split are what
+            # tell the two apart, so a wrong AndroidPackageFormat cannot ship unnoticed.
+            foreach ($required in @('BundleConfig.pb', 'base/manifest/AndroidManifest.xml')) {
+              if ($entries -notcontains $required) {
+                throw "$Path is not an Android app bundle: $required is missing."
+              }
+            }
+
+            foreach ($abi in @('arm64-v8a', 'x86_64')) {
+              if (-not ($entries | Where-Object { $_.StartsWith("base/lib/$abi/") })) {
+                throw "$Path carries no $abi native code."
+              }
+            }
+
+            # The unsigned bundle is the deliverable; a signature here means the debug-signed one
+            # was picked up by mistake.
+            $signature = @($entries | Where-Object { $_ -match '^META-INF/.+\.(RSA|DSA|EC|SF)$' })
+            if ($signature) {
+              throw "$Path is signed ($($signature -join ', ')); the preview package ships unsigned bundles."
+            }
+
+            $megabytes = [Math]::Round((Get-Item -LiteralPath $Path).Length / 1MB, 1)
+            Write-Host "==> verified $(Split-Path -Leaf $Path): app bundle, $($entries.Count) entries, $megabytes MB, unsigned"
+          }
+
+          $publishRoot = Join-Path $env:RUNNER_TEMP 'android-publish'
+          $packageRoot = Join-Path $env:RUNNER_TEMP 'packages/BPP-Android'
+          New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
+
+          $heads = @(
+            @{ Directory = 'browser'; ApplicationId = 'org.broiler.browser'; PackageName = 'Broiler.Browser.aab' }
+            @{ Directory = 'writer'; ApplicationId = 'org.broiler.writer'; PackageName = 'Broiler.Writer.aab' }
+          )
+
+          foreach ($head in $heads) {
+            $bundle = Get-UnsignedBundle `
+              -PublishDirectory (Join-Path $publishRoot $head.Directory) `
+              -ApplicationId $head.ApplicationId
+
+            Assert-AndroidAppBundle -Path $bundle
+            Copy-Item -LiteralPath $bundle -Destination (Join-Path $packageRoot $head.PackageName) -Force
+          }
+
+      - name: Package Android assets
+        shell: pwsh
+        env:
+          RELEASE_BRANCH: ${{ github.event.inputs.branch }}
+        run: |
+          $assetDir = Join-Path $env:RUNNER_TEMP 'release-assets'
+          $packageParent = Join-Path $env:RUNNER_TEMP 'packages'
+          $packageName = 'BPP-Android'
+          New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
+
+          ./scripts/write-bpp-build-info.ps1 `
+            -PackageDirectory (Join-Path $packageParent $packageName) `
+            -Platform android `
+            -Variant app-bundle `
+            -Branch $env:RELEASE_BRANCH `
+            -Configuration $env:ANDROID_CONFIGURATION
+
+          # A zip rather than the Linux job's tar.xz: these bundles are fed to Android tooling from
+          # whatever desktop the developer has, and .zip opens on all three without extra tools.
+          Compress-Archive `
+            -LiteralPath (Join-Path $packageParent $packageName) `
+            -DestinationPath (Join-Path $assetDir "$packageName.zip") `
+            -Force
+
+      - name: Upload Android BPP
+        uses: actions/upload-artifact@v6
+        with:
+          name: BPP-Android
+          path: ${{ runner.temp }}/release-assets/BPP-Android.zip
+          if-no-files-found: error
+
   create-preview-package-release:
     name: Create BPP Draft Release
     runs-on: ubuntu-24.04
     needs:
       - build-windows-preview-package
       - build-linux-preview-package
+      - build-android-preview-package
     timeout-minutes: 30
 
     steps:
@@ -601,12 +815,14 @@ jobs:
           $windowsSelfContained = Resolve-Asset 'BPP-Win32-self-contained' @('.7z', '.zip')
           $linuxFrameworkDependent = Resolve-Asset 'BPP-Linux-framework-dependent' @('.tar.xz', '.tar.gz')
           $linuxSelfContained = Resolve-Asset 'BPP-Linux-self-contained' @('.tar.xz', '.tar.gz')
+          $android = Resolve-Asset 'BPP-Android' @('.zip')
 
           $packages = @(
             $windowsFrameworkDependent,
             $windowsSelfContained,
             $linuxFrameworkDependent,
-            $linuxSelfContained
+            $linuxSelfContained,
+            $android
           )
 
           foreach ($asset in $packages) {
@@ -628,7 +844,7 @@ jobs:
           # Single-quoted here-string: the notes are full of Markdown backticks, and in an
           # interpolating string PowerShell would eat them as escape characters.
           $contents = @'
-          Each package contains:
+          Each desktop package (`BPP-Win32-*`, `BPP-Linux-*`) contains:
 
           * `Broiler.Browser` — the Broiler web browser.
           * `Broiler.Writer` — the Broiler word processor (desktop).
@@ -665,6 +881,26 @@ jobs:
             ASP.NET Core 10 runtime on the target machine.
           '@
 
+          $androidNotes = @'
+          `BPP-Android.zip` carries the two Android application heads as Release app bundles:
+
+          * `Broiler.Browser.aab` — application ID `org.broiler.browser`.
+          * `Broiler.Writer.aab` — application ID `org.broiler.writer`.
+
+          Both bundles carry the `arm64-v8a` and `x86_64` ABIs, compile against API 36, and declare a
+          minimum of API 24. They are **unsigned**: release keys live outside the repository, so
+          signing and store upload belong to the delivery pipeline. An `.aab` is not installable as it
+          stands — sign it, then build and install an APK set for the device with Google `bundletool`:
+
+          ```
+          bundletool build-apks --bundle=Broiler.Browser.aab --output=Broiler.Browser.apks \
+            --ks=<keystore> --ks-key-alias=<alias>
+          bundletool install-apks --apks=Broiler.Browser.apks
+          ```
+
+          Android is an emulator-verified preview; physical-device validation is still outstanding.
+          '@
+
           $verify = @'
           Verify a download against `SHA256SUMS.txt`:
 
@@ -678,6 +914,8 @@ jobs:
             "Draft Broiler Preview Package prepared from branch $env:RELEASE_BRANCH at commit $env:SHORT_SHA.",
             '',
             $contents,
+            '',
+            $androidNotes,
             '',
             'Assets:',
             ($assetList -join "`n"),
@@ -693,6 +931,7 @@ jobs:
             $windowsSelfContained `
             $linuxFrameworkDependent `
             $linuxSelfContained `
+            $android `
             $checksumPath `
             --draft `
             --target $env:RELEASE_BRANCH `

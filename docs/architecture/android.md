@@ -170,6 +170,17 @@ normal `adb install` cannot reuse stale fast-deployment assemblies. Release buil
 create AABs. Release AABs are not publishable until the external signing and
 review gates are satisfied.
 
+The [Broiler Preview Package workflow](../../.github/workflows/broiler-preview-package.yml)
+builds both heads with `dotnet publish -c Release` — the configuration name has to
+be exactly `Release`, since that is what switches `AndroidPackageFormat` to `aab` —
+and ships them as `BPP-Android.zip`. One publish leaves three packages side by
+side: the unsigned `<applicationId>.aab` plus a `-Signed.aab` and `-Signed.apk`
+carrying the workload's debug key. The workflow packages the unsigned bundle and
+fails if the file it picked turns out to be signed, so a debug-signed artifact
+cannot reach a release under the policy above. Each bundle carries `arm64-v8a` and
+`x86_64`, which is what the heads' `RuntimeIdentifiers` resolve to when the publish
+passes no `--runtime`.
+
 ## Non-goals and support boundary
 
 - No .NET MAUI, Android XML content layouts, or Android widget copy of the UI.

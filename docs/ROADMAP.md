@@ -496,19 +496,30 @@ failure modes worth knowing are in
 A1, A4, and A5 are no longer blocked on environment access; they are blocked only
 on being written.
 
+**Delivery update (2026-08-02):** CI now provisions Android in one place. The
+Broiler Preview Package workflow installs the `android` workload, tops the
+runner's SDK up to the compile API, publishes both heads with
+`dotnet publish -c Release`, and ships the resulting bundles as `BPP-Android.zip`
+beside the desktop packages. The bundles are the **unsigned**
+`<applicationId>.aab`; the workflow rejects the debug-key `-Signed` pair the same
+publish produces, so the artifact stays inside the A0 signing policy. That is the
+preview-delivery half of this phase. A per-change Android build, the emulator
+smoke run, and signed store-ready artifacts remain open below.
+
 **Next actions:**
 
-1. Give CI the same Android provisioning the development container now has —
-   `scripts/install-android-sdk.sh`, or the runner's own SDK image — and confirm
-   the CI egress policy allows `dl.google.com`, since the development
-   environment's allowlist does not extend to it.
+1. Extend that provisioning past the preview package —
+   `scripts/install-android-sdk.sh`, or the runner's own SDK image — to whichever
+   workflow gates changes, and confirm the CI egress policy allows
+   `dl.google.com` wherever the runner image does not already carry the SDK.
 2. Add an Android build workflow that provisions the SDK and workload and builds
    the Android solutions on every change to the shared applications, so the port
    does not silently rot.
 3. Add an instrumented smoke run — launch, render a frame, dispatch synthetic
    touch and text, rotate, background, resume — on an emulator, with the honest
    note that emulator evidence is not hardware evidence.
-4. Produce signed AAB/APK artifacts through the frozen A0 signing policy and
+4. Sign the AAB/APK artifacts through the frozen A0 signing policy — the preview
+   package already builds the Release bundles, it just cannot sign them — and
    reconcile channels, versioning, and update ownership with the existing
    release work.
 5. Record the Android support statement in [the README](../README.md) and the
