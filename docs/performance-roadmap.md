@@ -54,13 +54,13 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 |---|---|
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is the critical path** — it is what phases A–F need to close on, and what phase 2's exit criterion is measured by. 0-7, 0-8 follow it |
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`). 1-1 open; 1-2's real fix open (`StackGuard` cannot fire today). 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
-| **2** — property access | **Complete as a ledger.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ landed; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1; **2-9** specified, spiked and startable. All nine commits are in the pinned pointer |
+| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; only 0-6's CI Octane run is outstanding |
 | **3** — arithmetic | Open. 3-1 first; 3-4 is a cost, not a task |
 | **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
 | **5** — regex | Open. Profile before rewriting |
 
-**What phase 2 changed, measured.** Every figure is a median of interleaved
-process-granularity pairs against a control, per §3:
+**What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
+wall-clock figure is a median of interleaved process-granularity pairs against a control, per §3:
 
 | Item | Result |
 |---|---|
@@ -70,20 +70,27 @@ process-granularity pairs against a control, per §3:
 | 2-4 | `o.x++` and `o.x op= rhs` reached **neither** cache — 0 hits *and* 0 misses. Both now take both, **0 → 199 999** on each side; the compound form went from costing 1.163x the spelled-out equivalent to 1.043x |
 | 2-7 | The property map reserved 16 trie nodes for the first property of any object — **920 B unused**. 43.9% of 47 M real maps never outgrow one four-node group: **live map bytes 0.56x, allocated 0.82x**, and Typescript, the suite with the worst tail, gains most |
 | 2-8 | Statics on a constructor function were a 100% miss — DeltaBlue's hot path — **0 → 199 999**, ~10% on a DeltaBlue-shaped loop. **This item also shipped a regression that broke DeltaBlue outright; the fix is folded into the same patch** |
+| 2-9 | A shape-tracked property cost ~150 B of radix trie to store an 8-byte reference. The trie is no longer written at all while an object is shape-tracked — **a three-field object is 0.36x and an eight-field one 0.15x**, against **+8 B on every object** for the attribute array. Over an Octane run **six in seven property maps are never built**: 16.2 M → 2.5 M, live map bytes 0.15x. All 22 cache rows byte-identical |
 
-**Owed.** Two things gate "landed" becoming "closed":
+**Owed.** One thing now gates "landed" becoming "closed":
 
-1. **test262 `properties-proxy` and `strict-mode`** — phase 2's exit gate, now covering 2-1,
-   2-2, 2-4 and 2-8, all of which touch `OrdinarySetWithOwnDescriptor`.
-2. **0-6's CI Octane run** — the only measurement of phase 2's real exit criterion, *DeltaBlue
+1. **0-6's CI Octane run** — the only measurement of phase 2's real exit criterion, *DeltaBlue
    and Richards inside 200x*. The committed results in `tests/octane/results/` predate the
    pointer bump and are stale.
 
-**The third — the patch handoff — is done.** `patches/0049`–`0058` have been applied, pushed
-and the pointer bumped to `a6f101cc`; the patch files are cleared and their rows moved to
-*Recently cleared* in [`patches/README.md`](../patches/README.md). What phase 2 measured and
-what CI now clones are the same tree, which is the condition the two gates above were always
-waiting on.
+**The conformance gate is satisfied.** All four pinned manifests were run at `a6f101cc` plus
+2-9, on win-x64 against the pinned suite ref `ccaac100` — **8 220 passed, 84 failed, 9 timed
+out, and every count is identical to §3.4's recorded run, manifest by manifest.** The 84 are the
+same `$262`-requiring files and the 9 the same integer-limit cases already tracked in
+`test262-failures.txt`. So `properties-proxy` and `strict-mode`, which phase 2's exit gate names
+because 2-1, 2-2, 2-4 and 2-8 all touch `OrdinarySetWithOwnDescriptor`, are **clean — and 2-9,
+which rewrites the storage underneath that path, adds no failure either.**
+
+**The patch handoff, which was the third gate, is done.** `patches/0049`–`0058` have been
+applied, pushed and the pointer bumped to `a6f101cc`; the patch files are cleared and their rows
+moved to *Recently cleared* in [`patches/README.md`](../patches/README.md). What phase 2 measured
+and what CI now clones are the same tree — which is the condition both remaining gates were
+waiting on, and it is why the conformance one could be run at all.
 
 **Two pre-existing defects found in passing**, both reproducing on a pristine build at the
 pinned pointer, neither owned by this campaign: a refused write to a function's `prototype`
@@ -286,8 +293,10 @@ a smaller package or faster context is not a win if required globals are absent.
 ### 3.4 Conformance gates
 
 The pinned manifests are `test262-arrays`, `test262-properties-proxy`,
-`test262-strict-mode`, `test262-realm-isolation`. As of 2026-08-01 at `cdb2fd41`
-(suite ref `ccaac100`):
+`test262-strict-mode`, `test262-realm-isolation`. First taken 2026-08-01 at `cdb2fd41`
+(suite ref `ccaac100`), and **re-run 2026-08-02 at `a6f101cc` plus 2-9 with every count
+unchanged** — so the table below now describes the pinned pointer as well as the commit it was
+first measured at:
 
 | Manifest | Executed | Passed | Failed | Skipped | Timed out | Engine failures |
 |---|---:|---:|---:|---:|---:|---:|
@@ -419,7 +428,7 @@ for the reason Phase 0 exists: the acceptance evidence has not been collected.
 | **D** | P1-2, P1-3 | Prototype and class method calls now hit the cache (**0 → ~400k hits**); constant-key stores go through a store cache (2.1×, or 3.6× when the key is not one-character early-interned) |
 | **E** | P2-1, P2-2 | Descriptor-free `push`; per-thread small-integer cache; unboxed `double` locals. Plus two array defects found by measuring: **repeated `pop` was quadratic (729×)** and array fill went **1 350 B → 145 B per element** |
 | **F** | P2-3, P2-4, P3 | Dense element = one reference, not a 32-byte descriptor (`new Array(1000)` −73%); string concatenation no longer quadratic (**150×** on the accumulation loop); the per-call activation record became a slot in a context-owned array addressed by a struct token — an argument-less call allocates **nothing**, and call-heavy code runs **3–15% faster** (median ≈11%) |
-| **2** | 2-0, 2-1, 2-2, 2-4, 2-7, 2-8 | Every remaining way a constant-key property access missed its cache, closed: allocation no longer retires prototype-keyed entries, a store that *creates* a property can hit, arrays and functions track named properties by shape, and `++`/`op=` take both caches. **Six sites went 0 → 199 999 hits.** Plus 2-7, which is memory rather than hit rate: the property map's 16-node floor charged **920 B of unused trie** to every object's first property — **live map bytes 0.56x**. Delivered as `2df877a0`…`a6f101cc`, all in the pinned pointer |
+| **2** | 2-0, 2-1, 2-2, 2-4, 2-7, 2-8 | Every remaining way a constant-key property access missed its cache, closed: allocation no longer retires prototype-keyed entries, a store that *creates* a property can hit, arrays and functions track named properties by shape, and `++`/`op=` take both caches. **Six sites went 0 → 199 999 hits.** Plus 2-7, which is memory rather than hit rate: the property map's 16-node floor charged **920 B of unused trie** to every object's first property — **live map bytes 0.56x**. Plus 2-9, which finishes what 2-7 started one layer down: a shape-tracked object no longer writes the radix trie at all, so **a three-field object is 0.36x and an eight-field one 0.15x** and **six in seven property maps over an Octane run are never built** (16.2 M → 2.5 M, live map bytes 0.15x). Delivered as `2df877a0`…`a6f101cc`, all in the pinned pointer, and 2-9 on top |
 
 Headline before/after on the probes:
 
@@ -505,7 +514,7 @@ onto benchmarks. → **phase 2**
 | Shape eligibility is `GetType() == typeof(JSObject)` — `JSArray`, `JSFunction`, every exotic excluded | **Fixed for arrays (2-2) and functions (2-8).** The four benchmarks named here were the wrong ones — they reach arrays by element and by `length`, neither of which a shape can hold. The idiom that pays is statics on a constructor function, and **DeltaBlue at 601× was the case** — 2-8 took it from 0 to 199 999 hits |
 | No shape-transition cache — *creating* a property misses every time | Richards, DeltaBlue, RayTrace, Box2D |
 | `o.x++`, `o.x += 1`, computed keys, `super`, optional chains, private names keep the old lowering | Richards, Gameboy, Box2D |
-| Double storage in `TrackShapeDataProperty` | everything — but **measured at ~3% of a worst-case store loop and, after 2-7, 1.0-4.3% of an object's per-property bytes**; 2-3 is **closed** on that, and the 67-94% that *is* the trie became 2-9 |
+| Double storage in `TrackShapeDataProperty` | everything — but **measured at ~3% of a worst-case store loop and, after 2-7, 1.0-4.3% of an object's per-property bytes**; 2-3 is **closed** on that, and the 67-94% that *is* the trie became 2-9, **which has landed** |
 
 A fifth gap belongs on that list and is **fixed**: every `new` published a global
 prototype-mutation notice, so a prototype-keyed entry could not survive a loop that
@@ -600,7 +609,7 @@ said so independently (§1.2). This phase contains no engineering.
 | **0-8** | Two runs inside the band on **win-x64, linux-x64, linux-arm64**, reporting time, allocation and working set together | **Not satisfied on any RID.** The win-x64 leg ran and **failed the band: 25 of 62 metrics outside 7.5%**, worst 56% (`FunctionCallBenchmarks.Native`), including 5 lifecycle metrics. That is the protocol working, not a defect — the run was on a 16-core developer workstation, and `performance.md` requires an *idle physical machine*. **A workstation cannot produce this evidence**; linux-x64 and linux-arm64 are unavailable here regardless |
 | **0-9** | A permanent home for the Appendix A probes under `Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks`, wired into `Broiler.JS/eng/performance/phase0.json` | **Done — and engine §8.1's "not created" was wrong.** The project existed and was *already* `phase0.json`'s `benchmark.project`; what was missing was the probe corpus inside it. Added `HotPathProbeBenchmarks` (all 14 Appendix A scenarios at Appendix A's iteration counts, plus the P2-4 accumulation probe), registered in `Program.cs` and wired into all three profiles. Phase C's hit rates got their own emitter, `--cache-metrics`, because a hit rate is not a wall-clock benchmark |
 | **0-10** | Pinned test262 over the four manifests | **Done** — 8 313 tests, **zero engine failures** (§3.4). Getting there took three tooling fixes, below. The Annex B paths P0-3 names are still in no manifest |
-| **0-11** | An `ownership.json` entry per item | **Done.** Fifteen added, one per item rather than one per phase since the file is item-scoped, bringing it to 36 total. The pre-existing `tiered-unboxed-locals` is the same work as `numeric-local-doubles` and should be retired when the phase 0–5 evidence is next revisited — left alone rather than silently retargeted |
+| **0-11** | An `ownership.json` entry per item | **Done.** Fifteen added, one per item rather than one per phase since the file is item-scoped, bringing it to 36 total, and 2-9 has since added `shape-only-property-storage` for 37. The pre-existing `tiered-unboxed-locals` is the same work as `numeric-local-doubles` and should be retired when the phase 0–5 evidence is next revisited — left alone rather than silently retargeted |
 
 #### 0-9 reproduces phase C exactly
 
@@ -1037,11 +1046,11 @@ hit-rate guard for the fix itself. **Removing the two hit-time prototype guards 
 of them**, which is what makes them load-bearing rather than decorative. Suite: **7 307 tests
 across 13 projects, 0 failures.**
 
-> **test262 has not been run for this item.** §3.4's protocol and this phase's exit gate both
-> require `test262-properties-proxy` and `test262-strict-mode` for anything touching
-> `OrdinarySetWithOwnDescriptor`, and 2-1 touches its last step. The repository suite and the
-> targeted battery above are what *has* been run. **The two manifests are owed before this
-> closes** — this is the gate the phase-2 exit criterion names, not an optional extra.
+> **test262 has since been run, and it is clean.** §3.4's protocol and this phase's exit gate
+> both require `test262-properties-proxy` and `test262-strict-mode` for anything touching
+> `OrdinarySetWithOwnDescriptor`, and 2-1 touches its last step. Both manifests were run at
+> `a6f101cc` plus 2-9 and match §3.4's recorded counts exactly — 3 950 / 38 and 1 040 / 26 — so
+> this item's conformance debt is paid. See §0.
 
 Landed as `5d31617a`, which builds on `2df877a0`.
 
@@ -1538,8 +1547,10 @@ only genuinely per-object extras are the value (already in `shapeSlots`) and the
 are a *byte*. A parallel `byte[]` costs 24 + n against the trie's 150 B per property.
 
 **L**, with a measured prize of 67–94% of per-property object bytes — the first version of this item
-that has one. Sequence it after phase 2's exit gate: it touches the same storage
-`OrdinarySetWithOwnDescriptor` writes through.
+that has one, and the reason it was worth starting. It touches the same storage
+`OrdinarySetWithOwnDescriptor` writes through, so it was sequenced with that path's conformance
+gate rather than after it: **test262 and Octane were run as part of the change, not once it
+looked finished.** Landed; see below.
 
 #### Design spike — three questions answered, so nobody re-derives them
 
@@ -1575,13 +1586,131 @@ reasons, both verified rather than assumed:
   non-null deferred cell. So the 56-byte node does not shrink by 8 bytes for free; the prize is only
   reachable by not allocating the node at all.
 
-**Not started.** The remaining work is a materialization boundary, per-object attribute storage, and
-rerouting `TryWriteShapeSlot`/`TryCreateShapeSlot`'s `IsValue`/`IsReadOnly` checks off the trie —
-across enumeration, descriptor queries, `delete`, `defineProperty`, Proxy traps and the Annex B
-deferred cells. **It needs a verification budget to match**, and this session's evidence is that a
-shape change verified only by unit tests is not verified: 2-8 passed 7 347 of them and broke
-DeltaBlue. Whoever starts it should plan the Octane run and the test262 pass *as part of the change*,
-not after.
+#### Landed — the trie is not written at all while an object is shape-tracked
+
+Built exactly as the spike specified, and the spike held: the choke point was where it said, the
+shape did supply the keys and their order with no change to `ObjectShape`, and the attributes did
+need a per-object array.
+
+**Bytes per object**, `--object-alloc`, same method as 2-7 (forced gen2 collection, then
+`GC.GetAllocatedBytesForCurrentThread()` deltas over 50 000 objects, warmed first):
+
+| Object | Before | After | Ratio | Delta |
+|---|--:|--:|--:|--:|
+| `{}` | 192 | 200 | 1.04 | **+8** |
+| `{ a, b, c }` literal | 968 | 288 | **0.30** | −680 |
+| `{ …8 fields }` literal | 3 344 | 408 | **0.12** | −2 936 |
+| `new T()`, empty body | 216 | 224 | 1.04 | **+8** |
+| `new T()`, 1 field | 584 | 376 | **0.64** | −208 |
+| `new T()`, 3 fields | 1 056 | 376 | **0.36** | −680 |
+| `new T()`, 8 fields | 3 432 | 496 | **0.15** | −2 936 |
+| `class C`, 3 fields | 1 248 | 568 | **0.46** | −680 |
+| `Object.create(null)` + 3 | 1 024 | 344 | **0.34** | −680 |
+
+**A three-field object is 0.36x and an eight-field one 0.15x**, and the shape of the win is the
+shape of the finding: the saving is per *property*, so it grows with the object, where 2-7's was a
+fixed block. One field and three fields no longer cost the same — the fixed block 2-7 shrank is
+now gone entirely for these objects, and what remains is a slot and a byte each.
+
+**The losing side is +8 bytes on every object**, including one with no named properties at all,
+for the `shapeAttributes` reference. That is the whole cost, and it is smaller than it first
+measured: carrying the materialization flag as its own `bool` field cost another 8 bytes on every
+object — a fresh alignment group — so it moved into a spare bit of the existing `ObjectStatus`
+word. **An empty object pays 8 bytes; a three-field one saves 680.**
+
+**The inline caches are untouched, and that is asserted rather than assumed.** All 22
+`--cache-metrics` rows are byte-identical to the pre-change build — every hit, miss, dictionary
+fallback and shape transition — so nothing phase 2 landed is paid for here.
+
+#### It holds on real programs — `--property-map-distribution`, before and after
+
+The rows above are synthetic sites, and the open question they cannot answer is how much of a
+real workload *stays* shape-only rather than materializing on its first enumeration. 2-7's
+emitter answers it directly, because a map that is never allocated is counted nowhere: run
+Octane and count the property maps. Both runs on this machine, 13 suites (Mandreel skipped, as
+2-7's own run of record did), **10 runs per benchmark on each side**, the second on a pristine
+build at `a6f101cc`:
+
+| | Before | After | Ratio |
+|---|--:|--:|--:|
+| **Property maps allocated** | 16 246 854 | 2 501 706 | **0.154** |
+| Node-group allocations | 36 634 448 | 6 371 061 | 0.174 |
+| Nodes copied by resizes | 110 622 968 | 14 175 868 | **0.128** |
+| **Live map bytes** (shipped policy) | 9.47 GB | 1.39 GB | **0.147** |
+| Allocated map bytes | 16.75 GB | 2.24 GB | 0.134 |
+
+**Six in seven property maps are never built at all.** The per-suite spread is what makes it a
+finding rather than an average — Splay **591 324 → 60**, EarleyBoyer 0.036x, Typescript 0.100x,
+DeltaBlue 0.144x, PdfJS 0.173x, while RayTrace (0.500x) and Box2D (0.510x) keep half of theirs
+because they materialize more. Nothing regressed; the worst suite still halves.
+
+**The before-run is also a check on the harness, and it passes.** It reproduces 2-7's recorded
+16.2 M-map sample to four digits — one-group share **0.4386** against the 43.86% §2-7 records —
+so the two sides are being measured the same way that run was. Afterwards the surviving maps sit
+at a one-group share of 0.114 and **98.97% within four groups**: what still materializes is
+overwhelmingly small, which is consistent with the survivors being objects that took a
+descriptor path rather than objects with many properties.
+
+*This is the measurement 2-3 was closed on, pointed at 2-3's successor, and it is the first
+real-workload number this item has* — the byte table above is 50 000 objects in a loop; this is
+fifteen large real programs.
+
+**How it works, in one paragraph.** An object starts *shape-only*: the shape holds key-to-slot,
+`shapeSlots` holds the values, a parallel `JSPropertyAttributes[]` holds the attributes, and the
+radix trie is never written. Anything that needs a real descriptor — an accessor, a deferred
+cell, a `delete`, a private name, or the mutable `ref PropertySequence` that `GetOwnProperties()`
+hands to another assembly — calls `MaterializeNamedProperties()`, which replays the shape's keys
+in slot order into the trie and sets a status bit for good. **After that the object behaves
+exactly as it did before this item existed, so the worst case is the old behaviour** — which is
+what made it safe to convert the paths one at a time. Slot order is insertion order
+(`ObjectShape.Add` assigns `slots[key] = slots.Count`), so the rebuilt chain is the one the eager
+path would have built and `OrdinaryOwnPropertyKeys` reports the order it always did.
+
+The rule that makes a shape-only object answerable without a descriptor: **every key in its shape
+has a non-null slot and a plain data attribute set.** Everything that would violate it
+materializes *before* it is recorded — which is why `TrackShapeKeyWithoutSlotValue`, 2-8's
+null-slot mechanism for the Annex B `caller`/`arguments` cells, now materializes first.
+
+**Where the trie writes were removed.** Six paths, and they are the ones that create or overwrite
+a property: `FastAddValue`, `DefineReceiverDataProperty` (both overloads), the `[[Set]]`
+overwrite fast path, `TryCreateShapeSlot` (2-1's transition entry), `TryWriteShapeSlot` (the store
+cache's overwrite) and `CopyDataProperties`. Five read paths answer from the shape rather than
+materializing, because materializing on a read would hand the trie straight back to every object
+that is ever read without a warm cache: `GetValue`, `GetInternalProperty`, `GetOwnProperty`,
+`HasOwnProperty`/`TryGetOrdinaryOwnProperty` and `GetMethod`. Everything else materializes, on
+purpose.
+
+**Verify — the boundary, not the hit rates.** 25 test cases in `ShapeOnlyPropertyStorageTests`,
+and what they pin is what a shape cannot carry. Order: insertion order through a rebuild for five
+construction forms, order continuing rather than restarting for properties added *after*
+materialization, and a deleted-then-recreated property still moving to the tail. Attributes: each
+of `writable`/`enumerable`/`configurable` set to a non-default while shape-only and read back
+through a descriptor query, plus **two objects at the same shape keeping different flags** —
+the reason the parallel array exists, stated as a test. Refusals through a *warmed* store site:
+a frozen receiver, and a property made non-writable after 300 cached writes. The descriptor kinds
+a slot cannot hold: an accessor redefined mid-loop taking over both directions, a function's
+Annex B `caller` keeping the non-writable/non-enumerable/non-configurable **data** descriptor P0-3
+preserved, and a private field staying out of the own keys. And the boundary as other assemblies
+cross it: `Object.assign`, spread, a Proxy over a shape-only target, `for`-in over a chain, and
+40 properties across every growth step with **every value and every position checked**, because a
+resize that copied the slots and not the attributes would surface as a wrong flag rather than a
+crash. Repository suite: **7 401 tests across 13 projects, 3 failures**, all three the
+pre-existing win-x64 host-environment ones §4.1 names.
+
+**test262 and Octane were run as part of the item, which is what 2-8 established they have to
+be.** All four pinned manifests are unchanged — 8 220 passed, 84 failed, 9 timed out, identical
+counts manifest by manifest (§0). Octane: **14 of 15 suites `ok`, DeltaBlue included**, which is
+the specific check 2-8 skipped and paid for.
+
+**The fifteenth is Mandreel, and it is not this item — confirmed against a control rather than
+assumed.** It fails in phase `Setup` with `RangeError: Maximum call stack size exceeded` at
+`EnsureWithinStackBudget` (`CallFrames.cs:215`) from `mandreelAppInit` (`mandreel.js:1460`),
+which is the win-x64 signature phase 0 recorded and item 1-2 diagnosed. Re-run on a **pristine
+build at `a6f101cc` with 2-9 absent**, on the same machine and the same harness, it fails
+**identically** — same guard, same frame, same phase, same eleven-frame stack. So the one
+non-`ok` suite is pre-existing at the pinned pointer on this platform, exactly as 1-2 says, and
+1-2's note that it does not reproduce on linux-x64 is why 0-6 will not see it. *A failing suite
+is a claim; the control is what turns it into a verdict, and it cost one 387 s run.*
 
 ### 2-7 · The property map's 16-node floor costs ~1 KB per object — **landed**
 
@@ -1737,18 +1866,18 @@ wall-clock benchmark reports, and it exists because 2-3 could not be decided wit
 item's *only* surviving justification was memory, and there was no way to measure memory per
 object from a clean checkout. Both 2-3's re-sizing and 2-7 came out of its first run.
 
-**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ (both halves) → 2-8 ✅; **2-5 closed** and
-**2-6 folded into 4-1**, both on measurements. **Every listed item in this phase is now either
-landed or closed, and 2-7 is landed as well.** **2-3 is closed** — re-measured against the shipped
-2-7 build, its own proposal is worth 1.0-4.3% of an object's per-property bytes while the radix trie
-it does not target is 67-94%; that became **2-9** (L, not started).** The phase's own exit gate — test262 `properties-proxy` and `strict-mode`,
-now covering 2-1, 2-2, 2-4 and 2-8 — and 0-6's CI Octane run are what stand between "landed" and
-"closed".
+**Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ (both halves) → 2-8 ✅ → 2-7 ✅ → **2-9 ✅**;
+**2-5 closed** and **2-6 folded into 4-1**, both on measurements. **Every item in this phase is now
+landed or closed.** **2-3 is closed** — re-measured against the shipped 2-7 build, its own proposal
+is worth 1.0-4.3% of an object's per-property bytes while the radix trie it does not target is
+67-94%; that became **2-9**, which has since landed and taken it. The phase's own exit gate —
+test262 `properties-proxy` and `strict-mode`, covering 2-1, 2-2, 2-4, 2-8 and now 2-9 — is
+**satisfied**; 0-6's CI Octane run is what still stands between "landed" and "closed".
 
 **Verify — per item, not per phase.**
 
 - An `ownership.json` entry naming its benchmark and semantic owner. The file is
-  item-scoped and already carries 36 entries; match that granularity.
+  item-scoped and carries 37 entries; match that granularity.
 - Coverage in `PropertyShapeCacheTests` / `PropertyStoreCacheTests` for **every**
   invalidation path: `setPrototypeOf`, prototype mutation, own-property shadowing,
   `delete`, freeze, accessor redefinition, polymorphic and megamorphic sites.
@@ -1913,7 +2042,7 @@ pinned RegExp corpus is clean.
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅; 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1; **2-9 is 2-3's successor, L, not started**. **Every listed item is landed or closed** | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1, 2-2, 2-4 and 2-8**; **DeltaBlue and Richards inside 200×** |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
@@ -2084,7 +2213,7 @@ Where each item came from, so existing cross-references still resolve.
 | 2-2 | P1-4 remainder | 2-2 | **Landed for arrays** — `641241af`, in the pinned pointer; its four named benchmarks were the wrong targets |
 | 2-8 | — (the blocked half of 2-2) | — | **Landed** — `850121a0`, in the pinned pointer; both prerequisites fixed. **Shipped a regression that broke DeltaBlue** (a cached store to `f.prototype` bypassed `JSFunction`'s cached-field sync); the gate that fixes it is folded into the same commit |
 | 2-3 | P1-4 remainder | 2-3 | **Closed** — measured twice. Not a pure removal, ~3% throughput ceiling, and after 2-7 its own proposal is worth 1.0-4.3% of per-property object bytes. Its premise is also wrong: shape slots admit non-default attributes, which are per-object data a shared shape cannot hold |
-| 2-9 | — (found closing 2-3) | — | **Specified, not started** — shape-tracked properties should not live in a radix trie: 2.5-4.0 nodes per property at 56 B a node, **67-94% of a tracked object's per-property bytes**. L; sequence after phase 2's exit gate |
+| 2-9 | — (found closing 2-3) | — | **Landed** — shape-tracked properties no longer live in the radix trie; it is written only when something needs a real descriptor. A three-field object is **0.36x**, an eight-field one **0.15x**, against +8 B on every object; over an Octane run **16.2 M property maps become 2.5 M**. All 22 cache rows byte-identical; test262 unchanged across all four manifests; Octane 14/15 with the fifteenth confirmed pre-existing against a control |
 | 2-7 | — (found measuring 2-3) | — | **Landed** — `55c6b1fb` (the measurement) and `a6f101cc` (the policy), both in the pinned pointer. 43.9% of 47 M real maps never outgrow one four-node group; live map bytes 0.56x, allocated 0.82x, Typescript 0.92x |
 | 2-5 | P0-2 remainder | 2-5 | **Closed** — measured at 0%; P0-2 had already taken the cost, and 2-1 narrowed what was left |
 | 2-6 | — | 2-6 | **Folded into 4-1** — no callee resolution to cache; a call costs ~250 ns and a call-site cache removes none of it |
