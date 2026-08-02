@@ -1488,12 +1488,51 @@ an object in shape mode, key to slot is already in the shape, order is already s
 only genuinely per-object extras are the value (already in `shapeSlots`) and the attributes, which
 are a *byte*. A parallel `byte[]` costs 24 + n against the trie's 150 B per property.
 
-**Not started, and larger than 2-3 ever was.** Every `GetOwnProperties()` consumer — enumeration,
-descriptor queries, `delete`, `defineProperty`, the deferred-cell paths, `PropertyValueEnumerator` —
-reads the sequence directly, so this needs a materialize-on-demand boundary rather than an
-in-place swap. **L**, with a measured prize of 67–94% of per-property object bytes, which is the
-first version of this item that has one. Sequence it after phase 2's exit gate, not before: it
-touches the same storage `OrdinarySetWithOwnDescriptor` writes through.
+**L**, with a measured prize of 67–94% of per-property object bytes — the first version of this item
+that has one. Sequence it after phase 2's exit gate: it touches the same storage
+`OrdinarySetWithOwnDescriptor` writes through.
+
+#### Design spike — three questions answered, so nobody re-derives them
+
+**1. Is there a single choke point?** Yes. `GetOwnProperties()` returns a **mutable
+`ref PropertySequence`** to about 25 files across `BuiltIns`, `Extensions`, `Modules`, `Debugger`
+and `Engine`, and `ownProperties` is otherwise private. A caller holding that ref can mutate the
+trie directly, so lazy materialization is viable *because* every such caller has to go through the
+accessor — but it also means the boundary must materialize unconditionally and then never
+un-materialize. Design: shape mode holds nothing in the trie; the first `GetOwnProperties()` rebuilds
+it and sets a flag; after that the object behaves exactly as it does today. Worst case is today's
+behaviour, which is the property that makes this safe to land incrementally.
+
+**2. Can a property be rebuilt from the shape?** **Yes, and with no change to `ObjectShape`.** This
+was the question the item looked most likely to die on: the shape stores `Dictionary<uint, int>` —
+key *hashes* — while a trie node needs a full `KeyString`. It turns out a `KeyString` **is** that
+uint (`public readonly uint Key`, and `KeyStrings.GetName(uint) => new(id)` reconstructs it, with
+`GetMetadata`/`GetNameString` alongside). So the shape already carries everything materialization
+needs: iterate its keys in slot order — slot order *is* insertion order, since `ObjectShape.Add`
+assigns `slots[key] = slots.Count` — and take the value from `shapeSlots[slot]`.
+
+**3. Can the value be reconstructed without a per-object attribute array?** **No.** Two independent
+reasons, both verified rather than assumed:
+- `IsShapeTrackableData` admits any plain data property, so writable/enumerable/configurable vary
+  per object at the same shape (see 2-3 above). One `byte` per slot, so a parallel array costs
+  24 + n against the trie's ~150 B per property — still overwhelmingly worth it.
+- **`JSProperty.get` is not derivable from `value`**, which kills the tempting cheap alternative of
+  shrinking the node instead of replacing it. The accessor factory sets `value = get` and the data
+  factory sets `get = value as IPropertyAccessor`, which together *look* like a redundant field —
+  but four five-argument call sites pass them independently:
+  `new JSProperty(key, getter, setter, existing.value, attributes)` in `JSObjectExtensions` and
+  `JSObject.PropertyStorage` install an accessor pair while retaining the old **data** value, and
+  `new JSProperty(key, null, null, deferred, attributes)` deliberately holds a null `get` beside a
+  non-null deferred cell. So the 56-byte node does not shrink by 8 bytes for free; the prize is only
+  reachable by not allocating the node at all.
+
+**Not started.** The remaining work is a materialization boundary, per-object attribute storage, and
+rerouting `TryWriteShapeSlot`/`TryCreateShapeSlot`'s `IsValue`/`IsReadOnly` checks off the trie —
+across enumeration, descriptor queries, `delete`, `defineProperty`, Proxy traps and the Annex B
+deferred cells. **It needs a verification budget to match**, and this session's evidence is that a
+shape change verified only by unit tests is not verified: 2-8 passed 7 347 of them and broke
+DeltaBlue. Whoever starts it should plan the Octane run and the test262 pass *as part of the change*,
+not after.
 
 ### 2-7 · The property map's 16-node floor costs ~1 KB per object — **landed**
 
