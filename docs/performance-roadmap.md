@@ -21,19 +21,20 @@ so only the parent can hold the combined view.
 - **Acceptance protocol:** unchanged and unchallenged —
   [`Broiler.JS/docs/performance.md`](../Broiler.JS/docs/performance.md) governs what
   may be *claimed*. **Nothing in this document closes on the numbers it quotes.**
-- **Provenance:** the pinned submodule pointer is **`685026c0`**, checked 2026-08-01 —
-  two commits past the `b3f53dcc` this document named a revision ago and nine past the
-  `cdb2fd41` both source documents name; `cdb2fd41`, `7ef80c03` and `8228b0da` all remain
-  ancestors, so item 0-1's substance holds. Those two commits are item 0-9's probe corpus
-  (`aa2b1562`, #938), which means the corpus 0-9 describes is now *in* the pointer rather
-  than pending against it. **Measurements and the test262 run in §4.1 and §3.4 were taken
-  at `cdb2fd41` and have not been repeated at `685026c0`** — which also carries a
-  string-allocation fix (#936). Octane code sites verified at `45f4f679`. **Phase 2's own
-  measurements — §0, and each 2-x section — were all taken at `685026c0` plus the pending
-  `patches/0050`–`0058`**, the tree those patches reproduce and the only tree they describe.
-  Item rows were
+- **Provenance:** the pinned submodule pointer is **`a6f101cc`**, checked 2026-08-02.
+  **The patch handoff has completed**: `patches/0049`–`0058` were applied to `Broiler.JS`,
+  pushed, and the pointer bumped, so all ten are now ancestors of the pin rather than
+  pending against it — verified patch-by-patch against the submodule log, not inferred from
+  the prose. `685026c0`, `cdb2fd41`, `7ef80c03` and `8228b0da` all remain ancestors, so item
+  0-1's substance holds, and `685026c0` carries item 0-9's probe corpus (`aa2b1562`, #938).
+  **Measurements and the test262 run in §4.1 and §3.4 were taken at `cdb2fd41` and have not
+  been repeated** — `685026c0` also carries a string-allocation fix (#936). Octane code
+  sites verified at `45f4f679`. **Phase 2's own measurements — §0, and each 2-x section —
+  were taken at `685026c0` plus the then-pending `0050`–`0058`, which is exactly the tree
+  `a6f101cc` now is**, so they describe the pinned pointer directly and no longer depend on
+  a patch series being applied in order. Item rows were
   checked against the tree rather than inherited from the prose above them; doing that is
-  what caught this, and this time it also caught that **item 1-2's acceptance criterion
+  what caught this, and it also caught that **item 1-2's acceptance criterion
   already passed before any work** (phase 1).
 
 > **Path convention.** Because this document moved up a level, every path is written
@@ -52,8 +53,8 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | Phase | State |
 |---|---|
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is the critical path** — it is what phases A–F need to close on, and what phase 2's exit criterion is measured by. 0-7, 0-8 follow it |
-| **1** — compile-time | 1-2's mitigation ✅ (`patches/0049`). 1-1 open; 1-2's real fix open (`StackGuard` cannot fire today). 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
-| **2** — property access | **Complete as a ledger.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ landed; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1; **2-9** specified, spiked and startable. Nine patches, `0050`–`0058` |
+| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`). 1-1 open; 1-2's real fix open (`StackGuard` cannot fire today). 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
+| **2** — property access | **Complete as a ledger.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ landed; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1; **2-9** specified, spiked and startable. All nine commits are in the pinned pointer |
 | **3** — arithmetic | Open. 3-1 first; 3-4 is a cost, not a task |
 | **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
 | **5** — regex | Open. Profile before rewriting |
@@ -70,17 +71,19 @@ process-granularity pairs against a control, per §3:
 | 2-7 | The property map reserved 16 trie nodes for the first property of any object — **920 B unused**. 43.9% of 47 M real maps never outgrow one four-node group: **live map bytes 0.56x, allocated 0.82x**, and Typescript, the suite with the worst tail, gains most |
 | 2-8 | Statics on a constructor function were a 100% miss — DeltaBlue's hot path — **0 → 199 999**, ~10% on a DeltaBlue-shaped loop. **This item also shipped a regression that broke DeltaBlue outright; the fix is folded into the same patch** |
 
-**Owed, and not obtainable from a container.** Three things gate "landed" becoming "closed":
+**Owed.** Two things gate "landed" becoming "closed":
 
 1. **test262 `properties-proxy` and `strict-mode`** — phase 2's exit gate, now covering 2-1,
    2-2, 2-4 and 2-8, all of which touch `OrdinarySetWithOwnDescriptor`.
 2. **0-6's CI Octane run** — the only measurement of phase 2's real exit criterion, *DeltaBlue
    and Richards inside 200x*. The committed results in `tests/octane/results/` predate the
    pointer bump and are stale.
-3. **The patch handoff.** `patches/0050`–`0058` apply in order from the pinned pointer and
-   reproduce the verified tree exactly. The submodule pointer is deliberately **not** bumped:
-   the `Broiler.JS` remote is outside this session's GitHub scope and returns 403, and a pointer
-   at a commit CI cannot clone would break the build.
+
+**The third — the patch handoff — is done.** `patches/0049`–`0058` have been applied, pushed
+and the pointer bumped to `a6f101cc`; the patch files are cleared and their rows moved to
+*Recently cleared* in [`patches/README.md`](../patches/README.md). What phase 2 measured and
+what CI now clones are the same tree, which is the condition the two gates above were always
+waiting on.
 
 **Two pre-existing defects found in passing**, both reproducing on a pristine build at the
 pinned pointer, neither owned by this campaign: a refused write to a function's `prototype`
@@ -416,7 +419,7 @@ for the reason Phase 0 exists: the acceptance evidence has not been collected.
 | **D** | P1-2, P1-3 | Prototype and class method calls now hit the cache (**0 → ~400k hits**); constant-key stores go through a store cache (2.1×, or 3.6× when the key is not one-character early-interned) |
 | **E** | P2-1, P2-2 | Descriptor-free `push`; per-thread small-integer cache; unboxed `double` locals. Plus two array defects found by measuring: **repeated `pop` was quadratic (729×)** and array fill went **1 350 B → 145 B per element** |
 | **F** | P2-3, P2-4, P3 | Dense element = one reference, not a 32-byte descriptor (`new Array(1000)` −73%); string concatenation no longer quadratic (**150×** on the accumulation loop); the per-call activation record became a slot in a context-owned array addressed by a struct token — an argument-less call allocates **nothing**, and call-heavy code runs **3–15% faster** (median ≈11%) |
-| **2** | 2-0, 2-1, 2-2, 2-4, 2-7, 2-8 | Every remaining way a constant-key property access missed its cache, closed: allocation no longer retires prototype-keyed entries, a store that *creates* a property can hit, arrays and functions track named properties by shape, and `++`/`op=` take both caches. **Six sites went 0 → 199 999 hits.** Plus 2-7, which is memory rather than hit rate: the property map's 16-node floor charged **920 B of unused trie** to every object's first property — **live map bytes 0.56x**. Delivered as `patches/0050`–`0058`, pointer not bumped |
+| **2** | 2-0, 2-1, 2-2, 2-4, 2-7, 2-8 | Every remaining way a constant-key property access missed its cache, closed: allocation no longer retires prototype-keyed entries, a store that *creates* a property can hit, arrays and functions track named properties by shape, and `++`/`op=` take both caches. **Six sites went 0 → 199 999 hits.** Plus 2-7, which is memory rather than hit rate: the property map's 16-node floor charged **920 B of unused trie** to every object's first property — **live map bytes 0.56x**. Delivered as `2df877a0`…`a6f101cc`, all in the pinned pointer |
 
 Headline before/after on the probes:
 
@@ -819,7 +822,7 @@ not the demonstration this item thought it was.
 
 **Work.**
 
-1. **Mitigation (S) — landed as `patches/0049-js-compilation-stack.patch`.** Compilation
+1. **Mitigation (S) — landed as `43bc4230`.** Compilation
    runs on a thread the engine sizes (`CompilationStack`, 64 MiB, settable via
    `SizeBytes` or `BROILER_JS_COMPILE_STACK_BYTES`; `0` compiles in place). The boundary
    sits at the point each `ICodeCache` starts a compilation, so parse, validation, tree
@@ -962,7 +965,7 @@ hits before, ≥999 after**) and `AClassInstanceStillGetsItsNewTargetPrototype` 
 prototype the construct paths install, including the subclass, `Reflect.construct` and
 primitive-`prototype` forms. Suite: **7 290 tests across 13 projects, 0 failures.**
 
-Landed as `patches/0050-js-construct-prototype-invalidation.patch`.
+Landed as `2df877a0`.
 
 ### 2-1 · A store-cache entry that can describe a property *creation* — **landed**
 
@@ -1040,8 +1043,7 @@ across 13 projects, 0 failures.**
 > targeted battery above are what *has* been run. **The two manifests are owed before this
 > closes** — this is the gate the phase-2 exit criterion names, not an optional extra.
 
-Landed as `patches/0051-js-store-cache-property-creation.patch`, which applies on top of
-`0050`.
+Landed as `5d31617a`, which builds on `2df877a0`.
 
 | # | Item | Origin | Where | Why it matters here | Size |
 |---|---|---|---|---|---|
@@ -1124,7 +1126,7 @@ kinds of write; a sparse array keeping its holes; an `extends Array` instance; a
 staying untracked; and two arrays reaching the same shape staying distinct. Suite: **7 319
 tests across 13 projects, 0 failures.**
 
-Landed as `patches/0053-js-array-shape-eligibility.patch`, on top of `0051`.
+Landed as `641241af`, on top of `5d31617a`.
 
 ### 2-4 · `obj.name++` and `obj.name op= rhs` through both caches — **landed, both halves**
 
@@ -1213,9 +1215,8 @@ property likewise; nested compound assignments not sharing a base temporary; and
 update and plain-store forms agreeing on one property. Suite: **7 385 tests across 13 projects,
 0 failures.**
 
-Landed as `patches/0054-js-update-expression-cache.patch` (the update form) and
-`patches/0056-js-compound-assignment-cache.patch` (the compound form), on top of `0053` and
-`0055` respectively.
+Landed as `f9c2193f` (the update form) and `c5842c9d` (the compound form), on top of
+`641241af` and `850121a0` respectively.
 
 ### 2-8 · Functions track their named properties by shape — **landed**
 
@@ -1351,9 +1352,9 @@ are not gated: `f.prototype` still caches, because a read has no field to keep i
 > item's justification is a test that item has to pass** — a resemblance to it is not evidence
 > about it. Now recorded in §3.5.
 
-Landed as `patches/0055-js-function-shape-eligibility.patch`, on top of `0054`, **with the gate
-folded in** — the patch is pending and unapplied, so shipping it broken and fixing it in a later
-patch would leave any partial application of the series with a DeltaBlue that does not run.
+Landed as `850121a0`, on top of `f9c2193f`, **with the gate folded in** — the patch was still
+pending when this was written, so shipping it broken and fixing it in a later patch would have
+left any partial application of the series with a DeltaBlue that does not run.
 
 > **Two pre-existing defects found alongside it, neither caused by this item and neither fixed
 > here.** Both reproduce identically on a pristine build at the pinned pointer `685026c0`:
@@ -1654,7 +1655,7 @@ for any object carrying a named property, and one field and three fields both la
 block. It also confirmed the trie allocates in groups of four, and that the first block covers four
 groups.
 
-Instrumentation landed as `patches/0057-js-property-map-distribution-metrics.patch`.
+Instrumentation landed as `55c6b1fb`.
 
 #### The distribution, and what it decided — **landed**
 
@@ -1723,7 +1724,7 @@ increment, every slot's contents surviving 50 growths — the policy is only saf
 copies — and `SAUint32Map` keeping all 2 000 entries across the many resizes the new policy forces. Suite:
 **7 397 tests across 13 projects, 0 failures.**
 
-Landed as `patches/0058-js-property-map-growth-policy.patch`.
+Landed as `a6f101cc`.
 
 #### `--object-alloc`, and why the corpus grew again
 
@@ -2075,16 +2076,16 @@ Where each item came from, so existing cross-references still resolve.
 | 0-7, 0-8, 0-9 | engine §8.1 acceptance evidence | — | **Owed** |
 | 0-10, 0-11 | engine §8.1, §8.2 | — | Done |
 | 1-1, 1-3 | *excluded by engine §9* | 1-1, 1-3 | Open — superseded, see §1.1 |
-| 1-2 mitigation | *excluded by engine §9* | 1-2 | **Landed** — `patches/0049`, pending submodule push |
+| 1-2 mitigation | *excluded by engine §9* | 1-2 | **Landed** — `43bc4230`, in the pinned pointer |
 | 1-2 real fix | — | 1-2 | Open — repair `StackGuard`, which cannot fire today |
-| 2-0 | — (P1-2's guard, reached in a state it cannot recognise) | — | **Landed** — `patches/0050`, pending submodule push |
-| 2-1 | P1-3 remainder | 2-1 | **Landed** — `patches/0051`, pending submodule push; **test262 owed** |
-| 2-4 | P1-3 remainder | 2-4 | **Landed, both halves** — `patches/0054` (`o.x++`) and `patches/0056` (`o.x op= rhs`), pending submodule push; computed keys, `super`, optional chains, private names and the three short-circuiting compound forms stay out on purpose |
-| 2-2 | P1-4 remainder | 2-2 | **Landed for arrays** — `patches/0053`, pending submodule push; its four named benchmarks were the wrong targets |
-| 2-8 | — (the blocked half of 2-2) | — | **Landed** — `patches/0055`, pending submodule push; both prerequisites fixed. **Shipped a regression that broke DeltaBlue** (a cached store to `f.prototype` bypassed `JSFunction`'s cached-field sync); the gate that fixes it is folded into the same patch |
+| 2-0 | — (P1-2's guard, reached in a state it cannot recognise) | — | **Landed** — `2df877a0`, in the pinned pointer |
+| 2-1 | P1-3 remainder | 2-1 | **Landed** — `5d31617a`, in the pinned pointer; **test262 owed** |
+| 2-4 | P1-3 remainder | 2-4 | **Landed, both halves** — `f9c2193f` (`o.x++`) and `c5842c9d` (`o.x op= rhs`), both in the pinned pointer; computed keys, `super`, optional chains, private names and the three short-circuiting compound forms stay out on purpose |
+| 2-2 | P1-4 remainder | 2-2 | **Landed for arrays** — `641241af`, in the pinned pointer; its four named benchmarks were the wrong targets |
+| 2-8 | — (the blocked half of 2-2) | — | **Landed** — `850121a0`, in the pinned pointer; both prerequisites fixed. **Shipped a regression that broke DeltaBlue** (a cached store to `f.prototype` bypassed `JSFunction`'s cached-field sync); the gate that fixes it is folded into the same commit |
 | 2-3 | P1-4 remainder | 2-3 | **Closed** — measured twice. Not a pure removal, ~3% throughput ceiling, and after 2-7 its own proposal is worth 1.0-4.3% of per-property object bytes. Its premise is also wrong: shape slots admit non-default attributes, which are per-object data a shared shape cannot hold |
 | 2-9 | — (found closing 2-3) | — | **Specified, not started** — shape-tracked properties should not live in a radix trie: 2.5-4.0 nodes per property at 56 B a node, **67-94% of a tracked object's per-property bytes**. L; sequence after phase 2's exit gate |
-| 2-7 | — (found measuring 2-3) | — | **Landed** — `patches/0057` (the measurement) and `patches/0058` (the policy), pending submodule push. 43.9% of 47 M real maps never outgrow one four-node group; live map bytes 0.56x, allocated 0.82x, Typescript 0.92x |
+| 2-7 | — (found measuring 2-3) | — | **Landed** — `55c6b1fb` (the measurement) and `a6f101cc` (the policy), both in the pinned pointer. 43.9% of 47 M real maps never outgrow one four-node group; live map bytes 0.56x, allocated 0.82x, Typescript 0.92x |
 | 2-5 | P0-2 remainder | 2-5 | **Closed** — measured at 0%; P0-2 had already taken the cost, and 2-1 narrowed what was left |
 | 2-6 | — | 2-6 | **Folded into 4-1** — no callee resolution to cache; a call costs ~250 ns and a call-site cache removes none of it |
 | 3-1, 3-2 | — | 3-1, 3-2 | Open |
@@ -2117,4 +2118,5 @@ which remains the archive of record; only their transferable lessons were lifted
 _Merged 2026-08-01 from `tests/octane/roadmap.md`, `tests/octane/benchmarks.md` and
 `Broiler.JS/docs/performance-roadmap.md`. Engine facts verified against `Broiler.JS` at
 `cdb2fd41`; Octane code sites at `45f4f679`. Phase 2 worked and measured 2026-08-01/02 at
-pointer `685026c0` plus `patches/0050`–`0058`; status summary in §0._
+pointer `685026c0` plus the then-pending `0050`–`0058`, since applied and pinned as
+`a6f101cc`; status summary in §0._
