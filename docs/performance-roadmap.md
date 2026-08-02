@@ -55,7 +55,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is the critical path** — it is what phases A–F need to close on, and what phase 2's exit criterion is measured by. 0-7, 0-8 follow it |
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`). 1-1 open; 1-2's real fix open (`StackGuard` cannot fire today). 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; only 0-6's CI Octane run is outstanding |
-| **3** — arithmetic | Open. 3-1 first; 3-4 is a cost, not a task |
+| **3** — arithmetic | Open. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. The same probe found **3-0** — an indexed access boxes its index, ~32 B on every array read and write — which is larger, has no read-side cost, and goes first. 3-4 is a cost, not a task |
 | **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
 | **5** — regex | Open. Profile before rewriting |
 
@@ -193,6 +193,7 @@ half in the column it was not looking at.
 | Question | Instrument |
 |---|---|
 | Did this operation get cheaper? | In-process probes, Appendix A |
+| What does an object or an element cost in bytes? | `--object-alloc`, `--element-alloc` |
 | Did the cache actually start hitting? | `PropertyOptimizationDiagnostics.Snapshot()` |
 | Did real programs get faster? | Octane, ≥3 repetitions, median + spread |
 | Is the engine still correct? | test262 over the pinned manifests |
@@ -1907,7 +1908,14 @@ this is not.
 
 Owner assemblies: `Broiler.JavaScript.Storage`, `.Runtime`, `.Compiler`.
 
-### 3-1 · Unboxed backing stores for dense arrays — **start here**
+> **The order changed on a measurement.** 3-1 was written as the phase's opener because it looked
+> like the most contained item covering the most benchmarks. Measured before starting (below), it
+> is a 1:1 trade of write allocation for read allocation whose unambiguous half is live memory —
+> and the same probe found a larger, strictly-cheaper target it was standing in front of: **an
+> indexed access boxes its index**, ~32 B on every array read and write in the engine, with no
+> read-side cost to removing it. That became **3-0**, and it goes first.
+
+### 3-1 · Unboxed backing stores for dense arrays — **measured; re-specified, and no longer first**
 
 **Where.** `Broiler.JavaScript.Storage/ElementArray.cs` — `private IPropertyValue[] dense`.
 
@@ -1927,6 +1935,88 @@ the phase and the one covering the most benchmarks** — which is why it goes fi
 `ElementDescriptorRoundTripTests`, `IndexedWriteAndLengthTests` for integrity levels,
 foreign receivers, exotics and length-shrink. **Report allocation per element
 alongside time.** **Size: L.**
+
+#### Measured before starting — and it re-specifies the item
+
+The item's premise is a claim about the **write** side, and it is true. What it does not say
+is what the change costs on the **read** side, which is the half that decides it: the dense
+store is `IPropertyValue[]` and every read hands back an `IPropertyValue`, so a raw `double[]`
+cannot answer one without boxing a fresh `JSNumber`. 3-1 therefore *trades* a write allocation
+for a read allocation, and the exchange rate had to be measured before anything was built.
+
+`--element-alloc` (new; `ElementAllocationMetrics`), 100 000 elements, warmed then measured
+after a forced gen2 collection, every row net of an inert no-array loop control:
+
+| Site | Write B/element | Read B/element |
+|---|--:|--:|
+| loop control, no array access | 0.00 | 0.00 |
+| `a[0] = t` — constant index, hoisted reference | **0.00** | **0.00** |
+| `a[0] = i + 0.5` — constant index, fresh number | **32.00** | 0.00 |
+| `a[i] = t` — variable index, hoisted reference | 52.65 | 31.67 |
+| `a[i] = i + 0.5` — variable index, fresh number | **84.69** | **31.67** |
+| `a[i] = i & 1023` — small integers | 84.32 | 31.67 |
+
+**The 84.69 decomposes exactly, and only one third of it is what 3-1 removes:**
+
+| Component | B/element | How the rows show it |
+|---|--:|---|
+| Boxing the **index** | ~32 | a constant index costs **0.00**; a variable one costs 32 more |
+| Boxing the **value** | **32.00** | the constant-index-number row *is* this number, alone |
+| Amortized backing growth | ~21 | 100 000 slots doubling from four ≈ 21 B/element |
+
+**Three findings, and two of them change the plan.**
+
+- **3-1's prize is 32 of 85 bytes on write, and it costs 32 bytes on every read.** Reads are
+  free today — the value is already a heap object, so a read is a reference copy — and after a
+  typed store each one boxes. On allocation the item is a **wash at a 1:1 read/write ratio, a
+  win only when writes dominate, and a loss on read-heavy code.** Its named targets —
+  NavierStokes' grids, Crypto's digit arrays — read each element many times per write, which
+  is the unfavourable direction. **What survives unambiguously is live memory**: a resident
+  `double[1e6]` is 8 MB against 8 MB of references plus 32 MB of `JSNumber`, so ~0.2x, and that
+  is a real win for exactly those long-lived numeric heaps. **Re-specify 3-1 as a live-memory
+  item whose throughput case is contingent on 3-4**, rather than as the phase's throughput
+  opener.
+- **The bigger contained win on array access is not the element store at all — it is that a
+  variable index is boxed.** It costs ~32 B on every indexed read and every indexed write,
+  whatever the array holds, and unlike a typed backing store removing it has **no read-side
+  penalty**: it is pure removal, and it applies to reference arrays too. On the read path it is
+  *the entire cost*. That deserves its own item ahead of 3-1.
+- **The per-thread small-integer cache does not reach this path.** `a[i] = i & 1023` costs
+  84.32 against 84.65 for large integers — a 0.33 B difference, i.e. none. So 3-1 buys the same
+  32 B for small integers as for doubles, and P2-1's cache is not already collecting it here.
+  Worth knowing before anyone sizes the integer case as already-solved.
+
+*Neither the read-side cost nor the index boxing was visible from the item's text, and both
+came out of one probe run. §3.5's rule about a premise not being a finding, applied to an item
+that was right about its premise and wrong about its consequence.*
+
+### 3-0 · Stop boxing the index of an indexed access — **found measuring 3-1; do this first**
+
+**Measured, not proposed.** `a[0] = t` allocates **0.00 B/element** and `a[i] = t` allocates
+**52.65**; the read side is **0.00** against **31.67**. The array, the element and the value are
+identical across each pair — only the index expression differs — so ~32 B per access is the
+index, and on the read path it is *the whole cost*. It is charged to every indexed access the
+engine performs, on reference arrays as much as numeric ones, which is why it is worth more than
+3-1 and costs less to take.
+
+**Why it happens** (to be confirmed at the source before the fix is designed, not assumed): a
+loop counter eligible for P2-2's unboxed-`double` locals is held raw, and using it as an index
+requires a `JSValue` to go through `ToKey()`. The fast path wants to take the raw numeric local
+straight to a `uint` index without materializing the `JSNumber` in between.
+
+**Where.** `Broiler.JavaScript.Compiler`'s index-expression lowering and `JSValue`'s indexers —
+the same eligibility question 2-4 answered for member stores, asked for element access.
+
+**Why it is *not* a wash, unlike 3-1.** There is no read-side counterpart: the index is consumed
+as a number and never handed back, so removing its boxing adds nothing anywhere. **Pure removal
+in the sense 2-3 was not** — and per §3.5 that phrase now has to be demonstrated rather than
+asserted, so the first step is a scratch build that removes it and shows what breaks.
+
+**Verify.** `test262-arrays`; `IndexedWriteAndLengthTests`; and the negative cases an index fast
+path must still refuse — a non-integer index, a negative one, one past 2^32-2, `-0`, a string
+index that only looks canonical, and a Proxy or typed-array receiver. **Report allocation per
+element alongside time**, using `--element-alloc`'s constant-index rows as the floor.
+**Size: M.**
 
 ### 3-2 · Unboxed doubles in shape slots
 
@@ -2043,7 +2133,7 @@ pinned RegExp corpus is clean.
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
-| **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
+| **3** | **3-0** (found measuring 3-1) → 3-3 → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
 
@@ -2217,7 +2307,9 @@ Where each item came from, so existing cross-references still resolve.
 | 2-7 | — (found measuring 2-3) | — | **Landed** — `55c6b1fb` (the measurement) and `a6f101cc` (the policy), both in the pinned pointer. 43.9% of 47 M real maps never outgrow one four-node group; live map bytes 0.56x, allocated 0.82x, Typescript 0.92x |
 | 2-5 | P0-2 remainder | 2-5 | **Closed** — measured at 0%; P0-2 had already taken the cost, and 2-1 narrowed what was left |
 | 2-6 | — | 2-6 | **Folded into 4-1** — no callee resolution to cache; a call costs ~250 ns and a call-site cache removes none of it |
-| 3-1, 3-2 | — | 3-1, 3-2 | Open |
+| 3-0 | — (found measuring 3-1) | — | **Open, and 3-1's replacement as the phase opener** — an indexed access boxes its index: ~32 B on every array read and write, all of the read cost, and no read-side penalty to removing it. M |
+| 3-1 | — | 3-1 | **Open, re-specified on a measurement** — trades 32 B of write allocation for 32 B of read allocation, so it is a live-memory item (a resident `double[1e6]` ~0.2x) whose throughput case is contingent on 3-4 |
+| 3-2 | — | 3-2 | Open |
 | 3-3 | P2-2 item 3 remainder | 3-3 | Open |
 | 3-4 | — (`tagged-js-value` in ownership.json) | 3-4 | Cost, do not start |
 | 4-1 … 4-4 | *excluded by engine §9* | 4-1 … 4-4 | Open — superseded, see §1.1 |
