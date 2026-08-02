@@ -1,6 +1,6 @@
-From 95208be6aee7e075018247dd7d2bd7c75a9a30ea Mon Sep 17 00:00:00 2001
+From 1c426cce3cb26b3b09e3898932a9e0cbb44afa6e Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Sat, 1 Aug 2026 23:49:00 +0000
+Date: Sun, 2 Aug 2026 00:30:48 +0000
 Subject: [PATCH] Route `obj.name op= rhs` through both inline caches
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -52,7 +52,7 @@ mis-valuing; a refused write still evaluating to the computed value; a
 nullish base throwing before the RHS runs; a primitive base and a
 getter-only property silently discarding in sloppy mode and throwing in
 strict; and nested compound assignments not sharing a base temporary.
-Suite: 7 385 tests across 13 projects, 0 failures.
+Suite: 7 392 tests across 13 projects, 0 failures.
 
 Refs docs/performance-roadmap.md item 2-4.
 ---

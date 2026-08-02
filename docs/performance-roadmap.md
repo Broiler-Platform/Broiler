@@ -274,6 +274,12 @@ These were paid for once each. They apply to every phase below.
 - **Reproduce on the platform you will close on.** 1-2's repro was a win-x64 Octane run.
   The same suite completes on linux-x64 at the same pointer, so the CI run that was meant
   to confirm it never could. *A one-platform repro dates the item to that platform.*
+- **A benchmark named as an item's justification is a test that item has to pass.** 2-8 existed
+  because of DeltaBlue's 601× score, was measured with a loop written to look like DeltaBlue's hot
+  path, and **broke DeltaBlue** — the real suite threw before scoring. The loop reproduced the
+  *reads* the item was about and none of the *writes* the item's change also affected, so it could
+  not have failed. Octane was available, takes minutes, and no test in 7 347 caught it. *A
+  resemblance to a benchmark is not evidence about that benchmark; run the thing you named.*
 - **A conservative bug passes its own tests.** 2-0 invalidated too much, never too little,
   so every staleness test in `PropertyShapeCacheTests` was green — and green for a reason
   none of them was checking. A correctness suite cannot find an
@@ -1201,7 +1207,16 @@ function is on the stack; the `Function.prototype` poison pills still throwing; 
 key still reading through the generic path after its site is warmed. Plus a function's own
 `length`/`name`/`prototype` values, attributes and enumeration order unchanged, redefining them,
 a bound function's name and length, a static redefined as an accessor mid-loop, and `delete`
-revealing an inherited static. Suite: **7 347 tests across 13 projects, 0 failures.**
+revealing an inherited static.
+
+**Seven more for the prototype-write gate below**, which is the half these 13 did not cover:
+DeltaBlue's exact three-level `inheritsFrom` idiom; one warmed site writing 300 different
+functions' prototypes with every instance landing on its own; the property and `[[Construct]]`
+agreeing across 400 warmed writes; a class's non-writable `prototype` still refused once the site
+is warm; constructability surviving a non-object assignment; a function's *other* statics still
+taking the store cache — the assertion that stops the fix undoing 2-8 — and `f.prototype` still
+being cached on **read**, because only the write paths are gated. Suite: **7 392 tests across 13
+projects, 0 failures.**
 
 > **One pre-existing test changed with it, and the change is worth reading.**
 > `AnInheritedAccessorIsNotSlotCached` asserted *zero* cache hits for a script that also called
@@ -1213,7 +1228,88 @@ revealing an inherited static. Suite: **7 347 tests across 13 projects, 0 failur
 > counter is coupled to everything else in its script** — worth remembering for the next item
 > that widens what can be cached.
 
-Landed as `patches/0055-js-function-shape-eligibility.patch`, on top of `0054`.
+#### It shipped a regression, and Octane found it in one run
+
+**2-8 broke DeltaBlue.** The item whose entire justification was DeltaBlue's 601× score, measured
+with a hand-written loop shaped like DeltaBlue's hot path, made the real benchmark throw
+`TypeError: undefined is not a function` before it produced a score. Found by running Octane
+while setting up 2-7's measurement — not by any of the 7 347 tests, and not by the loop.
+
+`JSFunction` keeps its `prototype` object in a **cached field**, and that field — not the
+property — is what `[[Construct]]` reads. It is synced by overriding every observable write path:
+the indexer, `SetValue`, `DefineProperty`. **A shape fast path is none of them.** It writes
+`ownProperties` and `shapeSlots` and returns. So once functions became shape-tracked, a *cached*
+store to `f.prototype` updated the observable property and left construction building instances
+on the previous object.
+
+DeltaBlue's `inheritsFrom` is precisely the shape that exposes it:
+
+```js
+Object.defineProperty(Object.prototype, "inheritsFrom", {
+  value: function (shuper) {
+    function Inheriter() { }
+    Inheriter.prototype = shuper.prototype;
+    this.prototype = new Inheriter();     // one emitted site, once per class
+    this.superConstructor = shuper;
+  }
+});
+```
+
+One store site, called once per class. **The first call missed and was right; every call after it
+hit and was wrong** — so the first level of every inheritance chain linked and the second did not,
+and `this.addConstraint` was undefined two constructors down.
+
+Fixed with a virtual `JSObject.AllowsDirectShapeWrite(key)`, checked by `TryWriteShapeSlot`,
+`TryCreateShapeSlot` and `TryGetWritableShapeSlot`, which `JSFunction` overrides for exactly one
+key. **Checked on the write and not only on the install**, because shapes are interned by key set:
+a `JSFunction` and a plain object carrying the same keys share one shape *and one id*, so an entry
+installed against the plain object would otherwise hit the function.
+
+It is deliberately not the null-slot trick 2-8 introduced for `caller`/`arguments`. That one works
+because a deferred cell's stored value is not a `JSValue`, which the write paths already reject —
+`prototype` holds an ordinary `JSValue` and sails through every existing check. The comment
+claiming "all three fast paths already reject a null slot" was **only true of the read path**;
+corrected in place.
+
+**Octane runs again: 17 of the 18 benchmarks pass.** The one failure — RegExp's
+`Error: Wrong checksum.` — fails identically on a pristine build at the pinned pointer, so it is
+not from this patch. Mandreel exceeded the 300 s smoke budget rather than failing;
+`scripts/octane-suites.json` already gives it 1 200 s for that reason.
+
+**The fix costs nothing measurable.** All 22 `--cache-metrics` rows are byte-identical before and
+after, including all four function rows at 199 999 — the exclusion is one key wide and the win is
+in the statics. Wall clock on a 2 M-iteration three-field constructor loop, gate against a build
+with the three call sites removed, six interleaved pairs: **median paired ratio 1.0015**. Reads
+are not gated: `f.prototype` still caches, because a read has no field to keep in sync.
+
+> **The lesson is about the probe, not the bug.** 2-8's evidence was a loop I wrote to look like
+> DeltaBlue. It reproduced the *reads* the item was about and none of the *writes* the item's
+> change also affected, so it could not have failed. Octane was available the whole time, takes
+> minutes, and would have caught this before the patch was written. **A benchmark named as an
+> item's justification is a test that item has to pass** — a resemblance to it is not evidence
+> about it. Now recorded in §3.5.
+
+Landed as `patches/0055-js-function-shape-eligibility.patch`, on top of `0054`, **with the gate
+folded in** — the patch is pending and unapplied, so shipping it broken and fixing it in a later
+patch would leave any partial application of the series with a DeltaBlue that does not run.
+
+> **Two pre-existing defects found alongside it, neither caused by this item and neither fixed
+> here.** Both reproduce identically on a pristine build at the pinned pointer `685026c0`:
+>
+> 1. **A refused write to `prototype` still redirects `[[Construct]]`.** `JSFunction`'s indexer
+>    calls `AssignPrototypeField` *before* the write and unconditionally, so for a non-writable
+>    `prototype` — every `class`, or any function frozen with `defineProperty` — the property
+>    correctly refuses the write while `new` starts producing instances on the rejected object.
+>    `class C {}; C.prototype = x;` leaves `C.prototype` untouched and `new C().__proto__ === x`.
+>    A spec violation (a failed `[[Set]]` must have no effect), and the reason the class test here
+>    asserts only the observable property.
+> 2. **Octane's RegExp suite fails its own checksum** — `Error: Wrong checksum.`, so the
+>    committed score of 89.9 predates whatever changed. The checksum is computed inside a single
+>    `run()` call, so it is a match-count discrepancy in the regex engine, not a harness artifact.
+>
+> Neither belongs to phase 2. Item 0-6's run will surface the second on its own; the first wants
+> its own item, because moving that sync after the write means giving the indexer a success signal
+> it does not currently have.
 
 ### 2-6 · Monomorphic call-site caching — **measured; folded into 4-1**
 
@@ -1344,7 +1440,7 @@ backing `VirtualMemory<T>` relocates on growth, so a `ref` is not. That is a sto
 change with real questions about node identity across trie restructuring, deletes and
 deferred cells. **M, not S**, and it should be re-justified against 2-7 first.
 
-### 2-7 · The property map's 16-node floor costs ~1 KB per object — **sized, not started**
+### 2-7 · The property map's 16-node floor costs ~1 KB per object — **instrumented; awaiting its distribution**
 
 Numbered 2-7 because it was not on this list either; it came out of measuring 2-3. Bytes per
 object, warmed then measured after a forced gen2 collection, field values small integer
@@ -1392,6 +1488,38 @@ block rather than one constant for both. Related to **B1**: this is a large part
 the allocation rate severe, and unlike B1 proper it needs no change to value representation.
 
 **Size: S for the change, M for the measurement that justifies it.**
+
+#### The blocking measurement now exists — `--property-map-distribution`
+
+`PropertyStorageMetrics` (in `Broiler.JavaScript.Storage`, the layer that owns the floor) records
+**the final node-group count of every map**, per `SAUint32Map<T>` value type. Each allocation moves
+its map out of the previous bucket and into the next, so `histogram[k]` ends up holding the number
+of maps whose life ended at `k` groups. A map that never allocated — an object with no named
+properties — is counted nowhere, which is right: it never pays the floor. Resizes and the nodes they
+copy are counted too, because that is the cost a smaller floor trades *for*.
+
+`--property-map-distribution <octane-dir>` runs Octane's own suites, one fresh context each with the
+histogram reset between them so a per-suite disagreement is visible rather than averaged away, and
+simulates each candidate policy against the result. Two deliberate choices: the simulation **mirrors
+`VirtualMemory.Allocate` step for step** instead of modelling it, and the node size comes from
+`SAUint32Map<T>.NodeSizeBytes` instead of a hand-added field list — so the arithmetic cannot drift
+from the code it is about. `BROILER_MAP_DISTRIBUTION_RUNS` sets runs per benchmark, present so the
+claim that the distribution converges can be *checked* rather than assumed.
+
+**First result confirms the model the item was built on, from the real layout rather than from
+`--object-alloc`'s deltas:** a node is **56 bytes**, so the 16-node floor is **16 × 56 + 24 = 920 B**
+for any object carrying a named property, and one field and three fields both land inside a single
+block. It also confirmed the trie allocates in groups of four, and that the first block covers four
+groups.
+
+**Still open: the distribution itself, at a sample worth deciding on.** A 3-runs-per-benchmark smoke
+produced only 65 property maps for Richards — Richards creates a handful of `TaskControlBlock`s and
+then passes messages, so map *allocations* are rare even though the suite is long. The run of record
+needs a larger sample and a check that the shares do not move with the run count. **Do not pick a
+floor before that number exists** — this item's whole reason for being sized rather than started is
+that the answer is a distribution, and a converged one is the only kind that settles a trade.
+
+Instrumentation landed as `patches/0057-js-property-map-distribution-metrics.patch`.
 
 #### `--object-alloc`, and why the corpus grew again
 
@@ -1749,9 +1877,9 @@ Where each item came from, so existing cross-references still resolve.
 | 2-1 | P1-3 remainder | 2-1 | **Landed** — `patches/0051`, pending submodule push; **test262 owed** |
 | 2-4 | P1-3 remainder | 2-4 | **Landed, both halves** — `patches/0054` (`o.x++`) and `patches/0056` (`o.x op= rhs`), pending submodule push; computed keys, `super`, optional chains, private names and the three short-circuiting compound forms stay out on purpose |
 | 2-2 | P1-4 remainder | 2-2 | **Landed for arrays** — `patches/0053`, pending submodule push; its four named benchmarks were the wrong targets |
-| 2-8 | — (the blocked half of 2-2) | — | **Landed** — `patches/0055`, pending submodule push; both prerequisites fixed |
+| 2-8 | — (the blocked half of 2-2) | — | **Landed** — `patches/0055`, pending submodule push; both prerequisites fixed. **Shipped a regression that broke DeltaBlue** (a cached store to `f.prototype` bypassed `JSFunction`'s cached-field sync); the gate that fixes it is folded into the same patch |
 | 2-3 | P1-4 remainder | 2-3 | **Re-specified** — not a pure removal, ~3% ceiling, S → M, superseded in value by 2-7 |
-| 2-7 | — (found measuring 2-3) | — | **Sized, not started** — needs an object-size distribution from an Octane run |
+| 2-7 | — (found measuring 2-3) | — | **Instrumented** — `patches/0057` adds `--property-map-distribution`; the floor is 920 B per object with a named property. Still needs the distribution itself at a converged sample before a floor is chosen |
 | 2-5 | P0-2 remainder | 2-5 | **Closed** — measured at 0%; P0-2 had already taken the cost, and 2-1 narrowed what was left |
 | 2-6 | — | 2-6 | **Folded into 4-1** — no callee resolution to cache; a call costs ~250 ns and a call-site cache removes none of it |
 | 3-1, 3-2 | — | 3-1, 3-2 | Open |
