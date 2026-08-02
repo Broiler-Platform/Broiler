@@ -311,6 +311,11 @@ These were paid for once each. They apply to every phase below.
   content was a storage-layer redesign, and its measured ceiling was 3% of the most favourable
   workload available. *Before writing "pure removal", delete the thing in a scratch build and
   see what breaks — here it took one probe, and the wrong answer it returned was the proof.*
+- **Re-measuring can make an item *worse*, not just smaller.** 2-3's memory case was "the slot
+  array is 4.5% of an object's bytes". 2-7 then cut 672 B out of that object — bytes 2-3 was not
+  targeting — so the same proposal came back at **1.9%** for the common shape. *An item's share can
+  fall because the work around it succeeded, so a share recorded before that work is not a share at
+  all; and the direction is not predictable from the numerator alone.*
 - **An item can be overtaken by the items before it, and it has happened twice.** 2-3 was
   written when a store cost two key lookups; P1-3 and 2-1 removed the second, so most of its
   value was collected before anyone reached it. 2-5 was written against "an `AsyncLocal` per
@@ -449,7 +454,7 @@ onto benchmarks. → **phase 2**
 | Shape eligibility is `GetType() == typeof(JSObject)` — `JSArray`, `JSFunction`, every exotic excluded | **Fixed for arrays (2-2) and functions (2-8).** The four benchmarks named here were the wrong ones — they reach arrays by element and by `length`, neither of which a shape can hold. The idiom that pays is statics on a constructor function, and **DeltaBlue at 601× was the case** — 2-8 took it from 0 to 199 999 hits |
 | No shape-transition cache — *creating* a property misses every time | Richards, DeltaBlue, RayTrace, Box2D |
 | `o.x++`, `o.x += 1`, computed keys, `super`, optional chains, private names keep the old lowering | Richards, Gameboy, Box2D |
-| Double storage in `TrackShapeDataProperty` | everything — but **measured at ~3% of a worst-case store loop and 4.5% of an object's bytes**; see 2-3, which is re-specified, and 2-7, which is where the memory actually goes |
+| Double storage in `TrackShapeDataProperty` | everything — but **measured at ~3% of a worst-case store loop and, after 2-7, 1.0-4.3% of an object's per-property bytes**; 2-3 is **closed** on that, and the 67-94% that *is* the trie became 2-9 |
 
 A fifth gap belongs on that list and is **fixed**: every `new` published a global
 prototype-mutation notice, so a prototype-keyed entry could not survive a loop that
@@ -1411,7 +1416,7 @@ the read into a slower path; if that is ever suspected, the reproduction is the 
 it takes one build to re-run. Nothing in this document should be read as saying the read is
 free in every host — only that it is free in the one the roadmap measures on.
 
-### 2-3 · Remove the double storage — **re-specified; do not start as written**
+### 2-3 · Remove the double storage — **measured twice; closed, superseded by 2-9**
 
 Measured before starting, and the item does not survive it. Three things are wrong.
 
@@ -1441,13 +1446,54 @@ access plus a cached slot. The double *lookup* is gone from the hot paths. Only 
 constructor-built three-field object — **4.5%**. What the same measurement found instead is
 2-7.
 
-**If someone does take it on**, the only shape that stores the value once while keeping O(1)
-slot access is for a slot to hold a stable `PropertySequence` node index rather than the value
-itself, so `shapeSlots` becomes a `uint[]` and the read is one more indirection. Node indices
-are stable — `PropertySequence` already uses them as its `Previous`/`Next` links — but the
-backing `VirtualMemory<T>` relocates on growth, so a `ref` is not. That is a storage-layer
-change with real questions about node identity across trie restructuring, deletes and
-deferred cells. **M, not S**, and it should be re-justified against 2-7 first.
+#### Re-justified against 2-7, and it does not survive that either — **closed**
+
+2-7 has landed, so the re-justification this item was waiting on is now possible. Measured, not
+modelled: the group count for each shape comes from `--property-map-distribution` and the bytes
+from `--object-alloc`, both against the shipped build, and the trie figure is
+`VirtualMemory.Allocate` replayed over the measured group count.
+
+| Object | Trie nodes | Nodes **per property** | Bytes over empty | Of which trie | Trie share |
+|---|--:|--:|--:|--:|--:|
+| `new T()`, 1 field | 4 | 4.00 | 368 | 248 | **67%** |
+| `new T()`, 3 fields | 8 | 2.67 | 840 | 720 | **86%** |
+| `new T()`, 8 fields | 20 | 2.50 | 3 216 | 3 008 | **94%** |
+
+**The item is aimed at the small side, and 2-7 made it smaller.** Its own proposal — slots holding
+a `uint` node index instead of a `JSValue`, saving 4 bytes a slot — is worth **1.9%** of a
+three-field object's per-property bytes, 4.3% at one field and 1.0% at eight. For a storage-layer
+change with open questions about node identity across trie restructuring, deletes and deferred
+cells, that is not a trade worth making. **Closed.** The 4.5% figure recorded before 2-7 was
+against a denominator 2-7 has since cut; the share moved the *wrong* way for the item, because
+2-7 removed bytes the item was not targeting.
+
+**And its central premise is wrong in a way worth writing down.** "Store the value once" cannot be
+done by dropping the `ownProperties` copy for shape-tracked objects, because a shape is *shared* by
+every object that reaches it and `IsShapeTrackableData` admits **any** plain data property —
+writable, enumerable and configurable in any combination. That widening was deliberate (without it
+no prototype object could keep a shape, so no inherited method could be cached), and it means
+per-property attributes are per-*object* data the shape cannot hold. Enumeration order the shape
+*could* supply, since slot order is insertion order; attributes it cannot.
+
+#### What the measurement actually points at — new item 2-9
+
+**A property costs ~150 B of radix trie to store an 8-byte reference.** The trie allocates 2.5–4.0
+nodes per property — a `JSObjectProperty` node is 56 B and only ~37% of the nodes a three-field
+object allocates hold a property at all; the rest are branch structure. That, not the duplicated
+8-byte value, is where a tracked object's memory is, and it is the same finding 2-7 made one layer
+up: the storage is sized for a shape the workload does not have.
+
+So the correctly-aimed item is **"shape-tracked properties should not live in a radix trie"** — for
+an object in shape mode, key to slot is already in the shape, order is already slot order, and the
+only genuinely per-object extras are the value (already in `shapeSlots`) and the attributes, which
+are a *byte*. A parallel `byte[]` costs 24 + n against the trie's 150 B per property.
+
+**Not started, and larger than 2-3 ever was.** Every `GetOwnProperties()` consumer — enumeration,
+descriptor queries, `delete`, `defineProperty`, the deferred-cell paths, `PropertyValueEnumerator` —
+reads the sequence directly, so this needs a materialize-on-demand boundary rather than an
+in-place swap. **L**, with a measured prize of 67–94% of per-property object bytes, which is the
+first version of this item that has one. Sequence it after phase 2's exit gate, not before: it
+touches the same storage `OrdinarySetWithOwnDescriptor` writes through.
 
 ### 2-7 · The property map's 16-node floor costs ~1 KB per object — **landed**
 
@@ -1605,9 +1651,9 @@ object from a clean checkout. Both 2-3's re-sizing and 2-7 came out of its first
 
 **Sequence.** 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ (both halves) → 2-8 ✅; **2-5 closed** and
 **2-6 folded into 4-1**, both on measurements. **Every listed item in this phase is now either
-landed or closed.** What remains is not implementation: **2-3 is re-specified** (M, and
-superseded in value by 2-7) and **2-7 needs an object-size distribution from an Octane run before
-it can be picked up**. The phase's own exit gate — test262 `properties-proxy` and `strict-mode`,
+landed or closed, and 2-7 is landed as well.** **2-3 is closed** — re-measured against the shipped
+2-7 build, its own proposal is worth 1.0-4.3% of an object's per-property bytes while the radix trie
+it does not target is 67-94%; that became **2-9** (L, not started).** The phase's own exit gate — test262 `properties-proxy` and `strict-mode`,
 now covering 2-1, 2-2, 2-4 and 2-8 — and 0-6's CI Octane run are what stand between "landed" and
 "closed".
 
@@ -1779,7 +1825,7 @@ pinned RegExp corpus is clean.
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-8 ✅; 2-5 closed, 2-6 folded into 4-1; 2-3 re-specified (M), 2-7 needs its measurement. **No listed item is still open** | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1, 2-2, 2-4 and 2-8**; **DeltaBlue and Richards inside 200×** |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅; 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1; **2-9 is 2-3's successor, L, not started**. **Every listed item is landed or closed** | M each | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode — **owed for 2-1, 2-2, 2-4 and 2-8**; **DeltaBlue and Richards inside 200×** |
 | **3** | **3-1** → 3-3 → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
@@ -1949,7 +1995,8 @@ Where each item came from, so existing cross-references still resolve.
 | 2-4 | P1-3 remainder | 2-4 | **Landed, both halves** — `patches/0054` (`o.x++`) and `patches/0056` (`o.x op= rhs`), pending submodule push; computed keys, `super`, optional chains, private names and the three short-circuiting compound forms stay out on purpose |
 | 2-2 | P1-4 remainder | 2-2 | **Landed for arrays** — `patches/0053`, pending submodule push; its four named benchmarks were the wrong targets |
 | 2-8 | — (the blocked half of 2-2) | — | **Landed** — `patches/0055`, pending submodule push; both prerequisites fixed. **Shipped a regression that broke DeltaBlue** (a cached store to `f.prototype` bypassed `JSFunction`'s cached-field sync); the gate that fixes it is folded into the same patch |
-| 2-3 | P1-4 remainder | 2-3 | **Re-specified** — not a pure removal, ~3% ceiling, S → M, superseded in value by 2-7 |
+| 2-3 | P1-4 remainder | 2-3 | **Closed** — measured twice. Not a pure removal, ~3% throughput ceiling, and after 2-7 its own proposal is worth 1.0-4.3% of per-property object bytes. Its premise is also wrong: shape slots admit non-default attributes, which are per-object data a shared shape cannot hold |
+| 2-9 | — (found closing 2-3) | — | **Specified, not started** — shape-tracked properties should not live in a radix trie: 2.5-4.0 nodes per property at 56 B a node, **67-94% of a tracked object's per-property bytes**. L; sequence after phase 2's exit gate |
 | 2-7 | — (found measuring 2-3) | — | **Landed** — `patches/0057` (the measurement) and `patches/0058` (the policy), pending submodule push. 43.9% of 47 M real maps never outgrow one four-node group; live map bytes 0.56x, allocated 0.82x, Typescript 0.92x |
 | 2-5 | P0-2 remainder | 2-5 | **Closed** — measured at 0%; P0-2 had already taken the cost, and 2-1 narrowed what was left |
 | 2-6 | — | 2-6 | **Folded into 4-1** — no callee resolution to cache; a call costs ~250 ns and a call-site cache removes none of it |
