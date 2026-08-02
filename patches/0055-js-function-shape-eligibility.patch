@@ -1,0 +1,794 @@
+From 8f0ba0fe3b71fdd04c0c55030efa66249bea6945 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 2 Aug 2026 00:30:38 +0000
+Subject: [PATCH] Track a function's named properties by shape
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Statics on a constructor function were a 100% cache miss — 0 hits out of
+200 000, sloppy, strict and class alike — and that is how DeltaBlue reads
+`Strength.REQUIRED` and `Strength.stronger` in its hot path.
+
+Two prerequisites had to be fixed before the eligibility gate could be
+flipped; without them flipping it would have been a correctness bug
+rather than a no-op:
+
+1. A function installed its own `length`, `name` and `prototype` with
+   bare `ownProperties.Put`, and four constructors additionally took a
+   shape-abandoning mutable ref through GetOwnProperties(). All are
+   routed through FastAddValue now.
+2. Every ordinary non-strict function carries the Annex B
+   `caller`/`arguments` as deferred cells from birth, and a deferred cell
+   abandoned the shape. Recorded with a NULL SLOT instead: the shape's
+   *presence* claim needs no value, and its *absence* claim — "this
+   object does not own K" — is what has to stay correct. A private name
+   still abandons, being per-class-evaluation.
+
+All four function rows go 0 → 199 999 and no site in the corpus abandons
+a shape any more.
+
+Also gates `prototype` out of the shape WRITE paths, which is a bug this
+change would otherwise have introduced — and did, in an earlier draft.
+JSFunction keeps its prototype in a cached field, and that field, not the
+property, is what [[Construct]] reads; it is synced by overriding the
+indexer, SetValue and DefineProperty. A shape fast path is none of those:
+it writes ownProperties and shapeSlots and returns. So a cached store to
+`f.prototype` updated the observable property and left `new` building
+instances on the previous object.
+
+That is DeltaBlue. Its `inheritsFrom` helper does
+`this.prototype = new Inheriter()` from one emitted site, once per class,
+so the first call missed and was correct and every call after it hit and
+was not — leaving the second level of every inheritance chain unlinked
+and `this.addConstraint` undefined two constructors down. The suite threw
+before producing a score.
+
+Fixed with a virtual JSObject.AllowsDirectShapeWrite(key), checked by
+TryWriteShapeSlot, TryCreateShapeSlot and TryGetWritableShapeSlot.
+Checked on the write and not only on the install: shapes are interned by
+key set, so a JSFunction and a plain object carrying the same keys share
+one shape AND one id, and an entry installed against the plain object
+would otherwise hit the function. Reads are not gated — a read has no
+field to keep in sync, so `f.prototype` still caches.
+
+It is deliberately not the null-slot mechanism above. That works because
+a deferred cell's stored value is not a JSValue, which the write paths
+already reject; `prototype` holds an ordinary JSValue and sails through
+every existing check. The comment claiming all three fast paths reject a
+null slot was only ever true of the read path, and is corrected.
+
+The fix costs nothing measurable: all 22 --cache-metrics rows are
+byte-identical before and after, including all four function rows at
+199 999, and a 2 M-iteration three-field constructor loop measures a
+median paired ratio of 1.0015 against a build with the three call sites
+removed. A DeltaBlue-shaped loop stays ~10% faster (median paired ratio
+0.905 over five interleaved pairs).
+
+20 test cases in PropertyShapeCacheTests: 13 on the Annex B surface —
+`caller`/`arguments` keeping their non-writable, non-enumerable,
+non-configurable DATA descriptor, reading `caller` while the function is
+on the stack, the Function.prototype poison pills still throwing, a
+null-slot key still reading through the generic path once warm, plus
+`length`/`name`/`prototype` values, attributes and enumeration order,
+redefinition, a bound function's name and length, a static redefined as
+an accessor mid-loop, and delete revealing an inherited static. Seven
+more on the write gate, including DeltaBlue's exact three-level
+`inheritsFrom` idiom, one warmed site writing 300 functions' prototypes,
+a class's non-writable prototype still refused once warm,
+constructability surviving a non-object assignment, a function's other
+statics still taking the store cache, and `prototype` still cached on
+read.
+
+Suite: 7 392 tests across 13 projects, 0 failures. Octane: 17 of 18
+benchmarks pass, the one failure (RegExp's checksum) failing identically
+on a pristine build at the pinned pointer.
+
+Refs docs/performance-roadmap.md item 2-8.
+---
+ .../Class/JSClass.cs                          |  12 +-
+ .../Function/JSFunction.cs                    |  86 +++--
+ .../PropertyShapeCacheTests.cs                | 300 +++++++++++++++++-
+ .../JSObject.PropertyStorage.cs               |   8 +-
+ .../Broiler.JavaScript.Runtime/JSObject.cs    |  85 ++++-
+ 5 files changed, 462 insertions(+), 29 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Class/JSClass.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Class/JSClass.cs
+index 99fb6dbd..5a3b22b3 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Class/JSClass.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Class/JSClass.cs
+@@ -10,6 +10,14 @@ namespace Broiler.JavaScript.BuiltIns.Class;
+ 
+ public class JSClass : JSFunction
+ {
++    /// <summary>
++    /// A class constructor tracks its named properties by shape, so its statics reach an inline
++    /// cache. See <see cref="JSFunction.SupportsShapeTracking"/> — earned the same way, by this
++    /// class installing <c>prototype</c> and <c>length</c> through <c>FastAddValue</c> instead of
++    /// a mutable ref to the property store, which abandoned the layout on the spot.
++    /// </summary>
++    internal override bool SupportsShapeTracking => GetType() == typeof(JSClass);
++
+     internal readonly JSValue super;
+ 
+     // True for a body-less class with no own constructor (no explicit constructor and
+@@ -72,7 +80,7 @@ public class JSClass : JSFunction
+         // "prototype" is a non-writable, non-enumerable, non-configurable data
+         // property (ECMA-262 ClassDefinitionEvaluation / MakeClassConstructor). The
+         // base JSFunction constructor installed it as writable, so tighten it here.
+-        GetOwnProperties().Put(KeyStrings.prototype, prototype, JSPropertyAttributes.ReadonlyValue);
++        FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.ReadonlyValue);
+     }
+ 
+     [EditorBrowsable(EditorBrowsableState.Never)]
+@@ -84,7 +92,7 @@ public class JSClass : JSFunction
+         // leaving the placeholder length (0) the base JSFunction ctor installed, so e.g.
+         // `class C { constructor(a, b) {} }` reported `C.length === 0`. Copy the constructor
+         // function's own "length" (configurable, non-writable, non-enumerable).
+-        GetOwnProperties().Put(KeyStrings.length, fx[KeyStrings.length], JSPropertyAttributes.ConfigurableReadonlyValue);
++        FastAddValue(KeyStrings.length, fx[KeyStrings.length], JSPropertyAttributes.ConfigurableReadonlyValue);
+ 
+         // The class now has its own constructor body, so it is no longer the default
+         // derived constructor; its super references are already compiled dynamically.
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs
+index dcf29db3..58636bfc 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs
+@@ -16,6 +16,28 @@ namespace Broiler.JavaScript.BuiltIns.Function;
+ [JSFunctionGenerator("Function", Register = false)]
+ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+ {
++    /// <summary>
++    /// An ordinary function tracks its named properties by shape, so statics on a constructor
++    /// reach an inline cache (roadmap item 2-8).
++    /// </summary>
++    /// <remarks>
++    /// Earned by two things, both of which had to be fixed first. Every named property this
++    /// class installs — <c>length</c>, <c>name</c>, <c>prototype</c> — now goes through
++    /// <c>FastAddValue</c> rather than a bare <c>ownProperties.Put</c>, so the shape's key set is
++    /// the object's complete set of own named properties; and the Annex B <c>caller</c> and
++    /// <c>arguments</c> cells are recorded as keys with no slot value rather than abandoning the
++    /// layout, so a non-strict function keeps its shape (see
++    /// <c>JSObject.TrackShapeKeyWithoutSlotValue</c>). Without the second, this would help only
++    /// strict functions and classes, and the idiom that motivates it — statics on a constructor,
++    /// which is how DeltaBlue reads <c>Strength.REQUIRED</c> in its hot path — is sloppy.
++    /// <para>
++    /// Exact-type, like every other override of this: a subclass reaching the property store
++    /// another way must make the claim for itself. <c>JSClass</c> does, having had the same two
++    /// fixes; the async, generator and bound-function forms deliberately do not.
++    /// </para>
++    /// </remarks>
++    internal override bool SupportsShapeTracking => GetType() == typeof(JSFunction);
++
+     internal static JSFunctionDelegate empty = (in Arguments a) => a.This;
+ 
+     [EditorBrowsable(EditorBrowsableState.Never)]
+@@ -46,6 +68,34 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         prototype = value as JSObject;
+     }
+ 
++    /// <summary>
++    /// Keeps <c>prototype</c> off the shape write fast paths, because writing it has an effect
++    /// beyond the property store: it re-caches the <see cref="prototype"/> field above, which is
++    /// what <c>[[Construct]]</c> reads.
++    /// </summary>
++    /// <remarks>
++    /// Every observable write path on this type — the indexer, <see cref="SetValue"/>,
++    /// <see cref="DefineProperty"/> — calls <see cref="AssignPrototypeField"/>. A shape fast path
++    /// is none of them: it writes <c>ownProperties</c> and <c>shapeSlots</c> and returns. So a
++    /// cached store to <c>f.prototype</c> updated the observable property and left
++    /// <c>[[Construct]]</c> reading the previous object, and `new f()` produced instances on a
++    /// stale prototype.
++    /// <para>
++    /// That is not hypothetical and it is not obscure: it is DeltaBlue. Its `inheritsFrom` helper
++    /// does `this.prototype = new Inheriter()` from one emitted site, called once per class, so
++    /// the first call missed and was correct and every call after it hit and was not — leaving
++    /// the second level of every inheritance chain unlinked and `this.addConstraint` undefined.
++    /// Item 2-8 admitted functions to shape tracking and this is the hole that opened; the
++    /// synthetic loop that measured 2-8's win could not see it, because it never wrote a
++    /// prototype.
++    /// </para>
++    /// <para>
++    /// Only this one key is withheld. <c>length</c>, <c>name</c> and every static a constructor
++    /// carries keep their slots, which is where 2-8's win actually is.
++    /// </para>
++    /// </remarks>
++    internal override bool AllowsDirectShapeWrite(uint key) => key != KeyStrings.prototype.Key;
++
+     private StringSpan source;
+ 
+     internal JSFunction constructor;
+@@ -330,7 +380,6 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+     public JSFunction(JSFunctionDelegate clrDelegate, JSFunction type) : this()
+     {
+         CaptureRealm();
+-        ref var ownProperties = ref GetOwnProperties();
+ 
+         f = clrDelegate;
+         name = "clr-native";
+@@ -338,7 +387,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         prototype = type.prototype;
+ 
+         prototype.FastAddValue(KeyStrings.constructor, type, JSPropertyAttributes.EnumerableConfigurableValue);
+-        ownProperties.Put(KeyStrings.prototype.Key) = JSProperty.Property(KeyStrings.prototype, (IPropertyValue)prototype, JSPropertyAttributes.Value);
++        FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
+ 
+         FastAddValue(KeyStrings.name, name.IsEmpty ? CreateString("native") : CreateString(name.Value), JSPropertyAttributes.ConfigurableReadonlyValue);
+         FastAddValue(KeyStrings.length, CreateNumber(0), JSPropertyAttributes.ConfigurableReadonlyValue);
+@@ -359,7 +408,6 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+     protected JSFunction(StringSpan name, StringSpan source, JSObject _prototype) : this()
+     {
+         CaptureRealm();
+-        ref var ownProperties = ref GetOwnProperties();
+         f = empty;
+         this.name = name.IsEmpty ? "native" : name;
+         this.source = source.IsEmpty ? $"function {this.name}() {{ [native code] }}" : source;
+@@ -367,9 +415,9 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         prototype = _prototype;
+         prototype.GetOwnProperties(true).Put(KeyStrings.constructor, this);
+ 
+-            ownProperties.Put(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
+-        ownProperties.Put(KeyStrings.length, NumberZero, JSPropertyAttributes.ConfigurableReadonlyValue);
+-        ownProperties.Put(KeyStrings.name, name.IsEmpty ? CreateString("native") : CreateString(name.Value), JSPropertyAttributes.ConfigurableReadonlyValue);
++            FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
++        FastAddValue(KeyStrings.length, NumberZero, JSPropertyAttributes.ConfigurableReadonlyValue);
++        FastAddValue(KeyStrings.name, name.IsEmpty ? CreateString("native") : CreateString(name.Value), JSPropertyAttributes.ConfigurableReadonlyValue);
+ 
+         constructor = this;
+     }
+@@ -383,7 +431,6 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+ 
+     public JSFunction(JSObject basePrototype, JSFunctionDelegate f, in StringSpan name, in StringSpan source, int length = 0, bool createPrototype = true) : base(basePrototype)
+     {
+-        ref var ownProperties = ref GetOwnProperties();
+         this.f = f;
+         // A user-compiled function carries its source span; per ES2026 §10.2.9 SetFunctionName
+         // an anonymous user function's `name` defaults to "" (and the contextual NamedEvaluation
+@@ -404,14 +451,14 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         // Own-key order per spec: a function's "length" and "name" are installed
+         // before its "prototype" (SetFunctionName/SetFunctionLength then
+         // MakeConstructor), so getOwnPropertyNames yields [length, name, prototype].
+-        ownProperties.Put(KeyStrings.length, CreateNumber(length), JSPropertyAttributes.ConfigurableReadonlyValue);
+-        ownProperties.Put(KeyStrings.name, CreateString(publicName), JSPropertyAttributes.ConfigurableReadonlyValue);
++        FastAddValue(KeyStrings.length, CreateNumber(length), JSPropertyAttributes.ConfigurableReadonlyValue);
++        FastAddValue(KeyStrings.name, CreateString(publicName), JSPropertyAttributes.ConfigurableReadonlyValue);
+ 
+         if (createPrototype)
+         {
+             prototype = new JSObject();
+             prototype.FastAddValue(KeyStrings.constructor, this, JSPropertyAttributes.ConfigurableValue);
+-            ownProperties.Put(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
++            FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
+         }
+ 
+         constructor = this;
+@@ -420,7 +467,6 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+     public JSFunction(JSFunctionDelegate f, in StringSpan name, in StringSpan source, int length = 0, bool createPrototype = true) : base((JSEngine.Current as IJSExecutionContext)?.FunctionPrototype)
+     {
+         CaptureRealm();
+-        ref var ownProperties = ref GetOwnProperties();
+         this.f = f;
+         // See the other constructor above: anonymous user functions report name "" per
+         // SetFunctionName, while native functions keep the "native" placeholder so
+@@ -436,14 +482,14 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         IsAnonymousNamePending = name.IsEmpty && !source.IsEmpty;
+ 
+         // Own-key order per spec: [length, name, prototype] (see above).
+-        ownProperties.Put(KeyStrings.length, CreateNumber(length), JSPropertyAttributes.ConfigurableReadonlyValue);
+-        ownProperties.Put(KeyStrings.name, CreateString(publicName), JSPropertyAttributes.ConfigurableReadonlyValue);
++        FastAddValue(KeyStrings.length, CreateNumber(length), JSPropertyAttributes.ConfigurableReadonlyValue);
++        FastAddValue(KeyStrings.name, CreateString(publicName), JSPropertyAttributes.ConfigurableReadonlyValue);
+ 
+         if (createPrototype)
+         {
+             prototype = new JSObject();
+             prototype.FastAddValue(KeyStrings.constructor, this, JSPropertyAttributes.ConfigurableValue);
+-            ownProperties.Put(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
++            FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
+         }
+ 
+         constructor = this;
+@@ -480,16 +526,15 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+             length: 0,
+             createPrototype: false);
+ 
+-        ref var ownProperties = ref throwTypeError.GetOwnProperties();
+-        ownProperties.Put(KeyStrings.length, NumberZero, JSPropertyAttributes.ReadonlyValue);
+-        ownProperties.Put(KeyStrings.name, CreateString(string.Empty), JSPropertyAttributes.ReadonlyValue);
++        throwTypeError.FastAddValue(KeyStrings.length, NumberZero, JSPropertyAttributes.ReadonlyValue);
++        throwTypeError.FastAddValue(KeyStrings.name, CreateString(string.Empty), JSPropertyAttributes.ReadonlyValue);
+         throwTypeError.f = (in Arguments a) => throw JSEngine.NewTypeError(message);
+         throwTypeError.PreventExtensions();
+         return throwTypeError;
+     }
+ 
+     internal void SetNameProperty(string name, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableReadonlyValue)
+-        => GetOwnProperties().Put(KeyStrings.name, CreateString(name), attributes);
++        => FastAddValue(KeyStrings.name, CreateString(name), attributes);
+ 
+     // Override the source text reported by Function.prototype.toString. Used by the
+     // dynamic Function constructor, which builds the function from an *anonymous*
+@@ -974,9 +1019,8 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         };
+         if (originalFunction != null)
+             fx.prototypeChain = originalFunction.prototypeChain;
+-        ref var ownProperties = ref fx.GetOwnProperties();
+-        ownProperties.Put(KeyStrings.name, CreateString(boundName), JSPropertyAttributes.ConfigurableReadonlyValue);
+-        ownProperties.Put(KeyStrings.length, CreateNumber(boundLength), JSPropertyAttributes.ConfigurableReadonlyValue);
++        fx.FastAddValue(KeyStrings.name, CreateString(boundName), JSPropertyAttributes.ConfigurableReadonlyValue);
++        fx.FastAddValue(KeyStrings.length, CreateNumber(boundLength), JSPropertyAttributes.ConfigurableReadonlyValue);
+ 
+         // Function.prototype.toString of a bound function is the implementation-defined
+         // NativeFunction form with NO name: the bound "name" property ("bound …") is not a
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyShapeCacheTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyShapeCacheTests.cs
+index 9afaf7e2..4370c30b 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyShapeCacheTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyShapeCacheTests.cs
+@@ -215,11 +215,14 @@ public class PropertyShapeCacheTests
+     [Fact]
+     public void AnInheritedAccessorIsNotSlotCached()
+     {
++        // The prototype is linked by `__proto__` in the literal rather than by
++        // Object.create, so the script performs no other cacheable read. `Object.create` is a
++        // named read on a FUNCTION object, which item 2-8 made cacheable, and it was quietly
++        // supplying the one hit this exact assertion is here to rule out.
+         var (result, stats) = Measure("""
+             var calls = 0;
+             var proto = { get k() { calls++; return 5; } };
+-            var o = Object.create(proto);
+-            o.own = 1;
++            var o = { __proto__: proto, own: 1 };
+             var s = 0;
+             for (var i = 0; i < 400; i++) s += o.k;
+             s + '|' + calls;
+@@ -594,6 +597,149 @@ public class PropertyShapeCacheTests
+             rx + '|' + ry;
+             """));
+ 
++    // ── functions track their named properties by shape (item 2-8) ────────────────────
++    //
++    // Statics on a constructor function were a 100% cache miss — 0 hits out of 200 000 — and
++    // that is how DeltaBlue reads `Strength.REQUIRED` and `Strength.stronger` in its hot path,
++    // at 601× off. Two things blocked it. The function's own `length`, `name` and `prototype`
++    // went in through a bare property-store put that never told the shape, so its key set would
++    // have been missing three keys every function has. And every ordinary NON-strict function
++    // carries the Annex B `caller`/`arguments` as deferred cells from birth, which abandoned the
++    // shape outright — so what is pinned below is mostly that those two still behave.
++
++    [Theory]
++    [InlineData("function S() {}")]
++    [InlineData("'use strict'; function S() {}")]
++    [InlineData("var S = function () {};")]
++    [InlineData("class S {}")]
++    public void AStaticOnAFunction_IsCached(string declaration)
++    {
++        var (result, stats) = Measure(declaration + """
++
++            S.REQUIRED = 7;
++            var s = 0;
++            for (var i = 0; i < 500; i++) s += S.REQUIRED;
++            s;
++            """);
++
++        Assert.Equal("3500", result);
++        Assert.True(stats.CacheHits >= 499, $"expected hits, got {stats.CacheHits}/{stats.CacheMisses}");
++        Assert.Equal(0, stats.DictionaryFallbacks);
++    }
++
++    [Fact]
++    public void AFunctionsOwnPropertiesAreUnchangedAndComplete()
++        // length, name and prototype now go through the shape tracker. Their values, their
++        // attributes and their enumeration order are what must not have moved.
++        => Assert.Equal("2|f|true|false,false,true|true,false,false|length,name,prototype", Eval("""
++            function f(a, b) {}
++            var d = Object.getOwnPropertyDescriptor(f, 'length');
++            var p = Object.getOwnPropertyDescriptor(f, 'prototype');
++            [
++                f.length,
++                f.name,
++                f.prototype.constructor === f,
++                [d.writable, d.enumerable, d.configurable].join(','),
++                [p.writable, p.enumerable, p.configurable].join(','),
++                Object.getOwnPropertyNames(f).filter(function (k) { return k !== 'caller' && k !== 'arguments'; }).join(',')
++            ].join('|');
++            """));
++
++    [Fact]
++    public void TheAnnexBCallerAndArgumentsKeepTheirDescriptorShape()
++        // A deferred cell is now recorded in the shape with no slot value instead of abandoning
++        // it. The cell still has to be the thing that answers, with the Annex B descriptor P0-3
++        // preserved: a non-writable, non-enumerable, non-configurable DATA property.
++        => Assert.Equal("true|||false,false,false|false,false,false", Eval("""
++            function f() {}
++            var c = Object.getOwnPropertyDescriptor(f, 'caller');
++            var a = Object.getOwnPropertyDescriptor(f, 'arguments');
++            [
++                ('value' in c) && ('value' in a) && !('get' in c) && !('get' in a),
++                f.caller,
++                f.arguments,
++                [c.writable, c.enumerable, c.configurable].join(','),
++                [a.writable, a.enumerable, a.configurable].join(',')
++            ].join('|');
++            """));
++
++    [Fact]
++    public void ANullSlotKeyStillReadsThroughTheGenericPath()
++        // The read site for `caller` is warmed against a key the shape carries with no slot
++        // value, so every read must decline the fast path and realize the cell.
++        => Assert.Equal("300|null", Eval("""
++            function f() {}
++            f.tag = 1;
++            var n = 0, last = 'x';
++            for (var i = 0; i < 300; i++) { last = f.caller; n++; }
++            n + '|' + last;
++            """));
++
++    [Fact]
++    public void ReadingCallerWhileTheFunctionIsOnTheStackStillWorks()
++        => Assert.Equal("true|true", Eval("""
++            function inner() { return inner.caller === outer; }
++            function outer() { return inner(); }
++            var first = outer();
++            var second = outer();
++            first + '|' + second;
++            """));
++
++    [Fact]
++    public void AStaticRedefinedAsAnAccessorMidLoop_IsObserved()
++        => Assert.Equal("800", Eval("""
++            function S() {}
++            S.k = 1;
++            var s = 0;
++            for (var i = 0; i < 400; i++) {
++                if (i === 200) Object.defineProperty(S, 'k', { get: function () { return 3; } });
++                s += S.k;
++            }
++            s;
++            """));
++
++    [Fact]
++    public void OverwritingAFunctionsOwnLengthAndNameStillWorks()
++        => Assert.Equal("9|renamed|7", Eval("""
++            function f(a, b) {}
++            f.tag = 7;
++            for (var i = 0; i < 300; i++) f.tag = 7;
++            Object.defineProperty(f, 'length', { value: 9 });
++            Object.defineProperty(f, 'name', { value: 'renamed' });
++            [f.length, f.name, f.tag].join('|');
++            """));
++
++    [Fact]
++    public void ABoundFunctionKeepsItsNameAndLength()
++        => Assert.Equal("bound f|1|3", Eval("""
++            function f(a, b) { return a + b; }
++            var b = f.bind(null, 1);
++            [b.name, b.length, b(2)].join('|');
++            """));
++
++    [Fact]
++    public void ThePoisonPillThrowTypeErrorStillThrows()
++        => Assert.Equal("TypeError|TypeError", Eval("""
++            'use strict';
++            function f() {}
++            var d = Object.getOwnPropertyDescriptor(Function.prototype, 'caller');
++            var r = [];
++            try { d.get.call(f); } catch (e) { r.push(e.constructor.name); }
++            try { d.set.call(f, 1); } catch (e) { r.push(e.constructor.name); }
++            r.join('|');
++            """));
++
++    [Fact]
++    public void DeletingAStaticRevealsTheInheritedOne()
++        => Assert.Equal("1200", Eval("""
++            function S() {}
++            Object.setPrototypeOf(S, { k: 5 });
++            S.k = 1;
++            var s = 0;
++            for (var i = 0; i < 400; i++) { if (i === 200) delete S.k; s += S.k; }
++            s;
++            """));
++
+     [Fact]
+     public void AProxyInThePrototypeChainStillTraps()
+     {
+@@ -607,4 +753,154 @@ public class PropertyShapeCacheTests
+             traps + '|' + last;
+             """));
+     }
++
++    // ── a function's `prototype` is withheld from the shape WRITE paths ───────────────
++    //
++    // Item 2-8 admitted functions to shape tracking, and that opened a hole these cover.
++    // JSFunction keeps a cached `prototype` FIELD — the one [[Construct]] reads — and syncs it
++    // by overriding every observable write path. A shape fast path is none of them: it writes
++    // ownProperties and shapeSlots and returns. So a *cached* store to `f.prototype` updated the
++    // observable property and left construction building instances on the previous object.
++    //
++    // The shape it broke is DeltaBlue's. `inheritsFrom` does `this.prototype = new Inheriter()`
++    // from one emitted site, called once per class: the first call missed and was right, every
++    // call after it hit and was wrong, and the second level of every inheritance chain came out
++    // unlinked. The loop that measured 2-8's win never wrote a prototype, so it saw none of it.
++
++    [Fact]
++    public void AWarmedPrototypeWriteSiteStillRelinksTheWholeChain()
++        => Assert.Equal("true|true|function|function|true", Eval("""
++            // DeltaBlue's exact idiom, three levels deep. One store site, many functions.
++            Object.defineProperty(Object.prototype, 'inheritsFrom', {
++                value: function (shuper) {
++                    function Inheriter() { }
++                    Inheriter.prototype = shuper.prototype;
++                    this.prototype = new Inheriter();
++                    this.superConstructor = shuper;
++                }
++            });
++
++            function Constraint(s) { this.strength = s; }
++            Constraint.prototype.addConstraint = function () { this.added = true; };
++            function BinaryConstraint() { this.addConstraint(); }
++            BinaryConstraint.inheritsFrom(Constraint);
++            function EqualityConstraint() { EqualityConstraint.superConstructor.call(this); }
++            EqualityConstraint.inheritsFrom(BinaryConstraint);
++
++            var e = new EqualityConstraint();
++            [
++                Object.getPrototypeOf(BinaryConstraint.prototype) === Constraint.prototype,
++                Object.getPrototypeOf(EqualityConstraint.prototype) === BinaryConstraint.prototype,
++                typeof EqualityConstraint.prototype.addConstraint,
++                typeof e.addConstraint,
++                e.added === true
++            ].join('|');
++            """));
++
++    [Fact]
++    public void OneWarmedSiteWritingManyFunctionsPrototypes_EveryNewGetsItsOwn()
++        => Assert.Equal("300|300", Eval("""
++            // The store site is warm from the second iteration on; every instance after that
++            // must still land on the prototype its own constructor was given.
++            function install(f, proto) { f.prototype = proto; }
++            var right = 0, wrong = 0;
++            for (var i = 0; i < 300; i++) {
++                var ctor = new Function('return function C() {};')();
++                var proto = { tag: i };
++                install(ctor, proto);
++                var instance = new ctor();
++                if (Object.getPrototypeOf(instance) === proto && instance.tag === i) right++; else wrong++;
++            }
++            right + '|' + (300 - wrong);
++            """));
++
++    [Fact]
++    public void APrototypeWriteThroughAWarmedSiteAgreesWithTheObservableProperty()
++        => Assert.Equal("400|400", Eval("""
++            // The property and [[Construct]] must never disagree — that disagreement WAS the bug.
++            function F() {}
++            var agreed = 0, constructed = 0;
++            for (var i = 0; i < 400; i++) {
++                var proto = { n: i };
++                F.prototype = proto;
++                if (F.prototype === proto) agreed++;
++                if (Object.getPrototypeOf(new F()) === proto) constructed++;
++            }
++            agreed + '|' + constructed;
++            """));
++
++    [Fact]
++    public void AClassPrototypeWriteThroughAWarmedSiteIsStillRefused()
++        => Assert.Equal("300|true|true", Eval("""
++            // JSClass derives from JSFunction, so it inherits the same cached field and the same
++            // exclusion. A class's `prototype` is non-writable and non-configurable, so every one
++            // of these writes must be refused — including the ones after the site is warm, which
++            // is the case a cached store could have got wrong.
++            //
++            // Scoped deliberately to the observable PROPERTY. What `new C()` produces after a
++            // refused write is wrong on this engine at the pinned pointer too — the indexer syncs
++            // JSFunction's cached prototype field before the write, so a refusal still redirects
++            // [[Construct]] — and asserting it here would either encode that defect as correct or
++            // fail for a reason this item does not own. It is reported separately in
++            // docs/performance-roadmap.md item 2-8.
++            class C {}
++            var original = C.prototype;
++            var kept = 0;
++            for (var i = 0; i < 300; i++) {
++                try { C.prototype = { n: i }; } catch (e) { /* sloppy: silently refused */ }
++                if (C.prototype === original) kept++;
++            }
++            var d = Object.getOwnPropertyDescriptor(C, 'prototype');
++            kept + '|' + (d.writable === false) + '|' + (d.configurable === false);
++            """));
++
++    [Fact]
++    public void AssigningANonObjectPrototypeThroughAWarmedSiteKeepsConstructability()
++        => Assert.Equal("300|300", Eval("""
++            // AssignPrototypeField's other half: a function that HAS had a prototype object is a
++            // constructor for good, even after `prototype` is set to a primitive. Reflect.construct
++            // consults that, so a warmed site must not lose it either.
++            function F() { this.ok = 1; }
++            var constructed = 0, accepted = 0;
++            for (var i = 0; i < 300; i++) {
++                F.prototype = 7;
++                if (new F().ok === 1) constructed++;
++                try { Reflect.construct(Object, [], F); accepted++; } catch (e) { /* would be the bug */ }
++            }
++            constructed + '|' + accepted;
++            """));
++
++    [Fact]
++    public void AFunctionsOtherNamedPropertiesStillTakeTheStoreCache()
++    {
++        // The exclusion is one key wide. Statics are where item 2-8's win is, so they must
++        // still hit — this is the assertion that stops the fix from quietly undoing it.
++        var (result, stats) = Measure("""
++            function S() {}
++            S.count = 0;
++            for (var i = 0; i < 500; i++) S.count = i;
++            S.count;
++            """);
++
++        Assert.Equal("499", result);
++        Assert.True(stats.StoreCacheHits >= 499,
++            $"a function's statics must still hit, got {stats.StoreCacheHits}/{stats.StoreCacheMisses}");
++    }
++
++    [Fact]
++    public void ReadingAFunctionsPrototypeIsStillCached()
++    {
++        // Only the WRITE paths are gated: a read has no field to keep in sync, and gating it
++        // would give up cache coverage for nothing.
++        var (result, stats) = Measure("""
++            function F() {}
++            var p = null;
++            for (var i = 0; i < 500; i++) p = F.prototype;
++            (p === F.prototype).toString();
++            """);
++
++        Assert.Equal("true", result);
++        Assert.True(stats.CacheHits >= 499,
++            $"reading `prototype` should still hit, got {stats.CacheHits}/{stats.CacheMisses}");
++    }
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.PropertyStorage.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.PropertyStorage.cs
+index 6ceaa034..5a87b30c 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.PropertyStorage.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.PropertyStorage.cs
+@@ -341,7 +341,13 @@ public partial class JSObject
+     {
+         CancelLazyDataProperty(in ownProperties.GetValue(key.Key));
+         ownProperties.Put(key.Key) = new JSProperty(key, null, null, deferred, attributes);
+-        AbandonObjectShape();
++
++        // Recorded in the shape with no slot value rather than abandoning it. A deferred cell
++        // has to be realized by the generic path, and a null slot is exactly how the shape says
++        // so while still admitting the key exists — see TrackShapeKeyWithoutSlotValue. Dropping
++        // the whole layout instead meant an ordinary non-strict function, which gets two of
++        // these at birth, could never be shape-tracked (roadmap item 2-8).
++        TrackShapeKeyWithoutSlotValue(in key);
+     }
+ 
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+index 3f1b4ff2..2226421a 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+@@ -183,6 +183,58 @@ public partial class JSObject : JSValue
+         => (attributes & JSPropertyAttributes.Value) != 0
+             && (attributes & JSPropertyAttributes.Property) == 0;
+ 
++    /// <summary>
++    /// Records that this object owns <paramref name="key"/> as a named property whose value no
++    /// slot can hold, keeping the shape rather than abandoning it.
++    /// </summary>
++    /// <remarks>
++    /// The shape's job is two claims, and only one of them needs the value. *Presence* — "key K
++    /// is at slot N" — is what <see cref="TryReadShapeSlot"/> and <see cref="TryWriteShapeSlot"/>
++    /// use. *Absence* — "the shape does not carry K, so this object does not own K" — is what
++    /// <see cref="GetPrototypeLookupShapeId"/> and <see cref="TryCreateShapeSlot"/> use. A key
++    /// present in the shape with a <c>null</c> slot keeps both claims true: absence reasoning
++    /// sees the key and declines, and all three fast paths already reject a null slot or a
++    /// descriptor whose value is not a <see cref="JSValue"/>, so a read or a write falls through
++    /// to the generic path that knows how to realize it.
++    /// <para>
++    /// That is what lets an ordinary non-strict function be shape-tracked at all. Every one
++    /// carries the Annex B <c>caller</c> and <c>arguments</c> as deferred cells from birth
++    /// (P0-3), and abandoning the shape for them meant no function could keep one — which is
++    /// roadmap item 2-8, and why DeltaBlue's `Strength.REQUIRED` was a 100% cache miss.
++    /// </para>
++    /// </remarks>
++    internal void TrackShapeKeyWithoutSlotValue(in KeyString key)
++    {
++        if (!SupportsShapeTracking || objectShape.IsDictionary)
++            return;
++
++        if (key.Metadata.IsPrivateName)
++        {
++            // A private name is per-class-evaluation, so admitting one would mint a shape per
++            // class instantiation rather than share a chain. Not worth a slot it cannot use.
++            AbandonObjectShape();
++            NotifyNamedPropertyMutation();
++            return;
++        }
++
++        if (!objectShape.TryGetSlot(key.Key, out var slot))
++        {
++            objectShape = objectShape.Add(key.Key);
++            slot = objectShape.SlotCount - 1;
++            if (shapeSlots.Length <= slot)
++            {
++                var replacement = new JSValue[Math.Max(4, Math.Max(objectShape.SlotCount, shapeSlots.Length * 2))];
++                Array.Copy(shapeSlots, replacement, shapeSlots.Length);
++                shapeSlots = replacement;
++            }
++        }
++
++        // Cleared, not left alone: if this key previously held a fast value, the descriptor it
++        // now has is the truth and the slot must stop answering for it.
++        shapeSlots[slot] = null;
++        NotifyNamedPropertyMutation();
++    }
++
+     internal void TrackShapeDataProperty(in KeyString key, JSValue value, JSPropertyAttributes attributes)
+     {
+         if (!SupportsShapeTracking)
+@@ -223,6 +275,31 @@ public partial class JSObject : JSValue
+         PropertyOptimizationDiagnostics.RecordDictionaryFallback();
+     }
+ 
++    /// <summary>
++    /// Whether a shape fast path may write this key's slot directly, bypassing this type's
++    /// <c>[[Set]]</c> and <c>DefineProperty</c> overrides.
++    /// </summary>
++    /// <remarks>
++    /// The shape fast paths write <c>ownProperties</c> and <c>shapeSlots</c> and nothing else.
++    /// That is the whole point of them, and it is correct for a plain object — but a derived
++    /// type may keep state <em>derived</em> from a property, synced by overriding every
++    /// observable write path. <see cref="TryWriteShapeSlot"/> is not one of those paths, so for
++    /// such a key the fast path would leave the object internally inconsistent.
++    /// <para>
++    /// Checked on the write and on the install, not just the install: shapes are interned by key
++    /// set, so a <c>JSFunction</c> and a plain object that happen to carry the same keys share
++    /// one shape <em>and one id</em>. An entry installed against the plain object would otherwise
++    /// hit the function.
++    /// </para>
++    /// <para>
++    /// This is not the same guard as the null slot <see cref="TrackShapeKeyWithoutSlotValue"/>
++    /// installs. That one works because a deferred cell's stored value is not a
++    /// <see cref="JSValue"/>, which the write paths already reject; a key like a function's
++    /// <c>prototype</c> holds an ordinary JSValue and would sail through every existing check.
++    /// </para>
++    /// </remarks>
++    internal virtual bool AllowsDirectShapeWrite(uint key) => true;
++
+     internal bool TryGetShapeSlot(in KeyString key, out int shapeId, out int slot)
+     {
+         if (SupportsShapeTracking
+@@ -250,7 +327,7 @@ public partial class JSObject : JSValue
+     /// </remarks>
+     internal bool TryGetWritableShapeSlot(in KeyString key, out int shapeId, out int slot)
+     {
+-        if (!TryGetShapeSlot(in key, out shapeId, out slot))
++        if (!TryGetShapeSlot(in key, out shapeId, out slot) || !AllowsDirectShapeWrite(key.Key))
+             return false;
+ 
+         ref var own = ref ownProperties.GetValue(key.Key);
+@@ -346,7 +423,8 @@ public partial class JSObject : JSValue
+     {
+         if (value == null
+             || objectShape.Id != shapeId
+-            || (uint)slot >= (uint)shapeSlots.Length)
++            || (uint)slot >= (uint)shapeSlots.Length
++            || !AllowsDirectShapeWrite(key.Key))
+         {
+             return false;
+         }
+@@ -414,7 +492,8 @@ public partial class JSObject : JSValue
+         if (value == null
+             || !SupportsShapeTracking
+             || !ReferenceEquals(objectShape, from)
+-            || (status & ObjectStatus.NonExtensible) != 0)
++            || (status & ObjectStatus.NonExtensible) != 0
++            || !AllowsDirectShapeWrite(key.Key))
+         {
+             return false;
+         }
+-- 
+2.43.0
+

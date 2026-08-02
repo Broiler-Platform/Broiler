@@ -1,0 +1,593 @@
+From f1e24b45602ea20b0b8e1ef049e1d329693fc271 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 1 Aug 2026 20:26:01 +0000
+Subject: [PATCH] Let the store cache describe a property creation
+
+The store inline cache could only ever describe overwriting a slot that
+already exists. It records where a write landed - (shape after the write,
+slot) - and hits through TryWriteShapeSlot, which requires the property to be
+there. A store that CREATES its property therefore installs an entry keyed on
+the shape the object ended up with, and the next object arrives with that
+shape's predecessor. It misses. Always, at every such site, for the life of
+the process: measured 0 store-cache hits against 600 000 misses for 200 000
+constructions of a three-field object. Every constructor assigning fields one
+at a time missed on every field of every object it ever built, which is the
+exact shape of Richards' TaskControlBlock, DeltaBlue's constraints,
+RayTrace's Vector and Box2D's b2Vec2.
+
+Add a second entry form keyed on the shape BEFORE the write, discriminated by
+a null FromShape exactly as the read cache discriminates own from prototype
+entries. A hit creates the property in the recorded slot and advances the
+object to the recorded successor shape, which is where the saving is:
+TrackShapeDataProperty would look the key up in the current shape, miss, and
+then look it up again in that shape's transition table to arrive at the very
+shape and slot the entry already holds. Now 599 997 hits against 3 misses -
+one cold miss per field - and ~20% faster on a 2 M-iteration constructor
+loop, median of paired ratios 0.797 over four interleaved pairs, every pair
+the same direction.
+
+Creating a property is the last step of OrdinarySetWithOwnDescriptor, so a
+replay is only correct under conditions the shape id says nothing about, and
+three guards carry them.
+
+A concrete shape proves the key is absent: while an object is in shape mode
+its tracked keys ARE its complete set of own named properties, because every
+untrackable addition - a private name, an accessor, non-default attributes, a
+deferred cell - abandons the shape first. The entry holds the ObjectShape by
+reference rather than by id, so the test is identity and Empty being shared by
+every fresh object is harmless.
+
+The prototype chain is walked once, at install, and required to supply
+nothing for the key. It would change the outcome if it did: a setter there has
+to run, and an inherited non-writable data property has to reject the write.
+Two guards keep that answer true at every later hit - the receiver still
+pointing at the same prototype, by reference, and the global
+prototype-mutation version, which any addition to any object used as a
+prototype publishes. Those are the same two the read cache's prototype form
+uses, and they only hold up because the previous change stopped `new` from
+advancing that version once per allocation; before it, a transition entry
+retired on the next object the loop built.
+
+Extensibility is re-checked on every hit, unlike the overwrite form which
+deliberately omits it, because this call adds a property rather than
+overwriting one. preventExtensions, seal and freeze all set NonExtensible, so
+one test covers all three.
+
+Everything else falls through to the unchanged generic path, and that is what
+bounds the risk: a guard failing costs a miss, never a wrong answer, and a
+rejected creation is reported by the generic path exactly as before. The only
+way to be wrong is a false positive, and each guard closes one.
+
+A creation is detected by the shape changing across the store. A shape is
+immutable, so a receiver reporting a different one has gained a tracked
+property, and the only one it can have gained at this site is this key - no
+pre-lookup of the key is needed, which matters because it would be paid on
+every miss.
+
+PropertyStoreCacheTests covers each way either condition can stop holding,
+each after the site has been warmed on the fast path: a prototype setter
+present from the start and added mid-loop, an inherited read-only data
+property in sloppy and strict mode, a non-extensible receiver in sloppy and
+strict mode, a frozen receiver, two receivers sharing a shape but not a
+prototype, setPrototypeOf mid-loop, `__proto__` still reaching the inherited
+accessor, a dictionary-mode receiver, a Proxy as receiver and in the chain,
+delete and re-create, attributes and key order, and the hit rate itself.
+Removing the two hit-time prototype guards fails four of them.
+
+test262 is NOT run here. The properties-proxy and strict-mode manifests are
+owed for this item before it can close, per the measurement protocol and the
+phase-2 exit gate.
+---
+ .../PropertyStoreCacheTests.cs                | 259 ++++++++++++++++++
+ .../Broiler.JavaScript.Runtime/JSObject.cs    |  75 +++++
+ .../Broiler.JavaScript.Runtime/ObjectShape.cs | 106 ++++++-
+ 3 files changed, 436 insertions(+), 4 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyStoreCacheTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyStoreCacheTests.cs
+index 0971058b..9d62df62 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyStoreCacheTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyStoreCacheTests.cs
+@@ -389,4 +389,263 @@ public class PropertyStoreCacheTests
+             for (var i = 0; i <= 9; i++) base().x = i;
+             n;
+             """));
++
++    // ── the transition form: a store that CREATES its property (item 2-1) ─────────────
++    //
++    // The entries above all describe overwriting a slot that exists. A store that adds one
++    // could not hit at all — the shape recorded after the write never matches the shape the
++    // next object presents before it — so a constructor assigning fields missed on every
++    // field of every object it ever built (measured 0 hits against 600 000 misses). A second
++    // entry form keyed on the shape BEFORE the write fixes that, and it is the more dangerous
++    // of the two: replaying a creation means performing CreateDataProperty directly, which is
++    // only what OrdinarySetWithOwnDescriptor would do while the receiver is extensible AND the
++    // prototype chain supplies nothing for the key. Every way either can stop being true is
++    // below, each after the site has been warmed on the fast path.
++
++    [Fact]
++    public void CreatingAPropertyInAConstructor_IsCached()
++    {
++        var (result, stats) = MeasureFirstRun("""
++            function T(a, b, c) { this.a = a; this.b = b; this.c = c; }
++            var last = null;
++            for (var i = 0; i < 300; i++) last = new T(i, i + 1, i + 2);
++            last.a + ',' + last.b + ',' + last.c;
++            """);
++
++        Assert.Equal("299,300,301", result);
++        // Three creating sites, one cold miss each; everything after is a transition hit.
++        Assert.True(
++            stats.StoreCacheHits >= 3 * 300 - 6,
++            $"expected creating stores to hit, got {stats.StoreCacheHits}/{stats.StoreCacheMisses}");
++    }
++
++    [Fact]
++    public void ACreatedPropertyGetsTheDefaultAttributesAndOrder()
++    {
++        // CreateDataProperty means writable, enumerable and configurable — all true — and the
++        // insertion order the generic path would have produced.
++        Assert.Equal("true|true|true|1|a,b,c", Eval("""
++            function T() { this.a = 1; this.b = 2; this.c = 3; }
++            var last = null;
++            for (var i = 0; i < 400; i++) last = new T();
++            var d = Object.getOwnPropertyDescriptor(last, 'a');
++            [d.writable, d.enumerable, d.configurable, d.value, Object.keys(last).join(',')].join('|');
++            """));
++    }
++
++    [Fact]
++    public void APrototypeSetterTakesTheCreationInsteadOfAnOwnProperty()
++    {
++        // Present from the start, so the site never installs a transition entry at all.
++        Assert.Equal("400|false|99", Eval("""
++            var taken = 0;
++            function T() { this.x = 1; }
++            Object.defineProperty(T.prototype, 'x', {
++                set: function (v) { taken++; },
++                get: function () { return 99; }
++            });
++            var last = null;
++            for (var i = 0; i < 400; i++) last = new T();
++            [taken, last.hasOwnProperty('x'), last.x].join('|');
++            """));
++    }
++
++    [Fact]
++    public void APrototypeSetterAddedAfterWarmUp_TakesTheCreation()
++    {
++        // The invalidation path that matters most: 200 objects get their own property, then a
++        // setter appears on the chain and the remaining 200 must run it instead.
++        Assert.Equal("true|true|false|false|200", Eval("""
++            var taken = 0;
++            function T() { this.x = 1; }
++            var own = [];
++            for (var i = 0; i < 400; i++) {
++                if (i === 200)
++                    Object.defineProperty(T.prototype, 'x', { set: function (v) { taken++; } });
++                own.push(new T().hasOwnProperty('x'));
++            }
++            [own[0], own[199], own[200], own[399], taken].join('|');
++            """));
++    }
++
++    [Fact]
++    public void AnInheritedReadOnlyDataProperty_RefusesTheCreation()
++    {
++        Assert.Equal("false|5", Eval("""
++            function T() { this.x = 1; }
++            Object.defineProperty(T.prototype, 'x', { value: 5, writable: false });
++            var last = null;
++            for (var i = 0; i < 400; i++) last = new T();
++            [last.hasOwnProperty('x'), last.x].join('|');
++            """));
++    }
++
++    [Fact]
++    public void AnInheritedReadOnlyDataPropertyAddedAfterWarmUp_ThrowsInStrictMode()
++    {
++        Assert.Equal("200|200", Eval("""
++            function T() { 'use strict'; this.x = 1; }
++            var made = 0, thrown = 0;
++            for (var i = 0; i < 400; i++) {
++                if (i === 200)
++                    Object.defineProperty(T.prototype, 'x', { value: 5, writable: false });
++                try { new T(); made++; } catch (e) { if (e instanceof TypeError) thrown++; }
++            }
++            made + '|' + thrown;
++            """));
++    }
++
++    [Fact]
++    public void ANonExtensibleReceiverRefusesTheCreation()
++    {
++        Assert.Equal("true|true|false|false", Eval("""
++            function add(o) { o.x = 1; return o.hasOwnProperty('x'); }
++            var own = [];
++            for (var i = 0; i < 400; i++) {
++                var o = {};
++                if (i >= 200) Object.preventExtensions(o);
++                own.push(add(o));
++            }
++            [own[0], own[199], own[200], own[399]].join('|');
++            """));
++    }
++
++    [Fact]
++    public void ANonExtensibleReceiverThrowsInStrictMode()
++    {
++        Assert.Equal("200|200", Eval("""
++            function add(o) { 'use strict'; o.x = 1; }
++            var made = 0, thrown = 0;
++            for (var i = 0; i < 400; i++) {
++                var o = {};
++                if (i >= 200) Object.preventExtensions(o);
++                try { add(o); made++; } catch (e) { if (e instanceof TypeError) thrown++; }
++            }
++            made + '|' + thrown;
++            """));
++    }
++
++    [Fact]
++    public void AFrozenReceiverRefusesTheCreation()
++        => Assert.Equal("true|false", Eval("""
++            function add(o) { o.x = 1; return o.hasOwnProperty('x'); }
++            for (var i = 0; i < 400; i++) add({});
++            var open = {}, frozen = Object.freeze({});
++            add(open) + '|' + add(frozen);
++            """));
++
++    [Fact]
++    public void TwoReceiversSharingAShapeButNotAPrototype_DoNotShareATransition()
++    {
++        // Both receivers are empty objects, so they present the same shape; only their
++        // prototypes differ, and one of those prototypes has a setter for the key. An entry
++        // guarded by the shape alone would create an own property on both.
++        Assert.Equal("400|400|0", Eval("""
++            var taken = 0;
++            var plain = {};
++            var trapped = {};
++            Object.defineProperty(trapped, 'x', { set: function (v) { taken++; } });
++            function add(o) { o.x = 1; return o.hasOwnProperty('x') ? 1 : 0; }
++            var ownOnPlain = 0, ownOnTrapped = 0;
++            for (var i = 0; i < 400; i++) {
++                ownOnPlain += add(Object.create(plain));
++                ownOnTrapped += add(Object.create(trapped));
++            }
++            [taken, ownOnPlain, ownOnTrapped].join('|');
++            """));
++    }
++
++    [Fact]
++    public void SwappingTheReceiversPrototypeAfterWarmUp_IsObserved()
++        => Assert.Equal("true|false|200", Eval("""
++            var taken = 0;
++            var plain = {};
++            var trapped = {};
++            Object.defineProperty(trapped, 'x', { set: function (v) { taken++; } });
++            function add(o) { o.x = 1; return o.hasOwnProperty('x'); }
++            var own = [];
++            for (var i = 0; i < 400; i++) {
++                var o = {};
++                if (i >= 200) Object.setPrototypeOf(o, trapped);
++                own.push(add(o));
++            }
++            [own[0], own[399], taken].join('|');
++            """));
++
++    [Fact]
++    public void ADunderProtoAssignmentStillRunsTheInheritedAccessor()
++        => Assert.Equal("false|true|true", Eval("""
++            // `__proto__` is an accessor on %Object.prototype%, so the chain is never free of
++            // the key and no transition entry may be installed for it.
++            var a = { marker: 1 };
++            function setProto(o, v) { o.__proto__ = v; }
++            var ownAny = false, allLinked = true, allMarked = true;
++            for (var i = 0; i < 400; i++) {
++                var o = {};
++                setProto(o, a);
++                if (o.hasOwnProperty('__proto__')) ownAny = true;
++                if (Object.getPrototypeOf(o) !== a) allLinked = false;
++                if (o.marker !== 1) allMarked = false;
++            }
++            [ownAny, allLinked, allMarked].join('|');
++            """));
++
++    [Fact]
++    public void ADictionaryModeReceiverStillCreatesCorrectly()
++        => Assert.Equal("400|400", Eval("""
++            function add(o) { o.x = 1; return o.x; }
++            var ok = 0, dict = 0;
++            for (var i = 0; i < 400; i++) {
++                ok += add({});
++                var d = {};
++                Object.defineProperty(d, 'k', { get: function () { return 1; } });
++                dict += add(d);
++            }
++            ok + '|' + dict;
++            """));
++
++    [Fact]
++    public void ACreatedPropertyIsVisibleToReadsEnumerationAndJson()
++        => Assert.Equal("1|a|{\"a\":1}|true", Eval("""
++            function T() { this.a = 1; }
++            var last = null;
++            for (var i = 0; i < 400; i++) last = new T();
++            [last.a, Object.keys(last).join(','), JSON.stringify(last), 'a' in last].join('|');
++            """));
++
++    [Fact]
++    public void DeletingACreatedPropertyAndRecreatingIt_Works()
++        => Assert.Equal("1|false|1", Eval("""
++            function add(o) { o.x = 1; }
++            var o = null;
++            for (var i = 0; i < 400; i++) { o = {}; add(o); }
++            var before = o.x;
++            delete o.x;
++            var gone = o.hasOwnProperty('x');
++            add(o);
++            [before, gone, o.x].join('|');
++            """));
++
++    [Fact]
++    public void AProxyReceiverStillFiresItsSetTrapForACreation()
++        => Assert.Equal("400|1", Eval("""
++            var traps = 0;
++            function add(o) { o.x = 1; }
++            for (var i = 0; i < 400; i++) add({});
++            var target = {};
++            var p = new Proxy(target, { set: function (t, k, v, r) { traps++; return Reflect.set(t, k, v); } });
++            for (var i = 0; i < 400; i++) add(p);
++            traps + '|' + target.x;
++            """));
++
++    [Fact]
++    public void AProxyInThePrototypeChainStillFiresItsSetTrapForACreation()
++        => Assert.Equal("400|false", Eval("""
++            var traps = 0;
++            var p = new Proxy({}, { set: function (t, k, v, r) { traps++; return true; } });
++            function add(o) { o.x = 1; return o.hasOwnProperty('x'); }
++            var own = false;
++            for (var i = 0; i < 400; i++) { if (add(Object.create(p))) own = true; }
++            traps + '|' + own;
++            """));
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+index 4003e972..a65308b0 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+@@ -339,6 +339,81 @@ public partial class JSObject : JSValue
+         return true;
+     }
+ 
++    /// <summary>
++    /// The shape a store cache may record a transition out of, or <c>null</c> when this
++    /// receiver cannot be keyed by one.
++    /// </summary>
++    /// <remarks>
++    /// A concrete shape is by itself proof that a key it does not carry is absent from the
++    /// object: while an object is in shape mode its tracked keys ARE its complete set of own
++    /// named properties, because every addition that cannot be tracked — a private name, an
++    /// accessor, a non-default attribute set, a deferred cell — calls
++    /// <see cref="AbandonObjectShape"/> first. Dictionary mode carries no such guarantee and is
++    /// excluded. <see cref="ObjectShape.Empty"/> is deliberately NOT excluded even though every
++    /// fresh object shares it: it is exactly the state a constructor's first field assignment
++    /// starts from, and sharing is harmless because a transition is determined by the shape and
++    /// the key alone — unlike <see cref="GetPrototypeLookupShapeId"/>, which must reject it
++    /// because there the shared id would have to stand in for the receiver's identity.
++    /// </remarks>
++    internal ObjectShape TransitionShape
++        => GetType() == typeof(JSObject) && !objectShape.IsDictionary ? objectShape : null;
++
++    /// <summary>
++    /// Creates the key as a fresh own data property, in a slot and a successor shape a store
++    /// inline cache has already resolved. Returns false when this receiver cannot take the
++    /// creation, leaving the caller to run the ordinary [[Set]].
++    /// </summary>
++    /// <remarks>
++    /// The write twin of <see cref="TryWriteShapeSlot"/> for the case that one cannot serve:
++    /// a store that does not overwrite an existing slot but adds one. That is
++    /// CreateDataProperty, the last step of OrdinarySetWithOwnDescriptor, so three things must
++    /// hold and only two of them are checked here — the shape must be exactly the one the
++    /// transition was recorded from, the object must still be extensible, and nothing on the
++    /// prototype chain may supply the key. The third belongs to the caller, which is where the
++    /// chain was walked and where the guards that detect it changing live.
++    /// <para>
++    /// Extensibility is checked, unlike in <see cref="TryWriteShapeSlot"/>, precisely because
++    /// this call ADDS a property: <c>Object.preventExtensions</c>, <c>seal</c> and
++    /// <c>freeze</c> all set <see cref="ObjectStatus.NonExtensible"/>, so one test covers all
++    /// three. A rejected creation is not reported here either — returning false runs the
++    /// generic path, which throws or returns false exactly as it did before.
++    /// </para>
++    /// </remarks>
++    internal bool TryCreateShapeSlot(
++        ObjectShape from,
++        ObjectShape to,
++        int slot,
++        in KeyString key,
++        JSValue value)
++    {
++        if (value == null
++            || GetType() != typeof(JSObject)
++            || !ReferenceEquals(objectShape, from)
++            || (status & ObjectStatus.NonExtensible) != 0)
++        {
++            return false;
++        }
++
++        if (shapeSlots.Length <= slot)
++        {
++            var replacement = new JSValue[Math.Max(4, Math.Max(to.SlotCount, shapeSlots.Length * 2))];
++            Array.Copy(shapeSlots, replacement, shapeSlots.Length);
++            shapeSlots = replacement;
++        }
++
++        // The same three steps DefineReceiverDataProperty performs for an ordinary target,
++        // with the shape advanced to the recorded successor instead of being re-derived:
++        // TrackShapeDataProperty would look the key up in the current shape, miss, and then
++        // look it up again in that shape's transition table to find the very shape and slot
++        // this entry already holds.
++        ownProperties.Put(key, value, JSPropertyAttributes.EnumerableConfigurableValue);
++        objectShape = to;
++        shapeSlots[slot] = value;
++        NotifyNamedPropertyMutation();
++        PropertyChanged?.Invoke(this, (key.Key, uint.MaxValue, null));
++        return true;
++    }
++
+     internal bool HasIndexedPropertiesOnPrototypeChain()
+     {
+         for (var current = prototypeChain?.Object as JSObject; current != null; current = current.prototypeChain?.Object as JSObject)
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs b/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
+index f558b8e0..9218a4c0 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
+@@ -294,7 +294,17 @@ public static class PropertyInlineCacheSite
+                 for (var i = 0; i < count; i++)
+                 {
+                     ref readonly var entry = ref entries[i];
+-                    if (receiver.TryWriteShapeSlot(entry.ShapeId, entry.Slot, in property, value))
++                    if (entry.FromShape == null)
++                    {
++                        if (receiver.TryWriteShapeSlot(entry.ShapeId, entry.Slot, in property, value))
++                        {
++                            PropertyOptimizationDiagnostics.RecordStoreCacheHit();
++                            return;
++                        }
++                    }
++                    else if (ReferenceEquals(receiver.PrototypeChainObject, entry.ReceiverPrototype)
++                        && entry.PrototypeVersion == JSObject.PrototypeMutationVersion
++                        && receiver.TryCreateShapeSlot(entry.FromShape, entry.ToShape, entry.Slot, in property, value))
+                     {
+                         PropertyOptimizationDiagnostics.RecordStoreCacheHit();
+                         return;
+@@ -302,6 +312,11 @@ public static class PropertyInlineCacheSite
+                 }
+             }
+ 
++            // The shape the receiver presents BEFORE the store, so a store that turns out to
++            // have created a property can be recorded as the transition it performed. Read
++            // here because after the store it is gone.
++            var shapeBeforeStore = (target as JSObject)?.TransitionShape;
++
+             PropertyOptimizationDiagnostics.RecordStoreCacheMiss();
+             target[property] = value;
+ 
+@@ -332,8 +347,13 @@ public static class PropertyInlineCacheSite
+                 return;
+             }
+ 
++            var overwriteForm = new Entry(shapeId, slot);
++            var entryToAdd = shapeBeforeStore != null && !ReferenceEquals(shapeBeforeStore, ordinary.TransitionShape)
++                ? DescribeTransition(ordinary, shapeBeforeStore, in property, slot, overwriteForm)
++                : overwriteForm;
++
+             for (var i = 0; i < count; i++)
+-                if (entries[i].ShapeId == shapeId)
++                if (entries[i].ShapeId == entryToAdd.ShapeId && entries[i].FromShape == entryToAdd.FromShape)
+                     return;
+ 
+             if (count == MaxEntries)
+@@ -342,11 +362,74 @@ public static class PropertyInlineCacheSite
+                 return;
+             }
+ 
+-            entries[count++] = new Entry(shapeId, slot);
++            entries[count++] = entryToAdd;
+             if (count == 2)
+                 PropertyOptimizationDiagnostics.RecordPolymorphicPromotion();
+         }
+ 
++        /// <summary>
++        /// Describes a store that CREATED its property as the shape transition it performed,
++        /// falling back to the plain overwrite form when the creation cannot be replayed safely.
++        /// </summary>
++        /// <remarks>
++        /// The shape changing across the store is what identifies a creation — a shape is
++        /// immutable, so a receiver reporting a different one has gained a tracked property, and
++        /// the only one it can have gained at this site is this key.
++        /// <para>
++        /// Replaying it means performing CreateDataProperty directly, which is only the right
++        /// answer while OrdinarySetWithOwnDescriptor would still reach it. It would not if the
++        /// prototype chain supplied the key: a setter there has to run, and an inherited
++        /// non-writable data property has to reject the write. So the chain is walked once here
++        /// and required to be free of the key, and two guards keep that answer true at every
++        /// later hit — the receiver still pointing at the same prototype, by reference, and the
++        /// global prototype-mutation version, which any addition to any object used as a
++        /// prototype publishes. Those are the same two the read cache's prototype form uses, and
++        /// they are only affordable because 2-0 stopped `new` from advancing the version once
++        /// per allocation; before that a transition entry retired on the next object built.
++        /// </para>
++        /// </remarks>
++        private static Entry DescribeTransition(
++            JSObject receiver,
++            ObjectShape fromShape,
++            in KeyString property,
++            int slot,
++            Entry overwriteForm)
++        {
++            // Not the shape the transition landed on — the receiver left shape mode during the
++            // store, so there is no transition to record. Unreachable as things stand, because
++            // the caller has already resolved a writable tracked slot on this receiver, which
++            // dictionary mode cannot supply; kept because that is the caller's invariant to
++            // hold, not this method's to assume.
++            var toShape = receiver.TransitionShape;
++            if (toShape == null || !toShape.TryGetSlot(property.Key, out var toSlot) || toSlot != slot)
++                return overwriteForm;
++
++            // Walked through the raw chain link rather than GetPrototypeOf, which would fire a
++            // Proxy's getPrototypeOf trap — a visible side effect that must not happen just
++            // because a cache is warming up.
++            for (var holder = receiver.PrototypeChainObject; holder != null; holder = holder.PrototypeChainObject)
++            {
++                // An exotic or proxied holder has its own [[GetOwnProperty]] and [[Set]], so
++                // stop rather than reason about what a creation past it would mean.
++                if (holder.GetType() != typeof(JSObject))
++                    return overwriteForm;
++
++                // Present anywhere on the chain, in any form: a setter, a read-only data
++                // property, or a plain writable one. Only the first two change the outcome, but
++                // tested by presence because the cheap test is the conservative one.
++                if (!holder.GetInternalProperty(property, inherited: false).IsEmpty)
++                    return overwriteForm;
++            }
++
++            return new Entry(
++                toShape.Id,
++                slot,
++                fromShape,
++                toShape,
++                receiver.PrototypeChainObject,
++                JSObject.PrototypeMutationVersion);
++        }
++
+         private void BecomeMegamorphic()
+         {
+             if (megamorphic)
+@@ -359,8 +442,23 @@ public static class PropertyInlineCacheSite
+         /// Where the key's value lives on a receiver of shape <see cref="ShapeId"/>. Unlike a
+         /// read entry there is no prototype form: a write that resolves on the chain either
+         /// runs a setter or creates an own property, and neither is a slot write on a holder.
++        /// <para>
++        /// Two forms, discriminated by <see cref="FromShape"/>. An <em>overwrite</em> entry
++        /// (null) writes <see cref="Slot"/> on a receiver already of shape
++        /// <see cref="ShapeId"/>. A <em>transition</em> entry creates it instead: the receiver
++        /// presents <see cref="FromShape"/>, which does not carry the key, and the write moves
++        /// it to <see cref="ToShape"/> — guarded additionally by
++        /// <see cref="ReceiverPrototype"/> identity and <see cref="PrototypeVersion"/>, since a
++        /// creation is only correct while the chain supplies nothing for the key.
++        /// </para>
+         /// </summary>
+-        private readonly record struct Entry(int ShapeId, int Slot);
++        private readonly record struct Entry(
++            int ShapeId,
++            int Slot,
++            ObjectShape FromShape = null,
++            ObjectShape ToShape = null,
++            JSObject ReceiverPrototype = null,
++            long PrototypeVersion = 0);
+     }
+ 
+     private sealed class PropertyInlineCache
+-- 
+2.43.0
+

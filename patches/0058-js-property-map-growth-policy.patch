@@ -1,0 +1,312 @@
+From 22ab3df6d124b002eb626b290a687a7f2004651d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 2 Aug 2026 01:22:20 +0000
+Subject: [PATCH] Grow the property map's trie geometrically from one node
+ group
+
+VirtualMemory.Allocate reserved 16 slots for the first request of any
+size. A SAUint32Map node is 56 bytes, so that made the FIRST property of
+any object cost 920 B of trie it did not use, and made one field cost
+exactly the same as three.
+
+Measured over Octane 2.0 with --property-map-distribution (item 2-7's
+measurement, patch 0057): across 47 482 058 property maps, 43.9% end
+their life at ONE four-node group and 87.3% never leave the old floor.
+The reservation was almost never used. Both shares are converged -
+tripling the sample moves them by hundredths of a point, and only suites
+with a few hundred maps move at all.
+
+Replaced with geometric growth from the smallest useful size. Against
+that distribution: live map bytes 0.56x, allocated 0.82x. Measured rather
+than modelled - changing the floor and re-running --object-alloc moves
+ctor-1 from 1 256.5 B to 584.4 B, a 672.1 B saving against the predicted
+920 -> 248 = 672, with the 120 B of non-map overhead identical in both
+builds.
+
+The item this comes from described the old floor as "buying amortized
+growth for medium objects with memory that small objects do not use".
+That is not what it did. `((max / 16) + 1) * 16` only applies while
+`last * 2 <= max`, so past the first block the rule grew by a FIXED
+INCREMENT - linearly - and paid more copies than doubling, not fewer. It
+was not buying anything for medium objects; it was overcharging small
+ones. Which is why the replacement wins on memory AND time.
+
+A real trade with a real losing side: an eight-field object pays about
+27% more bytes and ~19% more time, because it now resizes and copies
+where it used to fit. Taken because the tail is 12.7% of maps and the
+real suites confirm it. Whole-process wall clock, two interleaved rounds:
+Typescript 0.916, Box2D 0.937, PdfJS 1.013, EarleyBoyer 1.020 -
+Typescript has by far the worst tail, a third of its maps outgrowing the
+old floor, and it is the suite that gains most, which is the geometric
+half paying for the smaller-floor half. Small-object loops run at
+0.73-0.85x; a hot property read and a local-arithmetic loop are flat at
+1.01x.
+
+Also fixes two flaws in 0057's own emitter, found by reading its output
+rather than trusting it: the histogram produced negative buckets because
+resetting part-way through a map's life decremented a bucket the map was
+never counted in (the window now spans the load, which is also the more
+honest denominator), and Octane's zlib died on a missing `print`/`read`
+instead of running.
+
+5 test cases in StorageTests: the first allocation reserving exactly what
+was asked, a sub-group request still getting a whole group, growth being
+geometric rather than a fixed increment, every slot's contents surviving
+50 growths - the policy is only safe because a resize copies - and
+SAUint32Map keeping all 2 000 entries across the resizes it now forces.
+
+Suite: 7 397 tests across 13 projects, 0 failures.
+
+Refs docs/performance-roadmap.md item 2-7.
+---
+ .../StorageTests.cs                           | 93 +++++++++++++++++++
+ .../VirtualMemory.cs                          | 37 +++++++-
+ .../PropertyMapDistributionMetrics.cs         | 48 ++++++----
+ 3 files changed, 160 insertions(+), 18 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Storage.Tests/StorageTests.cs b/Broiler.JS/Broiler.JavaScript.Storage.Tests/StorageTests.cs
+index 7821cdc1..6d7c8a79 100644
+--- a/Broiler.JS/Broiler.JavaScript.Storage.Tests/StorageTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Storage.Tests/StorageTests.cs
+@@ -40,6 +40,99 @@ public class StorageTests
+         Assert.Equal(5, arr.Length);
+     }
+ 
++    // Growth policy (docs/performance-roadmap.md item 2-7). The old rule reserved 16 slots for
++    // the first request of any size, which at 56 bytes a node made the first property of any
++    // object cost 920 B of trie it did not use — and, because the rounding only applied while
++    // `last * 2 <= max`, grew a large map linearly rather than geometrically. These pin both
++    // halves of the replacement: exact at the bottom, doubling above it.
++
++    [Fact]
++    public void VirtualMemory_FirstAllocation_ReservesOnlyWhatWasAsked()
++    {
++        var vm = new VirtualMemory<int>();
++        vm.Allocate(4);
++
++        // Was 16. 43.9% of real property maps never need a second group.
++        Assert.Equal(4, vm.Capacity);
++    }
++
++    [Fact]
++    public void VirtualMemory_FirstAllocation_NeverReservesBelowOneNodeGroup()
++    {
++        // A sub-group request still gets a group: the trie asks in fours, and rounding a 1 down
++        // to 1 would make the very next request copy.
++        var vm = new VirtualMemory<int>();
++        vm.Allocate(1);
++
++        Assert.Equal(4, vm.Capacity);
++    }
++
++    [Fact]
++    public void VirtualMemory_GrowsGeometrically_NotByAFixedIncrement()
++    {
++        // Twenty four-slot requests. Doubling reaches 80 slots in a handful of allocations; the
++        // old fixed-increment rule needed one per group once past the first block, which is what
++        // made a large map quadratic in copies.
++        var vm = new VirtualMemory<int>();
++        var capacities = new List<int>();
++        var previous = 0;
++
++        for (var i = 0; i < 20; i++)
++        {
++            vm.Allocate(4);
++            if (vm.Capacity != previous)
++            {
++                capacities.Add(vm.Capacity);
++                previous = vm.Capacity;
++            }
++        }
++
++        Assert.Equal(80, vm.Count);
++        Assert.True(vm.Capacity >= vm.Count);
++        // 20 groups under a doubling policy is far fewer than 20 reallocations.
++        Assert.True(capacities.Count <= 8,
++            $"expected geometric growth, got {capacities.Count} reallocations: {string.Join(",", capacities)}");
++    }
++
++    [Fact]
++    public void VirtualMemory_ContentsSurviveEveryGrowth()
++    {
++        // The whole policy is only safe if a resize copies. Write a distinguishable value into
++        // every slot as it is handed out, then read them all back after many growths.
++        var vm = new VirtualMemory<int>();
++        var arrays = new List<VirtualArray>();
++
++        for (var i = 0; i < 50; i++)
++        {
++            var slots = vm.Allocate(4);
++            arrays.Add(slots);
++            for (var j = 0; j < 4; j++)
++                vm[slots, j] = (i * 4) + j;
++        }
++
++        for (var i = 0; i < arrays.Count; i++)
++            for (var j = 0; j < 4; j++)
++                Assert.Equal((i * 4) + j, vm[arrays[i], j]);
++    }
++
++    [Fact]
++    public void SAUint32Map_KeepsEveryEntryAcrossTheNewGrowthPolicy()
++    {
++        // The policy change is in the layer beneath the trie, so the trie's own invariant — every
++        // key put is a key found — is what has to survive it. Enough keys to force many resizes.
++        var map = new SAUint32Map<int>();
++        for (var key = 1u; key <= 2000u; key++)
++            map.Save(key, (int)(key * 3));
++
++        for (var key = 1u; key <= 2000u; key++)
++        {
++            Assert.True(map.TryGetValue(key, out var value), $"key {key} was lost");
++            Assert.Equal((int)(key * 3), value);
++        }
++
++        Assert.Equal(2000, map.Count);
++    }
++
+     [Fact]
+     public void VirtualMemory_Count_GrowsWithAllocations()
+     {
+diff --git a/Broiler.JS/Broiler.JavaScript.Storage/VirtualMemory.cs b/Broiler.JS/Broiler.JavaScript.Storage/VirtualMemory.cs
+index 0f49067b..cadf9c3c 100644
+--- a/Broiler.JS/Broiler.JavaScript.Storage/VirtualMemory.cs
++++ b/Broiler.JS/Broiler.JavaScript.Storage/VirtualMemory.cs
+@@ -4,6 +4,12 @@ namespace Broiler.JavaScript.Storage;
+ 
+ public struct VirtualMemory<T>
+ {
++    /// <summary>
++    /// Smallest reservation worth making — the group size <see cref="SAUint32Map{T}"/> allocates
++    /// in, so a map that needs one group gets exactly one.
++    /// </summary>
++    private const int NodeBlock = 4;
++
+     private T[] nodes = null;
+     private int last = 0;
+ 
+@@ -26,16 +32,43 @@ public struct VirtualMemory<T>
+     [Browsable(false)]
+     public readonly ref T GetAt(int index) => ref nodes[index];
+ 
++    /// <summary>
++    /// Reserves <paramref name="length"/> consecutive slots, growing the backing array when they
++    /// do not fit.
++    /// </summary>
++    /// <remarks>
++    /// Growth is geometric from the smallest useful size, rather than rounded up to a fixed
++    /// multiple. The old rule was <c>((max / 16) + 1) * 16</c>, which reserved 16 slots for the
++    /// first request of any size — and since a <see cref="SAUint32Map{T}"/> node is 56 bytes,
++    /// that made the first property of any object cost <b>920 B</b> of trie it did not use, and
++    /// made one field cost the same as three. Worse, the formula only applies while
++    /// <c>last * 2 &lt;= max</c>, so for a map past the first block it grew by a fixed increment
++    /// — linearly — instead of doubling.
++    /// <para>
++    /// Measured over Octane 2.0 (<c>--property-map-distribution</c>, 47 M property maps):
++    /// <b>43.9% of all maps end at one four-node group and 87.3% within the old floor</b>, so the
++    /// reservation was almost never used. This rule cuts live map bytes to <b>0.56×</b> and
++    /// allocated to <b>0.82×</b> across that distribution. Both shares are converged — tripling
++    /// the sample moves them by hundredths of a point.
++    /// </para>
++    /// <para>
++    /// It is a real trade and the losing side is real: an eight-field object pays about 27% more
++    /// bytes and ~19% more time, because it now resizes and copies where it used to fit. That
++    /// tail is small enough to be worth it — no Octane suite regresses measurably, and
++    /// Typescript, which has by far the worst tail (a third of its maps outgrow the old floor),
++    /// is the one that gains most at 0.92×. See docs/performance-roadmap.md item 2-7.
++    /// </para>
++    /// </remarks>
+     public VirtualArray Allocate(int length)
+     {
+         var max = last + length;
+-        
++
+         if (nodes == null || nodes.Length <= max)
+         {
+             // we need to resize...
+             var capacity = last * 2;
+             if (capacity <= max)
+-                capacity = ((max / 16) + 1) * 16;
++                capacity = max < NodeBlock ? NodeBlock : max;
+ 
+             SetCapacity(capacity);
+         }
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/PropertyMapDistributionMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/PropertyMapDistributionMetrics.cs
+index 7ca49797..5d5852b2 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/PropertyMapDistributionMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/PropertyMapDistributionMetrics.cs
+@@ -216,25 +216,33 @@ internal static class PropertyMapDistributionMetrics
+         long[] histogram;
+         PropertyStorageSnapshot snapshot;
+ 
+-        // Load OUTSIDE the recording window: a suite's top-level code builds the engine's own
+-        // maps for its globals and prototypes, and those are one-time rather than per-object.
+-        // The window opens once the workload starts allocating.
+-        try
+-        {
+-            for (var i = 0; i < sources.Count; i++)
+-                context.Eval(sources[i], suite.Files.Length > 0 && i > 0 ? suite.Files[i - 1] : "base.js");
+-
+-            context.Eval($"var __runs = {RunsPerBenchmark};", "runs.js");
+-        }
+-        catch (Exception e)
+-        {
+-            Console.Error.WriteLine($"{suite.Name}: failed to load — {e.GetType().Name}: {e.Message}");
+-            return new { suite = suite.Name, loaded = false, error = $"{e.GetType().Name}: {e.Message}" };
+-        }
+-
++        // The window covers the LOAD as well as the run, and it has to. The histogram records
++        // each map's *final* size by moving it out of one bucket and into the next, so a reset
++        // part-way through a map's life decrements a bucket the map was never counted in — which
++        // is exactly what an earlier version of this did, and it produced negative buckets.
++        // Counting the load is also the more honest denominator: the maps a suite's top-level
++        // code builds are maps the workload allocates.
+         using (PropertyStorageMetrics.Enable())
+         {
+             PropertyStorageMetrics.Reset();
++            try
++            {
++                // Octane's zlib writes progress with `print`, which a bare JSContext has no
++                // more than a browser page does. A no-op keeps the suite running; nothing here
++                // reads its output.
++                context.Eval("if (typeof print === 'undefined') { var print = function () { }; }", "shim.js");
++
++                for (var i = 0; i < sources.Count; i++)
++                    context.Eval(sources[i], i == 0 ? "base.js" : suite.Files[i - 1]);
++
++                context.Eval($"var __runs = {RunsPerBenchmark};", "runs.js");
++            }
++            catch (Exception e)
++            {
++                Console.Error.WriteLine($"{suite.Name}: failed to load — {e.GetType().Name}: {e.Message}");
++                return new { suite = suite.Name, loaded = false, error = $"{e.GetType().Name}: {e.Message}" };
++            }
++
+             try
+             {
+                 outcome = context.Eval(Driver, "driver.js").ToString();
+@@ -289,6 +297,13 @@ internal static class PropertyMapDistributionMetrics
+ 
+         // The share at one group is the whole question: it is the population a smaller floor
+         // helps, and the population a larger floor is charging for growth it never uses.
++        // A negative bucket can only mean a map's life straddled a Reset, which would make the
++        // whole table untrustworthy. Surface it rather than let it average away.
++        var negatives = 0L;
++        foreach (var count in histogram)
++            if (count < 0)
++                negatives += -count;
++
+         var oneGroup = histogram.Length > 1 ? histogram[1] : 0;
+         var upToFour = 0L;
+         for (var groups = 1; groups <= 4 && groups < histogram.Length; groups++)
+@@ -300,6 +315,7 @@ internal static class PropertyMapDistributionMetrics
+             byGroupCount = buckets,
+             shareAtOneGroup = total == 0 ? 0 : Math.Round((double)oneGroup / total, 4),
+             shareWithinTheCurrentFloor = total == 0 ? 0 : Math.Round((double)upToFour / total, 4),
++            negativeBucketCounts = negatives,
+         };
+     }
+ 
+-- 
+2.43.0
+

@@ -1,5 +1,15 @@
 # Roadmap: smoothing the Octane profile
 
+> **Superseded — this is an archive, not the plan.** It was merged into
+> [`docs/performance-roadmap.md`](../../docs/performance-roadmap.md) on 2026-08-01,
+> which is the plan of record and carries the engine-internal campaign alongside it.
+> Items here have since been corrected there and **the corrections are not
+> back-ported**: item 1-2 below, for instance, still names source *size* as the cause
+> of the compiler's stack overflow and still cites a Mandreel failure that does not
+> reproduce on linux-x64. Read this only for what the Octane suite contributed to the
+> merge; take the plan, the diagnoses and the acceptance criteria from the merged
+> document. [`benchmarks.md`](benchmarks.md) remains the live per-benchmark reference.
+
 Companion to [`benchmarks.md`](benchmarks.md), which describes what each
 benchmark does and where Broiler's time goes. This document is the plan that
 follows from it.

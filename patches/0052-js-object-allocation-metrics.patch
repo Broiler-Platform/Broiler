@@ -1,0 +1,184 @@
+From 9a364b85a3a87c225ea6bff93266bf0e772a6e6e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 1 Aug 2026 20:48:54 +0000
+Subject: [PATCH] Measure bytes per object, and stop guessing at item 2-3
+
+Roadmap item 2-3 proposed removing the double storage every shape-tracked
+object carries - its value lives in both shapeSlots and the PropertySequence -
+described as a pure removal justified by "storing twice and paying to keep them
+in sync". Neither half of that survives measurement, and measuring it needed an
+instrument the repository did not have.
+
+It is not a pure removal. The two stores serve different access paths: a cached
+read takes shapeSlots[slot], an array index, while the generic path takes
+ownProperties, a radix trie keyed by name. Removing the array puts a trie walk
+back on the path phases C and D exist to keep off it; removing the value from
+the trie puts a shape lookup on every generic read, descriptor query and
+enumeration. A cost probe that dropped only the trie write proved it directly -
+the store loop stayed correct because it read through the cache, and a later
+cold read of the same property returned the stale value.
+
+The throughput case is ~3%, of the most favourable workload available: same
+build, one line differing, four interleaved pairs of a 20 M-iteration pure
+overwrite loop, median of paired ratios 0.971, every pair the same direction.
+And most of what the item was aiming at is already collected - it was written
+when a store cost two key lookups, and P1-3 and the transition entry removed
+the second from both cached paths.
+
+So it is a memory item, which is what --object-alloc measures: bytes per object
+by construction form and field count, by Appendix A's method - forced gen2
+collection, then GC.GetAllocatedBytesForCurrentThread() deltas over 50 000
+objects, warmed first so compilation, key strings, shapes and cache entries
+land outside the measured run. Field values are small integer constants the
+per-thread cache serves without allocating, so a difference between two rows is
+structure rather than contents, and the empty rows are the baseline the
+per-field cost is measured against.
+
+The slot array turns out to be 4.5% of a constructor-built three-field object.
+What the same run found instead is that one field costs the same as three -
+1256 B either way, about 1040 B more than an object with none. The per-object
+cost is a fixed block: SAUint32Map allocates trie nodes from a VirtualMemory
+whose first allocation rounds up to sixteen, and a node is a whole descriptor
+plus two link fields, so one property reserves sixteen descriptors' worth of
+memory and uses one. That block covers the first four node groups, which is why
+fields two and three are free.
+
+Shrinking the floor is a trade rather than a win, which the emitter also
+settles: rounding to four instead of sixteen makes a one-field object 53%
+cheaper and a three-field object 16% cheaper while making an eight-field object
+27% more expensive, and a minimum of four with capacity doubling is worse again
+at 43%. Choosing a floor needs the size distribution of real objects, which no
+synthetic probe can supply and an Octane run can. Recorded on the roadmap as an
+item with its measurement named, not started.
+---
+ .../ObjectAllocationMetrics.cs                | 100 ++++++++++++++++++
+ .../Program.cs                                |   6 ++
+ 2 files changed, 106 insertions(+)
+ create mode 100644 Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/ObjectAllocationMetrics.cs
+
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/ObjectAllocationMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/ObjectAllocationMetrics.cs
+new file mode 100644
+index 00000000..dab9d3cc
+--- /dev/null
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/ObjectAllocationMetrics.cs
+@@ -0,0 +1,100 @@
++using System;
++using System.Linq;
++using System.Text.Json;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.Engine.Benchmarks;
++
++/// <summary>
++/// Emits allocated bytes per ordinary object, by how the object was built and how many named
++/// fields it carries, as JSON.
++/// <para>
++/// Exists to size roadmap item 2-3, which proposes removing the double storage every
++/// shape-tracked object carries — its value in both <c>shapeSlots</c> and the
++/// <c>PropertySequence</c>. That item was justified as "storing twice and paying to keep them
++/// in sync", and the throughput half of that turned out to be unmeasurable: dropping the
++/// PropertySequence write from the overwrite path moved a 20 M-iteration store loop by 0.7%,
++/// inside noise. What remains is memory, and memory is what this measures — so the item can be
++/// decided on a number instead of on the phrase.
++/// </para>
++/// <para>
++/// Field values are small integer constants, which the per-thread small-integer cache serves
++/// without allocating, so a delta between two rows is the cost of the object's own structure
++/// rather than of the values put in it. The empty rows are the baseline the per-field cost is
++/// measured against; the 8-field rows are there because the slot array grows by doubling from
++/// four, so the step between 3 and 8 fields shows what that growth costs.
++/// </para>
++/// </summary>
++internal static class ObjectAllocationMetrics
++{
++    private const int Objects = 50_000;
++
++    private sealed record Site(string Name, string Body, string Note);
++
++    private static readonly Site[] Sites =
++    [
++        new("literal-empty", "last = {};", "baseline: an object with no named properties"),
++        new("literal-3", "last = { a: 1, b: 2, c: 3 };", "the cheapest three-field object the engine builds"),
++        new("literal-8", "last = { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7, h: 8 };", "past the slot array's first growth step"),
++        new("ctor-empty", "last = new E();", "baseline for the constructor form"),
++        new("ctor-1", "last = new T1();", "one field: where the slot array is first allocated"),
++        new("ctor-3", "last = new T3();", "item 2-3's subject, and the shape Richards and DeltaBlue build"),
++        new("ctor-8", "last = new T8();", "past the slot array's first growth step"),
++        new("class-3", "last = new C3();", "the class form of ctor-3"),
++        new("create-null-3", "last = Object.create(null); last.a = 1; last.b = 2; last.c = 3;", "no prototype, three assigned fields"),
++    ];
++
++    private const string Preamble = """
++        function E() {}
++        function T1() { this.a = 1; }
++        function T3() { this.a = 1; this.b = 2; this.c = 3; }
++        function T8() { this.a = 1; this.b = 2; this.c = 3; this.d = 4; this.e = 5; this.f = 6; this.g = 7; this.h = 8; }
++        class C3 { constructor() { this.a = 1; this.b = 2; this.c = 3; } }
++        """;
++
++    internal static void Write()
++    {
++        var rows = Sites.Select(Measure).ToArray();
++
++        Console.WriteLine(JsonSerializer.Serialize(
++            new
++            {
++                schema = "broiler.object-allocation-metrics/1",
++                objectsPerSite = Objects,
++                note = "Bytes per object, warmed then measured after a forced gen2 collection. "
++                    + "See docs/performance-roadmap.md item 2-3.",
++                sites = rows,
++            },
++            new JsonSerializerOptions { WriteIndented = true }));
++    }
++
++    private static object Measure(Site site)
++    {
++        using var context = BenchmarkContext.Create();
++
++        var source = $"(function () {{\n{Preamble}\nvar last = null;\nfor (var i = 0; i < {Objects}; i++) {{ {site.Body} }}\nreturn last;\n}})";
++        var function = context.Eval(source, $"{site.Name}.js");
++        var arguments = new Arguments(JSUndefined.Value);
++
++        // Warmed first, so the measured run pays for objects and nothing else: the compile, the
++        // key strings, the shapes and the inline-cache entries are all one-time and would
++        // otherwise land in the delta.
++        function.InvokeFunction(in arguments);
++
++        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
++        GC.WaitForPendingFinalizers();
++        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
++
++        var before = GC.GetAllocatedBytesForCurrentThread();
++        function.InvokeFunction(in arguments);
++        var total = GC.GetAllocatedBytesForCurrentThread() - before;
++
++        return new
++        {
++            site = site.Name,
++            note = site.Note,
++            totalBytes = total,
++            bytesPerObject = Math.Round((double)total / Objects, 1),
++        };
++    }
++}
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+index 5067b792..9028ca8a 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+@@ -38,6 +38,12 @@ public static class Program
+             return;
+         }
+ 
++        if (args.Length == 1 && args[0] == "--object-alloc")
++        {
++            ObjectAllocationMetrics.Write();
++            return;
++        }
++
+         BenchmarkSwitcher
+             .FromTypes([
+                 typeof(ContextStartupBenchmarks),
+-- 
+2.43.0
+
