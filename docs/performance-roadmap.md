@@ -59,7 +59,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | Phase | State |
 |---|---|
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is the critical path** — it is what phases A–F need to close on, and what phase 2's exit criterion is measured by. 0-7, 0-8 follow it |
-| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix landed for the validator and emitter passes** (`StackGuard` had three defects and could not fire) — `FastParser` still unguarded. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
+| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
@@ -370,7 +370,20 @@ These were paid for once each. They apply to every phase below.
   will not fire at a 100 KB threshold is not a subtle bug.*
 - **Reproduce on the platform you will close on.** 1-2's repro was a win-x64 Octane run.
   The same suite completes on linux-x64 at the same pointer, so the CI run that was meant
-  to confirm it never could. *A one-platform repro dates the item to that platform.*
+  to confirm it never could. *A one-platform repro dates the item to that platform.* **And so
+  does a one-platform verification matrix** — 1-2's own four-way table records "mitigation off /
+  guard on completes", which is true on linux-x64 and false on win-x64, for the reason in the
+  next bullet. The rule was applied to the item's repro and not to its proof.
+- **A threshold larger than the resource it guards is not a guard, and it fails silently.**
+  `StackSegment` segments a recursive walk after 4 MiB of stack. With the compilation mitigation
+  disabled, the front end compiles in place on a win-x64 stack that measures **1 052 048 bytes** —
+  so the threshold can never be reached, the guard never fires once, and the process aborts
+  looking exactly as it would with no guard at all. The struct's own remarks predicted the
+  shape of this ("a walk cannot know how large the stack it is standing on actually is"); what
+  was missing is that the condition is reachable on a shipping platform rather than hypothetical.
+  *An absolute limit on a resource whose size you cannot query is unfireable in precisely the
+  cases you wrote it for — probe what is left (`RuntimeHelpers.TryEnsureSufficientExecutionStack`)
+  instead of assuming how much there was.*
 - **A formula's stated intent is not its behaviour.** 2-7 read the property map's 16-node floor as
   "buying amortized growth for medium objects with memory small objects do not use", and sized two
   alternatives against that reading. The rounding it describes only applies while
@@ -958,7 +971,7 @@ not the demonstration this item thought it was.
    under `SyntaxValidation.StrictModeValidator`, whose base `AstMapVisitor<T>` never derived
    from `StackGuard` at all. Repairing `StackGuard` alone therefore did not move the repro;
    the same guard had to be put on `AstMapVisitor.Visit`. **`FastParser`'s recursive descent is
-   the third pass and is still unguarded** — that half of the item remains open.
+   the third pass, and it is now guarded too** — see below.
 
    **Verified by turning each mechanism off independently**, which is the only way to tell which
    one is doing the work. A 20 000-operator chain through the script host: mitigation on / guard
@@ -967,10 +980,79 @@ not the demonstration this item thought it was.
    the other three mean anything. Cost, interleaved on one build with only the environment
    variable differing: **median paired ratio 1.0027**, i.e. nothing.
 
+   > **That matrix is a linux-x64 result, and the second row does not hold on win-x64.** Re-run
+   > there while guarding the parser, *this same 20 000-operator chain* completes with the
+   > mitigation on and **aborts with it off**, guard or no guard. The reason was measured rather
+   > than guessed: with the mitigation disabled the front end compiles in place on a stack that
+   > tops out at **1 052 048 bytes** — about 1 MiB — while `StackSegment.SegmentAtBytes` is
+   > **4 MiB**, so the threshold is larger than the whole stack and the guard cannot fire once.
+   > `StackSegment`'s own remarks anticipate exactly this ("a walk cannot know how large the
+   > stack it is standing on actually is, and a threshold above it would never be reached before
+   > the CLR aborted the process"); what is new is that the condition is *reachable on a shipping
+   > platform* with the mitigation off. It costs nothing in the default configuration, where the
+   > worker is 64 MiB and the guard fires freely — 223 times on a 10 000-level parse. **The fix
+   > is an adaptive threshold** (`RuntimeHelpers.TryEnsureSufficientExecutionStack` probes what
+   > is actually left, rather than assuming), and it belongs to `StackSegment`, so it would move
+   > all three passes at once. Not done here. *A one-platform matrix dates its rows to that
+   > platform — the same lesson this item already learned from Mandreel, applied to its own
+   > verification instead of to its repro.*
+
    *No unit test pins the guard-alone row.* Doing so means setting `CompilationStack.SizeBytes`
    to 0, which is a process-wide static that xUnit's parallel classes would race on, so it needs
    process isolation the fixtures do not have. The four-way matrix above is a manual result, and
    saying so is better than a test that appears to cover it and does not.
+3. **The parser pass (S) — landed.** `FastParser`'s recursive descent was the last of the three
+   and the one that overflows *first*, before the validator or the emitter ever see a tree.
+
+   **The failing case was written first and watched to fail, in the configuration that ships.**
+   A right-nested conditional through the script host, mitigation at its default 64 MiB:
+   20 000 levels returns its answer, **25 000 aborts the process** — no exception, nothing to
+   catch. So this was not a defect that needed a diagnostic switch flipped to see; it was
+   reachable by a syntactically valid script on the default build.
+
+   **Where.** `Broiler.JavaScript.Parser/FastParser.Expression.cs`. The abort trace's repeating
+   cycle is seven frames — `Expression` → `SinglePrefixPostfixExpression` →
+   `SingleMemberExpression` → `SingleExpression` → `BracketExpression` → `ExpressionList` →
+   `Expression` — and `Expression` appears in it twice, so guarding that one entry covers every
+   nested construct. `.Parser` already references `.ExpressionCompiler`, so it shares
+   `StackSegment` rather than copying it, which is the whole point of that struct existing.
+
+   **After: 25 000, 40 000 and 90 000 levels all complete.** With the guard alone disabled
+   (`BROILER_JS_VISITOR_SEGMENT_BYTES=0`) 25 000 aborts again, which is what makes the pass
+   attributable to the guard rather than to anything else in the build.
+
+   **Cost: none measurable.** The guard sits on the parser's hottest entry, so it was measured
+   rather than assumed — 3 000 *distinct* `new Function` compilations (distinct so the code cache
+   cannot answer them), six interleaved pairs on one build with only the environment variable
+   differing: **median of paired ratios 0.9993**, three pairs above 1 and three below.
+
+   **Verify.** A 25 000-level fixture in `DeeplyNestedSourceTests` — the smallest depth that was
+   fatal, and decisive without touching `CompilationStack.SizeBytes`. A syntax error at the
+   deepest point of one still reports the same exception type and the right offset (1, 552 809),
+   which is the path that crosses the worker handoff. Repository suite **7 561 tests across 13
+   projects, 3 failures**, the pre-existing win-x64 host ones. **test262 unchanged across all four
+   pinned manifests** — 8 220 passed, 84 failed, 9 timed out, identical manifest by manifest,
+   which is the gate that matters most for a change to the parser. **Octane 14 of 15 `ok`**, the
+   same set as before it, with Mandreel's failure record **byte-identical** to the previous run —
+   so this does not fix Mandreel, and does not pretend to: that one aborts on the *JavaScript*
+   stack budget during execution, not in parsing.
+
+   > **The first version of this guard was wrong, and the `off/on` row is what exposed it.**
+   > It inferred "this is the outermost call" from `!segment.IsAnchored`, which reads correctly
+   > and is false: `StackSegment.Continue` *deliberately* clears the anchor so the continuation
+   > measures against its fresh stack — so the first call on a segmented continuation calls
+   > itself outermost and releases the anchor again the moment that one sub-expression finishes.
+   > The accounting then restarts from whatever depth the next call happens to sit at, so the
+   > guard fires on an interval it did not choose. Fixed with an explicit recursion counter,
+   > which says what the anchor cannot: *this is the top of the recursion, not the top of the
+   > current stack.* **Recorded as a structural defect, not as a measured regression** — it was
+   > found while chasing the `off/on` failure above, which turned out to have a different cause,
+   > and the two were never separated. The fix is cheap and obviously right, so it stayed; what
+   > it is worth was not established.
+   >
+   > **`StackGuard<T,TIn>` makes the same inference** for the validator and emitter passes. Not
+   > changed here — those two are verified working and this item is the parser — but it is the
+   > first place to look if either is ever found segmenting less than it should.
 
 **Verify.** `Broiler.JavaScript.Compiler.Tests/DeeplyNestedSourceTests.cs` — a nested `+`
 chain, a nested conditional, a long flat statement list (kept, so the size case cannot be
@@ -2597,7 +2679,7 @@ pinned RegExp corpus is clean.
 | Phase | Order within it | Size | Unblocks / expected effect | Exit gate |
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
-| **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
+| **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-1** → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
 | **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
@@ -2762,7 +2844,7 @@ Where each item came from, so existing cross-references still resolve.
 | 0-10, 0-11 | engine §8.1, §8.2 | — | Done |
 | 1-1, 1-3 | *excluded by engine §9* | 1-1, 1-3 | Open — superseded, see §1.1 |
 | 1-2 mitigation | *excluded by engine §9* | 1-2 | **Landed** — `43bc4230`, in the pinned pointer |
-| 1-2 real fix | — | 1-2 | Open — repair `StackGuard`, which cannot fire today |
+| 1-2 real fix | — | 1-2 | **Landed on all three recursing passes.** `StackGuard` was repaired and put on `AstMapVisitor.Visit`; `FastParser.Expression` is now guarded too, which was the last one — its descent aborted the process at 25 000 nesting levels in the DEFAULT configuration and now survives 90 000, median paired ratio 0.9993. The four-way matrix's "mitigation off / guard on" row is a **linux-x64** statement: on win-x64 the front end compiles in place on ~1 MiB while the threshold is 4 MiB, so no segmenter can fire there |
 | 2-0 | — (P1-2's guard, reached in a state it cannot recognise) | — | **Landed** — `2df877a0`, in the pinned pointer |
 | 2-1 | P1-3 remainder | 2-1 | **Landed** — `5d31617a`, in the pinned pointer; **test262 owed** |
 | 2-4 | P1-3 remainder | 2-4 | **Landed, both halves** — `f9c2193f` (`o.x++`) and `c5842c9d` (`o.x op= rhs`), both in the pinned pointer; computed keys, `super`, optional chains, private names and the three short-circuiting compound forms stay out on purpose |
