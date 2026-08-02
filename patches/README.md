@@ -21,9 +21,19 @@ Delete the patch file and its row below once the pointer is bumped.
 
 ## Index
 
-**Empty — nothing is pending.** The ten `Broiler.JS` patches this file carried
-(`0049`–`0058`) have all been applied and their pointer bumped; they are listed under
-*Recently cleared* below with the commit each landed as.
+| Patch | Submodule | Note |
+| --- | --- | --- |
+| `0059-js-single-match-replace-one-allocation` | `Broiler.JS` | Phase 5's first follow-up to item 1. A single-match `replace` assembled its answer through a `StringBuilder`, costing two full UTF-16 copies of the subject — into the chunk list, then back out through `ToString()`. `string.Concat` over three spans writes it in one allocation: **4.020 → 2.020 bytes per subject character**, exactly the predicted halving, in `RegExp.prototype[@@replace]` *and* in `String.prototype.replace`'s string-`searchValue` builtin, which had the same three appends into a builder that was already sized exactly right. Adds `SingleMatchReplaceAllocationTests` (41 cases) and a `replace-one-string` profile row. |
+
+The ten `Broiler.JS` patches this file previously carried (`0049`–`0058`) have all been
+applied and their pointer bumped; they are listed under *Recently cleared* below with the
+commit each landed as.
+
+**`0059` is pending against the pinned pointer `2ebc0c3c`** — the push to
+`Broiler-Platform/Broiler.JS` returned 403 from the session's git proxy, so the pointer is
+deliberately *not* bumped. There is no main-repo fallback for it and none is needed: the
+change is an allocation reduction with no behaviour difference, so CI is correct without it,
+only more allocating.
 
 ## Recently cleared
 

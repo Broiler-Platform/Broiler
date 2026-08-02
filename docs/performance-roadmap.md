@@ -21,10 +21,19 @@ so only the parent can hold the combined view.
 - **Acceptance protocol:** unchanged and unchallenged —
   [`Broiler.JS/docs/performance.md`](../Broiler.JS/docs/performance.md) governs what
   may be *claimed*. **Nothing in this document closes on the numbers it quotes.**
-- **Provenance:** the pinned submodule pointer is **`71dda1b7`**, checked 2026-08-02 against
-  the gitlink rather than against the prose. `a6f101cc` — which this section named until 3-3
+- **Provenance:** the pinned submodule pointer is **`2ebc0c3c`**, checked 2026-08-02 against
+  the gitlink rather than against the prose — **and checking it is what caught that this line
+  said `71dda1b7`**, which the pointer had moved past. `71dda1b7` is an **ancestor** of the
+  current pin, so nothing recorded against it is invalidated; the correction is to the prose,
+  not to any measurement — which is exactly the failure mode the rule two sentences down
+  already names, caught by applying it. **Phase 5's single-match `replace` change is *not* in the
+  pin**: its push to the submodule remote returned 403, so it is carried as
+  [`patches/0059`](../patches/0059-js-single-match-replace-one-allocation.patch) and the
+  pointer is deliberately unbumped — its figures below were measured on a local build of
+  `2ebc0c3c` **plus** that patch, control and change from the same tree.
+  `a6f101cc` — which this section named until 3-3
   was worked, and which every §0 and phase-2 measurement below was taken at — is an **ancestor**
-  of it, six commits back (`merge-base --is-ancestor`), so nothing recorded here is invalidated;
+  of it (`merge-base --is-ancestor`), so nothing recorded here is invalidated;
   what moved on top of it is 2-9, 3-0, 1-2's visitor stack guard and the script-host shell
   joining the solution. **A pointer written into prose goes stale silently**, which is why
   §4.1's and §3.4's figures below carry the commit they were taken at rather than "the pin".
@@ -63,7 +72,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
-| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time** |
+| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. What remains is the global case's retained result list, ~10 MB per call |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
 wall-clock figure is a median of interleaved process-granularity pairs against a control, per §3:
@@ -520,6 +529,28 @@ These were paid for once each. They apply to every phase below.
   never reaches the component the phase is about. The engine that does serve it was one grep away
   — `new Regex(pattern, options)` with no `RegexOptions.Compiled`. *A blocker that names a file
   is making a routing claim, and routing is cheaper to check than to profile.*
+- **A `StringBuilder`'s floor is two copies, and pre-sizing removes neither.** Phase 5's
+  single-match `replace` assembled its answer through a builder: one copy into the chunk list,
+  one back out through `ToString()`. Pre-sizing it was tried first and was worth 0.2% — .NET's
+  `StringBuilder` chunks rather than doubles, so there was no reallocation waste to remove — and
+  the change that worked was to not use a builder at all, `string.Concat` over the three spans,
+  worth exactly half. The neighbouring `String.prototype.replace` had the same three appends into
+  a builder that was *already sized exactly right*, and halved by the same amount — which is the
+  cleanest statement of the point, since there was nothing left to tune. *When the final length is
+  knowable in one pass, a builder is the wrong tool rather than a mis-tuned one, and tuning it
+  optimizes the copy you should not be making.*
+- **A defect found by profiling has siblings the profile cannot see.** The single-match `replace`
+  was found in a `--regex-profile` row; the identical assembly in `String.prototype.replace`'s
+  string-`searchValue` path had **no row at all**, and was found by reading the builtin next to
+  the one being edited. Its before-slope then matched the profiled path's to three decimal places
+  — 4.020 B/char both — which is what established them as one defect in two places rather than
+  two resembling ones. *When a profile localizes a cost to a mechanism, grep for the mechanism;
+  the corpus only measures what somebody thought to add to it.*
+- **A halving that lands exactly is a check on the decomposition, not just a win.** The same item
+  predicted 4 B/char → 2 from "two full UTF-16 copies and nothing else". Measuring 4.02 → 2.02 at
+  three subject lengths is what rules out a third copy hiding in the row; a saving of *roughly*
+  half would have left the model unfalsified and untested. *Predict the number before the change,
+  then treat a miss as evidence about the model rather than noise in the measurement.*
 - **Interleave, at process granularity.** Sub-1.5% effects are only visible ABBA-
   interleaved across independent builds, ten runs each, medians compared.
 - **Hold the call site fixed when the callee is what changed.** Sizing a parameter's cost by
@@ -2906,18 +2937,21 @@ result array plus its `index` / `input` / `groups` properties. And a *single* no
 `replace` costs four bytes per subject character, which is **two full UTF-16 copies**: the
 `StringBuilder`'s chunks and then its `ToString()`.
 
-Two follow-ups, both sized by those rows and neither started:
+Two follow-ups, both sized by those rows. **The first has landed** — see below; the second has
+not started:
 
 - **The single-match replace should not use a builder at all.** `input[0..pos] + replacement +
   input[end..]` is one `string.Concat` over three spans and one allocation, halving 4 B/char
   to 2. *Pre-sizing the builder was tried first and is worth 0.2%* — .NET's `StringBuilder`
   is a chunk list, not a doubling array, so there was no reallocation waste to remove. The
   change was reverted rather than kept for a rationale that turned out to be wrong.
+  **Landed, and the halving is exact — in both builtins that had the pattern.**
 - **A global replace retains every result before it builds anything.** §22.2.6.11 collects all
   matches in step 14 and reads their properties in step 16, so 5 000 matches means 5 000 live
   result arrays — 5 000 × ~2 KB, which is exactly the ~10 MB per call still measured. Streaming
   them would change the observable order of `exec` calls against capture reads, so it is only
-  available on a fast path where nothing is patched.
+  available on a fast path where nothing is patched. **Not started, and it is now the largest
+  measured regex cost left.**
 
 **One hazard the change introduced and closed.** Deferring the slice means `Update` publishes a
 subject and two indices that must agree; three separate field writes would let a reader on
@@ -2944,6 +2978,92 @@ failure record byte-identical to the earlier runs.
 > these are single runs on a developer workstation, so what is claimed here is the allocation
 > figure, which is deterministic and exact. The scores are recorded as corroboration and as a
 > reason for 0-6 to look at them.
+
+#### The single-match follow-up landed — the halving is exact
+
+> **Delivered as a patch, not in the pin.** The push to `Broiler-Platform/Broiler.JS` returned
+> **403** — the submodule remote is outside this session's GitHub scope — so per the patch
+> workflow the pointer is **not** bumped and the change ships as
+> [`patches/0059`](../patches/0059-js-single-match-replace-one-allocation.patch) for a maintainer
+> to apply. Every figure below was measured on a local build of the pinned `2ebc0c3c` **plus**
+> that patch, with the control built from the same tree minus it. No main-repo fallback is
+> needed: this is an allocation reduction with no behaviour difference, so CI is correct without
+> it and only more allocating.
+
+`RegExp.prototype[@@replace]` accumulated into a `StringBuilder` whatever the match count. For a
+single match the answer is exactly `prefix + replacement + suffix`, so `string.Concat` over three
+spans writes it into **one** allocation of the final length, and the builder's two copies — into
+its chunk list, then back out through `ToString()` — become one.
+
+Measured with the same `--regex-profile` scaling rows, both sides built from the same tree rather
+than compared against the figures recorded above:
+
+| `replace`, one match | 5 000 | 20 000 | 80 000 | Slope |
+|---|--:|--:|--:|--:|
+| Before | 22 635 | 82 935 | 324 190 | **4.020 B/char** |
+| After | 12 483 | 42 783 | 164 030 | **2.020 B/char** |
+| | 0.55x | 0.52x | 0.51x | **exactly half** |
+
+**The predicted halving is realized to two decimal places, and that is the load-bearing part.**
+The decomposition claimed the 4 B/char was two copies of the subject *and nothing else*; removing
+one copy and getting exactly half is what confirms there was no third. The `test` and `exec` rows
+are byte-identical on both sides — 2 051 / 2 351 / 3 551 and 1 995 / 2 295 / 3 495 — so they are
+the control, and they place the saving on the replace path rather than in the profile.
+
+*(The before row's 80 000 figure is 324 190 here against the 324 135 recorded in the table above.
+Both are this build's own control, taken a pointer apart; 55 bytes on 324 KB is 0.02% and changes
+no slope. It is written as measured rather than reconciled to the earlier row.)*
+
+**The same assembly was one file over, and it is fixed too.** `String.prototype.replace` with a
+**string** `searchValue` never reaches `@@replace` — it is a separate builtin — and it replaces
+only the first occurrence, so it is single-match *by construction*. It built its answer from three
+appends into a **pre-sized** `StringBuilder`: the same two copies, and the clearest case of why
+pre-sizing does not help, since that builder was already sized exactly right. `--regex-profile`
+now carries a `replace-one-string` row beside `replace-one` so the two cannot drift apart:
+
+| `replace`, one match, **string** searchValue | 5 000 | 20 000 | 80 000 | Slope |
+|---|--:|--:|--:|--:|
+| Before | 20 406 | 80 706 | 321 965 | **4.020 B/char** |
+| After | 10 326 | 40 626 | 161 877 | **2.020 B/char** |
+| | 0.51x | 0.50x | 0.50x | **exactly half** |
+
+Its slope was already identical to the regexp path's to three decimal places before the change,
+which is what identifies the two as the same defect rather than two similar ones — and it lands
+on the same 2.020 after. **It was found by reading the neighbouring builtin, not by the profile**,
+which had no row for it; the row exists now because the fix needed one.
+
+**A global regexp that matches once takes the fast path too.** The gate is `results.Count == 1`,
+not the `g` flag: `global` decides how many results were collected, not how they are assembled,
+so `'abc'.replace(/b/g, 'X')` gets it. And step 16.p's backwards-position guard cannot apply to a
+single result — `nextSourcePosition` is still 0 and `position` is clamped to [0, lengthS], so
+`position >= 0` holds — which makes the fast path the loop's behaviour rather than an
+approximation of it.
+
+**The per-result work is shared, not duplicated.** Step 16 reads the result's properties in an
+order a Proxy can observe (`length` → `0` → `index` → captures → `groups`), and test262
+`sm/RegExp/replace-trace` pins it. Both paths call one local function rather than each carrying a
+copy, so the order cannot drift between them; it is called directly and never as a delegate, so
+the capture is a struct closure and costs no allocation.
+
+**Verify.** `SingleMatchReplaceAllocationTests` asserts the bytes and **fails on the build
+without the change** — 95 881 B/call against its 60 000 bound — while every one of its answer
+cases passes on *both* builds, which is what identifies them as regression guards rather than
+change detectors. They cover the edges the fast path now owns: a match at position 0 and at the
+end of the subject, an empty match, an empty replacement, the global-matching-once case, every
+`$` substitution form, functional replacers, surrogate pairs, an ill-behaving `exec` reporting an
+index past the subject, the Annex B statics, and the property read order — plus the same edges
+again through the string-`searchValue` builtin.
+
+**test262 is unchanged across all four pinned manifests — 8 313 executed, 8 220 passed, 84
+failed, 44 skipped, 9 timed out, identical manifest by manifest** to §3.4's recorded run, at
+suite ref `ccaac100`. And because the four pinned manifests contain no `replace` coverage at all,
+**the paths this change actually touches were run separately, control against change**:
+`RegExp/prototype/Symbol.replace`, `String/prototype/replace`, `replaceAll`, `RegExp/prototype/exec`,
+`Symbol.split`, `Symbol.match`, `annexB/built-ins/RegExp` and `staging/sm/RegExp` — **499 tests,
+484 passed, 13 failed, 2 timed out, and the failing set is the same file for file on both
+builds.** All 13 are cross-realm cases needing `$262.createRealm`, which the raw script host does
+not provide; **not one failure is in a `replace` directory.** Repository suite
+**7 604 tests across 13 projects, 0 failures** — 41 of them new here.
 
 #### Item 2 measured — and the obvious policy is the wrong one
 
@@ -2997,7 +3117,7 @@ predicate at all.
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
 | **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | 4-3 design ✅ → **4-1** (unblocked) → 4-3a (S) → 4-3b (M–L) → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
-| **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
+| **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → single-match `replace` without a builder ✅ (both builtins) → **the global case's retained result list** → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
 **Dependencies.**
 
