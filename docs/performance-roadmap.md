@@ -331,6 +331,19 @@ These were paid for once each. They apply to every phase below.
   was found on, when the cause was *nesting*. A criterion that passes before the change
   measures nothing and hides the real one. *Write the failing case first, and check that it
   fails.*
+- **Check that the thing you measured is the thing you built.** `Broiler.JavaScript.csproj` — the
+  `--script-host` shell every Octane and test262 run executes — was **not a member of
+  `Broiler.JS.slnx`**, so `dotnet build Broiler.JS.slnx` left its output untouched. A full day of
+  shell-driven verification therefore ran a binary from the previous session, and test262 came
+  back "identical" for the trivial reason that both sides were the same executable. The unit
+  suites and the `--object-alloc` / `--cache-metrics` emitters were unaffected, because those
+  projects *are* in the solution — which is exactly why the discrepancy was invisible. Two
+  things follow. The project is now in the solution, so a solution build refreshes the shell.
+  And a run that cannot fail is not evidence: **assert something that is only true of the build
+  under test before trusting a suite of it.** Here that is one command — deeply nested source
+  with `BROILER_JS_COMPILE_STACK_BYTES=0` completes only with 1-2's guard present, and aborts
+  without it. *The tell was there and was read as a puzzle rather than a signal: a guard that
+  will not fire at a 100 KB threshold is not a subtle bug.*
 - **Reproduce on the platform you will close on.** 1-2's repro was a win-x64 Octane run.
   The same suite completes on linux-x64 at the same pointer, so the CI run that was meant
   to confirm it never could. *A one-platform repro dates the item to that platform.*
