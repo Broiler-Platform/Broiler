@@ -63,7 +63,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
-| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and **4× against** on the seventh. Largest regex cost measured is neither: `replace` with a global flag allocates **~42 KB per match** |
+| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and **4× against** on the seventh. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time** |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
 wall-clock figure is a median of interleaved process-granularity pairs against a control, per §3:
@@ -491,6 +491,13 @@ These were paid for once each. They apply to every phase below.
   wrong-answer bug to two more declaration forms rather than exposing it. *A gate is only as
   sound as the analysis behind it, and the cheapest time to audit that analysis is while you
   still think of it as someone else's.*
+- **Eager work for a deprecated feature is still work, and it is charged to the feature that is
+  not deprecated.** Annex B's `RegExp.leftContext` / `rightContext` partition the subject around
+  the match, and keeping them warm copied the whole subject on every successful match — so
+  `replace` with a global flag, which execs once per match, was quadratic in allocation at
+  42 859 bytes a match. Nothing reads those statics in ordinary code; recording the span and
+  slicing on read costs a reference. *A compatibility surface nobody calls should be paid for by
+  the caller that arrives, not by every operation that might one day precede one.*
 - **Check which component actually runs before profiling the one the plan names.** Phase 5 is
   written about `Broiler.Regex`'s closure matcher, and B5 ranked it as sitting on PdfJS's and
   Typescript's critical path. It does not: `JSRegExp` routes only semantic-gap patterns to it,
@@ -2750,9 +2757,9 @@ the same treatment.
 
 **So phase 5 is re-specified, and re-ordered against itself:**
 
-1. **Stop allocating per match on the `replace`/`exec` result path.** Largest measured cost by
-   three orders of magnitude, and it is the one that reaches PdfJS and Typescript — which is
-   what this phase claimed to care about.
+1. **Stop allocating per match on the `replace`/`exec` result path — landed, see below.**
+   Largest measured cost by three orders of magnitude, and it is the one that reaches PdfJS and
+   Typescript — which is what this phase claimed to care about.
 2. **Decide `RegexOptions.Compiled` per pattern**, on use count. ~2× on six of seven real
    patterns, 4× *against* on the seventh, so it is a policy and not a flag.
 3. **Only then consider compiling `Broiler.Regex`.** It is correctness-critical for the gap
@@ -2761,6 +2768,69 @@ the same treatment.
 
 **RegExp's 110× is therefore not evidence about `Matcher.cs`**, and the score should not be
 quoted as if it were until something establishes which engine produced it.
+
+#### Item 1 landed — an Annex B legacy static was copying the subject on every match
+
+The profile said `replace` with a global flag cost **10 522 bytes per subject character**. The
+cause is one line, and it is not in either regex engine.
+
+`RegExpBuiltinExec` calls `LegacyRegExpState.Update` on every **successful** match, to keep
+Annex B §B.2.4's deprecated statics warm — `RegExp.lastMatch`, `RegExp.leftContext`,
+`RegExp.rightContext` and friends. `LeftContext` and `RightContext` **partition the subject
+around the match**, and they were built eagerly:
+
+```csharp
+LastMatch    = input.Substring(startIndex, endIndex - startIndex);
+LeftContext  = input.Substring(0, startIndex);      // O(startIndex)
+RightContext = input.Substring(endIndex);           // O(length - endIndex)
+```
+
+Together those copy the **entire subject, once per successful match**. And
+`RegExp.prototype[@@replace]` is the generic spec path — it calls `exec` once per match — so a
+global replace was **quadratic in allocation**: measured at **42 859 bytes per match**, 204 MB
+for one call over a 40 KB subject with 5 000 matches.
+
+**The fix is to record the span and slice on read.** Nothing needs those substrings until
+somebody reads one, and almost nothing ever does — they are a deprecated compatibility surface.
+
+| | Before | After | |
+|---|--:|--:|--:|
+| `replace(/[aeiou]/g, 'x')` | 10 522 B/char | **504 B/char** | **0.048x** |
+| the same, time | 1 318 ns/char | **397 ns/char** | **0.30x** |
+| `exec` with eight captures | 2.23 B/char | **0.23 B/char** | 0.10x |
+| `test`, matching | 2.22 B/char | **0.22 B/char** | 0.10x |
+| every **miss** row | 0.01 – 0.02 | **unchanged** | — |
+
+The miss rows are the control and they do not move by a byte, which is what identifies the cost
+as *per successful match* rather than per scan. Note what is **not** claimed: the remaining
+504 B/char is the exec result object itself — an array plus `index`, `input` and `groups`, built
+once per match by the generic `@@replace` path — and that is the next layer, not this one.
+
+**One hazard the change introduced and closed.** Deferring the slice means `Update` publishes a
+subject and two indices that must agree; three separate field writes would let a reader on
+another thread pair a new subject with the previous match's indices and slice outside it. The
+eager version could not do that — its fields were independent, already-built strings, so a torn
+read returned something stale but valid. They are now one immutable record published by a single
+reference write.
+
+**Verify.** `LegacyRegExpStaticsAllocationTests` asserts the bytes, because nothing about the
+*answers* changes and `Issue845RegExpAndWithTests`' twenty existing cases pass either way — on
+the build without this, the allocation test reports **204.4 MB (42 859 B/match)** against its
+50 MB bound, so it fails by a factor of four. A second test pins that the statics still describe
+the last match, so the allocation test cannot be satisfied by simply not recording them.
+Repository suite **7 563 tests across 13 projects, 3 failures**, the pre-existing win-x64 host
+ones. **test262 unchanged across all four pinned manifests** — 8 220 passed, 84 failed, 9 timed
+out, identical manifest by manifest. **Octane 14 of 15 `ok`**, the same set, with Mandreel's
+failure record byte-identical to the earlier runs.
+
+> **Octane's scores moved the right way and are not claimed.** Across this session's four
+> broiler-only runs RegExp went 131, 126, 132 → **140** and Typescript 2 935, 2 951, 2 998 →
+> **3 257**, so both landed above the spread of the three runs that preceded the change — which
+> is the direction a per-match subject copy disappearing should push the two suites that use
+> regexes most. **One repetition per side cannot separate a change from noise (§3.2)**, and
+> these are single runs on a developer workstation, so what is claimed here is the allocation
+> figure, which is deterministic and exact. The scores are recorded as corroboration and as a
+> reason for 0-6 to look at them.
 
 > **The RegExp checksum failure 2-8 recorded did not reproduce.** All three Octane runs this
 > session scored it (131, 126, 132) rather than failing `Error: Wrong checksum.`. Left as an
@@ -2778,7 +2848,7 @@ quoted as if it were until something establishes which engine produced it.
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
 | **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
-| **5** | profile ✅ → **stop allocating per match on `replace`/`exec`** → `Compiled` per pattern → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
+| **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → **`Compiled` per pattern** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
 **Dependencies.**
 
