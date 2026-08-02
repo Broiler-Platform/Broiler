@@ -62,7 +62,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
-| **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
+| **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
 | **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time** |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
@@ -491,6 +491,14 @@ These were paid for once each. They apply to every phase below.
   wrong-answer bug to two more declaration forms rather than exposing it. *A gate is only as
   sound as the analysis behind it, and the cheapest time to audit that analysis is while you
   still think of it as someone else's.*
+- **An item can be written from another engine's architecture.** 4-3 asked for a mid-function
+  bailout that "reconstructs an interpreter frame from a specialized one" — the V8 model, with a
+  stack map naming where each value lives. This engine has no interpreter frame to reconstruct:
+  tier-1 is compiled IL and a JavaScript local is a CLR local of that method, which is what
+  phases C–F were *for*. The design that fits is a fallback branch inside the specialized method,
+  where the locals are shared because it is the same method — cheaper than the item, and it
+  preserves the frame-stack invariants by never engaging them. *When an item names a mechanism
+  rather than an outcome, check the mechanism exists here before sizing it.*
 - **Eager work for a deprecated feature is still work, and it is charged to the feature that is
   not deprecated.** Annex B's `RegExp.leftContext` / `rightContext` partition the subject around
   the match, and keeping them warm copied the whole subject on every successful match — so
@@ -2651,7 +2659,7 @@ and tested; what is missing is the part that makes entering tier-2 worth anythin
 
 | # | Item | Where | Note | Size |
 |---|---|---|---|---|
-| **4-3** | **Deoptimization** — **do this first** | `Runtime/FunctionTiering.cs`, `Engine/CallFrames.cs` | The safety net that makes everything else legal. Must bail out **mid-function** when a guard fails; the current model can only swap the delegate for the *next* call. The gating item for the entire phase | XL |
+| **4-3** | **Deoptimization** — **designed; see below** | `Runtime/FunctionTiering.cs`, `Engine/CallFrames.cs`, and for 4-3b `.Compiler` / `.ExpressionCompiler` | The safety net that makes everything else legal. "Bail out mid-function by reconstructing an interpreter frame" is **not expressible here** — there is no interpreter frame. Splits into **4-3a** (S, the restart contract the pilot already implements) and **4-3b** (M–L, a generic fallback branch inside the specialized method), and only 4-3b gates 4-4 | ~~XL~~ **S + M–L** |
 | **4-1** | **Type feedback collection** — *now also carries what was 2-6* | `Runtime/ObjectShape.cs`, `.Compiler` sites | The inline caches already observe shapes at property sites. Extend to record and retain observed shapes, **callee identities**, and numeric-vs-generic outcomes per site. Callee identity was phase 2's 2-6 until that item was measured: there is no repeated callee resolution to remove, so recording it is feedback and nothing else, and it pays only once 4-2 and 4-4 consume it | L |
 | **4-2** | **A specializing tier-2 compile** | `BuiltIns/Function/JSFunction.cs` — replace the `numericPlan == null` branch | Consume 4-1's feedback: monomorphic property access → shape check plus direct slot read; arithmetic → raw `double`/`int` where feedback says so | XL |
 | **4-4** | **Inlining of small JS callees** at monomorphic sites | `.Compiler` | What Richards and DeltaBlue actually need, and the measurement says why: **a call costs ~250 ns, about thirteen times the loop body it replaces** (2-6). Strictly downstream of 4-3, 4-1 and 4-2 — the callee-identity feedback it needs is 4-1's, not a separate phase-2 item | XL |
@@ -2670,6 +2678,78 @@ unspecialized answer. Then the full test262 matrix — **this phase can break an
 > struct. The three invariants that redesign asserts — a suspendable frame retaking a
 > slot under a different caller, unwinding refusing to grow back into abandoned slots,
 > and popping past stranded callees — are exactly the surface 4-3 has to preserve.
+
+### 4-3 · Deoptimization — **design spike; the item is mis-specified and the fix is cheaper**
+
+Written before 4-2 as the phase requires. Four questions, answered from the code so nobody
+re-derives them.
+
+**1. What does a mid-function bailout have to reconstruct? — Nothing, because there is nothing
+to reconstruct *into*.** 4-3's brief says "reconstruct an interpreter frame from a specialized
+one". **This engine has no interpreter frame.** §4.3's own B2 says so: source → `FastParser` →
+`FastCompiler` → expression trees → IL → RyuJIT, and "real machine code comes out, so this is not
+'an interpreter'". Tier-1 is a compiled `JSFunctionDelegate`, and a JavaScript local in it is a
+**CLR local of that IL method** — that is exactly what phases C–F achieved. `CallFrame` carries
+`FileName`, `Function`, `Line`, `Column`, `NewTarget`, `DirectEvalBindings` and the `Escaped`
+marker, and **no JavaScript values at all**.
+
+So the V8 model — a stack map naming where each value lives, replayed into an interpreter frame —
+has no counterpart here, and could not have one: the CLR does not let one method materialize
+another's locals. *The item was written from V8's architecture, not from this one.*
+
+**2. What transfer IS expressible? Two, and the pilot already runs the first.**
+`NumericLoopPlan.Compile(baseline, deoptimize)` takes the **baseline delegate** and, on a failed
+guard, does:
+
+```csharp
+if (!guard) { deoptimize(); return baseline(in arguments); }
+```
+
+That is **restart, not resume** — re-enter the unoptimized function with the original arguments —
+and it is soundly limited to guards that fire *before any observable effect*. The pilot's fire on
+entry, on argument count and argument type.
+
+The general mechanism is the other one: **compile the specialized and generic forms into one
+method and make a failed guard a branch.** Then the CLR locals are shared because it is the same
+method, no transfer exists to get wrong, and speculation is legal *after* effects have begun —
+which is what 4-2 and 4-4 need and what restart cannot give them. It costs code size, and the
+generic path can never be dropped.
+
+**3. How does each interact with `CallFrameStack`'s three invariants?**
+
+| | Entry-guard restart (A) | In-method branch (B) |
+|---|---|---|
+| suspendable frame retaking a slot | **illegal** — a generator or async body may already have yielded, so re-entering it re-runs effects. Never speculate this way on one | untouched: one method, one `FrameToken`, no re-entry |
+| unwinding never growing back | safe only if the guard fires **before** the frame is pushed; otherwise the optimized frame must be popped, and `RestoreDepth` deliberately refuses to grow, so a bailout can never resurrect an abandoned slot | no frame transition at all |
+| popping past stranded callees | the restart must not leave the optimized call's frame behind — `Pop(token)` clears from the target to the current depth | not reachable |
+
+**(B) is the design that preserves all three by not engaging them.** That is the strongest
+argument for it, and it is an argument the item could not have made before the frame redesign
+landed.
+
+**4. Is the item still XL? No — it is two items, and neither is XL.**
+
+- **4-3a, S:** state the restart contract the pilot already implements, and enforce it — guards
+  before any effect, no suspendable bodies, frame popped on the bailout path. Mostly a rule and
+  a test, since the mechanism ships today.
+- **4-3b, M–L:** teach the compiler to emit a generic fallback path inside a specialized method
+  and branch to it. This is the real prerequisite for 4-2 and 4-4, and it is a codegen change in
+  `.Compiler` / `.ExpressionCompiler` rather than a runtime redesign.
+
+**What this changes about the phase.** "Do not start 4-2 before 4-3 has a design" stands, and the
+design now exists. But the sentence under it — *"speculation without a mid-function bailout is
+either unsound or restricted to functions with no observable side effect before the guard, which
+excludes everything worth optimizing"* — is **half wrong**: restart is exactly that restricted
+form, and it is not worthless (it is what the shipping pilot uses). What it excludes is
+speculation *inside* a body, which is what inlining needs. **4-3b is therefore the gate on 4-4,
+not on all of phase 4**, and 4-1's feedback collection can start immediately — it consumes
+neither.
+
+**Verify, when built.** Deopt correctness before any speculation ships, as the phase already
+says, and for (B) specifically: a test that forces every guard to fail at every point in a body
+and asserts the generic path produces the unspecialized answer *with the same observable effect
+sequence* — the effects before the guard have already happened and must not be repeated, which
+is the one thing a branch gets right for free and a restart cannot.
 
 ---
 
@@ -2883,7 +2963,7 @@ predicate at all.
 | **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-1** → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
 | **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
-| **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
+| **4** | 4-3 design ✅ → **4-1** (unblocked) → 4-3a (S) → 4-3b (M–L) → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
 **Dependencies.**
@@ -3061,7 +3141,7 @@ Where each item came from, so existing cross-references still resolve.
 | 3-2 | — | 3-2 | Open |
 | 3-3 | P2-2 item 3 remainder | 3-3 | **Parameters landed; `let`/`const` and block `var` open and re-ranked ahead of them.** Measured before starting, and the item was right about the target and wrong about the tier: a parameter was excluded from the *scalar* gate, not the numeric one, so it allocated a `JSVariable` cell on every call — **56 B per parameter, a three-parameter call 230.2 → 62.2 B**. The numeric tier cannot be widened to parameters at all, because the caller picks the type; that is phase 4. All four ineligible categories cost the same per site, so the item's ordering was never a cost claim |
 | 3-4 | — (`tagged-js-value` in ownership.json) | 3-4 | Cost, do not start |
-| 4-1 … 4-4 | *excluded by engine §9* | 4-1 … 4-4 | Open — superseded, see §1.1 |
+| 4-1 … 4-4 | *excluded by engine §9* | 4-1 … 4-4 | Open — superseded, see §1.1. **4-3's design is written**: the item asked for V8-style frame reconstruction, which this engine cannot express (tier-1 locals are CLR locals of an IL method, and `CallFrame` carries no JavaScript values). Re-specified as restart (shipping in the pilot) plus an in-method fallback branch |
 | 5 | — | Octane §7 "regex, until late" | **Profiled — gate satisfied, phase re-specified.** `Matching/Matcher.cs` is not on the Octane path at all (only semantic-gap patterns route to it); the default engine is .NET's, built without `RegexOptions.Compiled`. B5's ranking of the closure matcher was never checked against the routing |
 | Lazy frame materialization | P3 remainder | — | Candidate, not a task — no measured cost to remove |
 
