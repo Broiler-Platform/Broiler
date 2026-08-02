@@ -21,7 +21,13 @@ so only the parent can hold the combined view.
 - **Acceptance protocol:** unchanged and unchallenged —
   [`Broiler.JS/docs/performance.md`](../Broiler.JS/docs/performance.md) governs what
   may be *claimed*. **Nothing in this document closes on the numbers it quotes.**
-- **Provenance:** the pinned submodule pointer is **`a6f101cc`**, checked 2026-08-02.
+- **Provenance:** the pinned submodule pointer is **`71dda1b7`**, checked 2026-08-02 against
+  the gitlink rather than against the prose. `a6f101cc` — which this section named until 3-3
+  was worked, and which every §0 and phase-2 measurement below was taken at — is an **ancestor**
+  of it, six commits back (`merge-base --is-ancestor`), so nothing recorded here is invalidated;
+  what moved on top of it is 2-9, 3-0, 1-2's visitor stack guard and the script-host shell
+  joining the solution. **A pointer written into prose goes stale silently**, which is why
+  §4.1's and §3.4's figures below carry the commit they were taken at rather than "the pin".
   **The patch handoff has completed**: `patches/0049`–`0058` were applied to `Broiler.JS`,
   pushed, and the pointer bumped, so all ten are now ancestors of the pin rather than
   pending against it — verified patch-by-patch against the submodule log, not inferred from
@@ -53,11 +59,11 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | Phase | State |
 |---|---|
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is the critical path** — it is what phases A–F need to close on, and what phase 2's exit criterion is measured by. 0-7, 0-8 follow it |
-| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix landed for the validator and emitter passes** (`StackGuard` had three defects and could not fire) — `FastParser` still unguarded. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
+| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
-| **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3 is next.** 3-4 is a cost, not a task |
-| **4** — tiering | Open, and **superseded in scope** by §1.1. 4-3's design gates the rest |
-| **5** — regex | Open. Profile before rewriting |
+| **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
+| **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
+| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time** |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
 wall-clock figure is a median of interleaved process-granularity pairs against a control, per §3:
@@ -194,6 +200,8 @@ half in the column it was not looking at.
 |---|---|
 | Did this operation get cheaper? | In-process probes, Appendix A |
 | What does an object or an element cost in bytes? | `--object-alloc`, `--element-alloc` |
+| What does a local, a binding or a parameter cost? | `--local-alloc`, which reports the compiler's own eligibility counts beside the bytes |
+| What does a regex cost, and which engine ran it? | `--regex-profile` |
 | Did the cache actually start hitting? | `PropertyOptimizationDiagnostics.Snapshot()` |
 | Did real programs get faster? | Octane, ≥3 repetitions, median + spread |
 | Is the engine still correct? | test262 over the pinned manifests |
@@ -295,9 +303,10 @@ a smaller package or faster context is not a win if required globals are absent.
 
 The pinned manifests are `test262-arrays`, `test262-properties-proxy`,
 `test262-strict-mode`, `test262-realm-isolation`. First taken 2026-08-01 at `cdb2fd41`
-(suite ref `ccaac100`), and **re-run 2026-08-02 at `a6f101cc` plus 2-9 with every count
-unchanged** — so the table below now describes the pinned pointer as well as the commit it was
-first measured at:
+(suite ref `ccaac100`), **re-run 2026-08-02 at `a6f101cc` plus 2-9 with every count
+unchanged**, and **re-run again at `71dda1b7` plus 3-3, again with every count unchanged,
+manifest by manifest** — so the table below describes the pinned pointer as well as the commit
+it was first measured at:
 
 | Manifest | Executed | Passed | Failed | Skipped | Timed out | Engine failures |
 |---|---:|---:|---:|---:|---:|---:|
@@ -316,6 +325,22 @@ lines 7–15, nine for nine, the integer-limit `slice`/`unshift`/`reduceRight`/
 **Still not covered:** the Annex B forbidden-extension paths that P0-3 gates on
 (`test/annexB/built-ins/Function`, `forbidden-ext/b2`) are in no manifest. Adding them
 changes what CI enforces, so it is an open item rather than a silent edit.
+
+> **Check out the suite with `core.autocrlf=false` on Windows, or `strict-mode` reports 27
+> failures instead of 26.** Git's Windows default rewrites every LF to CRLF on checkout, and
+> `built-ins/Function/prototype/toString/line-terminator-normalisation-LF.js` asserts that a
+> function containing an LF round-trips through `toString` as an LF — so converting the *test
+> file* makes it assert the opposite of its name. All 37 of its lines arrive as CRLF and it
+> fails; its `CR` and `CR-LF` siblings are unaffected, which is why the damage is one test and
+> not a family. Found while running 3-3, where the one-count difference from the recorded row
+> was the only thing standing between "unchanged" and a claim that would have been wrong.
+>
+> **This is the third time the same root cause has produced a fake engine failure**, after the
+> two §3.4 tooling defects below, and it is worth naming the general form: *a test whose subject
+> is its own bytes cannot survive any layer that normalizes bytes* — the harness writing the
+> assembled script (fixed), and now the checkout that supplies the file. `git cat-file -p HEAD:<path>`
+> is the check, because it prints the blob rather than the working copy; re-checking out will not
+> fix it once the index has recorded the translated form.
 
 ### 3.5 Standing measurement lessons
 
@@ -346,7 +371,20 @@ These were paid for once each. They apply to every phase below.
   will not fire at a 100 KB threshold is not a subtle bug.*
 - **Reproduce on the platform you will close on.** 1-2's repro was a win-x64 Octane run.
   The same suite completes on linux-x64 at the same pointer, so the CI run that was meant
-  to confirm it never could. *A one-platform repro dates the item to that platform.*
+  to confirm it never could. *A one-platform repro dates the item to that platform.* **And so
+  does a one-platform verification matrix** — 1-2's own four-way table records "mitigation off /
+  guard on completes", which is true on linux-x64 and false on win-x64, for the reason in the
+  next bullet. The rule was applied to the item's repro and not to its proof.
+- **A threshold larger than the resource it guards is not a guard, and it fails silently.**
+  `StackSegment` segments a recursive walk after 4 MiB of stack. With the compilation mitigation
+  disabled, the front end compiles in place on a win-x64 stack that measures **1 052 048 bytes** —
+  so the threshold can never be reached, the guard never fires once, and the process aborts
+  looking exactly as it would with no guard at all. The struct's own remarks predicted the
+  shape of this ("a walk cannot know how large the stack it is standing on actually is"); what
+  was missing is that the condition is reachable on a shipping platform rather than hypothetical.
+  *An absolute limit on a resource whose size you cannot query is unfireable in precisely the
+  cases you wrote it for — probe what is left (`RuntimeHelpers.TryEnsureSufficientExecutionStack`)
+  instead of assuming how much there was.*
 - **A formula's stated intent is not its behaviour.** 2-7 read the property map's 16-node floor as
   "buying amortized growth for medium objects with memory small objects do not use", and sized two
   alternatives against that reading. The rounding it describes only applies while
@@ -415,8 +453,81 @@ These were paid for once each. They apply to every phase below.
   in-function shape: 0.903, seven of eight the same direction, against a control at 1.002. *A
   probe whose bulk is inert dilutes the effect and keeps all of the noise* — and it fails
   downward, so it reads as "the change barely helps" rather than as a broken measurement.
+- **An item's title can hide the mechanism, and then the item asks for the wrong thing.** 3-3
+  was "widen the *unboxed-locals* gate", and named parameters as its first target. That gate has
+  two tiers, and a parameter was outside *both* — but the one it could actually reach is the
+  **scalar** tier, because a `var` can be proved numeric by reading the function while a
+  parameter's type is the caller's choice. Taken at its word the item would have delivered
+  nothing; measured, the parameter gap turned out to be a per-call `JSVariable` **cell** and not a
+  box at all, worth 56 B on every parameter of every call. *When an item names a category, check
+  which tier of the mechanism that category is missing before accepting the tier in the title.*
+- **A ranking inside an item is a claim, and it is usually the least-supported sentence in it.**
+  3-3 said "parameters are the valuable one" of four ineligible categories. Measured, all four
+  cost **31.98 B/iteration** — identical to the byte — so the ordering recorded the order they
+  were written down. The measurement also *reversed* it: the three that were deferred can reach
+  the numeric tier and the one that was promoted cannot. *An ordering with no number behind it
+  will be followed anyway, because it reads like a conclusion.*
+- **A comment that says "missing one here is a miscompile" is a checklist, and it has to be run
+  against every member of its family.** `AstReduce` leaves `ObjectProperty`, `VariableDeclarator`
+  and `Case` as leaves for its rewriting visitors. Two of the three walkers that must not accept
+  that carry an override for each and a comment saying why. The third, `NameCollector` — which
+  backs the *only* rejection path in `NumericLocalAnalysis` — carried none, so every name bound
+  through an object pattern was invisible to every rejection at once: `var { a: s } = o` aborted
+  compilation of the whole script with an unhandled `NotImplementedException`, and
+  `({ a: s } = o)` returned NaN. *The hazard was known, written down and fixed twice; nobody
+  grepped for the third case. When a comment explains a trap, search for every class that can
+  fall into it before writing the comment again.*
+- **A green single run is not a green feature when the bug needs two.** 3-3's `let`/`const` half
+  passed every script-host check, every single-test run, and its own allocation measurement — and
+  miscompiled the moment a second compilation happened in the same process. The script host
+  evaluates one file per process, so it is structurally incapable of seeing a defect of that
+  shape, and the unit tests only caught it because xUnit happens to reuse one process across test
+  methods. *When a change touches state that outlives a compilation, the smallest honest test is
+  two compilations — and if the harness you reach for runs one, it is not the harness.*
+- **Probe the analysis you are about to extend, before extending it.** 3-3's successor widens
+  `NumericLocalAnalysis` from `var` to `let`/`const`. Ten minutes of probing what the existing
+  analysis does with unusual *writes* found two it could not see at all — one of them a
+  process abort on valid JavaScript, shipped since P2-2. Extending first would have widened a
+  wrong-answer bug to two more declaration forms rather than exposing it. *A gate is only as
+  sound as the analysis behind it, and the cheapest time to audit that analysis is while you
+  still think of it as someone else's.*
+- **A per-unit figure cannot tell a fixed cost from a scaling one, and it reads as scaling.**
+  Phase 5's profile reported `exec` at 0.22 bytes per subject character, which sounds like
+  something walking the subject; measured per CALL at three subject lengths it is ~1 950 bytes
+  FLAT plus 0.02 B/char. The normalization that made the first finding legible — bytes per
+  character, which is how the per-match subject copy was spotted — made the second one
+  invisible. *Normalize by the thing you think is driving the cost, then vary that thing to
+  check.*
+- **An item can be written from another engine's architecture.** 4-3 asked for a mid-function
+  bailout that "reconstructs an interpreter frame from a specialized one" — the V8 model, with a
+  stack map naming where each value lives. This engine has no interpreter frame to reconstruct:
+  tier-1 is compiled IL and a JavaScript local is a CLR local of that method, which is what
+  phases C–F were *for*. The design that fits is a fallback branch inside the specialized method,
+  where the locals are shared because it is the same method — cheaper than the item, and it
+  preserves the frame-stack invariants by never engaging them. *When an item names a mechanism
+  rather than an outcome, check the mechanism exists here before sizing it.*
+- **Eager work for a deprecated feature is still work, and it is charged to the feature that is
+  not deprecated.** Annex B's `RegExp.leftContext` / `rightContext` partition the subject around
+  the match, and keeping them warm copied the whole subject on every successful match — so
+  `replace` with a global flag, which execs once per match, was quadratic in allocation at
+  42 859 bytes a match. Nothing reads those statics in ordinary code; recording the span and
+  slicing on read costs a reference. *A compatibility surface nobody calls should be paid for by
+  the caller that arrives, not by every operation that might one day precede one.*
+- **Check which component actually runs before profiling the one the plan names.** Phase 5 is
+  written about `Broiler.Regex`'s closure matcher, and B5 ranked it as sitting on PdfJS's and
+  Typescript's critical path. It does not: `JSRegExp` routes only semantic-gap patterns to it,
+  and Octane's corpus has no look-behind and no `u` flag, so the suite the phase is justified by
+  never reaches the component the phase is about. The engine that does serve it was one grep away
+  — `new Regex(pattern, options)` with no `RegexOptions.Compiled`. *A blocker that names a file
+  is making a routing claim, and routing is cheaper to check than to profile.*
 - **Interleave, at process granularity.** Sub-1.5% effects are only visible ABBA-
   interleaved across independent builds, ten runs each, medians compared.
+- **Hold the call site fixed when the callee is what changed.** Sizing a parameter's cost by
+  comparing `h(a)` called with one argument against `h(a, c, d)` called with three measured the
+  *arguments* as much as the bindings, and reported 88 B per parameter. Passing three arguments to
+  both — so the only difference left is how many the callee declares — gave **56**, which the
+  before/after then confirmed exactly at 168 B for three. *Same failure as 2-4's diluted probe,
+  from the opposite direction: there the probe was mostly inert, here it moved two things at once.*
 - **The local suite will not catch a lifetime bug.** All three frame-recycling defects
   appeared as corrupted parent chains — two only as an intermittent hang. The suite
   stayed green through every one. Diagnosis was bisection to a failure *rate*
@@ -554,10 +665,16 @@ compilation a stack the engine sizes; see 1-2, which also records that the Mandr
 failure this blocker was written around does not reproduce on linux-x64. The blocker with
 the clearest browser relevance: it is page load time. → **phase 1**
 
-**B5 · The regex engine is a backtracking interpreter.** `Broiler.Regex`'s
-`Matching/Matcher.cs` has no compilation to native code; V8's Irregexp JIT-compiles
-each pattern. RegExp is 110× off *against Octane's lowest reference baseline*, and the
-same engine sits on PdfJS's and Typescript's critical path. → **phase 5**
+**B5 · The regex engine is a backtracking interpreter — *and it is not the engine Octane
+runs*.** `Broiler.Regex`'s `Matching/Matcher.cs` has no compilation to native code; V8's
+Irregexp JIT-compiles each pattern. RegExp is 110× off *against Octane's lowest reference
+baseline*. **The second half of that sentence — "the same engine sits on PdfJS's and
+Typescript's critical path" — is wrong, and phase 5's profile is what found it:** `JSRegExp`
+keeps `System.Text.RegularExpressions` as the default engine and routes only semantic-gap
+patterns to `Broiler.Regex`, and Octane's corpus contains no look-behind and no `u` flag, so
+it never gets there. The engine that does serve those suites is built **interpreted** — no
+`RegexOptions.Compiled` anywhere on the user-regex path. **This blocker names the wrong
+component**; see phase 5 for what the measurement puts in its place. → **phase 5**
 
 **B6 · Ambient state on hot paths — *the write half was the blocker, and it is gone*.**
 `JSEngine` holds the current context and the strict-mode flag in `AsyncLocal<T>`. P0-2 removed
@@ -890,7 +1007,7 @@ not the demonstration this item thought it was.
    under `SyntaxValidation.StrictModeValidator`, whose base `AstMapVisitor<T>` never derived
    from `StackGuard` at all. Repairing `StackGuard` alone therefore did not move the repro;
    the same guard had to be put on `AstMapVisitor.Visit`. **`FastParser`'s recursive descent is
-   the third pass and is still unguarded** — that half of the item remains open.
+   the third pass, and it is now guarded too** — see below.
 
    **Verified by turning each mechanism off independently**, which is the only way to tell which
    one is doing the work. A 20 000-operator chain through the script host: mitigation on / guard
@@ -899,10 +1016,79 @@ not the demonstration this item thought it was.
    the other three mean anything. Cost, interleaved on one build with only the environment
    variable differing: **median paired ratio 1.0027**, i.e. nothing.
 
+   > **That matrix is a linux-x64 result, and the second row does not hold on win-x64.** Re-run
+   > there while guarding the parser, *this same 20 000-operator chain* completes with the
+   > mitigation on and **aborts with it off**, guard or no guard. The reason was measured rather
+   > than guessed: with the mitigation disabled the front end compiles in place on a stack that
+   > tops out at **1 052 048 bytes** — about 1 MiB — while `StackSegment.SegmentAtBytes` is
+   > **4 MiB**, so the threshold is larger than the whole stack and the guard cannot fire once.
+   > `StackSegment`'s own remarks anticipate exactly this ("a walk cannot know how large the
+   > stack it is standing on actually is, and a threshold above it would never be reached before
+   > the CLR aborted the process"); what is new is that the condition is *reachable on a shipping
+   > platform* with the mitigation off. It costs nothing in the default configuration, where the
+   > worker is 64 MiB and the guard fires freely — 223 times on a 10 000-level parse. **The fix
+   > is an adaptive threshold** (`RuntimeHelpers.TryEnsureSufficientExecutionStack` probes what
+   > is actually left, rather than assuming), and it belongs to `StackSegment`, so it would move
+   > all three passes at once. Not done here. *A one-platform matrix dates its rows to that
+   > platform — the same lesson this item already learned from Mandreel, applied to its own
+   > verification instead of to its repro.*
+
    *No unit test pins the guard-alone row.* Doing so means setting `CompilationStack.SizeBytes`
    to 0, which is a process-wide static that xUnit's parallel classes would race on, so it needs
    process isolation the fixtures do not have. The four-way matrix above is a manual result, and
    saying so is better than a test that appears to cover it and does not.
+3. **The parser pass (S) — landed.** `FastParser`'s recursive descent was the last of the three
+   and the one that overflows *first*, before the validator or the emitter ever see a tree.
+
+   **The failing case was written first and watched to fail, in the configuration that ships.**
+   A right-nested conditional through the script host, mitigation at its default 64 MiB:
+   20 000 levels returns its answer, **25 000 aborts the process** — no exception, nothing to
+   catch. So this was not a defect that needed a diagnostic switch flipped to see; it was
+   reachable by a syntactically valid script on the default build.
+
+   **Where.** `Broiler.JavaScript.Parser/FastParser.Expression.cs`. The abort trace's repeating
+   cycle is seven frames — `Expression` → `SinglePrefixPostfixExpression` →
+   `SingleMemberExpression` → `SingleExpression` → `BracketExpression` → `ExpressionList` →
+   `Expression` — and `Expression` appears in it twice, so guarding that one entry covers every
+   nested construct. `.Parser` already references `.ExpressionCompiler`, so it shares
+   `StackSegment` rather than copying it, which is the whole point of that struct existing.
+
+   **After: 25 000, 40 000 and 90 000 levels all complete.** With the guard alone disabled
+   (`BROILER_JS_VISITOR_SEGMENT_BYTES=0`) 25 000 aborts again, which is what makes the pass
+   attributable to the guard rather than to anything else in the build.
+
+   **Cost: none measurable.** The guard sits on the parser's hottest entry, so it was measured
+   rather than assumed — 3 000 *distinct* `new Function` compilations (distinct so the code cache
+   cannot answer them), six interleaved pairs on one build with only the environment variable
+   differing: **median of paired ratios 0.9993**, three pairs above 1 and three below.
+
+   **Verify.** A 25 000-level fixture in `DeeplyNestedSourceTests` — the smallest depth that was
+   fatal, and decisive without touching `CompilationStack.SizeBytes`. A syntax error at the
+   deepest point of one still reports the same exception type and the right offset (1, 552 809),
+   which is the path that crosses the worker handoff. Repository suite **7 561 tests across 13
+   projects, 3 failures**, the pre-existing win-x64 host ones. **test262 unchanged across all four
+   pinned manifests** — 8 220 passed, 84 failed, 9 timed out, identical manifest by manifest,
+   which is the gate that matters most for a change to the parser. **Octane 14 of 15 `ok`**, the
+   same set as before it, with Mandreel's failure record **byte-identical** to the previous run —
+   so this does not fix Mandreel, and does not pretend to: that one aborts on the *JavaScript*
+   stack budget during execution, not in parsing.
+
+   > **The first version of this guard was wrong, and the `off/on` row is what exposed it.**
+   > It inferred "this is the outermost call" from `!segment.IsAnchored`, which reads correctly
+   > and is false: `StackSegment.Continue` *deliberately* clears the anchor so the continuation
+   > measures against its fresh stack — so the first call on a segmented continuation calls
+   > itself outermost and releases the anchor again the moment that one sub-expression finishes.
+   > The accounting then restarts from whatever depth the next call happens to sit at, so the
+   > guard fires on an interval it did not choose. Fixed with an explicit recursion counter,
+   > which says what the anchor cannot: *this is the top of the recursion, not the top of the
+   > current stack.* **Recorded as a structural defect, not as a measured regression** — it was
+   > found while chasing the `off/on` failure above, which turned out to have a different cause,
+   > and the two were never separated. The fix is cheap and obviously right, so it stayed; what
+   > it is worth was not established.
+   >
+   > **`StackGuard<T,TIn>` makes the same inference** for the validator and emitter passes. Not
+   > changed here — those two are verified working and this item is the parser — but it is the
+   > first place to look if either is ever found segmenting less than it should.
 
 **Verify.** `Broiler.JavaScript.Compiler.Tests/DeeplyNestedSourceTests.cs` — a nested `+`
 chain, a nested conditional, a long flat statement list (kept, so the size case cannot be
@@ -2157,23 +2343,291 @@ and this gets cheaper.
 
 **Where.** `Runtime/JSObject.cs`, `Runtime/ObjectShape.cs`. **Size: L.**
 
-### 3-3 · Widen the unboxed-locals eligibility gate
+### 3-3 · Widen the unboxed-locals eligibility gate — **measured; the parameter half landed, and it is not the half the item described**
 
-P2-2 item 3 currently covers a function-top-level `var` not named by any nested
-closure. Still ineligible: **function parameters**, `let`/`const` (needs TDZ analysis),
-and `var` declared inside a block or loop body (needs definite-assignment analysis).
+P2-2 item 3 covers a function-top-level `var` not named by any nested closure. Still
+ineligible when this item was written: **function parameters**, `let`/`const` (needs TDZ
+analysis), and `var` declared inside a block or loop body (needs definite-assignment
+analysis).
 
-**Parameters are the valuable one** — every numeric helper takes them, and every Octane
-benchmark is full of numeric helpers. Do parameters first; treat the other two as
-separate items.
+The item then asserted an ordering: *"**Parameters are the valuable one** — every numeric
+helper takes them, and every Octane benchmark is full of numeric helpers. Do parameters
+first; treat the other two as separate items."* That is a claim about where the bytes are,
+and it had never been measured. Measured now, it is **right about the target and wrong
+about the tier**, which changes both what landed and what comes next.
 
-**Where.** `Broiler.JavaScript.Compiler` — the P2-2 eligibility gate.
+**Where.** `Broiler.JavaScript.Compiler` — `Declarations/FastCompiler.CreateFunction.cs`
+(the parameter-binding site and `TryPlanScalarReplacement`), `Scope/FastFunctionScope.cs`.
 
-**Watch:** patch 0047 exists because this codegen path produced **invalid IL** when an
-unboxed local reached value position. Widening the gate widens that exposure;
-`InvalidProgramException` is the failure signature to test for. Note also that the same
-work carries the `NaN <= x` bug as a precedent for how subtly numeric specialization
-goes wrong. **Size: M.**
+#### Measured before starting — `--local-alloc`, and it re-specifies the item
+
+`LocalAllocationMetrics` (new; `--local-alloc`) reports bytes per iteration for every place
+a number can live in a function, alongside the compiler's own count of how many bindings it
+kept scalar. Two instruments on purpose: the counter is exact and settles *whether a shape is
+eligible at all*, the bytes settle *what that eligibility is worth*. Every row is net of a
+loop control carrying no value under test.
+
+| Site | B/iteration | Numeric locals |
+|---|--:|--:|
+| `loop-control` | 0.00 | 2 |
+| **`top-level-var`** — the only eligible category today | **0.00** | **3** |
+| `parameter` | 31.98 | 1 |
+| `let-binding` | 31.98 | 1 |
+| `const-binding` | 31.98 | 1 |
+| `block-var` | 31.98 | 1 |
+
+**Three findings, and two of them change the plan.**
+
+- **All four ineligible categories cost exactly the same.** A `let`, a `const` and a
+  block-scoped `var` each cost what a parameter costs, to the byte. So "parameters are the
+  valuable one" is not a statement about cost per site, and nothing in the item ever
+  established it — the four were ranked by how they were written down, not by what they
+  charge.
+- **An ineligible binding does not merely fail to help; it de-optimizes the locals
+  downstream of it.** The eligible row keeps **3** locals in raw doubles and every
+  ineligible row keeps **1**. The accumulator `s` in `s = s + v * 2` stops being provably
+  numeric the moment `v` is not, so one ineligible binding costs the specialization of
+  everything that reads it. That is a multiplier the item did not have, and it is the
+  strongest argument for finishing the gate.
+- **The parameter gap is not a box. It is a cell** — and that is the finding the item's own
+  title hid. Every parameter was created with `CreateVariable(name, null, …)`, whose default
+  type is `JSVariable`, so **every parameter allocated a heap cell on every call**, while a
+  `var` in the same function had been scalar-replaced since P2-2. It is not the numeric tier
+  of the gate that parameters were missing, it is the *scalar* one.
+
+| Helper called in a loop | B/call | What the pair isolates |
+|---|--:|---|
+| `h(a) { return a * 2 + 1; }` | 119.99 | binds and reads a parameter |
+| `h(a) { return a; }` | 120.01 | **the same cost with no arithmetic at all** — so the cost is the binding |
+| `h(a) { var b = 3.5; return b * 2 + 1; }` | 95.99 | a parameter nothing reads, which is elided outright |
+| `h() { var b = 3.5; return b * 2 + 1; }` | 95.99 | no parameter — identical, which is what proves the row above |
+
+**And the numeric tier cannot be widened to parameters at all.** A `var` can be proved to
+hold only numbers by reading the function; a parameter's value is the caller's choice, and no
+analysis of the callee can constrain it. Holding one in a raw `double` needs an entry guard
+and a generic fallback — that is speculation, and speculation is **phase 4**. So the item as
+written asked for the one thing in its list that this phase cannot deliver, and would have
+delivered nothing had it been taken at its word.
+
+#### Landed — a parameter no longer costs a cell
+
+The gate now admits parameters at the scalar tier, on four conditions, and the
+simple-parameter-list one is doing more work than it looks:
+
+| Condition | Why |
+|---|---|
+| `CanScalarReplaceLocals` | the same hazards that stop a `var`: direct `eval`, `with`, `debugger`, a dynamic nested function, async, generator |
+| `arguments` named **nowhere** in the function or anything nested in it | a sloppy simple-parameter-list function gets a **mapped** `arguments` object, and the mapping is built out of the parameters' cells. Refused on any mention, because `arguments` is materialized lazily on first reference — long after the parameters are created |
+| a **simple** parameter list | rules out defaults, rest and destructuring, and with them every *expression* in the parameter list. Without it, a closure in a default (`function f(a, b = () => a)`) would capture a scalarized parameter, because the hazard detector scans the body and never the parameter list. **A bound, not a heuristic** — it is what lets this reuse the existing analysis instead of extending it |
+| not named by any nested function | capturing a binding requires naming it — the same rule, and the same set, `VisitBlock` already applies to `var`s |
+
+**Bytes per call**, from the item's own acceptance test, on a three-parameter helper called
+20 000 times:
+
+| | Before | After | Ratio |
+|---|--:|--:|--:|
+| three-parameter call | 230.2 B | **62.2 B** | **0.27** |
+| of which parameter cells | 168.0 | **0** | — |
+
+**56.0 bytes per parameter per call, and it is now nothing.** The `--local-alloc` rows agree
+and identify it as per-*binding* rather than per-call: a one-parameter helper drops 56.00, a
+three-parameter one 168.00, and **three rows that provably cannot move — the two
+no-parameter controls and the numeric-var control — do not move by a byte.** So a one-line
+helper's call allocation falls **47% at one parameter and 73% at three**, on every helper in
+every program, whatever its parameters hold.
+
+Note what is *not* claimed: the in-loop rows above are unchanged, because a cell is charged
+once per call and those loops call once. This item removes an allocation per call, not per
+use, and the 31.98 B/iteration those rows report is still owed to the numeric tier.
+
+**Patch 0047's hazard is untouched, and deliberately so.** This item never puts a value in a
+raw `double`, so the codegen path that produced **invalid IL** when an unboxed local reached
+value position is not on it — `InvalidProgramException` is the signature for the *numeric*
+half of this gate, which is the half that did not land. The `NaN <= x` precedent applies
+there too, not here.
+
+**Verify.** 57 test cases in `ScalarParameterTests`, weighted to what a cell exists *for*
+rather than to hit rates, because a miss there is a miscompilation and shows up as a stale
+read rather than a crash: a mapped `arguments` aliasing both directions and a strict one not;
+a closure over a parameter seeing a later write and writing back through it; a direct `eval`
+reading and assigning one; `with` shadowing one and stopping at the closing brace; and eleven
+refusal cases asserting **zero** scalar bindings for the shapes that must keep cells
+(defaults, rest, destructuring, generators, async, `debugger`, `var arguments`, an
+`arguments` mention reaching in from a nested arrow). Plus duplicate parameter names, a `var`
+redeclaring a parameter, a body function declaration overriding one, arity mismatches both
+ways, every write form, `typeof`/`delete`, recursion, class and accessor parameters, and a
+catch parameter.
+
+**The counter assertions are the ones that pin the gate**, and they were checked against the
+build without the item: `ScalarLocals` is **0** for every parameter before and 2 for a
+two-parameter function after, and the allocation test fails at 230.2 B/call against its
+100 B/call bound. *A criterion that passes before the change measures nothing (§3.5), so this
+one was run before the change and watched to fail.* Repository suite: **7 525 tests across 13
+projects, 3 failures**, all three the pre-existing win-x64 host-environment ones §4.1 names.
+
+**test262 over all four pinned manifests is unchanged — 8 220 passed, 84 failed, 9 timed out,
+identical counts manifest by manifest** (§3.4), which is the gate this item most needed:
+`FunctionDeclarationInstantiation` and the Annex B `arguments` mapping are the spec surface it
+edits.
+
+**Octane was run too, because this item's justification names it.** 2-8 established that a
+benchmark quoted as an item's reason is a test that item has to pass, and 3-3's reason is
+"every Octane benchmark is full of numeric helpers" — a claim about calls with parameters,
+which is exactly what this changes. **14 of 15 suites `ok`, DeltaBlue and Richards included**,
+on win-x64 with results kept out of `tests/octane/results`.
+
+**The fifteenth is Mandreel, and it is not this item — confirmed against a control rather than
+assumed.** It fails in phase `Setup` with `RangeError: Maximum call stack size exceeded` at
+`EnsureWithinStackBudget` (`CallFrames.cs:215`) from `mandreelAppInit` (`mandreel.js:1460`),
+which is the win-x64 signature phase 0 recorded, item 1-2 diagnosed and 2-9 already controlled
+for one pointer earlier. Re-run with **only the compiler reverted to `71dda1b7`**, same machine
+and same harness, it fails **byte-identically** — the two `OCTANE_ERROR` records compare equal,
+so it is the same guard, frame, phase and eleven-frame stack, not merely a similar-looking one.
+*A failing suite is a claim; the control is what turns it into a verdict, and the pointer had
+moved since the last one was taken.*
+
+> **`RegExp` scored rather than failing its checksum**, which is a change from what 2-8
+> recorded as a pre-existing defect. Not investigated here and not claimed as fixed — a single
+> run on a different platform is not evidence either way — but it is worth someone confirming
+> before that note is relied on again.
+
+**Size: M**, and the half that landed came in at that size. What did not land is below.
+
+> **One pre-existing defect found in passing, neither caused nor fixed here.** A parameter
+> named `undefined` does not shadow the global: `(function (undefined) { return undefined; })(1)`
+> answers `undefined`, and `typeof` on it answers `"undefined"` rather than `"number"`. It
+> reproduces identically with this item reverted, so it is not a regression, and it is pinned
+> by `KnownGap_AParameterNamedUndefinedDoesNotShadowTheGlobal` rather than left to be
+> rediscovered — a fix flips a failing assertion instead of passing unnoticed.
+
+#### A correctness fix the successor needed first — two writes the analysis could not see
+
+**Found by probing `NumericLocalAnalysis` before extending it, and it is a wrong-answer bug in
+shipped code** — present since `a746f82d` landed P2-2 item 3, on every platform, in ordinary
+JavaScript. The analysis proves a `var` only ever holds a number and then the compiler keeps it
+in a raw CLR `double`. Two ways of writing that binding were invisible to the proof:
+
+| Invisible write | Why | What happened |
+|---|---|---|
+| A `var` **re-declared** below the function body's own statement list — inside a block, `if`, loop, `while`, `try`, `switch` | it names the same function-scoped binding, but only the *top-level* declarations were recorded as stores; the collector's `VisitVariableDeclarator` visited the initializer as a read and recorded nothing | `var s = 0; { var s = 'x'; } return s` → **NaN** |
+| Any name bound through an **object destructuring pattern**, in a declaration *or* an assignment | `AstReduce` treats `ObjectProperty` as a leaf, and `NameCollector` — the walker behind every `RejectEveryNameIn` call — never overrode it | `({ a: s } = { a: 'x' })` → **NaN**; `var { a: s } = …` → **the process aborts** |
+
+**The second failure mode is the serious one, and it is not a wrong answer — it is an unhandled
+`System.NotImplementedException`** (*"Assignment target Call (BCallExpression) is not
+supported"*) out of `ILCodeGenerator.VisitAssign`, which kills compilation of the whole script
+and cannot be caught from JavaScript. That is precisely what the numeric local's own remarks
+predict: its readable `Expression` is a **boxing read**, so writing through it is an assignment
+to a method call. Three shapes reach it — `var { a: s } = o`, the same nested in a block, and
+`for (var { a: s } of …)`. A fourth, `[...s] = ['a']`, threw a bogus `undefined is not a
+function`.
+
+**One root cause is shared and it is worth naming.** `ScalarReplacementHazardDetector` and
+`NestedFunctionScanner` both carry a comment explaining that `AstReduce` leaves `ObjectProperty`,
+`VariableDeclarator` and `Case` as leaves, and both override all three — *"Missing one here is
+not a missed optimization but a miscompile."* `NameCollector` is the third walker in the same
+family and had none of them. The comment was right, was written twice, and was not applied to
+the class that needed it most: `RejectEveryNameIn` is the analysis's only *rejection* path, so a
+name it cannot see is a name nothing else will reject either.
+
+**The fix costs nothing measurable**, which is the expected result and worth stating because it
+is checkable: all fourteen `--local-alloc` rows are byte-identical before and after and every
+numeric-local count is unchanged, because the names now rejected are exactly the ones that were
+being compiled wrongly. Ordinary code loses no specialization — `a[i] = v` and `o.x = i` are
+asserted by count, not just by answer, since the over-broad version of the pattern rule would
+have silently undone 3-0's unboxed index while still computing the right values.
+
+**Verify.** 35 test cases in `NumericLocalWriteVisibilityTests`, written as ordinary JavaScript
+answers because every one of them is a value the engine got wrong or refused to compile.
+**18 of the 35 fail on the build without the fix**, four of those by aborting the test host —
+which is what makes them a pin rather than a description. Repository suite: **7 560 tests across
+13 projects, 3 failures**, the pre-existing win-x64 host ones.
+
+*This is why the successor could not start first.* Extending the same analysis to `let`/`const`
+without this would have widened a silent-NaN miscompilation to two more declaration forms.
+
+#### What is left of 3-3, and it now outranks what landed
+
+`let`/`const` and the block-scoped `var` are still ineligible, and the measurement moves them
+**ahead** of where the item put them, for a reason the item could not have known:
+
+- They cost the same per site as a parameter did — **31.98 B/iteration**, charged per
+  *assignment* rather than once per call, so on a loop they dominate what a cell ever cost.
+- They can reach the **numeric** tier, which parameters cannot: a `const v = 3.5` at function
+  top level is exactly as provable as the `var` beside it, and the TDZ condition is already
+  satisfied by the dominance argument `NumericLocalAnalysis` uses today — the declaration
+  must be a direct statement of the function body with no textual reference before it.
+- And they carry the multiplier: re-qualifying one binding re-qualifies every local
+  downstream of it, which is the 1 → 3 in the table above.
+
+So the successor item is **`let`/`const` at the numeric tier first**, then the block-scoped
+`var` (which does need the definite-assignment analysis the item names).
+
+#### `let`/`const` was attempted and **withdrawn**, and the reproduction is the deliverable
+
+It was built, it measured exactly as predicted, and it miscompiles. Recorded here rather than
+left as a branch, because the next attempt should start from the evidence.
+
+**What worked.** Offering a function-body-top-level `let`/`const` to `NumericLocalAnalysis` and
+admitting a lexical name in the function body block only:
+
+| Site | Before | After |
+|---|--:|--:|
+| `let-binding` | 31.98 B/iter, 1 numeric local | **0.00 B/iter, 3** |
+| `const-binding` | 31.98 B/iter, 1 numeric local | **0.00 B/iter, 3** |
+
+— identical to `top-level-var`, the eligible floor, with **every other `--local-alloc` row
+unchanged**. The multiplier the section above predicts is visible in the second column: one
+binding re-qualified, and the accumulator and counter that read it came with it. Semantics held
+in single-compilation runs: the `const` reassignment `TypeError`, the `let` TDZ
+`ReferenceError`, and the nested-shadowing dead zone all still fired, byte-identical to the
+baseline.
+
+**Two obligations it had to discharge, and both were fine.** The **TDZ** is discharged by the
+dominance argument the analysis already makes — a name with any reference before its
+declaration is rejected, so the throw is unreachable rather than removed. **Const-ness** needed
+one addition: a write to a const is a `TypeError` raised by the binding's *cell*, so a const
+written anywhere was rejected outright rather than specialized into a silent store.
+
+**What is wrong.** After **any** earlier compilation in the same process — a different
+`JSContext`, a different source — a `let` declared in a *nested block* reads back as an
+uninitialized double:
+
+```js
+// First, in one JSContext:
+(function () { let v = 3.5; v = v + 1; return v; })()      // → 4.5, correct
+
+// Then, in a fresh JSContext in the same process:
+(function () { let v = 1; { let v = 2; return v; } })()    // → 2.0000000074796844
+(function () { { let v = 2; return v; } })()               // → 2.0000000074796844
+(function () { let v = 1; { let w = 2; return w; } })()    // → 2.0000000074796844
+```
+
+**The tell is the third line: none of those nested bindings is one the gate admits.** A lexical
+name is applied in the function body block only, so `{ let v = 2; }` must get a cell — and it
+does not. **So a lexical binding's storage is decided somewhere other than that gate**, and
+until that is found no amount of tightening the gate is a fix. Three hypotheses were eliminated:
+it is not a specific predecessor (any one will do), not a compile count (64 preceding
+compilations in a fresh context each are harmless), and not repetition of the same source. The
+value's shape is a clue worth keeping — the high bits read as the right integer and the low
+mantissa bits are garbage, which is a slot written narrower than it is read.
+
+**One real bug was found and fixed on the way there**, which is why the attempt was worth
+making even though it did not land: the lexical declaration path assigns through the binding's
+value setter, and for a numeric local that setter is a **boxing read** — so the first build of
+this threw `System.NotImplementedException: Assignment target Call (BCallExpression) is not
+supported` out of `ILCodeGenerator.VisitAssign`. That is patch 0047's hazard family, exactly
+where this item's own *Watch* note said to look, and the fix is to test `NumericStorage` before
+the lexical branch rather than after it.
+
+**For the next attempt**, in order: find what else decides a lexical binding's storage (start at
+`VisitBlock`'s `CreateVariable` and `FastFunctionScope.variableScopeList` — the block scope is
+constructed fresh, so the leak is below it); keep the `NumericStorage`-before-lexical ordering
+in `VisitVariableDeclaration`; keep the const-write rejection; and re-run the reproduction above
+**as two evaluations in one process**, because a single one is green and the script host is
+therefore not an instrument that can see this.
+
+`const` remains the cheaper half and worth separating once the storage question is answered: it
+cannot be reassigned at all, so its analysis reduces to checking the initializer.
 
 ### 3-4 · A tagged value representation — *scope and cost, do not start*
 
@@ -2212,7 +2666,7 @@ and tested; what is missing is the part that makes entering tier-2 worth anythin
 
 | # | Item | Where | Note | Size |
 |---|---|---|---|---|
-| **4-3** | **Deoptimization** — **do this first** | `Runtime/FunctionTiering.cs`, `Engine/CallFrames.cs` | The safety net that makes everything else legal. Must bail out **mid-function** when a guard fails; the current model can only swap the delegate for the *next* call. The gating item for the entire phase | XL |
+| **4-3** | **Deoptimization** — **designed; see below** | `Runtime/FunctionTiering.cs`, `Engine/CallFrames.cs`, and for 4-3b `.Compiler` / `.ExpressionCompiler` | The safety net that makes everything else legal. "Bail out mid-function by reconstructing an interpreter frame" is **not expressible here** — there is no interpreter frame. Splits into **4-3a** (S, the restart contract the pilot already implements) and **4-3b** (M–L, a generic fallback branch inside the specialized method), and only 4-3b gates 4-4 | ~~XL~~ **S + M–L** |
 | **4-1** | **Type feedback collection** — *now also carries what was 2-6* | `Runtime/ObjectShape.cs`, `.Compiler` sites | The inline caches already observe shapes at property sites. Extend to record and retain observed shapes, **callee identities**, and numeric-vs-generic outcomes per site. Callee identity was phase 2's 2-6 until that item was measured: there is no repeated callee resolution to remove, so recording it is feedback and nothing else, and it pays only once 4-2 and 4-4 consume it | L |
 | **4-2** | **A specializing tier-2 compile** | `BuiltIns/Function/JSFunction.cs` — replace the `numericPlan == null` branch | Consume 4-1's feedback: monomorphic property access → shape check plus direct slot read; arithmetic → raw `double`/`int` where feedback says so | XL |
 | **4-4** | **Inlining of small JS callees** at monomorphic sites | `.Compiler` | What Richards and DeltaBlue actually need, and the measurement says why: **a call costs ~250 ns, about thirteen times the loop body it replaces** (2-6). Strictly downstream of 4-3, 4-1 and 4-2 — the callee-identity feedback it needs is 4-1's, not a separate phase-2 item | XL |
@@ -2231,6 +2685,78 @@ unspecialized answer. Then the full test262 matrix — **this phase can break an
 > struct. The three invariants that redesign asserts — a suspendable frame retaking a
 > slot under a different caller, unwinding refusing to grow back into abandoned slots,
 > and popping past stranded callees — are exactly the surface 4-3 has to preserve.
+
+### 4-3 · Deoptimization — **design spike; the item is mis-specified and the fix is cheaper**
+
+Written before 4-2 as the phase requires. Four questions, answered from the code so nobody
+re-derives them.
+
+**1. What does a mid-function bailout have to reconstruct? — Nothing, because there is nothing
+to reconstruct *into*.** 4-3's brief says "reconstruct an interpreter frame from a specialized
+one". **This engine has no interpreter frame.** §4.3's own B2 says so: source → `FastParser` →
+`FastCompiler` → expression trees → IL → RyuJIT, and "real machine code comes out, so this is not
+'an interpreter'". Tier-1 is a compiled `JSFunctionDelegate`, and a JavaScript local in it is a
+**CLR local of that IL method** — that is exactly what phases C–F achieved. `CallFrame` carries
+`FileName`, `Function`, `Line`, `Column`, `NewTarget`, `DirectEvalBindings` and the `Escaped`
+marker, and **no JavaScript values at all**.
+
+So the V8 model — a stack map naming where each value lives, replayed into an interpreter frame —
+has no counterpart here, and could not have one: the CLR does not let one method materialize
+another's locals. *The item was written from V8's architecture, not from this one.*
+
+**2. What transfer IS expressible? Two, and the pilot already runs the first.**
+`NumericLoopPlan.Compile(baseline, deoptimize)` takes the **baseline delegate** and, on a failed
+guard, does:
+
+```csharp
+if (!guard) { deoptimize(); return baseline(in arguments); }
+```
+
+That is **restart, not resume** — re-enter the unoptimized function with the original arguments —
+and it is soundly limited to guards that fire *before any observable effect*. The pilot's fire on
+entry, on argument count and argument type.
+
+The general mechanism is the other one: **compile the specialized and generic forms into one
+method and make a failed guard a branch.** Then the CLR locals are shared because it is the same
+method, no transfer exists to get wrong, and speculation is legal *after* effects have begun —
+which is what 4-2 and 4-4 need and what restart cannot give them. It costs code size, and the
+generic path can never be dropped.
+
+**3. How does each interact with `CallFrameStack`'s three invariants?**
+
+| | Entry-guard restart (A) | In-method branch (B) |
+|---|---|---|
+| suspendable frame retaking a slot | **illegal** — a generator or async body may already have yielded, so re-entering it re-runs effects. Never speculate this way on one | untouched: one method, one `FrameToken`, no re-entry |
+| unwinding never growing back | safe only if the guard fires **before** the frame is pushed; otherwise the optimized frame must be popped, and `RestoreDepth` deliberately refuses to grow, so a bailout can never resurrect an abandoned slot | no frame transition at all |
+| popping past stranded callees | the restart must not leave the optimized call's frame behind — `Pop(token)` clears from the target to the current depth | not reachable |
+
+**(B) is the design that preserves all three by not engaging them.** That is the strongest
+argument for it, and it is an argument the item could not have made before the frame redesign
+landed.
+
+**4. Is the item still XL? No — it is two items, and neither is XL.**
+
+- **4-3a, S:** state the restart contract the pilot already implements, and enforce it — guards
+  before any effect, no suspendable bodies, frame popped on the bailout path. Mostly a rule and
+  a test, since the mechanism ships today.
+- **4-3b, M–L:** teach the compiler to emit a generic fallback path inside a specialized method
+  and branch to it. This is the real prerequisite for 4-2 and 4-4, and it is a codegen change in
+  `.Compiler` / `.ExpressionCompiler` rather than a runtime redesign.
+
+**What this changes about the phase.** "Do not start 4-2 before 4-3 has a design" stands, and the
+design now exists. But the sentence under it — *"speculation without a mid-function bailout is
+either unsound or restricted to functions with no observable side effect before the guard, which
+excludes everything worth optimizing"* — is **half wrong**: restart is exactly that restricted
+form, and it is not worthless (it is what the shipping pilot uses). What it excludes is
+speculation *inside* a body, which is what inlining needs. **4-3b is therefore the gate on 4-4,
+not on all of phase 4**, and 4-1's feedback collection can start immediately — it consumes
+neither.
+
+**Verify, when built.** Deopt correctness before any speculation ships, as the phase already
+says, and for (B) specifically: a test that forces every guard to fail at every point in a body
+and asserts the generic path produces the unspecialized answer *with the same observable effect
+sequence* — the effects before the guard have already happened and must not be repeated, which
+is the one thing a branch gets right for free and a restart cannot.
 
 ---
 
@@ -2254,6 +2780,212 @@ implements and tests, compare both backends during expansion, move `Exec`, `Spli
 `Replace` to one match-data abstraction, and retire the .NET translator only after the
 pinned RegExp corpus is clean.
 
+### The gate is satisfied, and it overturns the phase — **`Matcher.cs` is not on this path**
+
+Profiled with `--regex-profile` (new; `RegexProfileMetrics`), and the first thing the profile
+established is that **the engine this phase is written about barely runs**.
+
+**`Broiler.Regex` is not the default engine, by design.** `JSRegExp.Broiler.cs` says so in its
+own header — *"JSRegExp keeps the mature .NET translator as the default engine and routes ONLY
+gap-feature patterns that Broiler.Regex can fully handle through it"* — and `GapScan` defines
+"gap" precisely: an astral or lone-surrogate atom under `u`, a back-reference inside a
+look-behind or in Unicode mode, a capturing group inside a look-behind, or a nullable quantifier
+that can repeat. **Octane's `regexp.js` contains no look-behind and no `u` flag at all**, so
+essentially none of the suite reaches `Matching/Matcher.cs`. B5's sentence — *"`Broiler.Regex`'s
+`Matching/Matcher.cs` has no compilation to native code … the same engine sits on PdfJS's and
+Typescript's critical path"* — is describing a component those workloads route around.
+
+**What does serve them is `System.Text.RegularExpressions`, built INTERPRETED.**
+`JSRegExp.ParseFlags` starts from `RegexOptions.ECMAScript` and the pattern is constructed as
+`new Regex(pattern, options)`; **`RegexOptions.Compiled` appears nowhere on the user-regex
+path**, though the engine does use it for `Intl` and `DateParser`. So the phase's own plan —
+"compile the common subset, keeping the interpreter as the fallback" — would be building a
+compiler for a path the benchmark never takes, while the path it *does* take has compilation
+available behind one flag.
+
+**Measured, on seven patterns lifted from `regexp.js` itself**, 200 000 matches each, the same
+`RegexOptions.ECMAScript` the engine ships against that plus `Compiled`:
+
+| Pattern | Interpreted | Compiled | Speedup | Build (interp → compiled) |
+|---|--:|--:|--:|--:|
+| `^ba` | 10.19 ms | 4.72 ms | **2.16×** | 1.2 µs → 6.8 µs |
+| `,` | 9.53 | 4.67 | **2.04×** | 1.0 → 6.3 |
+| `(-[a-z])` | 14.38 | 7.69 | **1.87×** | 2.4 → 13.4 |
+| `[+, ]` | 9.48 | 5.01 | **1.89×** | 1.3 → 6.6 |
+| `TNQP=([^;]*)` | 16.98 | 8.41 | **2.02×** | 1.6 → 12.1 |
+| `[<>]` | 9.27 | 5.01 | **1.85×** | 1.4 → 6.7 |
+| **`^[\s\xa0]+\|[\s\xa0]+$`** | 17.95 | **71.54** | **0.25× — four times SLOWER** | 4.2 → 25.9 |
+
+**Six of seven are worth about 2×, and the seventh is a 4× regression** — which is exactly why
+this is a measurement and not a flag to set globally. Construction costs 5–6× more compiled, but
+in absolute terms 7–26 µs against a pattern Octane builds once and matches hundreds of thousands
+of times, so the trade is not close *where it wins*. A per-pattern decision — compile on the
+second or third use, the way tiering already reasons about functions — is the shape this wants,
+not a blanket option.
+
+**And the largest regex-shaped cost in the engine is not matching at all.** Nine JS-level shapes
+over a 20 000-character subject, net of an inert loop:
+
+| Shape | ns/char | B/char |
+|---|--:|--:|
+| `re.test` miss — literal, class, alternation | 0.13 – 0.35 | ~0.02 |
+| `re.exec` hit with eight captures | 0.80 | 2.23 |
+| `/a*b/` quantifier walk, fails at every position | 0.95 | 0.02 |
+| `String.indexOf` for the same literal *(floor)* | 15.94 | 0.00 |
+| **`subject.replace(/[aeiou]/g, 'x')`** | **1 318** | **10 522** |
+
+The miss rows cost *less than `indexOf`*, which is the clearest possible statement that matching
+is not where the time goes. `replace` with a global flag is **~3 800× the next row in time and
+~4 700× in bytes**: 20 calls allocated **4.21 GB**, i.e. **210 MB per call and ~42 KB per match**
+on a 40 KB subject with 5 000 matches. Time scales only mildly superlinearly (2.3× for a doubled
+subject), so this is **allocation per match**, not an algorithmic blow-up — a match-result object
+built per match, which is the same shape as phase E's quadratic string concatenation and wants
+the same treatment.
+
+**So phase 5 is re-specified, and re-ordered against itself:**
+
+1. **Stop allocating per match on the `replace`/`exec` result path — landed, see below.**
+   Largest measured cost by three orders of magnitude, and it is the one that reaches PdfJS and
+   Typescript — which is what this phase claimed to care about.
+2. **Decide `RegexOptions.Compiled` per pattern** — measured further, and **a use count is not
+   enough to decide it**. See below.
+3. **Only then consider compiling `Broiler.Regex`.** It is correctness-critical for the gap
+   cases and it should stay, but no measurement here puts it on a hot path, and B5's ranking of
+   it was never checked against the routing.
+
+**RegExp's 110× is therefore not evidence about `Matcher.cs`**, and the score should not be
+quoted as if it were until something establishes which engine produced it.
+
+#### Item 1 landed — an Annex B legacy static was copying the subject on every match
+
+The profile said `replace` with a global flag cost **10 522 bytes per subject character**. The
+cause is one line, and it is not in either regex engine.
+
+`RegExpBuiltinExec` calls `LegacyRegExpState.Update` on every **successful** match, to keep
+Annex B §B.2.4's deprecated statics warm — `RegExp.lastMatch`, `RegExp.leftContext`,
+`RegExp.rightContext` and friends. `LeftContext` and `RightContext` **partition the subject
+around the match**, and they were built eagerly:
+
+```csharp
+LastMatch    = input.Substring(startIndex, endIndex - startIndex);
+LeftContext  = input.Substring(0, startIndex);      // O(startIndex)
+RightContext = input.Substring(endIndex);           // O(length - endIndex)
+```
+
+Together those copy the **entire subject, once per successful match**. And
+`RegExp.prototype[@@replace]` is the generic spec path — it calls `exec` once per match — so a
+global replace was **quadratic in allocation**: measured at **42 859 bytes per match**, 204 MB
+for one call over a 40 KB subject with 5 000 matches.
+
+**The fix is to record the span and slice on read.** Nothing needs those substrings until
+somebody reads one, and almost nothing ever does — they are a deprecated compatibility surface.
+
+| | Before | After | |
+|---|--:|--:|--:|
+| `replace(/[aeiou]/g, 'x')` | 10 522 B/char | **504 B/char** | **0.048x** |
+| the same, time | 1 318 ns/char | **397 ns/char** | **0.30x** |
+| `exec` with eight captures | 2.23 B/char | **0.23 B/char** | 0.10x |
+| `test`, matching | 2.22 B/char | **0.22 B/char** | 0.10x |
+| every **miss** row | 0.01 – 0.02 | **unchanged** | — |
+
+The miss rows are the control and they do not move by a byte, which is what identifies the cost
+as *per successful match* rather than per scan.
+
+**What remains, decomposed — and the per-character framing was hiding it.** A `--regex-profile`
+scaling section now reports bytes **per call** at three subject lengths, because 4 400 bytes on a
+20 000-character subject reads as 0.22 B/char whether it scales with the subject or not:
+
+| Operation | 5 000 | 20 000 | 80 000 | Reading |
+|---|--:|--:|--:|---|
+| `test`, matching | 2 051 | 2 351 | 3 551 | **~1 950 B fixed** + 0.02 B/char |
+| `exec`, matching | 1 995 | 2 295 | 3 495 | the same, and the result array is nearly all of it |
+| `replace`, **one** match | 22 635 | 82 935 | 324 135 | **~4 B per subject character** |
+
+So `exec` is **not** proportional to the subject — it is a flat ~2 KB per call, which is the
+result array plus its `index` / `input` / `groups` properties. And a *single* non-global
+`replace` costs four bytes per subject character, which is **two full UTF-16 copies**: the
+`StringBuilder`'s chunks and then its `ToString()`.
+
+Two follow-ups, both sized by those rows and neither started:
+
+- **The single-match replace should not use a builder at all.** `input[0..pos] + replacement +
+  input[end..]` is one `string.Concat` over three spans and one allocation, halving 4 B/char
+  to 2. *Pre-sizing the builder was tried first and is worth 0.2%* — .NET's `StringBuilder`
+  is a chunk list, not a doubling array, so there was no reallocation waste to remove. The
+  change was reverted rather than kept for a rationale that turned out to be wrong.
+- **A global replace retains every result before it builds anything.** §22.2.6.11 collects all
+  matches in step 14 and reads their properties in step 16, so 5 000 matches means 5 000 live
+  result arrays — 5 000 × ~2 KB, which is exactly the ~10 MB per call still measured. Streaming
+  them would change the observable order of `exec` calls against capture reads, so it is only
+  available on a fast path where nothing is patched.
+
+**One hazard the change introduced and closed.** Deferring the slice means `Update` publishes a
+subject and two indices that must agree; three separate field writes would let a reader on
+another thread pair a new subject with the previous match's indices and slice outside it. The
+eager version could not do that — its fields were independent, already-built strings, so a torn
+read returned something stale but valid. They are now one immutable record published by a single
+reference write.
+
+**Verify.** `LegacyRegExpStaticsAllocationTests` asserts the bytes, because nothing about the
+*answers* changes and `Issue845RegExpAndWithTests`' twenty existing cases pass either way — on
+the build without this, the allocation test reports **204.4 MB (42 859 B/match)** against its
+50 MB bound, so it fails by a factor of four. A second test pins that the statics still describe
+the last match, so the allocation test cannot be satisfied by simply not recording them.
+Repository suite **7 563 tests across 13 projects, 3 failures**, the pre-existing win-x64 host
+ones. **test262 unchanged across all four pinned manifests** — 8 220 passed, 84 failed, 9 timed
+out, identical manifest by manifest. **Octane 14 of 15 `ok`**, the same set, with Mandreel's
+failure record byte-identical to the earlier runs.
+
+> **Octane's scores moved the right way and are not claimed.** Across this session's four
+> broiler-only runs RegExp went 131, 126, 132 → **140** and Typescript 2 935, 2 951, 2 998 →
+> **3 257**, so both landed above the spread of the three runs that preceded the change — which
+> is the direction a per-match subject copy disappearing should push the two suites that use
+> regexes most. **One repetition per side cannot separate a change from noise (§3.2)**, and
+> these are single runs on a developer workstation, so what is claimed here is the allocation
+> figure, which is deterministic and exact. The scores are recorded as corroboration and as a
+> reason for 0-6 to look at them.
+
+#### Item 2 measured — and the obvious policy is the wrong one
+
+The single-run table above had one pattern losing badly under `Compiled`. Repeated three times
+it is **stable, not noise**: `/^[\s ]+|[\s ]+$/` — an ordinary *trim* — measures
+**0.236, 0.225, 0.237**, consistently about **4.3× slower compiled**, while the other six sit
+between 1.7× and 2.3× faster.
+
+That kills "compile after N uses", which is the policy this item was about to specify: a trim is
+exactly the kind of pattern a program runs hundreds of thousands of times, so a use counter would
+find it first and make it four times worse.
+
+**So the loss was characterized rather than guessed at**, with four probes decomposing the
+pattern (they are kept in the emitter, since the next attempt needs them):
+
+| Probe | Speedup | |
+|---|--:|---|
+| `^[\s ]+` — anchor + class quantifier | 0.366, 0.365 | **loss** |
+| `[\s ]+$` — the other anchor | 0.464, 0.419 | **loss** |
+| `[\s ]+\|zzz` — **same class, no anchor** | 2.758, 2.938 | big win |
+| `^a+\|b+$` — **anchored alternation, literals** | 3.425, 2.765 | big win |
+
+**It is neither alternation nor anchoring**, which were the two obvious readings — an anchored
+alternation of literal quantifiers is one of the *best* rows in the set. What loses is
+specifically an **anchored character-class quantifier**, and the `trim` pattern is that shape
+twice over.
+
+**No policy is shipped, on purpose.** The rule above is drawn from eleven patterns on one
+runtime, and turning it into "compile unless the pattern begins with an anchored class
+quantifier" would be exactly the kind of heuristic §3.5 warns about — a branch described from
+its intent rather than traced with real numbers. What the next attempt needs, in order: the same
+comparison over a corpus far wider than Octane's, an explanation of *why* the compiled path
+loses that shape (it is .NET's codegen, not this engine's), and only then a predicate. A
+per-pattern decision made by measuring both forms once on the real subject — the way tiering
+already reasons about functions — is the design most likely to survive that, because it needs no
+predicate at all.
+
+> **The RegExp checksum failure 2-8 recorded did not reproduce.** All three Octane runs this
+> session scored it (131, 126, 132) rather than failing `Error: Wrong checksum.`. Left as an
+> observation, not a claim: those are single runs on a different platform from the one that
+> recorded the failure, and nothing here was aimed at it.
+
 ---
 
 ## Sequencing
@@ -2261,11 +2993,11 @@ pinned RegExp corpus is clean.
 | Phase | Order within it | Size | Unblocks / expected effect | Exit gate |
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
-| **1** | 1-2 mitigation ✅ → **1-1** → 1-2 real fix → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
+| **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-1** → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
-| **3** | 3-0 ✅ (both halves) → **3-3** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
-| **4** | **4-3 design first** → 4-1 → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
-| **5** | profile → compile the common subset | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite |
+| **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
+| **4** | 4-3 design ✅ → **4-1** (unblocked) → 4-3a (S) → 4-3b (M–L) → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
+| **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
 **Dependencies.**
 
@@ -2418,7 +3150,7 @@ Where each item came from, so existing cross-references still resolve.
 | §4.1 phase B | P0-2 | — | Implemented, not closed |
 | §4.1 phase C | P1-1, P1-4 | — | Implemented, not closed |
 | §4.1 phase D | P1-2, P1-3 | — | Implemented, not closed |
-| §4.1 phase E | P2-1, P2-2 (+ engine §6.5 array defects) | — | Implemented, not closed |
+| §4.1 phase E | P2-1, P2-2 (+ engine §6.5 array defects) | — | Implemented, not closed. **P2-2 item 3 shipped a wrong-answer bug**, found and fixed while working 3-3's successor: two writes to a numeric local were invisible to the analysis proving it numeric — a `var` re-declared in a nested statement, and any name bound through an object destructuring pattern. The first returned NaN; the second aborted compilation of the whole script with an unhandled `NotImplementedException`. See 3-3 |
 | §4.1 phase F | P2-3, P2-4, P3 | — | Implemented, not closed |
 | 0-1 … 0-5 | — | 0-1 … 0-5 | Implemented |
 | 0-6 | — | Octane §2.6 | **Owed** |
@@ -2426,7 +3158,7 @@ Where each item came from, so existing cross-references still resolve.
 | 0-10, 0-11 | engine §8.1, §8.2 | — | Done |
 | 1-1, 1-3 | *excluded by engine §9* | 1-1, 1-3 | Open — superseded, see §1.1 |
 | 1-2 mitigation | *excluded by engine §9* | 1-2 | **Landed** — `43bc4230`, in the pinned pointer |
-| 1-2 real fix | — | 1-2 | Open — repair `StackGuard`, which cannot fire today |
+| 1-2 real fix | — | 1-2 | **Landed on all three recursing passes.** `StackGuard` was repaired and put on `AstMapVisitor.Visit`; `FastParser.Expression` is now guarded too, which was the last one — its descent aborted the process at 25 000 nesting levels in the DEFAULT configuration and now survives 90 000, median paired ratio 0.9993. The four-way matrix's "mitigation off / guard on" row is a **linux-x64** statement: on win-x64 the front end compiles in place on ~1 MiB while the threshold is 4 MiB, so no segmenter can fire there |
 | 2-0 | — (P1-2's guard, reached in a state it cannot recognise) | — | **Landed** — `2df877a0`, in the pinned pointer |
 | 2-1 | P1-3 remainder | 2-1 | **Landed** — `5d31617a`, in the pinned pointer; **test262 owed** |
 | 2-4 | P1-3 remainder | 2-4 | **Landed, both halves** — `f9c2193f` (`o.x++`) and `c5842c9d` (`o.x op= rhs`), both in the pinned pointer; computed keys, `super`, optional chains, private names and the three short-circuiting compound forms stay out on purpose |
@@ -2440,10 +3172,10 @@ Where each item came from, so existing cross-references still resolve.
 | 3-0 | — (found measuring 3-1) | — | **Landed, both halves** — an indexed access boxed its index. A read now allocates **0.00 B/element** against 31.67 and a write loses ~32 B; write-once-read-once goes 0.46x for a numeric element and 0.25x for a reference one. Compound assignment keeps its boxed index, on purpose |
 | 3-1 | — | 3-1 | **Open, re-specified on a measurement** — trades 32 B of write allocation for 32 B of read allocation, so it is a live-memory item (a resident `double[1e6]` ~0.2x) whose throughput case is contingent on 3-4 |
 | 3-2 | — | 3-2 | Open |
-| 3-3 | P2-2 item 3 remainder | 3-3 | Open |
+| 3-3 | P2-2 item 3 remainder | 3-3 | **Parameters landed; `let`/`const` and block `var` open and re-ranked ahead of them.** Measured before starting, and the item was right about the target and wrong about the tier: a parameter was excluded from the *scalar* gate, not the numeric one, so it allocated a `JSVariable` cell on every call — **56 B per parameter, a three-parameter call 230.2 → 62.2 B**. The numeric tier cannot be widened to parameters at all, because the caller picks the type; that is phase 4. All four ineligible categories cost the same per site, so the item's ordering was never a cost claim |
 | 3-4 | — (`tagged-js-value` in ownership.json) | 3-4 | Cost, do not start |
-| 4-1 … 4-4 | *excluded by engine §9* | 4-1 … 4-4 | Open — superseded, see §1.1 |
-| 5 | — | Octane §7 "regex, until late" | Open |
+| 4-1 … 4-4 | *excluded by engine §9* | 4-1 … 4-4 | Open — superseded, see §1.1. **4-3's design is written**: the item asked for V8-style frame reconstruction, which this engine cannot express (tier-1 locals are CLR locals of an IL method, and `CallFrame` carries no JavaScript values). Re-specified as restart (shipping in the pilot) plus an in-method fallback branch |
+| 5 | — | Octane §7 "regex, until late" | **Profiled — gate satisfied, phase re-specified.** `Matching/Matcher.cs` is not on the Octane path at all (only semantic-gap patterns route to it); the default engine is .NET's, built without `RegexOptions.Compiled`. B5's ranking of the closure matcher was never checked against the routing |
 | Lazy frame materialization | P3 remainder | — | Candidate, not a task — no measured cost to remove |
 
 **Status of the three source documents.**
