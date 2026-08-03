@@ -1,0 +1,84 @@
+From 5786ea936a944f8011881f8fa1028136911fc22c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 3 Aug 2026 11:00:27 +0000
+Subject: [PATCH] Stop a redundant prototype write from retiring every
+ prototype cache
+
+Decomposing DeltaBlue's cache misses found that a class instantiation published
+a global prototype-chain invalidation once per allocation -- 2 002 for 2 000 --
+where a function constructor published 1. That is item 2-0's defect surviving on
+a path 2-0 did not cover.
+
+The two obvious sites in JSClass.CreateInstance were already correct: the
+instance is built with new JSObject(instancePrototype), carrying 2-0's own
+comment. What publishes is the re-apply afterwards -- assigning the prototype the
+constructor had already installed. prototypeChain is non-null by then, so the
+setter reads it as a [[SetPrototypeOf]] on a live object.
+
+The fix is to notice the chain did not change. Every assumption the prototype
+version guards is about which chain an object has; after a redundant write it
+has the same one, so nothing cached is stale. The setter now compares the
+resulting chain with the previous one and publishes only on a real change --
+fixing the class path, the derived-class path and any other redundant assignment
+at once rather than patching call sites one at a time.
+
+Per n allocations: class 2 002 -> 0, function 1 -> 0, derived class 2 flat.
+
+On the real Octane suites the effect is much larger than the class case
+suggested, because the retirement was process-wide -- one redundant write
+anywhere retired every prototype-keyed entry everywhere. Exact counts:
+
+  Richards   invalidations   37 -> 10     read hit rate  86.61% -> 99.97%
+  DeltaBlue  invalidations 2519 -> 16     read hit rate  65.96% -> 69.45%
+  Box2D      invalidations 1944 -> 107    read hit rate  96.39% -> 97.72%
+
+Richards goes from missing one read in seven to one in three thousand. Every
+phase 2 probe measured the machinery in isolation, where the storm does not
+exist, and all of them reported it working.
+
+Scores moved the right way and are NOT claimed: Richards 143 -> 168 and
+DeltaBlue 122 -> 125 over five repetitions per engine, with Richards's +17%
+inside its own 15.5% band. DeltaBlue still FAILS phase 2's exit criterion at
+516x against the 200x gate.
+
+Repository suite 7 563 tests across 13 projects, 0 failures. test262 unchanged
+across all four pinned manifests -- 8 313 / 8 220 / 84 / 44 / 9, identical
+manifest by manifest. test262-arrays matters doubly because the same version
+gates JSArray's dense-element fast path; properties-proxy and realm-isolation
+are where a wrongly-skipped invalidation would surface. Octane 15 of 15 ok.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+index 32623781..bff26e7b 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+@@ -68,9 +68,20 @@ public partial class JSObject : JSValue
+             // version itself. Bumping unconditionally made the prototype version advance once
+             // per object allocation, which would leave any prototype-keyed cache permanently
+             // invalid in a loop that allocates. See docs/performance-roadmap.md P1-2.
+-            var replacingExistingPrototype = prototypeChain != null;
++            var previousChain = prototypeChain;
+             prototypeChain = prototype?.PrototypeObject;
+-            if (replacingExistingPrototype || isUsedAsPrototype)
++
++            // A write that does not CHANGE the chain invalidates nothing. Every cached
++            // assumption guarded by the prototype version is about which chain this object
++            // has, and after a redundant write it still has the same one. Without this test a
++            // re-assignment of the prototype an object already had — which class construction
++            // does once per `new`, re-applying the newTarget-derived prototype the constructor
++            // had already installed — retired every prototype-keyed inline-cache entry in the
++            // process. That is item 2-0's defect surviving on the class path: 2-0 removed the
++            // second write in JSFunction's OrdinaryCreateFromConstructor and JSClass removed
++            // its own at construction, but the later re-apply still read as a mutation.
++            var chainChanged = !ReferenceEquals(previousChain, prototypeChain);
++            if (chainChanged && (previousChain != null || isUsedAsPrototype))
+                 NotifyPrototypeChainMutation();
+ 
+             PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, null));
+-- 
+2.43.0
+

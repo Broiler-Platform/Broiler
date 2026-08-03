@@ -21,9 +21,40 @@ Delete the patch file and its row below once the pointer is bumped.
 
 ## Index
 
-**Empty — nothing is pending.** The ten `Broiler.JS` patches this file carried
-(`0049`–`0058`) have all been applied and their pointer bumped; they are listed under
-*Recently cleared* below with the commit each landed as.
+| Patch | Submodule | Note |
+| --- | --- | --- |
+| `0059-js-single-match-replace-one-allocation` | `Broiler.JS` | Phase 5's first follow-up to item 1. A single-match `replace` assembled its answer through a `StringBuilder`, costing two full UTF-16 copies of the subject — into the chunk list, then back out through `ToString()`. `string.Concat` over three spans writes it in one allocation: **4.020 → 2.020 bytes per subject character**, exactly the predicted halving, in `RegExp.prototype[@@replace]` *and* in `String.prototype.replace`'s string-`searchValue` builtin, which had the same three appends into a builder that was already sized exactly right. Adds `SingleMatchReplaceAllocationTests` (41 cases) and a `replace-one-string` profile row. |
+| `0060-js-stream-global-replace` | `Broiler.JS` | Phase 5's second follow-up. §22.2.6.11 collects every match before reading any of their properties, so a global replace held one result array per match live — **2 032.8 bytes per match, dead linear**, 10.3 MB for one 5 000-match call. Streams instead when nothing can observe the results: the receiver's `exec` is the pristine `%RegExp.prototype.exec%` captured at realm init, the replacement is a string, and it contains no `$`. **478.3 B/match, 0.235x.** Splits `Exec` into `ExecMatch` + `BuildExecResult` so both paths share the `lastIndex`/sticky/statics code, and adds `JSContext.IntrinsicRegExpExec` and `GlobalReplaceStreamingTests` (23 cases). **Apply after `0059` — it builds on the same function.** |
+
+| `0061-js-measure-2-9-materialization-cause` | `Broiler.JS` | Measurement and instrumentation only, **no behaviour change**. Item 2-9's losing-side hypothesis said the Annex B deferred cells force the trie rebuild; a *strict* function is the control it never had, and it rebuilds just as much — **1.00 per function on all four rows**. What materializes is the `prototype` install, withheld from shape-only storage by 2-8's DeltaBlue fix, so the planned "stop materializing for a deferred cell" follow-up is withdrawn before being built. Adds `--deferred-cell-cost` and a `RecordNamedPropertiesMaterialized` counter. **Independent of `0059`/`0060`** — different files, applies in any order. |
+
+| `0062-js-array-length-keeps-shape` | `Broiler.JS` | Item 2-10. `JSArray.SetLengthWritable` recorded a `length` descriptor through `GetOwnProperties()`, which **abandons the object's shape permanently** — and it is on the grow path, so `push`, `pop` and `concat` each cost an array its shape on first use. A writable `length` needs no descriptor at all (`IsLengthReadOnly` reads absence as writable; the stored value is never read back). **DeltaBlue's dictionary fallbacks 2 503 → 0**, and a named property on a grown array keeps hitting its cache. Honest limit: DeltaBlue's read hit rate and score do **not** move, so this is not the explanation for its 576×. **Requires `0061` to compile.** |
+
+| `0063-js-prototype-rewrite-no-invalidate` | `Broiler.JS` | Item 2-11. A write that re-applies the prototype an object **already has** read as a `[[SetPrototypeOf]]` on a live object and retired **every** prototype-keyed inline-cache entry in the process — class construction did it once per `new` (2 002 invalidations for 2 000 allocations). The setter now publishes only when the chain actually changes. Because the retirement was process-wide the effect is far wider than the class case: **Richards's read cache hit rate 86.61% → 99.97%**, DeltaBlue 65.96% → 69.45%, Box2D 96.39% → 97.72%; invalidations 37 → 10, 2 519 → 16, 1 944 → 107. One file, one condition; independent of `0059`–`0062`. |
+
+| `0064-js-refresh-stale-cache-entry` | `Broiler.JS` | Item 2-12. The property inline cache's add path deduplicated on `ShapeId` + `Holder`, while a hit checked those **plus four more guards**. When one went stale the read missed, reached the add path, was told the entry was "already present", and returned without replacing it — so that site missed on that receiver **for the rest of the process**. 77.7% of DeltaBlue's misses. Refreshing in place takes **DeltaBlue's read hit rate 69.45% → 93.16%** (misses 306 004 → 68 534) and Box2D's 97.72% → 98.83%. Also adds the miss-reason counters the attribution needed. **Requires `0061` and `0062` to compile.** |
+
+The ten `Broiler.JS` patches this file previously carried (`0049`–`0058`) have all been
+applied and their pointer bumped; they are listed under *Recently cleared* below with the
+commit each landed as.
+
+**`0059`–`0064` are pending against the pinned pointer `2ebc0c3c`.** All six apply cleanly in
+numeric order, and the full stack builds. Two ordering constraints are real:
+
+- **`0060` after `0059`** — it touches the function `0059` restructures, so out of order they
+  conflict textually.
+- **`0064` after `0061` and `0062`** — it reads `0061`'s counters and extends `0062`'s emitter.
+- **`0062` after `0061`** — `0062` applies cleanly on its own but will **not compile** without
+  `0061`, because its new `--suite-cache-metrics` emitter reads the
+  `NamedPropertiesMaterializations` counter `0061` adds. A textual check is not enough here;
+  build after applying.
+
+Each push to `Broiler-Platform/Broiler.JS` returned 403 from the session's git proxy, so the
+pointer is deliberately *not* bumped. None of the six needs a main-repo fallback: `0059` and
+`0060` are allocation reductions with no behaviour difference, so CI is correct without them and
+only more allocating; `0061` adds a benchmark emitter and an opt-in counter that is off unless
+`PropertyOptimizationDiagnostics.Enabled` is set; and `0062`, `0063` and `0064` remove pessimizations, so
+without them CI is correct and only slower.
 
 ## Recently cleared
 

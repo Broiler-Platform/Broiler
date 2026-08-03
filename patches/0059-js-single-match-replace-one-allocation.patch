@@ -1,0 +1,339 @@
+From aca06ebe2de0212eebd237c1eb252fd1d72cffd6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 2 Aug 2026 23:19:36 +0000
+Subject: [PATCH] Assemble a single-match replace with one allocation, not a
+ builder
+
+RegExp.prototype[@@replace] accumulated into a StringBuilder whatever the match
+count. For one match the answer is exactly prefix + replacement + suffix, so
+string.Concat over three spans writes it into ONE allocation of the final
+length, and the builder's two copies -- into its chunk list, then back out
+through ToString() -- become one.
+
+Measured per call at three subject lengths, both sides built from the same tree:
+4.020 -> 2.020 bytes per subject character, exactly the halving the previous
+decomposition predicted. Getting exactly half is the load-bearing part: it
+confirms the 4 B/char was two copies of the subject and nothing else. The test
+and exec rows are byte-identical on both sides and are the control.
+
+The same three-append assembly was one file over, in String.prototype.replace's
+string-searchValue path -- a different builtin that never reaches @@replace and
+replaces only the first occurrence, so it is single-match by construction. Its
+builder was already sized exactly right, which is the cleanest case for why
+pre-sizing does not help: it halved by the same amount, 4.020 -> 2.020. Found by
+reading the neighbouring builtin, not by the profile, which had no row for it;
+--regex-profile now carries replace-one-string beside replace-one.
+
+A global regexp that matches once takes the fast path too -- the gate is
+results.Count == 1, not the g flag -- and step 16.p's backwards-position guard
+cannot apply to a single result, so the fast path is the loop's behaviour rather
+than an approximation of it. Step 16's observable property read order is kept in
+one shared local function so it cannot drift between the two paths.
+
+SingleMatchReplaceAllocationTests asserts the bytes and fails on the build
+without the change (95 881 B/call against a 60 000 bound); its answer cases pass
+on both builds, which makes them regression guards rather than change detectors.
+Repository suite 7 604 tests across 13 projects, 0 failures. test262 unchanged
+across all four pinned manifests -- 8 313 executed, 8 220 passed, 84 failed, 44
+skipped, 9 timed out, identical manifest by manifest. The pinned manifests carry
+no replace coverage, so the touched paths were run separately control against
+change: 499 tests, 484 passed, 13 failed, 2 timed out, failing set identical
+file for file, and no failure in a replace directory.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ .../BuiltInsAssemblyInitializer.cs            |  32 ++-
+ .../String/JSStringPrototype.Pattern.cs       |  14 +-
+ .../SingleMatchReplaceAllocationTests.cs      | 189 ++++++++++++++++++
+ .../RegexProfileMetrics.cs                    |   4 +
+ 4 files changed, 230 insertions(+), 9 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Integration.Tests/SingleMatchReplaceAllocationTests.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/BuiltInsAssemblyInitializer.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/BuiltInsAssemblyInitializer.cs
+index 9eba4e47..b14693ea 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/BuiltInsAssemblyInitializer.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/BuiltInsAssemblyInitializer.cs
+@@ -1650,9 +1650,12 @@ internal static class BuiltInsAssemblyInitializer
+             if (results.Count == 0)
+                 return JSValue.CreateString(input);
+ 
+-            var accumulatedResult = new StringBuilder();
+-            var nextSourcePosition = 0;
+-            foreach (var result in results)
++            // §22.2.6.11 step 16 for one result. Extracted so the single-match fast path
++            // below and the accumulating loop read the result's properties in exactly the
++            // same observable order — the order test262 sm/RegExp/replace-trace pins. It is
++            // called directly and never as a delegate, so the capture is a struct closure
++            // and costs no allocation.
++            (int Position, string Matched, string Replacement) OneReplacement(JSValue result)
+             {
+                 // §22.2.6.11 step 16 evaluates the result properties in this exact order:
+                 // LengthOfArrayLike ("length") → Get "0" → Get "index" → captures loop
+@@ -1710,6 +1713,29 @@ internal static class BuiltInsAssemblyInitializer
+                     replacement = GetSubstitution(matched, input, position, captures, normalizedNamedCaptures, replacementText);
+                 }
+ 
++                return (position, matched, replacement);
++            }
++
++            // A single match needs no builder. The result is exactly prefix + replacement +
++            // suffix, and string.Concat writes those three spans into one allocation of the
++            // final length; the builder path costs two full copies of the subject — its
++            // chunks, then ToString() — which measured ~4 bytes per subject character. The
++            // step 16.p guard below cannot apply here: nextSourcePosition is still 0 on the
++            // first result and position is clamped to [0, lengthS], so position >= 0 holds.
++            if (results.Count == 1)
++            {
++                var (position, matched, replacement) = OneReplacement(results[0]);
++                var sourceTail = Math.Min(position + matched.Length, input.Length);
++                return JSValue.CreateString(string.Concat(
++                    input.AsSpan(0, position), replacement.AsSpan(), input.AsSpan(sourceTail)));
++            }
++
++            var accumulatedResult = new StringBuilder();
++            var nextSourcePosition = 0;
++            foreach (var result in results)
++            {
++                var (position, matched, replacement) = OneReplacement(result);
++
+                 // §22.2.6.11 step 16.p: only accumulate the replacement when position has
+                 // not moved backwards. An ill-behaving subclass whose exec returns a result
+                 // with index < nextSourcePosition (e.g. the test262 g-pos-decrement case)
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/String/JSStringPrototype.Pattern.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/String/JSStringPrototype.Pattern.cs
+index 4576f0ce..7d434677 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/String/JSStringPrototype.Pattern.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/String/JSStringPrototype.Pattern.cs
+@@ -136,12 +136,14 @@ public partial class JSString
+                 CreateString(substr), CreateNumber(start), CreateString(@this))).StringValue
+             : GetSubstitution(substr, @this, start, replacementTemplate);
+ 
+-        // Replace only the first match.
+-        var result = new StringBuilder(@this.Length + (replaceText.Length - substr.Length));
+-        result.Append(@this, 0, start);
+-        result.Append(replaceText);
+-        result.Append(@this, end, @this.Length - end);
+-        return new JSString(result.ToString());
++        // Replace only the first match — so the answer is exactly prefix + replacement + suffix,
++        // and string.Concat writes those three spans into ONE allocation of the final length.
++        // A StringBuilder here cost two full copies of the subject (into its chunk list, then
++        // back out through ToString()) even though it was pre-sized: .NET's StringBuilder is a
++        // chunk list rather than a doubling array, so pre-sizing never removed the second copy.
++        // Same change, and same reason, as RegExp.prototype[@@replace]'s single-match path.
++        return new JSString(string.Concat(
++            @this.AsSpan(0, start), replaceText.AsSpan(), @this.AsSpan(end)));
+     }
+ 
+     [JSPrototypeMethod]
+diff --git a/Broiler.JS/Broiler.JavaScript.Integration.Tests/SingleMatchReplaceAllocationTests.cs b/Broiler.JS/Broiler.JavaScript.Integration.Tests/SingleMatchReplaceAllocationTests.cs
+new file mode 100644
+index 00000000..bd716b20
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Integration.Tests/SingleMatchReplaceAllocationTests.cs
+@@ -0,0 +1,189 @@
++using System;
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Integration.Tests;
++
++// RegExp.prototype[@@replace] accumulated its output into a StringBuilder even when there was
++// exactly one match. .NET's StringBuilder is a chunk list, so that costs two full UTF-16 copies
++// of the subject — the chunks, and then ToString() flattening them — which the --regex-profile
++// scaling rows measured as ~4 bytes per subject character.
++//
++// A single match needs no builder at all: the answer is exactly prefix + replacement + suffix,
++// and string.Concat writes those three spans into ONE allocation of the final length. That is
++// the 4 B/char -> 2 B/char halving these tests pin.
++//
++// The allocation is asserted in bytes rather than as a ratio because nothing about the ANSWERS
++// changes — so the second test class below pins the answers across the edges the fast path now
++// owns, and the allocation bound cannot be satisfied by returning something cheaper and wrong.
++// See docs/performance-roadmap.md phase 5.
++public class SingleMatchReplaceAllocationTests
++{
++    private const int Calls = 200;
++
++    // The needle sits in the MIDDLE, so both slices the fast path takes are non-empty and a
++    // regression that drops either one fails the answers test rather than passing quietly.
++    private static readonly string Source = $$"""
++        (function () {
++            var subject = 'a'.repeat(10000) + 'zqx' + 'a'.repeat(10000);
++            var re = /zqx/;
++            var sink = 0;
++            for (var i = 0; i < {{Calls}}; i++) { sink = subject.replace(re, 'y').length; }
++            return sink;
++        })()
++        """;
++
++    [Fact]
++    public void ASingleMatchReplaceDoesNotBuildTheSubjectTwice()
++    {
++        using var context = new JSContext();
++
++        // Warmed first: the compile, the pattern's construction and the inline-cache entries are
++        // one-time and would otherwise land in the delta.
++        Assert.Equal(20_001, (int)context.Eval(Source).DoubleValue);
++
++        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
++        GC.WaitForPendingFinalizers();
++        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
++
++        var before = GC.GetAllocatedBytesForCurrentThread();
++        Assert.Equal(20_001, (int)context.Eval(Source).DoubleValue);
++        var bytes = (GC.GetAllocatedBytesForCurrentThread() - before) / (double)Calls;
++
++        // A 20 003-character subject. Two copies measured ~82 900 B/call, one copy measures
++        // ~42 800 — the ~2 400 B of fixed per-call cost (the exec result array and its
++        // index / input / groups) is in both. The bound sits between them with roughly 40% of
++        // headroom each way, so it fails clearly before the change and is not tight after it.
++        const double Bound = 60_000;
++        Assert.True(
++            bytes < Bound,
++            $"expected under {Bound:N0} B per call for a single-match replace on a 20 003-character "
++                + $"subject, got {bytes:N0} B; building it through a StringBuilder copies the "
++                + "subject twice and costs ~82 900 B");
++    }
++}
++
++// The answers, across the edges the single-match fast path now owns. Every case here has exactly
++// one match, so every one of them takes it — including the global regexp, whose result list is
++// length 1 and which therefore no longer reaches the accumulating loop.
++public class SingleMatchReplaceAnswerTests
++{
++    [Theory]
++    // Position 0 and end-of-subject, where one of the two slices is empty.
++    [InlineData("'abc'.replace(/a/, 'X')", "Xbc")]
++    [InlineData("'abc'.replace(/c/, 'X')", "abX")]
++    [InlineData("'abc'.replace(/abc/, 'X')", "X")]
++    [InlineData("'abc'.replace(/b/, 'X')", "aXc")]
++    // An empty match consumes nothing, so the suffix must start where the prefix ended.
++    [InlineData("'abc'.replace(/(?:)/, 'X')", "Xabc")]
++    [InlineData("'abc'.replace(/(?=b)/, 'X')", "aXbc")]
++    [InlineData("''.replace(/(?:)/, 'X')", "X")]
++    // An empty replacement is a pure deletion.
++    [InlineData("'abc'.replace(/b/, '')", "ac")]
++    // A GLOBAL regexp that matches exactly once takes the fast path too.
++    [InlineData("'abc'.replace(/b/g, 'X')", "aXc")]
++    [InlineData("'abc'.replace(/z/g, 'X')", "abc")]
++    // No match at all returns the subject unchanged, before the fast path is reached.
++    [InlineData("'abc'.replace(/z/, 'X')", "abc")]
++    // The $ substitutions, which are computed before the slicing and must be unaffected by it.
++    [InlineData("'abc'.replace(/b/, '[$&]')", "a[b]c")]
++    [InlineData("'abc'.replace(/b/, '[$`]')", "a[a]c")]
++    [InlineData("'abc'.replace(/b/, \"[$']\")", "a[c]c")]
++    [InlineData("'abc'.replace(/b/, '[$$]')", "a[$]c")]
++    [InlineData("'abc'.replace(/(b)/, '[$1]')", "a[b]c")]
++    [InlineData("'abc'.replace(/(?<mid>b)/, '[$<mid>]')", "a[b]c")]
++    // A functional replacer receives match, captures, position and the whole subject.
++    [InlineData("'abc'.replace(/b/, function (m, p, s) { return m + p + s; })", "ab1abcc")]
++    [InlineData("'abc'.replace(/(b)/, function (m, c, p, s) { return c + p; })", "ab1c")]
++    // Surrogate pairs: the slices are UTF-16 index based, so a match between them must not
++    // split one. 😀 is U+1F600.
++    [InlineData("'x\\uD83D\\uDE00y'.replace(/y/, 'Z')", "x😀Z")]
++    [InlineData("'x\\uD83D\\uDE00y'.replace(/x/, 'Z')", "Z😀y")]
++    [InlineData("'\\uD83D\\uDE00'.replace(/\\uD83D\\uDE00/u, 'Z')", "Z")]
++    public void TheAnswerIsUnchanged(string source, string expected)
++    {
++        using var context = new JSContext();
++        Assert.Equal(expected, context.Eval(source).ToString());
++    }
++
++    [Theory]
++    // String.prototype.replace with a STRING searchValue is a different builtin — it never
++    // reaches @@replace — and it replaces only the first match, so it is single-match by
++    // construction. It had the same three-append assembly through a pre-sized StringBuilder.
++    [InlineData("'abc'.replace('a', 'X')", "Xbc")]
++    [InlineData("'abc'.replace('c', 'X')", "abX")]
++    [InlineData("'abc'.replace('abc', 'X')", "X")]
++    [InlineData("'abc'.replace('b', 'X')", "aXc")]
++    [InlineData("'abc'.replace('b', '')", "ac")]
++    [InlineData("'abc'.replace('', 'X')", "Xabc")]
++    [InlineData("'abc'.replace('z', 'X')", "abc")]
++    // Only the FIRST occurrence goes, which is what makes the path single-match.
++    [InlineData("'abab'.replace('a', 'X')", "Xbab")]
++    // The $ substitutions expand against the string match too.
++    [InlineData("'abc'.replace('b', '[$&]')", "a[b]c")]
++    [InlineData("'abc'.replace('b', '[$`]')", "a[a]c")]
++    [InlineData("'abc'.replace('b', \"[$']\")", "a[c]c")]
++    [InlineData("'abc'.replace('b', '[$$]')", "a[$]c")]
++    // A functional replacer receives (matched, position, subject).
++    [InlineData("'abc'.replace('b', function (m, p, s) { return m + p + s; })", "ab1abcc")]
++    // Surrogate pairs must not be split by the slices.
++    [InlineData("'x\\uD83D\\uDE00y'.replace('y', 'Z')", "x😀Z")]
++    [InlineData("'\\uD83D\\uDE00'.replace('\\uD83D\\uDE00', 'Z')", "Z")]
++    public void TheStringSearchValueAnswerIsUnchanged(string source, string expected)
++    {
++        using var context = new JSContext();
++        Assert.Equal(expected, context.Eval(source).ToString());
++    }
++
++    [Fact]
++    public void AnIllBehavingExecReportingAnIndexPastTheSubjectIsStillClamped()
++    {
++        // §22.2.6.11 step 16.f-g clamps position to [0, lengthS]. The fast path slices the
++        // subject with it, so an unclamped value would throw ArgumentOutOfRangeException out of
++        // string.Concat rather than produce the spec's answer.
++        using var context = new JSContext();
++        var answer = context.Eval("""
++            var re = /b/;
++            re.exec = function () { return { length: 1, 0: 'b', index: 9999 }; };
++            'abc'.replace(re, 'X')
++            """).ToString();
++
++        Assert.Equal("abcX", answer);
++    }
++
++    [Fact]
++    public void ASingleMatchStillRecordsTheLegacyStatics()
++    {
++        // The fast path returns before the accumulating loop, so it has to leave everything that
++        // is not the output string exactly as it was — the Annex B statics among them.
++        using var context = new JSContext();
++        var answer = context.Eval("""
++            'aXb'.replace(/X/, '-');
++            [RegExp.lastMatch, RegExp.leftContext, RegExp.rightContext, RegExp.input].join('|')
++            """).ToString();
++
++        Assert.Equal("X|a|b|aXb", answer);
++    }
++
++    [Fact]
++    public void ThePropertyReadOrderOnTheResultIsUnchanged()
++    {
++        // §22.2.6.11 step 16 reads length -> "0" -> index -> captures -> groups, and the order is
++        // observable through a Proxy result (test262 sm/RegExp/replace-trace). Extracting the
++        // per-result work into a local function so the fast path and the loop share it is what
++        // keeps this to one copy; this pins that the order survived the extraction.
++        using var context = new JSContext();
++        var answer = context.Eval("""
++            var seen = [];
++            var target = { length: 2, 0: 'b', 1: 'B', index: 1, groups: undefined };
++            var proxy = new Proxy(target, {
++                get: function (t, k) { seen.push(String(k)); return t[k]; }
++            });
++            var re = /b/;
++            re.exec = function () { return proxy; };
++            'abc'.replace(re, '[$1]');
++            seen.join(',')
++            """).ToString();
++
++        Assert.Equal("length,0,index,1,groups", answer);
++    }
++}
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/RegexProfileMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/RegexProfileMetrics.cs
+index f808ecec..da105b09 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/RegexProfileMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/RegexProfileMetrics.cs
+@@ -183,6 +183,10 @@ internal static class RegexProfileMetrics
+                 ("test-hit", "var re = /zqx/;", "sink = re.test(subject);"),
+                 ("exec-hit", "var re = /zqx/;", "sink = re.exec(subject) !== null;"),
+                 ("replace-one", "var re = /zqx/;", "sink = subject.replace(re, 'y').length;"),
++                // The same single replacement reached through a STRING searchValue, which is a
++                // different builtin (String.prototype.replace's own path, not @@replace) that had
++                // the same two-copy assembly. Kept alongside so the two cannot drift apart.
++                ("replace-one-string", "", "sink = subject.replace('zqx', 'y').length;"),
+             })
+             {
+                 rows.Add(MeasureCalls($"{name}@{length}", length, setup, body));
+-- 
+2.43.0
+

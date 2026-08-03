@@ -21,10 +21,23 @@ so only the parent can hold the combined view.
 - **Acceptance protocol:** unchanged and unchallenged —
   [`Broiler.JS/docs/performance.md`](../Broiler.JS/docs/performance.md) governs what
   may be *claimed*. **Nothing in this document closes on the numbers it quotes.**
-- **Provenance:** the pinned submodule pointer is **`71dda1b7`**, checked 2026-08-02 against
-  the gitlink rather than against the prose. `a6f101cc` — which this section named until 3-3
+- **Provenance:** the pinned submodule pointer is **`2ebc0c3c`**, checked 2026-08-02 against
+  the gitlink rather than against the prose — **and checking it is what caught that this line
+  said `71dda1b7`**, which the pointer had moved past. `71dda1b7` is an **ancestor** of the
+  current pin, so nothing recorded against it is invalidated; the correction is to the prose,
+  not to any measurement — which is exactly the failure mode the rule two sentences down
+  already names, caught by applying it. **Phase 5's two `replace` changes are *not* in the
+  pin**: their pushes to the submodule remote returned 403, so they are carried as
+  [`patches/0059`](../patches/0059-js-single-match-replace-one-allocation.patch) and
+  [`patches/0060`](../patches/0060-js-stream-global-replace.patch) — **in that order**, since
+  `0060` builds on the function `0059` restructures — and the pointer is deliberately unbumped.
+  Their figures below were measured on a local build of `2ebc0c3c` **plus** those patches,
+  control and change from the same tree. **Item 2-9's follow-up measurement is
+  [`patches/0061`](../patches/0061-js-measure-2-9-materialization-cause.patch)**, independent of
+  those two and measured on the pin alone.
+  `a6f101cc` — which this section named until 3-3
   was worked, and which every §0 and phase-2 measurement below was taken at — is an **ancestor**
-  of it, six commits back (`merge-base --is-ancestor`), so nothing recorded here is invalidated;
+  of it (`merge-base --is-ancestor`), so nothing recorded here is invalidated;
   what moved on top of it is 2-9, 3-0, 1-2's visitor stack guard and the script-host shell
   joining the solution. **A pointer written into prose goes stale silently**, which is why
   §4.1's and §3.4's figures below carry the commit they were taken at rather than "the pin".
@@ -58,12 +71,12 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 
 | Phase | State |
 |---|---|
-| **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is the critical path** — it is what phases A–F need to close on, and what phase 2's exit criterion is measured by. 0-7, 0-8 follow it |
+| **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is still the critical path, but its headline question is answered**: run at the pinned pointer on linux-x64, Octane is **15 of 15 suites `ok` and 17 of 17 scores** — Mandreel included, which the previous local pass had failing. Geomean 217, spread **113×** against a same-machine Chromium reference. What 0-6 still owes is the *workflow* run plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce |
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
-| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
+| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. Then **2-12** found why the misses that remained could never heal: the cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — **77.7% of DeltaBlue's misses**. Refreshing in place takes **DeltaBlue's read hit rate to 93.16%** (65.96% before both fixes) and Box2D's to 98.83%. **DeltaBlue still fails the gate at 447×**, but the cache is no longer the reason, and what remains is not property-cache-shaped Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
-| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time** |
+| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. The global case's retained result list then landed too — **2 032.8 → 478.3 B per match**, dead linear on both sides, by streaming when the receiver's `exec` is the pristine intrinsic and the replacement is a `$`-free string. **Every follow-up this phase named is now closed**; what is left is item 2's `Compiled` policy, deliberately unshipped |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
 wall-clock figure is a median of interleaved process-granularity pairs against a control, per §3:
@@ -166,11 +179,15 @@ source documents ended up disagreeing.
 
 ### 2.1 The suite view — three numbers per Octane run
 
-| Metric | Last committed run | Target |
-|---|---|---|
-| **Scores reported** out of 17 | 12 / 17 (stale) | **17 / 17** |
-| **Geomean** over all 17 scores | 245 over the 12 that completed; ≈244 including the five *(0046)* measurements | — |
-| **Spread** = worst ÷ best, as ×-slower-than-Chromium | 4646 / 45 ≈ **103×** | **< 5×** |
+| Metric | Last committed run | **At the pin, linux-x64 (§Phase 0)** | Target |
+|---|---|---|---|
+| **Scores reported** out of 17 | 12 / 17 (stale) | **17 / 17** — 15 of 15 suites `ok` | **17 / 17** |
+| **Geomean** over all 17 scores | 245 over the 12 that completed; ≈244 including the five *(0046)* measurements | **217** over all 17 | — |
+| **Spread** = worst ÷ best, as ×-slower-than-Chromium | 4646 / 45 ≈ **103×** | 3 097 / 27 ≈ **113×** | **< 5×** |
+
+The middle column is a single repetition on a developer container with its **own** Chromium
+reference measured on the same machine, so its ratios are internally valid while its scores are
+not comparable to the left column's. It is not 0-6; see Phase 0 for what it is and is not.
 
 **Spread is the organizing metric.** Because the suite total is a geometric mean,
 flattening the curve and raising the total are the same work: moving MandreelLatency
@@ -520,6 +537,101 @@ These were paid for once each. They apply to every phase below.
   never reaches the component the phase is about. The engine that does serve it was one grep away
   — `new Regex(pattern, options)` with no `RegexOptions.Compiled`. *A blocker that names a file
   is making a routing claim, and routing is cheaper to check than to profile.*
+- **A `StringBuilder`'s floor is two copies, and pre-sizing removes neither.** Phase 5's
+  single-match `replace` assembled its answer through a builder: one copy into the chunk list,
+  one back out through `ToString()`. Pre-sizing it was tried first and was worth 0.2% — .NET's
+  `StringBuilder` chunks rather than doubles, so there was no reallocation waste to remove — and
+  the change that worked was to not use a builder at all, `string.Concat` over the three spans,
+  worth exactly half. The neighbouring `String.prototype.replace` had the same three appends into
+  a builder that was *already sized exactly right*, and halved by the same amount — which is the
+  cleanest statement of the point, since there was nothing left to tune. *When the final length is
+  knowable in one pass, a builder is the wrong tool rather than a mis-tuned one, and tuning it
+  optimizes the copy you should not be making.*
+- **A defect found by profiling has siblings the profile cannot see.** The single-match `replace`
+  was found in a `--regex-profile` row; the identical assembly in `String.prototype.replace`'s
+  string-`searchValue` path had **no row at all**, and was found by reading the builtin next to
+  the one being edited. Its before-slope then matched the profiled path's to three decimal places
+  — 4.020 B/char both — which is what established them as one defect in two places rather than
+  two resembling ones. *When a profile localizes a cost to a mechanism, grep for the mechanism;
+  the corpus only measures what somebody thought to add to it.*
+- **A fix recorded as landed covers the path it was measured on, not the feature.** 2-0 removed
+  the per-allocation prototype invalidation and pinned it at "200 001 → 3" — on a `function`
+  constructor. `class C{}; new C()` still publishes one per allocation, by the same mechanism the
+  fix's own comment describes (a second write to the prototype that reads as `[[SetPrototypeOf]]`
+  on a live object). The item was not wrong and its number was not stale; its *scope* was one
+  construction path, and nothing in the record said so. *When a fix is verified through one
+  syntax, name the syntax in the claim — the next reader will otherwise take the general
+  statement, and a second path can carry the identical defect for as long as nobody spells it.*
+- **A cache entry that cannot be replaced is worse than no entry.** The inline cache's add path
+  deduplicated on `ShapeId` + `Holder`; a hit checked those plus four more guards. When one of the
+  four went stale the read missed, reached the add path, was told the entry was already present,
+  and returned — leaving the stale entry in place with no route back. That site then missed on
+  that receiver forever, and it was **77.7% of DeltaBlue's misses**. A cold site would have
+  recovered on its second read; this one could not recover at all. *Whenever a lookup and an
+  insert disagree about what identifies an entry, the insert wins and the lookup starves — check
+  that the dedup key is the whole guard, not a prefix of it.*
+- **A process-wide invalidation makes every workload pay for the worst one.** The prototype
+  version is deliberately coarse — one mutation anywhere retires every prototype-keyed entry
+  everywhere — so a redundant write on one construction path held *Richards's* read cache at 86%
+  when the machinery was capable of 99.97%. Richards does not construct classes; it was paying
+  for someone else's writes. Every phase 2 probe measured the machinery in isolation, where the
+  storm does not exist, and all of them reported it working. *A shared invalidation channel turns
+  a local defect into a global one and hides it from every local measurement — the only
+  instrument that sees it is a counter taken over a whole real workload.*
+- **A counter that separates two workloads is a lead, not an explanation.** DeltaBlue fails
+  phase 2's gate and Richards passes it, and of every inline-cache counter the sharpest split was
+  dictionary fallbacks: **2 503 against 1**, three orders of magnitude. It traced to a real
+  defect — `push` cost every array its shape permanently — and fixing it took DeltaBlue to **0**.
+  **DeltaBlue's read hit rate then did not move by a hundredth of a percent.** The suite was
+  losing shapes it never read through, because it puts no named properties on its arrays. The fix
+  is worth keeping on its own merits and the investigation still has to start over. *Rank a
+  counter by how well it explains the metric you care about, not by how sharply it separates the
+  cases — and confirm the link by moving it, because "biggest difference" and "cause" are
+  different claims and only one of them is testable cheaply.*
+- **An exit criterion that has never been run is not a pending task, it is an unknown answer.**
+  Phase 2's was *"DeltaBlue and Richards inside 200×"*, owed since the phase opened and carried
+  through every item as one line of the sequencing table. Run at last, it **splits**: Richards is
+  inside at 183× and DeltaBlue is outside at 576×, so the phase that was described as "every item
+  landed or closed" has in fact failed half its own gate, on the suite item 2-8 was written for.
+  Two repetitions would not have said that safely; five with a band did. *A gate carried unrun
+  reads as "nearly done" for as long as nobody runs it, and the cost of running it is almost
+  always less than the cost of the plan built on top of assuming it passes.*
+- **A hypothesis with a plausible mechanism still needs the control that would refute it.** 2-9's
+  losing side was explained by the Annex B deferred cells forcing a trie rebuild — a mechanism
+  read straight off the code, correct in every step, and wrong about the cause. The control that
+  settles it is one line of JavaScript: a **strict** function gets no deferred cells, so if the
+  cells are the cause it must not pay. It pays exactly the same — 1.00 trie rebuilds per function
+  on both — because the `prototype` install materializes first, for an unrelated correctness
+  reason. *The question "what would I expect to see if this were false" has an answer that is
+  usually cheaper to run than the fix the hypothesis implies, and running it first is what stops
+  a fix being built for a cause that was not there.*
+- **Count the thing, do not infer it from bytes.** The same hypothesis had been probed by
+  allocation, where the deferred cells do show up — non-strict functions cost 4.8% more than
+  strict, which reads like confirmation. A counter on the rebuild itself says 1.00 on both, and
+  the 4.8% turns out to be the cells' own price and nothing to do with the trie. *An indirect
+  instrument agreeing with you is weaker evidence than a direct one, and adding the direct one
+  here was six lines.*
+- **When an optimization skips work, the design is the observers, not the work.** Phase 5's
+  streaming replace is four lines: append each replacement instead of collecting them all. Every
+  hour of it went into establishing that nobody could watch the skipped result objects — and two
+  of the three conditions that turned out to be needed are not in the item's description. The
+  sharpest is the functional replacer: because the spec collects *all* matches before calling
+  *any* replacer, the final failing `exec` has already reset `lastIndex` to 0 before user code
+  runs, so a streamed replacer would see a *different value*, not merely a different order. The
+  item said "changes the observable order"; the actual hazard was a changed value. *Enumerate who
+  could have been watching, and check what each one would see — an item that names the hazard in
+  the abstract has usually not enumerated them.*
+- **"Is this builtin unpatched" can only be asked against a pristine capture.** The `exec` guard
+  compares against `%RegExp.prototype.exec%` captured at realm init, before user code runs.
+  Reading `RegExp.prototype.exec` at call time and comparing it to itself is circular — by then
+  it may already be the patched one — and there is no property of the function object that says
+  "genuine". *Identity against something captured earlier is the test; anything cheaper is
+  answering a different question.*
+- **A halving that lands exactly is a check on the decomposition, not just a win.** The same item
+  predicted 4 B/char → 2 from "two full UTF-16 copies and nothing else". Measuring 4.02 → 2.02 at
+  three subject lengths is what rules out a third copy hiding in the row; a saving of *roughly*
+  half would have left the model unfalsified and untested. *Predict the number before the change,
+  then treat a miss as evidence about the model rather than noise in the measurement.*
 - **Interleave, at process granularity.** Sub-1.5% effects are only visible ABBA-
   interleaved across independent builds, ten runs each, medians compared.
 - **Hold the call site fixed when the callee is what changed.** Sizing a parameter's cost by
@@ -831,6 +943,69 @@ only six frames deep, so what exhausted the budget is the engine recursing over
 0, the suite was reported rather than killed, and the other 14 were unaffected. That
 containment is 0-2 and B8 working as designed — the same overflow used to take a whole
 suite down.
+
+#### At the pinned pointer it is **17 of 17**, and phase 2's exit criterion finally has an answer
+
+Run 2026-08-03 at the pinned `2ebc0c3c` on **linux-x64**, against upstream `chromium/octane`
+`570ad1cc` (Octane v9), with the shell rebuilt by the harness rather than reused — and this
+time **both engines on the same machine**, so the ×-slower column is internally valid in a way
+no previous run's was.
+
+| | Committed run (2026-07-31, CI) | Local pass (`b3f53dcc`, win-x64) | **This run (pin, linux-x64)** |
+|---|---|---|---|
+| Suites `ok` | 10 of 15 | 14 of 15 | **15 of 15** |
+| Scores reported | 12 / 17 | 15 / 17 | **17 / 17** |
+
+**Mandreel passes now, and it is the difference between 15 and 17 scores.** The local pass
+above had it failing with 1-2's signature after 375 s of `global_init`; at the pin it completes,
+which is what **1-2's real fix landing on all three recursing passes** predicts and is the first
+run to show it. Every one of B8's five original failures stays fixed. **So 0-6's headline gate —
+17/17 with nothing timing out — is met at the pinned pointer**, which is the tree CI clones.
+
+**Read the timeout half of that gate precisely.** Nothing timed out, but two suites finish only
+because `scripts/octane-suites.json` raises their budgets above the run-wide **180 s floor**:
+**zlib at 644 s and Mandreel at 428 s**. The floor is a floor, not a bound, and it always was —
+the config file records the earlier 647 s / 313 s measurements that set those budgets. Mandreel
+is 37% slower here than the figure that budget was chosen from, which is the same
+this-machine-is-slower effect the scores show, and it leaves the budget comfortable rather than
+marginal. *"No timeout at the 180 s floor" would be the wrong sentence to carry forward: two of
+the fifteen exceed 180 s by design.*
+
+**The triad, with a same-machine Chromium reference:**
+
+| Metric | Value |
+|---|---|
+| Scores reported | **17 / 17** |
+| Broiler geomean over all 17 | **217** |
+| **Spread** = worst ÷ best, as ×-slower-than-Chromium | **113×** — MandreelLatency **3 097×** worst, SplayLatency **27×** best |
+
+MandreelLatency is still the tail by a wide margin, which is **phase 1's justification measured
+rather than quoted**: the two worst rows in the suite remain the two that measure only the front
+end. Nothing here changes that ordering.
+
+**Phase 2's exit criterion — "DeltaBlue and Richards inside 200×" — has been owed since the
+phase began. It is now answered, and it splits.** Re-run with **5 repetitions per engine**, so
+the verdict carries a band rather than a point:
+
+| Suite | Broiler median (band) | Chromium median (band) | ×-slower | Across the whole band | Gate |
+|---|--:|--:|--:|---|---|
+| **Richards** | 143 (7.0%) | 26 173 (8.6%) | **183×** | 163× – 191× | **PASS** |
+| **DeltaBlue** | 116 (16.7%) | 66 759 (10.1%) | **576×** | 538× – 711× | **FAIL** |
+
+Richards is inside 200× at *every* combination of the two bands, and DeltaBlue is outside it at
+every combination — worst-case-to-best-case it misses by between 2.7× and 3.6×. Neither verdict
+is a coin-flip against noise, which is the point of running five and reporting the band instead
+of one and reporting a number. **DeltaBlue is the item phase 2 has left**, and it is the suite
+2-8 was written for.
+
+> **What this is not.** It is not 0-6. That gate is *the workflow*, and it also carries 0-7's
+> BenchmarkDotNet comparison and 0-8's RID matrix, neither of which a container can produce —
+> §0-8 already records why a non-idle machine cannot. These results are therefore **not committed
+> to `tests/octane/results/`**, which stays CI's to write; the stale banner there still stands.
+> The full-suite numbers are **one repetition** and the harness says so in its own output. What
+> is claimed here is the pass/fail column, which is hardware-independent, and the two gate
+> ratios, which are same-machine, five-repetition and banded. The geomean and the spread are
+> recorded as this machine's, not as the campaign's.
 
 > **Superseded in part.** The same suite was re-run on **linux-x64 at `685026c0`** against
 > upstream `chromium/octane` while working 1-2, and **Mandreel completes** — `status: ok`,
@@ -1882,7 +2057,66 @@ movements is claimed here.** What is claimed is the allocation result, which is 
 and the compile-throughput cost, which reproduced across three separate measurement rounds.
 **The right follow-up is to stop materializing for a deferred cell** — the null-slot key it
 records needs its descriptor somewhere other than the trie — which would test the hypothesis and,
-if it holds, remove the loss.
+if it holds, remove the loss. ***It does not hold. See below: the hypothesis was measured against
+its own control and is wrong, and that follow-up would not have removed the loss.***
+
+#### The losing-side hypothesis was measured, and it is wrong — **`prototype` is what materializes**
+
+> **Delivered as a patch, not in the pin**, for the same 403 as phase 5's:
+> [`patches/0061`](../patches/0061-js-measure-2-9-materialization-cause.patch), which is
+> **measurement and instrumentation only — no behaviour change** — and is independent of
+> `0059`/`0060`, touching a disjoint set of files.
+
+The mechanism above was recorded as a hypothesis and flagged *"do not treat as settled"*. It is
+now settled, and against it. **A strict function is the control it never had**:
+`AddLegacyCallerAndArguments` runs for non-strict functions only, so if the Annex B deferred cells
+are what forces the trie, a strict function must not pay it.
+
+`--deferred-cell-cost` (new; `DeferredCellCostMetrics`) builds 4 000 functions each way, and a
+new `RecordNamedPropertiesMaterialized` counter reports trie rebuilds directly rather than
+inferring them from bytes:
+
+| Site | B/function | ns/function | **materializations/function** |
+|---|--:|--:|--:|
+| `nonstrict-create` | 356 421 | 4 667 190 | **1.00** |
+| `strict-create` | 340 161 | 4 900 524 | **1.00** |
+| `nonstrict-create-and-call` | 356 226 | 8 693 125 | **1.00** |
+| `strict-create-and-call` | 340 426 | 9 245 164 | **1.00** |
+
+**Exactly one materialization per function, on all four rows.** A strict function — which has no
+deferred cells at all — rebuilds its trie just as surely as a non-strict one, so the deferred
+cells cannot be what causes it. The wall clock says the same thing from the other side: strict is
+*marginally slower*, not faster, on both halves.
+
+**What actually materializes is the `prototype` install, and it is a correctness rule doing it.**
+Traced to `JSFunction..ctor`, whose three own-key writes are `length`, `name`, `prototype` — the
+first two stay shape-only and the third does not, because
+`JSFunction.AllowsDirectShapeWrite(uint key) => key != KeyStrings.prototype.Key` withholds that
+one key. `FastAddValue` then falls off `TryShapeOnlySetDataProperty` to `OwnProperties()`, which
+materializes. **That withhold is 2-8's DeltaBlue fix** — a cached prototype write left the second
+level of every inheritance chain unlinked — so it is load-bearing, not an oversight.
+
+**So the item is re-specified, and the planned fix is withdrawn before it was built.** Stopping
+the deferred-cell materialization would remove a materialization that has already happened: every
+function with a `prototype` has materialized before either Annex B cell is installed. The
+non-strict rows do cost **4.8% more bytes** than strict, which is the cells' real price — but it
+is a per-function 4.8%, not the compile-and-first-run loss the item is trying to explain.
+
+**The candidate that replaces it, not started and deliberately not attempted here.** The withhold
+exists so an *inline cache* cannot answer for `prototype`; shape-only *storage* is a different
+question, and `AllowsDirectShapeWrite` is currently the single answer to both — it is consulted at
+five sites, two of which are storage (`TryShapeOnlyOverwrite`, `TryShapeOnlySetDataProperty`) and
+three of which are cache paths. Splitting the two would let `prototype` live in a slot while
+staying invisible to the cache. **It is not attempted here because this is exactly the code whose
+last regression broke DeltaBlue outright**, and §3.5's own rule is that a change justified by a
+benchmark has to be run against that benchmark — which needs 0-6. The measurement is the
+deliverable; the fix is specified and left.
+
+**The first call is still unexplained, and it is not allocation.** The call roughly doubles wall
+clock (4.7 M → 8.7 M ns per function) while adding **no** managed bytes at all — the
+create-and-call rows are within 200 B of the create-only rows, on both halves. Whatever the
+first-call cost is, it allocates nothing and does not split on strictness, which rules out both
+the deferred cells and the trie. That narrows the item's open question rather than closing it.
 
 #### It holds on real programs — `--property-map-distribution`, before and after
 
@@ -2159,6 +2393,260 @@ curve whose median is ~180×, and this phase is the reason they are.
 > it worse silently.
 
 ---
+### 2-10 · DeltaBlue's dictionary fallbacks — **found, fixed, and it is not the explanation**
+
+> **Delivered as a patch, not in the pin**, for the same 403 as the rest:
+> [`patches/0062`](../patches/0062-js-array-length-keeps-shape.patch). It applies cleanly on its
+> own but **will not compile without [`patches/0061`](../patches/0061-js-measure-2-9-materialization-cause.patch)**,
+> whose counter the new emitter reads — a textual apply-check is not enough, build after applying.
+
+Phase 2's exit criterion split (Richards 183× passes, DeltaBlue 576× fails), and every phase 2
+item was sized on a probe rather than on the suite. §3.5 already records what that costs: 2-8 was
+justified by DeltaBlue's score, measured with a loop *shaped like* DeltaBlue, and broke DeltaBlue
+outright. So the first move was to run the suite itself.
+
+**`--suite-cache-metrics` (new; `SuiteCacheMetrics`) runs the real Octane suites of §0's phase 2
+cluster under the inline-cache counters.** Richards is the control — same phase, same items, and
+it *passes* — so a counter that separates the two is a lead:
+
+| | Richards (183×, passes) | **DeltaBlue (576×, fails)** | Box2D (144×) |
+|---|--:|--:|--:|
+| read cache hit rate | 86.61% | **65.96%** | 96.39% |
+| store cache hit rate | 99.74% | 80.65% | 92.57% |
+| **dictionary fallbacks** | **1** | **2 503** | 9 |
+| prototype invalidations | 37 | 2 519 | 1 944 |
+| materializations | 82 | 2 638 | 70 264 |
+
+**Three orders of magnitude on one counter.** A dictionary fallback is permanent — the object
+drops its shape and no inline cache can reach its named properties again — so 2 503 of them is
+not a tuning difference.
+
+**Traced, and the cause is `push`.** 2 507 of DeltaBlue's 2 512 array fallbacks come from
+`JSArray.SetLengthWritable`, which reaches the property store through `GetOwnProperties()`, and
+that hands out a mutable trie ref by *abandoning the shape*. Isolated one operation at a time on
+a fresh process, counting fallbacks against an empty-script baseline:
+
+| Operation | Fallbacks (before) | (after) |
+|---|--:|--:|
+| `a[i] = i`, array literal, `new Array(n)`, `a.slice()` | 0 | 0 |
+| **`a.push(i)`** | **1** | **0** |
+| **`a.pop()`** | **1** | **0** |
+| **`a.concat([3])`** | **1** | **0** |
+| `a.length = 2` | 1 | 0 |
+| `Object.defineProperty(a,'length',{writable:false})` | 1 | **1** |
+| `Object.freeze(a)` | 1 | **1** |
+
+One per array, not one per call — the first drops the shape and the rest find it already gone.
+**`push` is the most common array operation in the language**, and DeltaBlue's
+`OrderedCollection.add` is `this.elms.push(elm)`.
+
+**The fix is that a writable `length` needs no descriptor at all.** `IsLengthReadOnly` reads an
+*absent* entry as writable — the default — and the stored value is never read back, because
+`GetOwnPropertyDescriptor` builds it from `_length`. So the entry was pure write-only
+bookkeeping, and writing it cost the array its shape. `SetLengthWritable` now writes only when
+the length is non-writable or an entry already exists; the last two rows above show `freeze` and
+an explicit non-writable `length` still recording one, which is what keeps `IsLengthReadOnly`
+answerable.
+
+**It also closes a hole in this class's own stated invariant.** `JSArray.SupportsShapeTracking`
+documents that it is *"earned by not writing any named property of its own with a bare
+`ownProperties.Put`"* — and `length` was the one place that did.
+
+**What it is worth, stated honestly: the defect is real and the metric it was found by did not
+move.**
+
+- **Dictionary fallbacks: DeltaBlue 2 503 → 0**, Box2D 9 → 4, Richards 1 → 0.
+- **A named property on an array that grows now keeps hitting its cache.**
+  `GrowingAnArrayThroughABuiltInKeepsItsNamedShape` — which until now asserted the opposite, and
+  whose own comment called the fallback *"the part worth pinning, because it bounds what item 2-2
+  buys"* — now pins ≥499 hits across 500 reads after five pushes. That bound is gone.
+- **DeltaBlue's read hit rate did not change by a single hundredth: 65.96% before, 65.96%
+  after.** Nor did its prototype invalidations or materializations.
+
+- **And the score does not move either.** Re-run at five repetitions per engine, the same way the
+  gate was measured: **DeltaBlue 116 → 122 broiler-side, 576× → 581×**, against its own 16.4%
+  band — noise, in both directions. Richards is 183× → 179×. Recorded because §3.5's rule from
+  2-8 is that a change justified by a benchmark has to be *run* against that benchmark, and this
+  one was: it neither helps nor harms it.
+
+**So this is not the explanation for 576×.** DeltaBlue does not put named properties on its
+arrays, so the shapes it was losing were shapes it never read through. The counter that separated
+the two suites most sharply turned out to separate them for a reason unrelated to the gap being
+investigated — which is worth stating plainly, because the fix looked like the answer right up
+until it was measured.
+
+**Verify.** Repository suite **7 563 tests across 13 projects, 0 failures**. **test262 unchanged
+across all four pinned manifests — 8 313 executed, 8 220 passed, 84 failed, 44 skipped, 9 timed
+out, identical manifest by manifest**, `test262-arrays` among them, which is the manifest that
+covers this change most directly. Octane still runs 15 of 15 suites `ok`.
+
+**The live lead is the read hit rate itself: 65.96% against Richards's 86.61%**, one in three
+reads missing on a suite whose whole shape is polymorphic constraint objects. That is where 2-10's
+successor should start, and it should start by decomposing *which sites* miss rather than by
+assuming, which is the mistake this item just made and caught.
+
+#### Decomposing the misses: not megamorphism, and a **`class`-shaped 2-0 regression found on the way**
+
+Two things are already ruled out, and one new defect fell out.
+
+**It is not megamorphism.** DeltaBlue records **0 megamorphic read sites** — every read site stays
+within the four-entry polymorphic budget. Whatever misses, misses while the site still has room.
+
+**The counter that tracks the gap is prototype invalidation: 2 519 for DeltaBlue against
+Richards's 37**, and each one retires *every* prototype-keyed entry in the process — the guard is
+deliberately coarse ("one prototype mutation anywhere"). DeltaBlue's reads are overwhelmingly
+inherited-method lookups, which are exactly the entries that retires.
+
+**Tagging the two publish sites splits them 4 543 / 115** across the cluster: almost everything
+comes from `NotifyPrototypeChainMutation` (a real `[[SetPrototypeOf]]`, or a mutation on an object
+already used as a prototype), not from `MarkUsedAsPrototype` (which is correctly guarded and fires
+once per object).
+
+**And isolating that by construct found a live defect — in `class`, not in DeltaBlue.** Counting
+invalidations against an empty-script baseline, per *n* allocations:
+
+| Construct | n = 100 | n = 500 | n = 2 000 |
+|---|--:|--:|--:|
+| `function F(){…}; new F()` | **1** | **1** | **1** |
+| **`class C{…}; new C()`** | **102** | **502** | **2 002** |
+| object literal | 0 | 0 | 0 |
+| DeltaBlue's `inheritsFrom` + `new` | 2 | 2 | — |
+
+**Dead linear at one per allocation**, and it is *precisely* item 2-0's signature — 2-0 recorded
+"200 001 invalidations per 200 000 allocations → 3". Traced, a class instantiation reaches
+`JSValue.SetPrototypeOf` → `set_BasePrototypeObject`, where `prototypeChain` is already non-null,
+so the write reads as a `[[SetPrototypeOf]]` on a live object and publishes. That is the same
+second write `JSFunction.CreateInstance` documents having removed: *"Installed by the constructor
+rather than by an initializer that overwrites what the constructor just set. … the second write
+looked like a `[[SetPrototypeOf]]` on a live object … Once per `new`."` **2-0 fixed the function
+path and the class path still does it.**
+
+**It does not explain DeltaBlue, and that is the second time in this item.** Octane's DeltaBlue is
+ES5 — its only occurrences of the word "class" are in comments — so it never constructs one. The
+defect is real, dead-linear, and reaches every `class` in modern JavaScript; it is simply not this
+suite's problem. Recorded as its own item rather than folded into 2-10, and **not fixed here**:
+the fix is the constructor-installs-the-prototype change 2-0 already made once, but this is the
+code whose last two regressions (2-0's own, and 2-8's DeltaBlue break) both came from this area,
+and it wants the Octane cluster run against it — which is now possible.
+
+#### 2-11 · The redundant prototype write — **landed, and it is the largest cache win since 2-0**
+
+> **Delivered as a patch, not in the pin**:
+> [`patches/0063`](../patches/0063-js-prototype-rewrite-no-invalidate.patch). Independent of
+> `0059`–`0062` — one file, one condition.
+
+The class path was tracked to `JSClass.CreateInstance`, and the two obvious sites were already
+correct: the instance is built with `new JSObject(instancePrototype)`, carrying 2-0's own comment.
+What publishes is the **re-apply afterwards** — `@this.BasePrototypeObject = instancePrototype`,
+writing the prototype the constructor had *already installed*. `prototypeChain` is non-null by
+then, so the setter reads it as a `[[SetPrototypeOf]]` on a live object.
+
+**The fix is to notice that the chain did not change.** Every assumption the prototype version
+guards is about *which chain this object has*; after a redundant write it has the same one, so
+nothing cached is stale. The setter now compares the resulting chain with the previous one and
+publishes only on a real change — which fixes the class path, the derived-class path and any
+other redundant assignment at once, rather than patching call sites one at a time.
+
+| Construct, per *n* allocations | Before | After |
+|---|--:|--:|
+| `class C{…}; new C()`, n = 2 000 | 2 002 | **0** |
+| `function F(){…}; new F()`, n = 2 000 | 1 | **0** |
+| `class B extends A{…}; new B()`, any n | — | **2**, flat |
+
+**On the real suites the effect is much larger than the class case suggested**, because the
+retirement was process-wide — one redundant write anywhere retired every prototype-keyed entry
+everywhere. These are exact counts, not timings:
+
+| | Prototype invalidations | Read cache hit rate | Store hit rate |
+|---|--:|--:|--:|
+| **Richards** | 37 → **10** | 86.61% → **99.97%** | 99.74% → 99.75% |
+| **DeltaBlue** | 2 519 → **16** | 65.96% → **69.45%** | 80.65% → **83.92%** |
+| **Box2D** | 1 944 → **107** | 96.39% → **97.72%** | 92.57% → 92.98% |
+
+**Richards's read cache goes from missing one read in seven to missing one in three thousand.**
+That is the phase 2 machinery finally doing on a real suite what its probes always said it did,
+and it had been masked since the phase began by an invalidation storm none of the probes
+allocated their way into.
+
+> **The scores moved the right way and are *not* claimed.** Five repetitions per engine:
+> Richards 143 → 168 (178.7× → 155.4×) and DeltaBlue 122 → 125 (581× → 516×). Richards's **+17%
+> sits inside its own 15.5% band**, so a five-run median cannot separate it from noise — §3.2.
+> What is claimed is the hit-rate and invalidation columns, which are deterministic counts.
+
+**DeltaBlue still fails phase 2's exit criterion**, at 516× against the 200× gate, and its read
+hit rate is still 69% against Richards's 99.97%. So the gap narrowed and did not close, and the
+suite remains the phase's open item.
+
+**Verify.** Repository suite **7 563 tests across 13 projects, 0 failures**. **test262 unchanged
+across all four pinned manifests — 8 313 / 8 220 / 84 / 44 / 9, identical manifest by manifest**;
+`test262-arrays` matters doubly here because the same version gates `JSArray`'s dense-element fast
+path, and `properties-proxy` and `realm-isolation` are where a wrongly-skipped invalidation would
+surface. Octane still runs 15 of 15 suites `ok`.
+
+#### 2-12 · The stale cache entry that could never be replaced — **DeltaBlue 69% → 93%**
+
+> **Delivered as a patch, not in the pin**:
+> [`patches/0064`](../patches/0064-js-refresh-stale-cache-entry.patch). Needs `0061` (the counter
+> infrastructure) and `0062` (the emitter) to compile.
+
+2-10 owed a per-site attribution, and this is it. The bare miss counter cannot say *why* a read
+missed, so the lookup's exits are now counted separately:
+
+| | Richards (99.97%) | **DeltaBlue (69.45%)** | Box2D (97.72%) |
+|---|--:|--:|--:|
+| total read misses | 208 | 306 004 | 592 263 |
+| cold — first touch of a site | 84.1% | **0.1%** | 0.9% |
+| **shape — site had room, receiver's shape not among its entries** | 15.9% | **99.9%** | 99.1% |
+| megamorphic / key mismatch / non-object | 0 | **0** | ~0 |
+
+**Effectively every DeltaBlue miss is the same exit**, and it is the one that should be
+self-correcting: a site with room that meets a new shape is supposed to *add* it and hit from
+then on. Splitting that exit further found why it does not:
+
+| | Richards | **DeltaBlue** | Box2D |
+|---|--:|--:|--:|
+| entry could not be described at all | 11 | 67 874 | 297 786 |
+| **entry ALREADY PRESENT — declined, not refreshed** | 28 | **237 738 (77.7% of all misses)** | 288 980 |
+
+**The add path deduplicates on `ShapeId` and `Holder`. A hit checks four more guards** — the
+prototype version, the receiver's prototype identity, and the holder's shape and slot. Any of
+those can go stale while the two dedup keys stay equal, and when they do the read misses, reaches
+the add path, finds an entry it considers "already present", and **returns without replacing it**.
+The entry can never be re-described, so that site misses on that receiver **for the rest of the
+process**.
+
+**The fix is one line: refresh in place instead of declining.** `entryToAdd` was just built from
+the live receiver, so it is by construction the correct replacement.
+
+| | Read hit rate | Read misses |
+|---|--:|--:|
+| **DeltaBlue** | 69.45% → **93.16%** | 306 004 → **68 534** |
+| **Box2D** | 97.72% → **98.83%** | 592 263 → **303 612** |
+| Richards | 99.97% → 99.97% | 208 → 192 |
+
+**Taken with 2-11, DeltaBlue's read cache goes 65.96% → 93.16%** and its misses fall by 78%.
+Richards was already at the ceiling and stays there, which is the control working: it had almost
+no stale entries to refresh.
+
+> **Scores moved and are still not claimed.** Five repetitions per engine: DeltaBlue **125 → 145**
+> (516× → **447×**) and Richards 168 → 170 (155× → 150×). DeltaBlue's +16% against a 13.8% band is
+> at the edge, not clear of it. Across this session the suite has gone 116 → 145 and 576× → 447×,
+> which is the direction the deterministic counters predict — but §3.2's rule stands, and what is
+> claimed here is the hit-rate column.
+
+**DeltaBlue still fails phase 2's exit criterion**, at 447× against 200×. The cache is no longer
+the reason: at 93% it is closer to Box2D (98.8%, and 144×) than to its own former self, yet its
+ratio is still three times Box2D's. **Whatever is left is not property-cache-shaped**, and that is
+a genuinely new state for this item — three explanations eliminated, two defects fixed, and the
+remaining gap now has to be looked for somewhere other than phase 2's subject.
+
+**Verify.** Repository suite **7 627 tests across 13 projects, 0 failures**. **test262 unchanged
+across all four pinned manifests — 8 313 / 8 220 / 84 / 44 / 9, identical manifest by manifest.**
+The change cannot return a wrong value: a refreshed entry is still checked by every guard on the
+next read, and the entry it replaces was one the guards had just rejected.
+
+---
+
 
 ## Phase 3 — value representation
 
@@ -2906,18 +3394,21 @@ result array plus its `index` / `input` / `groups` properties. And a *single* no
 `replace` costs four bytes per subject character, which is **two full UTF-16 copies**: the
 `StringBuilder`'s chunks and then its `ToString()`.
 
-Two follow-ups, both sized by those rows and neither started:
+Two follow-ups, both sized by those rows. **The first has landed** — see below; the second has
+not started:
 
 - **The single-match replace should not use a builder at all.** `input[0..pos] + replacement +
   input[end..]` is one `string.Concat` over three spans and one allocation, halving 4 B/char
   to 2. *Pre-sizing the builder was tried first and is worth 0.2%* — .NET's `StringBuilder`
   is a chunk list, not a doubling array, so there was no reallocation waste to remove. The
   change was reverted rather than kept for a rationale that turned out to be wrong.
+  **Landed, and the halving is exact — in both builtins that had the pattern.**
 - **A global replace retains every result before it builds anything.** §22.2.6.11 collects all
   matches in step 14 and reads their properties in step 16, so 5 000 matches means 5 000 live
   result arrays — 5 000 × ~2 KB, which is exactly the ~10 MB per call still measured. Streaming
   them would change the observable order of `exec` calls against capture reads, so it is only
-  available on a fast path where nothing is patched.
+  available on a fast path where nothing is patched. **Landed — and the estimate was right to
+  three digits: 2 033 bytes per match, dead linear.**
 
 **One hazard the change introduced and closed.** Deferring the slice means `Update` publishes a
 subject and two indices that must agree; three separate field writes would let a reader on
@@ -2944,6 +3435,163 @@ failure record byte-identical to the earlier runs.
 > these are single runs on a developer workstation, so what is claimed here is the allocation
 > figure, which is deterministic and exact. The scores are recorded as corroboration and as a
 > reason for 0-6 to look at them.
+
+#### The single-match follow-up landed — the halving is exact
+
+> **Delivered as a patch, not in the pin.** The push to `Broiler-Platform/Broiler.JS` returned
+> **403** — the submodule remote is outside this session's GitHub scope — so per the patch
+> workflow the pointer is **not** bumped and the change ships as
+> [`patches/0059`](../patches/0059-js-single-match-replace-one-allocation.patch) for a maintainer
+> to apply. Every figure below was measured on a local build of the pinned `2ebc0c3c` **plus**
+> that patch, with the control built from the same tree minus it. No main-repo fallback is
+> needed: this is an allocation reduction with no behaviour difference, so CI is correct without
+> it and only more allocating.
+
+`RegExp.prototype[@@replace]` accumulated into a `StringBuilder` whatever the match count. For a
+single match the answer is exactly `prefix + replacement + suffix`, so `string.Concat` over three
+spans writes it into **one** allocation of the final length, and the builder's two copies — into
+its chunk list, then back out through `ToString()` — become one.
+
+Measured with the same `--regex-profile` scaling rows, both sides built from the same tree rather
+than compared against the figures recorded above:
+
+| `replace`, one match | 5 000 | 20 000 | 80 000 | Slope |
+|---|--:|--:|--:|--:|
+| Before | 22 635 | 82 935 | 324 190 | **4.020 B/char** |
+| After | 12 483 | 42 783 | 164 030 | **2.020 B/char** |
+| | 0.55x | 0.52x | 0.51x | **exactly half** |
+
+**The predicted halving is realized to two decimal places, and that is the load-bearing part.**
+The decomposition claimed the 4 B/char was two copies of the subject *and nothing else*; removing
+one copy and getting exactly half is what confirms there was no third. The `test` and `exec` rows
+are byte-identical on both sides — 2 051 / 2 351 / 3 551 and 1 995 / 2 295 / 3 495 — so they are
+the control, and they place the saving on the replace path rather than in the profile.
+
+*(The before row's 80 000 figure is 324 190 here against the 324 135 recorded in the table above.
+Both are this build's own control, taken a pointer apart; 55 bytes on 324 KB is 0.02% and changes
+no slope. It is written as measured rather than reconciled to the earlier row.)*
+
+**The same assembly was one file over, and it is fixed too.** `String.prototype.replace` with a
+**string** `searchValue` never reaches `@@replace` — it is a separate builtin — and it replaces
+only the first occurrence, so it is single-match *by construction*. It built its answer from three
+appends into a **pre-sized** `StringBuilder`: the same two copies, and the clearest case of why
+pre-sizing does not help, since that builder was already sized exactly right. `--regex-profile`
+now carries a `replace-one-string` row beside `replace-one` so the two cannot drift apart:
+
+| `replace`, one match, **string** searchValue | 5 000 | 20 000 | 80 000 | Slope |
+|---|--:|--:|--:|--:|
+| Before | 20 406 | 80 706 | 321 965 | **4.020 B/char** |
+| After | 10 326 | 40 626 | 161 877 | **2.020 B/char** |
+| | 0.51x | 0.50x | 0.50x | **exactly half** |
+
+Its slope was already identical to the regexp path's to three decimal places before the change,
+which is what identifies the two as the same defect rather than two similar ones — and it lands
+on the same 2.020 after. **It was found by reading the neighbouring builtin, not by the profile**,
+which had no row for it; the row exists now because the fix needed one.
+
+**A global regexp that matches once takes the fast path too.** The gate is `results.Count == 1`,
+not the `g` flag: `global` decides how many results were collected, not how they are assembled,
+so `'abc'.replace(/b/g, 'X')` gets it. And step 16.p's backwards-position guard cannot apply to a
+single result — `nextSourcePosition` is still 0 and `position` is clamped to [0, lengthS], so
+`position >= 0` holds — which makes the fast path the loop's behaviour rather than an
+approximation of it.
+
+**The per-result work is shared, not duplicated.** Step 16 reads the result's properties in an
+order a Proxy can observe (`length` → `0` → `index` → captures → `groups`), and test262
+`sm/RegExp/replace-trace` pins it. Both paths call one local function rather than each carrying a
+copy, so the order cannot drift between them; it is called directly and never as a delegate, so
+the capture is a struct closure and costs no allocation.
+
+**Verify.** `SingleMatchReplaceAllocationTests` asserts the bytes and **fails on the build
+without the change** — 95 881 B/call against its 60 000 bound — while every one of its answer
+cases passes on *both* builds, which is what identifies them as regression guards rather than
+change detectors. They cover the edges the fast path now owns: a match at position 0 and at the
+end of the subject, an empty match, an empty replacement, the global-matching-once case, every
+`$` substitution form, functional replacers, surrogate pairs, an ill-behaving `exec` reporting an
+index past the subject, the Annex B statics, and the property read order — plus the same edges
+again through the string-`searchValue` builtin.
+
+**test262 is unchanged across all four pinned manifests — 8 313 executed, 8 220 passed, 84
+failed, 44 skipped, 9 timed out, identical manifest by manifest** to §3.4's recorded run, at
+suite ref `ccaac100`. And because the four pinned manifests contain no `replace` coverage at all,
+**the paths this change actually touches were run separately, control against change**:
+`RegExp/prototype/Symbol.replace`, `String/prototype/replace`, `replaceAll`, `RegExp/prototype/exec`,
+`Symbol.split`, `Symbol.match`, `annexB/built-ins/RegExp` and `staging/sm/RegExp` — **499 tests,
+484 passed, 13 failed, 2 timed out, and the failing set is the same file for file on both
+builds.** All 13 are cross-realm cases needing `$262.createRealm`, which the raw script host does
+not provide; **not one failure is in a `replace` directory.** Repository suite
+**7 604 tests across 13 projects, 0 failures** — 41 of them new here.
+
+#### The retained-result-list follow-up landed — 2 033 bytes a match, and the guard is the change
+
+> **Delivered as a patch, not in the pin**, for the same 403 as the section above, and it must be
+> applied *after* it: [`patches/0060`](../patches/0060-js-stream-global-replace.patch) builds on
+> the function [`patches/0059`](../patches/0059-js-single-match-replace-one-allocation.patch)
+> restructures. Figures below were measured on a local build of the pinned `2ebc0c3c` plus both.
+
+`RegExp.prototype[@@replace]` collects every match in step 14 and only reads their properties in
+step 16, so a global replace held one result array per match live before it assembled anything.
+**Measured with the subject held fixed and only the match count varying** — which is the
+discriminator the earlier scaling rows could not be, since they vary the subject and hold the
+match count at one:
+
+| Global replace, 40 000-char subject | 500 matches | 2 500 | 5 000 | Slope |
+|---|--:|--:|--:|--:|
+| Before | 1 181 612 | 5 247 695 | 10 329 158 | **2 032.8 B/match** |
+| After | 409 588 | 1 363 919 | 2 561 870 | **478.3 B/match** |
+| | 0.35x | 0.26x | 0.25x | **0.235x** |
+
+Dead linear on both sides — 2 033.0 and 2 032.6 across the two independent intervals before the
+change — so the retained list was the whole of it, and the previous section's "5 000 × ~2 KB ≈
+10 MB" estimate was right to three digits rather than approximately. What is left at 478 B/match
+is the match data itself: the `RegexMatchData`, its capture array and the matched string.
+
+**The optimization is four lines; the guard is the item.** Appending each replacement as it is
+produced, instead of collecting first, is trivial. Establishing that nobody can *watch* the
+results being skipped is the entire design, and it needs three conditions at once:
+
+| Condition | Why, and what breaks without it |
+|---|---|
+| The receiver's `exec` **is** the pristine `%RegExp.prototype.exec%` | Every result is then a fresh array this function is the only holder of. A patched `exec` — own property or on the prototype — must run, and its results are the user's |
+| The replacement is a **string**, not a function | A functional replacer is user code running *between* matches |
+| That string contains **no `$`** | `$&`, `` $` ``, `$'`, `$n` and `$<name>` all read back through the result object |
+
+**Two of those three are not obvious from the item's own description, and one is a real trap.**
+The item says streaming "would change the observable order of `exec` calls against capture reads",
+which is true but understates the functional-replacer case: because the spec collects *all*
+matches before calling *any* replacer, the final failing `exec` has already reset `lastIndex` to
+**0** by the time user code first runs. A streamed replacer would instead see `lastIndex` sitting
+mid-subject, at a different value for every call. That is not a reordering, it is a different
+observable value, and `AFunctionalReplacerIsNotStreamed` pins it at `0,0`.
+
+**Identity against a pristine capture is the only sound form of the `exec` test.** `%RegExp.prototype.exec%`
+is captured into `JSContext.IntrinsicRegExpExec` at realm init, before any user code can run —
+the same mechanism `IntrinsicArrayValues` and `IntrinsicPromisePrototype` already use. Reading
+`RegExp.prototype.exec` later and comparing it to itself would be circular: by then it may
+already be the patched one.
+
+**Matching still goes through one shared code path.** `Exec` is split into `ExecMatch` — the
+`lastIndex` read and write, the match, the sticky re-check and the Annex B statics — and
+`BuildExecResult`, which is the part the fast path skips. Both callers use `ExecMatch`, so
+`lastIndex` progression, engine routing and the statics cannot drift between the two paths,
+because they are the same code rather than the same intention written twice. This is the same
+device 0059 used for step 16's property read order, and for the same reason.
+
+**Verify.** `GlobalReplaceStreamingAllocationTests` asserts the bytes and **fails on the build
+without the change** — 2 610 B/match against its 1 000 bound — while all 22 guard cases pass on
+*both* builds, which is what makes them regression guards rather than change detectors. They
+cover each exclusion (patched own `exec`, patched prototype `exec`, an `exec` returning null, a
+functional replacer, and every `$` form), the empty-match advance under `/u` and without it
+(asserted as code units, because a C# literal for a lone surrogate is its own trap), sticky with
+global, `lastIndex` after the call, and the Annex B statics.
+
+Repository suite **7 627 tests across 13 projects, 0 failures**. **test262 unchanged across all
+four pinned manifests — 8 313 executed, 8 220 passed, 84 failed, 44 skipped, 9 timed out,
+identical manifest by manifest**, at suite ref `ccaac100`. The replace-path manifest was re-run
+too: **499 tests, 484 passed, 13 failed, 2 timed out, and the failing set is identical file for
+file to the *pre-0059* control** — so both of this phase's follow-ups together move no test262
+file in either direction.
+
 
 #### Item 2 measured — and the obvious policy is the wrong one
 
@@ -2992,12 +3640,12 @@ predicate at all.
 
 | Phase | Order within it | Size | Unblocks / expected effect | Exit gate |
 |---|---|---|---|---|
-| **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
+| **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI — 17/17 established at the pin locally; the workflow run is still owed) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-1** → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured: Richards PASSES (183× → 150× after 2-11/2-12), DeltaBlue FAILS (576× → 447×)**, five repetitions per engine on one machine |
 | **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | 4-3 design ✅ → **4-1** (unblocked) → 4-3a (S) → 4-3b (M–L) → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
-| **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
+| **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → single-match `replace` without a builder ✅ (both builtins) → the global case's retained result list ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
 **Dependencies.**
 

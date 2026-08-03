@@ -1,0 +1,375 @@
+From f360dd4eacd1e1a177b422dc9ac89cc1238c5b21 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 3 Aug 2026 09:48:39 +0000
+Subject: [PATCH] Stop a writable array length from costing the array its shape
+
+Phase 2's exit criterion split -- Richards inside 200x at 183x, DeltaBlue
+outside at 576x -- and every phase 2 item had been sized on a probe rather than
+on the suite. Running the suites under the inline-cache counters (new
+--suite-cache-metrics) put three orders of magnitude between them on one number:
+DeltaBlue took 2 503 dictionary fallbacks against Richards's 1.
+
+2 507 of DeltaBlue's 2 512 array fallbacks came from JSArray.SetLengthWritable,
+which reaches the property store through GetOwnProperties() -- a mutable trie
+ref, which abandons the object's shape permanently. That method is on the grow
+path, so push, pop and concat each cost an array its shape on first use. push is
+the most common array operation in the language, and DeltaBlue's
+OrderedCollection.add is this.elms.push(elm).
+
+A writable length needs no descriptor at all: IsLengthReadOnly reads an ABSENT
+entry as writable, the default, and the stored value is never read back because
+GetOwnPropertyDescriptor builds it from _length. So the entry was pure
+write-only bookkeeping that cost the array its shape. SetLengthWritable now
+writes only when the length is non-writable or an entry already exists --
+Object.freeze and an explicit writable:false still record one, which is what
+keeps IsLengthReadOnly answerable.
+
+This also closes a hole in the class's own stated invariant:
+JSArray.SupportsShapeTracking documents that it is earned by not writing a named
+property of its own with a bare Put, and length was the one place that did.
+
+What it is worth, stated honestly. Dictionary fallbacks: DeltaBlue 2 503 -> 0,
+Box2D 9 -> 4, Richards 1 -> 0. A named property on an array that grows now keeps
+hitting its cache -- the test that until now asserted the opposite, and whose own
+comment called the fallback "the part worth pinning, because it bounds what item
+2-2 buys", is rewritten to pin >=499 hits across 500 reads after five pushes.
+
+But DeltaBlue's read hit rate did not change by a hundredth: 65.96% before,
+65.96% after, and the score is 116 -> 122 against its own 16.4% band, 576x ->
+581x. DeltaBlue puts no named properties on its arrays, so the shapes it was
+losing were shapes it never read through. This is a real defect fixed and it is
+NOT the explanation for 576x.
+
+Repository suite 7 563 tests across 13 projects, 0 failures. test262 unchanged
+across all four pinned manifests -- 8 313 executed, 8 220 passed, 84 failed, 44
+skipped, 9 timed out, identical manifest by manifest, test262-arrays included.
+Octane still 15 of 15 suites ok.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ .../Array/JSArray.cs                          |  35 ++++
+ .../PropertyShapeCacheTests.cs                |  29 +--
+ .../Program.cs                                |   6 +
+ .../SuiteCacheMetrics.cs                      | 190 ++++++++++++++++++
+ 4 files changed, 248 insertions(+), 12 deletions(-)
+ create mode 100644 Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SuiteCacheMetrics.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Array/JSArray.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Array/JSArray.cs
+index b5bc67dc..47c4088a 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Array/JSArray.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Array/JSArray.cs
+@@ -742,11 +742,46 @@ public partial class JSArray : JSObject
+         }
+     }
+ 
++    /// <summary>
++    /// Records the <c>length</c> descriptor, but only when it has something to say.
++    /// </summary>
++    /// <remarks>
++    /// A writable <c>length</c> needs no descriptor at all. <see cref="IsLengthReadOnly"/> reads
++    /// an <em>absent</em> entry as writable — the default — and the stored value is never read
++    /// back, because <see cref="GetOwnPropertyDescriptor"/> builds it from <c>_length</c>. So for
++    /// the overwhelmingly common case the entry was pure write-only bookkeeping.
++    /// <para>
++    /// Writing it anyway was expensive out of all proportion. <c>GetOwnProperties()</c> hands out
++    /// a mutable trie ref, which <em>abandons the object's shape</em> — permanently, into
++    /// dictionary mode — and this method is on the grow path, so <c>push</c>, <c>pop</c> and
++    /// <c>concat</c> each cost an array its shape on first use. Measured on Octane, DeltaBlue
++    /// took 2 507 dictionary fallbacks this way against Richards's 1, and its read cache hit
++    /// rate sat at 66% against Richards's 87%. It is also the exact invariant this class's
++    /// <c>SupportsShapeTracking</c> says it earns by <em>not</em> writing a named property of its
++    /// own with a bare <c>Put</c> — <c>length</c> was the one place that did.
++    /// </para>
++    /// <para>
++    /// The non-writable case still writes, and so does a re-write of an entry that already
++    /// exists, so nothing that ever recorded a descriptor stops maintaining it. See
++    /// docs/performance-roadmap.md item 2-2 and phase 2's exit criterion.
++    /// </para>
++    /// </remarks>
+     private void SetLengthWritable(bool writable)
+     {
++        if (writable && !HasStoredLengthDescriptor())
++            return;
++
+         var attributes = writable ? JSPropertyAttributes.Value : JSPropertyAttributes.ReadonlyValue;
+         GetOwnProperties().Put(KeyStrings.length.Key) = new JSProperty(KeyStrings.length, CreateNumber(_length), attributes);
+     }
++
++    /// <summary>Whether a <c>length</c> descriptor has ever been recorded in the trie.</summary>
++    /// <remarks>Read-only access (<c>create: false</c>), so asking does not abandon the shape.</remarks>
++    private bool HasStoredLengthDescriptor()
++    {
++        ref var ownProperties = ref GetOwnProperties(false);
++        return !ownProperties.IsEmpty && !ownProperties.GetValue(KeyStrings.length.Key).IsEmpty;
++    }
+ }
+ 
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyShapeCacheTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyShapeCacheTests.cs
+index aedefda9..f327bd7b 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyShapeCacheTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/PropertyShapeCacheTests.cs
+@@ -460,30 +460,35 @@ public class PropertyShapeCacheTests
+     }
+ 
+     [Fact]
+-    public void GrowingAnArrayThroughABuiltInAbandonsItsNamedShape()
++    public void GrowingAnArrayThroughABuiltInKeepsItsNamedShape()
+     {
+         // `length` is computed from the element store rather than held as a data property, so
+         // it can never occupy a slot however wide eligibility gets, and it must keep tracking
+         // the elements — which it does.
+         //
+-        // The dictionary fallback is the part worth pinning, because it bounds what item 2-2
+-        // buys. `push` reaches the property store through GetOwnProperties(create: true), and
+-        // that abandons the shape by design: a mutable ref handed to another assembly could add
+-        // a named property without telling the tracker, so the fast layout is dropped rather
+-        // than trusted. Exactly one fallback for five pushes — the first drops the shape and the
+-        // rest find it already gone. Correctness is unaffected; the named-property cache is, so
+-        // an array that grows through the built-ins stops hitting. Contrast
+-        // ANamedPropertyOnAnArray_IsCached, which does not grow and keeps its shape.
++        // This used to pin the OPPOSITE, and the old comment was right that the fallback bounded
++        // what item 2-2 buys: push reached the property store through GetOwnProperties(create:
++        // true), which abandons the shape, so an array that grew through the built-ins stopped
++        // hitting the named-property cache for good. That bound is gone. SetLengthWritable no
++        // longer records a descriptor for a WRITABLE length, because an absent entry already
++        // means writable and the stored value was never read back — so push, pop and concat
++        // no longer cost an array its shape.
++        //
++        // The hit assertion is the point, not the fallback count: the fallback was only ever
++        // interesting because of what it did to the cache.
+         var (result, stats) = Measure("""
+             var a = [];
+             a.tag = 1;
+             var seen = '';
+             for (var i = 0; i < 5; i++) { a.push(i); seen += a.length; }
+-            seen;
++            var s = 0;
++            for (var i = 0; i < 500; i++) s += a.tag;
++            seen + '|' + s;
+             """);
+ 
+-        Assert.Equal("12345", result);
+-        Assert.Equal(1, stats.DictionaryFallbacks);
++        Assert.Equal("12345|500", result);
++        Assert.Equal(0, stats.DictionaryFallbacks);
++        Assert.True(stats.CacheHits >= 499, $"expected the named read to keep hitting after growth, got {stats.CacheHits}/{stats.CacheMisses}");
+     }
+ 
+     [Fact]
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+index 78db6a1d..e821173a 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+@@ -68,6 +68,12 @@ public static class Program
+             return;
+         }
+ 
++        if (args.Length == 2 && args[0] == "--suite-cache-metrics")
++        {
++            SuiteCacheMetrics.Write(args[1]);
++            return;
++        }
++
+         if (args.Length == 2 && args[0] == "--property-map-distribution")
+         {
+             PropertyMapDistributionMetrics.Write(args[1]);
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SuiteCacheMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SuiteCacheMetrics.cs
+new file mode 100644
+index 00000000..2b25c599
+--- /dev/null
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SuiteCacheMetrics.cs
+@@ -0,0 +1,190 @@
++using System;
++using System.Collections.Generic;
++using System.IO;
++using System.Text.Json;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.Engine.Benchmarks;
++
++/// <summary>
++/// Runs real Octane suites and reports what the property inline caches actually did on them —
++/// hit rate, megamorphic sites, dictionary fallbacks, shape transitions and trie
++/// materializations — rather than what a synthetic loop shaped like them does.
++/// </summary>
++/// <remarks>
++/// Exists because phase 2's exit criterion has now been measured and it SPLIT: Richards is inside
++/// 200× at 183× and DeltaBlue is not, at 576×. Every phase 2 item was sized on a probe, and §3.5
++/// already records what that costs — 2-8 was justified by DeltaBlue's score, measured with a loop
++/// written to look like DeltaBlue's hot path, and broke DeltaBlue outright, because the loop
++/// reproduced the reads the item was about and none of the writes.
++/// <para>
++/// So the question this answers is deliberately narrow: <em>do the caches phase 2 built actually
++/// hit on the suite phase 2 is failing?</em> Richards is the control — the same cluster, the same
++/// items, and it passes — so a counter that differs sharply between the two is a lead and a
++/// counter that does not is an exoneration. Box2D is included because §0 names the same trio.
++/// </para>
++/// <para>
++/// Counters over wall clock on purpose. Hit rates and counts are deterministic and exact, and
++/// this machine has already been shown to be too noisy for a single-run score to mean anything
++/// (§Phase 0). A ratio between two suites measured in the same process is not a timing claim.
++/// </para>
++/// </remarks>
++internal static class SuiteCacheMetrics
++{
++    private sealed record Suite(string Name, string[] Files);
++
++    /// <summary>The cluster §0 names for phase 2, with Richards as the passing control.</summary>
++    private static readonly Suite[] Suites =
++    [
++        new("Richards", ["richards.js"]),
++        new("DeltaBlue", ["deltablue.js"]),
++        new("Box2D", ["box2d.js"]),
++    ];
++
++    private const int RunsPerBenchmark = 3;
++
++    private const string Driver = """
++        (function () {
++            var suites = (typeof BenchmarkSuite !== 'undefined' && BenchmarkSuite.suites) || [];
++            var ran = 0, failures = [];
++            for (var i = 0; i < suites.length; i++) {
++                var suite = suites[i];
++                for (var j = 0; j < suite.benchmarks.length; j++) {
++                    var benchmark = suite.benchmarks[j];
++                    try {
++                        benchmark.Setup();
++                        for (var k = 0; k < __runs; k++) benchmark.run();
++                        benchmark.TearDown();
++                        ran++;
++                    } catch (e) {
++                        failures.push(suite.name + '/' + benchmark.name + ': ' + e);
++                    }
++                }
++            }
++            return ran + '|' + failures.join(' ;; ');
++        })()
++        """;
++
++    internal static void Write(string octaneDirectory)
++    {
++        if (!Directory.Exists(octaneDirectory))
++        {
++            Console.Error.WriteLine($"octane directory not found: {octaneDirectory}");
++            Environment.ExitCode = 2;
++            return;
++        }
++
++        var basePath = Path.Combine(octaneDirectory, "base.js");
++        if (!File.Exists(basePath))
++        {
++            Console.Error.WriteLine($"not an Octane checkout (no base.js): {octaneDirectory}");
++            Environment.ExitCode = 2;
++            return;
++        }
++
++        var baseSource = File.ReadAllText(basePath);
++        var rows = new List<object>();
++        foreach (var suite in Suites)
++        {
++            Console.Error.WriteLine($"{suite.Name}: running ...");
++            var row = RunSuite(octaneDirectory, baseSource, suite);
++            if (row != null)
++                rows.Add(row);
++        }
++
++        Console.WriteLine(JsonSerializer.Serialize(
++            new
++            {
++                schema = "broiler.suite-cache-metrics/1",
++                runsPerBenchmark = RunsPerBenchmark,
++                note = "Property inline cache behaviour on the real Octane suites of phase 2's "
++                    + "cluster. Richards passes the phase's 200x exit criterion and DeltaBlue "
++                    + "fails it at 576x, so a counter that separates them is a lead. Counts are "
++                    + "deterministic; no wall clock is reported because this machine is too "
++                    + "noisy for a single run to mean anything.",
++                suites = rows,
++            },
++            new JsonSerializerOptions { WriteIndented = true }));
++    }
++
++    private static object RunSuite(string octaneDirectory, string baseSource, Suite suite)
++    {
++        var sources = new List<string> { baseSource };
++        foreach (var file in suite.Files)
++        {
++            var path = Path.Combine(octaneDirectory, file);
++            if (!File.Exists(path))
++            {
++                Console.Error.WriteLine($"{suite.Name}: missing {file}, skipped");
++                return null;
++            }
++
++            sources.Add(File.ReadAllText(path));
++        }
++
++        using var context = BenchmarkContext.Create();
++
++        string outcome;
++        PropertyOptimizationSnapshot snapshot;
++
++        // The window covers the LOAD as well as the run: the shapes a suite's top-level code
++        // builds are shapes the workload builds, and a cache that misses while warming is part
++        // of what the score pays for.
++        using (PropertyOptimizationDiagnostics.Enable())
++        {
++            PropertyOptimizationDiagnostics.Reset();
++            try
++            {
++                context.Eval("if (typeof print === 'undefined') { var print = function () { }; }", "shim.js");
++                for (var i = 0; i < sources.Count; i++)
++                    context.Eval(sources[i], i == 0 ? "base.js" : suite.Files[i - 1]);
++
++                context.Eval($"var __runs = {RunsPerBenchmark};", "runs.js");
++            }
++            catch (Exception e)
++            {
++                Console.Error.WriteLine($"{suite.Name}: failed to load — {e.GetType().Name}: {e.Message}");
++                return new { suite = suite.Name, loaded = false, error = $"{e.GetType().Name}: {e.Message}" };
++            }
++
++            try
++            {
++                outcome = context.Eval(Driver, "driver.js").ToString();
++            }
++            catch (Exception e)
++            {
++                outcome = $"0|driver threw {e.GetType().Name}: {e.Message}";
++            }
++
++            snapshot = PropertyOptimizationDiagnostics.Snapshot();
++        }
++
++        var split = outcome.Split('|', 2);
++        var reads = snapshot.CacheHits + snapshot.CacheMisses;
++        var writes = snapshot.StoreCacheHits + snapshot.StoreCacheMisses;
++
++        return new
++        {
++            suite = suite.Name,
++            loaded = true,
++            benchmarksRun = int.TryParse(split[0], out var ran) ? ran : 0,
++            failures = split.Length > 1 && split[1].Length > 0 ? split[1] : null,
++
++            readCacheHits = snapshot.CacheHits,
++            readCacheMisses = snapshot.CacheMisses,
++            readHitRatePercent = reads == 0 ? 0 : Math.Round(100.0 * snapshot.CacheHits / reads, 2),
++            readMegamorphicSites = snapshot.MegamorphicSites,
++
++            storeCacheHits = snapshot.StoreCacheHits,
++            storeCacheMisses = snapshot.StoreCacheMisses,
++            storeHitRatePercent = writes == 0 ? 0 : Math.Round(100.0 * snapshot.StoreCacheHits / writes, 2),
++            storeMegamorphicSites = snapshot.StoreMegamorphicSites,
++
++            polymorphicPromotions = snapshot.PolymorphicPromotions,
++            dictionaryFallbacks = snapshot.DictionaryFallbacks,
++            shapeTransitions = snapshot.ShapeTransitions,
++            prototypeInvalidations = snapshot.PrototypeInvalidations,
++            namedPropertiesMaterializations = snapshot.NamedPropertiesMaterializations,
++        };
++    }
++}
+-- 
+2.43.0
+
