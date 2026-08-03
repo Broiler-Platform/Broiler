@@ -73,7 +73,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 |---|---|
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is still the critical path, but its headline question is answered**: run at the pinned pointer on linux-x64, Octane is **15 of 15 suites `ok` and 17 of 17 scores** — Mandreel included, which the previous local pass had failing. Geomean 217, spread **113×** against a same-machine Chromium reference. What 0-6 still owes is the *workflow* run plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce |
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
-| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left**, and it is the suite 2-8 was written for. Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
+| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
 | **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. The global case's retained result list then landed too — **2 032.8 → 478.3 B per match**, dead linear on both sides, by streaming when the receiver's `exec` is the pristine intrinsic and the replacement is a `$`-free string. **Every follow-up this phase named is now closed**; what is left is item 2's `Compiled` policy, deliberately unshipped |
@@ -554,6 +554,16 @@ These were paid for once each. They apply to every phase below.
   — 4.020 B/char both — which is what established them as one defect in two places rather than
   two resembling ones. *When a profile localizes a cost to a mechanism, grep for the mechanism;
   the corpus only measures what somebody thought to add to it.*
+- **A counter that separates two workloads is a lead, not an explanation.** DeltaBlue fails
+  phase 2's gate and Richards passes it, and of every inline-cache counter the sharpest split was
+  dictionary fallbacks: **2 503 against 1**, three orders of magnitude. It traced to a real
+  defect — `push` cost every array its shape permanently — and fixing it took DeltaBlue to **0**.
+  **DeltaBlue's read hit rate then did not move by a hundredth of a percent.** The suite was
+  losing shapes it never read through, because it puts no named properties on its arrays. The fix
+  is worth keeping on its own merits and the investigation still has to start over. *Rank a
+  counter by how well it explains the metric you care about, not by how sharply it separates the
+  cases — and confirm the link by moving it, because "biggest difference" and "cause" are
+  different claims and only one of them is testable cheaply.*
 - **An exit criterion that has never been run is not a pending task, it is an unknown answer.**
   Phase 2's was *"DeltaBlue and Richards inside 200×"*, owed since the phase opened and carried
   through every item as one line of the sequencing table. Run at last, it **splits**: Richards is
@@ -2359,6 +2369,100 @@ curve whose median is ~180×, and this phase is the reason they are.
 > it worse silently.
 
 ---
+### 2-10 · DeltaBlue's dictionary fallbacks — **found, fixed, and it is not the explanation**
+
+> **Delivered as a patch, not in the pin**, for the same 403 as the rest:
+> [`patches/0062`](../patches/0062-js-array-length-keeps-shape.patch). It applies cleanly on its
+> own but **will not compile without [`patches/0061`](../patches/0061-js-measure-2-9-materialization-cause.patch)**,
+> whose counter the new emitter reads — a textual apply-check is not enough, build after applying.
+
+Phase 2's exit criterion split (Richards 183× passes, DeltaBlue 576× fails), and every phase 2
+item was sized on a probe rather than on the suite. §3.5 already records what that costs: 2-8 was
+justified by DeltaBlue's score, measured with a loop *shaped like* DeltaBlue, and broke DeltaBlue
+outright. So the first move was to run the suite itself.
+
+**`--suite-cache-metrics` (new; `SuiteCacheMetrics`) runs the real Octane suites of §0's phase 2
+cluster under the inline-cache counters.** Richards is the control — same phase, same items, and
+it *passes* — so a counter that separates the two is a lead:
+
+| | Richards (183×, passes) | **DeltaBlue (576×, fails)** | Box2D (144×) |
+|---|--:|--:|--:|
+| read cache hit rate | 86.61% | **65.96%** | 96.39% |
+| store cache hit rate | 99.74% | 80.65% | 92.57% |
+| **dictionary fallbacks** | **1** | **2 503** | 9 |
+| prototype invalidations | 37 | 2 519 | 1 944 |
+| materializations | 82 | 2 638 | 70 264 |
+
+**Three orders of magnitude on one counter.** A dictionary fallback is permanent — the object
+drops its shape and no inline cache can reach its named properties again — so 2 503 of them is
+not a tuning difference.
+
+**Traced, and the cause is `push`.** 2 507 of DeltaBlue's 2 512 array fallbacks come from
+`JSArray.SetLengthWritable`, which reaches the property store through `GetOwnProperties()`, and
+that hands out a mutable trie ref by *abandoning the shape*. Isolated one operation at a time on
+a fresh process, counting fallbacks against an empty-script baseline:
+
+| Operation | Fallbacks (before) | (after) |
+|---|--:|--:|
+| `a[i] = i`, array literal, `new Array(n)`, `a.slice()` | 0 | 0 |
+| **`a.push(i)`** | **1** | **0** |
+| **`a.pop()`** | **1** | **0** |
+| **`a.concat([3])`** | **1** | **0** |
+| `a.length = 2` | 1 | 0 |
+| `Object.defineProperty(a,'length',{writable:false})` | 1 | **1** |
+| `Object.freeze(a)` | 1 | **1** |
+
+One per array, not one per call — the first drops the shape and the rest find it already gone.
+**`push` is the most common array operation in the language**, and DeltaBlue's
+`OrderedCollection.add` is `this.elms.push(elm)`.
+
+**The fix is that a writable `length` needs no descriptor at all.** `IsLengthReadOnly` reads an
+*absent* entry as writable — the default — and the stored value is never read back, because
+`GetOwnPropertyDescriptor` builds it from `_length`. So the entry was pure write-only
+bookkeeping, and writing it cost the array its shape. `SetLengthWritable` now writes only when
+the length is non-writable or an entry already exists; the last two rows above show `freeze` and
+an explicit non-writable `length` still recording one, which is what keeps `IsLengthReadOnly`
+answerable.
+
+**It also closes a hole in this class's own stated invariant.** `JSArray.SupportsShapeTracking`
+documents that it is *"earned by not writing any named property of its own with a bare
+`ownProperties.Put`"* — and `length` was the one place that did.
+
+**What it is worth, stated honestly: the defect is real and the metric it was found by did not
+move.**
+
+- **Dictionary fallbacks: DeltaBlue 2 503 → 0**, Box2D 9 → 4, Richards 1 → 0.
+- **A named property on an array that grows now keeps hitting its cache.**
+  `GrowingAnArrayThroughABuiltInKeepsItsNamedShape` — which until now asserted the opposite, and
+  whose own comment called the fallback *"the part worth pinning, because it bounds what item 2-2
+  buys"* — now pins ≥499 hits across 500 reads after five pushes. That bound is gone.
+- **DeltaBlue's read hit rate did not change by a single hundredth: 65.96% before, 65.96%
+  after.** Nor did its prototype invalidations or materializations.
+
+- **And the score does not move either.** Re-run at five repetitions per engine, the same way the
+  gate was measured: **DeltaBlue 116 → 122 broiler-side, 576× → 581×**, against its own 16.4%
+  band — noise, in both directions. Richards is 183× → 179×. Recorded because §3.5's rule from
+  2-8 is that a change justified by a benchmark has to be *run* against that benchmark, and this
+  one was: it neither helps nor harms it.
+
+**So this is not the explanation for 576×.** DeltaBlue does not put named properties on its
+arrays, so the shapes it was losing were shapes it never read through. The counter that separated
+the two suites most sharply turned out to separate them for a reason unrelated to the gap being
+investigated — which is worth stating plainly, because the fix looked like the answer right up
+until it was measured.
+
+**Verify.** Repository suite **7 563 tests across 13 projects, 0 failures**. **test262 unchanged
+across all four pinned manifests — 8 313 executed, 8 220 passed, 84 failed, 44 skipped, 9 timed
+out, identical manifest by manifest**, `test262-arrays` among them, which is the manifest that
+covers this change most directly. Octane still runs 15 of 15 suites `ok`.
+
+**The live lead is the read hit rate itself: 65.96% against Richards's 86.61%**, one in three
+reads missing on a suite whose whole shape is polymorphic constraint objects. That is where 2-10's
+successor should start, and it should start by decomposing *which sites* miss rather than by
+assuming, which is the mistake this item just made and caught.
+
+---
+
 
 ## Phase 3 — value representation
 

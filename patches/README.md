@@ -28,19 +28,28 @@ Delete the patch file and its row below once the pointer is bumped.
 
 | `0061-js-measure-2-9-materialization-cause` | `Broiler.JS` | Measurement and instrumentation only, **no behaviour change**. Item 2-9's losing-side hypothesis said the Annex B deferred cells force the trie rebuild; a *strict* function is the control it never had, and it rebuilds just as much — **1.00 per function on all four rows**. What materializes is the `prototype` install, withheld from shape-only storage by 2-8's DeltaBlue fix, so the planned "stop materializing for a deferred cell" follow-up is withdrawn before being built. Adds `--deferred-cell-cost` and a `RecordNamedPropertiesMaterialized` counter. **Independent of `0059`/`0060`** — different files, applies in any order. |
 
+| `0062-js-array-length-keeps-shape` | `Broiler.JS` | Item 2-10. `JSArray.SetLengthWritable` recorded a `length` descriptor through `GetOwnProperties()`, which **abandons the object's shape permanently** — and it is on the grow path, so `push`, `pop` and `concat` each cost an array its shape on first use. A writable `length` needs no descriptor at all (`IsLengthReadOnly` reads absence as writable; the stored value is never read back). **DeltaBlue's dictionary fallbacks 2 503 → 0**, and a named property on a grown array keeps hitting its cache. Honest limit: DeltaBlue's read hit rate and score do **not** move, so this is not the explanation for its 576×. **Requires `0061` to compile.** |
+
 The ten `Broiler.JS` patches this file previously carried (`0049`–`0058`) have all been
 applied and their pointer bumped; they are listed under *Recently cleared* below with the
 commit each landed as.
 
-**`0059`, `0060` and `0061` are pending against the pinned pointer `2ebc0c3c`.** `0059` and
-`0060` must go in that order — `0060` touches the function `0059` restructures, so applying
-them out of order will conflict. `0061` touches a disjoint set of files and applies in any
-order relative to the other two. Each push to `Broiler-Platform/Broiler.JS` returned 403 from
-the session's git proxy, so the pointer is deliberately *not* bumped. None of the three needs
-a main-repo fallback: `0059` and `0060` are allocation reductions with no behaviour
-difference, so CI is correct without them and only more allocating, and `0061` adds a
-benchmark emitter and an opt-in counter that is off unless
-`PropertyOptimizationDiagnostics.Enabled` is set.
+**`0059`–`0062` are pending against the pinned pointer `2ebc0c3c`.** All four apply cleanly in
+numeric order. Two ordering constraints are real:
+
+- **`0060` after `0059`** — it touches the function `0059` restructures, so out of order they
+  conflict textually.
+- **`0062` after `0061`** — `0062` applies cleanly on its own but will **not compile** without
+  `0061`, because its new `--suite-cache-metrics` emitter reads the
+  `NamedPropertiesMaterializations` counter `0061` adds. A textual check is not enough here;
+  build after applying.
+
+Each push to `Broiler-Platform/Broiler.JS` returned 403 from the session's git proxy, so the
+pointer is deliberately *not* bumped. None of the four needs a main-repo fallback: `0059` and
+`0060` are allocation reductions with no behaviour difference, so CI is correct without them and
+only more allocating; `0061` adds a benchmark emitter and an opt-in counter that is off unless
+`PropertyOptimizationDiagnostics.Enabled` is set; and `0062` removes a pessimization, so without
+it CI is correct and only slower.
 
 ## Recently cleared
 
