@@ -1,24 +1,27 @@
 name: Octane Benchmarks
 
 # Runs Google's Octane 2.0 JavaScript benchmark suite (https://github.com/chromium/octane)
-# under two engines and commits the comparison back to the repository:
+# under three engines and commits the comparison back to the repository:
 #
 #   * Chromium  — real V8 in a headless browser, driven by Playwright.
 #   * Broiler   — the BroilerJS `--script-host` shell (the Broiler.JS engine).
+#   * Jint      — https://github.com/sebastienros/jint, a managed ECMAScript
+#                 interpreter, run through tests/octane/jint-host. The managed
+#                 reference point: same runtime, same script, same process shape.
 #
-# Each Octane suite runs in isolation (a fresh Chromium page / a fresh Broiler
+# Each Octane suite runs in isolation (a fresh Chromium page / a fresh shell
 # process) so a crash, hang, or error in one suite never discards the others —
-# Broiler is experimental and some suites do not yet complete. Results and a
-# Chromium-vs-Broiler comparison are written to tests/octane/results and, on the
-# default branch, committed.
+# Broiler is experimental and some suites do not yet complete. Results and the
+# comparison are written to tests/octane/results and, on the default branch,
+# committed.
 
 on:
   workflow_dispatch:
     inputs:
       engines:
-        description: Comma-separated engines to run (chromium,broiler).
+        description: Comma-separated engines to run (chromium,broiler,jint).
         required: false
-        default: 'chromium,broiler'
+        default: 'chromium,broiler,jint'
       timeout_seconds:
         description: >-
           Per-suite timeout floor in seconds. A slow suite (Mandreel, zlib) raises
@@ -63,9 +66,11 @@ concurrency:
 
 jobs:
   benchmark:
-    name: Octane (Chromium vs Broiler)
+    name: Octane (Chromium vs Broiler vs Jint)
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # Jint adds about ten minutes to the previous 90: it completes every suite,
+    # and its slowest (Mandreel) measured 104s against Broiler's 313s.
+    timeout-minutes: 105
     steps:
       - uses: actions/checkout@v5
         with:
@@ -90,7 +95,7 @@ jobs:
           VERBOSE: ${{ github.event.inputs.verbose }}
         run: |
           args=(
-            --engines "${{ github.event.inputs.engines || 'chromium,broiler' }}"
+            --engines "${{ github.event.inputs.engines || 'chromium,broiler,jint' }}"
             --timeout "${{ github.event.inputs.timeout_seconds || '180' }}"
             --repetitions "${{ github.event.inputs.repetitions || '1' }}"
             --octane-ref "${{ github.event.inputs.octane_ref || 'master' }}"

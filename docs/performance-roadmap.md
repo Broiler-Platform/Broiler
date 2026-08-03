@@ -1020,10 +1020,19 @@ For 0-6:
 
 ```text
 Actions → Octane Benchmarks → Run workflow
-  engines:         chromium,broiler
+  engines:         chromium,broiler,jint
   timeout_seconds: 180          # Mandreel and zlib raise their own
   repetitions:     3            # the first run that can distinguish signal
 ```
+
+`jint` is the third engine the harness gained after this section was written:
+[Jint](https://github.com/sebastienros/jint) run through `tests/octane/jint-host`,
+with the same shell surface and stack budget as `BroilerJS --script-host`. It
+costs about ten minutes of the run and adds the managed-versus-managed ratio —
+another AST-walking managed engine on the same runtime, so unlike the Chromium
+column it lands near 1 and moves with a Broiler change rather than dwarfing it.
+It is a reference, not a target: Jint has no compilation tier, so a suite where
+Broiler loses to it names a specific defect rather than a general deficit.
 
 **Exit gate for phase 0:**
 

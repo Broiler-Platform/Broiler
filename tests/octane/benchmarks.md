@@ -49,6 +49,45 @@ Two consequences worth keeping in mind when reading the committed results:
   engine with: it is 15 large, real, self-contained programs that exercise almost
   every path an engine has, and it either runs them or it does not.
 
+### A third column: Jint
+
+The harness now also runs [Jint](https://github.com/sebastienros/jint), a
+managed ECMAScript interpreter, in a shell with the same host surface and stack
+budget as `BroilerJS --script-host` (see [`README.md`](README.md)). Its column
+answers a different question from Chromium's. V8 is a JIT-compiling C++ engine,
+so its ratio is a four-figure number that no single change moves; Jint is an AST
+interpreter on the same runtime, so **Broiler ÷ Jint lands near 1 and moves with
+the work**.
+
+That makes it a floor rather than a target. Jint has no compilation tier at all,
+so a benchmark where Broiler is *behind* it is naming a specific defect — an
+overhead Broiler pays that a plain tree-walker does not — rather than a general
+deficit. Read the ratios in §4 against Chromium for the size of the gap, and
+against Jint for whether a given suite is anomalous.
+
+**What the column shows on first evidence.** A single unrepeated run in a dev
+container — so *not* publishable numbers, and no substitute for the workflow run
+§4 is waiting on — nonetheless sorts the suites into three groups. The middle
+group is within noise of parity and should be read as no more than that; the two
+ends are decided by margins no noise band reaches:
+
+| Group | Suites, with Broiler ÷ Jint |
+|---|---|
+| Ahead of the interpreter | Mandreel 1.7, Crypto 1.5, NavierStokes 1.5, EarleyBoyer 1.1, Gameboy 1.1, Richards 1.1, Box2D 1.1 |
+| Level with it | RayTrace 0.99, Splay 0.94, DeltaBlue 0.89 |
+| **Behind it** | Typescript 0.80, SplayLatency 0.73, PdfJS 0.57, RegExp 0.42, **zlib 0.073, CodeLoad 0.029, MandreelLatency 0.017** |
+
+The three at the end are the finding. **CodeLoad and MandreelLatency are the two
+compilation-cost benchmarks** — the ones §3's **B4** names — and they are where
+Broiler falls 34× and 59× behind an engine that never compiles anything. Against
+Chromium those two are simply the largest of a column of large numbers; against
+Jint they are categorically different from every other suite, which is the
+distinction the second reference point exists to draw. zlib at 14× behind is the
+one that §4's ranking does not already predict, and is worth its own look.
+
+The published numbers come with the next workflow run; §4 below predates the
+column.
+
 ---
 
 ## 2. The benchmarks
