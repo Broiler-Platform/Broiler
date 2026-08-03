@@ -71,9 +71,9 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 
 | Phase | State |
 |---|---|
-| **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is the critical path** — it is what phases A–F need to close on, and what phase 2's exit criterion is measured by. 0-7, 0-8 follow it |
+| **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is still the critical path, but its headline question is answered**: run at the pinned pointer on linux-x64, Octane is **15 of 15 suites `ok` and 17 of 17 scores** — Mandreel included, which the previous local pass had failing. Geomean 217, spread **113×** against a same-machine Chromium reference. What 0-6 still owes is the *workflow* run plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce |
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
-| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
+| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left**, and it is the suite 2-8 was written for. Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
 | **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. The global case's retained result list then landed too — **2 032.8 → 478.3 B per match**, dead linear on both sides, by streaming when the receiver's `exec` is the pristine intrinsic and the replacement is a `$`-free string. **Every follow-up this phase named is now closed**; what is left is item 2's `Compiled` policy, deliberately unshipped |
@@ -179,11 +179,15 @@ source documents ended up disagreeing.
 
 ### 2.1 The suite view — three numbers per Octane run
 
-| Metric | Last committed run | Target |
-|---|---|---|
-| **Scores reported** out of 17 | 12 / 17 (stale) | **17 / 17** |
-| **Geomean** over all 17 scores | 245 over the 12 that completed; ≈244 including the five *(0046)* measurements | — |
-| **Spread** = worst ÷ best, as ×-slower-than-Chromium | 4646 / 45 ≈ **103×** | **< 5×** |
+| Metric | Last committed run | **At the pin, linux-x64 (§Phase 0)** | Target |
+|---|---|---|---|
+| **Scores reported** out of 17 | 12 / 17 (stale) | **17 / 17** — 15 of 15 suites `ok` | **17 / 17** |
+| **Geomean** over all 17 scores | 245 over the 12 that completed; ≈244 including the five *(0046)* measurements | **217** over all 17 | — |
+| **Spread** = worst ÷ best, as ×-slower-than-Chromium | 4646 / 45 ≈ **103×** | 3 097 / 27 ≈ **113×** | **< 5×** |
+
+The middle column is a single repetition on a developer container with its **own** Chromium
+reference measured on the same machine, so its ratios are internally valid while its scores are
+not comparable to the left column's. It is not 0-6; see Phase 0 for what it is and is not.
 
 **Spread is the organizing metric.** Because the suite total is a geometric mean,
 flattening the curve and raising the total are the same work: moving MandreelLatency
@@ -550,6 +554,14 @@ These were paid for once each. They apply to every phase below.
   — 4.020 B/char both — which is what established them as one defect in two places rather than
   two resembling ones. *When a profile localizes a cost to a mechanism, grep for the mechanism;
   the corpus only measures what somebody thought to add to it.*
+- **An exit criterion that has never been run is not a pending task, it is an unknown answer.**
+  Phase 2's was *"DeltaBlue and Richards inside 200×"*, owed since the phase opened and carried
+  through every item as one line of the sequencing table. Run at last, it **splits**: Richards is
+  inside at 183× and DeltaBlue is outside at 576×, so the phase that was described as "every item
+  landed or closed" has in fact failed half its own gate, on the suite item 2-8 was written for.
+  Two repetitions would not have said that safely; five with a band did. *A gate carried unrun
+  reads as "nearly done" for as long as nobody runs it, and the cost of running it is almost
+  always less than the cost of the plan built on top of assuming it passes.*
 - **A hypothesis with a plausible mechanism still needs the control that would refute it.** 2-9's
   losing side was explained by the Annex B deferred cells forcing a trie rebuild — a mechanism
   read straight off the code, correct in every step, and wrong about the cause. The control that
@@ -897,6 +909,69 @@ only six frames deep, so what exhausted the budget is the engine recursing over
 0, the suite was reported rather than killed, and the other 14 were unaffected. That
 containment is 0-2 and B8 working as designed — the same overflow used to take a whole
 suite down.
+
+#### At the pinned pointer it is **17 of 17**, and phase 2's exit criterion finally has an answer
+
+Run 2026-08-03 at the pinned `2ebc0c3c` on **linux-x64**, against upstream `chromium/octane`
+`570ad1cc` (Octane v9), with the shell rebuilt by the harness rather than reused — and this
+time **both engines on the same machine**, so the ×-slower column is internally valid in a way
+no previous run's was.
+
+| | Committed run (2026-07-31, CI) | Local pass (`b3f53dcc`, win-x64) | **This run (pin, linux-x64)** |
+|---|---|---|---|
+| Suites `ok` | 10 of 15 | 14 of 15 | **15 of 15** |
+| Scores reported | 12 / 17 | 15 / 17 | **17 / 17** |
+
+**Mandreel passes now, and it is the difference between 15 and 17 scores.** The local pass
+above had it failing with 1-2's signature after 375 s of `global_init`; at the pin it completes,
+which is what **1-2's real fix landing on all three recursing passes** predicts and is the first
+run to show it. Every one of B8's five original failures stays fixed. **So 0-6's headline gate —
+17/17 with nothing timing out — is met at the pinned pointer**, which is the tree CI clones.
+
+**Read the timeout half of that gate precisely.** Nothing timed out, but two suites finish only
+because `scripts/octane-suites.json` raises their budgets above the run-wide **180 s floor**:
+**zlib at 644 s and Mandreel at 428 s**. The floor is a floor, not a bound, and it always was —
+the config file records the earlier 647 s / 313 s measurements that set those budgets. Mandreel
+is 37% slower here than the figure that budget was chosen from, which is the same
+this-machine-is-slower effect the scores show, and it leaves the budget comfortable rather than
+marginal. *"No timeout at the 180 s floor" would be the wrong sentence to carry forward: two of
+the fifteen exceed 180 s by design.*
+
+**The triad, with a same-machine Chromium reference:**
+
+| Metric | Value |
+|---|---|
+| Scores reported | **17 / 17** |
+| Broiler geomean over all 17 | **217** |
+| **Spread** = worst ÷ best, as ×-slower-than-Chromium | **113×** — MandreelLatency **3 097×** worst, SplayLatency **27×** best |
+
+MandreelLatency is still the tail by a wide margin, which is **phase 1's justification measured
+rather than quoted**: the two worst rows in the suite remain the two that measure only the front
+end. Nothing here changes that ordering.
+
+**Phase 2's exit criterion — "DeltaBlue and Richards inside 200×" — has been owed since the
+phase began. It is now answered, and it splits.** Re-run with **5 repetitions per engine**, so
+the verdict carries a band rather than a point:
+
+| Suite | Broiler median (band) | Chromium median (band) | ×-slower | Across the whole band | Gate |
+|---|--:|--:|--:|---|---|
+| **Richards** | 143 (7.0%) | 26 173 (8.6%) | **183×** | 163× – 191× | **PASS** |
+| **DeltaBlue** | 116 (16.7%) | 66 759 (10.1%) | **576×** | 538× – 711× | **FAIL** |
+
+Richards is inside 200× at *every* combination of the two bands, and DeltaBlue is outside it at
+every combination — worst-case-to-best-case it misses by between 2.7× and 3.6×. Neither verdict
+is a coin-flip against noise, which is the point of running five and reporting the band instead
+of one and reporting a number. **DeltaBlue is the item phase 2 has left**, and it is the suite
+2-8 was written for.
+
+> **What this is not.** It is not 0-6. That gate is *the workflow*, and it also carries 0-7's
+> BenchmarkDotNet comparison and 0-8's RID matrix, neither of which a container can produce —
+> §0-8 already records why a non-idle machine cannot. These results are therefore **not committed
+> to `tests/octane/results/`**, which stays CI's to write; the stale banner there still stands.
+> The full-suite numbers are **one repetition** and the harness says so in its own output. What
+> is claimed here is the pass/fail column, which is hardware-independent, and the two gate
+> ratios, which are same-machine, five-repetition and banded. The geomean and the spread are
+> recorded as this machine's, not as the campaign's.
 
 > **Superseded in part.** The same suite was re-run on **linux-x64 at `685026c0`** against
 > upstream `chromium/octane` while working 1-2, and **Mandreel completes** — `status: ok`,
@@ -3277,9 +3352,9 @@ predicate at all.
 
 | Phase | Order within it | Size | Unblocks / expected effect | Exit gate |
 |---|---|---|---|---|
-| **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
+| **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI — 17/17 established at the pin locally; the workflow run is still owed) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
 | **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-1** → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured: Richards 183× PASSES, DeltaBlue 576× FAILS**, five repetitions per engine on one machine |
 | **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | 4-3 design ✅ → **4-1** (unblocked) → 4-3a (S) → 4-3b (M–L) → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → single-match `replace` without a builder ✅ (both builtins) → the global case's retained result list ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
