@@ -32,7 +32,9 @@ so only the parent can hold the combined view.
   [`patches/0060`](../patches/0060-js-stream-global-replace.patch) — **in that order**, since
   `0060` builds on the function `0059` restructures — and the pointer is deliberately unbumped.
   Their figures below were measured on a local build of `2ebc0c3c` **plus** those patches,
-  control and change from the same tree.
+  control and change from the same tree. **Item 2-9's follow-up measurement is
+  [`patches/0061`](../patches/0061-js-measure-2-9-materialization-cause.patch)**, independent of
+  those two and measured on the pin alone.
   `a6f101cc` — which this section named until 3-3
   was worked, and which every §0 and phase-2 measurement below was taken at — is an **ancestor**
   of it (`merge-base --is-ancestor`), so nothing recorded here is invalidated;
@@ -71,7 +73,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 |---|---|
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is the critical path** — it is what phases A–F need to close on, and what phase 2's exit criterion is measured by. 0-7, 0-8 follow it |
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
-| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
+| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
 | **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. The global case's retained result list then landed too — **2 032.8 → 478.3 B per match**, dead linear on both sides, by streaming when the receiver's `exec` is the pristine intrinsic and the replacement is a `$`-free string. **Every follow-up this phase named is now closed**; what is left is item 2's `Compiled` policy, deliberately unshipped |
@@ -548,6 +550,21 @@ These were paid for once each. They apply to every phase below.
   — 4.020 B/char both — which is what established them as one defect in two places rather than
   two resembling ones. *When a profile localizes a cost to a mechanism, grep for the mechanism;
   the corpus only measures what somebody thought to add to it.*
+- **A hypothesis with a plausible mechanism still needs the control that would refute it.** 2-9's
+  losing side was explained by the Annex B deferred cells forcing a trie rebuild — a mechanism
+  read straight off the code, correct in every step, and wrong about the cause. The control that
+  settles it is one line of JavaScript: a **strict** function gets no deferred cells, so if the
+  cells are the cause it must not pay. It pays exactly the same — 1.00 trie rebuilds per function
+  on both — because the `prototype` install materializes first, for an unrelated correctness
+  reason. *The question "what would I expect to see if this were false" has an answer that is
+  usually cheaper to run than the fix the hypothesis implies, and running it first is what stops
+  a fix being built for a cause that was not there.*
+- **Count the thing, do not infer it from bytes.** The same hypothesis had been probed by
+  allocation, where the deferred cells do show up — non-strict functions cost 4.8% more than
+  strict, which reads like confirmation. A counter on the rebuild itself says 1.00 on both, and
+  the 4.8% turns out to be the cells' own price and nothing to do with the trie. *An indirect
+  instrument agreeing with you is weaker evidence than a direct one, and adding the direct one
+  here was six lines.*
 - **When an optimization skips work, the design is the observers, not the work.** Phase 5's
   streaming replace is four lines: append each replacement instead of collecting them all. Every
   hour of it went into establishing that nobody could watch the skipped result objects — and two
@@ -1931,7 +1948,66 @@ movements is claimed here.** What is claimed is the allocation result, which is 
 and the compile-throughput cost, which reproduced across three separate measurement rounds.
 **The right follow-up is to stop materializing for a deferred cell** — the null-slot key it
 records needs its descriptor somewhere other than the trie — which would test the hypothesis and,
-if it holds, remove the loss.
+if it holds, remove the loss. ***It does not hold. See below: the hypothesis was measured against
+its own control and is wrong, and that follow-up would not have removed the loss.***
+
+#### The losing-side hypothesis was measured, and it is wrong — **`prototype` is what materializes**
+
+> **Delivered as a patch, not in the pin**, for the same 403 as phase 5's:
+> [`patches/0061`](../patches/0061-js-measure-2-9-materialization-cause.patch), which is
+> **measurement and instrumentation only — no behaviour change** — and is independent of
+> `0059`/`0060`, touching a disjoint set of files.
+
+The mechanism above was recorded as a hypothesis and flagged *"do not treat as settled"*. It is
+now settled, and against it. **A strict function is the control it never had**:
+`AddLegacyCallerAndArguments` runs for non-strict functions only, so if the Annex B deferred cells
+are what forces the trie, a strict function must not pay it.
+
+`--deferred-cell-cost` (new; `DeferredCellCostMetrics`) builds 4 000 functions each way, and a
+new `RecordNamedPropertiesMaterialized` counter reports trie rebuilds directly rather than
+inferring them from bytes:
+
+| Site | B/function | ns/function | **materializations/function** |
+|---|--:|--:|--:|
+| `nonstrict-create` | 356 421 | 4 667 190 | **1.00** |
+| `strict-create` | 340 161 | 4 900 524 | **1.00** |
+| `nonstrict-create-and-call` | 356 226 | 8 693 125 | **1.00** |
+| `strict-create-and-call` | 340 426 | 9 245 164 | **1.00** |
+
+**Exactly one materialization per function, on all four rows.** A strict function — which has no
+deferred cells at all — rebuilds its trie just as surely as a non-strict one, so the deferred
+cells cannot be what causes it. The wall clock says the same thing from the other side: strict is
+*marginally slower*, not faster, on both halves.
+
+**What actually materializes is the `prototype` install, and it is a correctness rule doing it.**
+Traced to `JSFunction..ctor`, whose three own-key writes are `length`, `name`, `prototype` — the
+first two stay shape-only and the third does not, because
+`JSFunction.AllowsDirectShapeWrite(uint key) => key != KeyStrings.prototype.Key` withholds that
+one key. `FastAddValue` then falls off `TryShapeOnlySetDataProperty` to `OwnProperties()`, which
+materializes. **That withhold is 2-8's DeltaBlue fix** — a cached prototype write left the second
+level of every inheritance chain unlinked — so it is load-bearing, not an oversight.
+
+**So the item is re-specified, and the planned fix is withdrawn before it was built.** Stopping
+the deferred-cell materialization would remove a materialization that has already happened: every
+function with a `prototype` has materialized before either Annex B cell is installed. The
+non-strict rows do cost **4.8% more bytes** than strict, which is the cells' real price — but it
+is a per-function 4.8%, not the compile-and-first-run loss the item is trying to explain.
+
+**The candidate that replaces it, not started and deliberately not attempted here.** The withhold
+exists so an *inline cache* cannot answer for `prototype`; shape-only *storage* is a different
+question, and `AllowsDirectShapeWrite` is currently the single answer to both — it is consulted at
+five sites, two of which are storage (`TryShapeOnlyOverwrite`, `TryShapeOnlySetDataProperty`) and
+three of which are cache paths. Splitting the two would let `prototype` live in a slot while
+staying invisible to the cache. **It is not attempted here because this is exactly the code whose
+last regression broke DeltaBlue outright**, and §3.5's own rule is that a change justified by a
+benchmark has to be run against that benchmark — which needs 0-6. The measurement is the
+deliverable; the fix is specified and left.
+
+**The first call is still unexplained, and it is not allocation.** The call roughly doubles wall
+clock (4.7 M → 8.7 M ns per function) while adding **no** managed bytes at all — the
+create-and-call rows are within 200 B of the create-only rows, on both halves. Whatever the
+first-call cost is, it allocates nothing and does not split on strictness, which rules out both
+the deferred cells and the trie. That narrows the item's open question rather than closing it.
 
 #### It holds on real programs — `--property-map-distribution`, before and after
 

@@ -26,16 +26,21 @@ Delete the patch file and its row below once the pointer is bumped.
 | `0059-js-single-match-replace-one-allocation` | `Broiler.JS` | Phase 5's first follow-up to item 1. A single-match `replace` assembled its answer through a `StringBuilder`, costing two full UTF-16 copies of the subject — into the chunk list, then back out through `ToString()`. `string.Concat` over three spans writes it in one allocation: **4.020 → 2.020 bytes per subject character**, exactly the predicted halving, in `RegExp.prototype[@@replace]` *and* in `String.prototype.replace`'s string-`searchValue` builtin, which had the same three appends into a builder that was already sized exactly right. Adds `SingleMatchReplaceAllocationTests` (41 cases) and a `replace-one-string` profile row. |
 | `0060-js-stream-global-replace` | `Broiler.JS` | Phase 5's second follow-up. §22.2.6.11 collects every match before reading any of their properties, so a global replace held one result array per match live — **2 032.8 bytes per match, dead linear**, 10.3 MB for one 5 000-match call. Streams instead when nothing can observe the results: the receiver's `exec` is the pristine `%RegExp.prototype.exec%` captured at realm init, the replacement is a string, and it contains no `$`. **478.3 B/match, 0.235x.** Splits `Exec` into `ExecMatch` + `BuildExecResult` so both paths share the `lastIndex`/sticky/statics code, and adds `JSContext.IntrinsicRegExpExec` and `GlobalReplaceStreamingTests` (23 cases). **Apply after `0059` — it builds on the same function.** |
 
+| `0061-js-measure-2-9-materialization-cause` | `Broiler.JS` | Measurement and instrumentation only, **no behaviour change**. Item 2-9's losing-side hypothesis said the Annex B deferred cells force the trie rebuild; a *strict* function is the control it never had, and it rebuilds just as much — **1.00 per function on all four rows**. What materializes is the `prototype` install, withheld from shape-only storage by 2-8's DeltaBlue fix, so the planned "stop materializing for a deferred cell" follow-up is withdrawn before being built. Adds `--deferred-cell-cost` and a `RecordNamedPropertiesMaterialized` counter. **Independent of `0059`/`0060`** — different files, applies in any order. |
+
 The ten `Broiler.JS` patches this file previously carried (`0049`–`0058`) have all been
 applied and their pointer bumped; they are listed under *Recently cleared* below with the
 commit each landed as.
 
-**`0059` and `0060` are pending against the pinned pointer `2ebc0c3c`**, in that order —
-`0060` touches the function `0059` restructures, so applying them out of order will conflict.
-The push to `Broiler-Platform/Broiler.JS` returned 403 from the session's git proxy, so the
-pointer is deliberately *not* bumped. There is no main-repo fallback for either and none is
-needed: both are allocation reductions with no behaviour difference, so CI is correct without
-them, only more allocating.
+**`0059`, `0060` and `0061` are pending against the pinned pointer `2ebc0c3c`.** `0059` and
+`0060` must go in that order — `0060` touches the function `0059` restructures, so applying
+them out of order will conflict. `0061` touches a disjoint set of files and applies in any
+order relative to the other two. Each push to `Broiler-Platform/Broiler.JS` returned 403 from
+the session's git proxy, so the pointer is deliberately *not* bumped. None of the three needs
+a main-repo fallback: `0059` and `0060` are allocation reductions with no behaviour
+difference, so CI is correct without them and only more allocating, and `0061` adds a
+benchmark emitter and an opt-in counter that is off unless
+`PropertyOptimizationDiagnostics.Enabled` is set.
 
 ## Recently cleared
 
