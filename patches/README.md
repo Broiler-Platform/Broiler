@@ -32,25 +32,28 @@ Delete the patch file and its row below once the pointer is bumped.
 
 | `0063-js-prototype-rewrite-no-invalidate` | `Broiler.JS` | Item 2-11. A write that re-applies the prototype an object **already has** read as a `[[SetPrototypeOf]]` on a live object and retired **every** prototype-keyed inline-cache entry in the process — class construction did it once per `new` (2 002 invalidations for 2 000 allocations). The setter now publishes only when the chain actually changes. Because the retirement was process-wide the effect is far wider than the class case: **Richards's read cache hit rate 86.61% → 99.97%**, DeltaBlue 65.96% → 69.45%, Box2D 96.39% → 97.72%; invalidations 37 → 10, 2 519 → 16, 1 944 → 107. One file, one condition; independent of `0059`–`0062`. |
 
+| `0064-js-refresh-stale-cache-entry` | `Broiler.JS` | Item 2-12. The property inline cache's add path deduplicated on `ShapeId` + `Holder`, while a hit checked those **plus four more guards**. When one went stale the read missed, reached the add path, was told the entry was "already present", and returned without replacing it — so that site missed on that receiver **for the rest of the process**. 77.7% of DeltaBlue's misses. Refreshing in place takes **DeltaBlue's read hit rate 69.45% → 93.16%** (misses 306 004 → 68 534) and Box2D's 97.72% → 98.83%. Also adds the miss-reason counters the attribution needed. **Requires `0061` and `0062` to compile.** |
+
 The ten `Broiler.JS` patches this file previously carried (`0049`–`0058`) have all been
 applied and their pointer bumped; they are listed under *Recently cleared* below with the
 commit each landed as.
 
-**`0059`–`0063` are pending against the pinned pointer `2ebc0c3c`.** All five apply cleanly in
-numeric order. Two ordering constraints are real:
+**`0059`–`0064` are pending against the pinned pointer `2ebc0c3c`.** All six apply cleanly in
+numeric order, and the full stack builds. Two ordering constraints are real:
 
 - **`0060` after `0059`** — it touches the function `0059` restructures, so out of order they
   conflict textually.
+- **`0064` after `0061` and `0062`** — it reads `0061`'s counters and extends `0062`'s emitter.
 - **`0062` after `0061`** — `0062` applies cleanly on its own but will **not compile** without
   `0061`, because its new `--suite-cache-metrics` emitter reads the
   `NamedPropertiesMaterializations` counter `0061` adds. A textual check is not enough here;
   build after applying.
 
 Each push to `Broiler-Platform/Broiler.JS` returned 403 from the session's git proxy, so the
-pointer is deliberately *not* bumped. None of the five needs a main-repo fallback: `0059` and
+pointer is deliberately *not* bumped. None of the six needs a main-repo fallback: `0059` and
 `0060` are allocation reductions with no behaviour difference, so CI is correct without them and
 only more allocating; `0061` adds a benchmark emitter and an opt-in counter that is off unless
-`PropertyOptimizationDiagnostics.Enabled` is set; and `0062` and `0063` remove pessimizations, so
+`PropertyOptimizationDiagnostics.Enabled` is set; and `0062`, `0063` and `0064` remove pessimizations, so
 without them CI is correct and only slower.
 
 ## Recently cleared
