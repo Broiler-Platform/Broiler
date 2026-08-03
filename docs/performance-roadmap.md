@@ -1342,6 +1342,38 @@ observed directly, and it is the first thing 1-3 should check.
    them and read 1.6× and 2.6× **slower**, with bimodal ratios — the tell that it was ordering
    and not the change.
 
+**The three-engine comparison was run over both named suites.** Not `--only` — that makes the
+harness skip the comparison by design ("its suite set is a subset, so folding it into the full
+comparison would silently drop every suite it skipped") — but a **two-suite manifest**, which
+makes it a full run over exactly CodeLoad and Mandreel and emits `comparison.md` honestly.
+Chromium 3 reps, Broiler 3 reps, Jint 1:
+
+| Benchmark | Chromium | Broiler | Jint | Broiler × slower | Broiler / Jint |
+|---|--:|--:|--:|--:|--:|
+| CodeLoad | 19 334 | 82.4 ⚠ | 1 997 | 234.6× | 0.041 |
+| Mandreel | 28 359 | 104 | 58.5 | 272.7× | **1.778** |
+| MandreelLatency | 35 865 | 9.8 ⚠ | 499 | **3 659.7×** | 0.020 |
+
+⚠ = spread over 3 repetitions exceeded the 7.5% noise band (CodeLoad 15.9%, MandreelLatency
+9.5%). All six suite runs completed `ok`; nothing to diagnose.
+
+**Four things this table is not.** *(1)* Its geomean (44) and spread (15.6×) are over **three
+scores**, not the suite's seventeen — they are not comparable to the committed run's 354 and
+249×, and must never be quoted as if they were. *(2)* Broiler's absolute scores here are well
+below the same build measured alone earlier the same day (CodeLoad 82.4 against 104, Mandreel
+104 against 137): a three-engine session is a busier machine than a one-suite run, which is
+§3.2's rule about comparing only within a run, showing up. *(3)* **Jint ran one repetition, and
+`comparison.md`'s header says "Repetitions per suite: 3"** — the header takes that number from a
+single engine and presents it as global. A harness defect, small and worth fixing before anyone
+quotes the Jint column as a median. *(4)* Jint ran in a separate, later, quieter process after
+the first attempt was killed, so its column is the weakest of the three.
+
+**What it does show.** Broiler is **1.778× ahead of Jint on Mandreel** — the suite whose compile
+1-4 tripled — and far behind it on the two that are not compile-bound: 0.041× on CodeLoad, whose
+payload Jint evaluates far faster, and 0.020× on MandreelLatency. *A managed interpreter beating
+this engine by 25× and 50× on those two is the sharper statement of where phase 1 and phase 3
+have left to go, and it is a comparison no Chromium column makes visible.*
+
 **What is still open.** The parse and the expression-tree construction are still eager, and on
 real source that is the larger half. Closing it needs the capture mechanism described above,
 and this item stays open for it. **Size of what remains: L.**
