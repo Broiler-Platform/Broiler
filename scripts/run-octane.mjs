@@ -1,9 +1,16 @@
 // run-octane.mjs — run the Octane 2.0 benchmark suite under Chromium (V8 via
-// Playwright) and/or Broiler (the BroilerJS --script-host shell), then emit a
-// per-engine result file, a comparison report, and a failure diagnostics report.
+// Playwright), Broiler (the BroilerJS --script-host shell) and/or Jint (a
+// managed ECMAScript interpreter), then emit a per-engine result file, a
+// comparison report, and a failure diagnostics report.
+//
+// Chromium answers "how far is Broiler from V8" — a number about a JIT-compiling
+// C++ engine. Jint answers the question a Broiler change is steered by: how
+// Broiler compares to another managed engine on the same CLR, running the same
+// script in the same process shape. Both are reference points, neither replaces
+// the other.
 //
 // Each Octane suite is executed in isolation — a fresh Chromium page or a fresh
-// Broiler process — so a crash, hang, or error in one suite never discards the
+// shell process — so a crash, hang, or error in one suite never discards the
 // others. This matters because Broiler is an experimental engine: some suites
 // score, some throw a catchable error, and some abort the whole process.
 //
@@ -16,7 +23,10 @@
 //     command. Broiler prints a JS stack trace on an unhandled throw, and
 //     surfaces a CLR fault as a catchable JS error whose *message* carries the
 //     .NET exception type and its whole managed stack — both are kept verbatim.
-//   * Stack traces are mapped back to Octane sources. Broiler runs one
+//     Jint reports an escaping JavaScript error as an unhandled .NET exception
+//     whose inner exception is the JavaScript stack, so the same capture reads
+//     both engines.
+//   * Stack traces are mapped back to Octane sources. A shell engine runs one
 //     concatenated script per suite, so its traces cite lines in a temporary
 //     file; every such line is rewritten to the file and line it came from
 //     (base.js:371, crypto.js:104, …) using the offsets recorded when the
@@ -32,9 +42,12 @@
 //
 // Options:
 //   --octane-dir <dir>     Octane checkout (contains base.js, richards.js, …). Required.
-//   --engines <list>       Comma-separated: chromium,broiler (default: chromium,broiler)
+//   --engines <list>       Comma-separated: chromium,broiler,jint
+//                          (default: chromium,broiler,jint)
 //   --broiler-dll <path>   BroilerJS.dll to run with `dotnet ... --script-host`.
 //                          Required when broiler is in --engines.
+//   --jint-dll <path>      Broiler.Octane.JintHost.dll — the Jint shell.
+//                          Required when jint is in --engines.
 //   --out-dir <dir>        Where result JSON/MD are written (default: tests/octane/results)
 //   --log-dir <dir>        Where per-suite logs are written (default: tests/octane/logs)
 //   --suites <path>        Suite manifest (default: scripts/octane-suites.json)
@@ -78,8 +91,9 @@ const REPORT_CLR_FRAMES = 30;
 function parseArgs(argv) {
   const opts = {
     octaneDir: null,
-    engines: 'chromium,broiler',
+    engines: 'chromium,broiler,jint',
     broilerDll: null,
+    jintDll: null,
     outDir: join(REPO_ROOT, 'tests', 'octane', 'results'),
     logDir: join(REPO_ROOT, 'tests', 'octane', 'logs'),
     suites: join(__dirname, 'octane-suites.json'),
@@ -100,6 +114,7 @@ function parseArgs(argv) {
       case '--octane-dir': opts.octaneDir = next(); break;
       case '--engines': opts.engines = next(); break;
       case '--broiler-dll': opts.broilerDll = next(); break;
+      case '--jint-dll': opts.jintDll = next(); break;
       case '--out-dir': opts.outDir = next(); break;
       case '--log-dir': opts.logDir = next(); break;
       case '--suites': opts.suites = next(); break;
@@ -301,10 +316,14 @@ function tryJson(s) {
 // Read back the diagnostic lines octane-runner.js streamed. Works on partial
 // output, which is the point: a killed process still tells us how far it got.
 export function parseDiagnostics(stdout) {
-  const out = { start: null, traces: [], errors: [], fatal: null, loaded: [], notes: [], result: null };
+  const out = { start: null, traces: [], errors: [], fatal: null, loaded: [], notes: [], result: null, engine: null };
   if (!stdout) return out;
   for (const line of String(stdout).replace(/\r/g, '').split('\n')) {
-    if (line.startsWith('OCTANE_TRACE ')) {
+    if (line.startsWith('OCTANE_ENGINE ')) {
+      // A shell naming itself and its version, ahead of the script. Optional:
+      // the BroilerJS shell does not print one and keeps its static label.
+      out.engine = tryJson(line.slice('OCTANE_ENGINE '.length)) ?? out.engine;
+    } else if (line.startsWith('OCTANE_TRACE ')) {
       const v = tryJson(line.slice('OCTANE_TRACE '.length));
       if (v) out.traces.push(v);
     } else if (line.startsWith('OCTANE_ERROR ')) {
@@ -359,6 +378,18 @@ export function parseClrException(text) {
   return { ...outer, inner, frames };
 }
 
+// Jint spells a JS frame the way V8 does, with the location parenthesized and
+// the function name omitted at top level:
+//
+//   at <fn> (<file>:<line>:<col>)
+//   at <file>:<line>:<col>               top-level code, no enclosing function
+//
+// Tried before the Broiler spellings below because the two overlap: without the
+// parentheses the generic pattern reads `at f (crypto.js:405:12)` as a function
+// named `f (crypto.js` — a frame that localizes nothing.
+const V8_FRAME = /^\s*at\s+(?:(.+?)\s+)?\((.+):(\d+):(\d+)\)\s*$/;
+const V8_TOP_LEVEL_FRAME = /^\s*at\s+(\S.*):(\d+):(\d+)\s*$/;
+
 // Broiler spells a JS frame three ways, and each one localizes a different
 // class of failure — so all three are recognized:
 //
@@ -378,6 +409,16 @@ export function parseJsStack(text) {
   if (!text) return [];
   const frames = [];
   for (const line of String(text).replace(/\r/g, '').split('\n')) {
+    const named = V8_FRAME.exec(line);
+    if (named) {
+      frames.push({ fn: named[1]?.trim() || '<anonymous>', file: named[2].trim(), line: Number(named[3]) });
+      continue;
+    }
+    const topLevel = V8_TOP_LEVEL_FRAME.exec(line);
+    if (topLevel) {
+      frames.push({ fn: '<top level>', file: topLevel[1].trim(), line: Number(topLevel[2]) });
+      continue;
+    }
     const m = /^\s*at\s+(.+?)(?:\s+in\s+|[:-])(\S.*?)(?::line[ \t]+(\d+)|:(\d+))(?:,(\d+))?(?:\([^)]*\))?\s*$/.exec(line);
     if (m) {
       if (MANAGED_FRAME.test(line.trim().replace(/^at\s+/, ''))) continue;
@@ -585,10 +626,36 @@ function writeSuiteLog(path, sections) {
   writeFileSync(path, `${lines.join('\n')}\n`);
 }
 
-// ── Broiler: one isolated `dotnet … --script-host <combined>` process per suite
-async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
-  if (!opts.broilerDll) throw new Error('--broiler-dll is required for the broiler engine');
-  const logDir = join(dirs.logDir, 'broiler');
+// ── Shell engines: one isolated `dotnet <shell> <combined>` process per suite ──
+// Broiler and Jint differ only in which assembly is launched and what it wants
+// on its command line; everything downstream — the combined script, the
+// breadcrumbs, the line mapping, the failure classification — is identical,
+// because both are JavaScript shells reading the same script and printing the
+// same diagnostic protocol.
+export const SHELL_ENGINES = {
+  broiler: {
+    label: 'Broiler.JS (BroilerJS --script-host)',
+    dllOption: '--broiler-dll',
+    dll: (opts) => opts.broilerDll,
+    args: (dll, combined) => [dll, '--script-host', combined],
+    env: (opts) => ({ ...process.env, ...opts.broilerEnv }),
+  },
+  jint: {
+    // Replaced by whatever the shell reports in its OCTANE_ENGINE line, which
+    // names the Jint version that actually ran.
+    label: 'Jint (interpreter)',
+    dllOption: '--jint-dll',
+    dll: (opts) => opts.jintDll,
+    args: (dll, combined) => [dll, combined],
+    env: () => ({ ...process.env }),
+  },
+};
+
+async function runShellEngine(engine, opts, suites, baseJs, runnerJs, dirs) {
+  const spec = SHELL_ENGINES[engine];
+  const dll = spec.dll(opts);
+  if (!dll) throw new Error(`${spec.dllOption} is required for the ${engine} engine`);
+  const logDir = join(dirs.logDir, engine);
   const scriptDir = join(logDir, 'scripts');
   mkdirSync(scriptDir, { recursive: true });
 
@@ -596,6 +663,7 @@ async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
   const stability = {};
   const suiteStatus = {};
   let octaneVersion = null;
+  let engineLabel = spec.label;
 
   for (const suite of suites) {
     const parts = [{ file: 'base.js', text: baseJs }];
@@ -606,8 +674,8 @@ async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
     const combined = join(scriptDir, `${suite.name}.js`);
     writeFileSync(combined, text);
 
-    const args = [opts.broilerDll, '--script-host', combined];
-    const repro = `dotnet ${opts.broilerDll} --script-host ${combined}`;
+    const args = spec.args(dll, combined);
+    const repro = `dotnet ${args.join(' ')}`;
 
     // Map every citation of the combined script back to the Octane source, and
     // trim the repo root off engine frames, before anything is read or shown.
@@ -624,22 +692,25 @@ async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
       const logName = opts.repetitions === 1 ? `${suite.name}.log` : `${suite.name}.rep${rep}.log`;
       const label = opts.repetitions === 1 ? suite.name : `${suite.name} (${rep}/${opts.repetitions})`;
 
-      process.stderr.write(`[broiler] ${label} … `);
+      process.stderr.write(`[${engine}] ${label} … `);
       if (opts.verbose) process.stderr.write('\n');
 
       const res = await runProcess('dotnet', args, {
         timeoutMs: timeoutSec * 1000,
-        env: { ...process.env, ...opts.broilerEnv },
-        onStdout: opts.verbose ? createLineStreamer(`[broiler:${suite.name}] `, clean) : null,
-        onStderr: opts.verbose ? createLineStreamer(`[broiler:${suite.name}!] `, clean) : null,
+        env: spec.env(opts),
+        onStdout: opts.verbose ? createLineStreamer(`[${engine}:${suite.name}] `, clean) : null,
+        onStderr: opts.verbose ? createLineStreamer(`[${engine}:${suite.name}!] `, clean) : null,
       });
 
       const stdout = clean(res.stdout);
       const stderr = clean(res.stderr);
       const mapped = { ...res, stdout, stderr };
       const diag = parseDiagnostics(stdout);
+      // A shell that names itself (and its version) is labelled with what ran
+      // rather than with what the harness assumed was installed.
+      if (diag.engine?.label) engineLabel = diag.engine.label;
 
-      const status = classifyBroilerSuite(mapped, diag, {
+      const status = classifyShellSuite(mapped, diag, {
         combined,
         repro,
         log: relative(REPO_ROOT, join(logDir, logName)),
@@ -672,7 +743,7 @@ async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
       ]);
 
       if (!opts.verbose) process.stderr.write(`${status.status}\n`);
-      else process.stderr.write(`[broiler] ${label} … ${status.status}\n`);
+      else process.stderr.write(`[${engine}] ${label} … ${status.status}\n`);
       if (status.status !== 'ok') {
         const where = describeWhere(status.failedAt);
         const detail = clamp(status.error ?? '', 160);
@@ -704,8 +775,8 @@ async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
   }
 
   return {
-    engine: 'broiler',
-    engineLabel: 'Broiler.JS (BroilerJS --script-host)',
+    engine,
+    engineLabel,
     octaneVersion,
     perSuiteTimeoutSec: opts.timeout,
     repetitions: opts.repetitions,
@@ -720,7 +791,7 @@ async function runBroiler(opts, suites, baseJs, runnerJs, dirs) {
 // Turn a finished child process into a suite verdict plus everything needed to
 // act on it. The status vocabulary (ok/error/timeout/crash) is unchanged; the
 // surrounding detail is what is new.
-function classifyBroilerSuite(res, diag, paths) {
+function classifyShellSuite(res, diag, paths) {
   const base = {
     exitCode: res.code ?? null,
     signal: res.signal ?? null,
@@ -943,12 +1014,18 @@ async function runChromium(opts, suites, baseJs, runnerJs, dirs) {
 }
 
 // ── Comparison report ───────────────────────────────────────────────────────
+// Engines in report order. Broiler is the subject; Chromium and Jint are the two
+// reference points it is read against.
+export const ENGINE_IDS = ['chromium', 'broiler', 'jint'];
+
 export function buildComparison(results, generatedAt) {
   const chromium = results.chromium;
   const broiler = results.broiler;
+  const jint = results.jint;
+  const present = ENGINE_IDS.filter((id) => results[id]);
   const names = new Set();
-  for (const r of [chromium, broiler]) {
-    if (!r) continue;
+  for (const id of present) {
+    const r = results[id];
     for (const k of Object.keys(r.benchmarks)) names.add(k);
     for (const k of Object.keys(r.suiteStatus)) names.add(k);
   }
@@ -962,49 +1039,59 @@ export function buildComparison(results, generatedAt) {
     return { score: null, status: st ? st.status : 'n/a', error: st?.error, errorType: st?.errorType };
   }
 
+  // Higher is better in Octane, so a ratio above 1 means the first engine won.
+  const ratio = (a, b, digits) => (a.score && b.score ? Number((a.score / b.score).toFixed(digits)) : null);
+
   const comparison = {
     generatedAt,
-    octaneVersion: (chromium?.octaneVersion ?? broiler?.octaneVersion) ?? null,
-    engines: {
-      chromium: chromium ? { label: chromium.engineLabel, geomean: chromium.geomean } : null,
-      broiler: broiler ? { label: broiler.engineLabel, geomean: broiler.geomean } : null,
-    },
+    octaneVersion: present.map((id) => results[id].octaneVersion).find(Boolean) ?? null,
+    engines: Object.fromEntries(ENGINE_IDS.map((id) => [
+      id,
+      results[id] ? { label: results[id].engineLabel, geomean: results[id].geomean } : null,
+    ])),
     benchmarks: rows.map((name) => {
       const c = cell(chromium, name);
       const b = cell(broiler, name);
-      const ratio = c.score && b.score ? Number((b.score / c.score).toFixed(3)) : null;
-      const slower = c.score && b.score ? Number((c.score / b.score).toFixed(1)) : null;
+      const j = cell(jint, name);
       return {
         name,
         chromium: c,
         broiler: b,
-        broilerVsChromium: ratio,
-        broilerTimesSlower: slower,
-        stability: {
-          chromium: chromium?.stability?.[name] ?? null,
-          broiler: broiler?.stability?.[name] ?? null,
-        },
+        jint: j,
+        broilerVsChromium: ratio(b, c, 3),
+        broilerTimesSlower: ratio(c, b, 1),
+        jintVsChromium: ratio(j, c, 3),
+        // The managed-versus-managed number: above 1, Broiler beat Jint on this
+        // suite. Unlike the Chromium ratio it is expected to be near 1, so it is
+        // the one a Broiler change is actually read against.
+        broilerVsJint: ratio(b, j, 3),
+        stability: Object.fromEntries(ENGINE_IDS.map((id) => [id, results[id]?.stability?.[name] ?? null])),
       };
     }),
   };
-  comparison.summary = summarize(comparison, { chromium, broiler });
+  comparison.summary = summarize(comparison, results);
   return comparison;
 }
 
-// The three numbers this comparison is read for. Coverage and spread are here
-// because the geomean alone hides both: a run that drops five suites still
-// reports a geomean, and a profile with one catastrophic score reports much the
-// same total as an evenly-bad one while being a completely different problem.
-function summarize(cmp, { chromium, broiler }) {
+// The numbers this comparison is read for. Coverage and spread are here because
+// the geomean alone hides both: a run that drops five suites still reports a
+// geomean, and a profile with one catastrophic score reports much the same total
+// as an evenly-bad one while being a completely different problem.
+function summarize(cmp, results) {
+  const { chromium, broiler, jint } = results;
   const scored = cmp.benchmarks.filter((r) => r.broilerTimesSlower != null);
   const factors = scored.map((r) => r.broilerTimesSlower);
   const best = scored.find((r) => r.broilerTimesSlower === Math.min(...factors)) ?? null;
   const worst = scored.find((r) => r.broilerTimesSlower === Math.max(...factors)) ?? null;
   const count = (r) => (r ? Object.keys(r.benchmarks).length : 0);
   const expected = new Set(cmp.benchmarks.map((r) => r.name)).size;
+  // Only the engines this run has results for, so a two-engine run reports the
+  // same shape it always did rather than a column of zeroes for one that never ran.
+  const present = ENGINE_IDS.filter((id) => results[id]);
+  const perEngine = (fn) => Object.fromEntries(present.map((id) => [id, fn(results[id])]));
   return {
-    scoresReported: { chromium: count(chromium), broiler: count(broiler), expected },
-    geomean: { chromium: chromium?.geomean ?? null, broiler: broiler?.geomean ?? null },
+    scoresReported: { ...perEngine(count), expected },
+    geomean: perEngine((r) => r.geomean ?? null),
     // "Smoothness": how far apart the best and worst suites are. A uniformly
     // slow engine is a healthier engine than a mostly-fine one with an outlier,
     // because the outlier is a single subsystem failing rather than a broad
@@ -1014,36 +1101,58 @@ function summarize(cmp, { chromium, broiler }) {
       best: best && { name: best.name, timesSlower: best.broilerTimesSlower },
       worst: worst && { name: worst.name, timesSlower: worst.broilerTimesSlower },
     },
-    repetitions: broiler?.repetitions ?? chromium?.repetitions ?? 1,
-    noiseBandPercent: broiler?.noiseBandPercent ?? chromium?.noiseBandPercent ?? null,
+    // Broiler against the other managed engine, over the suites both scored —
+    // the geomeans above cannot be divided for this, since each is taken over
+    // whatever suites that engine happened to complete.
+    broilerVsJint: geomeanRatio(cmp.benchmarks.map((r) => r.broilerVsJint)),
+    repetitions: broiler?.repetitions ?? chromium?.repetitions ?? jint?.repetitions ?? 1,
+    noiseBandPercent: broiler?.noiseBandPercent ?? chromium?.noiseBandPercent ?? jint?.noiseBandPercent ?? null,
   };
 }
 
-export function renderMarkdown(cmp, broiler) {
+// Geometric mean of the per-benchmark ratios, ignoring the suites where one of
+// the two engines has no score.
+function geomeanRatio(ratios) {
+  const xs = ratios.filter((v) => Number.isFinite(v) && v > 0);
+  if (xs.length === 0) return null;
+  return { ratio: Number(Math.exp(xs.reduce((a, v) => a + Math.log(v), 0) / xs.length).toFixed(3)), benchmarks: xs.length };
+}
+
+const ENGINE_TITLES = { chromium: 'Chromium', broiler: 'Broiler', jint: 'Jint' };
+
+// The Jint columns appear only when a Jint result is in the run: a
+// Chromium-vs-Broiler run renders exactly the table it always did rather than
+// carrying two columns of dashes for an engine nobody asked for.
+export function renderMarkdown(cmp, results) {
+  const byEngine = results ?? {};
   const c = cmp.engines.chromium;
   const b = cmp.engines.broiler;
+  const j = cmp.engines.jint;
   const fmt = (cell) => {
     if (cell.score != null) return String(cell.score);
     if (cell.status === 'n/a') return '—';
     return `_${cell.status}_`;
   };
+  const present = ENGINE_IDS.filter((id) => cmp.engines[id]);
   const lines = [];
-  lines.push(`# Octane 2.0 benchmark — Chromium vs Broiler`);
+  lines.push(`# Octane 2.0 benchmark — ${present.map((id) => ENGINE_TITLES[id]).join(' vs ') || 'no engines'}`);
   lines.push('');
   lines.push(`- Generated: \`${cmp.generatedAt}\``);
   lines.push(`- Octane version: \`${cmp.octaneVersion ?? 'unknown'}\``);
-  if (c) lines.push(`- Chromium: \`${c.label}\` — **overall score ${c.geomean ?? 'n/a'}**`);
-  if (b) lines.push(`- Broiler: \`${b.label}\` — **overall score ${b.geomean ?? 'n/a'}**`);
+  for (const id of present) {
+    lines.push(`- ${ENGINE_TITLES[id]}: \`${cmp.engines[id].label}\` — **overall score ${cmp.engines[id].geomean ?? 'n/a'}**`);
+  }
   const s = cmp.summary;
   if (s) {
     lines.push(`- Repetitions per suite: ${s.repetitions}${s.repetitions === 1 ? ' — **a single run; deltas against it cannot be distinguished from noise**' : ` (median reported; noise band ${s.noiseBandPercent}%)`}`);
     lines.push('');
-    lines.push('| | Chromium | Broiler |');
-    lines.push('|---|--:|--:|');
-    lines.push(`| Scores reported (of ${s.scoresReported.expected}) | ${s.scoresReported.chromium} | ${s.scoresReported.broiler} |`);
-    lines.push(`| Overall (geomean) | ${s.geomean.chromium ?? '—'} | ${s.geomean.broiler ?? '—'} |`);
+    const cells = (values) => `| ${values.join(' | ')} |`;
+    lines.push(cells(['', ...present.map((id) => ENGINE_TITLES[id])]));
+    lines.push(`|---|${present.map(() => '--:|').join('')}`);
+    lines.push(cells([`Scores reported (of ${s.scoresReported.expected})`, ...present.map((id) => s.scoresReported[id] ?? '—')]));
+    lines.push(cells(['Overall (geomean)', ...present.map((id) => s.geomean[id] ?? '—')]));
     if (s.spread) {
-      lines.push(`| Spread (worst ÷ best suite) | — | ${s.spread.factor}× |`);
+      lines.push(cells(['Spread (worst ÷ best suite)', ...present.map((id) => (id === 'broiler' ? `${s.spread.factor}×` : '—'))]));
     }
     lines.push('');
     if (s.spread) {
@@ -1053,40 +1162,59 @@ export function renderMarkdown(cmp, broiler) {
         'engine being uniformly behind. See [`../roadmap.md`](../roadmap.md).');
       lines.push('');
     }
+    if (s.broilerVsJint) {
+      lines.push(`Against Jint — a managed interpreter on the same runtime, and so the closer reference point — ` +
+        `Broiler scores **${s.broilerVsJint.ratio}×** across the ${s.broilerVsJint.benchmarks} benchmark` +
+        `${s.broilerVsJint.benchmarks === 1 ? '' : 's'} both engines completed (geometric mean of the per-benchmark ratios).`);
+      lines.push('');
+    }
   }
   lines.push('Higher is better. "Broiler / Chromium" is the ratio of scores on suites both engines completed.');
+  if (j) lines.push('"Broiler / Jint" is the same ratio against the other managed engine: above 1, Broiler is ahead.');
   lines.push('');
   const noisy = (st) => (st && st.bandPercent != null && cmp.summary && st.bandPercent > cmp.summary.noiseBandPercent ? ' ⚠' : '');
   const showBand = cmp.summary && cmp.summary.repetitions > 1;
-  lines.push(`| Benchmark | Chromium | Broiler |${showBand ? ' Broiler spread |' : ''} Broiler / Chromium | × slower |`);
-  lines.push(`|---|--:|--:|${showBand ? '--:|' : ''}--:|--:|`);
+  lines.push(`| Benchmark | Chromium | Broiler |${j ? ' Jint |' : ''}${showBand ? ' Broiler spread |' : ''} Broiler / Chromium | × slower |${j ? ' Broiler / Jint |' : ''}`);
+  lines.push(`|---|--:|--:|${j ? '--:|' : ''}${showBand ? '--:|' : ''}--:|--:|${j ? '--:|' : ''}`);
   for (const row of cmp.benchmarks) {
     const ratio = row.broilerVsChromium != null ? row.broilerVsChromium.toFixed(3) : '—';
     const slower = row.broilerTimesSlower != null ? `${row.broilerTimesSlower}×` : '—';
     const st = row.stability?.broiler;
     const band = showBand ? ` ${st?.bandPercent != null ? `${st.bandPercent}%${noisy(st)}` : '—'} |` : '';
-    lines.push(`| ${row.name} | ${fmt(row.chromium)} | ${fmt(row.broiler)} |${band} ${ratio} | ${slower} |`);
+    const jintScore = j ? ` ${fmt(row.jint)} |` : '';
+    const jintRatio = j ? ` ${row.broilerVsJint != null ? row.broilerVsJint.toFixed(3) : '—'} |` : '';
+    lines.push(`| ${row.name} | ${fmt(row.chromium)} | ${fmt(row.broiler)} |${jintScore}${band} ${ratio} | ${slower} |${jintRatio}`);
   }
-  lines.push(`| **Overall (geomean)** | **${c?.geomean ?? '—'}** | **${b?.geomean ?? '—'}** |${showBand ? ' |' : ''} ${c?.geomean && b?.geomean ? (b.geomean / c.geomean).toFixed(3) : '—'} | ${c?.geomean && b?.geomean ? `${(c.geomean / b.geomean).toFixed(0)}×` : '—'} |`);
+  const overallJint = j ? ` **${j.geomean ?? '—'}** |` : '';
+  const overallVsJint = j ? ` ${s?.broilerVsJint ? s.broilerVsJint.ratio.toFixed(3) : '—'} |` : '';
+  lines.push(`| **Overall (geomean)** | **${c?.geomean ?? '—'}** | **${b?.geomean ?? '—'}** |${overallJint}${showBand ? ' |' : ''} ${c?.geomean && b?.geomean ? (b.geomean / c.geomean).toFixed(3) : '—'} | ${c?.geomean && b?.geomean ? `${(c.geomean / b.geomean).toFixed(0)}×` : '—'} |${overallVsJint}`);
   lines.push('');
   if (showBand) {
     lines.push(`⚠ marks a benchmark whose spread across ${cmp.summary.repetitions} repetitions exceeded the ${cmp.summary.noiseBandPercent}% band.`);
     lines.push('');
   }
 
-  const failures = Object.entries(broiler?.suiteStatus ?? {}).filter(([, s]) => s.status !== 'ok');
-  if (failures.length) {
-    lines.push('## Broiler failures');
+  // Failures per shell engine. Jint's are worth reporting for the same reason
+  // its scores are: a suite that fails under both managed engines is usually
+  // saying something about the benchmark's host expectations, not about Broiler.
+  let anyFailures = false;
+  for (const id of Object.keys(SHELL_ENGINES)) {
+    const failures = Object.entries(byEngine[id]?.suiteStatus ?? {}).filter(([, st]) => st.status !== 'ok');
+    if (!failures.length) continue;
+    anyFailures = true;
+    lines.push(`## ${ENGINE_TITLES[id]} failures`);
     lines.push('');
     lines.push('| Suite | Status | Failing type | Where | Detail |');
     lines.push('|---|---|---|---|---|');
-    for (const [name, s] of failures) {
-      const where = describeWhere(s.failedAt)?.replace(/\|/g, '\\|') ?? '—';
-      const type = s.errorType ? `\`${s.errorType}\`` : '—';
-      const detail = clamp(s.error ?? '', 140).replace(/\|/g, '\\|');
-      lines.push(`| ${name} | ${s.status} | ${type} | ${where} | ${detail} |`);
+    for (const [name, st] of failures) {
+      const where = describeWhere(st.failedAt)?.replace(/\|/g, '\\|') ?? '—';
+      const type = st.errorType ? `\`${st.errorType}\`` : '—';
+      const detail = clamp(st.error ?? '', 140).replace(/\|/g, '\\|');
+      lines.push(`| ${name} | ${st.status} | ${type} | ${where} | ${detail} |`);
     }
     lines.push('');
+  }
+  if (anyFailures) {
     lines.push('Stack traces, the phase each failure reached, and a repro command are in');
     lines.push('[`diagnostics.md`](diagnostics.md); full per-suite output is under `tests/octane/logs/`.');
     lines.push('');
@@ -1100,40 +1228,61 @@ export function renderMarkdown(cmp, broiler) {
 // ── Diagnostics report ──────────────────────────────────────────────────────
 // The artifact a person actually reads to fix a failing suite: what broke,
 // where it broke, the stack on both sides of the JS/CLR boundary, and how to
-// re-run just that suite.
-function renderDiagnostics(broiler, generatedAt) {
+// re-run just that suite. One section per shell engine — a Jint failure is not
+// a Broiler bug, but "both managed engines fail this suite the same way" is the
+// fastest way to tell a Broiler defect from a benchmark that expects a host
+// facility neither shell provides.
+export function renderDiagnostics(results, generatedAt) {
+  const engines = Object.keys(SHELL_ENGINES).filter((id) => results[id]);
   const lines = [];
-  lines.push('# Broiler Octane failure diagnostics');
+  lines.push('# Octane failure diagnostics');
   lines.push('');
   lines.push(`- Generated: \`${generatedAt}\``);
-  lines.push(`- Engine: \`${broiler.engineLabel}\``);
-  lines.push(`- Per-suite timeout: ${broiler.perSuiteTimeoutSec}s (floor; a suite may raise its own — the budget each ran under is in its section below)`);
-  if ((broiler.repetitions ?? 1) > 1) lines.push(`- Repetitions per suite: ${broiler.repetitions}`);
-  lines.push('');
-
-  const entries = Object.entries(broiler.suiteStatus);
-  const failures = entries.filter(([, s]) => s.status !== 'ok');
-  if (!failures.length) {
-    lines.push('All suites completed. Nothing to diagnose.');
-    lines.push('');
-    return lines.join('\n');
+  for (const id of engines) {
+    const r = results[id];
+    lines.push(`- ${ENGINE_TITLES[id]}: \`${r.engineLabel}\` — per-suite timeout ${r.perSuiteTimeoutSec}s ` +
+      `(floor; a suite may raise its own — the budget each ran under is in its section below)` +
+      `${(r.repetitions ?? 1) > 1 ? `, ${r.repetitions} repetitions` : ''}`);
   }
-
-  lines.push(`${failures.length} of ${entries.length} suites did not complete.`);
   lines.push('');
   lines.push('Statuses: **error** — Octane caught the throw and scored the rest;');
   lines.push('**crash** — the process died and took the suite with it;');
   lines.push('**timeout** — no result within the per-suite timeout.');
   lines.push('');
+
+  for (const id of engines) lines.push(...engineDiagnostics(id, results[id]));
+
+  lines.push('---');
+  lines.push('_Generated by `scripts/run-octane.mjs`. Re-runs of a single suite write to `tests/octane/logs/partial/`._');
+  lines.push('');
+  return lines.join('\n');
+}
+
+function engineDiagnostics(engine, result) {
+  const title = ENGINE_TITLES[engine];
+  const lines = [];
+  lines.push(`## ${title}`);
+  lines.push('');
+
+  const entries = Object.entries(result.suiteStatus);
+  const failures = entries.filter(([, s]) => s.status !== 'ok');
+  if (!failures.length) {
+    lines.push(`All ${entries.length} suites completed. Nothing to diagnose.`);
+    lines.push('');
+    return lines;
+  }
+
+  lines.push(`${failures.length} of ${entries.length} suites did not complete.`);
+  lines.push('');
   lines.push('| Suite | Status | Failing type | Where |');
   lines.push('|---|---|---|---|');
   for (const [name, s] of failures) {
-    lines.push(`| [${name}](#${name.toLowerCase()}) | ${s.status} | ${s.errorType ? `\`${s.errorType}\`` : '—'} | ${describeWhere(s.failedAt)?.replace(/\|/g, '\\|') ?? '—'} |`);
+    lines.push(`| [${name}](#${anchor(engine, name)}) | ${s.status} | ${s.errorType ? `\`${s.errorType}\`` : '—'} | ${describeWhere(s.failedAt)?.replace(/\|/g, '\\|') ?? '—'} |`);
   }
   lines.push('');
 
   for (const [name, s] of failures) {
-    lines.push(`## ${name}`);
+    lines.push(`### ${title}: ${name}`);
     lines.push('');
     lines.push(`- **Status**: ${s.status}${s.exitCode != null ? ` (exit code ${describeExitCode(s.exitCode)}${s.signal ? `, signal ${s.signal}` : ''})` : ''}`);
     if (s.errorType) lines.push(`- **Failing type**: \`${s.errorType}\`${s.errorKind === 'clr' ? ' (.NET exception surfaced through the engine)' : ''}`);
@@ -1156,7 +1305,7 @@ function renderDiagnostics(broiler, generatedAt) {
     }
 
     if (s.clrStack?.length) {
-      lines.push('**Engine (.NET) stack** — where inside Broiler the fault happened:');
+      lines.push(`**Engine (.NET) stack** — where inside ${title} the fault happened:`);
       lines.push('');
       lines.push('```text');
       lines.push(...formatFrames(s.clrStack, REPORT_CLR_FRAMES));
@@ -1179,15 +1328,19 @@ function renderDiagnostics(broiler, generatedAt) {
     lines.push('Re-run just this suite:');
     lines.push('');
     lines.push('```bash');
-    lines.push(`./scripts/run-octane-benchmarks.sh --engines broiler --skip-build --only ${name} --verbose`);
+    lines.push(`./scripts/run-octane-benchmarks.sh --engines ${engine} --skip-build --only ${name} --verbose`);
     lines.push('```');
     lines.push('');
   }
 
-  lines.push('---');
-  lines.push('_Generated by `scripts/run-octane.mjs`. Re-runs of a single suite write to `tests/octane/logs/partial/`._');
-  lines.push('');
-  return lines.join('\n');
+  return lines;
+}
+
+// GitHub's heading slug for `### <Title>: <Suite>`. Qualified by the engine
+// because two engines can fail the same suite, and an unqualified `#crypto`
+// would then link to whichever section came first.
+function anchor(engine, suite) {
+  return `${ENGINE_TITLES[engine]}-${suite}`.toLowerCase();
 }
 
 async function main() {
@@ -1211,12 +1364,16 @@ async function main() {
     process.stderr.write(`[octane] --only ${opts.only.join(',')}: writing to ${outDir} (committed results left alone)\n`);
   }
 
+  const unknown = engines.filter((e) => e !== 'chromium' && !(e in SHELL_ENGINES));
+  if (unknown.length) {
+    throw new Error(`Unknown engine: ${unknown.join(', ')}. Known engines: chromium, ${Object.keys(SHELL_ENGINES).join(', ')}`);
+  }
+
   const results = {};
   for (const engine of engines) {
-    let r;
-    if (engine === 'broiler') r = await runBroiler(opts, suites, baseJs, runnerJs, dirs);
-    else if (engine === 'chromium') r = await runChromium(opts, suites, baseJs, runnerJs, dirs);
-    else throw new Error(`Unknown engine: ${engine}`);
+    const r = engine === 'chromium'
+      ? await runChromium(opts, suites, baseJs, runnerJs, dirs)
+      : await runShellEngine(engine, opts, suites, baseJs, runnerJs, dirs);
     r.generatedAt = generatedAt;
     results[engine] = r;
     const out = join(outDir, `${engine}-results.json`);
@@ -1224,11 +1381,14 @@ async function main() {
     process.stderr.write(`[${engine}] wrote ${out} (overall score: ${r.geomean ?? 'n/a'})\n`);
   }
 
-  if (results.broiler) {
+  const diagnosed = Object.keys(SHELL_ENGINES).filter((id) => results[id]);
+  if (diagnosed.length) {
     const diagnostics = join(outDir, 'diagnostics.md');
-    writeFileSync(diagnostics, renderDiagnostics(results.broiler, generatedAt));
-    const failed = Object.values(results.broiler.suiteStatus).filter((s) => s.status !== 'ok').length;
-    process.stderr.write(`[broiler] wrote ${diagnostics} (${failed} failing suite${failed === 1 ? '' : 's'})\n`);
+    writeFileSync(diagnostics, renderDiagnostics(results, generatedAt));
+    const failed = diagnosed
+      .map((id) => `${id}: ${Object.values(results[id].suiteStatus).filter((s) => s.status !== 'ok').length}`)
+      .join(', ');
+    process.stderr.write(`[octane] wrote ${diagnostics} (failing suites — ${failed})\n`);
   }
 
   // A partial run compares nothing: its suite set is a subset, so folding it
@@ -1239,8 +1399,8 @@ async function main() {
   }
 
   // Fold in any per-engine result already on disk so a single-engine run still
-  // refreshes the comparison against the other engine's last result.
-  for (const engine of ['chromium', 'broiler']) {
+  // refreshes the comparison against the other engines' last results.
+  for (const engine of ENGINE_IDS) {
     if (results[engine]) continue;
     const p = join(outDir, `${engine}-results.json`);
     if (existsSync(p)) results[engine] = JSON.parse(readFileSync(p, 'utf8'));
@@ -1248,7 +1408,7 @@ async function main() {
 
   const cmp = buildComparison(results, generatedAt);
   writeFileSync(join(outDir, 'comparison.json'), `${JSON.stringify(cmp, null, 2)}\n`);
-  writeFileSync(join(outDir, 'comparison.md'), renderMarkdown(cmp, results.broiler));
+  writeFileSync(join(outDir, 'comparison.md'), renderMarkdown(cmp, results));
   process.stderr.write('[compare] wrote comparison.json + comparison.md\n');
 }
 

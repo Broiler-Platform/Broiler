@@ -49,6 +49,25 @@ Two consequences worth keeping in mind when reading the committed results:
   engine with: it is 15 large, real, self-contained programs that exercise almost
   every path an engine has, and it either runs them or it does not.
 
+### A third column: Jint
+
+The harness now also runs [Jint](https://github.com/sebastienros/jint), a
+managed ECMAScript interpreter, in a shell with the same host surface and stack
+budget as `BroilerJS --script-host` (see [`README.md`](README.md)). Its column
+answers a different question from Chromium's. V8 is a JIT-compiling C++ engine,
+so its ratio is a four-figure number that no single change moves; Jint is an AST
+interpreter on the same runtime, so **Broiler ÷ Jint lands near 1 and moves with
+the work**.
+
+That makes it a floor rather than a target. Jint has no compilation tier at all,
+so a benchmark where Broiler is *behind* it is naming a specific defect — an
+overhead Broiler pays that a plain tree-walker does not — rather than a general
+deficit. Read the ratios in §4 against Chromium for the size of the gap, and
+against Jint for whether a given suite is anomalous.
+
+The published numbers come with the next workflow run; §4 below predates the
+column.
+
 ---
 
 ## 2. The benchmarks

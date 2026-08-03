@@ -31,3 +31,13 @@ endorsed Broiler.
 Broiler.Unicode contains generated tables based on Unicode and CLDR data. Those data
 files remain subject to the [Unicode Terms of Use](https://www.unicode.org/terms_of_use.html),
 as identified in that component's documentation and notices.
+
+## Jint
+
+The Octane benchmark harness runs one of its reference engines on
+[Jint](https://github.com/sebastienros/jint), an independent managed ECMAScript
+interpreter by Sébastien Ros and contributors, licensed under the BSD 2-Clause License.
+It is consumed as an unmodified NuGet package by
+[`tests/octane/jint-host`](tests/octane/jint-host), a benchmark tool that is not part of
+any shipped Broiler component and carries no Jint code. Jint is used here only as a
+measurement reference; its authors have not reviewed or endorsed Broiler.

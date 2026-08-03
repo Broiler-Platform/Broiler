@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # run-octane-benchmarks.sh — run Google's Octane 2.0 JavaScript benchmark suite
-# under Chromium (V8 via Playwright) and Broiler (the BroilerJS shell), then
-# write per-engine result files and a Chromium-vs-Broiler comparison report.
+# under Chromium (V8 via Playwright), Broiler (the BroilerJS shell) and Jint (a
+# managed ECMAScript interpreter), then write per-engine result files and a
+# comparison report.
+#
+# Chromium says how far Broiler is from V8; Jint says how it compares to another
+# managed engine on the same runtime, which is the closer reference point.
 #
 # Source suite: https://github.com/chromium/octane
 #
@@ -12,7 +16,8 @@
 #     --octane-dir <dir>   Existing Octane checkout (default: clone into tests/octane/checkout)
 #     --out-dir <dir>      Results directory (default: tests/octane/results)
 #     --log-dir <dir>      Per-suite diagnostic logs (default: tests/octane/logs)
-#     --engines <list>     Comma-separated engines to run (default: chromium,broiler)
+#     --engines <list>     Comma-separated engines to run: chromium, broiler, jint
+#                          (default: chromium,broiler,jint)
 #     --timeout <sec>      Per-suite timeout floor in seconds (default: 180). A
 #                          slow suite may raise its own budget in
 #                          scripts/octane-suites.json.
@@ -22,7 +27,7 @@
 #     --noise-band <pct>   Spread above which a benchmark is flagged as noisy
 #                          (default: 7.5)
 #     --octane-ref <ref>   Git ref of chromium/octane to check out (default: master)
-#     --skip-build         Do not rebuild BroilerJS (reuse an existing Release build)
+#     --skip-build         Do not rebuild the engine shells (reuse existing Release builds)
 #     --only <list>        Comma-separated suites to run, e.g. --only Crypto,zlib.
 #                          Writes to <log-dir>/partial/ so a debugging run never
 #                          overwrites the committed full-run results.
@@ -40,7 +45,7 @@
 # repro command) and a diagnostics.md summarizing where it failed.
 #
 # Prerequisites:
-#     - .NET 10 SDK (BroilerJS shell)
+#     - .NET 10 SDK (the BroilerJS and Jint shells)
 #     - Node.js + npm (Playwright Chromium driver)
 #     - git (to clone the Octane suite)
 
@@ -52,7 +57,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 OCTANE_DIR=""
 OUT_DIR="$REPO_ROOT/tests/octane/results"
 LOG_DIR="$REPO_ROOT/tests/octane/logs"
-ENGINES="chromium,broiler"
+ENGINES="chromium,broiler,jint"
 TIMEOUT=180
 OCTANE_REF="master"
 SKIP_BUILD=false
@@ -76,7 +81,7 @@ while [[ $# -gt 0 ]]; do
         --no-trace) EXTRA_ARGS+=(--no-trace); shift ;;
         --broiler-env) EXTRA_ARGS+=(--broiler-env "$2"); shift 2 ;;
         -h|--help)
-            sed -n '2,38p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,43p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
@@ -113,21 +118,39 @@ echo ""
 NODE_ARGS=(--octane-dir "$OCTANE_DIR" --out-dir "$OUT_DIR" --log-dir "$LOG_DIR" \
            --engines "$ENGINES" --timeout "$TIMEOUT" "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}")
 
-# --- Step 2: Build the BroilerJS shell (if running the broiler engine) --------
+# --- Step 2: Build the shell hosts for whichever engines are running ----------
 
 if [[ ",$ENGINES," == *",broiler,"* ]]; then
     BROILER_PROJ="$REPO_ROOT/Broiler.JS/Broiler.JS/Broiler.JavaScript/Broiler.JavaScript.csproj"
     if [[ "$SKIP_BUILD" != "true" ]]; then
-        echo "--- Step 2: Building BroilerJS shell (Release) ---"
+        echo "--- Step 2a: Building BroilerJS shell (Release) ---"
         dotnet build "$BROILER_PROJ" --configuration Release --nologo --verbosity quiet 2>&1 | tail -3
         echo "  ✓ Build succeeded"
     else
-        echo "--- Step 2: Skipping BroilerJS build (--skip-build) ---"
+        echo "--- Step 2a: Skipping BroilerJS build (--skip-build) ---"
     fi
     BROILER_DLL="$(find "$REPO_ROOT/Broiler.JS/Broiler.JS/Broiler.JavaScript/bin/Release" -name BroilerJS.dll | head -1)"
     [[ -n "$BROILER_DLL" ]] || { echo "  ✗ BroilerJS.dll not found; build first." >&2; exit 1; }
     echo "  BroilerJS.dll: $BROILER_DLL"
     NODE_ARGS+=(--broiler-dll "$BROILER_DLL")
+    echo ""
+fi
+
+# The Jint shell is a small console app over the Jint NuGet package; building it
+# needs a package restore, which is the one part of this step that needs network.
+if [[ ",$ENGINES," == *",jint,"* ]]; then
+    JINT_PROJ="$REPO_ROOT/tests/octane/jint-host/Broiler.Octane.JintHost.csproj"
+    if [[ "$SKIP_BUILD" != "true" ]]; then
+        echo "--- Step 2b: Building the Jint shell (Release) ---"
+        dotnet build "$JINT_PROJ" --configuration Release --nologo --verbosity quiet 2>&1 | tail -3
+        echo "  ✓ Build succeeded"
+    else
+        echo "--- Step 2b: Skipping Jint shell build (--skip-build) ---"
+    fi
+    JINT_DLL="$(find "$REPO_ROOT/tests/octane/jint-host/bin/Release" -name Broiler.Octane.JintHost.dll | head -1)"
+    [[ -n "$JINT_DLL" ]] || { echo "  ✗ Broiler.Octane.JintHost.dll not found; build first." >&2; exit 1; }
+    echo "  Jint shell: $JINT_DLL"
+    NODE_ARGS+=(--jint-dll "$JINT_DLL")
     echo ""
 fi
 

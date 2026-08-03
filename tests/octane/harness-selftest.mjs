@@ -1,14 +1,14 @@
 // harness-selftest.mjs — checks the diagnostic parsing in scripts/run-octane.mjs
-// against real Broiler output.
+// against real Broiler and Jint output.
 //
 //     node tests/octane/harness-selftest.mjs
 //
 // These are the parts of the Octane harness that can silently degrade: if the
 // combined-script line mapping or the stack-trace parsing stops working, the
 // benchmark still runs and still reports "crash" — it just stops saying where.
-// The fixtures below are verbatim excerpts of what BroilerJS actually printed,
-// so a change in either the harness or the engine's output format shows up as
-// a failure here rather than as a quietly emptier report.
+// The fixtures below are verbatim excerpts of what the two shells actually
+// printed, so a change in either the harness or an engine's output format shows
+// up as a failure here rather than as a quietly emptier report.
 //
 // No engine, no Octane checkout, and no network are needed.
 
@@ -24,6 +24,7 @@ import {
   parseClrException,
   parseDiagnostics,
   parseJsStack,
+  renderDiagnostics,
   renderMarkdown,
   shortenEnginePaths,
   suiteTimeoutSec,
@@ -193,6 +194,59 @@ checkTrue('unhandled block starts at the engine banner',
   extractUnhandledBlock(`noise\n${CRYPTO_STDERR}`).startsWith('Unhandled exception.'));
 check('unhandled block absent', extractUnhandledBlock('clean exit'), null);
 
+// ── Jint stack parsing ──────────────────────────────────────────────────────
+// Jint spells frames the way V8 does, so the same text has to be read a second
+// way. Recorded from a tests/octane/jint-host run — a throw that escaped every
+// handler arrives as an unhandled .NET exception whose *inner* exception is the
+// JavaScript stack, with the managed frames below it — with the script path and
+// line numbers retargeted at the fixture segments above.
+
+const JINT_CRASH = `Unhandled exception. Jint.Runtime.JavaScriptException: missingGlobal is not defined
+ ---> Error: missingGlobal is not defined
+    at setupFixture (${COMBINED}:405:27)
+    at ${COMBINED}:402:1
+   --- End of inner exception stack trace ---
+   at Jint.Engine.ScriptEvaluation(ScriptRecord scriptRecord, ParserOptions parserOptions)
+   at Jint.Engine.Execute(String code, String source)
+   at Broiler.Octane.JintHost.Program.Run(FileInfo script, Int32 maxFrames) in tests/octane/jint-host/Program.cs:line 174`;
+
+const jintClr = parseClrException(JINT_CRASH);
+check('jint: the escaping exception is the engine one', jintClr.type, 'Jint.Runtime.JavaScriptException');
+check('jint: its message is the JavaScript error', jintClr.message, 'missingGlobal is not defined');
+checkTrue('jint: the bare `Error:` inner line is not read as a managed exception', jintClr.inner.length === 0, JSON.stringify(jintClr.inner));
+checkTrue('jint: JavaScript frames stay out of the engine stack',
+  !jintClr.frames.some((f) => f.includes('setupFixture')),
+  jintClr.frames.join('\n'));
+
+// Both JS frames must survive, including the top-level one that has no function
+// name — for a load-time failure that frame is the whole localization.
+check('jint: `at <fn> (<file>:<line>:<col>)` frames',
+  parseJsStack(annotateCombinedPaths(JINT_CRASH, COMBINED, segments)),
+  [
+    { fn: 'setupFixture', file: 'crypto.js', line: 5 },
+    { fn: '<top level>', file: 'crypto.js', line: 2 },
+  ]);
+
+check('jint: an anonymous parenthesized frame',
+  parseJsStack('    at (crypto.js:12:3)'),
+  [{ fn: '<anonymous>', file: 'crypto.js', line: 12 }]);
+
+// A file name may contain both a dash and a directory separator; the split has
+// to land on the last two numbers, not the first colon.
+check('jint: a path with its own colons and dashes',
+  parseJsStack('    at run (/tmp/o/zlib-data.js:65:12)'),
+  [{ fn: 'run', file: '/tmp/o/zlib-data.js', line: 65 }]);
+
+// The Broiler spellings must keep winning on Broiler output: its column is
+// comma-separated, which is what keeps the two apart.
+check('jint: the V8 pattern does not swallow a Broiler frame',
+  parseJsStack('    at inline:earley-boyer.js:203,4'),
+  [{ fn: 'inline', file: 'earley-boyer.js', line: 203 }]);
+
+check('annotate: a V8-spelled citation keeps its column',
+  annotateCombinedPaths(`    at Encrypt (${COMBINED}:405:12)`, COMBINED, segments),
+  '    at Encrypt (crypto.js:5:12)');
+
 // ── Runner diagnostics ──────────────────────────────────────────────────────
 // The breadcrumbs must survive truncation: a killed process leaves a stdout
 // that ends mid-line, and that partial tail is exactly when they matter.
@@ -282,6 +336,75 @@ const single = buildComparison({
 }, '2026-01-01T00:00:00.000Z');
 checkTrue('render: one repetition says so plainly', renderMarkdown(single, null).includes('cannot be distinguished from noise'));
 checkTrue('render: one repetition has no spread column', !renderMarkdown(single, null).includes('Broiler spread'));
+
+// A two-engine run must keep reporting exactly what it did before Jint existed:
+// no empty columns, no zeroed coverage entry for an engine that never ran.
+checkTrue('render: no Jint column when Jint did not run', !md.includes('Jint'), md.slice(0, 600));
+checkTrue('compare: coverage names only the engines that ran', !('jint' in cmp.summary.scoresReported));
+check('compare: no managed-versus-managed number without Jint', cmp.summary.broilerVsJint, null);
+
+// ── Three engines ───────────────────────────────────────────────────────────
+// Jint is the managed reference point, so the number it adds is Broiler ÷ Jint —
+// which, unlike the Chromium ratio, is expected to land near 1.
+
+const three = buildComparison({
+  chromium: {
+    engineLabel: 'Chromium test', geomean: 50000, repetitions: 1,
+    benchmarks: { Richards: 40000, Splay: 40000, zlib: 80000 },
+    suiteStatus: { Richards: { status: 'ok' }, Splay: { status: 'ok' }, zlib: { status: 'ok' } },
+  },
+  broiler: {
+    engineLabel: 'Broiler test', geomean: 200, repetitions: 1,
+    benchmarks: { Richards: 100, Splay: 400 },
+    suiteStatus: { Richards: { status: 'ok' }, Splay: { status: 'ok' }, zlib: { status: 'error' } },
+  },
+  jint: {
+    engineLabel: 'Jint 4.15.3 (interpreter)', geomean: 300, repetitions: 1,
+    benchmarks: { Richards: 200, Splay: 200, zlib: 500 },
+    suiteStatus: { Richards: { status: 'ok' }, Splay: { status: 'ok' }, zlib: { status: 'ok' } },
+  },
+}, '2026-01-01T00:00:00.000Z');
+
+check('three: coverage counts all three engines', three.summary.scoresReported, { chromium: 3, broiler: 2, jint: 3, expected: 3 });
+check('three: Broiler behind Jint on a suite', three.benchmarks.find((r) => r.name === 'Richards').broilerVsJint, 0.5);
+check('three: Broiler ahead of Jint on a suite', three.benchmarks.find((r) => r.name === 'Splay').broilerVsJint, 2);
+check('three: no ratio where Broiler has no score', three.benchmarks.find((r) => r.name === 'zlib').broilerVsJint, null);
+check('three: Jint keeps its own ratio against Chromium', three.benchmarks.find((r) => r.name === 'zlib').jintVsChromium, 0.006);
+// Geometric mean of 0.5 and 2 is 1 — and it is taken over the ratios, not over
+// the geomeans, which are each computed on a different set of suites.
+check('three: the summary ratio is the geomean of the per-benchmark ones', three.summary.broilerVsJint, { ratio: 1, benchmarks: 2 });
+
+const md3 = renderMarkdown(three, {});
+checkTrue('three: the title names every engine', md3.startsWith('# Octane 2.0 benchmark — Chromium vs Broiler vs Jint'), md3.slice(0, 120));
+checkTrue('three: coverage row carries the Jint column', md3.includes('| Scores reported (of 3) | 3 | 2 | 3 |'), md3.slice(0, 900));
+checkTrue('three: the table grows a Broiler / Jint column', md3.includes('Broiler / Jint |'), md3.slice(0, 1800));
+checkTrue('three: the Jint score is in the row', /\| Splay \| 40000 \| 400 \| 200 \|/.test(md3), md3);
+
+// ── Diagnostics across engines ──────────────────────────────────────────────
+// Two shells can fail the same suite, so each failure needs an anchor and a
+// re-run command of its own — an unqualified `#crypto` would send both links to
+// whichever section happened to be written first.
+
+const diagnostics = renderDiagnostics({
+  broiler: {
+    engineLabel: 'Broiler test', perSuiteTimeoutSec: 180, repetitions: 1,
+    suiteStatus: {
+      Crypto: { status: 'crash', errorType: 'Broiler.JavaScript.Runtime.JSException', error: 'Maximum call stack size exceeded', failedAt: { benchmark: 'Encrypt', phase: 'run', iteration: 1 } },
+      Splay: { status: 'ok' },
+    },
+  },
+  jint: {
+    engineLabel: 'Jint 4.15.3 (interpreter)', perSuiteTimeoutSec: 180, repetitions: 1,
+    suiteStatus: { Crypto: { status: 'ok' }, Splay: { status: 'ok' } },
+  },
+}, '2026-01-01T00:00:00.000Z');
+
+checkTrue('diagnostics: one section per shell engine', diagnostics.includes('## Broiler') && diagnostics.includes('## Jint'), diagnostics);
+checkTrue('diagnostics: the failing suite is qualified by its engine', diagnostics.includes('### Broiler: Crypto'), diagnostics);
+checkTrue('diagnostics: its index links to that qualified anchor', diagnostics.includes('[Crypto](#broiler-crypto)'), diagnostics);
+checkTrue('diagnostics: an engine that completed everything says so', diagnostics.includes('All 2 suites completed. Nothing to diagnose.'), diagnostics);
+checkTrue('diagnostics: the re-run command names the engine that failed',
+  diagnostics.includes('--engines broiler --skip-build --only Crypto'), diagnostics);
 
 // ── Report ──────────────────────────────────────────────────────────────────
 
