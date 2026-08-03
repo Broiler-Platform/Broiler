@@ -35,6 +35,18 @@ so only the parent can hold the combined view.
   control and change from the same tree. **Item 2-9's follow-up measurement is
   [`patches/0061`](../patches/0061-js-measure-2-9-materialization-cause.patch)**, independent of
   those two and measured on the pin alone.
+  **Item 1-4 is [`patches/0065`](../patches/0065-js-linear-closure-rewrite-scope.patch)**, on the
+  same terms: its push returned 403, the pointer is deliberately unbumped, and every figure in
+  its section was measured on a local build of the then-current pin `79c6ff23` with and without
+  that one patch — both arms from the same tree, interleaved. It touches
+  `Broiler.JavaScript.ExpressionCompiler`, which none of `0059`–`0064` do, so it applies in any
+  order relative to them. **Item 1-1's emission half is
+  [`patches/0066`](../patches/0066-js-defer-nested-lambda-il.patch), which must be applied after
+  `0065`** — it edits a file `0065` creates — and its figures were taken the same way, one build
+  with `BROILER_JS_DEFER_IL` as the only difference. Both were verified to apply with `git am`
+  against the pinned pointer from a clean clone, not merely with `git apply`: the two differ, and
+  the first version of `0065` passed `apply` and failed `am` on a line-ending change that the
+  README's own instructions would have hit.
   `a6f101cc` — which this section named until 3-3
   was worked, and which every §0 and phase-2 measurement below was taken at — is an **ancestor**
   of it (`merge-base --is-ancestor`), so nothing recorded here is invalidated;
@@ -72,7 +84,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | Phase | State |
 |---|---|
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is still the critical path, but its headline question is answered**: run at the pinned pointer on linux-x64, Octane is **15 of 15 suites `ok` and 17 of 17 scores** — Mandreel included, which the previous local pass had failing. Geomean 217, spread **113×** against a same-machine Chromium reference. What 0-6 still owes is the *workflow* run plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce |
-| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
+| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting. **New: 1-4 ✅.** Measuring 1-1's premise found the phase's actual dominant cost, and it was not lazy compilation: the closure rewrite held a lambda's in-scope bindings in a `List` and asked it `Contains` per parameter reference, so **emission was quadratic in a scope's binding count** — 2 000 top-level declarations emitted in 13 865 ms against 2.5 ms of parse. A reference-keyed multiset (list-backed below 32 bindings) makes it linear: **28.5× on that shape, and 3.04× on Mandreel end-to-end**, ABBA-interleaved, six pairs. **1-1 is still open and its premise now has a number** — 92–96% of compile time is function bodies on the large real programs — but the measurement also **splits phase 1 in two and re-targets 1-1**: Mandreel was *wide*, not deep, and never was a 1-1 case, while jQuery at 96.5% deferrable is the whole of it. **1-1's emission half then landed without needing the capture mechanism at all**: every risk the item names is settled by the front end, so deferring *IL generation* to first invocation is the same prize with none of them — **jQuery 0.661×, Box2D 0.636×, PdfJS 0.689× on compile, allocation ~0.52× across the board, and 1.0009× steady state**. **Octane CodeLoad, the benchmark the item names, was run and passes: 94.6 → 104.0, 1.099×, 24 samples an arm, 93% pairwise dominance** — and it took 24 because the first three-sample pair and its reverse disagreed. That ratio also re-frames the item: compilation is only ~27% of what CodeLoad measures, not the whole of it. Two mistakes were caught by measuring: a stack handoff per deferred function took the suite from 3.5 to 20 minutes, and a thunk that *called* its resolve cost 1.0247% on call-heavy code until the warm path was written in IL. Typescript is 1.034× slower and unexplained. **The Mandreel suite was then run too, and it overturns the phase's headline target**: a 3.04× faster compile of `mandreel.js` moves Mandreel 0.993× and MandreelLatency 0.992× — Octane compiles that file at script load and times only the run function, so MandreelLatency measures execution pauses and belongs to phase 3. The saving is real and outside every score: suite wall clock **358.2 → 350.0 s**, non-overlapping. What remains of 1-1 is the parse and tree construction, which on real source is the larger half |
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. Then **2-12** found why the misses that remained could never heal: the cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — **77.7% of DeltaBlue's misses**. Refreshing in place takes **DeltaBlue's read hit rate to 93.16%** (65.96% before both fixes) and Box2D's to 98.83%. **DeltaBlue still fails the gate at 447×**, but the cache is no longer the reason, and what remains is not property-cache-shaped Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
@@ -136,11 +148,18 @@ Both exclusions are **superseded here**, and the reason is not a change of opini
 it is that the probe corpus could not see the effect:
 
 - **Front end.** The probes are one-liners in a fresh `JSContext`. Octane runs 15
-  large real programs, and the two worst scores in the entire suite are the two that
-  measure nothing but the front end: **MandreelLatency at 4646×** and **CodeLoad at
-  371×**. `script:evaluation` at 37 ms was a true measurement of a corpus small
-  enough that eager compilation is free. It is not free on jQuery, on the TypeScript
-  compiler, or on a 152,948-line generated function. **The front end is phase 1.**
+  large real programs, and the two worst scores in the entire suite are
+  **MandreelLatency at 4646×** and **CodeLoad at 371×**. `script:evaluation` at 37 ms was
+  a true measurement of a corpus small enough that eager compilation is free. It is not
+  free on jQuery, on the TypeScript compiler, or on a 152,948-line generated function.
+  **The front end is phase 1.**
+  > **Correction, from running both suites (phase 1).** This bullet used to call those two
+  > scores "the two that measure nothing but the front end", and used them as the phase's
+  > success metric. Measured, **CodeLoad is ~27% compilation and MandreelLatency is 0%** —
+  > Octane compiles `mandreel.js` at script load and starts its timer afterwards. The
+  > argument above is unaffected, because it rests on the *probe corpus being too small to
+  > see eager compilation*, which is still true and is why phase 1 exists. What it cost was
+  > the phase's target list: see Phase 1's header.
 - **Speculation.** Engine §9 scoped itself to "achievable in the current
   architecture", which was an honest boundary for a bookkeeping-removal campaign. The
   remaining ~100× is not achievable inside it. **Speculation is phase 4**, and the
@@ -219,6 +238,8 @@ half in the column it was not looking at.
 | What does an object or an element cost in bytes? | `--object-alloc`, `--element-alloc` |
 | What does a local, a binding or a parameter cost? | `--local-alloc`, which reports the compiler's own eligibility counts beside the bytes |
 | What does a regex cost, and which engine ran it? | `--regex-profile` |
+| How much of a compile is function bodies — i.e. what can 1-1 win? | `--compile-profile <octane-dir>` |
+| Which of parse / tree construction / IL emission is the cost, and is it linear? | `--compile-scaling` |
 | Did the cache actually start hitting? | `PropertyOptimizationDiagnostics.Snapshot()` |
 | Did real programs get faster? | Octane, ≥3 repetitions, median + spread |
 | Is the engine still correct? | test262 over the pinned manifests |
@@ -363,6 +384,40 @@ changes what CI enforces, so it is an open item rather than a silent edit.
 
 These were paid for once each. They apply to every phase below.
 
+- **Measuring an item's premise is how you find the item next to it.** 1-1's premise —
+  "most front-end cost is function bodies" — needed a control, so one was built: the same
+  source with every body replaced by `{}`. Five corpora agreed with the premise. The sixth,
+  Mandreel, took **17.7 s with every body already removed**, and that residue was 1-4: an
+  emitter quadratic in a scope's binding count, worth 3.04× on the *compile* of the suite 1-1
+  was written around — though running that suite later showed its two scores do not measure
+  compilation at all. Nobody was looking for it, and no probe could have shown it — a one-liner has one
+  binding, and a quadratic needs width to be visible. *A control built to size one item
+  measures everything that item is not, which is the only place a cost nobody has named can
+  show up.*
+- **A benchmark's name is not its contents — read what it times before aiming a phase at it.**
+  Phase 1 was aimed at MandreelLatency, the worst score in the suite, on the strength of the
+  word *latency* and a 5 MB machine-generated file. Octane compiles that file at script load
+  and starts the timer afterwards; `MandreelLatency` is the RMS of pauses between 20 render
+  frames over already-compiled code. Making the compile **3.04× faster moved it 0.992×** — and
+  the saving is genuinely there, in the suite's wall clock (358.2 → 350.0 s), where no score
+  looks. The same reading error, smaller, put CodeLoad at 100% compilation when it is ~27%.
+  *Twenty lines of the benchmark's own source would have said so at any point in the last three
+  phases, and nobody opened it.*
+- **Two arms, three samples each, is a coin toss dressed as a measurement.** 1-1's CodeLoad
+  run separated cleanly on its first pair — 94.3 eager against 105 deferred, no overlap — and
+  then failed to separate at all on the reversed pair, 99.2 against 99.4. Both pairs were three
+  repetitions an arm, on a suite whose own declared noise band is 7.5%, chasing an effect near
+  10%. Twenty-four samples an arm settled it at 1.099× with 93% pairwise dominance, but *either
+  early pair would have been reported as the answer*, and they disagreed. **Interleaving is not
+  enough when the effect and the noise are the same size — the sample count has to grow until
+  the arms separate by rank, not by median.**
+- **"Big input is slow" is a description, not a diagnosis, and it hides the exponent.**
+  B4 said machine-generated code is expensive to compile, which was true, and everyone read
+  it as being about size. It was about *width*: 2 000 bindings in one scope cost 4× what
+  1 000 did, while parse and tree construction stayed flat. The tell was available from the
+  start — Mandreel's ratio to Box2D was far worse than their size ratio — and it reads as
+  "Mandreel is enormous" until someone divides. *Before accepting that a large input is
+  slow because it is large, halve it and check that the cost halves.*
 - **A premise is not a finding.** P3 blamed the five `using` scopes around every call,
   built the fast path, measured it, and found no signal — the scopes never allocated.
   The real cost was an 80-byte activation record they were hiding. *Measure before
@@ -713,7 +768,7 @@ committed run is stale** — see Phase 0.
 | CodeLoad | 30 916 | 83.4 *(0046)* | 371 | **B4 eager compilation** |
 | Richards | 46 754 | 108 | 433 | **B2 call cost, B3 shape transitions** |
 | DeltaBlue | 102 708 | 171 | 601 | **B2 polymorphic call cost** |
-| MandreelLatency | 67 368 | 14.5 | **4 646** | **B4 compile latency** |
+| MandreelLatency | 67 368 | 14.5 | **4 646** | ~~B4 compile latency~~ — **measured: not compilation.** Pauses between render frames over already-compiled code; a 3.04× faster compile of `mandreel.js` moves it 0.992×. Points at B1 allocation rate / B7 |
 
 The shape of that list *is* the finding: the extremes are front-end and call-path,
 not arithmetic. The losses are concentrated in two subsystems rather than spread
@@ -768,6 +823,16 @@ be validated separately, so `JSFunction` compiles each alone before the assemble
 (the `Evaluate` that follows hits the cache). So **~2.5 ms to compile one trivial
 expression.** That is the number 1-3 was told to go and measure, and it is large enough
 that it will still be there after 1-1 stops compiling what is never called.
+
+**This blocker named three causes and had a fourth, which was the biggest of them.** The
+three-way split it asked for now exists (`--compile-scaling`) and reports **parse ≈ 0.5%,
+expression-tree construction ≈ 11%, IL emission ≈ 89%** on function-dense source. Inside
+that 89% sat an algorithmic defect rather than a cost: the closure rewrite's per-lambda
+scope was a `List` scanned once per parameter reference, making emission **quadratic in a
+scope's binding count**. "Machine-generated code is expensive to compile" was true and read
+as a property of its size; it was a property of its *width*. Fixed in **1-4** — Mandreel's
+whole front end 21 307 → 7 015 ms. What remains of B4 after it is genuinely the eager and
+non-incremental part, which is 1-1 and 1-3.
 
 The recursion is a separate, sharper problem: it aborts the process rather than costing
 time, it lives in three passes across `.Parser`, `.Compiler` and `.ExpressionCompiler`,
@@ -1058,14 +1123,47 @@ Broiler loses to it names a specific defect rather than a general deficit.
 
 ## Phase 1 — the front end
 
-**Targets: MandreelLatency (4646×), CodeLoad (371×), Mandreel (300×).** Owns the two
-worst scores in the suite outright. Blocker **B4**. This is the phase the engine
-roadmap had excluded (§1.1), and it is the item with the clearest value outside
-Octane: **this is page-load time.**
+**Targets — and two of the three were wrong, measured.** This phase was aimed at
+MandreelLatency (4646×), CodeLoad (371×) and Mandreel (300×), on the reading that they
+measure the front end. Both Octane suites have now been *run* against a phase-1 build rather
+than reasoned about:
 
-Owner assemblies: `Broiler.JavaScript.Parser`, `.Compiler`, `.BuiltIns`.
+- **MandreelLatency measures no compilation at all.** Octane compiles `mandreel.js` at script
+  load and times only the benchmark's `run` function; `runMandreel` renders 20 frames over
+  already-compiled code and `MandreelLatency` is the RMS of the pauses between them. Tripling
+  the speed of compiling that file moves **neither** score: Mandreel 138.0 → 137.0 (0.993×),
+  MandreelLatency 12.70 → 12.60 (0.992×), four samples an arm, ABBA on one build. **It is an
+  execution-pause benchmark, so it belongs to B1/B7 and phase 3, not to B4 and this phase.**
+- **CodeLoad is about a quarter compilation**, not the whole of it — see 1-1, which did move
+  it, 1.099×.
 
-### 1-1 · Lazy function compilation — *the single highest-leverage item*
+What *did* move on Mandreel is real and outside every score: the suite's wall clock went
+**358.2 → 350.0 s**, non-overlapping over four runs an arm. **So phase 1's value is page-load
+time, exactly as the sentence below always said — and Octane is a poor instrument for it,
+because Octane deliberately excludes load from what it times.** Blocker **B4**. This is the
+phase the engine roadmap had excluded (§1.1), and it is the item with the clearest value
+outside Octane: **this is page-load time.**
+
+Owner assemblies: `Broiler.JavaScript.Parser`, `.Compiler`, `.BuiltIns` — **and
+`.ExpressionCompiler`, which 1-4 adds and which is where the phase's cost turned out to
+be.** The three-way split the phase was told to take (B4) now exists as `--compile-scaling`,
+and on **2 000 synthetic top-level declarations** it reads **parse ≈ 0.5%, expression-tree
+construction ≈ 11%, IL emission ≈ 89%**.
+
+**That split is a fact about that shape, and 1-1 established it does not carry over.** On the
+real corpora, removing every nested function body's IL generation removes only **17–36%** of
+compile time, so tree construction is a far larger share of a real program than of a wall of
+stubs — the synthetic shape has almost no tree to build. Both numbers are useful and neither
+generalizes: use the synthetic one for machine-generated declaration walls (Mandreel) and the
+corpus one for everything else.
+
+**The phase splits in two, and the split is not the one the items are numbered by.**
+Mandreel and CodeLoad were paired throughout as "the front end", and they fail for
+unrelated reasons: Mandreel is **wide** (1 364 top-level declarations in one scope, which
+was quadratic — 1-4, landed, 3.04×) and jQuery is **deep** (532 functions nested in one
+IIFE, 96.5% of its compile in bodies that are never called — 1-1, open).
+
+### 1-1 · Lazy function compilation — **the emission half landed; re-specified by measurement**
 
 **Target.** CodeLoad and MandreelLatency are *designed* so this is the dominant term —
 jQuery defines thousands of functions and calls almost none of them. A large multiple
@@ -1106,6 +1204,200 @@ new timeout** — the local suite is not sufficient for an early-error change. P
 cache confirmed off (0-5).
 
 **Size: XL.** The only item here that is a genuine sub-project.
+
+**Its premise is now measured, and it holds — but not on the suite the item leads with.**
+`--compile-profile`'s control compiles each corpus with every outermost function body
+replaced by `{}`, which is the floor an ideal deferral converges to. The saving is *not*
+that difference: a body that is never called must still be **parsed**, because a syntax
+error inside it is still a `SyntaxError` at script-compile time (this item's first named
+risk), and the stub source has no bodies to parse. Charging that pre-parse back gives
+`ceiling = full − stub − (parseFull − parseStub)`. Taken **after 1-4**, so it is what is
+left for 1-1 to win rather than what was there before the phase started:
+
+| Corpus | Functions | Compile | Ceiling | Share |
+|---|--:|--:|--:|--:|
+| codeload-jquery | 532 | 767 ms | 741 ms | **96.5%** |
+| box2d | 982 | 413 ms | 390 ms | 94.4% |
+| typescript | 1 763 | 947 ms | 892 ms | 94.2% |
+| pdfjs | 949 | 991 ms | 914 ms | 92.3% |
+| mandreel | 1 476 | 7 815 ms | 6 646 ms | 85.1% |
+| codeload-closure | 57 | 72 ms | 45 ms | 62.9% |
+
+So the item is right that most front-end cost is function bodies — 92–96% on the large real
+programs — and it is right that a *parse* is all a deferral has to keep. **Two corrections
+to how it is stated.** First, the ceiling is a **lower** bound, not an upper one: the
+control still emits an empty lambda per function, and a deferred function emits none, so
+the floor is below the stub. Second, the item's headline pairing of CodeLoad with
+MandreelLatency does not survive: Mandreel's cost was never mostly bodies (see **1-4**,
+which took it 3.04× without deferring anything), while **jQuery's is 96.5% bodies and
+essentially all of it is deferrable** — CodeLoad evaluates it and calls almost none of it.
+1-1 is a CodeLoad item and a page-load item. It is not the Mandreel item it was written as.
+
+**And its cost side is now known too**, which is what makes it startable: the deferred body
+has to compile against the scope it was created in, and this engine has no closure object to
+hang that on. Its only mechanism for "compile later against captured bindings" is direct
+eval's `JSVariable[]` capture list, and identifiers compiled that way resolve through
+`JSContextBuilder.ResolveIdentifier` at **run time** rather than binding to a cell at compile
+time — fine for CodeLoad, whose payload is eval'd code either way, and a steady-state
+regression for anything hot. Baking the cells in as constants is not available:
+`ILGeneratorExtensions.EmitConstant` throws `NotSupportedException` for any reference type
+that is not a `string`, `Type` or `MethodInfo`. **So the sub-project inside this item is a
+capture mechanism, not a pre-parser** — the pre-parser is the part that already exists.
+
+#### What landed: defer the *emission*, not the compilation
+
+**The capture mechanism was not built, and the item's win was taken without it.** The four
+risks above are all properties of the **front end**, and they are all settled before a
+function reaches the emitter: the source is parsed, early errors have thrown,
+`LambdaRewriter` has decided which variables are captured and boxed them, and
+`GeneratorRewriter` has run. What is left at that point is generating machine code for a tree
+that is already correct. **Deferring that is the same prize with none of the risk** — a
+deferred site cannot observe anything, cannot fail differently on any input the eager path
+accepts, and produces byte-identical IL, because it is the same call on the same tree, later.
+
+**Where.** `RuntimeMethodBuilder.Relay` generated each nested lambda's `DynamicMethod` while
+emitting its enclosing lambda. It now registers the site instead
+(`MethodRepository.RegisterDeferred`), and `Create` — which runs once per *closure
+instantiation* — hands back a thunk over that instance's boxes. The first invocation
+generates the method, memoized on the shared site; a function defined once and instantiated a
+million times generates once, and one instantiated once and never called generates never.
+`LambdaRewriter.Rewrite` stays eager and must: it decides the boxes the creation site
+references.
+
+**Two things had to be got right, and both were found by measuring rather than by reading.**
+
+- **No stack handoff.** Wrapping generation in `CompilationStack.RunOnFreshStack` — matching
+  what the eager path was inside — took the repository suite from 3.5 minutes to **over 20, at
+  12% CPU**: blocked, not working. It is 1-2's own lesson about short sources, applied at the
+  wrong granularity: a fixed ~180 µs handoff is nothing against one whole-script compilation
+  and unaffordable once per function. It is also unnecessary, because `ILCodeGenerator` derives
+  from `StackGuard` and segments onto a fresh stack only when a tree is actually deep enough.
+- **The thunk's warm path is written in IL, not called.** A `DynamicMethod` does not inline
+  what it calls, so a thunk that called `Instance.Resolve()` unconditionally cost **1.0247×**
+  on a call-heavy script — a real regression on every deferred function that is ever invoked.
+  Reading the field inline and branching to the slow path only when it is null takes that to
+  **1.0009×**, with pairs straddling 1 in both directions.
+
+**Result.** Compile only (the corpus is compiled and never invoked, which is CodeLoad's shape),
+ABBA-interleaved on one build with `BROILER_JS_DEFER_IL` as the only difference, **one corpus
+per process**, six pairs per arm:
+
+| Corpus | Functions | Eager | Deferred | Time | Allocation |
+|---|--:|--:|--:|--:|--:|
+| **codeload-jquery** | 532 | 587 ms | **398 ms** | **0.661×** | **0.518×** |
+| box2d | 982 | 914 ms | 581 ms | 0.636× | 0.553× |
+| pdfjs | 949 | 1 607 ms | 1 107 ms | 0.689× | 0.549× |
+| codeload-closure | 57 | 51 ms | 37 ms | 0.714× | 0.657× |
+| mandreel | 1 476 | 7 115 ms | 5 923 ms | 0.832× | 0.544× |
+| typescript | 1 763 | 1 657 ms | 1 805 ms | **1.034×** | 0.516× |
+
+Steady state — a script that compiles *and* runs 6.3 M calls across three shapes — is
+**1.0009×** by median paired ratio. So the change is free where it does not help.
+
+**The benchmark this item names was run, and it passes** (§3.5: *a benchmark named as an
+item's justification is a test that item has to pass*). Octane **CodeLoad**, ABBA-interleaved
+on one build with `BROILER_JS_DEFER_IL` as the only difference, 24 samples per arm:
+
+| Arm | n | Median | Range |
+|---|--:|--:|--:|
+| eager | 24 | 94.6 | 89.1–103.0 |
+| **deferred** | 24 | **104.0** | 98.0–110.0 |
+
+**1.099× (higher is better), with 93.1% pairwise dominance** — 536 of 576 deferred-vs-eager
+sample pairs favour deferral. Worth noting how nearly this was mis-called: the first pair of
+runs separated cleanly (94.3 vs 105) and the *reversed* pair did not (99.2 vs 99.4). At three
+samples an arm, against a suite whose own noise band is 7.5%, either pair alone would have
+been read as a verdict. It took 24.
+
+**And it re-frames the item, because 1.099× is not what 1-1 predicts.** The item says "a large
+multiple on both is the expected outcome; if it is not, the measurement is wrong before the
+change is." The measurement is not wrong — the same payload's isolated *compile* moved 1.51×
+(0.661× time). Solving for the share: if compilation were fraction *f* of CodeLoad's measured
+time, `f × 0.661 + (1 − f) = 1/1.099`, giving **f ≈ 0.27**. So **compilation is about a
+quarter of what CodeLoad measures**, not the dominant term this document has assumed since
+§1.1 called it "the two that measure nothing but the front end". The rest is executing the
+payload — jQuery's initialization runs a great deal of code, and the functions it calls have
+their generation forced. That estimate is derived from two measured ratios rather than
+observed directly, and it is the first thing 1-3 should check.
+
+**Three honest qualifications, and the first corrects something this document said.**
+
+1. **"Emission is 89%" is true of the synthetic shape and not of these corpora.** That figure
+   comes from `--compile-scaling`'s top-level declarations, where a lambda is a stub and almost
+   all the work is emitting it. On the real corpora, deferring every nested body removes
+   **17–36%** of total compile time (jQuery 32%, Box2D 36%, PdfJS 31%, Closure 29%, Mandreel
+   17%) — so on real source, expression-tree construction is a far larger share than 11%. The
+   phase-level claim above has been qualified accordingly; *a split measured on one shape is a
+   fact about that shape.*
+2. **Typescript is consistently slower and it is not explained.** 1.034× on the final build,
+   every one of six pairs above 1 (1.004–1.077), while its allocation halves like everything
+   else's. It is not GC — allocation moves the same 0.52× as the corpora that gain. It is
+   recorded rather than explained, because a plausible story with no measurement behind it is
+   what §3.5 exists to stop.
+3. **A deferred site retains its expression tree.** Sites are registered under a `GCHandle`
+   that is never freed (pre-existing), so an un-generated site holds its tree for the life of
+   the process where a generated one holds only its `DynamicMethod`. The tree is released the
+   moment a site is forced. This is also what made the *first* measurement of this change
+   wrong: with all six corpora in one process, the ones measured last paid for the ones before
+   them and read 1.6× and 2.6× **slower**, with bimodal ratios — the tell that it was ordering
+   and not the change.
+
+**The three-engine comparison was run over both named suites.** Not `--only` — that makes the
+harness skip the comparison by design ("its suite set is a subset, so folding it into the full
+comparison would silently drop every suite it skipped") — but a **two-suite manifest**, which
+makes it a full run over exactly CodeLoad and Mandreel and emits `comparison.md` honestly.
+Chromium 3 reps, Broiler 3 reps, Jint 1:
+
+| Benchmark | Chromium | Broiler | Jint | Broiler × slower | Broiler / Jint |
+|---|--:|--:|--:|--:|--:|
+| CodeLoad | 19 334 | 82.4 ⚠ | 1 997 | 234.6× | 0.041 |
+| Mandreel | 28 359 | 104 | 58.5 | 272.7× | **1.778** |
+| MandreelLatency | 35 865 | 9.8 ⚠ | 499 | **3 659.7×** | 0.020 |
+
+⚠ = spread over 3 repetitions exceeded the 7.5% noise band (CodeLoad 15.9%, MandreelLatency
+9.5%). All six suite runs completed `ok`; nothing to diagnose.
+
+**Four things this table is not.** *(1)* Its geomean (44) and spread (15.6×) are over **three
+scores**, not the suite's seventeen — they are not comparable to the committed run's 354 and
+249×, and must never be quoted as if they were. *(2)* Broiler's absolute scores here are well
+below the same build measured alone earlier the same day (CodeLoad 82.4 against 104, Mandreel
+104 against 137): a three-engine session is a busier machine than a one-suite run, which is
+§3.2's rule about comparing only within a run, showing up. *(3)* **Jint ran one repetition, and
+`comparison.md`'s header said "Repetitions per suite: 3"** — the header took that number from a
+single engine and presented it as global. **Found by running the thing, and fixed**: the summary
+now records repetitions per engine, reports one number only while they agree, and otherwise names
+each — the same comparison now reads *"Chromium 3, Broiler 3, Jint 1 — the engines differ, so each
+column is that engine's own median, and Jint is a single run whose deltas cannot be distinguished
+from noise"*. The ⚠ spread column follows Broiler's own count too, rather than whichever engine
+came first, since it describes Broiler's samples. Eight checks added to
+`tests/octane/harness-selftest.mjs`, five of which fail against the old harness. *(4)* Jint ran in a separate, later, quieter process after
+the first attempt was killed, so its column is the weakest of the three.
+
+**What it does show.** Broiler is **1.778× ahead of Jint on Mandreel** — the suite whose compile
+1-4 tripled — and far behind it on the two that are not compile-bound: 0.041× on CodeLoad, whose
+payload Jint evaluates far faster, and 0.020× on MandreelLatency. *A managed interpreter beating
+this engine by 25× and 50× on those two is the sharper statement of where phase 1 and phase 3
+have left to go, and it is a comparison no Chromium column makes visible.*
+
+**What is still open.** The parse and the expression-tree construction are still eager, and on
+real source that is the larger half. Closing it needs the capture mechanism described above,
+and this item stays open for it. **Size of what remains: L.**
+
+**Verify.** `DeferredCompilationTests` — ten fixtures covering the item's four named risks
+against the implementation (a syntax error in a never-called function still throws at compile
+time; per-instance loop captures; writes through a captured cell after first call; self- and
+mutual recursion through a thunk; direct `eval` inside a deferred body; a deferred generator;
+100 instances of one site keeping distinct state; concurrent first calls). Full repository
+suite **7 640 tests, 0 failures**.
+
+**One unreproduced failure is on the record.** A single run of the full suite reported
+`Broiler.JavaScript.ModuleExtensions.Tests` 1 of 5 failed. It did not reproduce in **nine
+subsequent full-suite runs** — four with `BROILER_JS_DEFER_IL=0` and five with it on, same
+build — nor in isolation. That project's first test guards a *module-initializer ordering*
+bug by its own comment ("before the BuiltIns `[ModuleInitializer]` that wires it had run"), so
+it is order-dependent by construction and a plausible pre-existing flake. **Eight runs cannot
+separate a 1-in-10 flake from a 1-in-10 regression**, so this is recorded as unresolved rather
+than dismissed: if it recurs, start here.
 
 ### 1-2 · Stop recursive compilation from overflowing — **mitigation landed**
 
@@ -1314,6 +1606,104 @@ There is now one datapoint to start from, taken while working 1-2: **~2.5 ms to 
 ways — but it does say the per-compile floor is milliseconds for a trivial body, which is
 the part 1-1 cannot remove. A body that is never called costs nothing after 1-1; the one
 that *is* called still pays this.
+
+**The three-way split this item asks for now exists** — `--compile-scaling` times parse,
+expression-tree construction and IL emission separately — and it was 1-4 that used it. On
+2 000 top-level function declarations the three phases are **2.5 ms / 63 ms / 486 ms**: parse
+noise, tree construction 11%, emission 89%.
+
+**But that is the synthetic shape, and on real source the answer is the other way round.**
+1-1's deferral removes *all* nested-body IL generation, and on the real corpora that is only
+17–36% of compile time — so on a real program most of what is left, after parse, is
+expression-tree construction. **1-3 is therefore a front-end item, not the emitter item the
+synthetic split implied**, and the first thing it should do is take the same three-way split
+on the corpora rather than on generated declarations.
+
+### 1-4 · The closure rewrite was quadratic in a scope's binding count — **landed**
+
+**Not an item either source roadmap had**, because neither could see it: it is invisible to
+a probe (one-liners have one binding) and it does not look like a bottleneck in a score
+(it looks like "Mandreel is big"). It was found by measuring 1-1's premise, and it is
+larger than 1-1's premise.
+
+**What it was.** `LambdaRewriter.Scope` held the variables in scope for one lambda in a
+`List<BParameterExpression>` and performed exactly the two operations a list is worst at:
+`Contains`, run by `CheckForClosure` for **every parameter reference in the tree**, and
+`Remove`, run once per variable as each block scope ends. Both are linear scans, so the
+cost of emitting a lambda grew as the **square of the number of bindings in it**. A
+script's top level is one lambda, which makes the count of top-level declarations the term
+that squares — and machine-generated JavaScript is nothing but top-level declarations.
+
+**The measurement that found it.** `--compile-profile` compiles each corpus twice: as
+written, and with every outermost function body replaced by `{}`. The second is the floor
+1-1 converges to, so the difference sizes 1-1. Five of six corpora behaved as 1-1 predicts.
+Mandreel did not: with **every function body removed**, its remaining 248 KB still took
+**17.7 s** to compile, against ~5 ms for the same control on PdfJS, Typescript and Box2D.
+Per byte that residue was ~70× more expensive than Box2D's entire source — a difference no
+deferral can explain, because there was nothing left to defer.
+
+`--compile-scaling` then varied one thing at a time. Emission on N top-level function
+declarations:
+
+| N | parse | tree | **emit** | ms per declaration |
+|--:|--:|--:|--:|--:|
+| 500 | 0.8 | 12.7 | **796.9** | 1.62 |
+| 1 000 | 1.3 | 24.0 | **2 980.8** | 3.01 |
+| 2 000 | 2.5 | 70.2 | **13 864.5** | 6.97 |
+
+Just under 4× per doubling with parse and tree construction flat: quadratic, in emission,
+in the declaration count. Name length was ruled out in the same run (200-character mangled
+names cost the same as `f1`), and plain `var`s were quadratic too — so it is bindings, not
+functions.
+
+**The fix.** The scope became a reference-keyed multiset. Three details are load-bearing:
+
+- **A multiset, not a set.** The list held *duplicates* and both operations depended on it:
+  a variable registered by two nested block scopes is added twice, and the inner scope's
+  exit has to leave the outer registration behind. A `HashSet` would have collapsed the
+  pair and taken a still-live binding out of scope — a miscompile, not a lost optimization.
+- **The list is kept for small scopes.** A dictionary is not free — hashing a reference is
+  a runtime call — and most scopes are small. Dictionary-only bought Mandreel 3.6× and cost
+  jQuery, one large IIFE full of small function scopes, ~20%. Promotion above 32 bindings
+  takes both ends; the list is abandoned once the index exists, so nothing is maintained twice.
+- **The comparison is spelled out.** `List.Contains` resolves through
+  `EqualityComparer<T>.Default`, i.e. a virtual `Equals` per element, and
+  `BParameterExpression` overrides neither `Equals` nor `GetHashCode`. An explicit
+  `ReferenceEquals` loop is the same answer without the dispatch — and it makes the identity
+  semantics the rewrite depends on unbreakable by a later `Equals` override.
+
+**Result.** Synthetic, same probe, before and after — emission on 2 000 top-level function
+declarations **13 864.5 → 485.7 ms (28.5×)**, and cost per declaration went from climbing
+(1.62 → 3.01 → 6.97) to flat (0.38 → 0.25 → 0.28). The speedup factor doubles as N doubles,
+which is what tells quadratic-made-linear from a constant-factor win.
+
+Real corpora, **ABBA-interleaved at process granularity, six pairs per arm**:
+
+| Corpus | HEAD | Changed | Ratio |
+|---|--:|--:|--:|
+| **mandreel** | 21 307 ms | **7 015 ms** | **0.329×** — every pair 0.29–0.40 |
+| pdfjs | 1 005 ms | 878 ms | 0.874× |
+| typescript | 1 028 ms | 920 ms | 0.894× |
+| box2d | 396 ms | 367 ms | 0.927× |
+| codeload-closure | 48.9 ms | 50.8 ms | 1.039× — ratios straddle 1 |
+| codeload-jquery | 540 ms | 600 ms | 1.112× — ratios 0.669–1.437, no signal |
+
+A second A/B on **one build**, with `BROILER_JS_REWRITER_INDEX_THRESHOLD` as the only
+difference, isolates the promotion from the devirtualized comparison: the index alone is
+**0.536× on Mandreel** and inside noise everywhere else. So both halves are real and the
+larger one is the index.
+
+**What it does not do.** CodeLoad is untouched, and that is the honest reading rather than a
+disappointment: its two payloads are 57 and 532 functions *nested inside one IIFE*, so no
+scope in them is wide. This item is about width, 1-1 is about depth of work per function,
+and Mandreel needed the first while jQuery needs the second.
+
+**Verify.** `DeclarationDenseSourceTests` — a scale-free ratio bound (4× the declarations
+must cost under 8×; it was 17.4× before and 2.6× after, so the bound is near neither), plus
+two semantic fixtures for the duplicate-registration case a set would have broken. Full
+repository suite: **7 630 tests across 13 projects, 0 failures.**
+
+**Size: S.** One class, and it was found by measuring a different item.
 
 ---
 
@@ -3650,7 +4040,7 @@ predicate at all.
 | Phase | Order within it | Size | Unblocks / expected effect | Exit gate |
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI — 17/17 established at the pin locally; the workflow run is still owed) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
-| **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-1** → 1-3 measure | XL | The two worst scores in the suite; page-load time generally | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
+| **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-4 ✅** → **1-1 emission half ✅**, capture half open → 1-3 measure | 1-4 S, 1-1 remainder L | The two worst scores in the suite; page-load time generally. **1-4 took the Mandreel half (3.04×); 1-1's deferred emission takes 0.64–0.69× off jQuery, PdfJS and Box2D at 1.0009× steady state, and CodeLoad 94.6 → 104.0 (1.099×)** | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured: Richards PASSES (183× → 150× after 2-11/2-12), DeltaBlue FAILS (576× → 447×)**, five repetitions per engine on one machine |
 | **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | 4-3 design ✅ → **4-1** (unblocked) → 4-3a (S) → 4-3b (M–L) → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
@@ -3737,6 +4127,55 @@ note the counters default to **off** since P0-1 and need an `Enable()` scope.
 Real-world scripts are the repository's own
 `Broiler.JS/OtherTests/JIntPerfTests/Scripts/*.js`, each in a fresh `JSContext`.
 
+### The front-end probes (phase 1)
+
+Both take the same benchmarks host as every other emitter above. `--compile-profile` needs
+an Octane checkout, because the shapes that matter here — hundreds of sibling declarations,
+one IIFE holding hundreds of nested functions — do not occur in hand-written test sources;
+`--compile-scaling` generates its own, since its job is to vary one property at a time.
+
+```bash
+cd Broiler.JS/Broiler.JS
+DLL=benchmarks/Broiler.JavaScript.Engine.Benchmarks/bin/Release/net10.0/Broiler.JavaScript.Engine.Benchmarks.dll
+
+# How much of each corpus's compile is function bodies (sizes item 1-1).
+# Third argument is repetitions; the report is a median. Mandreel dominates the runtime.
+dotnet $DLL --compile-profile /path/to/octane 3
+
+# Parse / expression-tree / IL-emission split, against declaration count and name length
+# (this is what found item 1-4). Streams a row per shape to stderr as it completes.
+dotnet $DLL --compile-scaling
+```
+
+`--compile-profile` builds its control by replacing every outermost function body with `{}`
+and **re-parses it before timing anything** — a control the parser rejects would measure
+failing early rather than compiling less. Set `BROILER_COMPILE_PROFILE_DUMP=<dir>` to write
+each control out; that is how Mandreel's residue was read.
+
+Both phase-1 changes carry a switch so they can be A/B'd on a single build, which is the only
+way to compare two compilers without also comparing two builds:
+
+```bash
+# Item 1-4: scope size above which the closure rewrite indexes instead of scanning
+# (default 32). Any value larger than a real scope restores the pre-1-4 linear scan.
+BROILER_JS_REWRITER_INDEX_THRESHOLD=1000000000 dotnet $DLL --compile-profile /path/to/octane 1
+
+# Item 1-1: 0 restores eager IL generation. Default is on.
+BROILER_JS_DEFER_IL=0 dotnet $DLL --compile-profile /path/to/octane 1
+```
+
+**Give `--compile-profile` a corpus name as its fourth argument and run one per process.**
+The corpora share a heap and item 1-1 keeps an un-generated lambda's tree alive, so a corpus
+measured after Mandreel's 5 MB pays collection time that has nothing to do with its own
+compile. Measured together, 1-1 read **1.6× and 2.6× slower** on the last two corpora and
+0.56–0.65× faster on the first three, with bimodal ratios; measured one per process it is
+0.64–0.83× on five of six. *That artifact cost a full A/B run to find, and the tell was the
+bimodality, not the sign.*
+
+```bash
+BROILER_JS_DEFER_IL=1 dotnet $DLL --compile-profile /path/to/octane 1 codeload-jquery
+```
+
 **These probes now have a permanent home** — `HotPathProbeBenchmarks` in
 `Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks`, wired into all three
 `Broiler.JS/eng/performance/phase0.json` profiles, with phase C's hit rates on their own
@@ -3813,7 +4252,9 @@ Where each item came from, so existing cross-references still resolve.
 | 0-6 | — | Octane §2.6 | **Owed** |
 | 0-7, 0-8, 0-9 | engine §8.1 acceptance evidence | — | **Owed** |
 | 0-10, 0-11 | engine §8.1, §8.2 | — | Done |
-| 1-1, 1-3 | *excluded by engine §9* | 1-1, 1-3 | Open — superseded, see §1.1 |
+| 1-1 | *excluded by engine §9* | 1-1 | **Emission half landed; capture half open.** Deferring IL generation to first invocation makes all four of the item's named risks vacuous — they are front-end properties and the front end still runs eagerly. jQuery **0.661×**, Box2D 0.636×, PdfJS 0.689×, allocation ~0.52× throughout, steady state **1.0009×**, and **Octane CodeLoad 94.6 → 104.0 (1.099×, 24 samples an arm, 93% pairwise dominance)** — the benchmark the item names, run and passed, though 1.099× is far short of the "large multiple" the item predicts because compilation is only ~27% of what CodeLoad measures. Typescript 1.034× and unexplained. Carried as a patch — see [`patches/README.md`](../patches/README.md). What remains is deferring the parse and tree construction, which needs the capture mechanism |
+| 1-3 | *excluded by engine §9* | 1-3 | Open, and **re-aimed**: the synthetic split (parse 0.5% / tree 11% / emission 89%) does not hold on real source, where deferring *all* nested-body emission removes only 17–36%. 1-3 is a front-end item, and its first task is that split on the corpora |
+| 1-4 | — (found measuring 1-1's premise) | — | **Landed** — the closure rewrite's per-lambda scope was a `List` asked `Contains` per parameter reference, so IL emission was **quadratic in a scope's binding count**. A reference-keyed multiset, list-backed below 32 bindings: **28.5×** on 2 000 top-level declarations, **3.04× on Mandreel** end-to-end (ABBA, six pairs), inside noise on the narrow-scope corpora. Carried as a patch, not a pointer bump — see [`patches/README.md`](../patches/README.md) |
 | 1-2 mitigation | *excluded by engine §9* | 1-2 | **Landed** — `43bc4230`, in the pinned pointer |
 | 1-2 real fix | — | 1-2 | **Landed on all three recursing passes.** `StackGuard` was repaired and put on `AstMapVisitor.Visit`; `FastParser.Expression` is now guarded too, which was the last one — its descent aborted the process at 25 000 nesting levels in the DEFAULT configuration and now survives 90 000, median paired ratio 0.9993. The four-way matrix's "mitigation off / guard on" row is a **linux-x64** statement: on win-x64 the front end compiles in place on ~1 MiB while the threshold is 4 MiB, so no segmenter can fire there |
 | 2-0 | — (P1-2's guard, reached in a state it cannot recognise) | — | **Landed** — `2df877a0`, in the pinned pointer |

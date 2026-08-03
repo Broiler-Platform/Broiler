@@ -337,6 +337,46 @@ const single = buildComparison({
 checkTrue('render: one repetition says so plainly', renderMarkdown(single, null).includes('cannot be distinguished from noise'));
 checkTrue('render: one repetition has no spread column', !renderMarkdown(single, null).includes('Broiler spread'));
 
+// ── Repetitions are per engine ──────────────────────────────────────────────
+// Engine results are folded in from disk, so a run that refreshes one engine
+// leaves the others at whatever repetition count they were last measured with.
+// The summary used to coalesce to the first engine present and report it as
+// though it applied to all of them: a real comparison whose Jint column was a
+// single sample carried the header "Repetitions per suite: 3", because Broiler's
+// was 3. A reader has no way to see that from the table, which is exactly the
+// kind of thing a comparison is read for.
+check('compare: repetitions are recorded per engine', cmp.summary.repetitionsByEngine, { chromium: 1, broiler: 3 });
+check('compare: no single repetition count when engines disagree', cmp.summary.repetitions, null);
+checkTrue('render: a mixed-repetition header names every engine',
+  md.includes('Chromium 1') && md.includes('Broiler 3'), md.slice(0, 700));
+checkTrue('render: a mixed-repetition header says the engines differ',
+  md.includes('the engines differ'), md.slice(0, 700));
+checkTrue('render: a mixed-repetition header names the single-run engine',
+  /Chromium is a single run/.test(md), md.slice(0, 700));
+
+const uniformReps = buildComparison({
+  chromium: { engineLabel: 'c', geomean: 100, repetitions: 3, benchmarks: { Richards: 100 }, suiteStatus: { Richards: { status: 'ok' } } },
+  broiler: {
+    engineLabel: 'b', geomean: 1, repetitions: 3, noiseBandPercent: 7.5, benchmarks: { Richards: 1 },
+    stability: { Richards: { samples: [1, 1, 1], bandPercent: 0 } },
+    suiteStatus: { Richards: { status: 'ok' } },
+  },
+}, '2026-01-01T00:00:00.000Z');
+check('compare: agreeing engines still report one number', uniformReps.summary.repetitions, 3);
+checkTrue('render: agreeing engines keep the original one-line header',
+  renderMarkdown(uniformReps, null).includes('- Repetitions per suite: 3 (median reported; noise band 7.5%)'),
+  renderMarkdown(uniformReps, null).slice(0, 700));
+
+// The spread column and its ⚠ describe BROILER's samples, so they follow
+// Broiler's repetition count and not whichever engine happened to come first.
+const chromiumRepeatedOnly = buildComparison({
+  chromium: { engineLabel: 'c', geomean: 100, repetitions: 3, benchmarks: { Richards: 100 }, suiteStatus: { Richards: { status: 'ok' } } },
+  broiler: { engineLabel: 'b', geomean: 1, repetitions: 1, benchmarks: { Richards: 1 }, suiteStatus: { Richards: { status: 'ok' } } },
+}, '2026-01-01T00:00:00.000Z');
+checkTrue('render: no Broiler spread column when only another engine repeated',
+  !renderMarkdown(chromiumRepeatedOnly, null).includes('Broiler spread'),
+  renderMarkdown(chromiumRepeatedOnly, null).slice(0, 700));
+
 // A two-engine run must keep reporting exactly what it did before Jint existed:
 // no empty columns, no zeroed coverage entry for an engine that never ran.
 checkTrue('render: no Jint column when Jint did not run', !md.includes('Jint'), md.slice(0, 600));

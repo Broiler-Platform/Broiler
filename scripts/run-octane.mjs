@@ -1105,9 +1105,29 @@ function summarize(cmp, results) {
     // the geomeans above cannot be divided for this, since each is taken over
     // whatever suites that engine happened to complete.
     broilerVsJint: geomeanRatio(cmp.benchmarks.map((r) => r.broilerVsJint)),
-    repetitions: broiler?.repetitions ?? chromium?.repetitions ?? jint?.repetitions ?? 1,
+    // Per engine, because they can genuinely differ: results are folded in from
+    // disk (see the caller), so a run that refreshes one engine leaves the others
+    // at whatever repetition count they were last measured with. This used to
+    // coalesce to the first engine present and report it as though it applied to
+    // all three — a comparison whose Jint column was a single sample said
+    // "Repetitions per suite: 3" because Broiler's was.
+    repetitionsByEngine: Object.fromEntries(
+      ENGINE_IDS.filter((id) => results[id]).map((id) => [id, results[id].repetitions ?? 1])),
+    // Kept as a number only while every engine agrees, so the common case reads
+    // exactly as it did; null is the signal that the header must name each engine.
+    repetitions: uniform(ENGINE_IDS.filter((id) => results[id]).map((id) => results[id].repetitions ?? 1)),
+    // The spread column and its ⚠ describe BROILER's samples specifically, so they
+    // are gated and labelled by Broiler's own numbers rather than by whichever
+    // engine happened to come first.
+    broilerRepetitions: broiler?.repetitions ?? null,
     noiseBandPercent: broiler?.noiseBandPercent ?? chromium?.noiseBandPercent ?? jint?.noiseBandPercent ?? null,
   };
+}
+
+// The one value shared by every element, or null when they disagree.
+function uniform(values) {
+  if (values.length === 0) return 1;
+  return values.every((v) => v === values[0]) ? values[0] : null;
 }
 
 // Geometric mean of the per-benchmark ratios, ignoring the suites where one of
@@ -1144,7 +1164,19 @@ export function renderMarkdown(cmp, results) {
   }
   const s = cmp.summary;
   if (s) {
-    lines.push(`- Repetitions per suite: ${s.repetitions}${s.repetitions === 1 ? ' — **a single run; deltas against it cannot be distinguished from noise**' : ` (median reported; noise band ${s.noiseBandPercent}%)`}`);
+    if (s.repetitions === null) {
+      // Engines disagree. Naming each is the whole point: a reader comparing two
+      // columns has to know that one of them is a single sample.
+      const perEngine = present
+        .map((id) => `${ENGINE_TITLES[id]} ${s.repetitionsByEngine[id]}`)
+        .join(', ');
+      const single = present.filter((id) => s.repetitionsByEngine[id] === 1).map((id) => ENGINE_TITLES[id]);
+      lines.push(`- Repetitions per suite: ${perEngine} — **the engines differ**, so each column is that engine's own median`
+        + `${single.length ? `, and ${single.join(' and ')} ${single.length === 1 ? 'is' : 'are'} a single run whose deltas cannot be distinguished from noise` : ''}`
+        + `${s.noiseBandPercent != null ? ` (noise band ${s.noiseBandPercent}%)` : ''}`);
+    } else {
+      lines.push(`- Repetitions per suite: ${s.repetitions}${s.repetitions === 1 ? ' — **a single run; deltas against it cannot be distinguished from noise**' : ` (median reported; noise band ${s.noiseBandPercent}%)`}`);
+    }
     lines.push('');
     const cells = (values) => `| ${values.join(' | ')} |`;
     lines.push(cells(['', ...present.map((id) => ENGINE_TITLES[id])]));
@@ -1173,7 +1205,8 @@ export function renderMarkdown(cmp, results) {
   if (j) lines.push('"Broiler / Jint" is the same ratio against the other managed engine: above 1, Broiler is ahead.');
   lines.push('');
   const noisy = (st) => (st && st.bandPercent != null && cmp.summary && st.bandPercent > cmp.summary.noiseBandPercent ? ' ⚠' : '');
-  const showBand = cmp.summary && cmp.summary.repetitions > 1;
+  // Gated by Broiler's own repetition count, because the column is Broiler's spread.
+  const showBand = cmp.summary && cmp.summary.broilerRepetitions > 1;
   lines.push(`| Benchmark | Chromium | Broiler |${j ? ' Jint |' : ''}${showBand ? ' Broiler spread |' : ''} Broiler / Chromium | × slower |${j ? ' Broiler / Jint |' : ''}`);
   lines.push(`|---|--:|--:|${j ? '--:|' : ''}${showBand ? '--:|' : ''}--:|--:|${j ? '--:|' : ''}`);
   for (const row of cmp.benchmarks) {
@@ -1190,7 +1223,7 @@ export function renderMarkdown(cmp, results) {
   lines.push(`| **Overall (geomean)** | **${c?.geomean ?? '—'}** | **${b?.geomean ?? '—'}** |${overallJint}${showBand ? ' |' : ''} ${c?.geomean && b?.geomean ? (b.geomean / c.geomean).toFixed(3) : '—'} | ${c?.geomean && b?.geomean ? `${(c.geomean / b.geomean).toFixed(0)}×` : '—'} |${overallVsJint}`);
   lines.push('');
   if (showBand) {
-    lines.push(`⚠ marks a benchmark whose spread across ${cmp.summary.repetitions} repetitions exceeded the ${cmp.summary.noiseBandPercent}% band.`);
+    lines.push(`⚠ marks a benchmark whose spread across Broiler's ${cmp.summary.broilerRepetitions} repetitions exceeded the ${cmp.summary.noiseBandPercent}% band.`);
     lines.push('');
   }
 
