@@ -26,11 +26,13 @@ so only the parent can hold the combined view.
   said `71dda1b7`**, which the pointer had moved past. `71dda1b7` is an **ancestor** of the
   current pin, so nothing recorded against it is invalidated; the correction is to the prose,
   not to any measurement — which is exactly the failure mode the rule two sentences down
-  already names, caught by applying it. **Phase 5's single-match `replace` change is *not* in the
-  pin**: its push to the submodule remote returned 403, so it is carried as
-  [`patches/0059`](../patches/0059-js-single-match-replace-one-allocation.patch) and the
-  pointer is deliberately unbumped — its figures below were measured on a local build of
-  `2ebc0c3c` **plus** that patch, control and change from the same tree.
+  already names, caught by applying it. **Phase 5's two `replace` changes are *not* in the
+  pin**: their pushes to the submodule remote returned 403, so they are carried as
+  [`patches/0059`](../patches/0059-js-single-match-replace-one-allocation.patch) and
+  [`patches/0060`](../patches/0060-js-stream-global-replace.patch) — **in that order**, since
+  `0060` builds on the function `0059` restructures — and the pointer is deliberately unbumped.
+  Their figures below were measured on a local build of `2ebc0c3c` **plus** those patches,
+  control and change from the same tree.
   `a6f101cc` — which this section named until 3-3
   was worked, and which every §0 and phase-2 measurement below was taken at — is an **ancestor**
   of it (`merge-base --is-ancestor`), so nothing recorded here is invalidated;
@@ -72,7 +74,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**; 0-6's CI Octane run is outstanding, and **2-9's ~20% compile-and-first-run cost wants a follow-up** (stop materializing for a deferred cell) |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
-| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. What remains is the global case's retained result list, ~10 MB per call |
+| **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. The global case's retained result list then landed too — **2 032.8 → 478.3 B per match**, dead linear on both sides, by streaming when the receiver's `exec` is the pristine intrinsic and the replacement is a `$`-free string. **Every follow-up this phase named is now closed**; what is left is item 2's `Compiled` policy, deliberately unshipped |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
 wall-clock figure is a median of interleaved process-granularity pairs against a control, per §3:
@@ -546,6 +548,22 @@ These were paid for once each. They apply to every phase below.
   — 4.020 B/char both — which is what established them as one defect in two places rather than
   two resembling ones. *When a profile localizes a cost to a mechanism, grep for the mechanism;
   the corpus only measures what somebody thought to add to it.*
+- **When an optimization skips work, the design is the observers, not the work.** Phase 5's
+  streaming replace is four lines: append each replacement instead of collecting them all. Every
+  hour of it went into establishing that nobody could watch the skipped result objects — and two
+  of the three conditions that turned out to be needed are not in the item's description. The
+  sharpest is the functional replacer: because the spec collects *all* matches before calling
+  *any* replacer, the final failing `exec` has already reset `lastIndex` to 0 before user code
+  runs, so a streamed replacer would see a *different value*, not merely a different order. The
+  item said "changes the observable order"; the actual hazard was a changed value. *Enumerate who
+  could have been watching, and check what each one would see — an item that names the hazard in
+  the abstract has usually not enumerated them.*
+- **"Is this builtin unpatched" can only be asked against a pristine capture.** The `exec` guard
+  compares against `%RegExp.prototype.exec%` captured at realm init, before user code runs.
+  Reading `RegExp.prototype.exec` at call time and comparing it to itself is circular — by then
+  it may already be the patched one — and there is no property of the function object that says
+  "genuine". *Identity against something captured earlier is the test; anything cheaper is
+  answering a different question.*
 - **A halving that lands exactly is a check on the decomposition, not just a win.** The same item
   predicted 4 B/char → 2 from "two full UTF-16 copies and nothing else". Measuring 4.02 → 2.02 at
   three subject lengths is what rules out a third copy hiding in the row; a saving of *roughly*
@@ -2950,8 +2968,8 @@ not started:
   matches in step 14 and reads their properties in step 16, so 5 000 matches means 5 000 live
   result arrays — 5 000 × ~2 KB, which is exactly the ~10 MB per call still measured. Streaming
   them would change the observable order of `exec` calls against capture reads, so it is only
-  available on a fast path where nothing is patched. **Not started, and it is now the largest
-  measured regex cost left.**
+  available on a fast path where nothing is patched. **Landed — and the estimate was right to
+  three digits: 2 033 bytes per match, dead linear.**
 
 **One hazard the change introduced and closed.** Deferring the slice means `Update` publishes a
 subject and two indices that must agree; three separate field writes would let a reader on
@@ -3065,6 +3083,77 @@ builds.** All 13 are cross-realm cases needing `$262.createRealm`, which the raw
 not provide; **not one failure is in a `replace` directory.** Repository suite
 **7 604 tests across 13 projects, 0 failures** — 41 of them new here.
 
+#### The retained-result-list follow-up landed — 2 033 bytes a match, and the guard is the change
+
+> **Delivered as a patch, not in the pin**, for the same 403 as the section above, and it must be
+> applied *after* it: [`patches/0060`](../patches/0060-js-stream-global-replace.patch) builds on
+> the function [`patches/0059`](../patches/0059-js-single-match-replace-one-allocation.patch)
+> restructures. Figures below were measured on a local build of the pinned `2ebc0c3c` plus both.
+
+`RegExp.prototype[@@replace]` collects every match in step 14 and only reads their properties in
+step 16, so a global replace held one result array per match live before it assembled anything.
+**Measured with the subject held fixed and only the match count varying** — which is the
+discriminator the earlier scaling rows could not be, since they vary the subject and hold the
+match count at one:
+
+| Global replace, 40 000-char subject | 500 matches | 2 500 | 5 000 | Slope |
+|---|--:|--:|--:|--:|
+| Before | 1 181 612 | 5 247 695 | 10 329 158 | **2 032.8 B/match** |
+| After | 409 588 | 1 363 919 | 2 561 870 | **478.3 B/match** |
+| | 0.35x | 0.26x | 0.25x | **0.235x** |
+
+Dead linear on both sides — 2 033.0 and 2 032.6 across the two independent intervals before the
+change — so the retained list was the whole of it, and the previous section's "5 000 × ~2 KB ≈
+10 MB" estimate was right to three digits rather than approximately. What is left at 478 B/match
+is the match data itself: the `RegexMatchData`, its capture array and the matched string.
+
+**The optimization is four lines; the guard is the item.** Appending each replacement as it is
+produced, instead of collecting first, is trivial. Establishing that nobody can *watch* the
+results being skipped is the entire design, and it needs three conditions at once:
+
+| Condition | Why, and what breaks without it |
+|---|---|
+| The receiver's `exec` **is** the pristine `%RegExp.prototype.exec%` | Every result is then a fresh array this function is the only holder of. A patched `exec` — own property or on the prototype — must run, and its results are the user's |
+| The replacement is a **string**, not a function | A functional replacer is user code running *between* matches |
+| That string contains **no `$`** | `$&`, `` $` ``, `$'`, `$n` and `$<name>` all read back through the result object |
+
+**Two of those three are not obvious from the item's own description, and one is a real trap.**
+The item says streaming "would change the observable order of `exec` calls against capture reads",
+which is true but understates the functional-replacer case: because the spec collects *all*
+matches before calling *any* replacer, the final failing `exec` has already reset `lastIndex` to
+**0** by the time user code first runs. A streamed replacer would instead see `lastIndex` sitting
+mid-subject, at a different value for every call. That is not a reordering, it is a different
+observable value, and `AFunctionalReplacerIsNotStreamed` pins it at `0,0`.
+
+**Identity against a pristine capture is the only sound form of the `exec` test.** `%RegExp.prototype.exec%`
+is captured into `JSContext.IntrinsicRegExpExec` at realm init, before any user code can run —
+the same mechanism `IntrinsicArrayValues` and `IntrinsicPromisePrototype` already use. Reading
+`RegExp.prototype.exec` later and comparing it to itself would be circular: by then it may
+already be the patched one.
+
+**Matching still goes through one shared code path.** `Exec` is split into `ExecMatch` — the
+`lastIndex` read and write, the match, the sticky re-check and the Annex B statics — and
+`BuildExecResult`, which is the part the fast path skips. Both callers use `ExecMatch`, so
+`lastIndex` progression, engine routing and the statics cannot drift between the two paths,
+because they are the same code rather than the same intention written twice. This is the same
+device 0059 used for step 16's property read order, and for the same reason.
+
+**Verify.** `GlobalReplaceStreamingAllocationTests` asserts the bytes and **fails on the build
+without the change** — 2 610 B/match against its 1 000 bound — while all 22 guard cases pass on
+*both* builds, which is what makes them regression guards rather than change detectors. They
+cover each exclusion (patched own `exec`, patched prototype `exec`, an `exec` returning null, a
+functional replacer, and every `$` form), the empty-match advance under `/u` and without it
+(asserted as code units, because a C# literal for a lone surrogate is its own trap), sticky with
+global, `lastIndex` after the call, and the Annex B statics.
+
+Repository suite **7 627 tests across 13 projects, 0 failures**. **test262 unchanged across all
+four pinned manifests — 8 313 executed, 8 220 passed, 84 failed, 44 skipped, 9 timed out,
+identical manifest by manifest**, at suite ref `ccaac100`. The replace-path manifest was re-run
+too: **499 tests, 484 passed, 13 failed, 2 timed out, and the failing set is identical file for
+file to the *pre-0059* control** — so both of this phase's follow-ups together move no test262
+file in either direction.
+
+
 #### Item 2 measured — and the obvious policy is the wrong one
 
 The single-run table above had one pattern losing badly under `Compiled`. Repeated three times
@@ -3117,7 +3206,7 @@ predicate at all.
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** still owed from 0-6 |
 | **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | 4-3 design ✅ → **4-1** (unblocked) → 4-3a (S) → 4-3b (M–L) → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
-| **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → single-match `replace` without a builder ✅ (both builtins) → **the global case's retained result list** → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
+| **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → single-match `replace` without a builder ✅ (both builtins) → the global case's retained result list ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
 **Dependencies.**
 

@@ -24,16 +24,18 @@ Delete the patch file and its row below once the pointer is bumped.
 | Patch | Submodule | Note |
 | --- | --- | --- |
 | `0059-js-single-match-replace-one-allocation` | `Broiler.JS` | Phase 5's first follow-up to item 1. A single-match `replace` assembled its answer through a `StringBuilder`, costing two full UTF-16 copies of the subject — into the chunk list, then back out through `ToString()`. `string.Concat` over three spans writes it in one allocation: **4.020 → 2.020 bytes per subject character**, exactly the predicted halving, in `RegExp.prototype[@@replace]` *and* in `String.prototype.replace`'s string-`searchValue` builtin, which had the same three appends into a builder that was already sized exactly right. Adds `SingleMatchReplaceAllocationTests` (41 cases) and a `replace-one-string` profile row. |
+| `0060-js-stream-global-replace` | `Broiler.JS` | Phase 5's second follow-up. §22.2.6.11 collects every match before reading any of their properties, so a global replace held one result array per match live — **2 032.8 bytes per match, dead linear**, 10.3 MB for one 5 000-match call. Streams instead when nothing can observe the results: the receiver's `exec` is the pristine `%RegExp.prototype.exec%` captured at realm init, the replacement is a string, and it contains no `$`. **478.3 B/match, 0.235x.** Splits `Exec` into `ExecMatch` + `BuildExecResult` so both paths share the `lastIndex`/sticky/statics code, and adds `JSContext.IntrinsicRegExpExec` and `GlobalReplaceStreamingTests` (23 cases). **Apply after `0059` — it builds on the same function.** |
 
 The ten `Broiler.JS` patches this file previously carried (`0049`–`0058`) have all been
 applied and their pointer bumped; they are listed under *Recently cleared* below with the
 commit each landed as.
 
-**`0059` is pending against the pinned pointer `2ebc0c3c`** — the push to
-`Broiler-Platform/Broiler.JS` returned 403 from the session's git proxy, so the pointer is
-deliberately *not* bumped. There is no main-repo fallback for it and none is needed: the
-change is an allocation reduction with no behaviour difference, so CI is correct without it,
-only more allocating.
+**`0059` and `0060` are pending against the pinned pointer `2ebc0c3c`**, in that order —
+`0060` touches the function `0059` restructures, so applying them out of order will conflict.
+The push to `Broiler-Platform/Broiler.JS` returned 403 from the session's git proxy, so the
+pointer is deliberately *not* bumped. There is no main-repo fallback for either and none is
+needed: both are allocation reductions with no behaviour difference, so CI is correct without
+them, only more allocating.
 
 ## Recently cleared
 
