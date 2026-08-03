@@ -1363,9 +1363,14 @@ scores**, not the suite's seventeen — they are not comparable to the committed
 below the same build measured alone earlier the same day (CodeLoad 82.4 against 104, Mandreel
 104 against 137): a three-engine session is a busier machine than a one-suite run, which is
 §3.2's rule about comparing only within a run, showing up. *(3)* **Jint ran one repetition, and
-`comparison.md`'s header says "Repetitions per suite: 3"** — the header takes that number from a
-single engine and presents it as global. A harness defect, small and worth fixing before anyone
-quotes the Jint column as a median. *(4)* Jint ran in a separate, later, quieter process after
+`comparison.md`'s header said "Repetitions per suite: 3"** — the header took that number from a
+single engine and presented it as global. **Found by running the thing, and fixed**: the summary
+now records repetitions per engine, reports one number only while they agree, and otherwise names
+each — the same comparison now reads *"Chromium 3, Broiler 3, Jint 1 — the engines differ, so each
+column is that engine's own median, and Jint is a single run whose deltas cannot be distinguished
+from noise"*. The ⚠ spread column follows Broiler's own count too, rather than whichever engine
+came first, since it describes Broiler's samples. Eight checks added to
+`tests/octane/harness-selftest.mjs`, five of which fail against the old harness. *(4)* Jint ran in a separate, later, quieter process after
 the first attempt was killed, so its column is the weakest of the three.
 
 **What it does show.** Broiler is **1.778× ahead of Jint on Mandreel** — the suite whose compile
