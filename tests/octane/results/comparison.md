@@ -1,57 +1,45 @@
-# Octane 2.0 benchmark — Chromium vs Broiler
+# Octane 2.0 benchmark — Chromium vs Broiler vs Jint
 
-> ⚠ **These results are stale.** They were generated against a `Broiler.JS`
-> pointer that predated the engine fixes for the five failing suites. Those
-> fixes landed at `7ef80c03` and the pointer was bumped to `cdb2fd41` in
-> `2d9f39ca` on 2026-08-01 11:45 — about 15 hours after this run. Crypto,
-> PdfJS, CodeLoad, zlib and Typescript are shown failing on an engine that no
-> longer has those defects; measured on the fixed engine they score 127, 321,
-> 83.4, 237 and 1009 respectively.
->
-> The Octane workflow needs a re-run. This banner is hand-added and disappears
-> the moment the results are regenerated — see
-> [`../roadmap.md`](../roadmap.md) §2.6.
-
-- Generated: `2026-07-31T20:28:07.637Z`
+- Generated: `2026-08-03T12:25:36.568Z`
 - Octane version: `9`
-- Chromium: `Chromium 149.0.7827.55` — **overall score 57245**
-- Broiler: `Broiler.JS (BroilerJS --script-host)` — **overall score 245**
+- Chromium: `Chromium 149.0.7827.55` — **overall score 56370**
+- Broiler: `Broiler.JS (BroilerJS --script-host)` — **overall score 354**
+- Jint: `Jint 4.15.3 (interpreter)` — **overall score 575**
+- Repetitions per suite: 1 — **a single run; deltas against it cannot be distinguished from noise**
+
+|  | Chromium | Broiler | Jint |
+|---|--:|--:|--:|
+| Scores reported (of 17) | 17 | 17 | 17 |
+| Overall (geomean) | 56370 | 354 | 575 |
+| Spread (worst ÷ best suite) | — | 249.5× | — |
+
+Broiler's best suite is **SplayLatency** at 17.3× slower and its worst is **MandreelLatency** at 4316.2×. The spread between them is the "smoothness" number — a large one means a single subsystem is pathological rather than the engine being uniformly behind. See [`../roadmap.md`](../roadmap.md).
+
+Against Jint — a managed interpreter on the same runtime, and so the closer reference point — Broiler scores **0.617×** across the 17 benchmarks both engines completed (geometric mean of the per-benchmark ratios).
 
 Higher is better. "Broiler / Chromium" is the ratio of scores on suites both engines completed.
+"Broiler / Jint" is the same ratio against the other managed engine: above 1, Broiler is ahead.
 
-| Benchmark | Chromium | Broiler | Broiler / Chromium |
-|---|--:|--:|--:|
-| Box2D | 99321 | 584 | 0.006 |
-| CodeLoad | 30916 | _error_ | — |
-| Crypto | 38183 | _crash_ | — |
-| DeltaBlue | 102708 | 171 | 0.002 |
-| EarleyBoyer | 91547 | 339 | 0.004 |
-| Gameboy | 90650 | 1041 | 0.011 |
-| Mandreel | 47996 | 160 | 0.003 |
-| MandreelLatency | 67368 | 14.5 | 0.000 |
-| NavierStokes | 35432 | 341 | 0.010 |
-| PdfJS | 58725 | _error_ | — |
-| RayTrace | 117436 | 403 | 0.003 |
-| RegExp | 9890 | 89.9 | 0.009 |
-| Richards | 46754 | 108 | 0.002 |
-| Splay | 43027 | 283 | 0.007 |
-| SplayLatency | 69725 | 1539 | 0.022 |
-| Typescript | 86327 | _error_ | — |
-| zlib | 80514 | _error_ | — |
-| **Overall (geomean)** | **57245** | **245** | 0.004 |
-
-## Broiler failures
-
-| Suite | Status | Failing type | Where | Detail |
-|---|---|---|---|---|
-| Crypto | crash | `Broiler.JavaScript.Runtime.JSException` | benchmark `Encrypt`, phase `run`, iteration 1 | Maximum call stack size exceeded |
-| PdfJS | error | `Error` | benchmark `PdfJS`, phase `run`, iteration 1 | Malformed PDF: stream must have data |
-| CodeLoad | error | `TypeError` | benchmark `CodeLoadJQuery`, phase `run`, iteration 1 | Cannot get property userAgent of undefined |
-| zlib | error | `ReferenceError` | benchmark `zlib`, phase `run`, iteration 1 | read is not defined |
-| Typescript | error | `TypeError` | benchmark `Typescript`, phase `run`, iteration 1 | Cannot get property getScopedTypeNameEx of null |
-
-Stack traces, the phase each failure reached, and a repro command are in
-[`diagnostics.md`](diagnostics.md); full per-suite output is under `tests/octane/logs/`.
+| Benchmark | Chromium | Broiler | Jint | Broiler / Chromium | × slower | Broiler / Jint |
+|---|--:|--:|--:|--:|--:|--:|
+| Box2D | 102373 | 751 | 593 | 0.007 | 136.3× | 1.266 |
+| CodeLoad | 28265 | 119 | 4005 | 0.004 | 237.5× | 0.030 |
+| Crypto | 41877 | 241 | 134 | 0.006 | 173.8× | 1.799 |
+| DeltaBlue | 103957 | 198 | 161 | 0.002 | 525× | 1.230 |
+| EarleyBoyer | 84425 | 476 | 362 | 0.006 | 177.4× | 1.315 |
+| Gameboy | 101309 | 1188 | 848 | 0.012 | 85.3× | 1.401 |
+| Mandreel | 46988 | 166 | 87.6 | 0.004 | 283.1× | 1.895 |
+| MandreelLatency | 66469 | 15.4 | 741 | 0.000 | 4316.2× | 0.021 |
+| NavierStokes | 38617 | 416 | 259 | 0.011 | 92.8× | 1.606 |
+| PdfJS | 62030 | 508 | 776 | 0.008 | 122.1× | 0.655 |
+| RayTrace | 117288 | 410 | 409 | 0.003 | 286.1× | 1.002 |
+| RegExp | 9971 | 107 | 185 | 0.011 | 93.2× | 0.578 |
+| Richards | 38239 | 262 | 166 | 0.007 | 146× | 1.578 |
+| Splay | 43728 | 666 | 801 | 0.015 | 65.7× | 0.831 |
+| SplayLatency | 42276 | 2440 | 3332 | 0.058 | 17.3× | 0.732 |
+| Typescript | 96595 | 2205 | 2316 | 0.023 | 43.8× | 0.952 |
+| zlib | 91016 | 401 | 5103 | 0.004 | 227× | 0.079 |
+| **Overall (geomean)** | **56370** | **354** | **575** | 0.006 | 159× | 0.617 |
 
 ---
 _Generated by `scripts/run-octane.mjs`. Source suite: https://github.com/chromium/octane_

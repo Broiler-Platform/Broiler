@@ -1,230 +1,458 @@
 {
-  "generatedAt": "2026-07-31T20:28:07.637Z",
+  "generatedAt": "2026-08-03T12:25:36.568Z",
   "octaneVersion": "9",
   "engines": {
     "chromium": {
       "label": "Chromium 149.0.7827.55",
-      "geomean": 57245
+      "geomean": 56370
     },
     "broiler": {
       "label": "Broiler.JS (BroilerJS --script-host)",
-      "geomean": 245
+      "geomean": 354
+    },
+    "jint": {
+      "label": "Jint 4.15.3 (interpreter)",
+      "geomean": 575
     }
   },
   "benchmarks": [
     {
       "name": "Box2D",
       "chromium": {
-        "score": 99321,
+        "score": 102373,
         "status": "ok"
       },
       "broiler": {
-        "score": 584,
+        "score": 751,
         "status": "ok"
       },
-      "broilerVsChromium": 0.006
+      "jint": {
+        "score": 593,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.007,
+      "broilerTimesSlower": 136.3,
+      "jintVsChromium": 0.006,
+      "broilerVsJint": 1.266,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "CodeLoad",
       "chromium": {
-        "score": 30916,
+        "score": 28265,
         "status": "ok"
       },
       "broiler": {
-        "score": null,
-        "status": "error",
-        "error": "Cannot get property userAgent of undefined",
-        "errorType": "TypeError"
+        "score": 119,
+        "status": "ok"
       },
-      "broilerVsChromium": null
+      "jint": {
+        "score": 4005,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.004,
+      "broilerTimesSlower": 237.5,
+      "jintVsChromium": 0.142,
+      "broilerVsJint": 0.03,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "Crypto",
       "chromium": {
-        "score": 38183,
+        "score": 41877,
         "status": "ok"
       },
       "broiler": {
-        "score": null,
-        "status": "crash",
-        "error": "Maximum call stack size exceeded",
-        "errorType": "Broiler.JavaScript.Runtime.JSException"
+        "score": 241,
+        "status": "ok"
       },
-      "broilerVsChromium": null
+      "jint": {
+        "score": 134,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.006,
+      "broilerTimesSlower": 173.8,
+      "jintVsChromium": 0.003,
+      "broilerVsJint": 1.799,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "DeltaBlue",
       "chromium": {
-        "score": 102708,
+        "score": 103957,
         "status": "ok"
       },
       "broiler": {
-        "score": 171,
+        "score": 198,
         "status": "ok"
       },
-      "broilerVsChromium": 0.002
+      "jint": {
+        "score": 161,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.002,
+      "broilerTimesSlower": 525,
+      "jintVsChromium": 0.002,
+      "broilerVsJint": 1.23,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "EarleyBoyer",
       "chromium": {
-        "score": 91547,
+        "score": 84425,
         "status": "ok"
       },
       "broiler": {
-        "score": 339,
+        "score": 476,
         "status": "ok"
       },
-      "broilerVsChromium": 0.004
+      "jint": {
+        "score": 362,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.006,
+      "broilerTimesSlower": 177.4,
+      "jintVsChromium": 0.004,
+      "broilerVsJint": 1.315,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "Gameboy",
       "chromium": {
-        "score": 90650,
+        "score": 101309,
         "status": "ok"
       },
       "broiler": {
-        "score": 1041,
+        "score": 1188,
         "status": "ok"
       },
-      "broilerVsChromium": 0.011
+      "jint": {
+        "score": 848,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.012,
+      "broilerTimesSlower": 85.3,
+      "jintVsChromium": 0.008,
+      "broilerVsJint": 1.401,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "Mandreel",
       "chromium": {
-        "score": 47996,
+        "score": 46988,
         "status": "ok"
       },
       "broiler": {
-        "score": 160,
+        "score": 166,
         "status": "ok"
       },
-      "broilerVsChromium": 0.003
+      "jint": {
+        "score": 87.6,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.004,
+      "broilerTimesSlower": 283.1,
+      "jintVsChromium": 0.002,
+      "broilerVsJint": 1.895,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "MandreelLatency",
       "chromium": {
-        "score": 67368,
+        "score": 66469,
         "status": "ok"
       },
       "broiler": {
-        "score": 14.5,
+        "score": 15.4,
         "status": "ok"
       },
-      "broilerVsChromium": 0
+      "jint": {
+        "score": 741,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0,
+      "broilerTimesSlower": 4316.2,
+      "jintVsChromium": 0.011,
+      "broilerVsJint": 0.021,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "NavierStokes",
       "chromium": {
-        "score": 35432,
+        "score": 38617,
         "status": "ok"
       },
       "broiler": {
-        "score": 341,
+        "score": 416,
         "status": "ok"
       },
-      "broilerVsChromium": 0.01
+      "jint": {
+        "score": 259,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.011,
+      "broilerTimesSlower": 92.8,
+      "jintVsChromium": 0.007,
+      "broilerVsJint": 1.606,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "PdfJS",
       "chromium": {
-        "score": 58725,
+        "score": 62030,
         "status": "ok"
       },
       "broiler": {
-        "score": null,
-        "status": "error",
-        "error": "Malformed PDF: stream must have data",
-        "errorType": "Error"
+        "score": 508,
+        "status": "ok"
       },
-      "broilerVsChromium": null
+      "jint": {
+        "score": 776,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.008,
+      "broilerTimesSlower": 122.1,
+      "jintVsChromium": 0.013,
+      "broilerVsJint": 0.655,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "RayTrace",
       "chromium": {
-        "score": 117436,
+        "score": 117288,
         "status": "ok"
       },
       "broiler": {
-        "score": 403,
+        "score": 410,
         "status": "ok"
       },
-      "broilerVsChromium": 0.003
+      "jint": {
+        "score": 409,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.003,
+      "broilerTimesSlower": 286.1,
+      "jintVsChromium": 0.003,
+      "broilerVsJint": 1.002,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "RegExp",
       "chromium": {
-        "score": 9890,
+        "score": 9971,
         "status": "ok"
       },
       "broiler": {
-        "score": 89.9,
+        "score": 107,
         "status": "ok"
       },
-      "broilerVsChromium": 0.009
+      "jint": {
+        "score": 185,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.011,
+      "broilerTimesSlower": 93.2,
+      "jintVsChromium": 0.019,
+      "broilerVsJint": 0.578,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "Richards",
       "chromium": {
-        "score": 46754,
+        "score": 38239,
         "status": "ok"
       },
       "broiler": {
-        "score": 108,
+        "score": 262,
         "status": "ok"
       },
-      "broilerVsChromium": 0.002
+      "jint": {
+        "score": 166,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.007,
+      "broilerTimesSlower": 146,
+      "jintVsChromium": 0.004,
+      "broilerVsJint": 1.578,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "Splay",
       "chromium": {
-        "score": 43027,
+        "score": 43728,
         "status": "ok"
       },
       "broiler": {
-        "score": 283,
+        "score": 666,
         "status": "ok"
       },
-      "broilerVsChromium": 0.007
+      "jint": {
+        "score": 801,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.015,
+      "broilerTimesSlower": 65.7,
+      "jintVsChromium": 0.018,
+      "broilerVsJint": 0.831,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "SplayLatency",
       "chromium": {
-        "score": 69725,
+        "score": 42276,
         "status": "ok"
       },
       "broiler": {
-        "score": 1539,
+        "score": 2440,
         "status": "ok"
       },
-      "broilerVsChromium": 0.022
+      "jint": {
+        "score": 3332,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.058,
+      "broilerTimesSlower": 17.3,
+      "jintVsChromium": 0.079,
+      "broilerVsJint": 0.732,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "Typescript",
       "chromium": {
-        "score": 86327,
+        "score": 96595,
         "status": "ok"
       },
       "broiler": {
-        "score": null,
-        "status": "error",
-        "error": "Cannot get property getScopedTypeNameEx of null",
-        "errorType": "TypeError"
+        "score": 2205,
+        "status": "ok"
       },
-      "broilerVsChromium": null
+      "jint": {
+        "score": 2316,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.023,
+      "broilerTimesSlower": 43.8,
+      "jintVsChromium": 0.024,
+      "broilerVsJint": 0.952,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     },
     {
       "name": "zlib",
       "chromium": {
-        "score": 80514,
+        "score": 91016,
         "status": "ok"
       },
       "broiler": {
-        "score": null,
-        "status": "error",
-        "error": "read is not defined",
-        "errorType": "ReferenceError"
+        "score": 401,
+        "status": "ok"
       },
-      "broilerVsChromium": null
+      "jint": {
+        "score": 5103,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.004,
+      "broilerTimesSlower": 227,
+      "jintVsChromium": 0.056,
+      "broilerVsJint": 0.079,
+      "stability": {
+        "chromium": null,
+        "broiler": null,
+        "jint": null
+      }
     }
-  ]
+  ],
+  "summary": {
+    "scoresReported": {
+      "chromium": 17,
+      "broiler": 17,
+      "jint": 17,
+      "expected": 17
+    },
+    "geomean": {
+      "chromium": 56370,
+      "broiler": 354,
+      "jint": 575
+    },
+    "spread": {
+      "factor": 249.5,
+      "best": {
+        "name": "SplayLatency",
+        "timesSlower": 17.3
+      },
+      "worst": {
+        "name": "MandreelLatency",
+        "timesSlower": 4316.2
+      }
+    },
+    "broilerVsJint": {
+      "ratio": 0.617,
+      "benchmarks": 17
+    },
+    "repetitions": 1,
+    "noiseBandPercent": 7.5
+  }
 }
