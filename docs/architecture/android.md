@@ -22,7 +22,7 @@ layouts or Android widgets in application content.
 | --- | --- |
 | Target framework / compile API | `net10.0-android36.0` / API 36 |
 | Minimum API | API 24 (`SupportedOSPlatformVersion=24`) |
-| Shipped ABIs | `android-arm64`; `android-x64` is retained for emulator CI |
+| Shipped ABIs | `android-arm64`; `android-x64` is retained for emulator CI. `BroilerAndroidAbis` overrides the pair per publish — the preview package's APK uses it to build `arm64-v8a` alone. |
 | Managed runtime | The workload's default Mono runtime with JIT |
 | AOT and trimming | Disabled. Browser uses an expression compiler based on `Reflection.Emit`, which is incompatible with full AOT. |
 | Packages | `org.broiler.writer` and `org.broiler.browser` |
@@ -181,21 +181,28 @@ which is what the heads' `RuntimeIdentifiers` resolve to when the publish passes
 `--runtime`.
 
 A bundle is the upload format and cannot be installed, so each head is published a
-second time as a directly installable APK, with two properties overridden on the
-command line — where they are global properties and so beat the csproj:
+second time as a directly installable APK:
 
 ```
-dotnet publish <head> -c Release -p:AndroidPackageFormat=apk -p:RuntimeIdentifiers=android-arm64
+dotnet publish <head> -c Release -p:AndroidPackageFormat=apk -p:BroilerAndroidAbis=android-arm64
 ```
 
 `arm64-v8a` alone, because that is the ABI physical devices run and an APK carries
-one ABI where a bundle carries the split set. That publish needs no restore of its
-own: `android-arm64` is part of the `RuntimeIdentifiers` already restored, and
-restoring the narrower set would rewrite `project.assets.json` and break the bundle
-publish's `--no-restore`. The workflow checks that what it collected really is an
-APK — manifest at the archive root, no `BundleConfig.pb` — and that `lib/` holds
-`arm64-v8a` and nothing else, since a second ABI would mean the override did not
-take.
+one ABI where a bundle carries the split set.
+
+The ABI override goes through `BroilerAndroidAbis`, which each head expands into
+its own `RuntimeIdentifiers`, rather than passing `RuntimeIdentifiers` on the
+command line directly. **A property on the command line is an MSBuild global
+property: it reaches every project in the graph.** `RuntimeIdentifiers=android-arm64`
+therefore also lands on the referenced `net10.0` libraries — `Broiler.Browser.Core`,
+`Broiler.CSS`, `Broiler.Dom` and the rest — which were restored without it and fail
+with `NETSDK1047`, asking for a `net10.0/android-arm64` target they have no reason
+to have. Only the two heads read `BroilerAndroidAbis`, so nothing below them
+changes and both publishes keep `--no-restore`.
+
+The workflow checks that what it collected really is an APK — manifest at the
+archive root, no `BundleConfig.pb` — and that `lib/` holds `arm64-v8a` and nothing
+else, since a second ABI would mean the override did not take.
 
 ### Release signing
 
