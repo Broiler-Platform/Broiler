@@ -500,11 +500,33 @@ on being written.
 Broiler Preview Package workflow installs the `android` workload, tops the
 runner's SDK up to the compile API, publishes both heads with
 `dotnet publish -c Release`, and ships the resulting bundles as `BPP-Android.zip`
-beside the desktop packages. The bundles are the **unsigned**
-`<applicationId>.aab`; the workflow rejects the debug-key `-Signed` pair the same
-publish produces, so the artifact stays inside the A0 signing policy. That is the
-preview-delivery half of this phase. A per-change Android build, the emulator
-smoke run, and signed store-ready artifacts remain open below.
+beside the desktop packages. It takes the unsigned `<applicationId>.aab` and
+rejects the debug-key `-Signed` pair the same publish produces, so the workload's
+debug key cannot pass itself off as a release. That is the preview-delivery half
+of this phase.
+
+**Signing update (2026-08-03):** those packages are now signed with the release
+key. `scripts/sign-android-packages.ps1` reads the key from the
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and
+`ANDROID_KEY_PASSWORD` repository secrets, signs each one, and verifies the result
+against the keystore's own certificate before the package is built — a missing or
+wrong secret fails the job instead of producing an unsigned package. The
+certificate fingerprint is published in `BUILD-INFO.txt` and the draft release
+notes. This keeps the A0 policy intact: the key stays outside the repository, and
+the delivery pipeline is what signs.
+[Release signing](architecture/android.md#release-signing) documents the secrets
+and the verification.
+
+**Installable-artifact update (2026-08-03):** `BPP-Android.zip` now carries each
+head twice. A bundle is the upload format and cannot be installed, so beside the
+two `.aab`s the workflow publishes `Broiler.Browser-arm64.apk` and
+`Broiler.Writer-arm64.apk` — the same Release configuration with
+`AndroidPackageFormat=apk` and `RuntimeIdentifiers=android-arm64` overridden, so
+each APK carries the one ABI physical devices run. APKs are zipaligned and signed
+with `apksigner` rather than `jarsigner`: from Android 11 an APK with only a JAR
+signature is refused at install. So a preview build can now be put on a device with
+`adb install` and nothing else. A per-change Android build, the emulator smoke run,
+and store delivery remain open below.
 
 **Next actions:**
 
@@ -518,10 +540,11 @@ smoke run, and signed store-ready artifacts remain open below.
 3. Add an instrumented smoke run — launch, render a frame, dispatch synthetic
    touch and text, rotate, background, resume — on an emulator, with the honest
    note that emulator evidence is not hardware evidence.
-4. Sign the AAB/APK artifacts through the frozen A0 signing policy — the preview
-   package already builds the Release bundles, it just cannot sign them — and
-   reconcile channels, versioning, and update ownership with the existing
-   release work.
+4. Take the signed packages the preview package now produces the rest of the way
+   to a store: decide Play App Signing versus self-managed keys and what the
+   secrets' key is then upload key or app key, add key rotation and expiry
+   handling, and reconcile channels, versioning, and update ownership with the
+   existing release work.
 5. Record the Android support statement in [the README](../README.md) and the
    component READMEs only after the A1–A5 gates pass, and keep it scoped to what
    was measured.
