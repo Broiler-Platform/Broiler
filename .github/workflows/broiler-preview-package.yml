@@ -652,31 +652,33 @@ jobs:
       - name: Publish the arm64 Release APKs
         shell: pwsh
         run: |
-          # The same Release configuration as the bundles, with two properties overridden. They go
-          # on the command line, where they become global properties and so win over the csproj:
+          # The same Release configuration as the bundles, with two properties overridden:
           #
           #   AndroidPackageFormat  the heads switch to aab on '$(Configuration)' == 'Release', and
           #                         this package is the directly installable counterpart.
-          #   RuntimeIdentifiers    an APK carries one ABI where a bundle carries the split set;
+          #   BroilerAndroidAbis    an APK carries one ABI where a bundle carries the split set;
           #                         arm64-v8a is the ABI real devices run.
           #
-          # No restore of its own: android-arm64 is part of the RuntimeIdentifiers already restored
-          # above, so --no-restore is still honest. Restoring the narrower set here would rewrite
-          # project.assets.json and break the bundle publish's own --no-restore.
+          # The ABI override is BroilerAndroidAbis and not RuntimeIdentifiers itself, because a
+          # property on the command line is an MSBuild *global* property: it reaches every project
+          # in the graph, so RuntimeIdentifiers=android-arm64 also lands on the referenced net10.0
+          # libraries, which were restored without it and fail NETSDK1047 asking for a
+          # 'net10.0/android-arm64' target they have no reason to have. Only the two heads read
+          # BroilerAndroidAbis, so nothing below them changes and --no-restore stays honest.
           $publishRoot = Join-Path $env:RUNNER_TEMP 'android-publish'
 
           dotnet publish $env:BROWSER_PROJECT_PATH `
             --configuration $env:ANDROID_CONFIGURATION `
             --no-restore `
             -p:AndroidPackageFormat=apk `
-            -p:RuntimeIdentifiers=android-arm64 `
+            -p:BroilerAndroidAbis=android-arm64 `
             --output (Join-Path $publishRoot 'browser-arm64-apk')
 
           dotnet publish $env:WRITER_PROJECT_PATH `
             --configuration $env:ANDROID_CONFIGURATION `
             --no-restore `
             -p:AndroidPackageFormat=apk `
-            -p:RuntimeIdentifiers=android-arm64 `
+            -p:BroilerAndroidAbis=android-arm64 `
             --output (Join-Path $publishRoot 'writer-arm64-apk')
 
       - name: Collect and verify the Android packages

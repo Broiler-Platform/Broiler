@@ -521,8 +521,8 @@ and the verification.
 head twice. A bundle is the upload format and cannot be installed, so beside the
 two `.aab`s the workflow publishes `Broiler.Browser-arm64.apk` and
 `Broiler.Writer-arm64.apk` — the same Release configuration with
-`AndroidPackageFormat=apk` and `RuntimeIdentifiers=android-arm64` overridden, so
-each APK carries the one ABI physical devices run. APKs are zipaligned and signed
+`AndroidPackageFormat=apk` and the heads' own `BroilerAndroidAbis=android-arm64`
+overridden, so each APK carries the one ABI physical devices run. APKs are zipaligned and signed
 with `apksigner` rather than `jarsigner`: from Android 11 an APK with only a JAR
 signature is refused at install. So a preview build can now be put on a device with
 `adb install` and nothing else. A per-change Android build, the emulator smoke run,
