@@ -73,7 +73,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 |---|---|
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is still the critical path, but its headline question is answered**: run at the pinned pointer on linux-x64, Octane is **15 of 15 suites `ok` and 17 of 17 scores** — Mandreel included, which the previous local pass had failing. Geomean 217, spread **113×** against a same-machine Chromium reference. What 0-6 still owes is the *workflow* run plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce |
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-1 open. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting |
-| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` publishes a global prototype invalidation **once per allocation** (2 002 for 2 000) where a `function` constructor publishes 1. Real, dead-linear, and **not** DeltaBlue's cause — Octane's DeltaBlue is ES5. Not fixed here Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
+| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. **DeltaBlue still fails the gate at 516×**, so the phase's open item stands Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
 | **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. The global case's retained result list then landed too — **2 032.8 → 478.3 B per match**, dead linear on both sides, by streaming when the receiver's `exec` is the pristine intrinsic and the replacement is a `$`-free string. **Every follow-up this phase named is now closed**; what is left is item 2's `Compiled` policy, deliberately unshipped |
@@ -562,6 +562,14 @@ These were paid for once each. They apply to every phase below.
   construction path, and nothing in the record said so. *When a fix is verified through one
   syntax, name the syntax in the claim — the next reader will otherwise take the general
   statement, and a second path can carry the identical defect for as long as nobody spells it.*
+- **A process-wide invalidation makes every workload pay for the worst one.** The prototype
+  version is deliberately coarse — one mutation anywhere retires every prototype-keyed entry
+  everywhere — so a redundant write on one construction path held *Richards's* read cache at 86%
+  when the machinery was capable of 99.97%. Richards does not construct classes; it was paying
+  for someone else's writes. Every phase 2 probe measured the machinery in isolation, where the
+  storm does not exist, and all of them reported it working. *A shared invalidation channel turns
+  a local defect into a global one and hides it from every local measurement — the only
+  instrument that sees it is a counter taken over a whole real workload.*
 - **A counter that separates two workloads is a lead, not an explanation.** DeltaBlue fails
   phase 2's gate and Richards passes it, and of every inline-cache counter the sharpest split was
   dictionary fallbacks: **2 503 against 1**, three orders of magnitude. It traced to a real
@@ -2513,9 +2521,64 @@ the fix is the constructor-installs-the-prototype change 2-0 already made once, 
 code whose last two regressions (2-0's own, and 2-8's DeltaBlue break) both came from this area,
 and it wants the Octane cluster run against it — which is now possible.
 
+#### 2-11 · The redundant prototype write — **landed, and it is the largest cache win since 2-0**
+
+> **Delivered as a patch, not in the pin**:
+> [`patches/0063`](../patches/0063-js-prototype-rewrite-no-invalidate.patch). Independent of
+> `0059`–`0062` — one file, one condition.
+
+The class path was tracked to `JSClass.CreateInstance`, and the two obvious sites were already
+correct: the instance is built with `new JSObject(instancePrototype)`, carrying 2-0's own comment.
+What publishes is the **re-apply afterwards** — `@this.BasePrototypeObject = instancePrototype`,
+writing the prototype the constructor had *already installed*. `prototypeChain` is non-null by
+then, so the setter reads it as a `[[SetPrototypeOf]]` on a live object.
+
+**The fix is to notice that the chain did not change.** Every assumption the prototype version
+guards is about *which chain this object has*; after a redundant write it has the same one, so
+nothing cached is stale. The setter now compares the resulting chain with the previous one and
+publishes only on a real change — which fixes the class path, the derived-class path and any
+other redundant assignment at once, rather than patching call sites one at a time.
+
+| Construct, per *n* allocations | Before | After |
+|---|--:|--:|
+| `class C{…}; new C()`, n = 2 000 | 2 002 | **0** |
+| `function F(){…}; new F()`, n = 2 000 | 1 | **0** |
+| `class B extends A{…}; new B()`, any n | — | **2**, flat |
+
+**On the real suites the effect is much larger than the class case suggested**, because the
+retirement was process-wide — one redundant write anywhere retired every prototype-keyed entry
+everywhere. These are exact counts, not timings:
+
+| | Prototype invalidations | Read cache hit rate | Store hit rate |
+|---|--:|--:|--:|
+| **Richards** | 37 → **10** | 86.61% → **99.97%** | 99.74% → 99.75% |
+| **DeltaBlue** | 2 519 → **16** | 65.96% → **69.45%** | 80.65% → **83.92%** |
+| **Box2D** | 1 944 → **107** | 96.39% → **97.72%** | 92.57% → 92.98% |
+
+**Richards's read cache goes from missing one read in seven to missing one in three thousand.**
+That is the phase 2 machinery finally doing on a real suite what its probes always said it did,
+and it had been masked since the phase began by an invalidation storm none of the probes
+allocated their way into.
+
+> **The scores moved the right way and are *not* claimed.** Five repetitions per engine:
+> Richards 143 → 168 (178.7× → 155.4×) and DeltaBlue 122 → 125 (581× → 516×). Richards's **+17%
+> sits inside its own 15.5% band**, so a five-run median cannot separate it from noise — §3.2.
+> What is claimed is the hit-rate and invalidation columns, which are deterministic counts.
+
+**DeltaBlue still fails phase 2's exit criterion**, at 516× against the 200× gate, and its read
+hit rate is still 69% against Richards's 99.97%. So the gap narrowed and did not close, and the
+suite remains the phase's open item.
+
+**Verify.** Repository suite **7 563 tests across 13 projects, 0 failures**. **test262 unchanged
+across all four pinned manifests — 8 313 / 8 220 / 84 / 44 / 9, identical manifest by manifest**;
+`test262-arrays` matters doubly here because the same version gates `JSArray`'s dense-element fast
+path, and `properties-proxy` and `realm-isolation` are where a wrongly-skipped invalidation would
+surface. Octane still runs 15 of 15 suites `ok`.
+
 **What 2-10's successor still owes** is the actual per-site attribution: *which* read sites in
-DeltaBlue miss, and why, given that they are neither megamorphic nor — now — explained by either
-of the two counters that looked most promising.
+DeltaBlue miss, and why. Two counters have now been ruled out and one storm removed, and the
+suite is still at 69% — so the remaining misses are not invalidation, not megamorphism and not
+dictionary mode.
 
 ---
 
