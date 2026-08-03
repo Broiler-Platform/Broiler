@@ -6,23 +6,23 @@
   "repetitions": 1,
   "noiseBandPercent": 7.5,
   "benchmarks": {
-    "Richards": 262,
-    "DeltaBlue": 198,
-    "Crypto": 241,
-    "RayTrace": 410,
-    "EarleyBoyer": 476,
-    "RegExp": 107,
-    "Splay": 666,
-    "SplayLatency": 2440,
-    "NavierStokes": 416,
+    "Richards": 264,
+    "DeltaBlue": 217,
+    "Crypto": 225,
+    "RayTrace": 463,
+    "EarleyBoyer": 404,
+    "RegExp": 122,
+    "Splay": 626,
+    "SplayLatency": 2220,
+    "NavierStokes": 384,
     "PdfJS": 508,
     "Mandreel": 166,
-    "MandreelLatency": 15.4,
-    "Gameboy": 1188,
-    "CodeLoad": 119,
-    "Box2D": 751,
-    "zlib": 401,
-    "Typescript": 2205
+    "MandreelLatency": 14.5,
+    "Gameboy": 1096,
+    "CodeLoad": 137,
+    "Box2D": 675,
+    "zlib": 390,
+    "Typescript": 2492
   },
   "stability": {},
   "suiteStatus": {
@@ -30,7 +30,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 2957,
+      "durationMs": 2928,
       "filesLoaded": [
         "base.js",
         "richards.js",
@@ -44,7 +44,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 4072,
+      "durationMs": 3027,
       "filesLoaded": [
         "base.js",
         "deltablue.js",
@@ -58,7 +58,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 20189,
+      "durationMs": 21044,
       "filesLoaded": [
         "base.js",
         "crypto.js",
@@ -72,7 +72,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 8531,
+      "durationMs": 7643,
       "filesLoaded": [
         "base.js",
         "raytrace.js",
@@ -86,7 +86,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 23567,
+      "durationMs": 22037,
       "filesLoaded": [
         "base.js",
         "earley-boyer.js",
@@ -100,7 +100,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 19042,
+      "durationMs": 17002,
       "filesLoaded": [
         "base.js",
         "regexp.js",
@@ -114,7 +114,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 4597,
+      "durationMs": 4670,
       "filesLoaded": [
         "base.js",
         "splay.js",
@@ -128,7 +128,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 8793,
+      "durationMs": 9348,
       "filesLoaded": [
         "base.js",
         "navier-stokes.js",
@@ -142,7 +142,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 15415,
+      "durationMs": 14984,
       "filesLoaded": [
         "base.js",
         "pdfjs.js",
@@ -156,7 +156,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 297410,
+      "durationMs": 299923,
       "filesLoaded": [
         "base.js",
         "mandreel.js",
@@ -170,7 +170,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 11797,
+      "durationMs": 11884,
       "filesLoaded": [
         "base.js",
         "gbemu-part1.js",
@@ -185,7 +185,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 22101,
+      "durationMs": 21378,
       "filesLoaded": [
         "base.js",
         "code-load.js",
@@ -199,7 +199,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 10145,
+      "durationMs": 9913,
       "filesLoaded": [
         "base.js",
         "box2d.js",
@@ -213,7 +213,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 382125,
+      "durationMs": 393207,
       "filesLoaded": [
         "base.js",
         "zlib.js",
@@ -228,7 +228,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 64931,
+      "durationMs": 57586,
       "filesLoaded": [
         "base.js",
         "typescript.js",
@@ -241,6 +241,6 @@
       "timeoutSec": 1800
     }
   },
-  "geomean": 354,
-  "generatedAt": "2026-08-03T12:25:36.568Z"
+  "geomean": 351,
+  "generatedAt": "2026-08-03T20:12:59.932Z"
 }
