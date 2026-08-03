@@ -23,42 +23,21 @@ Delete the patch file and its row below once the pointer is bumped.
 
 | Patch | Submodule | Note |
 | --- | --- | --- |
-| `0059-js-single-match-replace-one-allocation` | `Broiler.JS` | Phase 5's first follow-up to item 1. A single-match `replace` assembled its answer through a `StringBuilder`, costing two full UTF-16 copies of the subject — into the chunk list, then back out through `ToString()`. `string.Concat` over three spans writes it in one allocation: **4.020 → 2.020 bytes per subject character**, exactly the predicted halving, in `RegExp.prototype[@@replace]` *and* in `String.prototype.replace`'s string-`searchValue` builtin, which had the same three appends into a builder that was already sized exactly right. Adds `SingleMatchReplaceAllocationTests` (41 cases) and a `replace-one-string` profile row. |
-| `0060-js-stream-global-replace` | `Broiler.JS` | Phase 5's second follow-up. §22.2.6.11 collects every match before reading any of their properties, so a global replace held one result array per match live — **2 032.8 bytes per match, dead linear**, 10.3 MB for one 5 000-match call. Streams instead when nothing can observe the results: the receiver's `exec` is the pristine `%RegExp.prototype.exec%` captured at realm init, the replacement is a string, and it contains no `$`. **478.3 B/match, 0.235x.** Splits `Exec` into `ExecMatch` + `BuildExecResult` so both paths share the `lastIndex`/sticky/statics code, and adds `JSContext.IntrinsicRegExpExec` and `GlobalReplaceStreamingTests` (23 cases). **Apply after `0059` — it builds on the same function.** |
+| `0067-js-numeric-lexical-bindings` | `Broiler.JS` | Item 3-3's second half. A function-body-top-level `let` or `const` the compiler proves only ever holds a number now lives in a raw CLR `double`, as an eligible `var` already did: **`let-binding` and `const-binding` 31.98 → 0.00 B/iteration and 1 → 3 numeric locals**, identical to the eligible floor, with all twelve other `--local-alloc` rows byte-identical (both arms from one tree). Only the **numeric** tier admits lexical names — the JSValue tier stays closed, because a `let`'s TDZ and a `const`'s read-only-ness live in the cell either tier removes and only the numeric gate discharges them (the dominance argument makes the TDZ throw unreachable; a written `const` is rejected outright). Also moves the `NumericStorage` test *before* the lexical branch in `VisitVariableDeclaration`, since a numeric local's `Expression` is a boxing read. Adds `LexicalNumericLocalTests` (52 cases, including the withdrawn first attempt's reproduction as a pinned test) and `scripts/compliance/test262-lexical-declarations.txt`, a manifest for the `let`/`const`/`block-scope` paths **no pinned manifest covered**. **Independent of everything cleared below** — it applies to the pin directly. |
 
-| `0061-js-measure-2-9-materialization-cause` | `Broiler.JS` | Measurement and instrumentation only, **no behaviour change**. Item 2-9's losing-side hypothesis said the Annex B deferred cells force the trie rebuild; a *strict* function is the control it never had, and it rebuilds just as much — **1.00 per function on all four rows**. What materializes is the `prototype` install, withheld from shape-only storage by 2-8's DeltaBlue fix, so the planned "stop materializing for a deferred cell" follow-up is withdrawn before being built. Adds `--deferred-cell-cost` and a `RecordNamedPropertiesMaterialized` counter. **Independent of `0059`/`0060`** — different files, applies in any order. |
+**`0067` is pending against the pinned pointer `9bf9639b`.** It applies from a clean checkout of
+that commit with **`git am`**, not merely `git apply` — the two differ, and this README's own
+instructions use `am`, so `apply` is not the check.
 
-| `0062-js-array-length-keeps-shape` | `Broiler.JS` | Item 2-10. `JSArray.SetLengthWritable` recorded a `length` descriptor through `GetOwnProperties()`, which **abandons the object's shape permanently** — and it is on the grow path, so `push`, `pop` and `concat` each cost an array its shape on first use. A writable `length` needs no descriptor at all (`IsLengthReadOnly` reads absence as writable; the stored value is never read back). **DeltaBlue's dictionary fallbacks 2 503 → 0**, and a named property on a grown array keeps hitting its cache. Honest limit: DeltaBlue's read hit rate and score do **not** move, so this is not the explanation for its 576×. **Requires `0061` to compile.** |
+The push to `Broiler-Platform/Broiler.JS` returned **403** from the session's git proxy, so the
+pointer is deliberately *not* bumped. **No main-repo fallback is needed:** the change is an
+optimization with no behaviour difference, so CI without it is correct and only allocates more.
 
-| `0063-js-prototype-rewrite-no-invalidate` | `Broiler.JS` | Item 2-11. A write that re-applies the prototype an object **already has** read as a `[[SetPrototypeOf]]` on a live object and retired **every** prototype-keyed inline-cache entry in the process — class construction did it once per `new` (2 002 invalidations for 2 000 allocations). The setter now publishes only when the chain actually changes. Because the retirement was process-wide the effect is far wider than the class case: **Richards's read cache hit rate 86.61% → 99.97%**, DeltaBlue 65.96% → 69.45%, Box2D 96.39% → 97.72%; invalidations 37 → 10, 2 519 → 16, 1 944 → 107. One file, one condition; independent of `0059`–`0062`. |
-
-| `0064-js-refresh-stale-cache-entry` | `Broiler.JS` | Item 2-12. The property inline cache's add path deduplicated on `ShapeId` + `Holder`, while a hit checked those **plus four more guards**. When one went stale the read missed, reached the add path, was told the entry was "already present", and returned without replacing it — so that site missed on that receiver **for the rest of the process**. 77.7% of DeltaBlue's misses. Refreshing in place takes **DeltaBlue's read hit rate 69.45% → 93.16%** (misses 306 004 → 68 534) and Box2D's 97.72% → 98.83%. Also adds the miss-reason counters the attribution needed. **Requires `0061` and `0062` to compile.** |
-
-| `0065-js-linear-closure-rewrite-scope` | `Broiler.JS` | Item 1-4. `LambdaRewriter.Scope` held a lambda's in-scope bindings in a `List` and asked it `Contains` **once per parameter reference in the tree**, plus `Remove` per variable at each block scope's end — so IL emission was **quadratic in a scope's binding count**, and a script's top level is one scope. Emitting 2 000 top-level declarations took **13 865 ms** against 2.5 ms of parse; a reference-keyed multiset takes it to **486 ms (28.5×)** and Mandreel's whole front end **21 307 → 7 015 ms (0.329×)**, ABBA-interleaved over six pairs. A *multiset* because the list held duplicates a nested block scope's exit had to preserve — a `HashSet` would take a live binding out of scope — and list-backed below 32 bindings because hashing a reference costs more than scanning a handful. Also adds the two probes that found it (`--compile-profile`, `--compile-scaling`) and `DeclarationDenseSourceTests`. **Independent of `0059`–`0064`** — different assembly, applies in any order. |
-
-| `0066-js-defer-nested-lambda-il` | `Broiler.JS` | Item 1-1's emission half. A nested function's `DynamicMethod` was generated while its enclosing lambda was emitted; it is now generated on **first invocation**, memoized per syntactic site, with `Create` handing back a thunk over that instance's boxes. The item's four named risks (early errors, scope capture, direct `eval`, generator bodies) are all front-end properties and the front end still runs eagerly, so deferring *IL generation* takes the prize without any of them. Compile only, ABBA on one build, one corpus per process: **jQuery 587 → 398 ms (0.661×)**, Box2D 0.636×, PdfJS 0.689×, Mandreel 0.832×, allocation 0.52–0.66× throughout; **Typescript is 1.034× slower and unexplained**. **Octane CodeLoad 94.6 → 104.0 (1.099×)**, 24 samples an arm, 93% pairwise dominance. Steady state 1.0009×, but only because the thunk's warm path is written in IL — calling `Resolve()` cost 1.0247×. `BROILER_JS_DEFER_IL=0` restores eager generation. Adds `DeferredCompilationTests` (10 fixtures) and a corpus filter for `--compile-profile`. **Apply after `0065`** — same assembly, and `0066` edits a file `0065` creates. |
-
-The ten `Broiler.JS` patches this file previously carried (`0049`–`0058`) have all been
-applied and their pointer bumped; they are listed under *Recently cleared* below with the
-commit each landed as.
-
-**`0059`–`0064` are pending against the pinned pointer `2ebc0c3c`.** All six apply cleanly in
-numeric order, and the full stack builds. Two ordering constraints are real:
-
-- **`0060` after `0059`** — it touches the function `0059` restructures, so out of order they
-  conflict textually.
-- **`0064` after `0061` and `0062`** — it reads `0061`'s counters and extends `0062`'s emitter.
-- **`0062` after `0061`** — `0062` applies cleanly on its own but will **not compile** without
-  `0061`, because its new `--suite-cache-metrics` emitter reads the
-  `NamedPropertiesMaterializations` counter `0061` adds. A textual check is not enough here;
-  build after applying.
-
-Each push to `Broiler-Platform/Broiler.JS` returned 403 from the session's git proxy, so the
-pointer is deliberately *not* bumped. None of the six needs a main-repo fallback: `0059` and
-`0060` are allocation reductions with no behaviour difference, so CI is correct without them and
-only more allocating; `0061` adds a benchmark emitter and an opt-in counter that is off unless
-`PropertyOptimizationDiagnostics.Enabled` is set; and `0062`, `0063` and `0064` remove pessimizations, so
-without them CI is correct and only slower.
+The eighteen patches this file carried before it (`0049`–`0066`) have all been applied, pushed
+and their pointers bumped; they are listed under *Recently cleared* below with the commit each
+landed as. Every one was verified against the submodule log rather than inferred from this
+prose, and each landed commit was checked to be an ancestor of the pin with
+`git merge-base --is-ancestor`.
 
 ## Recently cleared
 
@@ -80,11 +59,21 @@ results it explains.
 | `0056-js-compound-assignment-cache` | `Broiler.JS` | `c5842c9d` | Item 2-4's compound half, and it corrects the reason `0054` gave for skipping it. Twelve operators; `&&=`/`||=`/`??=` stay out because their write is conditional. Median paired ratio 0.903 against a control at 1.002. |
 | `0057-js-property-map-distribution-metrics` | `Broiler.JS` | `55c6b1fb` | Storage instrumentation plus an emitter, no behaviour change. `--property-map-distribution` records the final node-group count of every map and simulates each candidate growth policy against it. A node is 56 B, so the old floor was 920 B per object with any named property. |
 | `0058-js-property-map-growth-policy` | `Broiler.JS` | `a6f101cc` | Item 2-7, decided by `0057`'s run of record: 43.9% of 47 M maps never outgrow one four-node group. Geometric growth from one group — live map bytes 0.56×, allocated 0.82×, `ctor-1` 1 256 → 584 B. Real losing side: an 8-field object pays ~27% more bytes. |
+| `0059-js-single-match-replace-one-allocation` | `Broiler.JS` | `962ca06a` | Phase 5's first follow-up to item 1. A single-match `replace` assembled its answer through a `StringBuilder`, costing two full UTF-16 copies of the subject. `string.Concat` over three spans writes it in one allocation: **4.020 → 2.020 bytes per subject character**, in `RegExp.prototype[@@replace]` *and* in `String.prototype.replace`'s string-`searchValue` builtin. |
+| `0060-js-stream-global-replace` | `Broiler.JS` | `6f56d24f` | Phase 5's second follow-up. §22.2.6.11 collects every match before reading any of their properties, so a global replace held one result array per match live — **2 032.8 B per match, dead linear**. Streams when nothing can observe the results: **478.3 B/match, 0.235×.** |
+| `0061-js-measure-2-9-materialization-cause` | `Broiler.JS` | `e6222df3` | Measurement and instrumentation only, no behaviour change. Refuted item 2-9's losing-side hypothesis against the control it never had (a *strict* function): every function materializes its trie exactly once either way, so the planned follow-up was withdrawn before being built. |
+| `0062-js-array-length-keeps-shape` | `Broiler.JS` | `0812d80d` | Item 2-10. `JSArray.SetLengthWritable` recorded a `length` descriptor through `GetOwnProperties()`, abandoning the object's shape permanently — on the grow path, so `push`/`pop`/`concat` each cost an array its shape on first use. **DeltaBlue's dictionary fallbacks 2 503 → 0**, though its hit rate and score do not move. |
+| `0063-js-prototype-rewrite-no-invalidate` | `Broiler.JS` | `4d1c4796` | Item 2-11. A write re-applying the prototype an object already had retired **every** prototype-keyed cache entry in the process — once per `new` for a class. **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue 65.96% → 69.45%, Box2D 96.39% → 97.72%. |
+| `0064-js-refresh-stale-cache-entry` | `Broiler.JS` | `fb1e2f4c` | Item 2-12. The cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — 77.7% of DeltaBlue's misses. Refreshing in place: **DeltaBlue 69.45% → 93.16%**, Box2D → 98.83%. |
+| `0065-js-linear-closure-rewrite-scope` | `Broiler.JS` | `1070525a` | Item 1-4. `LambdaRewriter.Scope` held a lambda's in-scope bindings in a `List` and asked it `Contains` once per parameter reference, so IL emission was **quadratic in a scope's binding count**. A reference-keyed multiset makes it linear: **28.5× on that shape**, Mandreel's front end 21 307 → 7 015 ms. |
+| `0066-js-defer-nested-lambda-il` | `Broiler.JS` | `9bf9639b` | Item 1-1's emission half. A nested function's `DynamicMethod` is now generated on first invocation, memoized per syntactic site. **jQuery 0.661×, Box2D 0.636×, PdfJS 0.689×** on compile, allocation ~0.52×, steady state 1.0009×; **Octane CodeLoad 94.6 → 104.0**. `BROILER_JS_DEFER_IL=0` restores eager generation. |
 
-All thirteen are ancestors of the pinned `Broiler.JS` pointer **`a6f101cc`**. `0046`–`0048`
+All twenty-one are ancestors of the pinned `Broiler.JS` pointer **`9bf9639b`**. `0046`–`0048`
 were bumped in `2d9f39ca` on 2026-08-01; `0049`–`0058` — the whole of item 1-2's mitigation
-and phase 2 — are in the pointer as of 2026-08-02, which retires the patch handoff
-[`docs/performance-roadmap.md`](../docs/performance-roadmap.md) §0 listed as owed.
+and phase 2 — on 2026-08-02; `0059`–`0066` — phase 5's follow-ups, items 2-10…2-12, and
+phase 1's 1-4 and 1-1 — on 2026-08-03. The patch handoff
+[`docs/performance-roadmap.md`](../docs/performance-roadmap.md) §0 listed as owed is retired,
+and has stayed retired across two further bumps.
 
 `0046`–`0048` changed core JavaScript semantics (`+`, `==`, the `for` head, `eval`
 scoping, and assignment codegen), which is why they were deliberately kept out of
@@ -95,9 +84,9 @@ has since happened on its own — `ff819e06` refreshed
 `tests/wpt-baseline/failed-tests.json` for a **net 36 fewer failures** (50
 removed, 14 added).
 
-**The committed Octane results in `tests/octane/results/` predate every pointer
-bump above** (generated 2026-07-31 20:28) and still show the five suites failing —
-on an engine that is now ten commits further on. They are stale, not wrong about the engine as it was; the
-Octane workflow needs a re-run — item 0-6 in
-[`docs/performance-roadmap.md`](../docs/performance-roadmap.md), which is the plan of
-record now that `tests/octane/roadmap.md` has been merged into it.
+**The committed Octane results in `tests/octane/results/` are no longer stale.** They were
+regenerated by the workflow on 2026-08-03 at the pointer above and now report **17 of 17
+scores with all 15 suites `ok`**, against the same-machine Chromium and Jint columns — which
+closes the headline half of item 0-6 in
+[`docs/performance-roadmap.md`](../docs/performance-roadmap.md), the plan of record now that
+`tests/octane/roadmap.md` has been merged into it.
