@@ -243,7 +243,9 @@ that catches a wrong key — present the same certificate the keystore holds und
 `ANDROID_KEY_ALIAS`; verifying alone only says the package is signed by *some*
 key, which a debug key satisfies. Nor is an exit code enough on its own:
 `jarsigner -verify` exits 0 on an *unsigned* jar, reporting the verdict in its
-output only. The certificate's SHA-256 fingerprint is published in the package's
+output only. A rotated key reports more than one signer, since the previous
+certificate still signs for older platforms — the release certificate has to be
+among them, not the only one. The certificate's SHA-256 fingerprint is published in the package's
 `BUILD-INFO.txt` and in the draft release notes, so a download can be checked
 against it.
 
