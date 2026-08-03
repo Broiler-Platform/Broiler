@@ -1,7 +1,7 @@
-From 1801b3ca0c2d2155e6db0483f423832cbac0bb44 Mon Sep 17 00:00:00 2001
+From 0e405b0d5c7ece28d05fba69fe31c76b8c9ec6f4 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 3 Aug 2026 14:42:03 +0000
-Subject: [PATCH] Make IL emission linear in a scope's binding count
+Subject: [PATCH 65/66] Make IL emission linear in a scope's binding count
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -53,11 +53,11 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01TFeGmVCTWPB5yNvbjDAcNT
 ---
  .../DeclarationDenseSourceTests.cs            | 140 ++++++
- .../LambdaRewriter.cs                         | 162 ++++++-
+ .../LambdaRewriter.cs                         | 165 ++++++-
  .../CompileProfileMetrics.cs                  | 424 ++++++++++++++++++
  .../CompileScalingMetrics.cs                  | 206 +++++++++
  .../Program.cs                                |  12 +
- 5 files changed, 935 insertions(+), 9 deletions(-)
+ 5 files changed, 938 insertions(+), 9 deletions(-)
  create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeclarationDenseSourceTests.cs
  create mode 100644 Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileProfileMetrics.cs
  create mode 100644 Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileScalingMetrics.cs
@@ -209,10 +209,10 @@ index 00000000..6a1c7c06
 +    }
 +}
 diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/LambdaRewriter.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/LambdaRewriter.cs
-index fda4fb0f..6fc0adce 100644
+index fda4fb0f..3536f687 100644
 --- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/LambdaRewriter.cs
 +++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/LambdaRewriter.cs
-@@ -78,28 +78,172 @@ public class ClosureRepository
+@@ -78,28 +78,175 @@ public class ClosureRepository
  
  public class LambdaRewriter: BExpressionMapVisitor
  {
@@ -234,8 +234,11 @@ index fda4fb0f..6fc0adce 100644
 +    /// 2 000 took 797 / 2 981 / 13 865 ms — a little under 4x per doubling, against parse and
 +    /// tree construction that stayed flat at a few milliseconds and tens of milliseconds. That
 +    /// is the whole of Mandreel's front-end cost: its 5 MB is 1 364 top-level function
-+    /// declarations plus a matching <c>var</c> apiece, and MandreelLatency measures exactly the
-+    /// pause this produces.
++    /// declarations plus a matching <c>var</c> apiece, and compiling it went 21 307 -> 7 015 ms.
++    /// Note what that does <em>not</em> buy: neither Mandreel nor MandreelLatency moves, because
++    /// Octane compiles the file at script load and times only the benchmark's run function. The
++    /// saving is real and shows up in the suite's wall clock (358.2 -> 350.0 s, non-overlapping
++    /// over four runs an arm); it is simply not what those two scores measure.
 +    /// </para>
 +    /// <para>
 +    /// A multiset rather than a set, because the list held duplicates and both operations
@@ -393,7 +396,7 @@ index fda4fb0f..6fc0adce 100644
              });
          }
      }
-@@ -224,7 +368,7 @@ public class LambdaRewriter: BExpressionMapVisitor
+@@ -224,7 +371,7 @@ public class LambdaRewriter: BExpressionMapVisitor
  
      private BParameterExpression CheckForClosure(ScopedStack<Scope>.ScopedItem current, BParameterExpression pe, bool setup = false)
      {

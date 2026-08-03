@@ -1,8 +1,8 @@
-From 53e39d8161c6567b85e225d37a9c49e1f1828e86 Mon Sep 17 00:00:00 2001
+From 02092802f33eb665c5889f806ab3c7ad7431d707 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 3 Aug 2026 16:33:37 +0000
-Subject: [PATCH] Generate a nested function's IL on first invocation, not at
- compile time
+Subject: [PATCH 66/66] Generate a nested function's IL on first invocation,
+ not at compile time
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
