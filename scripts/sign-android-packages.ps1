@@ -1,11 +1,15 @@
 <#
 .SYNOPSIS
-    Signs Broiler's Android app bundles with the release key held in repository secrets.
+    Signs Broiler's Android packages with the release key held in repository secrets.
 
 .DESCRIPTION
-    An .aab is signed with jarsigner, not apksigner: apksigner only speaks the APK signature
-    schemes, which a bundle does not carry, and the JAR signature produced here is what Play
-    checks on upload.
+    The two package formats are signed by different tools, because they are checked by different
+    things:
+
+    * An .aab is signed with jarsigner. apksigner only speaks the APK signature schemes, which a
+      bundle does not carry, and the JAR signature is what Play checks on upload.
+    * An .apk is zipaligned and signed with apksigner, which writes the v2/v3 signature blocks.
+      An APK carrying only a JAR signature is refused at install from Android 11 on.
 
     The key material never reaches a command line or the repository. The script reads four
     environment variables, which .github/workflows/broiler-preview-package.yml maps from
@@ -17,20 +21,25 @@
         ANDROID_KEY_PASSWORD         password of that key
 
     The keystore is decoded to a temporary file outside the workspace — so no packaging glob or
-    artifact upload can reach it — and deleted again before the script returns. The two passwords
-    are handed to jarsigner through its -storepass:env / -keypass:env forms, so they never appear
-    in the process list.
+    artifact upload can reach it — and deleted again before the script returns. The passwords are
+    handed to the signing tools through their env-variable forms (-storepass:env, --ks-pass env:),
+    so they never appear in the process list.
 
-    Signing is verified rather than assumed: jarsigner must report the bundle verified, the
-    signer certificate must be the one the keystore holds under ANDROID_KEY_ALIAS, and the bundle
-    must carry a signature block. `jarsigner -verify` exits 0 on an unsigned jar, so an exit code
-    alone proves nothing.
+    Signing is verified rather than assumed. Each package has to verify, and its signer
+    certificate has to be the one the keystore holds under ANDROID_KEY_ALIAS — verifying alone
+    only says the package is signed by *some* key, which a debug key satisfies. Neither tool's
+    exit code is sufficient on its own either: `jarsigner -verify` exits 0 on an unsigned jar and
+    reports the verdict only in its output.
 
     Returns the SHA-256 fingerprint of the signing certificate, for BUILD-INFO.txt and the release
     notes to quote.
 
 .PARAMETER BundlePath
-    App bundles to sign in place.
+    App bundles (.aab) to sign in place.
+
+.PARAMETER ApkPath
+    APKs to align and sign in place. Needs the Android SDK build-tools, located through
+    ANDROID_HOME or ANDROID_SDK_ROOT.
 
 .PARAMETER ValidateOnly
     Check the secrets, the toolchain, and the keystore without signing anything. The preview
@@ -38,16 +47,21 @@
     seconds instead of after an hour of building.
 
 .EXAMPLE
-    ./scripts/sign-android-app-bundles.ps1 -ValidateOnly
+    ./scripts/sign-android-packages.ps1 -ValidateOnly
 
 .EXAMPLE
-    ./scripts/sign-android-app-bundles.ps1 -BundlePath ./Broiler.Browser.aab, ./Broiler.Writer.aab
+    ./scripts/sign-android-packages.ps1 -BundlePath ./Broiler.Browser.aab, ./Broiler.Writer.aab
+
+.EXAMPLE
+    ./scripts/sign-android-packages.ps1 -ApkPath ./Broiler.Browser-arm64.apk
 #>
 [CmdletBinding(DefaultParameterSetName = 'Sign')]
 param(
-    [Parameter(Mandatory = $true, ParameterSetName = 'Sign', Position = 0)]
-    [ValidateNotNullOrEmpty()]
-    [string[]] $BundlePath,
+    [Parameter(ParameterSetName = 'Sign', Position = 0)]
+    [string[]] $BundlePath = @(),
+
+    [Parameter(ParameterSetName = 'Sign')]
+    [string[]] $ApkPath = @(),
 
     [Parameter(Mandatory = $true, ParameterSetName = 'Validate')]
     [switch] $ValidateOnly
@@ -93,7 +107,42 @@ function Resolve-JdkTool {
     throw "$Name was not found. Set JAVA_HOME to a JDK 21 installation, or put $Name on PATH."
 }
 
-function Invoke-JdkTool {
+function Resolve-BuildToolsTool {
+    param([Parameter(Mandatory = $true)][string] $Name)
+
+    $sdkRoot = if (-not [string]::IsNullOrWhiteSpace($env:ANDROID_HOME)) { $env:ANDROID_HOME } else { $env:ANDROID_SDK_ROOT }
+    if ([string]::IsNullOrWhiteSpace($sdkRoot)) {
+        throw "Signing an APK needs the Android SDK build-tools ($Name). Neither ANDROID_HOME nor ANDROID_SDK_ROOT is set."
+    }
+
+    $buildTools = Join-Path $sdkRoot 'build-tools'
+    if (-not (Test-Path -LiteralPath $buildTools -PathType Container)) {
+        throw "The Android SDK at $sdkRoot has no build-tools directory, so $Name is not available."
+    }
+
+    # Highest version wins, compared as versions rather than as text so 9.0.0 does not sort above
+    # 36.0.0. The workflow pins a build-tools version, but a runner image may carry others.
+    $candidates = @(Get-ChildItem -LiteralPath $buildTools -Directory -ErrorAction SilentlyContinue |
+        Sort-Object -Property @{ Expression = {
+                $parsed = [version]'0.0'
+                if ([version]::TryParse($_.Name, [ref] $parsed)) { $parsed } else { [version]'0.0' }
+            }
+        } -Descending)
+
+    foreach ($candidate in $candidates) {
+        foreach ($extension in @('', '.bat', '.exe')) {
+            $tool = Join-Path $candidate.FullName "$Name$extension"
+            if (Test-Path -LiteralPath $tool -PathType Leaf) {
+                return $tool
+            }
+        }
+    }
+
+    $versions = if ($candidates.Count -gt 0) { @($candidates | ForEach-Object { $_.Name }) -join ', ' } else { '(none)' }
+    throw "$Name was not found in any build-tools under $buildTools. Installed versions: $versions."
+}
+
+function Invoke-SigningTool {
     param(
         [Parameter(Mandatory = $true)][string] $Executable,
         [Parameter(Mandatory = $true)][string[]] $Arguments,
@@ -123,6 +172,21 @@ function Get-CertificateFingerprint {
     # 'SHA256:' on current JDKs, 'SHA-256:' on older ones, always 32 colon-separated hex bytes.
     $found = [regex]::Matches($ToolOutput, '(?im)^\s*SHA-?256:\s*((?:[0-9A-F]{2}:){31}[0-9A-F]{2})\s*$')
     return @($found | ForEach-Object { $_.Groups[1].Value.ToUpperInvariant() })
+}
+
+function Get-ApkSignerDigest {
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string] $ToolOutput)
+
+    # apksigner writes the same 32 bytes keytool does, as unseparated lowercase hex:
+    # 'Signer #1 certificate SHA-256 digest: 674f25f7…'.
+    $found = [regex]::Matches($ToolOutput, '(?im)^Signer #\d+ certificate SHA-256 digest:\s*([0-9a-f]{64})\s*$')
+    return @($found | ForEach-Object { $_.Groups[1].Value.ToLowerInvariant() })
+}
+
+function ConvertTo-ComparableFingerprint {
+    param([Parameter(Mandatory = $true)][string] $Fingerprint)
+
+    return ($Fingerprint -replace '[^0-9A-Fa-f]', '').ToLowerInvariant()
 }
 
 function Assert-SignatureBlock {
@@ -163,13 +227,27 @@ All four values are repository secrets, set under Settings > Secrets and variabl
   ANDROID_KEY_ALIAS            alias of the signing key inside it
   ANDROID_KEY_PASSWORD         password of that key
 
-A preview package with unsigned bundles is not a package this workflow ships, so this is a hard
+A preview package with unsigned packages in it is not one this workflow ships, so this is a hard
 failure rather than a fallback.
 "@
 }
 
+if (-not $ValidateOnly -and $BundlePath.Count -eq 0 -and $ApkPath.Count -eq 0) {
+    throw 'Nothing to sign. Pass -BundlePath, -ApkPath, or both — or -ValidateOnly to just check the secrets.'
+}
+
 $keytool = Resolve-JdkTool -Name 'keytool'
 $jarsigner = Resolve-JdkTool -Name 'jarsigner'
+
+# Resolved only when there are APKs to sign: the build-tools are an Android SDK dependency, and a
+# bundles-only run — or the secrets check, which the workflow runs before it provisions the SDK —
+# has no business requiring one.
+$zipalign = $null
+$apksigner = $null
+if ($ApkPath.Count -gt 0) {
+    $zipalign = Resolve-BuildToolsTool -Name 'zipalign'
+    $apksigner = Resolve-BuildToolsTool -Name 'apksigner'
+}
 
 $storePassword = [Environment]::GetEnvironmentVariable('ANDROID_KEYSTORE_PASSWORD')
 $keyAlias = [Environment]::GetEnvironmentVariable('ANDROID_KEY_ALIAS')
@@ -201,7 +279,7 @@ try {
     # keytool has no :env password form of its own, and a password on a command line is readable
     # by every process on the machine, so it goes in on stdin — which keytool falls back to when
     # it is not attached to a console, as here.
-    $listing = Invoke-JdkTool -Executable $keytool -StandardInput $storePassword -Arguments (
+    $listing = Invoke-SigningTool -Executable $keytool -StandardInput $storePassword -Arguments (
         $JdkLocaleArguments + @('-list', '-v', '-keystore', $keystorePath, '-alias', $keyAlias))
     if ($listing.ExitCode -ne 0) {
         throw @"
@@ -237,7 +315,7 @@ $($listing.Output)
             # jarsigner rewrites the archive in place. -sigalg is left to jarsigner so an EC key
             # signs as readily as an RSA one; -digestalg is pinned because SHA-256 is the floor
             # Play accepts.
-            $signing = Invoke-JdkTool -Executable $jarsigner -Arguments (
+            $signing = Invoke-SigningTool -Executable $jarsigner -Arguments (
                 $JdkLocaleArguments + @(
                     '-keystore', $keystorePath
                     '-storepass:env', 'ANDROID_KEYSTORE_PASSWORD'
@@ -260,7 +338,7 @@ $($listing.Output)
 
             # jarsigner reports an unsigned jar as 'jar is unsigned.' and still exits 0, so the
             # verdict has to be read out of the output, not the exit code.
-            $verification = Invoke-JdkTool -Executable $jarsigner -Arguments (
+            $verification = Invoke-SigningTool -Executable $jarsigner -Arguments (
                 $JdkLocaleArguments + @('-verify', '-keystore', $keystorePath, $resolved))
             if ($verification.ExitCode -ne 0 -or $verification.Output -notmatch '(?m)^jar verified\.') {
                 throw "jarsigner did not verify $resolved after signing it (exit code $($verification.ExitCode)):`n`n$($verification.Output)"
@@ -270,7 +348,7 @@ $($listing.Output)
 
             # Verified is not enough: it says the bundle is signed by *some* key. This says it is
             # signed by ours, which is what a debug key slipping through would fail.
-            $signer = Invoke-JdkTool -Executable $keytool -Arguments (
+            $signer = Invoke-SigningTool -Executable $keytool -Arguments (
                 $JdkLocaleArguments + @('-printcert', '-jarfile', $resolved))
             $signerFingerprints = @(Get-CertificateFingerprint -ToolOutput $signer.Output)
             if ($signerFingerprints -notcontains $fingerprint) {
@@ -280,6 +358,74 @@ $($listing.Output)
 
             $megabytes = [Math]::Round((Get-Item -LiteralPath $resolved).Length / 1MB, 1)
             Write-Host "==> signed and verified $(Split-Path -Leaf $resolved): $megabytes MB, signer $fingerprint"
+        }
+
+        foreach ($apk in $ApkPath) {
+            if (-not (Test-Path -LiteralPath $apk -PathType Leaf)) {
+                throw "APK not found: $apk"
+            }
+
+            $resolved = (Resolve-Path -LiteralPath $apk).ProviderPath
+
+            # Align before signing, never after: zipalign moves entries within the archive, which
+            # would invalidate a signature already over them. -p page-aligns the uncompressed
+            # native libraries, which is what lets Android map them straight out of the APK.
+            $alignedPath = "$resolved.aligned"
+            $alignment = Invoke-SigningTool -Executable $zipalign -Arguments @('-p', '-f', '4', $resolved, $alignedPath)
+            if ($alignment.ExitCode -ne 0) {
+                throw "zipalign failed on $resolved (exit code $($alignment.ExitCode)):`n`n$($alignment.Output)"
+            }
+            Move-Item -LiteralPath $alignedPath -Destination $resolved -Force
+
+            # apksigner rather than jarsigner: it writes the v2/v3 signature blocks, and an APK
+            # carrying only a JAR signature is refused at install from Android 11 on. v4 is off
+            # because it writes a detached .idsig that only an incremental `adb install` reads —
+            # the package should hold packages and nothing else.
+            $signing = Invoke-SigningTool -Executable $apksigner -Arguments @(
+                'sign'
+                '--ks', $keystorePath
+                '--ks-pass', 'env:ANDROID_KEYSTORE_PASSWORD'
+                '--key-pass', 'env:ANDROID_KEY_PASSWORD'
+                '--ks-key-alias', $keyAlias
+                '--v4-signing-enabled', 'false'
+                $resolved
+            )
+            if ($signing.ExitCode -ne 0) {
+                $hint = ''
+                if ($signing.Output -match 'not a private key|cannot recover key|password was incorrect') {
+                    $hint = "`n`nIf the keystore is a PKCS#12 file, ANDROID_KEY_PASSWORD has to be the same value as ANDROID_KEYSTORE_PASSWORD."
+                }
+
+                throw "apksigner failed on $resolved (exit code $($signing.ExitCode)).$hint`n`n$($signing.Output)"
+            }
+
+            # Belt and braces: if a build-tools version ever ignores --v4-signing-enabled, the
+            # sidecar still does not reach the package.
+            Remove-Item -LiteralPath "$resolved.idsig" -Force -ErrorAction SilentlyContinue
+
+            # -v as well as --print-certs: without it apksigner prints the certificates but not the
+            # 'Verifies' verdict or the per-scheme lines, and this checks both.
+            $verification = Invoke-SigningTool -Executable $apksigner -Arguments @('verify', '--print-certs', '-v', $resolved)
+            if ($verification.ExitCode -ne 0 -or $verification.Output -notmatch '(?m)^Verifies') {
+                throw "apksigner did not verify $resolved after signing it (exit code $($verification.ExitCode)):`n`n$($verification.Output)"
+            }
+
+            # Same certificate check as the bundles, against apksigner's unseparated lowercase
+            # rendering of the same 32 bytes.
+            $signerDigests = @(Get-ApkSignerDigest -ToolOutput $verification.Output)
+            if ($signerDigests -notcontains (ConvertTo-ComparableFingerprint -Fingerprint $fingerprint)) {
+                $reported = if ($signerDigests.Count -gt 0) { $signerDigests -join ', ' } else { '(none)' }
+                throw "$resolved is not signed by '$keyAlias'. Expected certificate $fingerprint, found: $reported."
+            }
+
+            # Which schemes signed it is the point of using apksigner, so it goes in the log:
+            # v1 alone would install nowhere from Android 11 on.
+            $schemes = @(
+                [regex]::Matches($verification.Output, '(?im)^Verified using (v[0-9.]+) scheme[^:]*:\s*true\s*$') |
+                    ForEach-Object { $_.Groups[1].Value }
+            )
+            $megabytes = [Math]::Round((Get-Item -LiteralPath $resolved).Length / 1MB, 1)
+            Write-Host "==> signed and verified $(Split-Path -Leaf $resolved): $megabytes MB, $($schemes -join '+') signature, signer $fingerprint"
         }
     }
 }

@@ -18,7 +18,7 @@
 
 .PARAMETER Variant
     self-contained or framework-dependent for the desktop packages; app-bundle for Android,
-    which has no such split — an .aab always carries its own runtime.
+    which has no such split — an .aab and an .apk both carry their own runtime.
 
 .PARAMETER Branch
     Branch the package was built from.
@@ -27,8 +27,8 @@
     MSBuild configuration used (Release-Linux / Release-Windows / Release).
 
 .PARAMETER SigningCertificateSha256
-    SHA-256 fingerprint of the certificate the Android bundles are signed with, as
-    scripts/sign-android-app-bundles.ps1 reports it. Quoted in BUILD-INFO.txt so the package says
+    SHA-256 fingerprint of the certificate the Android packages are signed with, as
+    scripts/sign-android-packages.ps1 reports it. Quoted in BUILD-INFO.txt so the package says
     which key signed it. Android only.
 
 .EXAMPLE
@@ -72,7 +72,7 @@ $run = if ($env:GITHUB_RUN_NUMBER) { "GitHub Actions run #$env:GITHUB_RUN_NUMBER
 $runtimeNote = switch ($Variant) {
     'self-contained' { 'self-contained — the .NET runtime is included, nothing to install' }
     'framework-dependent' { 'framework-dependent — requires the ASP.NET Core 10 runtime on the target machine' }
-    'app-bundle' { 'app bundle — the .NET runtime ships inside the .aab, nothing to install' }
+    'app-bundle' { 'app bundle and APK — the .NET runtime ships inside the package, nothing to install' }
 }
 
 $rid = switch ($Platform) {
@@ -102,23 +102,31 @@ if ($isAndroid) {
         'Contents'
         '--------'
         ''
-        ('  {0,-24}{1}' -f 'Broiler.Browser.aab', 'The Broiler web browser — org.broiler.browser.')
-        ('  {0,-24}{1}' -f 'Broiler.Writer.aab', 'The Broiler word processor — org.broiler.writer.')
+        ('  {0,-30}{1}' -f 'Broiler.Browser.aab', 'The Broiler web browser — org.broiler.browser.')
+        ('  {0,-30}{1}' -f 'Broiler.Writer.aab', 'The Broiler word processor — org.broiler.writer.')
+        ('  {0,-30}{1}' -f 'Broiler.Browser-arm64.apk', 'The same browser, installable on an arm64 device.')
+        ('  {0,-30}{1}' -f 'Broiler.Writer-arm64.apk', 'The same word processor, installable on arm64.')
         ''
-        '  Both bundles carry the arm64-v8a and x86_64 ABIs, compile against API 36, and declare a'
+        '  The app bundles carry the arm64-v8a and x86_64 ABIs; the APKs carry arm64-v8a alone,'
+        '  which is what physical devices run. All four compile against API 36 and declare a'
         '  minimum of API 24.'
+        ''
+        '  Take the .apk to put a build on a device, and the .aab to upload one to Play. An app'
+        '  bundle is not installable as it stands — see below.'
         ''
         'Signing'
         '-------'
         ''
-        '  Both bundles are signed with the Broiler release key. The key itself is kept outside'
-        '  the repository — the build reads it from encrypted repository secrets — and the'
+        '  All four packages are signed with the Broiler release key. The key itself is kept'
+        '  outside the repository — the build reads it from encrypted repository secrets — and the'
         '  workflow verifies each signature against it before packaging.'
         ''
-        '  Check a bundle before you install or upload it:'
+        '  The two formats are signed by the tools that check them: the bundles carry a JAR'
+        '  signature from jarsigner, the APKs an APK Signature Scheme v2/v3 block from apksigner.'
+        '  Check a package before you install or upload it:'
         ''
         '    jarsigner -verify Broiler.Browser.aab'
-        '    keytool -printcert -jarfile Broiler.Browser.aab'
+        '    apksigner verify --print-certs -v Broiler.Browser-arm64.apk'
     )
 
     if (-not [string]::IsNullOrWhiteSpace($SigningCertificateSha256)) {
@@ -132,8 +140,15 @@ if ($isAndroid) {
 
     $lines += @(
         ''
-        'Installing an .aab'
-        '------------------'
+        'Installing'
+        '----------'
+        ''
+        '  On an arm64 device, install the APK directly:'
+        ''
+        '    adb install -r Broiler.Browser-arm64.apk'
+        ''
+        '  Sideloading from the device itself needs "install unknown apps" allowed for whichever'
+        '  app opens the file. An emulator or a device on another ABI needs the bundle instead.'
         ''
         '  An app bundle is not installable as it stands. Use Google bundletool to build the APK'
         '  set for a device and install that:'

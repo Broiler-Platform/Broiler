@@ -534,11 +534,12 @@ jobs:
   build-android-preview-package:
     name: Build BPP Android Package
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    # Four publishes rather than the two this job started with: a bundle and an arm64 APK per head.
+    timeout-minutes: 150
     outputs:
       # The signing certificate's fingerprint, for the release notes to publish. A certificate is
       # public by construction — this is what a download is checked against, not key material.
-      signing-certificate-sha256: ${{ steps.sign-android-bundles.outputs.certificate-sha256 }}
+      signing-certificate-sha256: ${{ steps.sign-android-packages.outputs.certificate-sha256 }}
     env:
       BROWSER_PROJECT_PATH: src/Broiler.Browser.Android/Broiler.Browser.Android.csproj
       WRITER_PROJECT_PATH: src/Broiler.Writer.Android/Broiler.Writer.Android.csproj
@@ -578,7 +579,7 @@ jobs:
         run: |
           # Signing is what turns the publish output into a shippable package, so the secrets it
           # needs are checked before the hour of building rather than after it.
-          ./scripts/sign-android-app-bundles.ps1 -ValidateOnly | Out-Null
+          ./scripts/sign-android-packages.ps1 -ValidateOnly | Out-Null
 
       - name: Install the Android build workload
         shell: pwsh
@@ -648,40 +649,91 @@ jobs:
             --no-restore `
             --output (Join-Path $publishRoot 'writer')
 
-      - name: Collect and verify the Android app bundles
+      - name: Publish the arm64 Release APKs
         shell: pwsh
         run: |
-          # A Release publish leaves three packages side by side: the unsigned <applicationId>.aab
-          # plus -Signed.aab and -Signed.apk, both signed with the workload's debug key. The
-          # unsigned bundle is the one to carry forward — the next step signs it with the release
-          # key, and a debug-signed bundle would arrive looking release-ready when it is not.
-          function Get-UnsignedBundle {
+          # The same Release configuration as the bundles, with two properties overridden. They go
+          # on the command line, where they become global properties and so win over the csproj:
+          #
+          #   AndroidPackageFormat  the heads switch to aab on '$(Configuration)' == 'Release', and
+          #                         this package is the directly installable counterpart.
+          #   RuntimeIdentifiers    an APK carries one ABI where a bundle carries the split set;
+          #                         arm64-v8a is the ABI real devices run.
+          #
+          # No restore of its own: android-arm64 is part of the RuntimeIdentifiers already restored
+          # above, so --no-restore is still honest. Restoring the narrower set here would rewrite
+          # project.assets.json and break the bundle publish's own --no-restore.
+          $publishRoot = Join-Path $env:RUNNER_TEMP 'android-publish'
+
+          dotnet publish $env:BROWSER_PROJECT_PATH `
+            --configuration $env:ANDROID_CONFIGURATION `
+            --no-restore `
+            -p:AndroidPackageFormat=apk `
+            -p:RuntimeIdentifiers=android-arm64 `
+            --output (Join-Path $publishRoot 'browser-arm64-apk')
+
+          dotnet publish $env:WRITER_PROJECT_PATH `
+            --configuration $env:ANDROID_CONFIGURATION `
+            --no-restore `
+            -p:AndroidPackageFormat=apk `
+            -p:RuntimeIdentifiers=android-arm64 `
+            --output (Join-Path $publishRoot 'writer-arm64-apk')
+
+      - name: Collect and verify the Android packages
+        shell: pwsh
+        run: |
+          # Either publish leaves the unsigned <applicationId> package beside a -Signed pair
+          # carrying the workload's debug key. The unsigned one is what to carry forward — the next
+          # step signs it with the release key, and a debug-signed package would arrive looking
+          # release-ready when it is not.
+          function Get-UnsignedPackage {
             param(
               [Parameter(Mandatory=$true)][string]$PublishDirectory,
-              [Parameter(Mandatory=$true)][string]$ApplicationId
+              [Parameter(Mandatory=$true)][string]$ApplicationId,
+              [Parameter(Mandatory=$true)][string]$Extension
             )
 
-            $bundle = Join-Path $PublishDirectory "$ApplicationId.aab"
-            if (-not (Test-Path -LiteralPath $bundle)) {
-              $produced = @(Get-ChildItem -LiteralPath $PublishDirectory -Filter *.aab -ErrorAction SilentlyContinue |
+            $package = Join-Path $PublishDirectory "$ApplicationId$Extension"
+            if (-not (Test-Path -LiteralPath $package)) {
+              $produced = @(Get-ChildItem -LiteralPath $PublishDirectory -Filter "*$Extension" -ErrorAction SilentlyContinue |
                 ForEach-Object { $_.Name })
               $found = if ($produced) { $produced -join ', ' } else { '(none)' }
-              throw "Expected $ApplicationId.aab in $PublishDirectory. Bundles produced: $found"
+              throw "Expected $ApplicationId$Extension in $PublishDirectory. Packages produced: $found"
             }
 
-            return $bundle
+            return $package
+          }
+
+          function Get-ArchiveEntries {
+            param([Parameter(Mandatory=$true)][string]$Path)
+
+            $archive = [System.IO.Compression.ZipFile]::OpenRead($Path)
+            try {
+              return @($archive.Entries | ForEach-Object { $_.FullName })
+            }
+            finally {
+              $archive.Dispose()
+            }
+          }
+
+          function Assert-Unsigned {
+            param(
+              [Parameter(Mandatory=$true)][string]$Path,
+              [Parameter(Mandatory=$true)][AllowEmptyCollection()][string[]]$Entries
+            )
+
+            # Signing happens in the next step, against the release key. A signature already here
+            # means the debug-signed package was picked up by mistake.
+            $signature = @($Entries | Where-Object { $_ -match '^META-INF/.+\.(RSA|DSA|EC|SF)$' })
+            if ($signature) {
+              throw "$Path is already signed ($($signature -join ', ')); the debug-signed package was picked up instead of the unsigned one."
+            }
           }
 
           function Assert-AndroidAppBundle {
             param([Parameter(Mandatory=$true)][string]$Path)
 
-            $archive = [System.IO.Compression.ZipFile]::OpenRead($Path)
-            try {
-              $entries = @($archive.Entries | ForEach-Object { $_.FullName })
-            }
-            finally {
-              $archive.Dispose()
-            }
+            $entries = @(Get-ArchiveEntries -Path $Path)
 
             # An .aab is a protobuf bundle, not an APK. BundleConfig.pb and the base/ split are what
             # tell the two apart, so a wrong AndroidPackageFormat cannot ship unnoticed.
@@ -697,15 +749,42 @@ jobs:
               }
             }
 
-            # Signing happens in the next step, against the release key. A signature already here
-            # means the debug-signed bundle was picked up by mistake.
-            $signature = @($entries | Where-Object { $_ -match '^META-INF/.+\.(RSA|DSA|EC|SF)$' })
-            if ($signature) {
-              throw "$Path is already signed ($($signature -join ', ')); the debug-signed bundle was picked up instead of the unsigned one."
-            }
+            Assert-Unsigned -Path $Path -Entries $entries
 
             $megabytes = [Math]::Round((Get-Item -LiteralPath $Path).Length / 1MB, 1)
             Write-Host "==> verified $(Split-Path -Leaf $Path): app bundle, $($entries.Count) entries, $megabytes MB, unsigned publish output"
+          }
+
+          function Assert-AndroidArm64Apk {
+            param([Parameter(Mandatory=$true)][string]$Path)
+
+            $entries = @(Get-ArchiveEntries -Path $Path)
+
+            # The mirror of the bundle's check: an APK keeps its manifest at the archive root and
+            # has no BundleConfig.pb, so neither format can ship under the other one's name.
+            if ($entries -notcontains 'AndroidManifest.xml') {
+              throw "$Path is not an APK: AndroidManifest.xml is missing from the archive root."
+            }
+
+            if ($entries -contains 'BundleConfig.pb') {
+              throw "$Path is an app bundle, not an APK; AndroidPackageFormat did not take."
+            }
+
+            # One ABI is the point of this package: an installable arm64 build. A second one means
+            # the RuntimeIdentifiers override did not take, and the download would be twice the size
+            # it needs to be.
+            $abis = @($entries |
+              ForEach-Object { if ($_ -match '^lib/([^/]+)/.') { $Matches[1] } } |
+              Sort-Object -Unique)
+            if ($abis.Count -ne 1 -or $abis[0] -ne 'arm64-v8a') {
+              $found = if ($abis.Count -gt 0) { $abis -join ', ' } else { '(none)' }
+              throw "$Path should carry arm64-v8a native code and nothing else; found: $found."
+            }
+
+            Assert-Unsigned -Path $Path -Entries $entries
+
+            $megabytes = [Math]::Round((Get-Item -LiteralPath $Path).Length / 1MB, 1)
+            Write-Host "==> verified $(Split-Path -Leaf $Path): apk, arm64-v8a, $($entries.Count) entries, $megabytes MB, unsigned publish output"
           }
 
           $publishRoot = Join-Path $env:RUNNER_TEMP 'android-publish'
@@ -713,21 +792,30 @@ jobs:
           New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 
           $heads = @(
-            @{ Directory = 'browser'; ApplicationId = 'org.broiler.browser'; PackageName = 'Broiler.Browser.aab' }
-            @{ Directory = 'writer'; ApplicationId = 'org.broiler.writer'; PackageName = 'Broiler.Writer.aab' }
+            @{ Directory = 'browser'; ApplicationId = 'org.broiler.browser'; BundleName = 'Broiler.Browser.aab'; ApkName = 'Broiler.Browser-arm64.apk' }
+            @{ Directory = 'writer'; ApplicationId = 'org.broiler.writer'; BundleName = 'Broiler.Writer.aab'; ApkName = 'Broiler.Writer-arm64.apk' }
           )
 
           foreach ($head in $heads) {
-            $bundle = Get-UnsignedBundle `
+            $bundle = Get-UnsignedPackage `
               -PublishDirectory (Join-Path $publishRoot $head.Directory) `
-              -ApplicationId $head.ApplicationId
+              -ApplicationId $head.ApplicationId `
+              -Extension '.aab'
 
             Assert-AndroidAppBundle -Path $bundle
-            Copy-Item -LiteralPath $bundle -Destination (Join-Path $packageRoot $head.PackageName) -Force
+            Copy-Item -LiteralPath $bundle -Destination (Join-Path $packageRoot $head.BundleName) -Force
+
+            $apk = Get-UnsignedPackage `
+              -PublishDirectory (Join-Path $publishRoot "$($head.Directory)-arm64-apk") `
+              -ApplicationId $head.ApplicationId `
+              -Extension '.apk'
+
+            Assert-AndroidArm64Apk -Path $apk
+            Copy-Item -LiteralPath $apk -Destination (Join-Path $packageRoot $head.ApkName) -Force
           }
 
-      - name: Sign the Android app bundles
-        id: sign-android-bundles
+      - name: Sign the Android packages
+        id: sign-android-packages
         shell: pwsh
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -735,15 +823,20 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          # The copies in the package root are signed, not the publish output: the bundle that
-          # ships is the bundle that was verified. The script signs with jarsigner, checks the
-          # result verifies against the release certificate, and returns its SHA-256 fingerprint —
-          # which BUILD-INFO.txt and the release notes quote so a download can be checked.
+          # The copies in the package root are signed, not the publish output: what ships is what
+          # was verified. Bundles go through jarsigner and APKs through zipalign and apksigner —
+          # the tool each format is checked by. The script verifies every signature against the
+          # release certificate and returns its SHA-256 fingerprint, which BUILD-INFO.txt and the
+          # release notes quote so a download can be checked.
           $packageRoot = Join-Path $env:RUNNER_TEMP 'packages/BPP-Android'
 
-          $fingerprint = ./scripts/sign-android-app-bundles.ps1 -BundlePath `
-            (Join-Path $packageRoot 'Broiler.Browser.aab'), `
-            (Join-Path $packageRoot 'Broiler.Writer.aab')
+          $fingerprint = ./scripts/sign-android-packages.ps1 `
+            -BundlePath `
+              (Join-Path $packageRoot 'Broiler.Browser.aab'), `
+              (Join-Path $packageRoot 'Broiler.Writer.aab') `
+            -ApkPath `
+              (Join-Path $packageRoot 'Broiler.Browser-arm64.apk'), `
+              (Join-Path $packageRoot 'Broiler.Writer-arm64.apk')
 
           if ([string]::IsNullOrWhiteSpace($fingerprint)) {
             throw 'The signing script returned no certificate fingerprint.'
@@ -927,19 +1020,22 @@ jobs:
           '@
 
           $androidNotes = @'
-          `BPP-Android.zip` carries the two Android application heads as Release app bundles:
+          `BPP-Android.zip` carries the two Android application heads twice — as Release app bundles
+          to upload, and as arm64 Release APKs to install:
 
-          * `Broiler.Browser.aab` — application ID `org.broiler.browser`.
-          * `Broiler.Writer.aab` — application ID `org.broiler.writer`.
+          * `Broiler.Browser.aab` / `Broiler.Browser-arm64.apk` — application ID `org.broiler.browser`.
+          * `Broiler.Writer.aab` / `Broiler.Writer-arm64.apk` — application ID `org.broiler.writer`.
 
-          Both bundles carry the `arm64-v8a` and `x86_64` ABIs, compile against API 36, and declare a
-          minimum of API 24. Both are **signed with the Broiler release key** — held as repository
-          secrets, never in the repository — and the workflow verifies each signature against that
-          key before packaging. Check a download with:
+          The bundles carry the `arm64-v8a` and `x86_64` ABIs; the APKs carry `arm64-v8a` alone,
+          which is what physical devices run. All four compile against API 36 and declare a minimum
+          of API 24, and all four are **signed with the Broiler release key** — held as repository
+          secrets, never in the repository — with every signature verified against that key before
+          packaging. Each format is signed by the tool that checks it, so check a download the same
+          way:
 
           ```
           jarsigner -verify Broiler.Browser.aab
-          keytool -printcert -jarfile Broiler.Browser.aab
+          apksigner verify --print-certs -v Broiler.Browser-arm64.apk
           ```
           '@
 
@@ -958,8 +1054,15 @@ jobs:
           $androidNotes += @'
 
 
-          An `.aab` is still not installable as it stands. Build an APK set for the device with
-          Google `bundletool` and install that:
+          To put a build on an arm64 device:
+
+          ```
+          adb install -r Broiler.Browser-arm64.apk
+          ```
+
+          An `.aab` is not installable as it stands — it is the upload format. For an emulator or a
+          device on another ABI, build an APK set from the bundle with Google `bundletool` and
+          install that:
 
           ```
           bundletool build-apks --bundle=Broiler.Browser.aab --output=Broiler.Browser.apks
