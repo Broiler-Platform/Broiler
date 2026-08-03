@@ -535,6 +535,10 @@ jobs:
     name: Build BPP Android Package
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    outputs:
+      # The signing certificate's fingerprint, for the release notes to publish. A certificate is
+      # public by construction — this is what a download is checked against, not key material.
+      signing-certificate-sha256: ${{ steps.sign-android-bundles.outputs.certificate-sha256 }}
     env:
       BROWSER_PROJECT_PATH: src/Broiler.Browser.Android/Broiler.Browser.Android.csproj
       WRITER_PROJECT_PATH: src/Broiler.Writer.Android/Broiler.Writer.Android.csproj
@@ -563,6 +567,18 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Check the Android signing secrets
+        shell: pwsh
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          # Signing is what turns the publish output into a shippable package, so the secrets it
+          # needs are checked before the hour of building rather than after it.
+          ./scripts/sign-android-app-bundles.ps1 -ValidateOnly | Out-Null
 
       - name: Install the Android build workload
         shell: pwsh
@@ -636,8 +652,9 @@ jobs:
         shell: pwsh
         run: |
           # A Release publish leaves three packages side by side: the unsigned <applicationId>.aab
-          # plus -Signed.aab and -Signed.apk, both signed with the workload's debug key. Only the
-          # unsigned bundle may ship — a debug-signed one looks release-ready and is not.
+          # plus -Signed.aab and -Signed.apk, both signed with the workload's debug key. The
+          # unsigned bundle is the one to carry forward — the next step signs it with the release
+          # key, and a debug-signed bundle would arrive looking release-ready when it is not.
           function Get-UnsignedBundle {
             param(
               [Parameter(Mandatory=$true)][string]$PublishDirectory,
@@ -680,15 +697,15 @@ jobs:
               }
             }
 
-            # The unsigned bundle is the deliverable; a signature here means the debug-signed one
-            # was picked up by mistake.
+            # Signing happens in the next step, against the release key. A signature already here
+            # means the debug-signed bundle was picked up by mistake.
             $signature = @($entries | Where-Object { $_ -match '^META-INF/.+\.(RSA|DSA|EC|SF)$' })
             if ($signature) {
-              throw "$Path is signed ($($signature -join ', ')); the preview package ships unsigned bundles."
+              throw "$Path is already signed ($($signature -join ', ')); the debug-signed bundle was picked up instead of the unsigned one."
             }
 
             $megabytes = [Math]::Round((Get-Item -LiteralPath $Path).Length / 1MB, 1)
-            Write-Host "==> verified $(Split-Path -Leaf $Path): app bundle, $($entries.Count) entries, $megabytes MB, unsigned"
+            Write-Host "==> verified $(Split-Path -Leaf $Path): app bundle, $($entries.Count) entries, $megabytes MB, unsigned publish output"
           }
 
           $publishRoot = Join-Path $env:RUNNER_TEMP 'android-publish'
@@ -709,6 +726,32 @@ jobs:
             Copy-Item -LiteralPath $bundle -Destination (Join-Path $packageRoot $head.PackageName) -Force
           }
 
+      - name: Sign the Android app bundles
+        id: sign-android-bundles
+        shell: pwsh
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          # The copies in the package root are signed, not the publish output: the bundle that
+          # ships is the bundle that was verified. The script signs with jarsigner, checks the
+          # result verifies against the release certificate, and returns its SHA-256 fingerprint —
+          # which BUILD-INFO.txt and the release notes quote so a download can be checked.
+          $packageRoot = Join-Path $env:RUNNER_TEMP 'packages/BPP-Android'
+
+          $fingerprint = ./scripts/sign-android-app-bundles.ps1 -BundlePath `
+            (Join-Path $packageRoot 'Broiler.Browser.aab'), `
+            (Join-Path $packageRoot 'Broiler.Writer.aab')
+
+          if ([string]::IsNullOrWhiteSpace($fingerprint)) {
+            throw 'The signing script returned no certificate fingerprint.'
+          }
+
+          "ANDROID_SIGNING_CERT_SHA256=$fingerprint" >> $env:GITHUB_ENV
+          "certificate-sha256=$fingerprint" >> $env:GITHUB_OUTPUT
+
       - name: Package Android assets
         shell: pwsh
         env:
@@ -724,7 +767,8 @@ jobs:
             -Platform android `
             -Variant app-bundle `
             -Branch $env:RELEASE_BRANCH `
-            -Configuration $env:ANDROID_CONFIGURATION
+            -Configuration $env:ANDROID_CONFIGURATION `
+            -SigningCertificateSha256 $env:ANDROID_SIGNING_CERT_SHA256
 
           # A zip rather than the Linux job's tar.xz: these bundles are fed to Android tooling from
           # whatever desktop the developer has, and .zip opens on all three without extra tools.
@@ -792,6 +836,7 @@ jobs:
           TAG_NAME: ${{ steps.metadata.outputs.tag_name }}
           RELEASE_TITLE: ${{ steps.metadata.outputs.release_title }}
           SHORT_SHA: ${{ steps.metadata.outputs.short_sha }}
+          ANDROID_SIGNING_CERT_SHA256: ${{ needs.build-android-preview-package.outputs.signing-certificate-sha256 }}
         run: |
           $assetDir = Join-Path $env:RUNNER_TEMP 'release-assets'
 
@@ -888,15 +933,41 @@ jobs:
           * `Broiler.Writer.aab` — application ID `org.broiler.writer`.
 
           Both bundles carry the `arm64-v8a` and `x86_64` ABIs, compile against API 36, and declare a
-          minimum of API 24. They are **unsigned**: release keys live outside the repository, so
-          signing and store upload belong to the delivery pipeline. An `.aab` is not installable as it
-          stands — sign it, then build and install an APK set for the device with Google `bundletool`:
+          minimum of API 24. Both are **signed with the Broiler release key** — held as repository
+          secrets, never in the repository — and the workflow verifies each signature against that
+          key before packaging. Check a download with:
 
           ```
-          bundletool build-apks --bundle=Broiler.Browser.aab --output=Broiler.Browser.apks \
-            --ks=<keystore> --ks-key-alias=<alias>
+          jarsigner -verify Broiler.Browser.aab
+          keytool -printcert -jarfile Broiler.Browser.aab
+          ```
+          '@
+
+          # A doubled backtick is one literal backtick in an expandable here-string, so the
+          # fingerprint lands in the notes as markdown inline code.
+          if (-not [string]::IsNullOrWhiteSpace($env:ANDROID_SIGNING_CERT_SHA256)) {
+            $androidNotes += @"
+
+
+          The signing certificate's SHA-256 fingerprint is:
+
+          ``$env:ANDROID_SIGNING_CERT_SHA256``
+          "@
+          }
+
+          $androidNotes += @'
+
+
+          An `.aab` is still not installable as it stands. Build an APK set for the device with
+          Google `bundletool` and install that:
+
+          ```
+          bundletool build-apks --bundle=Broiler.Browser.aab --output=Broiler.Browser.apks
           bundletool install-apks --apks=Broiler.Browser.apks
           ```
+
+          `bundletool` signs the APKs it generates with its own debug key unless `--ks` says
+          otherwise; that is a local install detail and leaves the bundle's own signature untouched.
 
           Android is an emulator-verified preview; physical-device validation is still outstanding.
           '@

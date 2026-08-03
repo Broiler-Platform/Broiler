@@ -26,6 +26,11 @@
 .PARAMETER Configuration
     MSBuild configuration used (Release-Linux / Release-Windows / Release).
 
+.PARAMETER SigningCertificateSha256
+    SHA-256 fingerprint of the certificate the Android bundles are signed with, as
+    scripts/sign-android-app-bundles.ps1 reports it. Quoted in BUILD-INFO.txt so the package says
+    which key signed it. Android only.
+
 .EXAMPLE
     ./scripts/write-bpp-build-info.ps1 -PackageDirectory /tmp/packages/BPP-Linux-self-contained `
         -Platform linux -Variant self-contained -Branch main -Configuration Release-Linux
@@ -40,7 +45,8 @@ param(
     [Parameter(Mandatory = $true)][ValidateSet('linux', 'windows', 'android')][string] $Platform,
     [Parameter(Mandatory = $true)][ValidateSet('self-contained', 'framework-dependent', 'app-bundle')][string] $Variant,
     [string] $Branch = '(unknown)',
-    [string] $Configuration = '(unknown)'
+    [string] $Configuration = '(unknown)',
+    [string] $SigningCertificateSha256 = ''
 )
 
 Set-StrictMode -Version Latest
@@ -102,22 +108,41 @@ if ($isAndroid) {
         '  Both bundles carry the arm64-v8a and x86_64 ABIs, compile against API 36, and declare a'
         '  minimum of API 24.'
         ''
-        'These bundles are UNSIGNED'
-        '--------------------------'
+        'Signing'
+        '-------'
         ''
-        '  Release signing keys are kept outside the repository, so a preview build cannot produce'
-        '  a store-ready artifact. Sign a bundle with your own key before installing or uploading'
-        '  it.'
+        '  Both bundles are signed with the Broiler release key. The key itself is kept outside'
+        '  the repository — the build reads it from encrypted repository secrets — and the'
+        '  workflow verifies each signature against it before packaging.'
+        ''
+        '  Check a bundle before you install or upload it:'
+        ''
+        '    jarsigner -verify Broiler.Browser.aab'
+        '    keytool -printcert -jarfile Broiler.Browser.aab'
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($SigningCertificateSha256)) {
+        $lines += @(
+            ''
+            '  The signing certificate has this SHA-256 fingerprint:'
+            ''
+            "    $SigningCertificateSha256"
+        )
+    }
+
+    $lines += @(
         ''
         'Installing an .aab'
         '------------------'
         ''
-        '  An app bundle is not installable as it stands. Sign it, then use Google bundletool to'
-        '  build the APK set for a device and install it:'
+        '  An app bundle is not installable as it stands. Use Google bundletool to build the APK'
+        '  set for a device and install that:'
         ''
-        '    bundletool build-apks --bundle=Broiler.Browser.aab --output=Broiler.Browser.apks \'
-        '      --ks=<keystore> --ks-key-alias=<alias>'
+        '    bundletool build-apks --bundle=Broiler.Browser.aab --output=Broiler.Browser.apks'
         '    bundletool install-apks --apks=Broiler.Browser.apks'
+        ''
+        '  bundletool signs the APKs it generates with its own debug key unless --ks says'
+        '  otherwise; that is a local install detail and leaves the bundle signature untouched.'
         ''
         '  bundletool releases: https://github.com/google/bundletool/releases'
         ''

@@ -27,7 +27,7 @@ layouts or Android widgets in application content.
 | AOT and trimming | Disabled. Browser uses an expression compiler based on `Reflection.Emit`, which is incompatible with full AOT. |
 | Packages | `org.broiler.writer` and `org.broiler.browser` |
 | Artifacts | Self-contained Debug APK; Release AAB |
-| Signing | Debug signing is workload-managed. Release keys stay outside the repository and signing belongs to the delivery pipeline. |
+| Signing | Debug signing is workload-managed. Release keys stay outside the repository — the delivery pipeline signs, reading the key from encrypted repository secrets. |
 | Network policy | Only Browser declares `INTERNET`; cleartext traffic is disabled for both applications. |
 
 The generated roots are `Broiler.Android.Writer.slnx`,
@@ -167,19 +167,64 @@ dotnet run --project Broiler.Graphics/Broiler.Graphics.Android.Tests
 
 Debug builds create self-contained APKs (`EmbedAssembliesIntoApk=true`) so a
 normal `adb install` cannot reuse stale fast-deployment assemblies. Release builds
-create AABs. Release AABs are not publishable until the external signing and
-review gates are satisfied.
+create AABs.
 
 The [Broiler Preview Package workflow](../../.github/workflows/broiler-preview-package.yml)
 builds both heads with `dotnet publish -c Release` — the configuration name has to
 be exactly `Release`, since that is what switches `AndroidPackageFormat` to `aab` —
 and ships them as `BPP-Android.zip`. One publish leaves three packages side by
 side: the unsigned `<applicationId>.aab` plus a `-Signed.aab` and `-Signed.apk`
-carrying the workload's debug key. The workflow packages the unsigned bundle and
-fails if the file it picked turns out to be signed, so a debug-signed artifact
-cannot reach a release under the policy above. Each bundle carries `arm64-v8a` and
+carrying the workload's debug key. The workflow takes the unsigned bundle and
+fails if the file it picked turns out to be signed already, so a debug-signed
+artifact cannot pass itself off as a release. Each bundle carries `arm64-v8a` and
 `x86_64`, which is what the heads' `RuntimeIdentifiers` resolve to when the publish
 passes no `--runtime`.
+
+### Release signing
+
+The workflow signs the bundles it packages with the release key, through
+[`scripts/sign-android-app-bundles.ps1`](../../scripts/sign-android-app-bundles.ps1).
+The key stays out of the repository, as the baseline requires: it reaches the
+runner as four repository secrets, set under *Settings > Secrets and variables >
+Actions*.
+
+| Secret | Contents |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | The keystore file, base64-encoded (`base64 -w0 release.keystore`). PKCS#12 or JKS. |
+| `ANDROID_KEYSTORE_PASSWORD` | Password of that keystore. |
+| `ANDROID_KEY_ALIAS` | Alias of the signing key inside it. |
+| `ANDROID_KEY_PASSWORD` | Password of that key. For a PKCS#12 keystore this is the store password — the format keeps one password for both. |
+
+A bundle is signed with `jarsigner`, not `apksigner`: `apksigner` only speaks the
+APK signature schemes, which an `.aab` does not carry, and the JAR signature is
+what Play checks on upload. The keystore is decoded to a temporary file outside
+the workspace and deleted again when the script returns; the passwords reach
+`jarsigner` through its `-storepass:env` / `-keypass:env` forms, so they never
+appear in the process list.
+
+Signing is verified rather than assumed. Each bundle has to verify, carry a
+signature block, and — the part that catches a wrong key — present the same
+certificate the keystore holds under `ANDROID_KEY_ALIAS`. Note that
+`jarsigner -verify` exits 0 on an *unsigned* jar, reporting the verdict in its
+output only, so an exit code alone proves nothing. The certificate's SHA-256
+fingerprint is published in the package's `BUILD-INFO.txt` and in the draft
+release notes, so a download can be checked with
+`keytool -printcert -jarfile <bundle>`.
+
+A missing or wrong secret fails the job rather than falling back to an unsigned
+package, and the check runs before the build so it fails in seconds rather than
+after an hour. The same check runs locally against the four values in the
+environment, without building or signing anything:
+
+```powershell
+$env:ANDROID_KEYSTORE_BASE64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes('release.keystore'))
+$env:ANDROID_KEYSTORE_PASSWORD = '…'; $env:ANDROID_KEY_ALIAS = '…'; $env:ANDROID_KEY_PASSWORD = '…'
+./scripts/sign-android-app-bundles.ps1 -ValidateOnly
+```
+
+Play App Signing, release channels, and versioning are still open — see
+[the roadmap](../ROADMAP.md#a6--android-build-ci-and-delivery). What the pipeline
+signs with today is the key those secrets hold.
 
 ## Non-goals and support boundary
 
