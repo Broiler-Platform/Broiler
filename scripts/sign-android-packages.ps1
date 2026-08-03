@@ -169,17 +169,28 @@ function Invoke-SigningTool {
 function Get-CertificateFingerprint {
     param([Parameter(Mandatory = $true)][AllowEmptyString()][string] $ToolOutput)
 
-    # 'SHA256:' on current JDKs, 'SHA-256:' on older ones, always 32 colon-separated hex bytes.
-    $found = [regex]::Matches($ToolOutput, '(?im)^\s*SHA-?256:\s*((?:[0-9A-F]{2}:){31}[0-9A-F]{2})\s*$')
+    # 'SHA256:' on current JDKs, 'SHA-256:' on older ones, always 32 colon-separated hex bytes. The
+    # end of the line is deliberately unanchored, for the same reason as in Get-ApkSignerDigest: a
+    # tool that one day appends a note to the line should not read as "no fingerprint at all".
+    $found = [regex]::Matches($ToolOutput, '(?im)^\s*SHA-?256:\s*((?:[0-9A-F]{2}:){31}[0-9A-F]{2})')
     return @($found | ForEach-Object { $_.Groups[1].Value.ToUpperInvariant() })
 }
 
 function Get-ApkSignerDigest {
     param([Parameter(Mandatory = $true)][AllowEmptyString()][string] $ToolOutput)
 
-    # apksigner writes the same 32 bytes keytool does, as unseparated lowercase hex:
-    # 'Signer #1 certificate SHA-256 digest: 674f25f7…'.
-    $found = [regex]::Matches($ToolOutput, '(?im)^Signer #\d+ certificate SHA-256 digest:\s*([0-9a-f]{64})\s*$')
+    # apksigner writes the same 32 bytes keytool does, as unseparated lowercase hex — but it labels
+    # the signer in one of two shapes, and only the middle of the line is common to both:
+    #
+    #   Signer #1 certificate SHA-256 digest: 674f25f7…
+    #   Signer (minSdkVersion=33, maxSdkVersion=2147483647) certificate SHA-256 digest: 5daa4d29…
+    #
+    # The second appears when one signer does not cover the whole supported SDK range — a rotated
+    # key, where the previous certificate still signs for older platforms — and carries no number
+    # at all. So anchor on 'certificate SHA-256 digest:' rather than on either label, and leave the
+    # end of the line unanchored so a trailing note cannot hide a digest either. 'public key
+    # SHA-256 digest' lines carry a different value and must not be picked up.
+    $found = [regex]::Matches($ToolOutput, '(?im)^Signer\b[^\r\n]*?\bcertificate SHA-256 digest:\s*([0-9a-f]{64})')
     return @($found | ForEach-Object { $_.Groups[1].Value.ToLowerInvariant() })
 }
 
@@ -352,8 +363,17 @@ $($listing.Output)
                 $JdkLocaleArguments + @('-printcert', '-jarfile', $resolved))
             $signerFingerprints = @(Get-CertificateFingerprint -ToolOutput $signer.Output)
             if ($signerFingerprints -notcontains $fingerprint) {
-                $reported = if ($signerFingerprints.Count -gt 0) { $signerFingerprints -join ', ' } else { '(none)' }
-                throw "$resolved is not signed by '$keyAlias'. Expected certificate $fingerprint, found: $reported."
+                $reported = if ($signerFingerprints.Count -gt 0) { $signerFingerprints -join ', ' } else { '(no certificate fingerprint recognized)' }
+                throw @"
+$resolved is not signed by '$keyAlias'.
+
+  expected certificate : $fingerprint
+  found                : $reported
+
+keytool -printcert -jarfile reported:
+
+$($signer.Output)
+"@
             }
 
             $megabytes = [Math]::Round((Get-Item -LiteralPath $resolved).Length / 1MB, 1)
@@ -411,11 +431,33 @@ $($listing.Output)
             }
 
             # Same certificate check as the bundles, against apksigner's unseparated lowercase
-            # rendering of the same 32 bytes.
+            # rendering of the same 32 bytes. A rotated key legitimately reports more than one
+            # signer — the previous certificate still signs for older platforms — so ours has to be
+            # among them rather than the only one.
             $signerDigests = @(Get-ApkSignerDigest -ToolOutput $verification.Output)
-            if ($signerDigests -notcontains (ConvertTo-ComparableFingerprint -Fingerprint $fingerprint)) {
-                $reported = if ($signerDigests.Count -gt 0) { $signerDigests -join ', ' } else { '(none)' }
-                throw "$resolved is not signed by '$keyAlias'. Expected certificate $fingerprint, found: $reported."
+            $expectedDigest = ConvertTo-ComparableFingerprint -Fingerprint $fingerprint
+
+            # The digest is the evidence; the wording around it is not. If apksigner ever labels a
+            # signer in a shape this parser does not know, fall back to finding the digest anywhere
+            # in the output rather than failing a package that is correctly signed. Thirty-two
+            # bytes do not turn up by accident.
+            $labelled = $signerDigests -contains $expectedDigest
+            if (-not ($labelled -or $verification.Output -match "(?i)\b$expectedDigest\b")) {
+                $reported = if ($signerDigests.Count -gt 0) { $signerDigests -join ', ' } else { '(no certificate digest recognized)' }
+                throw @"
+$resolved is not signed by '$keyAlias'.
+
+  expected certificate : $fingerprint
+  found                : $reported
+
+apksigner verify --print-certs -v reported:
+
+$($verification.Output)
+"@
+            }
+
+            if (-not $labelled) {
+                Write-Host "==> note: apksigner labelled its signers in a shape this script does not parse; matched the certificate digest in the raw output instead. Worth teaching Get-ApkSignerDigest the new shape."
             }
 
             # Which schemes signed it is the point of using apksigner, so it goes in the log:
