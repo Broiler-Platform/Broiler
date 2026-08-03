@@ -1,4 +1,4 @@
-From f783bacfa66d90011c1f753d4d9bee2ff8cbc469 Mon Sep 17 00:00:00 2001
+From 1801b3ca0c2d2155e6db0483f423832cbac0bb44 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Mon, 3 Aug 2026 14:42:03 +0000
 Subject: [PATCH] Make IL emission linear in a scope's binding count
@@ -56,8 +56,8 @@ Claude-Session: https://claude.ai/code/session_01TFeGmVCTWPB5yNvbjDAcNT
  .../LambdaRewriter.cs                         | 162 ++++++-
  .../CompileProfileMetrics.cs                  | 424 ++++++++++++++++++
  .../CompileScalingMetrics.cs                  | 206 +++++++++
- .../Program.cs                                |  24 +-
- 5 files changed, 941 insertions(+), 15 deletions(-)
+ .../Program.cs                                |  12 +
+ 5 files changed, 935 insertions(+), 9 deletions(-)
  create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeclarationDenseSourceTests.cs
  create mode 100644 Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileProfileMetrics.cs
  create mode 100644 Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileScalingMetrics.cs
@@ -1045,28 +1045,9 @@ index 00000000..54dffc2d
 +    private static double Median(List<double> samples) => samples.OrderBy(v => v).ElementAt(1);
 +}
 diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
-index 4d48fda8..bdf15047 100644
+index 4d48fda8..c2e6c9fb 100644
 --- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
 +++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
-@@ -62,12 +62,12 @@ public static class Program
-             return;
-         }
- 
--        if (args.Length == 1 && args[0] == "--deferred-cell-cost")
--        {
--            DeferredCellCostMetrics.Write();
--            return;
--        }
--
-+        if (args.Length == 1 && args[0] == "--deferred-cell-cost")
-+        {
-+            DeferredCellCostMetrics.Write();
-+            return;
-+        }
-+
-         if (args.Length == 2 && args[0] == "--suite-cache-metrics")
-         {
-             SuiteCacheMetrics.Write(args[1]);
 @@ -80,6 +80,18 @@ public static class Program
              return;
          }

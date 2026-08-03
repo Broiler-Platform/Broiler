@@ -1,0 +1,710 @@
+From 53e39d8161c6567b85e225d37a9c49e1f1828e86 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 3 Aug 2026 16:33:37 +0000
+Subject: [PATCH] Generate a nested function's IL on first invocation, not at
+ compile time
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Roadmap item 1-1 (lazy function compilation), taken one layer below where the
+item describes it. The item proposes deferring a function's parse and compile,
+and names four spec-visible risks: a syntax error inside a never-called function
+is still a SyntaxError at compile time; a deferred body must compile against the
+scope as it was at closure creation; a direct eval can introduce bindings into
+enclosing scopes; generator and async bodies are rewritten into state machines.
+Every one of those is a property of the front end, and every one is already
+settled by the time a lambda reaches the emitter — the source is parsed, early
+errors have thrown, LambdaRewriter has boxed the captures, GeneratorRewriter has
+run. What is left is generating machine code for a tree that is already correct.
+
+So only that is deferred. RuntimeMethodBuilder.Relay registers the site instead
+of generating it, and MethodRepository.Create — which runs once per closure
+instantiation — returns a thunk over that instance's boxes. The first invocation
+generates the method, memoized on the shared syntactic site: a function defined
+once and instantiated a million times generates once, and one instantiated once
+and never called generates never. LambdaRewriter.Rewrite stays eager because it
+decides the boxes the creation site references.
+
+Two details are load-bearing and both were found by measuring. Generation runs
+on the calling thread with no CompilationStack handoff: matching what the eager
+path was inside took the repository suite from 3.5 minutes to over 20, at 12%
+CPU, for the reason item 1-2 already recorded about short sources — a fixed
+~180us handoff is unaffordable once per function. It is also unnecessary, since
+ILCodeGenerator derives from StackGuard and segments only when a tree is
+actually deep. And the thunk's warm path is written in IL rather than left to a
+call, because a DynamicMethod does not inline what it calls: calling Resolve()
+unconditionally cost 1.0247x on a call-heavy script, against 1.0009x for an
+inline field read that branches to the slow path only when null.
+
+Compile only, ABBA-interleaved on one build with BROILER_JS_DEFER_IL as the only
+difference, one corpus per process, six pairs per arm: jQuery 587 -> 398 ms
+(0.661x), Box2D 0.636x, PdfJS 0.689x, Closure 0.714x, Mandreel 0.832x,
+allocation 0.52-0.66x throughout. Typescript is 1.034x SLOWER, every pair above
+one, and is not explained — its allocation halves like the rest, so it is not
+GC. Steady state on a script running 6.3M calls is 1.0009x.
+
+A deferred site retains its expression tree until forced, because sites are
+registered under a GCHandle that is never freed; the tree is released the moment
+it is generated. That retention is also what made the first measurement of this
+change wrong: with six corpora in one process the ones measured last paid for
+the ones before them and read 1.6x and 2.6x slower, bimodally. --compile-profile
+now takes a corpus name so each is measured in its own process.
+
+Adds DeferredCompilationTests: ten fixtures putting the item's four named risks
+against the implementation. Repository suite 7 640 tests, 0 failures.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01TFeGmVCTWPB5yNvbjDAcNT
+---
+ .../DeferredCompilationTests.cs               | 192 +++++++++++
+ .../Runtime/DeferredMethod.cs                 | 302 ++++++++++++++++++
+ .../Runtime/MethodRepository.cs               |  31 +-
+ .../Runtime/RuntimeMethodBuilder.cs           |  21 +-
+ .../CompileProfileMetrics.cs                  |  11 +-
+ .../Program.cs                                |   5 +-
+ 6 files changed, 556 insertions(+), 6 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredCompilationTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/DeferredMethod.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredCompilationTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredCompilationTests.cs
+new file mode 100644
+index 00000000..2fb6dce4
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredCompilationTests.cs
+@@ -0,0 +1,192 @@
++using System.Collections.Generic;
++using System.Linq;
++using System.Text;
++using System.Threading.Tasks;
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++/// <summary>
++/// Fixtures for roadmap item 1-1: a nested function's IL is generated on first invocation
++/// rather than while its enclosing lambda is emitted.
++/// </summary>
++/// <remarks>
++/// <para>
++/// The item names four spec-visible risks for deferring a function — early errors, scope
++/// capture, direct <c>eval</c>, and generator/async bodies. Deferring <em>IL generation</em>
++/// rather than parse-and-compile is supposed to make all four vacuous, because each is settled
++/// by the front end and the front end still runs eagerly. "Supposed to" is the reason these
++/// exist: the claim is that a deferred function behaves identically, and a claim about
++/// behaviour is a test.
++/// </para>
++/// <para>
++/// None of these toggles <c>DeferredMethodCompilation.Enabled</c>. It is a process-wide static
++/// and xUnit runs classes in parallel, so a test that flipped it would change what every other
++/// test in the run was measuring — the same reason item 1-2's guard-alone row is a manual
++/// result. They assert behaviour under the shipped default instead.
++/// </para>
++/// </remarks>
++public class DeferredCompilationTests
++{
++    [Fact]
++    public void SyntaxErrorInNeverCalledFunction_StillThrowsAtCompileTime()
++    {
++        // The item's first risk. Nothing here is ever called, so if the error surfaced at
++        // invocation instead of at compile time this would return normally.
++        using var context = new JSContext();
++        Assert.ThrowsAny<System.Exception>(
++            () => context.Eval("function never() { var 1invalid = 2; } 'reached';"));
++    }
++
++    [Fact]
++    public void DeferredFunctionCapturesItsOwnInstanceOfALoopBinding()
++    {
++        // Generation is memoized per syntactic site and the boxes are captured per closure
++        // instance. Sharing the wrong one is the failure this pins: every closure would report
++        // the last iteration's value.
++        const string source = """
++            var fns = [];
++            for (let i = 0; i < 5; i++) fns.push(function () { return i * 10; });
++            fns.map(function (f) { return f(); }).join(',');
++            """;
++
++        using var context = new JSContext();
++        Assert.Equal("0,10,20,30,40", context.Eval(source).ToString());
++    }
++
++    [Fact]
++    public void DeferredFunctionSeesLaterWritesToACapturedBinding()
++    {
++        // A capture is by cell, not by value, and the cell is bound at closure creation while
++        // the code that reads it is generated later. Reading the value at generation time
++        // instead would freeze it at whatever it was on first call.
++        const string source = """
++            var x = 1;
++            function read() { return x; }
++            var before = read();
++            x = 2;
++            var after = read();
++            before + '/' + after;
++            """;
++
++        using var context = new JSContext();
++        Assert.Equal("1/2", context.Eval(source).ToString());
++    }
++
++    [Fact]
++    public void RecursionThroughADeferredFunctionTerminates()
++    {
++        // The first call generates the method and only then runs the body, which calls the same
++        // function again — re-entering the thunk while the outer resolve is still on the stack.
++        using var context = new JSContext();
++        Assert.Equal(
++            120,
++            context.Eval("function fact(n) { return n <= 1 ? 1 : n * fact(n - 1); } fact(5);")
++                .DoubleValue);
++    }
++
++    [Fact]
++    public void MutuallyRecursiveDeferredFunctionsTerminate()
++    {
++        // Two sites, each first-called from inside the other's first call. Generation is under
++        // a per-site lock, so a shared or reentrant lock would deadlock here rather than fail.
++        const string source = """
++            function isEven(n) { return n === 0 ? true : isOdd(n - 1); }
++            function isOdd(n) { return n === 0 ? false : isEven(n - 1); }
++            isEven(10) + '/' + isOdd(10);
++            """;
++
++        using var context = new JSContext();
++        Assert.Equal("true/false", context.Eval(source).ToString());
++    }
++
++    [Fact]
++    public void DirectEvalInsideADeferredFunctionSeesItsScope()
++    {
++        // The item's third risk. A direct eval resolves names against the enclosing activation
++        // at run time, which is established by the front end and by the closure rewrite — both
++        // of which still happen eagerly.
++        const string source = """
++            function outer(a) { var b = a + 1; return eval('a + b'); }
++            outer(4);
++            """;
++
++        using var context = new JSContext();
++        Assert.Equal(9, context.Eval(source).DoubleValue);
++    }
++
++    [Fact]
++    public void DeferredGeneratorAndAsyncBodiesRun()
++    {
++        // The item's fourth risk. A generator body is rewritten into a state machine before it
++        // ever reaches the emitter, so deferring the emitter cannot see the difference — but
++        // the rewritten lambda is a different shape, which is exactly why it is worth running.
++        const string source = """
++            function* count() { yield 1; yield 2; yield 3; }
++            var total = 0;
++            for (var v of count()) total += v;
++            total;
++            """;
++
++        using var context = new JSContext();
++        Assert.Equal(6, context.Eval(source).DoubleValue);
++    }
++
++    [Fact]
++    public void ManyInstancesOfOneSiteKeepDistinctCaptures()
++    {
++        // One site, many closure instances: generation happens once and is shared, the boxes do
++        // not. A thunk that memoized the resolved delegate on the SITE rather than on the
++        // instance would give every counter the first one's state and this would read all 1s.
++        const string source = """
++            function makeCounter(start) { return function () { return start++; }; }
++            var counters = [];
++            for (var i = 0; i < 100; i++) counters.push(makeCounter(i));
++            var sum = 0;
++            for (var i = 0; i < 100; i++) sum += counters[i]();
++            sum;
++            """;
++
++        using var context = new JSContext();
++        Assert.Equal(4950, context.Eval(source).DoubleValue);
++    }
++
++    [Fact]
++    public void ConcurrentFirstCallsOfOneSiteAgree()
++    {
++        // Generation is guarded and resolution deliberately is not — two threads racing to
++        // resolve the same instance both produce a delegate over the same generated method and
++        // the same boxes, so the loser's copy is equivalent. This is what says "equivalent" is
++        // true rather than assumed. Each context is its own engine, so the shared thing under
++        // test is the process-wide generation path, not the contexts.
++        const string source = """
++            function work(n) { var s = 0; for (var i = 0; i < n; i++) s += i; return s; }
++            work(1000);
++            """;
++
++        var results = new double[8];
++        Parallel.For(0, results.Length, i =>
++        {
++            using var context = new JSContext();
++            results[i] = context.Eval(source).DoubleValue;
++        });
++
++        Assert.All(results, r => Assert.Equal(499500, r));
++    }
++
++    [Fact]
++    public void ADeferredFunctionThatIsNeverCalledDoesNotAffectTheRest()
++    {
++        // The shape the whole item is for: thousands of definitions, almost none invoked. It
++        // asserts the answer rather than a time, because the timing claim belongs in the
++        // roadmap where it can carry its control; what a fixture can pin is that skipping
++        // generation for the other 999 changed nothing about the one that runs.
++        var source = new StringBuilder(1_000 * 40 + 64);
++        for (var i = 0; i < 1_000; i++)
++            source.Append("function unused").Append(i).Append("(a){return a*").Append(i).Append(";}\n");
++        source.Append("function used(a){return a+1;} used(41);");
++
++        using var context = new JSContext();
++        Assert.Equal(42, context.Eval(source.ToString()).DoubleValue);
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/DeferredMethod.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/DeferredMethod.cs
+new file mode 100644
+index 00000000..3afbe047
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/DeferredMethod.cs
+@@ -0,0 +1,302 @@
++using System;
++using System.Collections.Generic;
++using System.Reflection;
++using System.Reflection.Emit;
++using System.Threading;
++using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
++using Broiler.JavaScript.ExpressionCompiler.Expressions;
++
++namespace Broiler.JavaScript.ExpressionCompiler.Runtime;
++
++/// <summary>
++/// A nested lambda whose IL has not been generated yet, and the thunk that generates it on
++/// first invocation.
++/// </summary>
++/// <remarks>
++/// <para>
++/// This is roadmap item 1-1 (lazy function compilation), placed one layer lower than the item
++/// describes it. The item proposes deferring a function's <em>parse and compile</em> and names
++/// four spec-visible risks for doing so — early errors inside a never-called function are still
++/// syntax errors, a deferred body must compile against the scope as it was at closure creation,
++/// a direct <c>eval</c> can introduce bindings into enclosing scopes, and generator/async bodies
++/// are rewritten into state machines. Every one of those is a property of the front end, and
++/// every one of them is <em>already settled</em> by the time a lambda reaches here: the source
++/// is parsed, early errors have thrown, <see cref="LambdaRewriter"/> has decided which variables
++/// are captured and boxed them, and <c>GeneratorRewriter</c> has run. What is left is generating
++/// machine code for a tree that is already correct — and on function-dense source that is
++/// <b>89%</b> of front-end cost (parse 0.5%, expression-tree construction 11%).
++/// </para>
++/// <para>
++/// So the deferral is of IL generation alone. It is bounded by construction: the deferred work
++/// cannot observe anything, cannot fail differently for any input the eager path accepts, and
++/// produces byte-identical IL, because it is the same call on the same tree — only later.
++/// </para>
++/// <para>
++/// The unit is the <em>syntactic site</em>, not the closure instance. <c>Relay</c> runs once per
++/// nested lambda while the enclosing lambda is emitted, and <c>Create</c> runs once per closure
++/// instantiation; generation is memoized on the shared site while each instance still binds its
++/// own boxes. A function defined once and instantiated a million times generates once, and a
++/// function instantiated once and never called generates never.
++/// </para>
++/// </remarks>
++internal sealed class DeferredMethod
++{
++    private readonly bool enableJavaScriptTailCalls;
++    private readonly object gate = new();
++
++    /// <summary>
++    /// The delegate type this site produces. Held separately from <see cref="lambda"/> because
++    /// the tree is released once the code exists and this outlives it.
++    /// </summary>
++    private readonly Type delegateType;
++
++    // Cleared by Force. A site is registered under a GCHandle that is never freed, so anything
++    // still referenced here is retained for the life of the process: eagerly that is a
++    // DynamicMethod, and while deferred it is the whole expression tree, which is far larger.
++    // Keeping them past generation would turn every compiled script into a permanent copy of
++    // its own tree — measurably, on a probe that compiles six corpora in one process, the
++    // corpora measured last paid for the ones before them.
++    private BLambdaExpression lambda;
++    private IMethodBuilder methodBuilder;
++
++    private DynamicMethod method;
++
++    public DeferredMethod(
++        BLambdaExpression lambda,
++        IMethodBuilder methodBuilder,
++        bool enableJavaScriptTailCalls)
++    {
++        this.lambda = lambda;
++        this.delegateType = lambda.Type;
++        this.methodBuilder = methodBuilder;
++        this.enableJavaScriptTailCalls = enableJavaScriptTailCalls;
++    }
++
++    /// <summary>
++    /// The generated method, generating it if this is the first caller.
++    /// </summary>
++    /// <remarks>
++    /// Locked rather than <see cref="Lazy{T}"/> so the generation of a nested site that this
++    /// one's own emission triggers cannot deadlock against it: the lock is per site and
++    /// generation of a site never re-enters that same site.
++    /// </remarks>
++    public DynamicMethod Force()
++    {
++        var generated = Volatile.Read(ref method);
++        if (generated != null)
++            return generated;
++
++        lock (gate)
++        {
++            generated = method;
++            if (generated != null)
++                return generated;
++
++            // Generated on the calling thread, with no stack handoff. The emitter recurses over
++            // the tree and eagerly ran inside the enclosing compilation's single
++            // CompilationStack crossing, so hopping to a sized worker here looks like the
++            // matching thing to do — and it is the wrong thing, for the reason item 1-2 already
++            // recorded about short sources: the handoff is a fixed ~180 us, which is nothing
++            // against one whole-script compilation and unaffordable once per function. Doing it
++            // took the repository suite from 3.5 minutes to over 20, at 12% CPU — blocked, not
++            // working.
++            //
++            // It is also unnecessary. ILCodeGenerator derives from StackGuard, which measures
++            // consumed stack and segments onto a fresh one only when a tree is actually deep
++            // enough to need it. That is the mechanism 1-2 built for exactly this, and it costs
++            // nothing on the shallow trees that are almost all of them.
++            var (emitted, _, _) = lambda.CompileToBoundDynamicMethod(
++                methodBuilder: methodBuilder,
++                captureDiagnostics: false,
++                enableJavaScriptTailCalls: enableJavaScriptTailCalls);
++
++            Volatile.Write(ref method, emitted);
++            // Released here so a forced site retains exactly what an eagerly generated one
++            // does, and no more.
++            lambda = null;
++            methodBuilder = null;
++            return emitted;
++        }
++    }
++
++    /// <summary>
++    /// One closure instance of a deferred site: the boxes captured when the closure was
++    /// created, plus the real delegate once it exists.
++    /// </summary>
++    /// <remarks>
++    /// The instance is what the thunk delegate is bound to, so <see cref="Resolve"/> is on the
++    /// call path of every invocation of a deferred function — a field read and a null test once
++    /// warm. It is deliberately not virtual and not locked: two threads racing to resolve the
++    /// same instance both produce a delegate over the same generated method and the same boxes,
++    /// so the loser's copy is equivalent and discarded.
++    /// </remarks>
++    public sealed class Instance(DeferredMethod site, IMethodRepository repository, Box[] boxes)
++    {
++        internal static readonly MethodInfo ResolveMethod =
++            typeof(Instance).GetMethod(nameof(Resolve), BindingFlags.Public | BindingFlags.Instance);
++
++        internal static readonly FieldInfo ResolvedField =
++            typeof(Instance).GetField(nameof(resolved), BindingFlags.NonPublic | BindingFlags.Instance);
++
++        private Delegate resolved;
++
++        public Delegate Resolve()
++        {
++            var current = Volatile.Read(ref resolved);
++            if (current != null)
++                return current;
++
++            var created = site.Force().CreateDelegate(
++                site.delegateType,
++                new Closures(repository, boxes, string.Empty, string.Empty));
++            Volatile.Write(ref resolved, created);
++            return created;
++        }
++    }
++
++    public Delegate CreateThunk(IMethodRepository repository, Box[] boxes)
++        => ThunkFactory.For(delegateType).CreateDelegate(delegateType, new Instance(this, repository, boxes));
++
++    /// <summary>
++    /// Builds, once per delegate type in the process, a stub method with that delegate's exact
++    /// signature which resolves its instance and forwards to the real delegate.
++    /// </summary>
++    /// <remarks>
++    /// A stub has to be generated rather than written in C# because the signature is not known
++    /// here — this assembly is a leaf and cannot name <c>JSFunctionDelegate</c>, and the
++    /// parameter it takes is a by-ref struct, so no <c>Func&lt;&gt;</c> shape covers it. Keying
++    /// the cache on the delegate type rather than the site is what keeps this from being the
++    /// cost it is avoiding: jQuery's 532 deferred functions share one stub, and the per-instance
++    /// price is the same single <c>CreateDelegate</c> the eager path already paid.
++    /// </remarks>
++    private static class ThunkFactory
++    {
++        private static readonly Dictionary<Type, DynamicMethod> cache = [];
++
++        public static DynamicMethod For(Type delegateType)
++        {
++            lock (cache)
++            {
++                if (cache.TryGetValue(delegateType, out var existing))
++                    return existing;
++
++                var built = Build(delegateType);
++                cache[delegateType] = built;
++                return built;
++            }
++        }
++
++        /// <summary>
++        /// Whether a delegate type can be forwarded by a generated stub. Everything a stub has
++        /// to do is load its arguments in order and call <c>Invoke</c>, which works for any
++        /// signature <see cref="DynamicMethod"/> accepts — including the by-ref <c>in</c>
++        /// parameter every JavaScript function takes.
++        /// </summary>
++        public static bool CanForward(Type delegateType)
++            => delegateType != null
++                && typeof(Delegate).IsAssignableFrom(delegateType)
++                && delegateType.GetMethod("Invoke") != null;
++
++        private static DynamicMethod Build(Type delegateType)
++        {
++            var invoke = delegateType.GetMethod("Invoke");
++            var parameters = invoke.GetParameters();
++            var parameterTypes = new Type[parameters.Length + 1];
++            // Bound to an Instance, so the stub takes it as its leading (closed-over) argument.
++            parameterTypes[0] = typeof(Instance);
++            for (var i = 0; i < parameters.Length; i++)
++                parameterTypes[i + 1] = parameters[i].ParameterType;
++
++            var stub = new DynamicMethod(
++                "<deferred-thunk>" + delegateType.Name,
++                invoke.ReturnType,
++                parameterTypes,
++                typeof(Instance),
++                true);
++
++            var il = stub.GetILGenerator();
++
++            // The warm path is written out here rather than left to a call, because this stub is
++            // on every invocation of every deferred function forever and a DynamicMethod does
++            // not inline what it calls. Reading the field inline and branching to the slow path
++            // only when it is null took the steady-state cost of the whole mechanism from ~2.5%
++            // to what is measured in the roadmap; calling Resolve() unconditionally is the same
++            // logic and a real regression on call-heavy code.
++            //
++            // The field is private and the stub is emitted with skipVisibility, which is what
++            // makes reading it directly legal. A plain (non-volatile) read is correct: the
++            // publishing write is volatile, and the only way to observe a stale null is to take
++            // the slow path, which returns the same delegate.
++            var slow = il.DefineLabel();
++            il.Emit(OpCodes.Ldarg_0);
++            il.Emit(OpCodes.Ldfld, Instance.ResolvedField);
++            il.Emit(OpCodes.Dup);
++            il.Emit(OpCodes.Brfalse_S, slow);
++
++            EmitForward(il, delegateType, invoke, parameters.Length);
++
++            il.MarkLabel(slow);
++            il.Emit(OpCodes.Pop);
++            il.Emit(OpCodes.Ldarg_0);
++            il.Emit(OpCodes.Call, Instance.ResolveMethod);
++            EmitForward(il, delegateType, invoke, parameters.Length);
++
++            return stub;
++        }
++
++        private static void EmitForward(ILGenerator il, Type delegateType, MethodInfo invoke, int parameterCount)
++        {
++            il.Emit(OpCodes.Castclass, delegateType);
++            for (var i = 0; i < parameterCount; i++)
++                il.Emit(OpCodes.Ldarg, i + 1);
++            il.Emit(OpCodes.Callvirt, invoke);
++            il.Emit(OpCodes.Ret);
++        }
++    }
++
++    /// <summary>
++    /// Whether <paramref name="lambda"/> may have its IL generation deferred.
++    /// </summary>
++    public static bool CanDefer(BLambdaExpression lambda, bool captureDiagnostics)
++        // Two separate diagnostic switches, and both have to turn deferral off. CaptureDiagnostics
++        // collects the IL and expression text during generation and hands it to the Closures the
++        // delegate is bound to, so a deferred site would have none to give at the moment it is
++        // asked. ILCodeGenerator.GenerateLogs — what BROILER_GENERATE_IL_LOGS sets — is a
++        // different field on a different object, and deferral would reorder and delay the log it
++        // writes, which is the opposite of what someone reading that log wants.
++        => !captureDiagnostics
++            && !Generator.ILCodeGenerator.GenerateLogs
++            && DeferredMethodCompilation.Enabled
++            && ThunkFactory.CanForward(lambda?.Type);
++}
++
++/// <summary>
++/// Process-wide switch for item 1-1's deferred IL generation.
++/// </summary>
++/// <remarks>
++/// Present for the same reason <c>BROILER_JS_COMPILE_STACK_BYTES</c> and
++/// <c>BROILER_JS_REWRITER_INDEX_THRESHOLD</c> are: the change has a losing side — a function
++/// that <em>is</em> called pays one extra delegate hop on every invocation forever — so it has
++/// to be measurable against a build that differs in nothing else.
++/// </remarks>
++public static class DeferredMethodCompilation
++{
++    public const string EnvironmentVariable = "BROILER_JS_DEFER_IL";
++
++    private static int enabled = ReadConfigured();
++
++    /// <summary>Whether nested-lambda IL generation is deferred to first invocation.</summary>
++    public static bool Enabled
++    {
++        get => Volatile.Read(ref enabled) != 0;
++        set => Volatile.Write(ref enabled, value ? 1 : 0);
++    }
++
++    private static int ReadConfigured()
++        => string.Equals(
++            Environment.GetEnvironmentVariable(EnvironmentVariable),
++            "0",
++            StringComparison.Ordinal)
++            ? 0
++            : 1;
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/MethodRepository.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/MethodRepository.cs
+index e7e16353..0437acf2 100644
+--- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/MethodRepository.cs
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/MethodRepository.cs
+@@ -20,11 +20,17 @@ public class MethodRepository : IMethodRepository
+         public string IL;
+         public string Exp;
+         public Type Type;
++
++        /// <summary>
++        /// Set instead of <see cref="Method"/> when this site's IL generation was deferred to
++        /// first invocation (roadmap item 1-1). Exactly one of the two is ever non-null.
++        /// </summary>
++        internal DeferredMethod Deferred;
+     }
+ 
+     public ulong RegisterNew(DynamicMethod d, string il, string exp, Type type)
+     {
+-        var x = GCHandle.Alloc(new RuntimeMethod { 
++        var x = GCHandle.Alloc(new RuntimeMethod {
+             Method = d,
+             IL = il,
+             Exp = exp,
+@@ -33,9 +39,32 @@ public class MethodRepository : IMethodRepository
+         return (ulong)(IntPtr)x;
+     }
+ 
++    /// <summary>
++    /// Registers a site whose IL has not been generated, returning the same kind of handle
++    /// <see cref="RegisterNew"/> does so the creation site emitted for it is unchanged.
++    /// </summary>
++    internal ulong RegisterDeferred(DeferredMethod deferred, Type type)
++    {
++        var x = GCHandle.Alloc(new RuntimeMethod
++        {
++            Deferred = deferred,
++            IL = string.Empty,
++            Exp = string.Empty,
++            Type = type
++        });
++        return (ulong)(IntPtr)x;
++    }
++
+     public object Create(Box[] boxes, ulong id)
+     {
+         var rm = GCHandle.FromIntPtr((IntPtr)id).Target as RuntimeMethod;
++        // A deferred site hands back a thunk over this instance's boxes; the boxes are captured
++        // here, at closure creation, exactly as they are for a generated one. What is postponed
++        // is the machine code, which is shared by every instance of the site and belongs to
++        // none of them.
++        if (rm.Deferred != null)
++            return rm.Deferred.CreateThunk(this, boxes);
++
+         var c = new Closures(this, boxes, rm.IL, rm.Exp);
+         return rm.Method.CreateDelegate(rm.Type, c);
+     }
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs
+index ae8f9877..6bf06462 100644
+--- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs
+@@ -19,13 +19,28 @@ public class RuntimeMethodBuilder(
+ 
+     public BExpression Relay(BExpression @this, IFastEnumerable<BExpression> closures, BLambdaExpression innerLambda)
+     {
++        // Stays eager, and must: it decides which variables this lambda captures and boxes
++        // them, and the boxes are referenced by the creation-site expression built below. Only
++        // what comes after it — generating the machine code — is deferrable (item 1-1).
+         LambdaRewriter.Rewrite(innerLambda);
++
++        var repository = BExpression.Field(@this, Closures.repositoryField);
++        var id = methods is MethodRepository runtimeMethods
++            && DeferredMethod.CanDefer(innerLambda, captureDiagnostics)
++            ? runtimeMethods.RegisterDeferred(
++                new DeferredMethod(innerLambda, this, enableJavaScriptTailCalls),
++                innerLambda.Type)
++            : RegisterGenerated(innerLambda);
++
++        return BExpression.Call(repository, create, closures == null ? BExpression.Null : BExpression.NewArray(typeof(Box), closures), BExpression.Constant(id));
++    }
++
++    private ulong RegisterGenerated(BLambdaExpression innerLambda)
++    {
+         var (method, il, exp) = innerLambda.CompileToBoundDynamicMethod(
+             methodBuilder: this,
+             captureDiagnostics: captureDiagnostics,
+             enableJavaScriptTailCalls: enableJavaScriptTailCalls);
+-        var repository = BExpression.Field(@this, Closures.repositoryField);
+-        var id = methods.RegisterNew(method, il, exp, innerLambda.Type);
+-        return BExpression.Call(repository, create, closures == null ? BExpression.Null : BExpression.NewArray(typeof(Box), closures), BExpression.Constant(id));
++        return methods.RegisterNew(method, il, exp, innerLambda.Type);
+     }
+ }
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileProfileMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileProfileMetrics.cs
+index ca17adfe..9f3506c6 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileProfileMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileProfileMetrics.cs
+@@ -58,9 +58,18 @@ namespace Broiler.JavaScript.Engine.Benchmarks;
+ /// </remarks>
+ internal static class CompileProfileMetrics
+ {
+-    public static void Write(string octaneDirectory, int repetitions)
++    public static void Write(string octaneDirectory, int repetitions, string only = null)
+     {
+         var corpora = LoadCorpora(octaneDirectory);
++        // One corpus per process is how a comparison of two *compilers* is run, because the
++        // corpora share a heap: item 1-1's deferred generation keeps an un-generated lambda's
++        // tree alive, so a corpus measured after Mandreel's 5 MB pays for it in collection time
++        // that has nothing to do with its own compile. Measured together, the last two corpora
++        // read 1.6x and 2.6x SLOWER under deferral while the first three read 0.56-0.65x
++        // faster, and the ratios were bimodal — the tell that it was ordering, not the change.
++        if (!string.IsNullOrEmpty(only))
++            corpora = corpora.Where(c => c.Name == only).ToList();
++
+         var rows = new List<object>(corpora.Count);
+ 
+         foreach (var corpus in corpora)
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+index c2e6c9fb..b8cfffd7 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+@@ -88,7 +88,10 @@ public static class Program
+ 
+         if (args.Length >= 2 && args[0] == "--compile-profile")
+         {
+-            CompileProfileMetrics.Write(args[1], args.Length >= 3 ? int.Parse(args[2]) : 3);
++            CompileProfileMetrics.Write(
++                args[1],
++                args.Length >= 3 ? int.Parse(args[2]) : 3,
++                args.Length >= 4 ? args[3] : null);
+             return;
+         }
+ 
+-- 
+2.43.0
+

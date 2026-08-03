@@ -40,7 +40,13 @@ so only the parent can hold the combined view.
   its section was measured on a local build of the then-current pin `79c6ff23` with and without
   that one patch — both arms from the same tree, interleaved. It touches
   `Broiler.JavaScript.ExpressionCompiler`, which none of `0059`–`0064` do, so it applies in any
-  order relative to them.
+  order relative to them. **Item 1-1's emission half is
+  [`patches/0066`](../patches/0066-js-defer-nested-lambda-il.patch), which must be applied after
+  `0065`** — it edits a file `0065` creates — and its figures were taken the same way, one build
+  with `BROILER_JS_DEFER_IL` as the only difference. Both were verified to apply with `git am`
+  against the pinned pointer from a clean clone, not merely with `git apply`: the two differ, and
+  the first version of `0065` passed `apply` and failed `am` on a line-ending change that the
+  README's own instructions would have hit.
   `a6f101cc` — which this section named until 3-3
   was worked, and which every §0 and phase-2 measurement below was taken at — is an **ancestor**
   of it (`merge-base --is-ancestor`), so nothing recorded here is invalidated;
@@ -78,7 +84,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | Phase | State |
 |---|---|
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is still the critical path, but its headline question is answered**: run at the pinned pointer on linux-x64, Octane is **15 of 15 suites `ok` and 17 of 17 scores** — Mandreel included, which the previous local pass had failing. Geomean 217, spread **113×** against a same-machine Chromium reference. What 0-6 still owes is the *workflow* run plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce |
-| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting. **New: 1-4 ✅.** Measuring 1-1's premise found the phase's actual dominant cost, and it was not lazy compilation: the closure rewrite held a lambda's in-scope bindings in a `List` and asked it `Contains` per parameter reference, so **emission was quadratic in a scope's binding count** — 2 000 top-level declarations emitted in 13 865 ms against 2.5 ms of parse. A reference-keyed multiset (list-backed below 32 bindings) makes it linear: **28.5× on that shape, and 3.04× on Mandreel end-to-end**, ABBA-interleaved, six pairs. **1-1 is still open and its premise now has a number** — 92–96% of compile time is function bodies on the large real programs — but the measurement also **splits phase 1 in two and re-targets 1-1**: Mandreel was *wide*, not deep, and never was a 1-1 case, while jQuery at 96.5% deferrable is the whole of it. 1-1 is a CodeLoad and page-load item, and its remaining sub-project is a **capture mechanism** — this engine cannot bake a captured cell into compiled code (`EmitConstant` refuses reference types), so a deferred body has nothing to compile against |
+| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting. **New: 1-4 ✅.** Measuring 1-1's premise found the phase's actual dominant cost, and it was not lazy compilation: the closure rewrite held a lambda's in-scope bindings in a `List` and asked it `Contains` per parameter reference, so **emission was quadratic in a scope's binding count** — 2 000 top-level declarations emitted in 13 865 ms against 2.5 ms of parse. A reference-keyed multiset (list-backed below 32 bindings) makes it linear: **28.5× on that shape, and 3.04× on Mandreel end-to-end**, ABBA-interleaved, six pairs. **1-1 is still open and its premise now has a number** — 92–96% of compile time is function bodies on the large real programs — but the measurement also **splits phase 1 in two and re-targets 1-1**: Mandreel was *wide*, not deep, and never was a 1-1 case, while jQuery at 96.5% deferrable is the whole of it. **1-1's emission half then landed without needing the capture mechanism at all**: every risk the item names is settled by the front end, so deferring *IL generation* to first invocation is the same prize with none of them — **jQuery 0.661×, Box2D 0.636×, PdfJS 0.689× on compile, allocation ~0.52× across the board, and 1.0009× steady state**. Two mistakes were caught by measuring: a stack handoff per deferred function took the suite from 3.5 to 20 minutes, and a thunk that *called* its resolve cost 1.0247% on call-heavy code until the warm path was written in IL. Typescript is 1.034× slower and unexplained. What remains is the parse and tree construction, which on real source is the larger half |
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. Then **2-12** found why the misses that remained could never heal: the cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — **77.7% of DeltaBlue's misses**. Refreshing in place takes **DeltaBlue's read hit rate to 93.16%** (65.96% before both fixes) and Box2D's to 98.83%. **DeltaBlue still fails the gate at 447×**, but the cache is no longer the reason, and what remains is not property-cache-shaped Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
 | **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
@@ -1100,10 +1106,15 @@ Octane: **this is page-load time.**
 Owner assemblies: `Broiler.JavaScript.Parser`, `.Compiler`, `.BuiltIns` — **and
 `.ExpressionCompiler`, which 1-4 adds and which is where the phase's cost turned out to
 be.** The three-way split the phase was told to take (B4) now exists as `--compile-scaling`,
-and on function-dense source it reads **parse ≈ 0.5%, expression-tree construction ≈ 11%,
-IL emission ≈ 89%**. Every item here should be read against that: an item that does not
-reduce what reaches the emitter, or what the emitter does per unit reaching it, is working
-on the 11%.
+and on **2 000 synthetic top-level declarations** it reads **parse ≈ 0.5%, expression-tree
+construction ≈ 11%, IL emission ≈ 89%**.
+
+**That split is a fact about that shape, and 1-1 established it does not carry over.** On the
+real corpora, removing every nested function body's IL generation removes only **17–36%** of
+compile time, so tree construction is a far larger share of a real program than of a wall of
+stubs — the synthetic shape has almost no tree to build. Both numbers are useful and neither
+generalizes: use the synthetic one for machine-generated declaration walls (Mandreel) and the
+corpus one for everything else.
 
 **The phase splits in two, and the split is not the one the items are numbered by.**
 Mandreel and CodeLoad were paired throughout as "the front end", and they fail for
@@ -1111,7 +1122,7 @@ unrelated reasons: Mandreel is **wide** (1 364 top-level declarations in one sco
 was quadratic — 1-4, landed, 3.04×) and jQuery is **deep** (532 functions nested in one
 IIFE, 96.5% of its compile in bodies that are never called — 1-1, open).
 
-### 1-1 · Lazy function compilation — *the single highest-leverage item*
+### 1-1 · Lazy function compilation — **the emission half landed; re-specified by measurement**
 
 **Target.** CodeLoad and MandreelLatency are *designed* so this is the dominant term —
 jQuery defines thousands of functions and calls almost none of them. A large multiple
@@ -1191,6 +1202,98 @@ regression for anything hot. Baking the cells in as constants is not available:
 `ILGeneratorExtensions.EmitConstant` throws `NotSupportedException` for any reference type
 that is not a `string`, `Type` or `MethodInfo`. **So the sub-project inside this item is a
 capture mechanism, not a pre-parser** — the pre-parser is the part that already exists.
+
+#### What landed: defer the *emission*, not the compilation
+
+**The capture mechanism was not built, and the item's win was taken without it.** The four
+risks above are all properties of the **front end**, and they are all settled before a
+function reaches the emitter: the source is parsed, early errors have thrown,
+`LambdaRewriter` has decided which variables are captured and boxed them, and
+`GeneratorRewriter` has run. What is left at that point is generating machine code for a tree
+that is already correct. **Deferring that is the same prize with none of the risk** — a
+deferred site cannot observe anything, cannot fail differently on any input the eager path
+accepts, and produces byte-identical IL, because it is the same call on the same tree, later.
+
+**Where.** `RuntimeMethodBuilder.Relay` generated each nested lambda's `DynamicMethod` while
+emitting its enclosing lambda. It now registers the site instead
+(`MethodRepository.RegisterDeferred`), and `Create` — which runs once per *closure
+instantiation* — hands back a thunk over that instance's boxes. The first invocation
+generates the method, memoized on the shared site; a function defined once and instantiated a
+million times generates once, and one instantiated once and never called generates never.
+`LambdaRewriter.Rewrite` stays eager and must: it decides the boxes the creation site
+references.
+
+**Two things had to be got right, and both were found by measuring rather than by reading.**
+
+- **No stack handoff.** Wrapping generation in `CompilationStack.RunOnFreshStack` — matching
+  what the eager path was inside — took the repository suite from 3.5 minutes to **over 20, at
+  12% CPU**: blocked, not working. It is 1-2's own lesson about short sources, applied at the
+  wrong granularity: a fixed ~180 µs handoff is nothing against one whole-script compilation
+  and unaffordable once per function. It is also unnecessary, because `ILCodeGenerator` derives
+  from `StackGuard` and segments onto a fresh stack only when a tree is actually deep enough.
+- **The thunk's warm path is written in IL, not called.** A `DynamicMethod` does not inline
+  what it calls, so a thunk that called `Instance.Resolve()` unconditionally cost **1.0247×**
+  on a call-heavy script — a real regression on every deferred function that is ever invoked.
+  Reading the field inline and branching to the slow path only when it is null takes that to
+  **1.0009×**, with pairs straddling 1 in both directions.
+
+**Result.** Compile only (the corpus is compiled and never invoked, which is CodeLoad's shape),
+ABBA-interleaved on one build with `BROILER_JS_DEFER_IL` as the only difference, **one corpus
+per process**, six pairs per arm:
+
+| Corpus | Functions | Eager | Deferred | Time | Allocation |
+|---|--:|--:|--:|--:|--:|
+| **codeload-jquery** | 532 | 587 ms | **398 ms** | **0.661×** | **0.518×** |
+| box2d | 982 | 914 ms | 581 ms | 0.636× | 0.553× |
+| pdfjs | 949 | 1 607 ms | 1 107 ms | 0.689× | 0.549× |
+| codeload-closure | 57 | 51 ms | 37 ms | 0.714× | 0.657× |
+| mandreel | 1 476 | 7 115 ms | 5 923 ms | 0.832× | 0.544× |
+| typescript | 1 763 | 1 657 ms | 1 805 ms | **1.034×** | 0.516× |
+
+Steady state — a script that compiles *and* runs 6.3 M calls across three shapes — is
+**1.0009×** by median paired ratio. So the change is free where it does not help.
+
+**Three honest qualifications, and the first corrects something this document said.**
+
+1. **"Emission is 89%" is true of the synthetic shape and not of these corpora.** That figure
+   comes from `--compile-scaling`'s top-level declarations, where a lambda is a stub and almost
+   all the work is emitting it. On the real corpora, deferring every nested body removes
+   **17–36%** of total compile time (jQuery 32%, Box2D 36%, PdfJS 31%, Closure 29%, Mandreel
+   17%) — so on real source, expression-tree construction is a far larger share than 11%. The
+   phase-level claim above has been qualified accordingly; *a split measured on one shape is a
+   fact about that shape.*
+2. **Typescript is consistently slower and it is not explained.** 1.034× on the final build,
+   every one of six pairs above 1 (1.004–1.077), while its allocation halves like everything
+   else's. It is not GC — allocation moves the same 0.52× as the corpora that gain. It is
+   recorded rather than explained, because a plausible story with no measurement behind it is
+   what §3.5 exists to stop.
+3. **A deferred site retains its expression tree.** Sites are registered under a `GCHandle`
+   that is never freed (pre-existing), so an un-generated site holds its tree for the life of
+   the process where a generated one holds only its `DynamicMethod`. The tree is released the
+   moment a site is forced. This is also what made the *first* measurement of this change
+   wrong: with all six corpora in one process, the ones measured last paid for the ones before
+   them and read 1.6× and 2.6× **slower**, with bimodal ratios — the tell that it was ordering
+   and not the change.
+
+**What is still open.** The parse and the expression-tree construction are still eager, and on
+real source that is the larger half. Closing it needs the capture mechanism described above,
+and this item stays open for it. **Size of what remains: L.**
+
+**Verify.** `DeferredCompilationTests` — ten fixtures covering the item's four named risks
+against the implementation (a syntax error in a never-called function still throws at compile
+time; per-instance loop captures; writes through a captured cell after first call; self- and
+mutual recursion through a thunk; direct `eval` inside a deferred body; a deferred generator;
+100 instances of one site keeping distinct state; concurrent first calls). Full repository
+suite **7 640 tests, 0 failures**.
+
+**One unreproduced failure is on the record.** A single run of the full suite reported
+`Broiler.JavaScript.ModuleExtensions.Tests` 1 of 5 failed. It did not reproduce in **nine
+subsequent full-suite runs** — four with `BROILER_JS_DEFER_IL=0` and five with it on, same
+build — nor in isolation. That project's first test guards a *module-initializer ordering*
+bug by its own comment ("before the BuiltIns `[ModuleInitializer]` that wires it had run"), so
+it is order-dependent by construction and a plausible pre-existing flake. **Eight runs cannot
+separate a 1-in-10 flake from a 1-in-10 regression**, so this is recorded as unresolved rather
+than dismissed: if it recurs, start here.
 
 ### 1-2 · Stop recursive compilation from overflowing — **mitigation landed**
 
@@ -1401,11 +1504,16 @@ the part 1-1 cannot remove. A body that is never called costs nothing after 1-1;
 that *is* called still pays this.
 
 **The three-way split this item asks for now exists** — `--compile-scaling` times parse,
-expression-tree construction and IL emission separately — and it was 1-4 that used it. Its
-answer is lopsided enough to be the starting point 1-3 was told to go and find: on 2 000
-top-level function declarations the three phases are **2.5 ms / 63 ms / 486 ms**. Parse is
-noise, tree construction is 11%, **emission is 89%**, and that ordering held on every shape
-measured. Whatever 1-3 becomes, it is an emitter item.
+expression-tree construction and IL emission separately — and it was 1-4 that used it. On
+2 000 top-level function declarations the three phases are **2.5 ms / 63 ms / 486 ms**: parse
+noise, tree construction 11%, emission 89%.
+
+**But that is the synthetic shape, and on real source the answer is the other way round.**
+1-1's deferral removes *all* nested-body IL generation, and on the real corpora that is only
+17–36% of compile time — so on a real program most of what is left, after parse, is
+expression-tree construction. **1-3 is therefore a front-end item, not the emitter item the
+synthetic split implied**, and the first thing it should do is take the same three-way split
+on the corpora rather than on generated declarations.
 
 ### 1-4 · The closure rewrite was quadratic in a scope's binding count — **landed**
 
@@ -3828,7 +3936,7 @@ predicate at all.
 | Phase | Order within it | Size | Unblocks / expected effect | Exit gate |
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI — 17/17 established at the pin locally; the workflow run is still owed) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
-| **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-4 ✅** → **1-1** → 1-3 measure | 1-4 S, 1-1 XL | The two worst scores in the suite; page-load time generally. **1-4 took the Mandreel half (3.04×); 1-1 owns the CodeLoad half** | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
+| **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-4 ✅** → **1-1 emission half ✅**, capture half open → 1-3 measure | 1-4 S, 1-1 remainder L | The two worst scores in the suite; page-load time generally. **1-4 took the Mandreel half (3.04×); 1-1's deferred emission takes 0.64–0.69× off jQuery, PdfJS and Box2D at 1.0009× steady state** | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured: Richards PASSES (183× → 150× after 2-11/2-12), DeltaBlue FAILS (576× → 447×)**, five repetitions per engine on one machine |
 | **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
 | **4** | 4-3 design ✅ → **4-1** (unblocked) → 4-3a (S) → 4-3b (M–L) → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
@@ -3940,12 +4048,28 @@ and **re-parses it before timing anything** — a control the parser rejects wou
 failing early rather than compiling less. Set `BROILER_COMPILE_PROFILE_DUMP=<dir>` to write
 each control out; that is how Mandreel's residue was read.
 
-To A/B item 1-4 on a single build, `BROILER_JS_REWRITER_INDEX_THRESHOLD` sets the scope size
-above which the closure rewrite indexes instead of scanning (default 32). Any value larger
-than a real scope restores the pre-1-4 linear scan, so the two arms differ in nothing else:
+Both phase-1 changes carry a switch so they can be A/B'd on a single build, which is the only
+way to compare two compilers without also comparing two builds:
 
 ```bash
+# Item 1-4: scope size above which the closure rewrite indexes instead of scanning
+# (default 32). Any value larger than a real scope restores the pre-1-4 linear scan.
 BROILER_JS_REWRITER_INDEX_THRESHOLD=1000000000 dotnet $DLL --compile-profile /path/to/octane 1
+
+# Item 1-1: 0 restores eager IL generation. Default is on.
+BROILER_JS_DEFER_IL=0 dotnet $DLL --compile-profile /path/to/octane 1
+```
+
+**Give `--compile-profile` a corpus name as its fourth argument and run one per process.**
+The corpora share a heap and item 1-1 keeps an un-generated lambda's tree alive, so a corpus
+measured after Mandreel's 5 MB pays collection time that has nothing to do with its own
+compile. Measured together, 1-1 read **1.6× and 2.6× slower** on the last two corpora and
+0.56–0.65× faster on the first three, with bimodal ratios; measured one per process it is
+0.64–0.83× on five of six. *That artifact cost a full A/B run to find, and the tell was the
+bimodality, not the sign.*
+
+```bash
+BROILER_JS_DEFER_IL=1 dotnet $DLL --compile-profile /path/to/octane 1 codeload-jquery
 ```
 
 **These probes now have a permanent home** — `HotPathProbeBenchmarks` in
@@ -4024,7 +4148,8 @@ Where each item came from, so existing cross-references still resolve.
 | 0-6 | — | Octane §2.6 | **Owed** |
 | 0-7, 0-8, 0-9 | engine §8.1 acceptance evidence | — | **Owed** |
 | 0-10, 0-11 | engine §8.1, §8.2 | — | Done |
-| 1-1, 1-3 | *excluded by engine §9* | 1-1, 1-3 | Open — superseded, see §1.1. **Both now have their measurement**: 1-1's prize is 92-96% of compile time on the large real programs but its stated Mandreel target was never a 1-1 case, and 1-3's three-way split reads parse 0.5% / tree 11% / **emission 89%**, so 1-3 is an emitter item |
+| 1-1 | *excluded by engine §9* | 1-1 | **Emission half landed; capture half open.** Deferring IL generation to first invocation makes all four of the item's named risks vacuous — they are front-end properties and the front end still runs eagerly. jQuery **0.661×**, Box2D 0.636×, PdfJS 0.689×, allocation ~0.52× throughout, steady state **1.0009×**; Typescript 1.034× and unexplained. Carried as a patch — see [`patches/README.md`](../patches/README.md). What remains is deferring the parse and tree construction, which needs the capture mechanism |
+| 1-3 | *excluded by engine §9* | 1-3 | Open, and **re-aimed**: the synthetic split (parse 0.5% / tree 11% / emission 89%) does not hold on real source, where deferring *all* nested-body emission removes only 17–36%. 1-3 is a front-end item, and its first task is that split on the corpora |
 | 1-4 | — (found measuring 1-1's premise) | — | **Landed** — the closure rewrite's per-lambda scope was a `List` asked `Contains` per parameter reference, so IL emission was **quadratic in a scope's binding count**. A reference-keyed multiset, list-backed below 32 bindings: **28.5×** on 2 000 top-level declarations, **3.04× on Mandreel** end-to-end (ABBA, six pairs), inside noise on the narrow-scope corpora. Carried as a patch, not a pointer bump — see [`patches/README.md`](../patches/README.md) |
 | 1-2 mitigation | *excluded by engine §9* | 1-2 | **Landed** — `43bc4230`, in the pinned pointer |
 | 1-2 real fix | — | 1-2 | **Landed on all three recursing passes.** `StackGuard` was repaired and put on `AstMapVisitor.Visit`; `FastParser.Expression` is now guarded too, which was the last one — its descent aborted the process at 25 000 nesting levels in the DEFAULT configuration and now survives 90 000, median paired ratio 0.9993. The four-way matrix's "mitigation off / guard on" row is a **linux-x64** statement: on win-x64 the front end compiles in place on ~1 MiB while the threshold is 4 MiB, so no segmenter can fire there |
