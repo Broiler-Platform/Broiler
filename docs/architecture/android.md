@@ -172,7 +172,9 @@ create AABs.
 The [Broiler Preview Package workflow](../../.github/workflows/broiler-preview-package.yml)
 builds both heads with `dotnet publish -c Release` — the configuration name has to
 be exactly `Release`, since that is what switches `AndroidPackageFormat` to `aab` —
-and ships them as `BPP-Android.zip`. One publish leaves three packages side by
+and ships them as `BPP-Android-<build tag>.zip`, where the build tag names the
+branch, build time, run number and commit the package came from. One publish
+leaves three packages side by
 side: the unsigned `<applicationId>.aab` plus a `-Signed.aab` and `-Signed.apk`
 carrying the workload's debug key. The workflow takes the unsigned one and fails if
 the file it picked turns out to be signed already, so a debug-signed artifact
