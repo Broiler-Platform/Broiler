@@ -1,0 +1,595 @@
+From 4b1034c58745f128efcaf24dbd2d16b972d5fe58 Mon Sep 17 00:00:00 2001
+From: Enrico Bartky <enrico.bartky@gmail.com>
+Date: Tue, 4 Aug 2026 12:11:51 +0000
+Subject: [PATCH] Price a call's prologue, item 4-5; most of its premise is
+ wrong
+
+4-4's measurement created this item and told it to do an ablation pass before
+building anything. The pass falsifies most of what the item was written to
+attack, which is the point of doing it first.
+
+--call-prologue-probe prices each piece against the same empty loop, 200 M
+iterations, six rotated repetitions. Five nested `using` scopes cost 0.011 ns.
+A try/catch/finally is 0.73 ns, a delegate invoke 0.68 ns, a ThreadStatic read
+0.31 ns. The prologue's scopes and bookkeeping - the whole of what 4-5 was
+supposed to reduce - are free, which confirms item 2-6 directly instead of by
+subtraction.
+
+The one real cost is an AsyncLocal<bool> read at 7.0 ns, and JSEngine documents
+it as the opposite: "An AsyncLocal SET is expensive though ... Reads are cheap".
+The set half is right and the write-only-on-transition design follows from it.
+The read half was asserted, never measured, and is wrong by 24x - and it is the
+half that runs on every call, because the scope must save the previous value
+before it can decide whether anything changed.
+
+Fixed with the pattern the same file already uses for JSEngine.Current: the
+AsyncLocal stays as the mechanism that carries strictness across a suspension -
+its stated reason for existing is correct - and a ThreadStatic mirror answers
+the reads, kept in step by the AsyncLocal's change handler. 7.0 ns to 0.31 ns,
+once per call, which is 43 ms of a 19 694 ms driver: 0.22%.
+
+StrictModeMirrorTests, 9 cases. The ones that matter are the suspensions: a
+strict async body still throws after its await, a sloppy one still does not, two
+async bodies of opposite strictness interleave without leaking, and a strict
+generator stays strict across a yield. Those are what a bare ThreadStatic would
+get wrong. Every case also passes on the unmodified engine, so they are a
+regression guard rather than a fit to the change.
+
+Everything priced sums to about 10 ns of the ~142 ns a zero-argument call costs.
+Allocation adds a little more and is exact: 32 bytes per argument and 32 for the
+return, one boxed number each. That still leaves ~85% of a call's fixed cost
+unattributable from outside the engine, so the rest of this item is blocked on a
+sampling profiler rather than on a design.
+
+And the control every probe in the roadmap has used turned out not to be a floor.
+The same counted loop with a literal bound instead of a parameter one runs at
+8.36 ns and 0 bytes an iteration against 33.77 ns and 32 bytes, computing the
+identical answer - 4.0x and a box per iteration, because a parameter cannot reach
+the numeric tier (item 3-3's one acknowledged gap) so `i < n` compares a raw
+double against a JSValue. Copying the parameter into a local does not help; the
+local inherits its unknown type. The allocation difference is the solid half: a
+literal bound also gives the JIT a constant trip count, so part of the 4.0x could
+be unrolling, but 32 B to 0 B cannot be.
+
+`for (var i = 0; i < n; i++)` is the corpus's commonest shape, so that becomes
+new item 3-5, and on this evidence it is worth more than anything left in phase
+4.
+
+Adds CallPrologueMetrics, --call-prologue-probe, and per-shape allocation to
+--inlining-call-probe. Repository suite: 7 839 tests across 13 projects, 0
+failures.
+---
+ .../StrictModeMirrorTests.cs                  | 163 ++++++++++++++
+ .../Core/JSEngine.cs                          |  31 ++-
+ .../CallPrologueMetrics.cs                    | 204 ++++++++++++++++++
+ .../Program.cs                                |   9 +
+ .../SpecializingTierMetrics.cs                |  38 +++-
+ 5 files changed, 437 insertions(+), 8 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/StrictModeMirrorTests.cs
+ create mode 100644 Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CallPrologueMetrics.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/StrictModeMirrorTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/StrictModeMirrorTests.cs
+new file mode 100644
+index 00000000..72c9fca2
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/StrictModeMirrorTests.cs
+@@ -0,0 +1,163 @@
++using System;
++using Broiler.JavaScript.BuiltIns;
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// Item 4-5's first change: the engine's strict-mode flag is read on EVERY call, and it was an
++// AsyncLocal read (7.0 ns) where a [ThreadStatic] read is 0.3 ns. The AsyncLocal stays as the
++// mechanism that carries strictness across a suspension; a ThreadStatic mirror answers the reads,
++// kept in step by the AsyncLocal's change handler.
++//
++// The mirror is only sound if the handler fires on BOTH the ways the value can move: a direct set
++// (a strict/sloppy transition) and an execution-context switch (an async body resuming on another
++// thread). The second is the one a ThreadStatic would get wrong on its own, and the reason
++// JSEngine's comment says the flag "must remain an AsyncLocal" — so it stays one, and these tests
++// are what say the mirror did not quietly undo that.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public sealed class StrictModeMirrorTests
++{
++    private static JSContext Context()
++        => JavaScriptBootstrap.CreateContextBuilder()
++            .UseBuiltInRegistry(DefaultBuiltInRegistry.Instance)
++            .Build();
++
++    private static string Run(string source)
++    {
++        using var context = Context();
++        try
++        {
++            return context.Eval(source).ToString();
++        }
++        catch (Exception e)
++        {
++            return e.GetType().Name;
++        }
++    }
++
++    /// <summary>
++    /// Runs a body that suspends, pumping the event loop so the continuations actually run, then
++    /// reads back what it recorded. <c>Eval</c> alone returns before any microtask has been
++    /// pumped, so the post-await half of every case below would silently be missing.
++    /// </summary>
++    private static string Drive(string body)
++    {
++        using var context = Context();
++        context.Eval("globalThis.out = [];");
++        context.Execute(body);
++        return context.Eval("out.join('|')").ToString();
++    }
++
++    // The transition cases: strictness is a property of the code currently running, not of any
++    // frame on the stack, so it has to be restored on the way back out in both directions.
++    [Fact]
++    public void ASloppyCalleeInvokedFromStrictCodeIsSloppy()
++        => Assert.Equal("ok|ReferenceError", Run("""
++            function sloppy() { undeclaredA = 1; return 'ok'; }
++            function strict() { 'use strict'; try { undeclaredB = 1; return 'no throw'; } catch (e) { return e.name; } }
++            [sloppy(), strict()].join('|');
++            """));
++
++    [Fact]
++    public void AStrictCalleeInvokedFromSloppyCodeIsStrict()
++        => Assert.Equal("ReferenceError|ok", Run("""
++            function strict() { 'use strict'; try { undeclaredA = 1; return 'no throw'; } catch (e) { return e.name; } }
++            function sloppy() { return strict() + '|' + (function () { undeclaredB = 1; return 'ok'; })(); }
++            sloppy();
++            """));
++
++    // And back out again: after a strict callee returns, the sloppy caller must be sloppy once
++    // more. A mirror that was written but never restored would leave the caller strict.
++    [Fact]
++    public void StrictnessIsRestoredWhenAStrictCalleeReturns()
++        => Assert.Equal("ok", Run("""
++            function strict() { 'use strict'; return 1; }
++            function sloppy() { strict(); undeclaredAfter = 1; return 'ok'; }
++            sloppy();
++            """));
++
++    [Fact]
++    public void NestingStrictAndSloppyRestoresEachLevel()
++        => Assert.Equal("sloppy,strict,sloppy,strict,sloppy", Run("""
++            var out = [];
++            function probe() { try { undeclared1 = 1; out.push('sloppy'); } catch (e) { out.push('strict'); } }
++            function s3() { 'use strict'; probeStrict(); }
++            function probeStrict() { 'use strict'; try { undeclared2 = 1; out.push('sloppy'); } catch (e) { out.push('strict'); } }
++            function level1() { probe(); probeStrict(); probe(); s3(); probe(); }
++            level1();
++            out.join(',');
++            """));
++
++    // THE CASE THE MIRROR COULD BREAK. An async body suspends at `await` and resumes on whatever
++    // thread the microtask queue pumps it from; ExecutionContext capture is what carries the
++    // strictness across, and a bare ThreadStatic would not survive it. Asserted on both sides of
++    // the await so a resumption that lost the flag is visible.
++    [Fact]
++    public void StrictnessSurvivesAnAwaitInAStrictAsyncFunction()
++        => Assert.Equal("ReferenceError|ReferenceError", Drive("""
++            async function strictAsync() {
++              'use strict';
++              try { beforeAwait = 1; out.push('no throw'); } catch (e) { out.push(e.name); }
++              await Promise.resolve(0);
++              try { afterAwait = 1; out.push('no throw'); } catch (e) { out.push(e.name); }
++            }
++            strictAsync();
++            """));
++
++    // The same for a sloppy async body, which must NOT come back strict — the mirror restoring a
++    // stale `true` would show up here and nowhere else.
++    [Fact]
++    public void ASloppyAsyncFunctionStaysSloppyAcrossAnAwait()
++        => Assert.Equal("ok|ok", Drive("""
++            async function sloppyAsync() {
++              try { beforeAwait2 = 1; out.push('ok'); } catch (e) { out.push(e.name); }
++              await Promise.resolve(0);
++              try { afterAwait2 = 1; out.push('ok'); } catch (e) { out.push(e.name); }
++            }
++            sloppyAsync();
++            """));
++
++    // A strict async function awaiting inside a sloppy caller's continuation: the resumption must
++    // restore the awaiting function's strictness, not the resuming context's.
++    [Fact]
++    public void AStrictAndASloppyAsyncBodyInterleaveWithoutLeaking()
++        => Assert.Equal("strict|sloppy|strict|sloppy", Drive("""
++            async function s() {
++              'use strict';
++              try { leakA = 1; out.push('sloppy'); } catch (e) { out.push('strict'); }
++              await Promise.resolve(0);
++              try { leakB = 1; out.push('sloppy'); } catch (e) { out.push('strict'); }
++            }
++            async function n() {
++              try { leakC = 1; out.push('sloppy'); } catch (e) { out.push('strict'); }
++              await Promise.resolve(0);
++              try { leakD = 1; out.push('sloppy'); } catch (e) { out.push('strict'); }
++            }
++            s(); n();
++            """));
++
++    // A generator suspends and resumes too, without an ExecutionContext capture — it resumes on
++    // the thread that calls next(). Kept because it is the other suspendable shape and the mirror
++    // has to be right for it as well.
++    [Fact]
++    public void StrictnessSurvivesAGeneratorSuspension()
++        => Assert.Equal("ReferenceError|ReferenceError", Drive("""
++            function* strictGen() {
++              'use strict';
++              try { genA = 1; out.push('no throw'); } catch (e) { out.push(e.name); }
++              yield 1;
++              try { genB = 1; out.push('no throw'); } catch (e) { out.push(e.name); }
++            }
++            var it = strictGen();
++            it.next(); it.next();
++            """));
++
++    // Strict `this` is a second observable of the same flag, reached by a different route.
++    [Fact]
++    public void StrictThisBindingIsUnaffected()
++        => Assert.Equal("undefined|object", Run("""
++            function strict() { 'use strict'; return typeof this; }
++            function sloppy() { return typeof this; }
++            [strict(), sloppy()].join('|');
++            """));
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Engine/Core/JSEngine.cs b/Broiler.JS/Broiler.JavaScript.Engine/Core/JSEngine.cs
+index 255c530a..b5defd81 100644
+--- a/Broiler.JS/Broiler.JavaScript.Engine/Core/JSEngine.cs
++++ b/Broiler.JS/Broiler.JavaScript.Engine/Core/JSEngine.cs
+@@ -217,12 +217,27 @@ public static class JSEngine
+     //
+     // An AsyncLocal SET is expensive though — it boxes, copies the value map, and allocates a
+     // fresh ExecutionContext — and InvokeFunction enters a scope around every single call, so
+-    // a naive save/restore paid for two of those per JS call. Reads are cheap, so the scope
+-    // below only writes on an actual strict/sloppy TRANSITION, which real code performs rarely
+-    // (calls within one strictness level are the norm). See docs/performance-roadmap.md P0-2.
+-    private static readonly AsyncLocal<bool> _strictMode = new();
++    // a naive save/restore paid for two of those per JS call. So the scope below only writes on
++    // an actual strict/sloppy TRANSITION, which real code performs rarely (calls within one
++    // strictness level are the norm). See docs/performance-roadmap.md P0-2.
++    //
++    // P0-2 also said "reads are cheap", and that half was asserted rather than measured. It is
++    // wrong (item 4-5): `--call-prologue-probe` prices an AsyncLocal<bool> read at **7.0 ns**
++    // against **0.3 ns** for a [ThreadStatic] bool — 24x — and this one is read on every single
++    // call, entered or not, because the scope has to save the previous value before it can decide
++    // whether anything changed.
++    //
++    // The fix is the pattern `Current` above already uses: the AsyncLocal stays as the mechanism
++    // that carries the value across a suspension, and a [ThreadStatic] MIRROR answers the reads.
++    // The change handler keeps them in step — it fires both on a direct set and on an execution
++    // context switch, which is exactly the two ways the value can move.
++    private static readonly AsyncLocal<bool> _strictMode =
++        new(static e => strictMode = e.CurrentValue);
++
++    [ThreadStatic]
++    private static bool strictMode;
+ 
+-    internal static bool IsStrictMode => _strictMode.Value;
++    internal static bool IsStrictMode => strictMode;
+ 
+     internal static StrictModeScope EnterStrictMode(bool enabled) => new(enabled);
+ 
+@@ -249,7 +264,11 @@ public static class JSEngine
+             // Dispose it is the saved one. Storing the boolean directly is therefore
+             // behaviour-preserving, and it is what makes the no-transition case a no-op —
+             // with a counter, strict-calls-strict still moved 1 -> 2 and had to write.
+-            previous = _strictMode.Value;
++            // Read from the mirror, written through the AsyncLocal. The read is what happens on
++            // every call and the write only on a transition, so this is where item 4-5's saving
++            // is: the common case is now a ThreadStatic read and a compare, with no AsyncLocal
++            // touched at all.
++            previous = strictMode;
+             changed = previous != enabled;
+             if (changed)
+                 _strictMode.Value = enabled;
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CallPrologueMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CallPrologueMetrics.cs
+new file mode 100644
+index 00000000..ecf04dea
+--- /dev/null
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CallPrologueMetrics.cs
+@@ -0,0 +1,204 @@
++using System;
++using System.Collections.Generic;
++using System.Diagnostics;
++using System.Runtime.CompilerServices;
++using System.Text.Json;
++using System.Threading;
++
++namespace Broiler.JavaScript.Engine.Benchmarks;
++
++/// <summary>
++/// Prices the pieces a JavaScript call's fixed prologue is built from — the ablation pass item 4-5
++/// is not allowed to skip (docs/performance-roadmap.md item 4-5).
++/// </summary>
++/// <remarks>
++/// <para>
++/// Item 4-4's probe established that a call costs <b>142 ns before it carries any argument</b> and
++/// that ~89% of that is inside <c>JSFunction.InvokeFunction</c> rather than the compiled body. That
++/// says <em>where</em> to look and not <em>what to change</em>. Guessing from a reading of the code
++/// is what §3.5 keeps recording as the failure mode, so each candidate is priced here first, in
++/// isolation, against a control that does the same loop and nothing else.
++/// </para>
++/// <para>
++/// <b>These are framework costs, replicated locally rather than called through the engine.</b> An
++/// <c>AsyncLocal&lt;bool&gt;</c> read costs what it costs whoever declares it, and the benchmark
++/// assembly cannot see the engine's internal one anyway. The claim being tested is about the
++/// mechanism, so the mechanism is what is measured — and a local replica keeps the arms honest by
++/// making them differ in one thing.
++/// </para>
++/// <para>
++/// The standing claim this exists to check is in <c>JSEngine</c> itself: <em>"An AsyncLocal SET is
++/// expensive though … Reads are cheap"</em> (P0-2). The set half is not in doubt. The read half is
++/// asserted, has never been measured, and happens on every single call.
++/// </para>
++/// </remarks>
++internal static class CallPrologueMetrics
++{
++    private static readonly AsyncLocal<bool> AsyncLocalFlag = new();
++
++    [ThreadStatic]
++    private static bool threadStaticFlag;
++
++    private static bool plainStaticFlag;
++
++    private static readonly Func<int, int> Callee = static x => x + 1;
++
++    /// <summary>A no-op disposable struct, the shape every scope in the prologue has.</summary>
++    private readonly struct NoOpScope : IDisposable
++    {
++        private readonly bool changed;
++
++        public NoOpScope(bool changed) => this.changed = changed;
++
++        public void Dispose()
++        {
++            if (changed)
++                plainStaticFlag = !plainStaticFlag;
++        }
++    }
++
++    internal static void Write(long iterations, int repetitions)
++    {
++        var shapes = new (string Name, Func<long, long> Body)[]
++        {
++            ("control-empty-loop", static n =>
++            {
++                long acc = 0;
++                for (long i = 0; i < n; i++) acc += i & 1;
++                return acc;
++            }),
++
++            ("threadstatic-read", static n =>
++            {
++                long acc = 0;
++                for (long i = 0; i < n; i++) acc += threadStaticFlag ? 1 : 0;
++                return acc;
++            }),
++
++            ("plainstatic-read", static n =>
++            {
++                long acc = 0;
++                for (long i = 0; i < n; i++) acc += plainStaticFlag ? 1 : 0;
++                return acc;
++            }),
++
++            // The claim under test.
++            ("asynclocal-read", static n =>
++            {
++                long acc = 0;
++                for (long i = 0; i < n; i++) acc += AsyncLocalFlag.Value ? 1 : 0;
++                return acc;
++            }),
++
++            // Five nested `using`s over no-op scopes, which is the shape InvokeFunction has —
++            // five EH regions per call whether or not any of them does anything.
++            ("five-nested-usings", static n =>
++            {
++                long acc = 0;
++                for (long i = 0; i < n; i++)
++                {
++                    using (new NoOpScope(false))
++                    using (new NoOpScope(false))
++                    using (new NoOpScope(false))
++                    using (new NoOpScope(false))
++                    using (new NoOpScope(false))
++                    {
++                        acc += i & 1;
++                    }
++                }
++
++                return acc;
++            }),
++
++            ("one-using", static n =>
++            {
++                long acc = 0;
++                for (long i = 0; i < n; i++)
++                {
++                    using (new NoOpScope(false))
++                    {
++                        acc += i & 1;
++                    }
++                }
++
++                return acc;
++            }),
++
++            ("try-catch-finally", static n =>
++            {
++                long acc = 0;
++                for (long i = 0; i < n; i++)
++                {
++                    try
++                    {
++                        acc += i & 1;
++                    }
++                    catch (NullReferenceException)
++                    {
++                        throw;
++                    }
++                    finally
++                    {
++                        plainStaticFlag = plainStaticFlag;
++                    }
++                }
++
++                return acc;
++            }),
++
++            ("delegate-invoke", static n =>
++            {
++                long acc = 0;
++                for (long i = 0; i < n; i++) acc += Callee((int)(i & 1));
++                return acc;
++            }),
++        };
++
++        var rows = new List<object>();
++        for (var repetition = 0; repetition < repetitions; repetition++)
++        {
++            for (var offset = 0; offset < shapes.Length; offset++)
++            {
++                var shape = shapes[(offset + repetition) % shapes.Length];
++
++                // Warm the tier-1 JIT so the timed run measures steady state.
++                shape.Body(100_000);
++
++                var stopwatch = Stopwatch.StartNew();
++                var answer = shape.Body(iterations);
++                stopwatch.Stop();
++
++                rows.Add(new
++                {
++                    shape = shape.Name,
++                    repetition,
++                    elapsedMs = stopwatch.Elapsed.TotalMilliseconds,
++                    nsPerIteration = stopwatch.Elapsed.TotalMilliseconds * 1_000_000 / iterations,
++                    answer,
++                });
++            }
++        }
++
++        Console.WriteLine(JsonSerializer.Serialize(
++            new
++            {
++                schema = "broiler.call-prologue-probe/1",
++                iterations,
++                note = "What the pieces of a call's fixed prologue cost, each against the same empty "
++                    + "loop. Framework mechanisms are replicated locally rather than called through "
++                    + "the engine, because the claim under test is about the mechanism. Subtract "
++                    + "control-empty-loop from each.",
++                runs = rows,
++            },
++            new JsonSerializerOptions { WriteIndented = true }));
++    }
++
++    /// <summary>Keeps the flags from being folded away as constants.</summary>
++    [MethodImpl(MethodImplOptions.NoInlining)]
++    internal static void Poke(bool value)
++    {
++        threadStaticFlag = value;
++        plainStaticFlag = value;
++        AsyncLocalFlag.Value = value;
++    }
++}
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+index f8884ba2..10f71f58 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+@@ -80,6 +80,15 @@ public static class Program
+             return;
+         }
+ 
++        if (args.Length >= 1 && args[0] == "--call-prologue-probe")
++        {
++            CallPrologueMetrics.Poke(false);
++            CallPrologueMetrics.Write(
++                args.Length >= 2 ? long.Parse(args[1]) : 200_000_000,
++                args.Length >= 3 ? int.Parse(args[2]) : 6);
++            return;
++        }
++
+         if (args.Length >= 1 && args[0] == "--inlining-call-probe")
+         {
+             SpecializingTierMetrics.WriteCallProbe(
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index 3f7b86d9..6f32a50e 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -159,6 +159,15 @@ internal static class SpecializingTierMetrics
+             ("no-call-control",
+                 "function hot(n) { var s = 0; for (var i = 0; i < n; i++) { s = s + (i + 1); } return s; }"),
+ 
++            // The same loop with the bound a LITERAL, so every local in it is provably numeric
++            // (item 3-3) and nothing in the body touches a JSValue. A parameter is the one
++            // category that cannot reach the numeric tier, so `i < n` in the control compares a
++            // raw double against a JSValue — and copying the parameter into a local does not
++            // help, because the local inherits its unknown type. This is what says whether the
++            // control's per-iteration allocation is the bound or the arithmetic itself.
++            ("no-call-literal-bound",
++                "function hot(n) { var s = 0; for (var i = 0; i < {ITER}; i++) { s = s + (i + 1); } return s; }"),
++
+             // A cached property read in the SAME loop and the same run set, so the read path and
+             // the call path can be compared against one control instead of across two probes.
+             // This is what turns "where does Octane's time go" from two separate upper bounds into
+@@ -186,6 +195,22 @@ internal static class SpecializingTierMetrics
+             ("call-3-args",
+                 "function callee(a, b, c) { return 1; }\n" +
+                 "function hot(n) { var s = 0; for (var i = 0; i < n; i++) { s = s + callee(i, i, i); } return s; }"),
++
++            // WHICH prologue. A call to a NATIVE builtin takes the same JSFunction.InvokeFunction
++            // entry as a call to a JavaScript function — the same five `using` scopes, the same
++            // executing-function bookkeeping, the same dispatch — but its delegate is a C# method,
++            // so it pays none of the prologue a COMPILED JAVASCRIPT BODY emits for itself: the
++            // context capture and the CallStackItem frame push. The difference between these and
++            // the matching `call-N-args` shape is therefore the compiled-body half, and what is
++            // left is the InvokeFunction half. Item 4-5 has to know which half it is fixing, and
++            // this is the only split that needs no engine change to measure.
++            //
++            // Each native does a little work of its own, so the InvokeFunction half comes out
++            // slightly high and the compiled-body half slightly low. Stated rather than corrected.
++            ("native-call-1-arg",
++                "function hot(n) { var s = 0; for (var i = 0; i < n; i++) { s = s + Math.abs(i); } return s; }"),
++            ("native-call-2-args",
++                "function hot(n) { var s = 0; for (var i = 0; i < n; i++) { s = s + Math.max(i, 0); } return s; }"),
+         };
+ 
+         var rows = new List<object>();
+@@ -201,11 +226,19 @@ internal static class SpecializingTierMetrics
+                 CallPathDiagnostics.Enabled = false;
+ 
+                 using var context = BenchmarkContext.Create();
+-                context.Eval(shape.Source + "\nhot(1000); hot(1000); hot(1000);", "probe.js");
+-
++                var source = shape.Source.Replace("{ITER}", iterations.ToString());
++                context.Eval(source + "\nhot(1000); hot(1000); hot(1000);", "probe.js");
++
++                // Bytes are deterministic where the wall clock is not, and a call boundary boxes:
++                // an argument goes in as a JSValue and a result comes back as one, while the
++                // control loop's locals are raw doubles (item 3-3). So this says how much of a
++                // call's cost is the value representation rather than the prologue — which is a
++                // question about phase 3, and one no timing arm can answer on its own.
++                var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                 var stopwatch = Stopwatch.StartNew();
+                 var answer = context.Eval($"hot({iterations});", "run.js").ToString();
+                 stopwatch.Stop();
++                var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+ 
+                 rows.Add(new
+                 {
+@@ -213,6 +246,7 @@ internal static class SpecializingTierMetrics
+                     repetition,
+                     elapsedMs = stopwatch.Elapsed.TotalMilliseconds,
+                     nsPerIteration = stopwatch.Elapsed.TotalMilliseconds * 1_000_000 / iterations,
++                    bytesPerIteration = (double)allocated / iterations,
+                     answer,
+                 });
+             }
+-- 
+2.43.0
+

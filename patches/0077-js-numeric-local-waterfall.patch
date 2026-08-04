@@ -1,0 +1,264 @@
+From a14aabe5f12e9d6532b64bc068626e8252d20a00 Mon Sep 17 00:00:00 2001
+From: Enrico Bartky <enrico.bartky@gmail.com>
+Date: Tue, 4 Aug 2026 14:00:36 +0000
+Subject: [PATCH] Count which conjunct costs numeric-local coverage, item 3-6
+
+The item's whole instruction was to count before designing, because the three
+items before it had each been re-specified by their own premise. It was right to
+insist: the count says the item was looking in the wrong place, and then says so
+again one level down.
+
+Every hoisted name in the seven Octane suites, attributed to the FIRST conjunct
+of the numeric-local gate it fails - a waterfall rather than overlapping tallies,
+so the numbers add up and each reads as "widen this and at most that many names
+become eligible". Of 2 695 hoisted names: 203 accepted (7.5%), 2 012 not proven
+numeric (74.7%), 478 captured by a nested function (17.7%), and
+CanScalarReplaceLocals - the conjunction item 3-5 blamed for the coverage -
+rejects 2. That is 0.1%, and 3-5's explanation is corrected where it was made.
+
+The obvious reading of the 74.7% is that most locals are simply not numbers and
+there is nothing to fix. Counted inside the analysis, that is wrong too: only
+about 170 names are never offered as candidates. The analysis offers 2 335 and
+the optimistic fixed point then drops 1 842 of them, 78.9%, because something
+assigned to them comes from a parameter, a property read, an element or a call.
+
+The two counts reconcile - 1 842 dropped plus ~170 never offered is the 2 012 the
+waterfall attributes to "not proven numeric" - and the residue is 290 names the
+analysis proved numeric that the hoist site then refused, all of them for being
+captured by a nested function.
+
+So the work splits into two different problems, and the count is what separates
+them. The fixed point's 1 842 is a provability wall rather than a gate: the
+values are not knowable statically, so no widening of a conjunction reaches them
+and making them numeric needs a runtime guard - 4-3b's in-method branch pointed
+at a local's representation. The largest single obstacle in phase 3 is shaped
+like phase 4. The 290 captured names are the opposite: bounded, entirely static,
+and worth 203 -> ~493 numeric locals, 2.4x.
+
+3-6 as written is answered and closed. New items 3-7 (a raw-double cell for a
+captured numeric local) and 3-8 (guard a local's numeric-ness at run time) carry
+what it found, in that order.
+
+Nothing is built for the item itself, deliberately - its own text said to count
+first, and the count retired the design it was going to justify. That is the
+fourth item running, which is less a run of luck than a description of how this
+campaign works.
+
+Adds the waterfall counters and the candidate offered/dropped split, reported by
+--specializing-tier. Repository suite: 7 872 tests across 13 projects, 0 failures.
+---
+ .../CompilerSpecializationDiagnostics.cs      | 75 ++++++++++++++++++-
+ .../Declarations/NumericLocalAnalysis.cs      | 13 ++++
+ .../Statements/FastCompiler.VisitBlock.cs     | 14 ++++
+ .../SpecializingTierMetrics.cs                | 18 +++++
+ 4 files changed, 118 insertions(+), 2 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs b/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
+index fe706baf..e8274d31 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
+@@ -6,7 +6,42 @@ public readonly record struct CompilerSpecializationSnapshot(
+     long ScalarLocals,
+     long NumericLocals,
+     long MixedNumericComparisons,
+-    long BoxedNumericComparisons);
++    long BoxedNumericComparisons,
++    long HoistedNames,
++    long[] NumericRejections,
++    long NumericCandidatesOffered,
++    long NumericCandidatesDropped);
++
++/// <summary>
++/// Why a hoisted name did not become a raw <c>double</c> local, in the order the gate asks
++/// (docs/performance-roadmap.md item 3-6).
++/// </summary>
++/// <remarks>
++/// A waterfall: a name is attributed to the FIRST conjunct it fails, which is what makes the
++/// counts actionable — "widen this one and that many names become eligible" — rather than a set
++/// of overlapping tallies that cannot be added up. The cost is that removing the top reason only
++/// promotes the names that also pass everything below it, so the numbers are an upper bound on
++/// each conjunct taken alone.
++/// </remarks>
++public enum NumericLocalRejection
++{
++    /// <summary>Became a numeric local. Not a rejection; the head of the waterfall.</summary>
++    Accepted,
++    /// <summary>Hoisted into a direct <c>eval</c>'s own variable environment.</summary>
++    DirectEvalRoot,
++    /// <summary>The whole function is not scalar-replaceable: async, generator, `eval`, `with`, `debugger`, or a nested function that can reach names it does not mention.</summary>
++    FunctionNotScalarReplaceable,
++    /// <summary>Program or module top level rather than a function body.</summary>
++    NotInAFunction,
++    /// <summary>The name is <c>arguments</c> or <c>eval</c>.</summary>
++    ArgumentsOrEval,
++    /// <summary>A nested function mentions the name, so it needs a cell to capture.</summary>
++    CapturedByNestedFunction,
++    /// <summary>A <c>let</c>/<c>const</c> in a nested block, which is a distinct binding per entry.</summary>
++    LexicalOutsideFunctionBody,
++    /// <summary>The analysis could not prove the name only ever holds a number.</summary>
++    NotProvenNumeric,
++}
+ 
+ /// <summary>Compilation counters used by Phase 3 tests and benchmark reports.</summary>
+ public static class CompilerSpecializationDiagnostics
+@@ -15,6 +50,10 @@ public static class CompilerSpecializationDiagnostics
+     private static long numericLocals;
+     private static long mixedNumericComparisons;
+     private static long boxedNumericComparisons;
++    private static long hoistedNames;
++    private static readonly long[] numericRejections = new long[8];
++    private static long numericCandidatesOffered;
++    private static long numericCandidatesDropped;
+ 
+     internal static void RecordScalarLocal() => Interlocked.Increment(ref scalarLocals);
+ 
+@@ -33,12 +72,39 @@ public static class CompilerSpecializationDiagnostics
+     /// </summary>
+     internal static void RecordBoxedNumericComparison() => Interlocked.Increment(ref boxedNumericComparisons);
+ 
++    /// <summary>How many names the analysis offered as numeric candidates before resolving.</summary>
++    internal static void RecordNumericCandidatesOffered(int count)
++        => Interlocked.Add(ref numericCandidatesOffered, count);
++
++    /// <summary>How many of those the optimistic fixed point then had to drop.</summary>
++    internal static void RecordNumericCandidatesDropped(int count)
++        => Interlocked.Add(ref numericCandidatesDropped, count);
++
++    /// <summary>Records why one hoisted name did or did not reach the numeric tier.</summary>
++    internal static void RecordNumericLocalDecision(NumericLocalRejection reason)
++    {
++        Interlocked.Increment(ref hoistedNames);
++        Interlocked.Increment(ref numericRejections[(int)reason]);
++    }
++
+     public static CompilerSpecializationSnapshot Snapshot()
+         => new(
+             Interlocked.Read(ref scalarLocals),
+             Interlocked.Read(ref numericLocals),
+             Interlocked.Read(ref mixedNumericComparisons),
+-            Interlocked.Read(ref boxedNumericComparisons));
++            Interlocked.Read(ref boxedNumericComparisons),
++            Interlocked.Read(ref hoistedNames),
++            ReadRejections(),
++            Interlocked.Read(ref numericCandidatesOffered),
++            Interlocked.Read(ref numericCandidatesDropped));
++
++    private static long[] ReadRejections()
++    {
++        var copy = new long[numericRejections.Length];
++        for (var i = 0; i < copy.Length; i++)
++            copy[i] = Interlocked.Read(ref numericRejections[i]);
++        return copy;
++    }
+ 
+     public static void Reset()
+     {
+@@ -46,5 +112,10 @@ public static class CompilerSpecializationDiagnostics
+         Interlocked.Exchange(ref numericLocals, 0);
+         Interlocked.Exchange(ref mixedNumericComparisons, 0);
+         Interlocked.Exchange(ref boxedNumericComparisons, 0);
++        Interlocked.Exchange(ref hoistedNames, 0);
++        Interlocked.Exchange(ref numericCandidatesOffered, 0);
++        Interlocked.Exchange(ref numericCandidatesDropped, 0);
++        for (var i = 0; i < numericRejections.Length; i++)
++            Interlocked.Exchange(ref numericRejections[i], 0);
+     }
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
+index c154928e..28e09ce5 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
+@@ -324,9 +324,21 @@ internal sealed class NumericLocalAnalysis
+ 
+     private IReadOnlySet<string> Resolve()
+     {
++        // Item 3-6 splits "not proven numeric" in two, because the halves call for opposite
++        // responses. A name never OFFERED is one whose declaration is not numeric at all —
++        // `var a = []`, `var s = ''` — and no analysis makes a string a double. A name offered
++        // and then DROPPED is one the fixed point could not keep, and that is the only part a
++        // stronger analysis could reach.
++        CompilerSpecializationDiagnostics.RecordNumericCandidatesOffered(candidates.Count);
++
+         candidates.ExceptWith(rejected);
+         if (candidates.Count == 0)
++        {
++            CompilerSpecializationDiagnostics.RecordNumericCandidatesDropped(0);
+             return System.Collections.Immutable.ImmutableHashSet<string>.Empty;
++        }
++
++        var beforeFixedPoint = candidates.Count;
+ 
+         // Optimistic fixed point: drop any candidate whose assigned value is not numeric
+         // under the current assumption, and repeat, because dropping one can invalidate
+@@ -349,6 +361,7 @@ internal sealed class NumericLocalAnalysis
+         }
+         while (changed && candidates.Count > 0);
+ 
++        CompilerSpecializationDiagnostics.RecordNumericCandidatesDropped(beforeFixedPoint - candidates.Count);
+         return candidates;
+     }
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitBlock.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitBlock.cs
+index e0bde1be..34fa2acd 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitBlock.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitBlock.cs
+@@ -149,6 +149,20 @@ partial class FastCompiler
+                 var useNumericLocal = canUseRawLocal
+                     && (!isLexical || isFunctionBodyBlock)
+                     && scope.NumericLocals.Contains(v.Value);
++                // Item 3-6: why this name did or did not reach the numeric tier, attributed to
++                // the FIRST conjunct it fails. Item 3-5 measured the coverage at 5.0% of scalar
++                // locals and could not say which condition costs it; this is that count, and
++                // 3-6's own instruction is to take it before designing anything.
++                CompilerSpecializationDiagnostics.RecordNumericLocalDecision(
++                    useNumericLocal ? NumericLocalRejection.Accepted
++                    : hoistToDirectEvalRoot ? NumericLocalRejection.DirectEvalRoot
++                    : !scope.CanScalarReplaceLocals ? NumericLocalRejection.FunctionNotScalarReplaceable
++                    : scope.Function == null ? NumericLocalRejection.NotInAFunction
++                    : v.Equals("arguments") || v.Equals("eval") ? NumericLocalRejection.ArgumentsOrEval
++                    : scope.CapturedByNestedFunctions.Contains(v.Value) ? NumericLocalRejection.CapturedByNestedFunction
++                    : isLexical && !isFunctionBodyBlock ? NumericLocalRejection.LexicalOutsideFunctionBody
++                    : NumericLocalRejection.NotProvenNumeric);
++
+                 var variable = hoistToDirectEvalRoot
+                     ? GetOrCreateDirectEvalRootVariable(v)
+                     : useNumericLocal
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index afd7eb3b..7f973a1f 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -267,6 +267,16 @@ internal static class SpecializingTierMetrics
+             new JsonSerializerOptions { WriteIndented = true }));
+     }
+ 
++    /// <summary>Names the waterfall's buckets so the JSON is readable without the enum.</summary>
++    private static object DescribeRejections(long[] counts)
++    {
++        var names = System.Enum.GetNames(typeof(Broiler.JavaScript.Compiler.NumericLocalRejection));
++        var described = new Dictionary<string, long>(names.Length);
++        for (var i = 0; i < names.Length && i < counts.Length; i++)
++            described[names[i]] = counts[i];
++        return described;
++    }
++
+     private sealed record Suite(string Name, string[] Files);
+ 
+     private static readonly Suite[] Suites =
+@@ -474,6 +484,14 @@ internal static class SpecializingTierMetrics
+             mixedComparisons = compiler.MixedNumericComparisons,
+             boxedComparisons = compiler.BoxedNumericComparisons,
+ 
++            // Item 3-6: the waterfall. Every hoisted name attributed to the first conjunct of
++            // the numeric-local gate it fails, which is what says WHICH condition costs the
++            // coverage item 3-5 measured at 5.0%.
++            hoistedNames = compiler.HoistedNames,
++            numericRejections = DescribeRejections(compiler.NumericRejections),
++            numericCandidatesOffered = compiler.NumericCandidatesOffered,
++            numericCandidatesDropped = compiler.NumericCandidatesDropped,
++
+             candidates = tiering.Candidates,
+             invocations = tiering.Invocations,
+             recompilationAttempts = tiering.RecompilationAttempts,
+-- 
+2.43.0
+
