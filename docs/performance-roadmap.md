@@ -78,7 +78,7 @@ so only the parent can hold the combined view.
 
 ## 0. Status
 
-**Last updated 2026-08-02.** Snapshot of where the campaign stands; every claim is detailed in
+**Last updated 2026-08-04.** Snapshot of where the campaign stands; every claim is detailed in
 the item's own section below, and nothing here is *closed* — see the acceptance protocol in §3.
 
 | Phase | State |
@@ -87,7 +87,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting. **New: 1-4 ✅.** Measuring 1-1's premise found the phase's actual dominant cost, and it was not lazy compilation: the closure rewrite held a lambda's in-scope bindings in a `List` and asked it `Contains` per parameter reference, so **emission was quadratic in a scope's binding count** — 2 000 top-level declarations emitted in 13 865 ms against 2.5 ms of parse. A reference-keyed multiset (list-backed below 32 bindings) makes it linear: **28.5× on that shape, and 3.04× on Mandreel end-to-end**, ABBA-interleaved, six pairs. **1-1 is still open and its premise now has a number** — 92–96% of compile time is function bodies on the large real programs — but the measurement also **splits phase 1 in two and re-targets 1-1**: Mandreel was *wide*, not deep, and never was a 1-1 case, while jQuery at 96.5% deferrable is the whole of it. **1-1's emission half then landed without needing the capture mechanism at all**: every risk the item names is settled by the front end, so deferring *IL generation* to first invocation is the same prize with none of them — **jQuery 0.661×, Box2D 0.636×, PdfJS 0.689× on compile, allocation ~0.52× across the board, and 1.0009× steady state**. **Octane CodeLoad, the benchmark the item names, was run and passes: 94.6 → 104.0, 1.099×, 24 samples an arm, 93% pairwise dominance** — and it took 24 because the first three-sample pair and its reverse disagreed. That ratio also re-frames the item: compilation is only ~27% of what CodeLoad measures, not the whole of it. Two mistakes were caught by measuring: a stack handoff per deferred function took the suite from 3.5 to 20 minutes, and a thunk that *called* its resolve cost 1.0247% on call-heavy code until the warm path was written in IL. Typescript is 1.034× slower and unexplained. **The Mandreel suite was then run too, and it overturns the phase's headline target**: a 3.04× faster compile of `mandreel.js` moves Mandreel 0.993× and MandreelLatency 0.992× — Octane compiles that file at script load and times only the run function, so MandreelLatency measures execution pauses and belongs to phase 3. The saving is real and outside every score: suite wall clock **358.2 → 350.0 s**, non-overlapping. What remains of 1-1 is the parse and tree construction, which on real source is the larger half |
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. Then **2-12** found why the misses that remained could never heal: the cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — **77.7% of DeltaBlue's misses**. Refreshing in place takes **DeltaBlue's read hit rate to 93.16%** (65.96% before both fixes) and Box2D's to 98.83%. **DeltaBlue still fails the gate at 447×**, but the cache is no longer the reason, and what remains is not property-cache-shaped. **0-6's CI run has since confirmed the split independently — Richards 144.9×, DeltaBlue 460×** — so the phase's exit criterion is answered by two measurements on different machines that agree on which side of 200× each benchmark falls, rather than by one. Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. **Its `let`/`const` half is now landed**, on the second attempt: the first was withdrawn on a miscompile, and re-built scoped to the *numeric* tier alone it reproduces the predicted number and not the defect — **`let` and `const` both 31.98 → 0.00 B/iter and 1 → 3 numeric locals, identical to the eligible `var` floor, with all twelve other `--local-alloc` rows byte-identical**, both arms from one tree. The recorded reproduction was re-run against it and is green, including under the switches that restore the pre-1-4 and pre-1-1 front end — so the withdrawn attempt's defect is **not explained**, only not reproduced; what the second attempt does differently is leave the JSValue tier closed to lexical names, since a TDZ and const-ness live in the cell that tier removes while the numeric gate proves both unobservable. **The block-scoped `var` then landed too, and 3-3 is complete**: the "definite-assignment analysis" it asked for is the function body's own dominance argument applied one level down — an unconditional block is *transparent* (entered whenever reached, exits only via `return`/`throw`), and any other block *confines* its declaration, which then needs every reference inside it. **`block-var` 31.98 → 0.00 B/iter and 1 → 3, one row moved and twelve byte-identical.** Two defects were caught on the way, neither shipped: a non-dominating declaration could mark a name readable and mask a read that would see `undefined`, and the fix for that over-corrected into rejecting a benign numeric re-declaration — caught by a pre-existing test written as "the guard against over-fixing". All four of the item's categories are now at the eligible floor except `parameter`, which cannot reach the numeric tier at all. 3-4 is a cost, not a task |
-| **4** — tiering | Started. **4-3a is landed and it found a real hazard**: restart is only sound if the body is not suspendable, and nothing said so — the property held by two unrelated accidents (the `EnableTiering` call sitting inside the ordinary-function `else` branch, and the tiering gate borrowing `CanScalarReplaceLocals`, which refuses generators for its own reasons). Defeating both, a legal `async function` whose body matches the planner's shape returns **`number` instead of a Promise** from its second call on — measured, not argued. One condition at the decision point fixes it, and 16 tests pin all three conditions. **4-3b is landed too**: `SpeculationBuilder.Guarded` compiles the specialized and generic forms into one method so a failed guard is a *branch*, with the subject evaluated exactly once (the hand-rolled spelling fails 12 of its 15 tests) and per-site poisoning after four misses. **It emits no JavaScript-level speculation, and that is structural rather than scope-trimming** — a guard needs a shape or a callee to speculate on and a tier-1 method knows neither, so the branch only has meaning inside a tier-2 recompile, which is 4-2. The mechanism lands before its consumer because it has to. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 has landed and it settles the phase's premise.** Per-site feedback now *retains* what the inline caches only observe — receiver shapes at reads, callee identities at calls — and over seven Octane suites, weighted by executed operations, **93.54% of 37.9 M property reads and 96.70% of 4.24 M calls happen at a site that only ever saw one shape or one callee**. 4-2 and 4-4 are an XL each and both are worth their cost only in proportion to that number; nothing in the engine could report it until now, and it comes out high. **Megamorphism is essentially absent** — 18 sites in total, five of seven suites have none — corroborating 2-10's independent finding of zero megamorphic read sites; the fallback path 4-3b must still be correct, it just will not be hot. **DeltaBlue is the worst read case at 77.10%**, with 43 polymorphic read sites against Richards's 1, which is a lead on the suite still outside phase 2's gate. Collection is off by default, costs nothing on the call path *by construction*, and the item's third signal — numeric-vs-generic per site — is deliberately left uncollected rather than half-built. **4-1 can start now** |
+| **4** — tiering | Started. **4-3a is landed and it found a real hazard**: restart is only sound if the body is not suspendable, and nothing said so — the property held by two unrelated accidents (the `EnableTiering` call sitting inside the ordinary-function `else` branch, and the tiering gate borrowing `CanScalarReplaceLocals`, which refuses generators for its own reasons). Defeating both, a legal `async function` whose body matches the planner's shape returns **`number` instead of a Promise** from its second call on — measured, not argued. One condition at the decision point fixes it, and 16 tests pin all three conditions. **4-3b is landed too**: `SpeculationBuilder.Guarded` compiles the specialized and generic forms into one method so a failed guard is a *branch*, with the subject evaluated exactly once (the hand-rolled spelling fails 12 of its 15 tests) and per-site poisoning after four misses. **It emits no JavaScript-level speculation, and that is structural rather than scope-trimming** — a guard needs a shape or a callee to speculate on and a tier-1 method knows neither, so the branch only has meaning inside a tier-2 recompile, which is 4-2. The mechanism lands before its consumer because it has to. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 has landed and it settles the phase's premise.** Per-site feedback now *retains* what the inline caches only observe — receiver shapes at reads, callee identities at calls — and over seven Octane suites, weighted by executed operations, **93.54% of 37.9 M property reads and 96.70% of 4.24 M calls happen at a site that only ever saw one shape or one callee**. 4-2 and 4-4 are an XL each and both are worth their cost only in proportion to that number; nothing in the engine could report it until now, and it comes out high. **Megamorphism is essentially absent** — 18 sites in total, five of seven suites have none — corroborating 2-10's independent finding of zero megamorphic read sites; the fallback path 4-3b must still be correct, it just will not be hot. **DeltaBlue is the worst read case at 77.10%**, with 43 polymorphic read sites against Richards's 1, which is a lead on the suite still outside phase 2's gate. Collection is off by default, costs nothing on the call path *by construction*, and the item's third signal — numeric-vs-generic per site — is deliberately left uncollected rather than half-built. **4-2 has now landed too, and it splits the same way 4-3 did.** Measuring the branch it was told to replace found that it does **not** "recompile the same code the same way": a fresh top-level compilation builds a *second* function object and loses inherited strictness, so **DeltaBlue died on the shipping tier-2 hook** — `TypeError: Cannot get property call of undefined`, 0 of 1 benchmarks against 1 of 1 untiered, because its constructors read `X.superConstructor` off their own name and got the copy. Four of thirteen probes disagreed between tiered and untiered. **4-2a** states the recompile contract, refuses the identity cases and repairs strictness, at a cost of ~5% of promotions. **4-2b** then makes tier-2 re-emit tier-1's *own* site indices — which carries the warm caches across promotion and makes 4-1's feedback addressable — and emits a monomorphic read as a shape guard plus a direct slot load through 4-3b's in-method branch, whose **first JavaScript-level consumer** this is. **44.74% of the corpus's 37.9 M executed reads leave the inline-cache path** (counted exactly: cache misses are identical, so they were removed, not converted), carried by **1 130 sites**, with 156 guard misses and 30 poisoned — the monomorphism holds past the promotion point. **Each such read is 0.818× (46.83 → 37.12 ns, six pairs, 0.778–0.879), and the suite wall clock does not move: 0.9947 against a feedback-on control.** That is arithmetic, not failure — 16.9 M × 9.7 ns is 164 ms of a 19.7 s run, **0.83%**, under a ±2% floor. It also bounds the phase: the whole read path is ≤ ~9% of Octane's execution time here and the whole call path ≤ ~5.5%, so **the two paths phase 4 is built around are together at most ~15%**, which 4-4 should know before it starts. The item's arithmetic half is still not built, for 4-1's reason |
 | **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. The global case's retained result list then landed too — **2 032.8 → 478.3 B per match**, dead linear on both sides, by streaming when the receiver's `exec` is the pristine intrinsic and the replacement is a `$`-free string. **Every follow-up this phase named is now closed**; what is left is item 2's `Compiled` policy, deliberately unshipped |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
@@ -3795,12 +3795,14 @@ and tested; what is missing is the part that makes entering tier-2 worth anythin
 |---|---|---|---|---|
 | **4-3** | **Deoptimization** — **designed; 4-3a and 4-3b both landed** | `Runtime/FunctionTiering.cs`, `Engine/CallFrames.cs`, and for 4-3b `.Compiler` / `.ExpressionCompiler` | The safety net that makes everything else legal. "Bail out mid-function by reconstructing an interpreter frame" is **not expressible here** — there is no interpreter frame. Splits into **4-3a** (S, the restart contract the pilot already implements) and **4-3b** (M–L, a generic fallback branch inside the specialized method), and only 4-3b gates 4-4 | ~~XL~~ **S + M–L** |
 | **4-1** | **Type feedback collection** — **shapes and callees landed; numeric-vs-generic outstanding** | `Runtime/TypeFeedback.cs`, `Runtime/ObjectShape.cs`, `LinqExpressions/JSFunctionBuilder.cs` | The inline caches already observe shapes at property sites but do not *retain* them. Now recorded per site and kept: receiver shapes at reads, callee identities at calls. **And it answers the question the rest of the phase rests on — see below.** Callee identity was phase 2's 2-6 until that item was measured: there is no repeated callee resolution to remove, so recording it is feedback and nothing else, and it pays only once 4-2 and 4-4 consume it | L |
-| **4-2** | **A specializing tier-2 compile** | `BuiltIns/Function/JSFunction.cs` — replace the `numericPlan == null` branch | Consume 4-1's feedback: monomorphic property access → shape check plus direct slot read; arithmetic → raw `double`/`int` where feedback says so | XL |
+| **4-2** | **A specializing tier-2 compile** — **split by measurement; 4-2a and 4-2b both landed, arithmetic half outstanding** | `BuiltIns/Function/JSFunction.cs` — replace the `numericPlan == null` branch, plus `Runtime/TypeFeedback.cs` and `.LinqExpressions` for 4-2b | Consume 4-1's feedback: monomorphic property access → shape check plus direct slot read; arithmetic → raw `double`/`int` where feedback says so. **Measuring the branch first found it unsound** — it does not recompile the same code the same way, and DeltaBlue died on it — so the item splits into **4-2a** (S, the recompile contract) and **4-2b** (L, the specializing emission). 4-2b specializes **44.7% of the corpus's executed reads at 0.818× each**, which is **0.83% of suite time**: real, and below the noise floor | ~~XL~~ **S + L** |
 | **4-4** | **Inlining of small JS callees** at monomorphic sites | `.Compiler` | What Richards and DeltaBlue actually need, and the measurement says why: **a call costs ~250 ns, about thirteen times the loop body it replaces** (2-6). Strictly downstream of 4-3, 4-1 and 4-2 — the callee-identity feedback it needs is 4-1's, not a separate phase-2 item | XL |
 
 **Do not start 4-2 before 4-3 has a design.** Speculation without a mid-function
 bailout is either unsound or restricted to functions with no observable side effect
-before the guard — which excludes everything worth optimizing.
+before the guard — which excludes everything worth optimizing. *(Satisfied: 4-3's design
+spike, then 4-3a and 4-3b, all landed before 4-2 began — and 4-2b is 4-3b's first
+consumer.)*
 
 **Verify.** Deopt correctness before any speculation ships: a test that forces every
 guard to fail at every point in a function body and asserts the fallback produces the
@@ -4084,6 +4086,247 @@ only the failing operation took the generic path. Plus the evaluate-once contrac
 poisoning after four misses (visible as the guard disappearing from the log while the answer
 holds), a never-missing site never poisoning, and a refused site index emitting the generic form
 alone. Repository suite: **7 788 tests across 13 projects, 0 failures**.
+
+### 4-2 · A specializing tier-2 compile — **split by measurement; both halves landed**
+
+Written after 4-3's design, as the phase requires. The item said "replace the `numericPlan == null`
+branch", and the first thing to establish is whether that branch is reached by anything worth an
+XL. **`--specializing-tier` answers it on the same seven suites 4-1 used**, with a budget generous
+enough not to bound the answer (100 000 recompilations, 512 MiB of retained code — a cap that bound
+the result would be reporting the cap):
+
+| Suite | Tiering candidates | Promoted |
+|---|--:|--:|
+| Richards | 82 | 16 |
+| DeltaBlue | 123 | 9 — **and the suite died** |
+| RayTrace | 126 | 32 |
+| Box2D | 665 | 100 |
+| EarleyBoyer | 716 | 33 |
+| Crypto | 299 | 14 |
+| NavierStokes | 30 | 0 |
+
+**The branch is reached by real code** — the gate is narrow (no nested functions, no outer-function
+captures, scalar-replaceable locals, not a class, not an arrow) but a few hundred functions per
+suite survive it and tens get hot. NavierStokes's 0 is the same observation 4-1 made about it from
+the other side: its work is typed-array elements inside a handful of long-running calls, so there is
+nothing to promote.
+
+**And DeltaBlue reported a failure**, which is not something a "hook that recompiles the same code
+the same way" should be able to do. That is item **4-2a**, below, and it had to be fixed before
+anything speculative could be built on top. The specializing emission is **4-2b**.
+
+#### 4-2a · The recompile contract — **it was not recompiling the same code the same way**
+
+> **Delivered as a patch, not in the pin**:
+> [`patches/0072`](../patches/0072-js-recompile-contract.patch).
+
+§4's header says the `numericPlan == null` path "re-runs `CoreScript.Compile` on `({source})` — it
+recompiles *the same code the same way*, so it cannot be faster". The first half of that is wrong.
+A fresh top-level compilation does not reproduce the scope the function was written in, and **two
+consequences of that were producing wrong answers on real programs**.
+
+**The recompile builds a second function object.** Only its *delegate* is installed on the original,
+so a body that can observe its own function object observes the copy — while every other reference
+in the program still reaches the original, and the two differ in every own property the program
+installed. DeltaBlue's constructors are written
+
+```js
+UnaryConstraint.superConstructor.call(this, strength);
+```
+
+so after promotion `UnaryConstraint` names the copy, the copy has no `superConstructor`, and the
+suite dies with **`TypeError: Cannot get property call of undefined` — 0 of 1 benchmarks run,
+against 1 of 1 with tiering off**. Minimally: a function reading `f.step` off its own name answers
+`6|NaN|NaN|NaN`, correct on the first call and wrong on every one after it.
+
+**Strictness is inherited rather than written.** A function inside a `'use strict'` script carries
+no directive of its own, so re-parsing its text at the top level of a fresh script makes the copy
+sloppy: `undeclaredGlobal = t` **threw a `ReferenceError` before promotion and silently created a
+global after it**.
+
+Thirteen probes, each run through a tiered and an untiered context, and **four disagreed** — the
+two above plus `arguments.callee` and `f === original`, which are the same identity defect by two
+more routes. The nine that agreed are kept as pins, because each is a way the fresh compilation
+could have failed to reproduce the original scope and did not: a top-level `const`, a `class`
+binding, `this` in a strict function, a default-parameter initializer resolving an outer name.
+
+**Identity is refused; strictness is repaired.** The two halves are not symmetrical and it is worth
+saying why. Strictness is something a re-parse *can* reproduce — the wrapper re-states the directive
+when the original was strict — so nothing is lost. Identity is not: the copy is a different object,
+and no wrapper makes it the same one. `TieringRecompileContract` therefore declines a function whose
+body mentions **its own name** or **`arguments`** — the second because `arguments.callee` is the
+function object by a route no name check can see, and can be reached through an alias
+(`var a = arguments; a.callee`), so the narrow check is the unsound one.
+
+**Asked at the decision point**, for exactly the reason 4-3a records about its own condition 3. The
+tiering gate is a conjunction of conditions that exist for unrelated reasons; a property that holds
+because of where a call happens to sit is one refactor from being gone.
+
+**What the refusal costs, measured rather than asserted.** Candidates 2 041 → 1 940 and, setting
+DeltaBlue aside because it stops dying and so promotes far more (9 → 44), **promotions 195 → 186 —
+about 5%**. Cheap, and the 5% were producing whatever the copy produced.
+
+**Recursion by name is refused too, and that is the cost of the rule rather than an oversight.**
+`fact(n - 1)` inside the copy calls the copy, which computes the same answer — a self-call is only
+wrong when the identity is *observed* rather than invoked. Telling those apart needs a use analysis
+the contract deliberately does not do, so the conservative side is taken and pinned by a test that
+says so.
+
+**The detector had the bug the item is about, one level down.** `AstReduce` treats three compact
+structs — `VariableDeclarator`, `ObjectProperty`, `Case` — as leaves, because most rewriting
+visitors handle them explicitly. Inheriting that, the first draft admitted
+`function fact(n) { var t = n <= 1 ? 1 : n * fact(n - 1); return t; }` while refusing the same
+reference written as an assignment statement: the self-reference was hidden in a declarator's
+initializer and the detector never looked. "Did not look" reading as "did not find" is the failure
+this whole item exists to close. One test per leaf kind pins it.
+
+**Verify.** `RecompileContractTests`, 19 cases. Every one runs the same source through a tiered and
+an untiered context and requires the two to agree — the untiered answer is the specification — with
+**a control that is still promoted**, without which a refusal could just be the gate rejecting the
+shape for some unrelated reason and every test would pass vacuously. DeltaBlue completes again:
+1 of 1 benchmarks, no failures.
+
+#### 4-2b · The specializing emission — **44.7% of executed reads specialized, 18% cheaper each, and that is 0.8% of the suite**
+
+> **Delivered as a patch, not in the pin**:
+> [`patches/0073`](../patches/0073-js-specializing-tier.patch). **Apply after `0072`** — same files.
+
+The item's own brief: *"monomorphic property access → shape check plus direct slot read"*. What was
+missing was not the codegen — 4-3b built the in-method branch — but a way for the tier-2 compile to
+**address** tier-1's feedback.
+
+**The site map, and a defect it closes on the way.** A tier-2 recompile re-parses the source, and
+every property read it emits allocates a *fresh* inline-cache site. So promoting a function silently
+threw away every warm cache it had **and** there was no way to ask what the original sites had seen,
+because their indices were nowhere. Tier-1 now records the half-open range of read sites its body
+compile allocated, and tier-2 hands those same indices back out in emission order — which carries
+the warm caches across promotion and makes 4-1's per-site feedback addressable.
+
+**The mapping is ordinal, and it is deliberately not trusted.** The site counter is process-wide, so
+two threads compiling at once is enough to slide the range. The emitted guard therefore compares the
+key the specialization was built for against the key actually being read — **one integer compare** —
+so a slipped mapping fails its guard, poisons, and falls back. *The mapping is a performance
+heuristic and never a correctness dependency*, which is the only thing that makes an ordinal mapping
+acceptable at all.
+
+**What is emitted.** For a site whose whole history is one shape resolving one key to one own slot,
+through `SpeculationBuilder.Guarded`:
+
+```
+receiver evaluated once
+  → key == K && receiver is JSObject && shape.Id == S && slots[N] != null
+      ? slots[N]
+      : PropertyInlineCacheSite.Get(site, receiver, key)
+```
+
+`S` and `N` are literals. The cache's own monomorphic hit ends in the same shape compare and slot
+load, but reaches it through a static call taking a `KeyString`, a bounds test, a side-table read, a
+megamorphic flag, a receiver type test, a key compare, an entry loop and a holder test — and reads
+the shape id and slot *out of a cache entry* rather than having them as constants.
+
+**This is 4-3b's first JavaScript-level consumer**, and it needs the guarantee that facility was
+built for: the receiver is evaluated **exactly once**. Hand-rolled, `f().x` would run `f()` twice.
+4-3b recorded that it had no consumer and that the reason was structural — a guard needs an
+observation, and only a tier-2 recompile has one. That is now discharged.
+
+**What it declines**, each with a test: a prototype-resolved read (a method — no own slot describes
+it), an indexed read (an element, which no shape tracks), and a site the feedback classifies as
+polymorphic. The last is the half 4-1 exists to answer and the only one a guard cannot recover from
+on its own without paying for a speculation that was never going to hold.
+
+##### The addressable surface, counted rather than argued
+
+A read that takes the specialized path never calls `PropertyInlineCacheSite.Get`, so it records no
+cache hit. **`cacheHits(tiered) − cacheHits(specializing)` is therefore an exact count of the
+executed reads the specialization took off the cache path**, with the two arms differing in nothing
+else. Cache *misses* come out identical in six of seven suites and eleven reads apart in Crypto, so
+the reads were removed rather than converted:
+
+| Suite | Executed reads | Removed from the cache path | Share | Specialized sites | Guard misses | Poisoned |
+|---|--:|--:|--:|--:|--:|--:|
+| Richards | 605 672 | 333 048 | **54.99%** | 70 | 0 | 0 |
+| DeltaBlue | 1 001 675 | 462 850 | **46.21%** | 94 | 52 | 13 |
+| RayTrace | 2 919 249 | 2 119 050 | **72.59%** | 276 | 16 | 4 |
+| Box2D | 25 963 010 | 7 417 962 | **28.57%** | 585 | 48 | 6 |
+| EarleyBoyer | 5 490 829 | 5 383 113 | **98.04%** | 54 | 0 | 0 |
+| Crypto | 1 891 047 | 1 227 467 | **64.91%** | 51 | 40 | 7 |
+| NavierStokes | 428 | 0 | — | 0 | 0 | 0 |
+| **All seven** | **37 871 908** | **16 943 490** | **44.74%** | **1 130** | **156** | **30** |
+
+Two things worth keeping. **A thousand sites carry nearly half the corpus's reads**, which is the
+promoted functions being the hot ones and is the strongest form of 4-1's premise holding. And
+**the monomorphism holds through the rest of the run**: 156 guard misses against 16.9 M taken
+speculations, 30 poisoned sites of 1 130 — so "only ever saw one shape" was not merely true up to
+the promotion point.
+
+##### The throughput, and the control that changes what it means
+
+Three arms, rotated across six rounds, separate processes, driver time only (source loading is
+outside the stopwatch): **tiered** (4-2a's engine), **feedback** (recording on, consuming off) and
+**specializing**. The middle arm is the one that matters — without it the two arms differ in *two*
+things, and a first two-arm run read DeltaBlue's 1.232 as the specialization's cost when it is not.
+
+| | median paired ratio | spread over six rounds |
+|---|--:|---|
+| feedback ÷ tiered — the cost of **collecting** | **1.0249** | 0.941 – 1.095 |
+| specializing ÷ feedback — the effect of **consuming** | **0.9947** | 0.931 – 1.106 |
+
+**Removing 44.7% of the corpus's executed reads from the inline-cache path does not move the wall
+clock.** NavierStokes, which specializes nothing at all, comes out at 0.982 on the same probe, which
+is the noise floor stating itself.
+
+##### Why not, and it is arithmetic rather than a mystery
+
+Two explanations fit — the specialized path is not actually cheaper, or reads are too small a share
+of the time for any change to them to show — and they call for opposite follow-ups. So they were
+separated with `--specializing-read-probe`: one promoted function whose body is a monomorphic read
+in a loop, so essentially all of the measured time *is* the read path, timed with the specialization
+on and off and feedback recording on in both.
+
+| | ns per iteration (median of 6) | spread |
+|---|--:|---|
+| cached get | **46.83** | 44.52 – 48.59 |
+| shape guard + slot load | **37.12** | 35.97 – 41.72 |
+| **paired ratio** | **0.818** | 0.778 – 0.879 |
+
+**The specialized read is ~18% cheaper — about 9.7 ns — and every one of six pairs agrees.** The
+absolute is a loop *iteration*, not a read alone, so 9.7 ns is the attributable difference and 46.83
+is an upper bound on what a read costs. Then:
+
+- **16 943 490 specialized reads × 9.7 ns = 164 ms.**
+- The seven suites' driver time is **19 694 ms**.
+- **0.83%** — against a suite probe whose noise floor is ±2%.
+
+**The effect is real, measured, and arithmetically invisible at suite level.** That also puts a
+number on something the phase had not asked: at 46.83 ns an iteration, the *entire* property-read
+path is an upper bound of **~9%** of Octane's execution time here, and at 2-6's ~255 ns a call the
+*entire* call path is an upper bound of **~5.5%**. Both are upper bounds because both figures
+include their loop's overhead. **So the two paths phase 4 is built around are together at most ~15%
+of the time**, which is a lead worth having before 4-4 is started rather than after: an XL that
+inlines calls perfectly cannot buy more than that ceiling, and where the other ~85% goes is not
+answered by anything in this document.
+
+**Cost when off.** Nothing is emitted and nothing is consulted: `SpecializeFromTypeFeedback`
+defaults to `false`, and with it clear a tier-2 recompile emits exactly what 4-2a left behind. The
+specialization is gated on the *plan*, not on whether feedback happens to be recording, so the two
+are independently controllable — which is what made the three-arm measurement expressible.
+
+**What is not done.**
+
+- **The item's arithmetic half.** *"Arithmetic → raw `double`/`int` where feedback says so"* is not
+  built, and the blocker is 4-1's, restated: the numeric-vs-generic signal was deliberately left
+  uncollected, because the compiler already proves numeric-ness statically for locals (3-3), so a
+  runtime counter has to be defined against *that* to say anything new. Left open rather than
+  half-built, for the second time and for the same reason.
+- **A poisoned site still pays its guard**, which 4-3b predicted and recorded as owed to this item.
+  The right answer is to re-emit the method without the guard once a site poisons; 30 sites of 1 130
+  is small enough that it was not worth building before this item had a throughput number, and now
+  that it has one, 0.83% is not the place to spend it.
+- **Prototype-resolved reads are not specialized.** A method read — which is most of what Richards
+  and DeltaBlue do — needs the receiver shape, the receiver's prototype identity, the global
+  prototype version and the holder's shape and slot, all four of which the cache already guards.
+  That is a strictly larger guard and it is the same set 4-4's inlining needs, so it belongs with
+  4-4 rather than here.
 
 ---
 
@@ -4480,7 +4723,7 @@ predicate at all.
 | **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-4 ✅** → **1-1 emission half ✅**, capture half open → 1-3 measure | 1-4 S, 1-1 remainder L | The two worst scores in the suite; page-load time generally. **1-4 took the Mandreel half (3.04×); 1-1's deferred emission takes 0.64–0.69× off jQuery, PdfJS and Box2D at 1.0009× steady state, and CodeLoad 94.6 → 104.0 (1.099×)** | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured twice, agreeing: Richards PASSES (183× → 150× after 2-11/2-12 locally; 144.9× in CI), DeltaBlue FAILS (576× → 447× locally; 460× in CI)**, five repetitions per engine on one machine and the committed CI run on another |
 | **3** | 3-0 ✅ (both halves) → **3-3 ✅ complete** (parameters, `let`/`const`, block-scoped `var`) → **3-1** → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`, and — added by 3-3's `let`/`const` half — `test262-lexical-declarations`; allocation reported per item alongside time |
-| **4** | 4-3 design ✅ → **4-1 ✅** (shapes and callees; numeric-vs-generic left open) → **4-3a ✅** → **4-3b ✅** → **4-2** → 4-4 | XL | The remaining order of magnitude. **4-1 measured the premise: 93.5% of reads and 96.7% of calls are monomorphic by execution weight, so 4-2 and 4-4 are well-founded.** 4-3a stated and enforced the restart contract — and found its no-suspendable-bodies condition was held only by two unrelated accidents, two ordinary refactors away from an async function returning a number instead of a Promise | Deopt correctness proven **before** any speculation ships; full test262 matrix |
+| **4** | 4-3 design ✅ → **4-1 ✅** (shapes and callees; numeric-vs-generic left open) → **4-3a ✅** → **4-3b ✅** → **4-2a ✅** → **4-2b ✅** (arithmetic half left open) → 4-4 | XL | The remaining order of magnitude. **4-1 measured the premise: 93.5% of reads and 96.7% of calls are monomorphic by execution weight, so 4-2 and 4-4 are well-founded.** 4-3a stated and enforced the restart contract — and found its no-suspendable-bodies condition was held only by two unrelated accidents, two ordinary refactors away from an async function returning a number instead of a Promise. **4-2 then split the same way**: measuring the branch it was told to replace found it produced *wrong answers* — DeltaBlue died on the shipping tier-2 hook — which 4-2a fixes, and 4-2b's specialization takes **44.7% of the corpus's executed reads off the cache path at 0.818× each**, which is **0.83% of suite time**. That number is the phase's own warning: the whole read path is ≤ ~9% of Octane's execution time here and the whole call path ≤ ~5.5%, so **4-4's ceiling is smaller than the phase assumed** | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → single-match `replace` without a builder ✅ (both builtins) → the global case's retained result list ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
 **Dependencies.**

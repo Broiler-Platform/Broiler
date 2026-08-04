@@ -1,0 +1,1340 @@
+From bd4b6b13c8120f50fd0fcea6faa93364957f424f Mon Sep 17 00:00:00 2001
+From: Enrico Bartky <enrico.bartky@gmail.com>
+Date: Tue, 4 Aug 2026 10:33:46 +0000
+Subject: [PATCH 2/2] Specialize a promoted function's monomorphic reads, item
+ 4-2b
+
+The item asked for "monomorphic property access to a shape check plus direct
+slot read". What was missing was not the codegen - 4-3b built the in-method
+branch - but a way for the tier-2 compile to ADDRESS tier-1's feedback. A
+recompile re-parses the source, so every property read it emitted allocated a
+fresh inline-cache site: promoting a function silently threw away every warm
+cache it had, and the original sites' indices were nowhere, so nothing could ask
+what they had seen.
+
+Tier-1 now records the half-open range of read sites its body compile allocated
+and tier-2 hands those same indices back out in emission order. That carries the
+warm caches across promotion and makes item 4-1's per-site feedback addressable.
+The mapping is ordinal and deliberately not trusted: the site counter is
+process-wide, so two threads compiling at once is enough to slide it, and the
+emitted guard therefore compares the key it was built for against the key
+actually read. A slipped mapping fails its guard and falls back, so the mapping
+is a performance heuristic and never a correctness dependency.
+
+A site whose whole history is one shape resolving one key to one own slot is
+emitted through SpeculationBuilder.Guarded as a key compare, a type test, a
+shape-id compare against a literal and a slot load at a literal index, with the
+cached get as the fallback arm. This is 4-3b's first JavaScript-level consumer
+and it needs the guarantee that facility exists for - the receiver is evaluated
+exactly once, so f().x does not run f() twice.
+
+Counted exactly rather than argued: a specialized read records no cache hit, so
+cacheHits(tiered) - cacheHits(specializing) is the number of executed reads
+taken off the cache path, and cache MISSES come out identical in six of seven
+suites. 16 943 490 of 37 871 908 reads, 44.74%, carried by 1 130 sites, with
+156 guard misses and 30 poisoned sites - the monomorphism holds well past the
+promotion point.
+
+Each such read is 0.818x (46.83 -> 37.12 ns per iteration, six pairs,
+0.778-0.879) on a probe whose body is one read in a loop. The suite wall clock
+does not move: 0.9947 against a feedback-on control, which is the arm that
+matters - a first two-arm run read DeltaBlue's 1.232 as the specialization's
+cost when it is the cost of collecting feedback (1.0249 overall). That is
+arithmetic rather than failure: 16.9 M x 9.7 ns is 164 ms of a 19.7 s run,
+0.83%, under a +/-2% floor. It also bounds the phase - the whole read path is at
+most ~9% of Octane's execution time here and the whole call path at most ~5.5%.
+
+Off by default. SpecializeFromTypeFeedback gates the emission on the plan rather
+than on whether feedback happens to be recording, so collection and consumption
+are independently controllable, which is what made the three-arm measurement
+expressible at all.
+
+Adds SpecializingTierTests (16 cases) and --specializing-read-probe. Repository
+suite: 7 823 tests across 13 projects, 0 failures.
+---
+ .../Function/JSFunction.cs                    |  25 +-
+ .../SpecializingTierTests.cs                  | 361 ++++++++++++++++++
+ .../FastCompiler.CreateFunction.cs            |  12 +-
+ .../Broiler.JavaScript.Engine/JSContext.cs    |   5 +
+ .../LinqExpressions/JSFunctionBuilder.cs      |  18 +-
+ .../LinqExpressions/JSValueBuilder.cs         |  56 ++-
+ .../FunctionTiering.cs                        |  18 +
+ .../Broiler.JavaScript.Runtime/JSObject.cs    |  20 +
+ .../Broiler.JavaScript.Runtime/ObjectShape.cs |  17 +-
+ .../SpecializingTier.cs                       | 156 ++++++++
+ .../TypeFeedback.cs                           | 115 +++++-
+ .../Program.cs                                |  15 +-
+ .../SpecializingTierMetrics.cs                | 148 ++++++-
+ 13 files changed, 940 insertions(+), 26 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpecializingTierTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Runtime/SpecializingTier.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs
+index 61eac3e1..4e608197 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs
+@@ -117,6 +117,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+     internal JSFunctionDelegate f;
+     private FunctionTieringController tieringController;
+     private FunctionTieringState tieringState;
++    private (int First, int End) tieringReadSites;
+     private string tieringLocation;
+     private JSContext realm;
+     public bool CoerceThisOnInvoke { get; set; }
+@@ -304,8 +305,13 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+     }
+ 
+     /// <summary>Enables the compiler-proven, opt-in tiering site for this function.</summary>
++    /// <param name="firstReadSite">
++    /// The half-open range of property-read inline-cache sites the tier-1 compile allocated for
++    /// this body, replayed by the tier-2 recompile (item 4-2b).
++    /// </param>
++    /// <param name="endReadSite"><inheritdoc cref="firstReadSite" path="/node()" /></param>
+     [EditorBrowsable(EditorBrowsableState.Never)]
+-    public void EnableTiering(NumericLoopPlan numericPlan, string location)
++    public void EnableTiering(NumericLoopPlan numericPlan, string location, int firstReadSite, int endReadSite)
+     {
+         CaptureRealm();
+         tieringController = realm?.FunctionTiering;
+@@ -313,6 +319,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+             return;
+ 
+         tieringLocation = string.IsNullOrWhiteSpace(location) ? "tiered-function.js" : location;
++        tieringReadSites = (firstReadSite, endReadSite);
+         tieringState = tieringController.CreateState(
+             checked(Math.Max(256, source.Length * 6L)),
+             () => RecompileForTiering(numericPlan));
+@@ -351,6 +358,22 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         // condition the recompile can reproduce; the identity conditions it cannot reproduce are
+         // refused instead, in TieringRecompileContract.
+         var wrappedSource = IsStrictMode ? $"'use strict';({source.Value})" : $"({source.Value})";
++
++        // The specializing half (item 4-2b). Inside this scope every property read the recompile
++        // emits takes the tier-1 site index it had before, in order — so the warm inline caches
++        // carry over rather than the promoted function starting cold, and item 4-1's feedback for
++        // each site becomes addressable. A site whose whole history is one shape and one own slot
++        // is emitted as a shape guard plus a direct slot load, with the cached get as the
++        // fallback arm; everything else is emitted exactly as tier-1 emitted it.
++        //
++        // The code cache is deliberately NOT shared across promotions: two functions with
++        // identical source have different site ranges, so a cached tree would carry the first
++        // one's specializations into the second. MaxEntries = 1 already gives one entry per
++        // recompile, and the entry is scoped to this call.
++        using var specializing = SpecializingTier.Recompiling(
++            tieringReadSites.First,
++            tieringReadSites.End,
++            tieringController.SpecializeFromTypeFeedback);
+         var factory = CoreScript.Compile(
+             wrappedSource,
+             tieringLocation + "#tier1",
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpecializingTierTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpecializingTierTests.cs
+new file mode 100644
+index 00000000..81e86f8b
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpecializingTierTests.cs
+@@ -0,0 +1,361 @@
++using System;
++using Broiler.JavaScript.BuiltIns;
++using Broiler.JavaScript.Engine;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// The specializing tier-2 compile (docs/performance-roadmap.md item 4-2b).
++//
++// A promoted function's property reads are re-emitted at their ORIGINAL inline-cache site
++// indices, so item 4-1's per-site feedback becomes addressable from the recompile. A site whose
++// whole history is one shape, resolving one key to one own slot, is emitted as a shape guard plus
++// a direct slot load — through item 4-3b's in-method fallback, whose first JavaScript-level
++// consumer this is — with the ordinary cached get as the fallback arm.
++//
++// Every test here runs the same source through a specializing and an untiered context and
++// requires the two to agree. The untiered answer is the specification; the speculation snapshot
++// is what says the specialized path was actually emitted, without which a passing test would only
++// prove that nothing happened.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public sealed class SpecializingTierTests
++{
++    private static JSContext Specializing(int threshold = 2)
++        => JavaScriptBootstrap.CreateContextBuilder()
++            .UseBuiltInRegistry(DefaultBuiltInRegistry.Instance)
++            .UseFunctionTiering(new FunctionTieringOptions
++            {
++                Enabled = true,
++                InvocationThreshold = threshold,
++                MaxRecompilations = 64,
++                MaxRetainedCodeBytes = 8L * 1024 * 1024,
++                SpecializeFromTypeFeedback = true,
++            })
++            .Build();
++
++    private static JSContext Untiered()
++        => JavaScriptBootstrap.CreateContextBuilder()
++            .UseBuiltInRegistry(DefaultBuiltInRegistry.Instance)
++            .Build();
++
++    private static string Run(JSContext context, string source)
++    {
++        try
++        {
++            return context.Eval(source).ToString();
++        }
++        catch (Exception e)
++        {
++            return e.GetType().Name;
++        }
++    }
++
++    private readonly record struct Outcome(string Answer, int SpeculationSites, long GuardsMissed, long Recompilations);
++
++    /// <summary>
++    /// Runs <paramref name="source"/> with and without the specializing tier and asserts the
++    /// answers agree, returning what the specializing run did.
++    /// </summary>
++    private static Outcome Compare(string source, string expected, int threshold = 2)
++    {
++        using var untiered = Untiered();
++        var control = Run(untiered, source);
++        Assert.Equal(expected, control);
++
++        var previouslyEnabled = TypeFeedback.Enabled;
++        try
++        {
++            TypeFeedback.Reset();
++            Speculation.Reset();
++            using var specializing = Specializing(threshold);
++            var answer = Run(specializing, source);
++            Assert.Equal(control, answer);
++
++            var speculation = Speculation.Snapshot();
++            return new Outcome(
++                answer,
++                speculation.Sites,
++                speculation.GuardsMissed,
++                specializing.FunctionTiering.Snapshot().Recompilations);
++        }
++        finally
++        {
++            TypeFeedback.Enabled = previouslyEnabled;
++            TypeFeedback.Reset();
++            Speculation.Reset();
++        }
++    }
++
++    private const string Monomorphic = """
++        function total(p) { var t = 0; for (var i = 0; i < 4; i++) t += p.x; return t; }
++        var a = { x: 1, y: 2 };
++        [total(a), total(a), total(a), total(a)].join('|');
++        """;
++
++    // The base case, and the one that says the machinery runs at all: four reads of one own data
++    // property on one shape. The site is monomorphic, so the promoted body reads the slot behind
++    // a shape guard — and never misses, because the receiver never changes shape.
++    [Fact]
++    public void AMonomorphicOwnPropertyReadIsSpecializedAndCorrect()
++    {
++        var outcome = Compare(Monomorphic, "4|4|4|4");
++
++        Assert.Equal(1, outcome.Recompilations);
++        Assert.True(outcome.SpeculationSites >= 1,
++            $"expected a specialized read, got {outcome.SpeculationSites} speculation sites");
++        Assert.Equal(0, outcome.GuardsMissed);
++    }
++
++    // The control for the control: with feedback off nothing is specialized, and the same source
++    // still answers the same. Without this, "speculation sites >= 1" above could be measuring
++    // some other part of the engine.
++    [Fact]
++    public void WithoutFeedbackNothingIsSpecialized()
++    {
++        using var untiered = Untiered();
++        Assert.Equal("4|4|4|4", Run(untiered, Monomorphic));
++
++        var previouslyEnabled = TypeFeedback.Enabled;
++        try
++        {
++            TypeFeedback.Enabled = false;
++            TypeFeedback.Reset();
++            Speculation.Reset();
++            using var tiered = JavaScriptBootstrap.CreateContextBuilder()
++                .UseBuiltInRegistry(DefaultBuiltInRegistry.Instance)
++                .UseFunctionTiering(new FunctionTieringOptions
++                {
++                    Enabled = true,
++                    InvocationThreshold = 2,
++                    MaxRecompilations = 64,
++                    MaxRetainedCodeBytes = 8L * 1024 * 1024,
++                    SpecializeFromTypeFeedback = false,
++                })
++                .Build();
++
++            Assert.Equal("4|4|4|4", Run(tiered, Monomorphic));
++            Assert.Equal(1, tiered.FunctionTiering.Snapshot().Recompilations);
++            Assert.Equal(0, Speculation.Snapshot().Sites);
++        }
++        finally
++        {
++            TypeFeedback.Enabled = previouslyEnabled;
++            TypeFeedback.Reset();
++            Speculation.Reset();
++        }
++    }
++
++    // ── the guard has to be able to fail, and failing has to be right ────────────────
++
++    // A second shape arrives only AFTER promotion, so the feedback still says monomorphic and the
++    // guard is emitted — then misses. The answer must not change.
++    [Fact]
++    public void AShapeTheFeedbackNeverSawFallsBackToTheCachedGet()
++    {
++        var outcome = Compare("""
++            function read(p) { var t = p.x; return t; }
++            var a = { x: 1 };
++            var out = [read(a), read(a), read(a)];
++            var b = { w: 0, x: 9 };
++            out.push(read(b), read(b));
++            out.join('|');
++            """, "1|1|1|9|9");
++
++        Assert.True(outcome.GuardsMissed >= 1,
++            $"expected the guard to miss on the second shape, got {outcome.GuardsMissed}");
++    }
++
++    // Adding a property to the very receiver the feedback described moves it to a new shape id,
++    // so the guard fails on an object that is otherwise the same one.
++    [Fact]
++    public void GrowingTheReceiverInvalidatesTheGuard()
++        => Compare("""
++            function read(p) { var t = p.x; return t; }
++            var a = { x: 1 };
++            var out = [read(a), read(a), read(a)];
++            a.z = 5;
++            out.push(read(a), read(a));
++            out.join('|');
++            """, "1|1|1|1|1");
++
++    // Deleting a property drops the object out of shape mode entirely.
++    [Fact]
++    public void DeletingAPropertyDropsToTheGenericPath()
++        => Compare("""
++            function read(p) { var t = p.x; return t; }
++            var a = { x: 1, y: 2 };
++            var out = [read(a), read(a), read(a)];
++            delete a.y;
++            out.push(read(a), read(a));
++            out.join('|');
++            """, "1|1|1|1|1");
++
++    // Redefining the property as an accessor must be observed: a slot load would answer the old
++    // value, and there is no old value to answer.
++    [Fact]
++    public void RedefiningAsAnAccessorIsObserved()
++        => Compare("""
++            function read(p) { var t = p.x; return t; }
++            var a = { x: 1 };
++            var out = [read(a), read(a), read(a)];
++            Object.defineProperty(a, 'x', { get: function () { return 42; }, configurable: true });
++            out.push(read(a), read(a));
++            out.join('|');
++            """, "1|1|1|42|42");
++
++    // Writing through the property between reads: the slot is the same, the value is not.
++    [Fact]
++    public void AWrittenSlotReadsTheNewValue()
++        => Compare("""
++            function read(p) { var t = p.x; return t; }
++            var a = { x: 1 };
++            var out = [read(a), read(a), read(a)];
++            a.x = 7;
++            out.push(read(a), read(a));
++            out.join('|');
++            """, "1|1|1|7|7");
++
++    // ── what the specialization must decline ─────────────────────────────────────────
++
++    // A method lives on the PROTOTYPE, so no own slot describes it and the site is never
++    // specialized — the read stays on the cached get, which has the prototype guards. Kept
++    // because getting this wrong would read some unrelated own slot of the receiver.
++    [Fact]
++    public void APrototypeResolvedReadIsNotSpecialized()
++    {
++        var outcome = Compare("""
++            function Point(x) { this.x = x; }
++            Point.prototype.scale = 3;
++            function read(p) { var t = p.scale; return t; }
++            var a = new Point(1);
++            [read(a), read(a), read(a), read(a)].join('|');
++            """, "3|3|3|3");
++
++        Assert.Equal(0, outcome.SpeculationSites);
++    }
++
++    // An element read is not a shape read at all — the key is an array index, which no shape
++    // tracks, and the feedback declines to describe it for the same reason the cache declines to
++    // cache it.
++    [Fact]
++    public void AnIndexedReadIsNotSpecialized()
++        => Compare("""
++            function read(p) { var t = p[0]; return t; }
++            var a = [5, 6];
++            [read(a), read(a), read(a), read(a)].join('|');
++            """, "5|5|5|5");
++
++    // A site that saw two shapes BEFORE promotion is polymorphic in the feedback, so nothing is
++    // emitted for it — this is the half 4-1 exists to answer, and the only one the guard cannot
++    // recover on its own without paying for a speculation that was never going to hold.
++    //
++    // The threshold has to be raised for this to be expressible at all, and that is worth saying:
++    // at the default the site's whole history when the recompile reads it is the handful of calls
++    // that got the function promoted, so "what the site saw" is a claim about very little. The
++    // shipping threshold is 64; this uses 8 so the second shape is seen four times first.
++    [Fact]
++    public void APolymorphicSiteIsNotSpecialized()
++    {
++        var outcome = Compare("""
++            function read(p) { var t = p.x; return t; }
++            var a = { x: 1 };
++            var b = { w: 0, x: 2 };
++            var out = [];
++            for (var i = 0; i < 5; i++) { out.push(read(a)); out.push(read(b)); }
++            out.join('|');
++            """, "1|2|1|2|1|2|1|2|1|2", threshold: 8);
++
++        Assert.Equal(0, outcome.SpeculationSites);
++    }
++
++    // ── the guarantee the facility exists for ────────────────────────────────────────
++
++    // The receiver is evaluated EXACTLY ONCE. Hand-rolled, the conditional would evaluate it in
++    // the guard and again in whichever arm ran, so an effectful receiver would run twice — a
++    // wrong answer visible only on receivers nobody tests by hand. This is item 4-3b's stated
++    // guarantee, exercised through JavaScript for the first time.
++    [Fact]
++    public void AnEffectfulReceiverIsEvaluatedOnce()
++        => Compare("""
++            var calls = 0;
++            var target = { x: 1 };
++            function make() { calls++; return target; }
++            function read() { var t = make().x; return t; }
++            var out = [read(), read(), read(), read()];
++            out.join('|') + '|' + calls;
++            """, "1|1|1|1|4");
++
++    // The same, on the miss path: the fallback arm must not re-evaluate either.
++    [Fact]
++    public void AnEffectfulReceiverIsEvaluatedOnceWhenTheGuardMisses()
++        => Compare("""
++            var calls = 0;
++            var first = { x: 1 };
++            var second = { w: 0, x: 2 };
++            var current = first;
++            function make() { calls++; return current; }
++            function read() { var t = make().x; return t; }
++            var out = [read(), read(), read()];
++            current = second;
++            out.push(read(), read());
++            out.join('|') + '|' + calls;
++            """, "1|1|1|2|2|5");
++
++    // ── the site range, which is what makes the feedback addressable ─────────────────
++
++    // Two functions with IDENTICAL source text and different site ranges. If the recompile reused
++    // one range for both — a shared code cache would do exactly that — the second would read the
++    // first's slots. They are given receivers whose shapes put `x` at different slots, so a
++    // crossed mapping answers the wrong number rather than merely missing.
++    [Fact]
++    public void TwoIdenticalFunctionsDoNotShareASiteRange()
++        => Compare("""
++            function one(p) { var t = p.x; return t; }
++            function two(p) { var t = p.x; return t; }
++            var flat = { x: 11 };
++            var deep = { a: 0, b: 0, x: 22 };
++            var out = [];
++            for (var i = 0; i < 4; i++) { out.push(one(flat)); out.push(two(deep)); }
++            out.join('|');
++            """, "11|22|11|22|11|22|11|22");
++
++    // Several reads in one body, so the ordinal mapping has to line up for more than one site.
++    // Each key sits at a different slot, so a mapping off by one answers the wrong property.
++    [Fact]
++    public void SeveralReadsInOneBodyKeepTheirOwnSites()
++    {
++        var outcome = Compare("""
++            function read(p) { var t = p.a + ':' + p.b + ':' + p.c; return t; }
++            var o = { a: 'A', b: 'B', c: 'C' };
++            [read(o), read(o), read(o), read(o)].join('|');
++            """, "A:B:C|A:B:C|A:B:C|A:B:C");
++
++        Assert.True(outcome.SpeculationSites >= 3,
++            $"expected all three reads specialized, got {outcome.SpeculationSites}");
++        Assert.Equal(0, outcome.GuardsMissed);
++    }
++
++    // A read whose receiver is not an object at all. The guard's type test is what catches it,
++    // and the fallback has to produce the same TypeError the untiered engine produces.
++    [Fact]
++    public void ANullReceiverStillThrowsTheSameWay()
++        => Compare("""
++            function read(p) { var t = p.x; return t; }
++            var a = { x: 1 };
++            var out = [read(a), read(a), read(a)];
++            try { read(null); out.push('no throw'); } catch (e) { out.push(e.name); }
++            out.join('|');
++            """, "1|1|1|TypeError");
++
++    // A receiver that is a primitive: `'s'.length` resolves through the String wrapper, never
++    // through a shape slot on the receiver.
++    [Fact]
++    public void APrimitiveReceiverTakesTheGenericPath()
++        => Compare("""
++            function read(p) { var t = p.length; return t; }
++            var a = { length: 1 };
++            var out = [read(a), read(a), read(a)];
++            out.push(read('abcd'));
++            out.join('|');
++            """, "1|1|1|4");
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+index dddb0ef4..ed961b6c 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+@@ -64,6 +64,14 @@ partial class FastCompiler
+         thisIsUninitialized: thisIsUninitialized,
+         previousNewTarget: previousNewTarget));
+         {
++            // The first property-read inline-cache site this function's body may allocate. Read
++            // again just before the tiering gate below, the pair bounds the sites this body
++            // emitted — which is how a tier-2 recompile re-emits the SAME site indices instead of
++            // fresh cold ones, and so can ask item 4-1's feedback what each of them saw
++            // (item 4-2b). A bound rather than an inventory: the counter is process-wide, so a
++            // concurrent compilation can interleave into the range, and the emitted guard's key
++            // compare is what makes that cost a poisoned speculation instead of an answer.
++            var firstReadSite = PropertyInlineCacheSite.NextReadSite;
+             cs.CanScalarReplaceLocals = TryPlanScalarReplacement(functionDeclaration, out var capturedNames, out var hasNestedFunction, out var mentionsArguments);
+             cs.CapturedByNestedFunctions = capturedNames;
+             cs.HasNestedFunctions = hasNestedFunction;
+@@ -428,7 +436,9 @@ partial class FastCompiler
+                     jsf = JSFunctionBuilder.EnableTiering(
+                         jsf,
+                         NumericLoopPlanner.TryCreate(functionDeclaration),
+-                        location);
++                        location,
++                        firstReadSite,
++                        PropertyInlineCacheSite.NextReadSite);
+                 }
+             }
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.Engine/JSContext.cs b/Broiler.JS/Broiler.JavaScript.Engine/JSContext.cs
+index 8b853e27..eb073fb9 100644
+--- a/Broiler.JS/Broiler.JavaScript.Engine/JSContext.cs
++++ b/Broiler.JS/Broiler.JavaScript.Engine/JSContext.cs
+@@ -1562,6 +1562,11 @@ public class JSContext : JSObject, IJSExecutionContext, IJSFeatureResolver, IDis
+         Options = options ?? JSContextOptions.Default;
+         Frames.StackUsageLimit = Options.MaxStackUsageBytes;
+         FunctionTiering = new FunctionTieringController(Options.FunctionTiering);
++        // Item 4-2b: the specializing tier consumes item 4-1's feedback, so opting into it opts
++        // into the collection. Process-wide and one-way, for the reason FunctionTieringOptions
++        // records — a site index is process-wide, so its feedback table is too.
++        if (Options.FunctionTiering.Enabled && Options.FunctionTiering.SpecializeFromTypeFeedback)
++            TypeFeedback.Enabled = true;
+         if (Options.BuiltInRegistry == null && !JSEngine.HasExplicitBuiltInRegistry)
+             JSEngine.EnsureBuiltInsAssemblyLoaded();
+         builtInRegistry = Options.BuiltInRegistry ?? JSEngine.BuiltInRegistry;
+diff --git a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSFunctionBuilder.cs b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSFunctionBuilder.cs
+index bff7c39a..d5119b0a 100644
+--- a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSFunctionBuilder.cs
++++ b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSFunctionBuilder.cs
+@@ -73,8 +73,8 @@ public class JSFunctionBuilder
+             ?? throw new InvalidOperationException($"IsStrictMode property not found on {type.FullName}");
+         _isOrdinaryUserFunction = type.GetProperty("IsOrdinaryUserFunction")
+             ?? throw new InvalidOperationException($"IsOrdinaryUserFunction property not found on {type.FullName}");
+-        _enableTiering = type.PublicMethod("EnableTiering", typeof(NumericLoopPlan), typeof(string))
+-            ?? throw new InvalidOperationException($"EnableTiering(NumericLoopPlan, string) not found on {type.FullName}");
++        _enableTiering = type.PublicMethod("EnableTiering", typeof(NumericLoopPlan), typeof(string), typeof(int), typeof(int))
++            ?? throw new InvalidOperationException($"EnableTiering(NumericLoopPlan, string, int, int) not found on {type.FullName}");
+         _captureWithScopes = type.PublicMethod("CaptureWithScopes", typeof(JSValue))
+             ?? throw new InvalidOperationException($"CaptureWithScopes(JSValue) not found on {type.FullName}");
+         _addLegacyCallerAndArguments = type.PublicMethod("AddLegacyCallerAndArguments")
+@@ -222,7 +222,15 @@ public class JSFunctionBuilder
+             temp);
+     }
+ 
+-    public static Expression EnableTiering(Expression target, NumericLoopPlan numericPlan, string location)
++    /// <param name="firstReadSite">
++    /// The half-open range of property-read inline-cache sites this function's body compile
++    /// allocated. A tier-2 recompile re-emits exactly these indices instead of fresh ones, which
++    /// is what carries the warm caches across promotion and makes item 4-1's per-site feedback
++    /// addressable from the recompile (item 4-2b).
++    /// </param>
++    /// <param name="endReadSite"><inheritdoc cref="firstReadSite" path="/node()" /></param>
++    public static Expression EnableTiering(
++        Expression target, NumericLoopPlan numericPlan, string location, int firstReadSite, int endReadSite)
+     {
+         var temp = Expression.Parameter(type, "#tieredFunction");
+         var planExpression = numericPlan == null
+@@ -244,7 +252,9 @@ public class JSFunctionBuilder
+                 temp,
+                 _enableTiering,
+                 planExpression,
+-                Expression.Constant(location)),
++                Expression.Constant(location),
++                Expression.Constant(firstReadSite),
++                Expression.Constant(endReadSite)),
+             temp);
+     }
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSValueBuilder.cs b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSValueBuilder.cs
+index 2b188f22..a284d6c8 100644
+--- a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSValueBuilder.cs
++++ b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSValueBuilder.cs
+@@ -179,11 +179,63 @@ public class JSValueBuilder
+     public static Expression UnwrapOptionalChain(Expression chainResult)
+         => Expression.Call(chainResult, _UnwrapOptionalChain);
+ 
++    private static readonly MethodInfo _SpecializedMatches = typeof(SpecializedPropertyRead)
++        .GetMethod(nameof(SpecializedPropertyRead.Matches),
++            [typeof(JSValue), typeof(KeyString), typeof(uint), typeof(int), typeof(int)])
++        ?? throw new InvalidOperationException("SpecializedPropertyRead.Matches not found");
++    private static readonly MethodInfo _SpecializedRead = typeof(SpecializedPropertyRead)
++        .GetMethod(nameof(SpecializedPropertyRead.Read), [typeof(JSValue), typeof(int)])
++        ?? throw new InvalidOperationException("SpecializedPropertyRead.Read not found");
++
+     /// <summary>Creates one bounded inline-cache side-table entry for an emitted constant-key read.</summary>
++    /// <remarks>
++    /// Inside a tier-2 recompile the site index is the tier-1 site's rather than a fresh one, so
++    /// the warm cache carries over instead of the promoted function starting cold — and item
++    /// 4-1's feedback for that site becomes addressable, which is what item 4-2b specializes on.
++    /// Outside one this is unchanged.
++    /// </remarks>
+     public static Expression CachedIndex(Expression target, Expression property)
+     {
+-        var site = PropertyInlineCacheSite.Allocate();
+-        return Expression.Call(null, _CachedPropertyGet, Expression.Constant(site), target, property);
++        var site = SpecializingTier.NextReadSite();
++        var generic = Expression.Call(null, _CachedPropertyGet, Expression.Constant(site), target, property);
++
++        if (!SpecializingTier.MaySpecialize
++            || !TypeFeedback.TryGetMonomorphicOwnSlot(site, out var key, out var shapeId, out var slot))
++        {
++            return generic;
++        }
++
++        return SpecializedRead(site, target, property, key, shapeId, slot);
++    }
++
++    /// <summary>
++    /// <c>shape matches ? slot load : cached get</c>, over a single evaluation of the receiver
++    /// (docs/performance-roadmap.md item 4-2b).
++    /// </summary>
++    /// <remarks>
++    /// Built through <c>SpeculationBuilder.Guarded</c> rather than as a hand-rolled conditional,
++    /// for the reason that facility exists: the receiver is evaluated <b>exactly once</b>. Spelled
++    /// by hand it would be evaluated in the guard and again in whichever arm ran, so a receiver
++    /// with an effect — <c>f().x</c> — would run <c>f()</c> twice. That is item 4-3b's guarantee,
++    /// and this is its first JavaScript-level consumer; 4-3b recorded that it had none, and that
++    /// the reason was structural rather than scope-trimming, because a guard needs an observation
++    /// to speculate on and only a tier-2 recompile has one.
++    /// </remarks>
++    private static Expression SpecializedRead(
++        int site, Expression target, Expression property, uint key, int shapeId, int slot)
++    {
++        var keyConstant = Expression.Constant(key);
++        var shapeConstant = Expression.Constant(shapeId);
++        var slotConstant = Expression.Constant(slot);
++
++        return SpeculationBuilder.Guarded(
++            Speculation.Allocate(),
++            target,
++            receiver => Expression.Call(
++                null, _SpecializedMatches, receiver, property, keyConstant, shapeConstant, slotConstant),
++            receiver => Expression.Call(null, _SpecializedRead, receiver, slotConstant),
++            receiver => Expression.Call(null, _CachedPropertyGet, Expression.Constant(site), receiver, property),
++            typeof(JSValue));
+     }
+ 
+     /// <summary>
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/FunctionTiering.cs b/Broiler.JS/Broiler.JavaScript.Runtime/FunctionTiering.cs
+index b256f6ea..b3314be9 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/FunctionTiering.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/FunctionTiering.cs
+@@ -14,6 +14,21 @@ public sealed class FunctionTieringOptions
+     public int MaxRecompilations { get; init; } = 32;
+     public long MaxRetainedCodeBytes { get; init; } = 4L * 1024 * 1024;
+ 
++    /// <summary>
++    /// Whether a promoted function's monomorphic property reads are emitted as a shape guard plus
++    /// a direct slot load, using item 4-1's per-site type feedback (item 4-2b).
++    /// </summary>
++    /// <remarks>
++    /// <b>Off by default, and it turns feedback on process-wide when set.</b> The specialization
++    /// consumes what 4-1 recorded, and 4-1's collection is a static switch rather than a per-realm
++    /// one — deliberately, since a site index is process-wide too. So enabling this on one realm
++    /// starts recording property feedback for every realm in the process, and the recording is not
++    /// turned back off when the realm goes away. That is stated rather than hidden: a host that
++    /// wants tiering without the recording leaves this clear, and gets exactly the tier-2 recompile
++    /// item 4-2a left behind.
++    /// </remarks>
++    public bool SpecializeFromTypeFeedback { get; init; }
++
+     internal void Validate()
+     {
+         if (!Enabled)
+@@ -62,6 +77,9 @@ public sealed class FunctionTieringController
+ 
+     public bool Enabled => options.Enabled;
+ 
++    /// <inheritdoc cref="FunctionTieringOptions.SpecializeFromTypeFeedback"/>
++    public bool SpecializeFromTypeFeedback => options.SpecializeFromTypeFeedback;
++
+     public FunctionTieringSnapshot Snapshot() => new(
+         Interlocked.Read(ref candidates),
+         Interlocked.Read(ref invocations),
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+index e49aee18..39101805 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+@@ -418,6 +418,26 @@ public partial class JSObject : JSValue
+     /// the id. The remaining bounds and null checks are cheap and keep a stale or
+     /// partially-initialized cache entry from reading out of range.
+     /// </remarks>
++    /// <summary>
++    /// The <see cref="TryReadShapeSlot"/> guard on its own, for a caller that reads the slot in a
++    /// separate step (item 4-2b's specialized property read).
++    /// </summary>
++    /// <remarks>
++    /// Split in two because the two halves are emitted into different arms of one conditional:
++    /// the guard decides, and only the taken arm reads. Nothing runs between them — they are the
++    /// test and the consequent of the same branch — so the read needs no re-validation, and the
++    /// duplicated slot load is a second hit on the line the guard just touched.
++    /// </remarks>
++    [MethodImpl(MethodImplOptions.AggressiveInlining)]
++    internal bool HasShapeSlotValue(int shapeId, int slot)
++        => objectShape.Id == shapeId
++            && (uint)slot < (uint)shapeSlots.Length
++            && shapeSlots[slot] != null;
++
++    /// <summary>Reads a slot <see cref="HasShapeSlotValue"/> has just validated.</summary>
++    [MethodImpl(MethodImplOptions.AggressiveInlining)]
++    internal JSValue ReadShapeSlotUnchecked(int slot) => shapeSlots[slot];
++
+     internal bool TryReadShapeSlot(int shapeId, int slot, out JSValue value)
+     {
+         if (objectShape.Id == shapeId
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs b/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
+index a2896734..2e00f1ac 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
+@@ -250,6 +250,19 @@ public static class PropertyInlineCacheSite
+ 
+     public static int Allocate() => SiteTable<PropertyInlineCache>.Allocate();
+ 
++    /// <summary>
++    /// The index <see cref="Allocate"/> would hand out next. Read either side of one function's
++    /// body compilation to bound the read sites it emitted, which is how a tier-2 recompile finds
++    /// the tier-1 sites whose feedback it consumes (item 4-2b).
++    /// </summary>
++    /// <remarks>
++    /// A bound, not an inventory: the counter is process-wide, so another thread compiling at the
++    /// same time interleaves its own sites into the range. That is why the emitted guard compares
++    /// the key it was built for against the key actually read — a range that picked up a foreign
++    /// site costs a poisoned speculation, never an answer.
++    /// </remarks>
++    public static int NextReadSite => SiteTable<PropertyInlineCache>.Next;
++
+     public static JSValue Get(int site, JSValue target, KeyString key)
+     {
+         // Item 4-1. The cache below observes shapes to answer THIS read and forgets them —
+@@ -258,7 +271,7 @@ public static class PropertyInlineCacheSite
+         // where the site index is in hand, behind the same predictable branch the cache-hit
+         // counter on the line below already pays.
+         if (TypeFeedback.Enabled)
+-            TypeFeedback.RecordPropertyShape(site, target is JSObject shaped ? shaped.CurrentShapeId : 0);
++            TypeFeedback.RecordPropertyRead(site, target, in key);
+ 
+         if ((uint)site >= MaxSites)
+             return target[key];
+@@ -297,6 +310,8 @@ public static class PropertyInlineCacheSite
+         private static TCache[] sites = new TCache[64];
+         private static int nextSite;
+ 
++        public static int Next => Volatile.Read(ref nextSite);
++
+         public static int Allocate()
+         {
+             lock (allocationLock)
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/SpecializingTier.cs b/Broiler.JS/Broiler.JavaScript.Runtime/SpecializingTier.cs
+new file mode 100644
+index 00000000..4fc1366f
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/SpecializingTier.cs
+@@ -0,0 +1,156 @@
++using System;
++using System.Runtime.CompilerServices;
++using System.Threading;
++using Broiler.JavaScript.Storage;
++
++namespace Broiler.JavaScript.Runtime;
++
++/// <summary>
++/// The two runtime halves of a specialized property read: the guard that decides whether the
++/// speculation holds, and the slot load taken when it does (docs/performance-roadmap.md item
++/// 4-2b).
++/// </summary>
++/// <remarks>
++/// <para>
++/// This is what a monomorphic read compiles into instead of
++/// <see cref="PropertyInlineCacheSite.Get"/>. The cache's own monomorphic hit already ends in a
++/// shape-id compare and a slot load — but it gets there through a static call taking a
++/// <c>KeyString</c>, a bounds test, a side-table read, a megamorphic flag, a receiver type test,
++/// a key compare, an entry loop and a holder test, and it re-reads the shape id and slot out of
++/// a cache entry rather than having them as constants. Specializing removes all of that: the
++/// shape id and the slot are literals in the emitted code, so what is left is a type test, two
++/// integer compares and an array load.
++/// </para>
++/// <para>
++/// <b>Split into a guard and a read</b> because the two go into different arms of one
++/// conditional. Nothing runs between the test and the consequent of a branch, so the read needs
++/// no re-validation; the slot load happening twice is a second hit on a line the guard has just
++/// touched, and it is what buys the guard being expressible as a plain <c>bool</c> that
++/// <see cref="LinqExpressions"/>' speculation builder can use unchanged.
++/// </para>
++/// <para>
++/// <b>The key compare is not redundant.</b> The tier-2 compile addresses a tier-1 site by its
++/// ORDINAL position in the function's emission, and the site counter is process-wide — two
++/// threads compiling at once is enough to slide the mapping. Comparing the key the
++/// specialization was built for against the key actually being read turns any such slip into a
++/// failed guard, which poisons the site and falls back. So the mapping is a performance
++/// heuristic and never a correctness dependency, which is the property that makes an ordinal
++/// mapping acceptable at all.
++/// </para>
++/// </remarks>
++public static class SpecializedPropertyRead
++{
++    /// <summary>
++    /// Whether <paramref name="target"/> is an object of exactly <paramref name="shapeId"/> whose
++    /// <paramref name="slot"/> holds a value, and whose read is for <paramref name="expectedKey"/>.
++    /// </summary>
++    /// <remarks>
++    /// <paramref name="key"/> is taken by value rather than <c>in</c>: it is one <c>uint</c>, so
++    /// the copy is free, and a by-ref parameter would need the emitted call to have an address to
++    /// hand over — which a key that is a static field read does not obviously have.
++    /// </remarks>
++    [MethodImpl(MethodImplOptions.AggressiveInlining)]
++    public static bool Matches(JSValue target, KeyString key, uint expectedKey, int shapeId, int slot)
++        => key.Key == expectedKey
++            && target is JSObject shaped
++            && shaped.HasShapeSlotValue(shapeId, slot);
++
++    /// <summary>Loads the slot <see cref="Matches"/> has just validated.</summary>
++    [MethodImpl(MethodImplOptions.AggressiveInlining)]
++    public static JSValue Read(JSValue target, int slot)
++        => ((JSObject)target).ReadShapeSlotUnchecked(slot);
++}
++
++/// <summary>
++/// The tier-2 compile's plan: which tier-1 read sites the recompile is re-emitting, so it can ask
++/// item 4-1's feedback what each of them saw (item 4-2b).
++/// </summary>
++/// <remarks>
++/// <para>
++/// <b>Why a plan is needed at all.</b> A tier-2 recompile re-parses the function's source, and
++/// every property read it emits allocates a <em>fresh</em> inline-cache site. So before this
++/// existed, promoting a function silently threw away every warm cache it had and started over
++/// cold — and, more to the point, there was no way to ask what the ORIGINAL sites had seen,
++/// because their indices were nowhere. Tier-1 records the half-open range of read sites its body
++/// compile allocated; tier-2 hands those same indices back out, in order.
++/// </para>
++/// <para>
++/// <b>A plain static under a lock, not a thread-static.</b> A compilation does not stay on the
++/// thread that asked for it — <c>CompilationStack</c> moves anything over 512 characters onto a
++/// sized worker — so a thread-local would be invisible exactly when the function is big enough to
++/// be worth promoting. The lock makes concurrent tier-2 recompiles serialize with each other; it
++/// is not taken by ordinary compilation, and promotions are rare (under a hundred per Octane
++/// suite), so what it serializes is measured in the tens.
++/// </para>
++/// <para>
++/// <b>Exhaustion is the stopping rule.</b> The plan hands out indices until the recorded range
++/// runs out and then falls back to fresh allocation, which is what keeps a nested or unrelated
++/// compilation triggered from inside the recompile from consuming the range. Combined with the
++/// key compare in <see cref="SpecializedPropertyRead.Matches"/>, an exhausted or misaligned plan
++/// can only cost speed.
++/// </para>
++/// </remarks>
++public static class SpecializingTier
++{
++    private static readonly object gate = new();
++
++    private static Plan active;
++
++    /// <summary>One promoted function's site range, consumed in emission order.</summary>
++    private sealed class Plan(int start, int end, bool specialize)
++    {
++        private int next = start;
++
++        public bool Specialize { get; } = specialize;
++
++        public int Take() => next < end ? next++ : -1;
++    }
++
++    /// <summary>
++    /// Installs the plan for the duration of one tier-2 compilation. Serializes against other
++    /// tier-2 compilations; ordinary compilation never takes the lock.
++    /// </summary>
++    /// <param name="specialize">
++    /// Whether monomorphic reads may be specialized. Separate from whether feedback happens to be
++    /// recording, so the two are independently controllable — which is what lets the cost of
++    /// <em>collecting</em> feedback be measured apart from the effect of <em>consuming</em> it.
++    /// Without that separation the two arms of any measurement differ in two things.
++    /// </param>
++    public static IDisposable Recompiling(int firstReadSite, int endReadSite, bool specialize)
++    {
++        Monitor.Enter(gate);
++        Volatile.Write(
++            ref active,
++            endReadSite > firstReadSite ? new Plan(firstReadSite, endReadSite, specialize) : null);
++        return new Scope();
++    }
++
++    private sealed class Scope : IDisposable
++    {
++        public void Dispose()
++        {
++            Volatile.Write(ref active, null);
++            Monitor.Exit(gate);
++        }
++    }
++
++    /// <summary>
++    /// The site index the next emitted property read should use: the corresponding tier-1 site
++    /// while a plan is active and has one left, otherwise a freshly allocated one.
++    /// </summary>
++    public static int NextReadSite()
++    {
++        var plan = Volatile.Read(ref active);
++        if (plan != null)
++        {
++            var replayed = plan.Take();
++            if (replayed >= 0)
++                return replayed;
++        }
++
++        return PropertyInlineCacheSite.Allocate();
++    }
++
++    /// <summary>Whether a tier-2 compilation is in progress and may specialize.</summary>
++    public static bool MaySpecialize => Volatile.Read(ref active)?.Specialize == true;
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/TypeFeedback.cs b/Broiler.JS/Broiler.JavaScript.Runtime/TypeFeedback.cs
+index 91b6efe3..2e5da04c 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/TypeFeedback.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/TypeFeedback.cs
+@@ -2,6 +2,7 @@ using System;
+ using System.Collections.Generic;
+ using System.Runtime.CompilerServices;
+ using System.Threading;
++using Broiler.JavaScript.Storage;
+ 
+ namespace Broiler.JavaScript.Runtime;
+ 
+@@ -102,25 +103,66 @@ public static class TypeFeedback
+         /// <summary>Total times this site ran while recording was on.</summary>
+         public long Observations { get; private set; }
+ 
+-        internal void Record(int shapeId)
++        /// <summary>
++        /// Where the FIRST observed shape put the key this site reads — the (key, slot) pair a
++        /// specializing tier bakes in as constants (item 4-2b).
++        /// </summary>
++        /// <remarks>
++        /// Only meaningful while the site is monomorphic, which <see cref="Classify"/> decides
++        /// and <see cref="TryGetMonomorphicOwnSlot"/> checks before handing it out. Recorded once
++        /// — the first time a shape id is admitted — rather than on every read, because an
++        /// <c>ObjectShape</c> is immutable and interned by key set, so shape id S maps key K to
++        /// slot N for as long as S exists. Re-resolving it per read would cost the trie lookup
++        /// the whole item exists to remove.
++        /// <para>
++        /// <c>DescribedSlot</c> is -1 when the read did not resolve to an own shape slot: the
++        /// receiver was not an object, the key lives on the prototype chain, or the key is an
++        /// array index or private name (neither of which a shape tracks). A site like that is
++        /// observed and classified like any other; it just cannot be specialized this way.
++        /// </para>
++        /// </remarks>
++        public uint DescribedKey { get; private set; }
++
++        /// <inheritdoc cref="DescribedKey"/>
++        public int DescribedSlot { get; private set; } = -1;
++
++        /// <summary>Records a shape id, and whether it was newly distinct.</summary>
++        internal bool Record(int shapeId)
+         {
+             Observations++;
+             for (var i = 0; i < Distinct; i++)
+             {
+                 if (shapeIds[i] == shapeId)
+-                    return;
++                    return false;
+             }
+ 
+             if (Distinct == MaxTracked)
+             {
+                 Overflowed = true;
+-                return;
++                return false;
+             }
+ 
+             shapeIds[Distinct++] = shapeId;
++            return true;
+         }
+ 
+-        internal void Record(object callee)
++        /// <summary>The single shape this site saw, or 0 when it saw none or more than one.</summary>
++        internal int OnlyShapeId => Distinct == 1 && !Overflowed ? shapeIds[0] : 0;
++
++        internal void Describe(uint key, int slot)
++        {
++            // The FIRST admitted shape only. A polymorphic site is not specialized, so a second
++            // description would only ever be read by a site that is about to be refused — and
++            // overwriting would make the retained pair depend on execution order, which is the
++            // kind of thing that reads as a hit rate and behaves like a coin flip.
++            if (DescribedSlot >= 0)
++                return;
++
++            DescribedKey = key;
++            DescribedSlot = slot;
++        }
++
++        internal void RecordCallee(object callee)
+         {
+             Observations++;
+             for (var i = 0; i < Distinct; i++)
+@@ -203,16 +245,73 @@ public static class TypeFeedback
+     }
+ 
+     /// <summary>
+-    /// Records the receiver shape at a property read site. Called from the property site helper,
++    /// Records the receiver shape at a property read site, and — the first time a shape is
++    /// admitted — where that shape puts the key being read. Called from the property site helper,
+     /// which has already tested <see cref="Enabled"/>.
+     /// </summary>
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+-    internal static void RecordPropertyShape(int site, int shapeId)
++    internal static void RecordPropertyRead(int site, JSValue target, in KeyString key)
+     {
+         if ((uint)site >= MaxSites)
+             return;
+ 
+-        RentProperty(site).Record(shapeId);
++        var shaped = target as JSObject;
++        if (!RentProperty(site).Record(shaped?.CurrentShapeId ?? 0))
++            return;
++
++        // Only on the newly-distinct path, which is at most four times per site for the whole
++        // run — so the trie lookup here is not on the hot path even while feedback is on.
++        Describe(site, shaped, in key);
++    }
++
++    private static void Describe(int site, JSObject shaped, in KeyString key)
++    {
++        if (shaped == null)
++            return;
++
++        // The same two exclusions the inline cache applies before it will record an entry: an
++        // array index or canonical numeric key names an ELEMENT, which no shape tracks, and a
++        // private name is per-class-evaluation. Kept in step deliberately — a specialization the
++        // cache would refuse to cache is one nobody has evidence for.
++        if (key.Metadata.IsPrivateName || key.Metadata.IsArrayIndex || key.Metadata.IsCanonicalNumericIndex)
++            return;
++
++        if (shaped.TryGetShapeSlot(in key, out _, out var slot))
++            RentProperty(site).Describe(key.Key, slot);
++    }
++
++    /// <summary>
++    /// The own-slot read a site can be specialized into, when its whole history is one shape and
++    /// that shape resolved the key to an own slot (item 4-2b consumes this).
++    /// </summary>
++    /// <param name="key">
++    /// The key the site was observed reading. It is handed back so the emitted guard can compare
++    /// it against the key actually being read: the tier-2 compile addresses a site by ORDINAL
++    /// position, and if that mapping is ever off — two threads compiling at once is enough — the
++    /// specialization would describe a different property. One integer compare in the guard makes
++    /// that a missed optimization instead of a wrong answer.
++    /// </param>
++    public static bool TryGetMonomorphicOwnSlot(int site, out uint key, out int shapeId, out int slot)
++    {
++        key = 0;
++        shapeId = 0;
++        slot = -1;
++
++        var table = Volatile.Read(ref propertySites);
++        if ((uint)site >= (uint)table.Length)
++            return false;
++
++        var entry = table[site];
++        if (entry == null || Classify(entry) != SiteKind.Monomorphic || entry.DescribedSlot < 0)
++            return false;
++
++        shapeId = entry.OnlyShapeId;
++        if (shapeId == 0)
++            return false;
++
++        key = entry.DescribedKey;
++        slot = entry.DescribedSlot;
++        return true;
+     }
+ 
+     /// <summary>
+@@ -224,7 +323,7 @@ public static class TypeFeedback
+         if (!Enabled || (uint)site >= MaxSites)
+             return callee;
+ 
+-        RentCall(site).Record(callee);
++        RentCall(site).RecordCallee(callee);
+         return callee;
+     }
+ 
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+index 3484982a..c0f03a04 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+@@ -80,9 +80,22 @@ public static class Program
+             return;
+         }
+ 
++        if (args.Length >= 1 && args[0] == "--specializing-read-probe")
++        {
++            SpecializingTierMetrics.WriteReadProbe(
++                args.Length >= 2 ? int.Parse(args[1]) : 20_000_000,
++                args.Length >= 3 ? int.Parse(args[2]) : 6);
++            return;
++        }
++
+         if (args.Length >= 2 && args[0] == "--specializing-tier")
+         {
+-            SpecializingTierMetrics.Write(args[1], args.Length < 3 || args[2] != "off");
++            SpecializingTierMetrics.Write(
++                args[1],
++                args.Length >= 3 && Enum.TryParse<SpecializingTierMetrics.Arm>(args[2], true, out var arm)
++                    ? arm
++                    : SpecializingTierMetrics.Arm.Specializing,
++                counters: args.Length < 4 || args[3] != "timing");
+             return;
+         }
+ 
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index b7b15f6f..64302370 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -34,6 +34,88 @@ namespace Broiler.JavaScript.Engine.Benchmarks;
+ /// </remarks>
+ internal static class SpecializingTierMetrics
+ {
++    /// <summary>
++    /// What one monomorphic property read costs on each path, isolated from everything else.
++    /// </summary>
++    /// <remarks>
++    /// The suite measurement says the specialization removes 44.7% of executed reads from the
++    /// inline-cache path and does not move the wall clock. Two things could explain that — the
++    /// specialized path is not actually cheaper, or property reads are too small a share of the
++    /// time for any change to them to be visible — and they call for opposite follow-ups. This
++    /// separates them: one promoted function whose body is a read in a loop, so essentially all
++    /// of the measured time IS the read path, timed with the specialization on and off.
++    /// </remarks>
++    internal static void WriteReadProbe(int iterations, int repetitions)
++    {
++        const string Probe = """
++            function hot(o, n) {
++              var s = 0;
++              for (var i = 0; i < n; i++) { s = s + o.x; }
++              return s;
++            }
++            """;
++
++        var rows = new List<object>();
++        for (var repetition = 0; repetition < repetitions; repetition++)
++        {
++            // Alternate which arm goes first, so a monotonic drift in the machine does not land
++            // entirely on one of them.
++            var armsInOrder = repetition % 2 == 0
++                ? new[] { Arm.Feedback, Arm.Specializing }
++                : new[] { Arm.Specializing, Arm.Feedback };
++
++            foreach (var arm in armsInOrder)
++            {
++                TypeFeedback.Enabled = arm == Arm.Feedback;
++                TypeFeedback.Reset();
++                Speculation.Reset();
++                PropertyOptimizationDiagnostics.Enabled = false;
++
++                using var context = new JavaScriptContextBuilder()
++                    .UseFunctionTiering(new FunctionTieringOptions
++                    {
++                        Enabled = true,
++                        InvocationThreshold = 2,
++                        MaxRecompilations = 64,
++                        MaxRetainedCodeBytes = 8L * 1024 * 1024,
++                        SpecializeFromTypeFeedback = arm == Arm.Specializing,
++                    })
++                    .Build();
++
++                context.Eval(Probe + "\nvar o = { x: 1 };\nhot(o, 1000); hot(o, 1000); hot(o, 1000);", "probe.js");
++
++                var stopwatch = Stopwatch.StartNew();
++                var answer = context.Eval($"hot(o, {iterations});", "run.js").ToString();
++                stopwatch.Stop();
++
++                rows.Add(new
++                {
++                    arm = arm.ToString(),
++                    repetition,
++                    elapsedMs = stopwatch.Elapsed.TotalMilliseconds,
++                    nsPerRead = stopwatch.Elapsed.TotalMilliseconds * 1_000_000 / iterations,
++                    answer,
++                    specializedReads = Speculation.Snapshot().Sites,
++                    guardsMissed = Speculation.Snapshot().GuardsMissed,
++                });
++            }
++        }
++
++        TypeFeedback.Enabled = false;
++        Console.WriteLine(JsonSerializer.Serialize(
++            new
++            {
++                schema = "broiler.specializing-tier-read-probe/1",
++                iterations,
++                note = "One promoted function whose body is a monomorphic property read in a loop, "
++                    + "so nearly all the measured time is the read path. Both arms record type "
++                    + "feedback; they differ only in whether the read is emitted as a shape guard "
++                    + "plus a direct slot load or as the ordinary cached get.",
++                runs = rows,
++            },
++            new JsonSerializerOptions { WriteIndented = true }));
++    }
++
+     private sealed record Suite(string Name, string[] Files);
+ 
+     private static readonly Suite[] Suites =
+@@ -71,7 +153,24 @@ internal static class SpecializingTierMetrics
+         })()
+         """;
+ 
+-    internal static void Write(string octaneDirectory, bool tieringEnabled)
++    /// <summary>Which of the three arms to run: no tiering, tiering, or tiering that specializes.</summary>
++    internal enum Arm
++    {
++        /// <summary>Tiering off entirely — the answer the engine gives without any of this.</summary>
++        None,
++        /// <summary>Tiering on, specialization off — what item 4-2a left behind.</summary>
++        Tiered,
++        /// <summary>
++        /// Tiering on, feedback recording on, specialization off. The control that separates the
++        /// cost of COLLECTING feedback from the effect of CONSUMING it — without it the two arms
++        /// differ in two things and neither number means anything on its own.
++        /// </summary>
++        Feedback,
++        /// <summary>Tiering on, monomorphic reads specialized — item 4-2b.</summary>
++        Specializing,
++    }
++
++    internal static void Write(string octaneDirectory, Arm arm, bool counters)
+     {
+         if (!Directory.Exists(octaneDirectory))
+         {
+@@ -93,7 +192,7 @@ internal static class SpecializingTierMetrics
+         foreach (var suite in Suites)
+         {
+             Console.Error.WriteLine($"{suite.Name}: running ...");
+-            var row = RunSuite(octaneDirectory, baseSource, suite, tieringEnabled);
++            var row = RunSuite(octaneDirectory, baseSource, suite, arm, counters);
+             if (row != null)
+                 rows.Add(row);
+         }
+@@ -103,7 +202,8 @@ internal static class SpecializingTierMetrics
+             {
+                 schema = "broiler.specializing-tier-metrics/1",
+                 runsPerBenchmark = RunsPerBenchmark,
+-                tieringEnabled,
++                arm = arm.ToString(),
++                counters,
+                 note = "What item 4-2's tier-2 recompile reaches. candidates is how many compiled "
+                     + "functions passed FastCompiler.CreateFunction's tiering gate; recompilations "
+                     + "how many of those got hot enough to be promoted. promotedReadShare is the "
+@@ -115,7 +215,7 @@ internal static class SpecializingTierMetrics
+             new JsonSerializerOptions { WriteIndented = true }));
+     }
+ 
+-    private static object RunSuite(string octaneDirectory, string baseSource, Suite suite, bool tieringEnabled)
++    private static object RunSuite(string octaneDirectory, string baseSource, Suite suite, Arm arm, bool counters)
+     {
+         var sources = new List<string> { baseSource };
+         foreach (var file in suite.Files)
+@@ -133,16 +233,35 @@ internal static class SpecializingTierMetrics
+         // A deliberately generous budget: the question is how many functions the GATE admits and
+         // how many get hot, not how many a 32-recompilation cap lets through. A cap that bound
+         // the answer would make the measurement report the cap.
++        // Process-wide tables, so the arm's numbers are this suite's rather than cumulative.
++        TypeFeedback.Enabled = arm == Arm.Feedback;
++        TypeFeedback.Reset();
++        Speculation.Reset();
++        PropertyOptimizationDiagnostics.Reset();
++
++        // Cache hits are what makes the addressable surface COUNTABLE rather than argued. A read
++        // that takes the specialized path never calls PropertyInlineCacheSite.Get, so it records
++        // no hit — so cacheHits(Tiered) - cacheHits(Specializing) is exactly the number of
++        // executed reads the specialization took off the cache path. Deterministic, unlike a wall
++        // clock, and the arms differ in nothing else.
++        //
++        // Off for a timing pass, because they are a branch and an interlocked increment per read
++        // on the very path being measured. Counts and wall clock therefore come from separate
++        // passes, which is the only honest way to have both.
++        PropertyOptimizationDiagnostics.Enabled = counters;
++
+         using var context = new JavaScriptContextBuilder()
+-            .UseFunctionTiering(tieringEnabled
+-                ? new FunctionTieringOptions
++            .UseFunctionTiering(arm == Arm.None
++                ? FunctionTieringOptions.Disabled
++                : new FunctionTieringOptions
+                 {
+                     Enabled = true,
+                     InvocationThreshold = 64,
+                     MaxRecompilations = 100_000,
+                     MaxRetainedCodeBytes = 512L * 1024 * 1024,
+-                }
+-                : FunctionTieringOptions.Disabled)
++                    // Arm.Feedback records but does not consume, which is the whole point of it.
++                    SpecializeFromTypeFeedback = arm == Arm.Specializing,
++                })
+             .Build();
+ 
+         string outcome;
+@@ -173,6 +292,8 @@ internal static class SpecializingTierMetrics
+ 
+         stopwatch.Stop();
+         var tiering = context.FunctionTiering.Snapshot();
++        var speculation = Speculation.Snapshot();
++        var properties = PropertyOptimizationDiagnostics.Snapshot();
+         var split = outcome.Split('|', 2);
+ 
+         return new
+@@ -191,6 +312,17 @@ internal static class SpecializingTierMetrics
+             budgetRejections = tiering.BudgetRejections,
+             deoptimizations = tiering.Deoptimizations,
+             retainedCodeBytes = tiering.RetainedCodeBytes,
++
++            // One speculation site per property read the tier-2 compile specialized. Guard misses
++            // and poisoned sites say whether the feedback's "only ever saw one shape" held for the
++            // rest of the run — the claim the whole item rests on, checked against execution
++            // rather than argued.
++            specializedReads = speculation.Sites,
++            guardsMissed = speculation.GuardsMissed,
++            poisonedSites = speculation.PoisonedSites,
++
++            cacheHits = properties.CacheHits,
++            cacheMisses = properties.CacheMisses,
+         };
+     }
+ }
+-- 
+2.43.0
+
