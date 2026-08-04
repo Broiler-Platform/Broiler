@@ -1,0 +1,902 @@
+From e34b1efc93f1d50cabfb18a7c6a79ac703f1458d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 4 Aug 2026 06:56:53 +0000
+Subject: [PATCH] Record per-site type feedback, item 4-1
+
+The inline caches already observe shapes, but they observe them to answer the
+current read: entries are replaced when stale (item 2-12) and dropped entirely
+once a site passes four shapes. Feedback has to RETAIN, because "this site only
+ever saw one shape" is a claim about history and a structure designed to be
+overwritten cannot make it. TypeFeedback keeps, per site, the distinct receiver
+shapes at a property read and the distinct callee identities at a call, plus
+the observation count and whether the site overflowed the four-entry cap -- the
+same threshold the cache calls megamorphic.
+
+Two gates, and they are not the same gate. Property feedback is a runtime flag
+tested inside the site helper, which already pays a predictable branch per read
+for the cache-hit counter. Call feedback is gated at COMPILE time: with the
+flag clear the compiler returns the call's target expression untouched, so the
+emitted call is the one emitted before this existed -- no extra hop, no extra
+branch, no extra argument. A call costs ~255 ns and is the path phase 4 exists
+to fix; instrumenting it unconditionally in order to measure it would be
+self-defeating. The cost is that enabling the flag does not retrofit compiled
+code, which a test pins rather than leaving to be discovered.
+
+The item buys no throughput -- 4-2 and 4-4 are what consume it -- so the
+deliverable is what it says about the real corpus, which nothing in the engine
+could report before. Seven Octane suites, weighted by executed operations
+rather than by site count: 93.54% of 37.9M property reads and 96.70% of 4.24M
+calls happen at a site that only ever saw one shape or one callee. Phase 4's
+two XL items are well-founded on this corpus. Megamorphism is essentially
+absent (18 sites in total, five of seven suites have none), which corroborates
+2-10's finding of zero megamorphic read sites. DeltaBlue is the worst read case
+at 77.10% with 43 polymorphic sites against Richards's 1 -- a lead on what is
+left of the suite that still fails phase 2's gate.
+
+Cost when off is zero by construction for calls, and for reads is below what
+this container can resolve: six ABBA-interleaved pairs over a 60M-read loop
+give a median paired ratio of 0.9835 with a 0.961-1.019 spread, so the change
+arm came out nominally faster and the probe bounds the cost at about +/-2%
+rather than showing one.
+
+Adds --type-feedback, TypeFeedbackTests (16 cases), and leaves the item's third
+signal -- numeric-vs-generic outcomes per site -- deliberately uncollected:
+the compiler already proves numeric-ness statically, so a runtime counter would
+have to be defined against that to say anything new.
+---
+ .../TypeFeedbackTests.cs                      | 206 +++++++++++
+ .../LinqExpressions/JSFunctionBuilder.cs      |  27 ++
+ .../Broiler.JavaScript.Runtime/ObjectShape.cs |   8 +
+ .../TypeFeedback.cs                           | 324 ++++++++++++++++++
+ .../Program.cs                                |   6 +
+ .../TypeFeedbackMetrics.cs                    | 213 ++++++++++++
+ 6 files changed, 784 insertions(+)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/TypeFeedbackTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Runtime/TypeFeedback.cs
+ create mode 100644 Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/TypeFeedbackMetrics.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/TypeFeedbackTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/TypeFeedbackTests.cs
+new file mode 100644
+index 00000000..f96fa980
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/TypeFeedbackTests.cs
+@@ -0,0 +1,206 @@
++using Broiler.JavaScript.Engine;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// Per-site type feedback: what an emitted property read or call actually saw over a whole run
++// (docs/performance-roadmap.md item 4-1).
++//
++// The point of the item is that this is NOT the inline cache. The cache observes shapes to
++// answer the current read and then forgets them — it replaces stale entries and drops
++// everything once a site passes four shapes. Feedback has to retain, because "this site only
++// ever saw one shape" is a claim about history that items 4-2 and 4-4 speculate on. So the
++// tests here are about RETENTION and CLASSIFICATION, not about lookup.
++//
++// Shares Phase 3's collection because TypeFeedback, like the other diagnostics, is a
++// process-wide side table.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public class TypeFeedbackTests
++{
++    /// <summary>Runs source with feedback on, and reports what the sites saw.</summary>
++    private static (TypeFeedback.Distribution Reads, TypeFeedback.Distribution Calls, string Result) Observe(string body)
++    {
++        using var context = new JSContext();
++        using (TypeFeedback.Enable())
++        {
++            TypeFeedback.Reset();
++            var result = context.Eval("(function(){ " + body + " })()").ToString();
++            return (TypeFeedback.PropertyDistribution(), TypeFeedback.CallDistribution(), result);
++        }
++    }
++
++    // ── it is off unless asked ───────────────────────────────────────────────────────
++
++    [Fact]
++    public void NothingIsRecordedWhileFeedbackIsDisabled()
++    {
++        TypeFeedback.Reset();
++        Assert.False(TypeFeedback.Enabled);
++
++        using (var context = new JSContext())
++            context.Eval("(function(){ var o = {a:1}; var s = 0; for (var i = 0; i < 50; i++) s += o.a; return s; })()");
++
++        Assert.Equal(0, TypeFeedback.PropertyDistribution().Observations);
++        Assert.Equal(0, TypeFeedback.CallDistribution().Observations);
++    }
++
++    // A call site is emitted only while feedback is on at COMPILE time — that is what keeps a
++    // call free of any extra work when the flag is clear. Compiling first and enabling after
++    // must therefore record no calls, and this pins that so nobody reads a partial figure as a
++    // whole one.
++    [Fact]
++    public void ACallCompiledBeforeFeedbackWasEnabledIsNotRecorded()
++    {
++        TypeFeedback.Reset();
++        using var context = new JSContext();
++
++        // Compiled with the flag clear.
++        var fn = context.Eval("var f = function (x) { return x + 1; }; var g = function () { var s = 0; for (var i = 0; i < 20; i++) s += f(i); return s; }; g;");
++
++        using (TypeFeedback.Enable())
++        {
++            context.Eval("g()");
++
++            // `g()` itself is compiled inside the scope, so that ONE call is recorded. The
++            // twenty `f(i)` calls in g's body were compiled before and are not — which is the
++            // property being pinned: enabling the flag does not retrofit compiled code, and a
++            // figure collected that way would understate the truth rather than overstate it.
++            Assert.True(TypeFeedback.CallDistribution().Observations <= 1,
++                $"expected only the eval'd call, got {TypeFeedback.CallDistribution().Observations}");
++        }
++
++        Assert.NotNull(fn);
++    }
++
++    // ── retention: the claim the inline cache cannot make ────────────────────────────
++
++    [Fact]
++    public void AReadThatOnlyEverSeesOneShapeIsMonomorphic()
++    {
++        var (reads, _, result) = Observe(
++            "var o = { a: 1 }; var s = 0; for (var i = 0; i < 50; i++) { s += o.a; } return s;");
++
++        Assert.Equal("50", result);
++        Assert.True(reads.MonomorphicObservations >= 50,
++            $"expected the hot read to be monomorphic, got {reads.MonomorphicObservations} of {reads.Observations}");
++        Assert.Equal(0, reads.MegamorphicSites);
++    }
++
++    // Five distinct shapes at one site is past the four-entry cap, so the site is megamorphic —
++    // and unlike the cache, feedback still SAYS so afterwards instead of simply stopping.
++    [Fact]
++    public void AReadThatSeesMoreShapesThanTheCapIsMegamorphic()
++    {
++        var (reads, _, result) = Observe("""
++            var os = [ {a:1}, {b:1,a:1}, {c:1,a:1}, {d:1,a:1}, {e:1,a:1} ];
++            var s = 0;
++            for (var i = 0; i < os.length; i++) { s += os[i].a; }
++            return s;
++            """);
++
++        Assert.Equal("5", result);
++        Assert.True(reads.MegamorphicSites >= 1,
++            $"expected a megamorphic read site, got {reads.MegamorphicSites}");
++    }
++
++    // Two shapes is polymorphic, and must not be reported as either of the extremes.
++    [Fact]
++    public void AReadThatSeesTwoShapesIsPolymorphic()
++    {
++        var (reads, _, result) = Observe("""
++            var os = [ {a:1}, {b:1,a:1} ];
++            var s = 0;
++            for (var i = 0; i < 40; i++) { s += os[i % 2].a; }
++            return s;
++            """);
++
++        Assert.Equal("40", result);
++        Assert.True(reads.PolymorphicSites >= 1, "expected a polymorphic read site");
++        Assert.Equal(0, reads.MegamorphicSites);
++    }
++
++    // ── callee identity ──────────────────────────────────────────────────────────────
++
++    [Fact]
++    public void ACallSiteThatOnlyEverSeesOneCalleeIsMonomorphic()
++    {
++        var (_, calls, result) = Observe(
++            "var f = function (x) { return x + 1; }; var s = 0; for (var i = 0; i < 30; i++) { s += f(i); } return s;");
++
++        Assert.Equal("465", result);
++        Assert.True(calls.MonomorphicObservations >= 30,
++            $"expected 30 monomorphic call observations, got {calls.MonomorphicObservations} of {calls.Observations}");
++        Assert.Equal(0, calls.MegamorphicSites);
++    }
++
++    // The shape 4-4 cannot inline: one site, several different functions.
++    [Fact]
++    public void ACallSiteThatSeesManyCalleesIsMegamorphic()
++    {
++        var (_, calls, result) = Observe("""
++            var fs = [ function(){return 1;}, function(){return 2;}, function(){return 3;},
++                       function(){return 4;}, function(){return 5;} ];
++            var s = 0;
++            for (var i = 0; i < fs.length; i++) { s += fs[i](); }
++            return s;
++            """);
++
++        Assert.Equal("15", result);
++        Assert.True(calls.MegamorphicSites >= 1,
++            $"expected a megamorphic call site, got {calls.MegamorphicSites}");
++    }
++
++    // ── the classification itself ────────────────────────────────────────────────────
++
++    [Fact]
++    public void ASiteThatNeverRanIsCold()
++    {
++        var (reads, _, result) = Observe(
++            "var o = { a: 1 }; var s = 0; if (s) { s += o.a; } return s;");
++
++        Assert.Equal("0", result);
++        // The read inside the dead branch allocated a site and never ran it. Cold sites are
++        // counted separately precisely so they cannot inflate the monomorphic share.
++        Assert.True(reads.ColdSites >= 1, "expected at least one cold site");
++    }
++
++    // Cold sites must stay out of the shares, since a tier that specializes code nothing runs
++    // has bought nothing.
++    [Fact]
++    public void ColdSitesAreExcludedFromTheShares()
++    {
++        var (reads, _, _) = Observe(
++            "var o = { a: 1 }; var s = 0; for (var i = 0; i < 10; i++) { s += o.a; } if (s > 1e9) { s += o.a; } return s;");
++
++        Assert.Equal(reads.MonomorphicSites + reads.PolymorphicSites + reads.MegamorphicSites, reads.LiveSites);
++        Assert.True(reads.ColdSites >= 1);
++        Assert.Equal(1.0, reads.MonomorphicObservationShare);
++    }
++
++    [Fact]
++    public void ResetClearsEveryHistory()
++    {
++        Observe("var o = { a: 1 }; var s = 0; for (var i = 0; i < 20; i++) { s += o.a; } return s;");
++        TypeFeedback.Reset();
++
++        Assert.Equal(0, TypeFeedback.PropertyDistribution().Observations);
++        Assert.Equal(0, TypeFeedback.CallDistribution().Observations);
++    }
++
++    // ── recording must not change what the program computes ──────────────────────────
++
++    [Theory]
++    [InlineData("var o = {a:1,b:2}; return o.a + o.b;", "3")]
++    [InlineData("var f = function(a,b){ return a*b; }; return f(6,7);", "42")]
++    [InlineData("var o = { m: function(){ return this.v; }, v: 9 }; return o.m();", "9")]
++    [InlineData("function C(v){ this.v = v; } C.prototype.get = function(){ return this.v; }; return new C(4).get();", "4")]
++    [InlineData("var o = null; return o?.a;", "undefined")]
++    [InlineData("var o = null; return typeof o?.m();", "undefined")]
++    public void TheAnswerIsTheSameWithFeedbackOnAsOff(string body, string expected)
++    {
++        using (var context = new JSContext())
++            Assert.Equal(expected, context.Eval("(function(){ " + body + " })()").ToString());
++
++        Assert.Equal(expected, Observe(body).Result);
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSFunctionBuilder.cs b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSFunctionBuilder.cs
+index b2c0195e..3d61aa26 100644
+--- a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSFunctionBuilder.cs
++++ b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSFunctionBuilder.cs
+@@ -28,6 +28,29 @@ public class JSFunctionBuilder
+     private static MethodInfo _normalizeConstructorReturn;
+ 
+     private static MethodInfo _resolveTailCall;
++
++    /// <summary>
++    /// <c>TypeFeedback.RecordCallee(site, callee)</c>, which returns the callee so the recording
++    /// can wrap the target expression in place (docs/performance-roadmap.md item 4-1).
++    /// </summary>
++    private static readonly MethodInfo RecordCalleeMethod = typeof(TypeFeedback).GetMethod(
++        nameof(TypeFeedback.RecordCallee), [typeof(int), typeof(JSValue)])
++        ?? throw new InvalidOperationException("TypeFeedback.RecordCallee(int, JSValue) not found");
++
++    /// <summary>
++    /// Wraps a call's target so the site records which callee it saw — but ONLY while feedback
++    /// is enabled at COMPILE time. With it clear this returns the target untouched, so the
++    /// emitted call is byte-for-byte the one emitted before item 4-1 existed: no extra hop, no
++    /// extra branch, no extra argument on the engine's hottest path. The cost of that choice is
++    /// that enabling the flag later does not retrofit already-compiled code; the harness sets it
++    /// before compiling the corpus, and <see cref="TypeFeedback"/> says so.
++    /// </summary>
++    private static Expression WithCalleeFeedback(Expression target)
++        => TypeFeedback.Enabled
++            ? Expression.Call(null, RecordCalleeMethod,
++                Expression.Constant(TypeFeedback.AllocateCallSite()), target)
++            : target;
++
+     private static readonly MethodInfo NumericLoopPlanFactory = typeof(NumericLoopPlan).GetMethod(
+         nameof(NumericLoopPlan.Create),
+         [typeof(int), typeof(double), typeof(double), typeof(double), typeof(int), typeof(double), typeof(double)])
+@@ -125,6 +148,10 @@ public class JSFunctionBuilder
+ 
+     public static Expression InvokeFunction(Expression target, Expression args, bool coalesce = false, bool inChain = false)
+     {
++        // Item 4-1: records the callee identity this site sees. A no-op unless feedback was
++        // enabled before this function was compiled.
++        target = WithCalleeFeedback(target);
++
+         // Inside an optional chain a short-circuit yields the skip sentinel (the chain
+         // root unwraps it), and an already-short-circuited callee (skip) propagates
+         // without being called. `fn?.(x)` short-circuits on a nullish callee; a trailing
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs b/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
+index 06f076bb..f62939b2 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
+@@ -252,6 +252,14 @@ public static class PropertyInlineCacheSite
+ 
+     public static JSValue Get(int site, JSValue target, KeyString key)
+     {
++        // Item 4-1. The cache below observes shapes to answer THIS read and forgets them —
++        // entries are replaced when stale and dropped entirely at megamorphic — so a
++        // specializing tier cannot ask it what a site saw over a whole run. Recorded here,
++        // where the site index is in hand, behind the same predictable branch the cache-hit
++        // counter on the line below already pays.
++        if (TypeFeedback.Enabled)
++            TypeFeedback.RecordPropertyShape(site, target is JSObject shaped ? shaped.CurrentShapeId : 0);
++
+         if ((uint)site >= MaxSites)
+             return target[key];
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/TypeFeedback.cs b/Broiler.JS/Broiler.JavaScript.Runtime/TypeFeedback.cs
+new file mode 100644
+index 00000000..00089a52
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/TypeFeedback.cs
+@@ -0,0 +1,324 @@
++using System;
++using System.Collections.Generic;
++using System.Runtime.CompilerServices;
++using System.Threading;
++
++namespace Broiler.JavaScript.Runtime;
++
++/// <summary>
++/// What each emitted site actually saw at run time: the receiver shapes at a property read,
++/// and the callee identities at a call (docs/performance-roadmap.md item 4-1).
++/// </summary>
++/// <remarks>
++/// <para>
++/// This is <em>feedback</em>, not a cache, and the distinction is the whole item. The property
++/// inline cache already observes shapes, but it observes them in order to answer the current
++/// read: it replaces entries when they go stale, and once a site passes four shapes it becomes
++/// megamorphic and stops describing anything at all. Feedback has to <em>retain</em> — a
++/// specializing tier needs to know that a site saw exactly one shape across a whole run, which
++/// is a claim about history that a structure designed to be overwritten cannot make.
++/// </para>
++/// <para>
++/// It buys nothing on its own. Item 4-1 exists because 4-2 (a specializing tier-2 compile) and
++/// 4-4 (inlining small callees at monomorphic sites) both consume it, and neither can be
++/// written against a guess. So the deliverable here is the collection plus <em>what it says
++/// about the real corpus</em>: the share of executed reads and calls that happen at sites which
++/// only ever saw one shape or one callee is the premise those two items rest on, and until this
++/// existed nothing in the engine could report it.
++/// </para>
++/// <para>
++/// <b>Two gates, deliberately.</b> Property feedback is recorded behind the runtime
++/// <see cref="Enabled"/> flag, inside the site helper that already pays a predictable branch per
++/// read for <see cref="PropertyOptimizationDiagnostics"/>. Call feedback is gated at
++/// <em>compile</em> time instead: with the flag clear the compiler emits exactly the call it
++/// emitted before, so a call carries no extra hop, no extra branch and no extra argument. A call
++/// costs ~255 ns and is the path phase 4 exists to fix; adding anything to it unconditionally to
++/// measure it would be self-defeating. The cost is that enabling the flag only affects code
++/// compiled afterwards — which is what a measurement harness does anyway, and is stated here so
++/// nobody reads a partial figure as a whole one.
++/// </para>
++/// <para>
++/// <b>Callee entries hold their functions alive</b> while recording is on. That is acceptable
++/// for a measurement run and unacceptable for a shipping default, which is a second reason this
++/// is off by default; a consumer that wants feedback in production needs a weaker reference or
++/// a stable per-function id first.
++/// </para>
++/// </remarks>
++public static class TypeFeedback
++{
++    /// <summary>
++    /// How many distinct observations a site records before it stops distinguishing them. Four
++    /// matches the inline cache's own entry cap, so "overflowed" here and "megamorphic" there
++    /// mean the same thing about the same site.
++    /// </summary>
++    public const int MaxTracked = 4;
++
++    private const int MaxSites = 65_536;
++
++    /// <summary>
++    /// Whether feedback is recorded. Defaults to <c>false</c>. Set it before compiling and
++    /// running the code under measurement — see the remarks about the compile-time gate on
++    /// calls.
++    /// </summary>
++    public static bool Enabled;
++
++    /// <summary>Enables recording until the returned scope is disposed.</summary>
++    public static RecordingScope Enable() => new(true);
++
++    /// <summary>Restores <see cref="Enabled"/> when disposed.</summary>
++    public readonly struct RecordingScope : IDisposable
++    {
++        private readonly bool previous;
++
++        internal RecordingScope(bool enabled)
++        {
++            previous = Enabled;
++            Enabled = enabled;
++        }
++
++        public void Dispose() => Enabled = previous;
++    }
++
++    /// <summary>One site's history. Not thread-safe by design; see <see cref="Record"/>.</summary>
++    /// <remarks>
++    /// A site is written from whichever thread runs it. Racing writers can lose an observation
++    /// or double-count a distinct id, which would matter for a correctness claim and does not
++    /// matter for a distribution — and the alternative, a lock or an interlocked compare per
++    /// property read, would cost more than the thing being measured. The engine runs
++    /// JavaScript on one thread per context, so in the harness this is single-threaded anyway.
++    /// Stated rather than assumed.
++    /// </remarks>
++    public sealed class Site
++    {
++        private readonly int[] shapeIds = new int[MaxTracked];
++        private readonly object[] callees = new object[MaxTracked];
++
++        /// <summary>Distinct observations retained, capped at <see cref="MaxTracked"/>.</summary>
++        public int Distinct { get; private set; }
++
++        /// <summary>Whether more distinct observations were seen than the cap retains.</summary>
++        public bool Overflowed { get; private set; }
++
++        /// <summary>Total times this site ran while recording was on.</summary>
++        public long Observations { get; private set; }
++
++        internal void Record(int shapeId)
++        {
++            Observations++;
++            for (var i = 0; i < Distinct; i++)
++            {
++                if (shapeIds[i] == shapeId)
++                    return;
++            }
++
++            if (Distinct == MaxTracked)
++            {
++                Overflowed = true;
++                return;
++            }
++
++            shapeIds[Distinct++] = shapeId;
++        }
++
++        internal void Record(object callee)
++        {
++            Observations++;
++            for (var i = 0; i < Distinct; i++)
++            {
++                if (ReferenceEquals(callees[i], callee))
++                    return;
++            }
++
++            if (Distinct == MaxTracked)
++            {
++                Overflowed = true;
++                return;
++            }
++
++            callees[Distinct++] = callee;
++        }
++    }
++
++    /// <summary>
++    /// How a site behaved over its whole recorded history — the question 4-2 and 4-4 ask, and
++    /// the one the inline cache cannot answer because it forgets.
++    /// </summary>
++    public enum SiteKind
++    {
++        /// <summary>Never ran while recording was on.</summary>
++        Cold,
++        /// <summary>Exactly one shape or callee, ever. The only shape 4-4 can inline.</summary>
++        Monomorphic,
++        /// <summary>Two to <see cref="MaxTracked"/> distinct, all retained.</summary>
++        Polymorphic,
++        /// <summary>More distinct than the cap retains.</summary>
++        Megamorphic,
++    }
++
++    /// <summary>Per-site totals plus the observation counts behind them.</summary>
++    public readonly record struct Distribution(
++        int ColdSites,
++        int MonomorphicSites,
++        int PolymorphicSites,
++        int MegamorphicSites,
++        long MonomorphicObservations,
++        long PolymorphicObservations,
++        long MegamorphicObservations)
++    {
++        public int LiveSites => MonomorphicSites + PolymorphicSites + MegamorphicSites;
++
++        public long Observations
++            => MonomorphicObservations + PolymorphicObservations + MegamorphicObservations;
++
++        /// <summary>
++        /// The share of executed operations that happened at a site which only ever saw one
++        /// shape or callee. This is the number 4-2 and 4-4 rest on — weighted by execution, not
++        /// by site count, because a specializing tier only pays off where the work is.
++        /// </summary>
++        public double MonomorphicObservationShare
++            => Observations == 0 ? 0 : (double)MonomorphicObservations / Observations;
++
++        public double MonomorphicSiteShare
++            => LiveSites == 0 ? 0 : (double)MonomorphicSites / LiveSites;
++    }
++
++    private static readonly object allocationLock = new();
++    private static Site[] propertySites = new Site[64];
++    private static Site[] callSites = new Site[64];
++    private static int nextCallSite;
++
++    /// <summary>Allocates a call-site index. Only called while <see cref="Enabled"/>.</summary>
++    public static int AllocateCallSite()
++    {
++        lock (allocationLock)
++        {
++            if (nextCallSite >= MaxSites)
++                return -1;
++
++            var site = nextCallSite++;
++            callSites = EnsureCapacity(callSites, site);
++            callSites[site] = new Site();
++            return site;
++        }
++    }
++
++    /// <summary>
++    /// Records the receiver shape at a property read site. Called from the property site helper,
++    /// which has already tested <see cref="Enabled"/>.
++    /// </summary>
++    [MethodImpl(MethodImplOptions.AggressiveInlining)]
++    internal static void RecordPropertyShape(int site, int shapeId)
++    {
++        if ((uint)site >= MaxSites)
++            return;
++
++        RentProperty(site).Record(shapeId);
++    }
++
++    /// <summary>
++    /// Records the callee at a call site and returns it, so the recording can sit in the
++    /// emitted expression without a temporary.
++    /// </summary>
++    public static JSValue RecordCallee(int site, JSValue callee)
++    {
++        if (!Enabled || (uint)site >= MaxSites)
++            return callee;
++
++        RentCall(site).Record(callee);
++        return callee;
++    }
++
++    private static Site RentProperty(int site)
++    {
++        var table = Volatile.Read(ref propertySites);
++        if ((uint)site < (uint)table.Length && table[site] != null)
++            return table[site];
++
++        lock (allocationLock)
++        {
++            propertySites = EnsureCapacity(propertySites, site);
++            return propertySites[site] ??= new Site();
++        }
++    }
++
++    private static Site RentCall(int site)
++    {
++        var table = Volatile.Read(ref callSites);
++        if ((uint)site < (uint)table.Length && table[site] != null)
++            return table[site];
++
++        lock (allocationLock)
++        {
++            callSites = EnsureCapacity(callSites, site);
++            return callSites[site] ??= new Site();
++        }
++    }
++
++    private static Site[] EnsureCapacity(Site[] table, int site)
++    {
++        if (site < table.Length)
++            return table;
++
++        var length = table.Length;
++        while (length <= site)
++            length = Math.Min(MaxSites, length * 2);
++        var replacement = new Site[length];
++        Array.Copy(table, replacement, table.Length);
++        return replacement;
++    }
++
++    /// <summary>Classifies one site.</summary>
++    public static SiteKind Classify(Site site)
++        => site == null || site.Observations == 0 ? SiteKind.Cold
++            : site.Overflowed ? SiteKind.Megamorphic
++            : site.Distinct <= 1 ? SiteKind.Monomorphic
++            : SiteKind.Polymorphic;
++
++    /// <summary>The property read sites' distribution.</summary>
++    public static Distribution PropertyDistribution() => Summarize(Volatile.Read(ref propertySites));
++
++    /// <summary>The call sites' distribution.</summary>
++    public static Distribution CallDistribution() => Summarize(Volatile.Read(ref callSites));
++
++    private static Distribution Summarize(IReadOnlyList<Site> table)
++    {
++        int cold = 0, mono = 0, poly = 0, mega = 0;
++        long monoObs = 0, polyObs = 0, megaObs = 0;
++
++        for (var i = 0; i < table.Count; i++)
++        {
++            var site = table[i];
++            switch (Classify(site))
++            {
++                case SiteKind.Cold:
++                    cold++;
++                    break;
++                case SiteKind.Monomorphic:
++                    mono++;
++                    monoObs += site.Observations;
++                    break;
++                case SiteKind.Polymorphic:
++                    poly++;
++                    polyObs += site.Observations;
++                    break;
++                default:
++                    mega++;
++                    megaObs += site.Observations;
++                    break;
++            }
++        }
++
++        return new Distribution(cold, mono, poly, mega, monoObs, polyObs, megaObs);
++    }
++
++    /// <summary>Clears every site's history. Does not change <see cref="Enabled"/>.</summary>
++    public static void Reset()
++    {
++        lock (allocationLock)
++        {
++            propertySites = new Site[64];
++            callSites = new Site[64];
++            nextCallSite = 0;
++        }
++    }
++}
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+index 17da1436..51ef7fc7 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+@@ -74,6 +74,12 @@ public static class Program
+             return;
+         }
+ 
++        if (args.Length == 2 && args[0] == "--type-feedback")
++        {
++            TypeFeedbackMetrics.Write(args[1]);
++            return;
++        }
++
+         if (args.Length == 2 && args[0] == "--property-map-distribution")
+         {
+             PropertyMapDistributionMetrics.Write(args[1]);
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/TypeFeedbackMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/TypeFeedbackMetrics.cs
+new file mode 100644
+index 00000000..aee91e75
+--- /dev/null
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/TypeFeedbackMetrics.cs
+@@ -0,0 +1,213 @@
++using System;
++using System.Collections.Generic;
++using System.IO;
++using System.Text.Json;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.Engine.Benchmarks;
++
++/// <summary>
++/// Reports what item 4-1's per-site type feedback actually saw on the real Octane suites: how
++/// many executed property reads and calls happened at a site that only ever observed one shape,
++/// or one callee.
++/// </summary>
++/// <remarks>
++/// <para>
++/// 4-1 buys nothing by itself — it is collection, and 4-2 and 4-4 are what consume it. So the
++/// deliverable is this number, because it is the premise those two items rest on and neither
++/// has ever been checked against it. <em>"Monomorphic property access → shape check plus direct
++/// slot read"</em> (4-2) and <em>"inlining of small JS callees at monomorphic sites"</em> (4-4)
++/// are both worth an XL each only in proportion to how much of the real work happens at
++/// monomorphic sites. If that share is high the phase is well-founded; if it is not, the phase
++/// needs re-specifying before anything is built, which is exactly the failure §3.5 keeps
++/// recording.
++/// </para>
++/// <para>
++/// <b>Weighted by execution, not by site count.</b> A tier only pays where the work is: ten
++/// thousand cold monomorphic sites are worth nothing and one hot one is worth everything. Both
++/// are reported, and they differ enough that quoting the wrong one would mislead.
++/// </para>
++/// <para>
++/// <b>Not a timing measurement.</b> Recording is on throughout, which adds a branch per read
++/// and a call per call, and it retains every callee. Counts here are deterministic; the cost of
++/// collection is measured separately, with the feedback OFF, because that is the configuration
++/// that ships.
++/// </para>
++/// </remarks>
++internal static class TypeFeedbackMetrics
++{
++    private sealed record Suite(string Name, string[] Files);
++
++    /// <summary>
++    /// The call-heavy cluster phase 4 exists for, plus two controls. Richards and DeltaBlue are
++    /// built out of one-line methods and have the worst throughput ratios in the suite (§4.3
++    /// B2); Crypto and NavierStokes are arithmetic-heavy rather than call-heavy, so they say
++    /// whether a high monomorphic share is a property of this corpus or of those two suites.
++    /// </summary>
++    private static readonly Suite[] Suites =
++    [
++        new("Richards", ["richards.js"]),
++        new("DeltaBlue", ["deltablue.js"]),
++        new("RayTrace", ["raytrace.js"]),
++        new("Box2D", ["box2d.js"]),
++        new("EarleyBoyer", ["earley-boyer.js"]),
++        new("Crypto", ["crypto.js"]),
++        new("NavierStokes", ["navier-stokes.js"]),
++    ];
++
++    private const int RunsPerBenchmark = 3;
++
++    private const string Driver = """
++        (function () {
++            var suites = (typeof BenchmarkSuite !== 'undefined' && BenchmarkSuite.suites) || [];
++            var ran = 0, failures = [];
++            for (var i = 0; i < suites.length; i++) {
++                var suite = suites[i];
++                for (var j = 0; j < suite.benchmarks.length; j++) {
++                    var benchmark = suite.benchmarks[j];
++                    try {
++                        benchmark.Setup();
++                        for (var k = 0; k < __runs; k++) benchmark.run();
++                        benchmark.TearDown();
++                        ran++;
++                    } catch (e) {
++                        failures.push(suite.name + '/' + benchmark.name + ': ' + e);
++                    }
++                }
++            }
++            return ran + '|' + failures.join(' ;; ');
++        })()
++        """;
++
++    internal static void Write(string octaneDirectory)
++    {
++        if (!Directory.Exists(octaneDirectory))
++        {
++            Console.Error.WriteLine($"octane directory not found: {octaneDirectory}");
++            Environment.ExitCode = 2;
++            return;
++        }
++
++        var basePath = Path.Combine(octaneDirectory, "base.js");
++        if (!File.Exists(basePath))
++        {
++            Console.Error.WriteLine($"not an Octane checkout (no base.js): {octaneDirectory}");
++            Environment.ExitCode = 2;
++            return;
++        }
++
++        var baseSource = File.ReadAllText(basePath);
++        var rows = new List<object>();
++        foreach (var suite in Suites)
++        {
++            Console.Error.WriteLine($"{suite.Name}: running ...");
++            var row = RunSuite(octaneDirectory, baseSource, suite);
++            if (row != null)
++                rows.Add(row);
++        }
++
++        Console.WriteLine(JsonSerializer.Serialize(
++            new
++            {
++                schema = "broiler.type-feedback-metrics/1",
++                runsPerBenchmark = RunsPerBenchmark,
++                maxTrackedPerSite = TypeFeedback.MaxTracked,
++                note = "What item 4-1's per-site feedback saw on real Octane suites. "
++                    + "monomorphicObservationShare is the number items 4-2 and 4-4 rest on: the "
++                    + "share of EXECUTED reads/calls at a site that only ever saw one shape or "
++                    + "one callee. Site-count shares are reported too and are much lower, "
++                    + "because most sites barely run. A site that saw more than "
++                    + "maxTrackedPerSite distinct observations is counted megamorphic, which is "
++                    + "the same threshold the inline cache uses. Counts are deterministic; no "
++                    + "wall clock is reported, and collection is off in any timing run.",
++                suites = rows,
++            },
++            new JsonSerializerOptions { WriteIndented = true }));
++    }
++
++    private static object RunSuite(string octaneDirectory, string baseSource, Suite suite)
++    {
++        var sources = new List<string> { baseSource };
++        foreach (var file in suite.Files)
++        {
++            var path = Path.Combine(octaneDirectory, file);
++            if (!File.Exists(path))
++            {
++                Console.Error.WriteLine($"{suite.Name}: missing {file}, skipped");
++                return null;
++            }
++
++            sources.Add(File.ReadAllText(path));
++        }
++
++        using var context = BenchmarkContext.Create();
++
++        string outcome;
++        TypeFeedback.Distribution properties, calls;
++
++        // Enabled around the LOAD as well as the run, and that ordering is required rather than
++        // tidy: call feedback is emitted at compile time, so a suite compiled before the flag
++        // was set would report no call sites at all.
++        using (TypeFeedback.Enable())
++        {
++            TypeFeedback.Reset();
++            try
++            {
++                context.Eval("if (typeof print === 'undefined') { var print = function () { }; }", "shim.js");
++                for (var i = 0; i < sources.Count; i++)
++                    context.Eval(sources[i], i == 0 ? "base.js" : suite.Files[i - 1]);
++
++                context.Eval($"var __runs = {RunsPerBenchmark};", "runs.js");
++            }
++            catch (Exception e)
++            {
++                Console.Error.WriteLine($"{suite.Name}: failed to load — {e.GetType().Name}: {e.Message}");
++                return new { suite = suite.Name, loaded = false, error = $"{e.GetType().Name}: {e.Message}" };
++            }
++
++            try
++            {
++                outcome = context.Eval(Driver, "driver.js").ToString();
++            }
++            catch (Exception e)
++            {
++                outcome = $"0|driver threw {e.GetType().Name}: {e.Message}";
++            }
++
++            properties = TypeFeedback.PropertyDistribution();
++            calls = TypeFeedback.CallDistribution();
++        }
++
++        var split = outcome.Split('|', 2);
++
++        return new
++        {
++            suite = suite.Name,
++            loaded = true,
++            benchmarksRun = int.TryParse(split[0], out var ran) ? ran : 0,
++            failures = split.Length > 1 && split[1].Length > 0 ? split[1] : null,
++
++            propertyReads = Describe(properties),
++            calls = Describe(calls),
++        };
++    }
++
++    private static object Describe(TypeFeedback.Distribution d) => new
++    {
++        liveSites = d.LiveSites,
++        coldSites = d.ColdSites,
++        monomorphicSites = d.MonomorphicSites,
++        polymorphicSites = d.PolymorphicSites,
++        megamorphicSites = d.MegamorphicSites,
++        monomorphicSitePercent = Math.Round(100 * d.MonomorphicSiteShare, 2),
++
++        observations = d.Observations,
++        monomorphicObservations = d.MonomorphicObservations,
++        polymorphicObservations = d.PolymorphicObservations,
++        megamorphicObservations = d.MegamorphicObservations,
++
++        // The headline: what share of the work happens somewhere a specializing tier could
++        // speculate on a single shape or a single callee.
++        monomorphicObservationPercent = Math.Round(100 * d.MonomorphicObservationShare, 2),
++    };
++}
+-- 
+2.43.0
+

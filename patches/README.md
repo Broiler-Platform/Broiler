@@ -23,19 +23,21 @@ Delete the patch file and its row below once the pointer is bumped.
 
 | Patch | Submodule | Note |
 | --- | --- | --- |
+| `0069-js-type-feedback-collection` | `Broiler.JS` | Item 4-1. The inline caches observe shapes to answer the *current* read — entries are replaced when stale and dropped once a site passes four shapes — so they cannot say what a site saw over a whole run, which is what a specializing tier speculates on. `TypeFeedback` retains, per site, the distinct receiver shapes at a read and the distinct callee identities at a call. **Two gates:** property feedback is a runtime flag inside the site helper (which already pays a branch per read for the cache-hit counter); call feedback is gated at *compile* time, so with the flag clear the emitted call is unchanged — a call costs ~255 ns and instrumenting it unconditionally to measure it would be self-defeating. The item buys no throughput, so the deliverable is what it reports: over seven Octane suites, **93.54% of 37.9 M property reads and 96.70% of 4.24 M calls happen at a site that only ever saw one shape or one callee**, weighted by executed operations. That is the premise 4-2 and 4-4 rest on, measured for the first time. Megamorphism is essentially absent (18 sites in total). Adds `--type-feedback` and `TypeFeedbackTests` (16 cases). **Independent of `0067`/`0068`** — different assemblies, applies in any order. |
 | `0068-js-block-scoped-numeric-var` | `Broiler.JS` | Item 3-3's third half, which completes the item. A `var` declared inside a block is hoisted to the function, so between entry and the block it is observably `undefined` — a raw double hoisted to 0 answers 0. The rule is the function body's own dominance argument one level down, with two admissions: an unlabelled `{ … }` that is a direct statement of the body (or of another such block) is **transparent** — entered whenever reached, exits only via `return`/`throw` — so its `var`s need no extra condition; any other block **confines** its declaration, which then needs every reference inside it, and that is the loop-body temporary the item is about. Only a *direct* statement of the block qualifies, which is what excludes `if (c) var t = 1;`; a labelled block and a `catch` are excluded too. **`block-var` 31.98 → 0.00 B/iteration and 1 → 3 numeric locals**, all twelve other `--local-alloc` rows byte-identical. Two defects were caught by testing and neither shipped — a non-dominating declaration marking a name readable, and the over-correction that fix caused. Adds `BlockScopedVarNumericLocalTests` (43 cases). **Apply after `0067`** — same file, and it builds on the gate `0067` restructures. |
 | `0067-js-numeric-lexical-bindings` | `Broiler.JS` | Item 3-3's second half. A function-body-top-level `let` or `const` the compiler proves only ever holds a number now lives in a raw CLR `double`, as an eligible `var` already did: **`let-binding` and `const-binding` 31.98 → 0.00 B/iteration and 1 → 3 numeric locals**, identical to the eligible floor, with all twelve other `--local-alloc` rows byte-identical (both arms from one tree). Only the **numeric** tier admits lexical names — the JSValue tier stays closed, because a `let`'s TDZ and a `const`'s read-only-ness live in the cell either tier removes and only the numeric gate discharges them (the dominance argument makes the TDZ throw unreachable; a written `const` is rejected outright). Also moves the `NumericStorage` test *before* the lexical branch in `VisitVariableDeclaration`, since a numeric local's `Expression` is a boxing read. Adds `LexicalNumericLocalTests` (58 cases, including the withdrawn first attempt's reproduction as a pinned test) and `scripts/compliance/test262-lexical-declarations.txt`, a manifest for the `let`/`const`/`block-scope` paths **no pinned manifest covered**. **Independent of everything cleared below** — it applies to the pin directly. |
 
-**`0067` and `0068` are pending against the pinned pointer `9bf9639b`, in that order.** Both
-were applied in sequence from a clean checkout of that commit with **`git am`**, not merely
+**`0067`, `0068` and `0069` are pending against the pinned pointer `9bf9639b`.** All three were
+applied in sequence from a clean checkout of that commit with **`git am`**, not merely
 `git apply` — the two differ, and this README's own instructions use `am`, so `apply` is not the
-check. `0068` edits the same file `0067` does and builds on the gate it restructures, so the
-order is not optional.
+check. **`0068` must follow `0067`**: it edits the same file and builds on the gate `0067`
+restructures. `0069` touches different assemblies and applies in any order relative to them.
 
 Each push to `Broiler-Platform/Broiler.JS` returned **403** from the session's git proxy, so the
-pointer is deliberately *not* bumped. **No main-repo fallback is needed for either:** both are
-optimizations with no behaviour difference, so CI without them is correct and only allocates
-more.
+pointer is deliberately *not* bumped. **No main-repo fallback is needed for any of them:**
+`0067` and `0068` are optimizations with no behaviour difference, so CI without them is correct
+and only allocates more; `0069` is collection that is off unless `TypeFeedback.Enabled` is set,
+so without it CI simply cannot report the distribution.
 
 The eighteen patches this file carried before it (`0049`–`0066`) have all been applied, pushed
 and their pointers bumped; they are listed under *Recently cleared* below with the commit each
