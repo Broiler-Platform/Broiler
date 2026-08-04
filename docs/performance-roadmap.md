@@ -21,43 +21,43 @@ so only the parent can hold the combined view.
 - **Acceptance protocol:** unchanged and unchallenged —
   [`Broiler.JS/docs/performance.md`](../Broiler.JS/docs/performance.md) governs what
   may be *claimed*. **Nothing in this document closes on the numbers it quotes.**
-- **Provenance:** the pinned submodule pointer is **`2ebc0c3c`**, checked 2026-08-02 against
+- **Provenance:** the pinned submodule pointer is **`9bf9639b`**, checked 2026-08-03 against
   the gitlink rather than against the prose — **and checking it is what caught that this line
-  said `71dda1b7`**, which the pointer had moved past. `71dda1b7` is an **ancestor** of the
-  current pin, so nothing recorded against it is invalidated; the correction is to the prose,
-  not to any measurement — which is exactly the failure mode the rule two sentences down
-  already names, caught by applying it. **Phase 5's two `replace` changes are *not* in the
-  pin**: their pushes to the submodule remote returned 403, so they are carried as
-  [`patches/0059`](../patches/0059-js-single-match-replace-one-allocation.patch) and
-  [`patches/0060`](../patches/0060-js-stream-global-replace.patch) — **in that order**, since
-  `0060` builds on the function `0059` restructures — and the pointer is deliberately unbumped.
-  Their figures below were measured on a local build of `2ebc0c3c` **plus** those patches,
-  control and change from the same tree. **Item 2-9's follow-up measurement is
-  [`patches/0061`](../patches/0061-js-measure-2-9-materialization-cause.patch)**, independent of
-  those two and measured on the pin alone.
-  **Item 1-4 is [`patches/0065`](../patches/0065-js-linear-closure-rewrite-scope.patch)**, on the
-  same terms: its push returned 403, the pointer is deliberately unbumped, and every figure in
-  its section was measured on a local build of the then-current pin `79c6ff23` with and without
-  that one patch — both arms from the same tree, interleaved. It touches
-  `Broiler.JavaScript.ExpressionCompiler`, which none of `0059`–`0064` do, so it applies in any
-  order relative to them. **Item 1-1's emission half is
-  [`patches/0066`](../patches/0066-js-defer-nested-lambda-il.patch), which must be applied after
-  `0065`** — it edits a file `0065` creates — and its figures were taken the same way, one build
-  with `BROILER_JS_DEFER_IL` as the only difference. Both were verified to apply with `git am`
-  against the pinned pointer from a clean clone, not merely with `git apply`: the two differ, and
-  the first version of `0065` passed `apply` and failed `am` on a line-ending change that the
-  README's own instructions would have hit.
-  `a6f101cc` — which this section named until 3-3
-  was worked, and which every §0 and phase-2 measurement below was taken at — is an **ancestor**
-  of it (`merge-base --is-ancestor`), so nothing recorded here is invalidated;
-  what moved on top of it is 2-9, 3-0, 1-2's visitor stack guard and the script-host shell
-  joining the solution. **A pointer written into prose goes stale silently**, which is why
-  §4.1's and §3.4's figures below carry the commit they were taken at rather than "the pin".
-  **The patch handoff has completed**: `patches/0049`–`0058` were applied to `Broiler.JS`,
-  pushed, and the pointer bumped, so all ten are now ancestors of the pin rather than
-  pending against it — verified patch-by-patch against the submodule log, not inferred from
-  the prose. `685026c0`, `cdb2fd41`, `7ef80c03` and `8228b0da` all remain ancestors, so item
-  0-1's substance holds, and `685026c0` carries item 0-9's probe corpus (`aa2b1562`, #938).
+  said `2ebc0c3c`**, which the pointer had moved past. That is the *second* consecutive time
+  this line was stale when read (it said `71dda1b7` before that), which is no longer a
+  coincidence: **a pointer written into prose goes stale silently**, and the only reliable
+  reading of it is `git submodule status`. It is why §4.1's and §3.4's figures below carry the
+  commit they were taken at rather than "the pin". `2ebc0c3c`, `a6f101cc`, `71dda1b7`,
+  `685026c0`, `cdb2fd41`, `7ef80c03` and `8228b0da` are all **ancestors** of the current pin
+  (`merge-base --is-ancestor`), so nothing recorded against any of them is invalidated and item
+  0-1's substance holds; `685026c0` carries item 0-9's probe corpus (`aa2b1562`, #938).
+  **The patch handoff has completed again, and `patches/` is now empty.** The eight files
+  pending at the last reading — `0059` and `0060` (phase 5's two `replace` changes), `0061`
+  (item 2-9's follow-up measurement), `0062`–`0064` (items 2-10, 2-11, 2-12), `0065` (item 1-4)
+  and `0066` (item 1-1's emission half) — were applied to `Broiler.JS`, pushed, and the pointer
+  bumped. Each was mapped to the commit it landed as and each of those was checked to be an
+  ancestor of the pin, patch-by-patch against the submodule log rather than inferred from this
+  prose: `962ca06a`, `6f56d24f`, `e6222df3`, `0812d80d`, `4d1c4796`, `fb1e2f4c`, `1070525a`,
+  `9bf9639b` in that order. **So every figure recorded for those eight items now describes the
+  pinned pointer directly**, rather than a local build of the pin plus a patch series applied in
+  order, which is what their sections used to have to say.
+  **Five patches are pending again:
+  [`patches/0067`](../patches/0067-js-numeric-lexical-bindings.patch)** (item 3-3's `let`/`const`
+  half), **[`patches/0068`](../patches/0068-js-block-scoped-numeric-var.patch)** (its
+  block-scoped `var` half),
+  **[`patches/0069`](../patches/0069-js-type-feedback-collection.patch)** (item 4-1) and
+  **[`patches/0070`](../patches/0070-js-restart-contract.patch)** (item 4-3a) and
+  **[`patches/0071`](../patches/0071-js-in-method-fallback.patch)** (item 4-3b), on the
+  usual terms — each push to the submodule remote returned 403, so the pointer is deliberately
+  unbumped and every figure in their sections was measured on a local build of `9bf9639b` with
+  and without the patch under test, both arms from the same tree. **`0068` must follow `0067`**:
+  it edits the same file and builds on the gate `0067` restructures. `0069` and `0070` touch
+  different assemblies and apply in any order relative to the others. All five were verified to
+  apply *in sequence* from a clean checkout of the pin with **`git am`**, not merely
+  `git apply`. None needs a main-repo fallback: without `0067`/`0068` CI is correct and only
+  allocates more, `0069` is collection that is off unless `TypeFeedback.Enabled` is set, `0070`
+  closes a hazard the tree does not currently reach, and `0071` adds a facility nothing calls
+  yet.
   **Measurements and the test262 run in §4.1 and §3.4 were taken at `cdb2fd41` and have not
   been repeated** — `685026c0` also carries a string-allocation fix (#936). Octane code
   sites verified at `45f4f679`. **Phase 2's own measurements — §0, and each 2-x section —
@@ -83,11 +83,11 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 
 | Phase | State |
 |---|---|
-| **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6 (the CI Octane run) is still the critical path, but its headline question is answered**: run at the pinned pointer on linux-x64, Octane is **15 of 15 suites `ok` and 17 of 17 scores** — Mandreel included, which the previous local pass had failing. Geomean 217, spread **113×** against a same-machine Chromium reference. What 0-6 still owes is the *workflow* run plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce |
+| **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6's workflow run has happened and its results are committed** — 2026-08-03 at the pinned pointer, **15 of 15 suites `ok` and 17 of 17 scores** for Broiler, Jint and a same-machine Chromium alike, nothing errored or timed out. Geomean **351** against Chromium's 57 080 (**163×**) and Jint's 616 (**0.569×**), spread **139.8×**. That answers the coverage question and phase 2's exit criterion (below); **what 0-6 still owes is the noise band** — the run is one repetition per suite and says so, so magnitudes and pass/fail may be read from it and deltas may not — plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce |
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting. **New: 1-4 ✅.** Measuring 1-1's premise found the phase's actual dominant cost, and it was not lazy compilation: the closure rewrite held a lambda's in-scope bindings in a `List` and asked it `Contains` per parameter reference, so **emission was quadratic in a scope's binding count** — 2 000 top-level declarations emitted in 13 865 ms against 2.5 ms of parse. A reference-keyed multiset (list-backed below 32 bindings) makes it linear: **28.5× on that shape, and 3.04× on Mandreel end-to-end**, ABBA-interleaved, six pairs. **1-1 is still open and its premise now has a number** — 92–96% of compile time is function bodies on the large real programs — but the measurement also **splits phase 1 in two and re-targets 1-1**: Mandreel was *wide*, not deep, and never was a 1-1 case, while jQuery at 96.5% deferrable is the whole of it. **1-1's emission half then landed without needing the capture mechanism at all**: every risk the item names is settled by the front end, so deferring *IL generation* to first invocation is the same prize with none of them — **jQuery 0.661×, Box2D 0.636×, PdfJS 0.689× on compile, allocation ~0.52× across the board, and 1.0009× steady state**. **Octane CodeLoad, the benchmark the item names, was run and passes: 94.6 → 104.0, 1.099×, 24 samples an arm, 93% pairwise dominance** — and it took 24 because the first three-sample pair and its reverse disagreed. That ratio also re-frames the item: compilation is only ~27% of what CodeLoad measures, not the whole of it. Two mistakes were caught by measuring: a stack handoff per deferred function took the suite from 3.5 to 20 minutes, and a thunk that *called* its resolve cost 1.0247% on call-heavy code until the warm path was written in IL. Typescript is 1.034× slower and unexplained. **The Mandreel suite was then run too, and it overturns the phase's headline target**: a 3.04× faster compile of `mandreel.js` moves Mandreel 0.993× and MandreelLatency 0.992× — Octane compiles that file at script load and times only the run function, so MandreelLatency measures execution pauses and belongs to phase 3. The saving is real and outside every score: suite wall clock **358.2 → 350.0 s**, non-overlapping. What remains of 1-1 is the parse and tree construction, which on real source is the larger half |
-| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. Then **2-12** found why the misses that remained could never heal: the cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — **77.7% of DeltaBlue's misses**. Refreshing in place takes **DeltaBlue's read hit rate to 93.16%** (65.96% before both fixes) and Box2D's to 98.83%. **DeltaBlue still fails the gate at 447×**, but the cache is no longer the reason, and what remains is not property-cache-shaped Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
-| **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. Its `let`/`const` half was then **built, measured (31.98 → 0.00 B/iter) and withdrawn**: it miscompiles after any earlier compilation in the same process, including for bindings the gate never admits, so the reproduction is recorded instead of the change. 3-4 is a cost, not a task |
-| **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
+| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. Then **2-12** found why the misses that remained could never heal: the cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — **77.7% of DeltaBlue's misses**. Refreshing in place takes **DeltaBlue's read hit rate to 93.16%** (65.96% before both fixes) and Box2D's to 98.83%. **DeltaBlue still fails the gate at 447×**, but the cache is no longer the reason, and what remains is not property-cache-shaped. **0-6's CI run has since confirmed the split independently — Richards 144.9×, DeltaBlue 460×** — so the phase's exit criterion is answered by two measurements on different machines that agree on which side of 200× each benchmark falls, rather than by one. Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
+| **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. **Its `let`/`const` half is now landed**, on the second attempt: the first was withdrawn on a miscompile, and re-built scoped to the *numeric* tier alone it reproduces the predicted number and not the defect — **`let` and `const` both 31.98 → 0.00 B/iter and 1 → 3 numeric locals, identical to the eligible `var` floor, with all twelve other `--local-alloc` rows byte-identical**, both arms from one tree. The recorded reproduction was re-run against it and is green, including under the switches that restore the pre-1-4 and pre-1-1 front end — so the withdrawn attempt's defect is **not explained**, only not reproduced; what the second attempt does differently is leave the JSValue tier closed to lexical names, since a TDZ and const-ness live in the cell that tier removes while the numeric gate proves both unobservable. **The block-scoped `var` then landed too, and 3-3 is complete**: the "definite-assignment analysis" it asked for is the function body's own dominance argument applied one level down — an unconditional block is *transparent* (entered whenever reached, exits only via `return`/`throw`), and any other block *confines* its declaration, which then needs every reference inside it. **`block-var` 31.98 → 0.00 B/iter and 1 → 3, one row moved and twelve byte-identical.** Two defects were caught on the way, neither shipped: a non-dominating declaration could mark a name readable and mask a read that would see `undefined`, and the fix for that over-corrected into rejecting a benign numeric re-declaration — caught by a pre-existing test written as "the guard against over-fixing". All four of the item's categories are now at the eligible floor except `parameter`, which cannot reach the numeric tier at all. 3-4 is a cost, not a task |
+| **4** — tiering | Started. **4-3a is landed and it found a real hazard**: restart is only sound if the body is not suspendable, and nothing said so — the property held by two unrelated accidents (the `EnableTiering` call sitting inside the ordinary-function `else` branch, and the tiering gate borrowing `CanScalarReplaceLocals`, which refuses generators for its own reasons). Defeating both, a legal `async function` whose body matches the planner's shape returns **`number` instead of a Promise** from its second call on — measured, not argued. One condition at the decision point fixes it, and 16 tests pin all three conditions. **4-3b is landed too**: `SpeculationBuilder.Guarded` compiles the specialized and generic forms into one method so a failed guard is a *branch*, with the subject evaluated exactly once (the hand-rolled spelling fails 12 of its 15 tests) and per-site poisoning after four misses. **It emits no JavaScript-level speculation, and that is structural rather than scope-trimming** — a guard needs a shape or a callee to speculate on and a tier-1 method knows neither, so the branch only has meaning inside a tier-2 recompile, which is 4-2. The mechanism lands before its consumer because it has to. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 has landed and it settles the phase's premise.** Per-site feedback now *retains* what the inline caches only observe — receiver shapes at reads, callee identities at calls — and over seven Octane suites, weighted by executed operations, **93.54% of 37.9 M property reads and 96.70% of 4.24 M calls happen at a site that only ever saw one shape or one callee**. 4-2 and 4-4 are an XL each and both are worth their cost only in proportion to that number; nothing in the engine could report it until now, and it comes out high. **Megamorphism is essentially absent** — 18 sites in total, five of seven suites have none — corroborating 2-10's independent finding of zero megamorphic read sites; the fallback path 4-3b must still be correct, it just will not be hot. **DeltaBlue is the worst read case at 77.10%**, with 43 polymorphic read sites against Richards's 1, which is a lead on the suite still outside phase 2's gate. Collection is off by default, costs nothing on the call path *by construction*, and the item's third signal — numeric-vs-generic per site — is deliberately left uncollected rather than half-built. **4-1 can start now** |
 | **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. The global case's retained result list then landed too — **2 032.8 → 478.3 B per match**, dead linear on both sides, by streaming when the receiver's `exec` is the pristine intrinsic and the replacement is a `$`-free string. **Every follow-up this phase named is now closed**; what is left is item 2's `Compiled` policy, deliberately unshipped |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
@@ -103,19 +103,37 @@ wall-clock figure is a median of interleaved process-granularity pairs against a
 | 2-8 | Statics on a constructor function were a 100% miss — DeltaBlue's hot path — **0 → 199 999**, ~10% on a DeltaBlue-shaped loop. **This item also shipped a regression that broke DeltaBlue outright; the fix is folded into the same patch** |
 | 2-9 | A shape-tracked property cost ~150 B of radix trie to store an 8-byte reference. The trie is no longer written at all while an object is shape-tracked — **a three-field object is 0.36x and an eight-field one 0.15x**, against **+8 B on every object** for the attribute array. Over an Octane run **six in seven property maps are never built**: 16.2 M → 2.5 M, live map bytes 0.15x. All 22 cache rows byte-identical. **Losing side, measured against a built control: ~20% on compile-and-first-run**, corroborated by Octane CodeLoad at 0.844 |
 
-**Owed.** One thing now gates "landed" becoming "closed":
+**Owed.** **0-6's CI Octane run has happened**, at the pinned pointer on 2026-08-03, and it is
+the first committed result that describes the engine as it now is. What it settles and what it
+does not:
 
-1. **0-6's CI Octane run** — the only measurement of phase 2's real exit criterion, *DeltaBlue
-   and Richards inside 200x*. The committed results in `tests/octane/results/` predate the
-   pointer bump and are stale.
+- **Coverage: 17 of 17 scores, all 15 suites `ok`, for all three engines** — Broiler, Jint and
+  a same-machine Chromium. Nothing errored, crashed or timed out (`diagnostics.md`: *"All 15
+  suites completed. Nothing to diagnose."*). This is the headline half of the gate and it is
+  met.
+- **Phase 2's real exit criterion — *DeltaBlue and Richards inside 200×* — is answered, and it
+  splits exactly as the local run predicted: Richards PASSES at 144.9×, DeltaBlue FAILS at
+  460×.** The local five-repetition run had them at 150× and 447×; CI's single-repetition run
+  says 144.9× and 460×. Two independent measurements agreeing on which side of 200× each
+  benchmark falls is what makes the split a finding rather than a reading.
+- **The noise band is still not on record**, and that is the half still owed: the run is
+  `"Repetitions per suite: 1"`, and `comparison.md` says so itself — *"a single run; deltas
+  against it cannot be distinguished from noise"*. So the per-suite numbers below may be
+  quoted for **magnitude and for pass/fail**, and **no delta against them may be claimed**.
+  0-7's BenchmarkDotNet comparison and 0-8's RID matrix remain owed too, and a container
+  cannot produce either.
 
-**The conformance gate is satisfied.** All four pinned manifests were run at `a6f101cc` plus
-2-9, on win-x64 against the pinned suite ref `ccaac100` — **8 220 passed, 84 failed, 9 timed
-out, and every count is identical to §3.4's recorded run, manifest by manifest.** The 84 are the
-same `$262`-requiring files and the 9 the same integer-limit cases already tracked in
+**The conformance gate is satisfied, and was re-run five times for items 3-3, 4-1, 4-3a and 4-3b.** All
+four pinned manifests were run **2026-08-03 on linux-x64 at the pinned `9bf9639b`** — plus
+`patches/0067`, and then plus each successive prefix through all five of `0067`–`0071` —
+against the pinned suite ref `ccaac100`: **8 220 passed, 84 failed, 44 skipped, 9 timed out, and
+every count is identical to §3.4's recorded run on all five, manifest by manifest.** The 84 are the same
+`$262`-requiring files and the 9 the same integer-limit cases already tracked in
 `test262-failures.txt`. So `properties-proxy` and `strict-mode`, which phase 2's exit gate names
-because 2-1, 2-2, 2-4 and 2-8 all touch `OrdinarySetWithOwnDescriptor`, are **clean — and 2-9,
-which rewrites the storage underneath that path, adds no failure either.**
+because 2-1, 2-2, 2-4 and 2-8 all touch `OrdinarySetWithOwnDescriptor`, are **clean; 2-9, which
+rewrites the storage underneath that path, adds no failure; and neither does 3-3's `let`/`const`
+half.** A **fifth manifest** was added with that item — `test262-lexical-declarations`, because
+none of the four covered `let` or `const` at all — and it is clean on both arms (§3.4).
 
 **The patch handoff, which was the third gate, is done.** `patches/0049`–`0058` have been
 applied, pushed and the pointer bumped to `a6f101cc`; the patch files are cleared and their rows
@@ -148,8 +166,8 @@ Both exclusions are **superseded here**, and the reason is not a change of opini
 it is that the probe corpus could not see the effect:
 
 - **Front end.** The probes are one-liners in a fresh `JSContext`. Octane runs 15
-  large real programs, and the two worst scores in the entire suite are
-  **MandreelLatency at 4646×** and **CodeLoad at 371×**. `script:evaluation` at 37 ms was
+  large real programs, and when this was written the two worst scores in the entire suite
+  were **MandreelLatency at 4646×** and **CodeLoad at 371×**. `script:evaluation` at 37 ms was
   a true measurement of a corpus small enough that eager compilation is free. It is not
   free on jQuery, on the TypeScript compiler, or on a 152,948-line generated function.
   **The front end is phase 1.**
@@ -160,6 +178,11 @@ it is that the probe corpus could not see the effect:
   > argument above is unaffected, because it rests on the *probe corpus being too small to
   > see eager compilation*, which is still true and is why phase 1 exists. What it cost was
   > the phase's target list: see Phase 1's header.
+  >
+  > **The two scores it named are no longer the two worst** (§4.2, 2026-08-03): CodeLoad is
+  > 228× and three suites are now behind it — DeltaBlue 460×, Mandreel 290×, RayTrace 256×.
+  > MandreelLatency at 4 584× is still the tail by an order of magnitude. Neither correction
+  > touches the argument, which was never about *which* scores were worst.
 - **Speculation.** Engine §9 scoped itself to "achievable in the current
   architecture", which was an honest boundary for a bookkeeping-removal campaign. The
   remaining ~100× is not achievable inside it. **Speculation is phase 4**, and the
@@ -198,15 +221,25 @@ source documents ended up disagreeing.
 
 ### 2.1 The suite view — three numbers per Octane run
 
-| Metric | Last committed run | **At the pin, linux-x64 (§Phase 0)** | Target |
+| Metric | Superseded run (2026-07-31) | **Committed run at the pin (2026-08-03)** | Target |
 |---|---|---|---|
-| **Scores reported** out of 17 | 12 / 17 (stale) | **17 / 17** — 15 of 15 suites `ok` | **17 / 17** |
-| **Geomean** over all 17 scores | 245 over the 12 that completed; ≈244 including the five *(0046)* measurements | **217** over all 17 | — |
-| **Spread** = worst ÷ best, as ×-slower-than-Chromium | 4646 / 45 ≈ **103×** | 3 097 / 27 ≈ **113×** | **< 5×** |
+| **Scores reported** out of 17 | 12 / 17 | **17 / 17** — 15 of 15 suites `ok` | **17 / 17** |
+| **Geomean** over all 17 scores | 245 over the 12 that completed | **351** over all 17 | — |
+| **Spread** = worst ÷ best, as ×-slower-than-Chromium | 4 646 / 45 ≈ **103×** | 4 584 / 32.8 ≈ **139.8×** | **< 5×** |
+| **Against Jint**, geomean of per-benchmark ratios | not measured | **0.569×** | > 1 |
 
-The middle column is a single repetition on a developer container with its **own** Chromium
-reference measured on the same machine, so its ratios are internally valid while its scores are
-not comparable to the left column's. It is not 0-6; see Phase 0 for what it is and is not.
+The right column is the workflow's own run, so its Chromium and Jint columns were measured on
+the same machine at the same time and the ratios are directly comparable. It is **one
+repetition per suite**, which is enough for coverage and for which side of a threshold a
+benchmark falls on, and not enough for a delta — the band is what 0-6 still owes.
+
+**The spread went up, and that is not a regression.** It is 139.8× against the superseded run's
+103× because the superseded run had *five suites scoring nothing at all*: a suite that fails
+contributes no ratio, and the four of those five that now score (Crypto, PdfJS, zlib,
+Typescript) landed across the middle of the range while the best axis improved from 45× to
+32.8×. Spread is a ratio of two suites, so widening the denominator widens it. Compare the
+column honestly or not at all — which is the reason this table names both dates rather than
+saying "before" and "after".
 
 **Spread is the organizing metric.** Because the suite total is a geometric mean,
 flattening the curve and raising the total are the same work: moving MandreelLatency
@@ -340,11 +373,14 @@ a smaller package or faster context is not a win if required globals are absent.
 ### 3.4 Conformance gates
 
 The pinned manifests are `test262-arrays`, `test262-properties-proxy`,
-`test262-strict-mode`, `test262-realm-isolation`. First taken 2026-08-01 at `cdb2fd41`
+`test262-strict-mode`, `test262-realm-isolation`, and — added 2026-08-03, see below —
+`test262-lexical-declarations`. First taken 2026-08-01 at `cdb2fd41`
 (suite ref `ccaac100`), **re-run 2026-08-02 at `a6f101cc` plus 2-9 with every count
-unchanged**, and **re-run again at `71dda1b7` plus 3-3, again with every count unchanged,
-manifest by manifest** — so the table below describes the pinned pointer as well as the commit
-it was first measured at:
+unchanged**, **re-run at `71dda1b7` plus 3-3 with every count unchanged**, and **re-run five
+times on 2026-08-03 on linux-x64 at the pinned `9bf9639b` — plus `patches/0067`, plus `0067` and
+`0068`, plus `0067`–`0069`, plus `0067`–`0070`, and plus all five of `0067`–`0071` — with every count
+identical every time, manifest by manifest** — so the table below describes the pinned pointer as well as the commit it was first
+measured at:
 
 | Manifest | Executed | Passed | Failed | Skipped | Timed out | Engine failures |
 |---|---:|---:|---:|---:|---:|---:|
@@ -353,12 +389,25 @@ it was first measured at:
 | `test262-strict-mode` | 1 066 | 1 040 | 26 | 27 | 0 | **0** |
 | `test262-realm-isolation` | 99 | 96 | 3 | 4 | 0 | **0** |
 | | **8 313** | **8 220** | **84** | **44** | **9** | **0** |
+| **`test262-lexical-declarations`** *(new)* | **397** | **397** | **0** | 207 | 0 | **0** |
 
 Every one of the 84 failures needs `$262` (`createRealm`, `detachArrayBuffer`, or a
 harness include that uses one), which the raw script host does not provide. All 9
 timeouts are already tracked in `Broiler.JS/scripts/compliance/test262-failures.txt` —
 lines 7–15, nine for nine, the integer-limit `slice`/`unshift`/`reduceRight`/
 `toReversed` cases CI has carried for a while.
+
+**`test262-lexical-declarations` is new, and it closes a gap rather than reporting one.**
+Item 3-3's `let`/`const` half changes how lexical bindings are *compiled*, and **no pinned
+manifest covered `let` or `const` at all** — `test262-language-basics` is twelve entries about
+`throw`, commas and relational operators. The manifest is
+`language/statements/{let,const,variable}` plus `language/block-scope`, and it was run **six
+times from the same tree**: at the pinned `9bf9639b`, and at that commit plus each successive
+prefix of `patches/0067`–`0071`. **Identical, 397 of 397 passing on each.** So it did not
+*detect* anything — its value is that a future regression on those paths now fails a pinned gate
+instead of passing unnoticed, and `language/statements/variable` is exactly what `0068` touches.
+The 207 skips are the negative-syntax and module cases the runner excludes by design, not silent
+failures.
 
 **Still not covered:** the Annex B forbidden-extension paths that P0-3 gates on
 (`test/annexB/built-ins/Function`, `forbidden-ext/b2`) are in no manifest. Adding them
@@ -747,32 +796,58 @@ repository root is the solution to run.
 
 ### 4.2 The current Octane profile
 
-Committed scores plus the five *(0046)* measurements taken on the fixed engine. **The
-committed run is stale** — see Phase 0.
+**Regenerated by the workflow on 2026-08-03 at the pinned pointer** — `tests/octane/results/`,
+Octane version 9, Chromium 149.0.7827.55 and Jint 4.15.3 on the same machine. This replaces the
+2026-07-31 table, which quoted an engine five suites of which did not score and which is now
+twenty-odd commits behind. Ordered by ratio, best first.
 
-| Benchmark | Chromium | Broiler | × slower | Dominant blocker |
-|---|--:|--:|--:|---|
-| SplayLatency | 69 725 | 1 539 | **45** | — (best axis; GC pauses are fine) |
-| Typescript | 86 327 | 1 009 *(0046)* | 86 | mixed; overhead amortized by real work |
-| Gameboy | 90 650 | 1 041 | 87 | B1 typed arrays, B3 exotic exclusion |
-| NavierStokes | 35 432 | 341 | 104 | B1 boxed array elements |
-| RegExp | 9 890 | 89.9 | 110 | B5 regex engine |
-| Splay | 43 027 | 283 | 152 | B1 allocation rate |
-| Box2D | 99 321 | 584 | 170 | B1 + B2 (no escape analysis, no inlining) |
-| PdfJS | 58 725 | 321 *(0046)* | 183 | B1, B5, B4 |
-| EarleyBoyer | 91 547 | 339 | 270 | B1 allocation rate |
-| RayTrace | 117 436 | 403 | 291 | B1 + B2 escape analysis |
-| Mandreel | 47 996 | 160 | 300 | B4 compile, B1 heap traffic |
-| Crypto | 38 183 | 127 *(0046)* | 301 | B1 integer boxing |
-| zlib | 80 514 | 237 *(0046)* | 340 | B1 integer boxing |
-| CodeLoad | 30 916 | 83.4 *(0046)* | 371 | **B4 eager compilation** |
-| Richards | 46 754 | 108 | 433 | **B2 call cost, B3 shape transitions** |
-| DeltaBlue | 102 708 | 171 | 601 | **B2 polymorphic call cost** |
-| MandreelLatency | 67 368 | 14.5 | **4 646** | ~~B4 compile latency~~ — **measured: not compilation.** Pauses between render frames over already-compiled code; a 3.04× faster compile of `mandreel.js` moves it 0.992×. Points at B1 allocation rate / B7 |
+> **One repetition per suite.** `comparison.md` says so on its own face — *"a single run;
+> deltas against it cannot be distinguished from noise"*. Read this table for **magnitude and
+> for which side of a threshold a benchmark falls**, which is what phase 2's exit gate asks;
+> do **not** read a delta out of it against any earlier table, including the one it replaces.
+> A band needs `--repetitions` and is still owed (0-6).
 
-The shape of that list *is* the finding: the extremes are front-end and call-path,
-not arithmetic. The losses are concentrated in two subsystems rather than spread
+| Benchmark | Chromium | Broiler | × slower | Jint | Dominant blocker |
+|---|--:|--:|--:|--:|---|
+| SplayLatency | 72 859 | 2 220 | **33** | 3 164 | — (best axis; GC pauses are fine) |
+| Typescript | 90 558 | 2 492 | 36 | 2 556 | mixed; overhead amortized by real work |
+| Splay | 44 461 | 626 | 71 | 839 | B1 allocation rate |
+| Gameboy | 91 279 | 1 096 | 83 | 936 | B1 typed arrays, B3 exotic exclusion |
+| RegExp | 10 263 | 122 | 84 | 210 | B5 — **and B5 names the wrong component**; see phase 5 |
+| NavierStokes | 35 474 | 384 | 92 | 255 | B1 boxed array elements |
+| PdfJS | 56 417 | 508 | 111 | 890 | B1, B5, B4 |
+| Richards | 38 257 | 264 | **145** | 188 | B2 call cost, B3 shape transitions — **now inside 200×** |
+| Box2D | 101 050 | 675 | 150 | 622 | B1 + B2 (no escape analysis, no inlining) |
+| Crypto | 38 431 | 225 | 171 | 148 | B1 integer boxing |
+| zlib | 80 429 | 390 | 206 | 5 339 | B1 integer boxing |
+| CodeLoad | 31 180 | 137 | 228 | 3 659 | B4 eager compilation — **~27% of what it measures**, see 1-1 |
+| EarleyBoyer | 93 399 | 404 | 231 | 416 | B1 allocation rate |
+| RayTrace | 118 472 | 463 | 256 | 448 | B1 + B2 escape analysis |
+| Mandreel | 48 186 | 166 | 290 | 92.8 | B1 heap traffic — **not B4 compile**, see 1-4 |
+| DeltaBlue | 99 812 | 217 | **460** | 188 | **B2 polymorphic call cost — the one suite still outside 200×** |
+| MandreelLatency | 66 469 | 14.5 | **4 584** | 789 | ~~B4 compile latency~~ — **measured: not compilation.** Pauses between render frames over already-compiled code; a 3.04× faster compile of `mandreel.js` moves it 0.992×. Points at B1 allocation rate / B7 |
+| **Overall (geomean)** | **57 080** | **351** | **163** | **616** | spread (worst ÷ best suite) **139.8×** |
+
+The shape of that list *is* the finding, and it has not changed: the extremes are front-end and
+call-path, not arithmetic. The losses are concentrated in two subsystems rather than spread
 evenly — which is what makes them addressable in a defined order.
+
+**Three things this run says that the stale one could not.**
+
+- **Richards is inside 200× and DeltaBlue is not** — 145× against 460×, the same split the
+  local run found at 150× and 447×. Phase 2 moved Richards across the line and did not move
+  DeltaBlue across it. That is the phase's exit criterion, answered.
+- **Jint is the more informative column.** Against a managed interpreter on the same runtime
+  Broiler is **0.569× overall** — behind, on a geometric mean of the 17 per-benchmark ratios.
+  It is *ahead* on the call- and object-heavy suites this campaign has been working (Mandreel
+  1.79×, Crypto 1.52×, NavierStokes 1.51×, Richards 1.40×, Gameboy 1.17×, DeltaBlue 1.15×,
+  Box2D 1.09×) and far behind on three: **CodeLoad 0.037×, zlib 0.073×, MandreelLatency
+  0.018×**. Two of those three are the front end and the third is latency, so the column
+  agrees with §1.1 about where this engine's remaining structural gap is — and it does it
+  against a reference that is not a JIT, which Chromium's column cannot.
+- **The worst score is no longer a compilation problem.** MandreelLatency at 4 584× is still
+  the tail, and 1-4 and 1-1 between them made compiling `mandreel.js` 3.04× faster and moved
+  it 0.992×. It belongs to phase 3.
 
 ### 4.3 The blockers, ranked
 
@@ -912,7 +987,7 @@ said so independently (§1.2). This phase contains no engineering.
 
 | # | Owed | State in the tree |
 |---|---|---|
-| **0-6** | **Run the Octane workflow and commit refreshed results** | **Not done, and not doable outside CI.** The committed results were generated 2026-07-31 20:28, ~15 hours *before* the pointer bump, so they show five suites failing on an engine that no longer has those defects. `comparison.md` carries a hand-added stale banner that disappears the moment the results regenerate. A local run is *technically* possible — upstream `chromium/octane` is reachable and `run-octane.mjs` only loads Playwright on the Chromium path, so `--engines broiler` needs no browser — but its numbers would come from a developer workstation and **could not be committed against the CI-generated Chromium column**. The gate is the workflow; see below |
+| **0-6** | **Run the Octane workflow and commit refreshed results** | **Done, and the results in `tests/octane/results/` are current** — regenerated by the workflow 2026-08-03 at the pinned pointer, against a same-machine Chromium 149 and Jint 4.15.3. **17 of 17 scores, all 15 suites `ok` for all three engines, nothing errored or timed out.** Geomean 351 against Chromium's 57 080 (163×) and Jint's 616 (0.569×); spread 139.8×. See §4.2 for the table and what may be read out of it. **The half still owed is the noise band**: the run is one repetition per suite, which cannot distinguish a delta from noise — it needs `--repetitions` (0-4 built the flag; nothing has used it in CI yet) |
 | **0-7** | A `PropertyOperationBenchmarks` / `FunctionCallBenchmarks` comparison | **Run** — `collect_phase0.py --profile baseline`, both classes plus the new probes, 2 repetitions, win-x64 at `b3f53dcc` (recorded `dirty: true`). The stale 2026-07-16 artifacts no longer stand alone. Artifacts under the gitignored `Broiler.JS/artifacts/performance/`, per `performance.md` |
 | **0-8** | Two runs inside the band on **win-x64, linux-x64, linux-arm64**, reporting time, allocation and working set together | **Not satisfied on any RID.** The win-x64 leg ran and **failed the band: 25 of 62 metrics outside 7.5%**, worst 56% (`FunctionCallBenchmarks.Native`), including 5 lifecycle metrics. That is the protocol working, not a defect — the run was on a 16-core developer workstation, and `performance.md` requires an *idle physical machine*. **A workstation cannot produce this evidence**; linux-x64 and linux-arm64 are unavailable here regardless |
 | **0-9** | A permanent home for the Appendix A probes under `Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks`, wired into `Broiler.JS/eng/performance/phase0.json` | **Done — and engine §8.1's "not created" was wrong.** The project existed and was *already* `phase0.json`'s `benchmark.project`; what was missing was the probe corpus inside it. Added `HotPathProbeBenchmarks` (all 14 Appendix A scenarios at Appendix A's iteration counts, plus the P2-4 accumulation probe), registered in `Program.cs` and wired into all three profiles. Phase C's hit rates got their own emitter, `--cache-metrics`, because a hit rate is not a wall-clock benchmark |
@@ -1066,7 +1141,9 @@ of one and reporting a number. **DeltaBlue is the item phase 2 has left**, and i
 > **What this is not.** It is not 0-6. That gate is *the workflow*, and it also carries 0-7's
 > BenchmarkDotNet comparison and 0-8's RID matrix, neither of which a container can produce —
 > §0-8 already records why a non-idle machine cannot. These results are therefore **not committed
-> to `tests/octane/results/`**, which stays CI's to write; the stale banner there still stands.
+> to `tests/octane/results/`**, which stays CI's to write. *(CI has since written them — the
+> committed results are the 2026-08-03 workflow run at the pin, §4.2, and they agree with this
+> table's verdicts: Richards 144.9× passes, DeltaBlue 460× fails.)*
 > The full-suite numbers are **one repetition** and the harness says so in its own output. What
 > is claimed here is the pass/fail column, which is hardware-independent, and the two gate
 > ratios, which are same-machine, five-repetition and banded. The geomean and the spread are
@@ -2461,10 +2538,9 @@ its own control and is wrong, and that follow-up would not have removed the loss
 
 #### The losing-side hypothesis was measured, and it is wrong — **`prototype` is what materializes**
 
-> **Delivered as a patch, not in the pin**, for the same 403 as phase 5's:
-> [`patches/0061`](../patches/0061-js-measure-2-9-materialization-cause.patch), which is
-> **measurement and instrumentation only — no behaviour change** — and is independent of
-> `0059`/`0060`, touching a disjoint set of files.
+> **In the pin.** Shipped as `patches/0061` while its push was blocked by a 403; since applied
+> and pushed, and it is now **`e6222df3`**, an ancestor of the pinned `9bf9639b`. Measurement
+> and instrumentation only — no behaviour change.
 
 The mechanism above was recorded as a hypothesis and flagged *"do not treat as settled"*. It is
 now settled, and against it. **A strict function is the control it never had**:
@@ -2794,10 +2870,8 @@ curve whose median is ~180×, and this phase is the reason they are.
 ---
 ### 2-10 · DeltaBlue's dictionary fallbacks — **found, fixed, and it is not the explanation**
 
-> **Delivered as a patch, not in the pin**, for the same 403 as the rest:
-> [`patches/0062`](../patches/0062-js-array-length-keeps-shape.patch). It applies cleanly on its
-> own but **will not compile without [`patches/0061`](../patches/0061-js-measure-2-9-materialization-cause.patch)**,
-> whose counter the new emitter reads — a textual apply-check is not enough, build after applying.
+> **In the pin.** Shipped as `patches/0062` while its push was blocked by a 403; since applied
+> and pushed, and it is now **`0812d80d`**, an ancestor of the pinned `9bf9639b`.
 
 Phase 2's exit criterion split (Richards 183× passes, DeltaBlue 576× fails), and every phase 2
 item was sized on a probe rather than on the suite. §3.5 already records what that costs: 2-8 was
@@ -2930,9 +3004,8 @@ and it wants the Octane cluster run against it — which is now possible.
 
 #### 2-11 · The redundant prototype write — **landed, and it is the largest cache win since 2-0**
 
-> **Delivered as a patch, not in the pin**:
-> [`patches/0063`](../patches/0063-js-prototype-rewrite-no-invalidate.patch). Independent of
-> `0059`–`0062` — one file, one condition.
+> **In the pin.** Shipped as `patches/0063` while its push was blocked by a 403; since applied
+> and pushed, and it is now **`4d1c4796`**, an ancestor of the pinned `9bf9639b`.
 
 The class path was tracked to `JSClass.CreateInstance`, and the two obvious sites were already
 correct: the instance is built with `new JSObject(instancePrototype)`, carrying 2-0's own comment.
@@ -2984,9 +3057,8 @@ surface. Octane still runs 15 of 15 suites `ok`.
 
 #### 2-12 · The stale cache entry that could never be replaced — **DeltaBlue 69% → 93%**
 
-> **Delivered as a patch, not in the pin**:
-> [`patches/0064`](../patches/0064-js-refresh-stale-cache-entry.patch). Needs `0061` (the counter
-> infrastructure) and `0062` (the emitter) to compile.
+> **In the pin.** Shipped as `patches/0064` while its push was blocked by a 403; since applied
+> and pushed, and it is now **`fb1e2f4c`**, an ancestor of the pinned `9bf9639b`.
 
 2-10 owed a per-site attribution, and this is it. The bare miss counter cannot say *why* a read
 missed, so the lookup's exits are now counted separately:
@@ -3230,7 +3302,7 @@ and this gets cheaper.
 
 **Where.** `Runtime/JSObject.cs`, `Runtime/ObjectShape.cs`. **Size: L.**
 
-### 3-3 · Widen the unboxed-locals eligibility gate — **measured; the parameter half landed, and it is not the half the item described**
+### 3-3 · Widen the unboxed-locals eligibility gate — **complete: all three halves landed**
 
 P2-2 item 3 covers a function-top-level `var` not named by any nested closure. Still
 ineligible when this item was written: **function parameters**, `let`/`const` (needs TDZ
@@ -3432,9 +3504,9 @@ which is what makes them a pin rather than a description. Repository suite: **7 
 *This is why the successor could not start first.* Extending the same analysis to `let`/`const`
 without this would have widened a silent-NaN miscompilation to two more declaration forms.
 
-#### What is left of 3-3, and it now outranks what landed
+#### What was left of 3-3, and it outranked what landed first
 
-`let`/`const` and the block-scoped `var` are still ineligible, and the measurement moves them
+`let`/`const` and the block-scoped `var` were still ineligible, and the measurement moved them
 **ahead** of where the item put them, for a reason the item could not have known:
 
 - They cost the same per site as a parameter did — **31.98 B/iteration**, charged per
@@ -3446,10 +3518,78 @@ without this would have widened a silent-NaN miscompilation to two more declarat
 - And they carry the multiplier: re-qualifying one binding re-qualifies every local
   downstream of it, which is the 1 → 3 in the table above.
 
-So the successor item is **`let`/`const` at the numeric tier first**, then the block-scoped
-`var` (which does need the definite-assignment analysis the item names).
+So the successor item was **`let`/`const` at the numeric tier first**, then the block-scoped
+`var` (which does need the definite-assignment analysis the item names). **Both have now
+landed, and item 3-3 is complete**: all four categories the item named are at the eligible
+floor except `parameter`, which cannot reach the numeric tier at all — the value arrives as a
+`JSValue` and nothing proves it is a number, which is why its half landed at the *scalar* tier
+instead.
 
-#### `let`/`const` was attempted and **withdrawn**, and the reproduction is the deliverable
+| Site | Before 3-3 | After all three halves |
+|---|--:|--:|
+| `top-level-var` — the eligible floor | 0.00 B/iter, 3 | 0.00, 3 |
+| `let-binding` | 31.98, 1 | **0.00, 3** |
+| `const-binding` | 31.98, 1 | **0.00, 3** |
+| `block-var` | 31.98, 1 | **0.00, 3** |
+| `parameter` | 31.98, 1 | 31.98, 1 — *scalar* tier only; see the parameter section above |
+
+#### `let`/`const` — **landed on the second attempt**
+
+The first attempt is recorded below, because it was withdrawn on a miscompile and the
+instruction it left behind ("find what else decides a lexical binding's storage") is the reason
+the second attempt was scoped the way it was. **The second attempt reproduces the number and
+not the defect.**
+
+**What it does.** `NumericLocalAnalysis` offers a function-body-top-level `let` or `const` on
+the same terms as a `var`; `VisitBlock`'s **numeric** gate admits a lexical name when the block
+is the function's own body; and `VisitVariableDeclaration` tests `NumericStorage` *before* the
+lexical branch rather than after it.
+
+**What it deliberately does not do, and this is the whole difference from the first attempt.**
+The **JSValue tier stays closed to lexical names.** The two tiers are not interchangeable:
+
+| | JSValue tier (`useScalarLocal`) | Numeric tier (`useNumericLocal`) |
+|---|---|---|
+| admits a name because | it is an ordinary local nothing captures | the analysis **proved** it only ever holds a number |
+| TDZ | nothing proves the dead zone unobservable | the dominance argument does — any name referenced before its declaration is rejected, so the throw is **unreachable**, not removed |
+| const-ness | nothing proves no write happens | a const written anywhere is rejected outright, so there is no assignment whose `TypeError` could go missing |
+
+A `let`'s dead zone and a `const`'s read-only-ness are both properties of the `JSVariable`
+**cell** that either tier removes. Only the numeric tier's gate discharges them, so only it may
+admit a lexical name.
+
+*Whether the first attempt relaxed the shared condition instead is an **inference**, not
+something checked — the branch was not kept, which is precisely why this section exists. It is
+offered as the most likely reading of its recorded symptom ("none of those nested bindings is
+one the gate admits") and should not be repeated as fact.*
+
+**Measured, both arms from one tree, `--local-alloc`:**
+
+| Site | Before | After |
+|---|--:|--:|
+| `let-binding` | 31.98 B/iter, 1 numeric local | **0.00 B/iter, 3** |
+| `const-binding` | 31.98 B/iter, 1 numeric local | **0.00 B/iter, 3** |
+| every other row (12 of them) | — | **byte-identical, numeric-local count unchanged** |
+
+— identical to `top-level-var`, the eligible floor. The multiplier the section above predicts
+is the second column: one binding re-qualified, and the accumulator and counter that read it
+came with it.
+
+**On the withdrawn attempt's defect: it did not reproduce, and it is not explained.** The
+recorded reproduction was re-run against this implementation — two evaluations in one process,
+fresh `JSContext` each, which is the only configuration that could ever see it — and all three
+lines answer correctly. It was then re-run with `BROILER_JS_REWRITER_INDEX_THRESHOLD` set above
+any real scope and with `BROILER_JS_DEFER_IL=0`, which between them restore the pre-1-4 and
+pre-1-1 front end, since both landed *after* the withdrawal and `LambdaRewriter` was the one
+plausible place a binding's storage is decided outside the gate. Green under all four
+configurations. The three compiler files this item touches are **byte-identical between
+`2ebc0c3c` (where the attempt was made) and the current pin**, so the tree did not fix it
+either. Widening the JSValue tier as a deliberate experiment did not reproduce it.
+**So the honest statement is that the second attempt avoids the defect rather than fixes it**,
+and the reproduction below is kept as a pinned test rather than retired — it costs one test and
+it is the only thing that would catch a recurrence.
+
+#### The first attempt, **withdrawn** — kept because the next one started from it
 
 It was built, it measured exactly as predicted, and it miscompiles. Recorded here rather than
 left as a branch, because the next attempt should start from the evidence.
@@ -3506,15 +3646,115 @@ supported` out of `ILCodeGenerator.VisitAssign`. That is patch 0047's hazard fam
 where this item's own *Watch* note said to look, and the fix is to test `NumericStorage` before
 the lexical branch rather than after it.
 
-**For the next attempt**, in order: find what else decides a lexical binding's storage (start at
-`VisitBlock`'s `CreateVariable` and `FastFunctionScope.variableScopeList` — the block scope is
-constructed fresh, so the leak is below it); keep the `NumericStorage`-before-lexical ordering
-in `VisitVariableDeclaration`; keep the const-write rejection; and re-run the reproduction above
-**as two evaluations in one process**, because a single one is green and the script host is
-therefore not an instrument that can see this.
+**What the next attempt did with this.** Three of the four instructions this section left were
+followed and one was overtaken. Kept: the `NumericStorage`-before-lexical ordering in
+`VisitVariableDeclaration`, the const-write rejection, and re-running the reproduction **as two
+evaluations in one process** — which is exactly why the landed change has
+`ALexicalBindingIsUnaffectedByAnEarlierCompilationInTheSameProcess` rather than a single-eval
+test that would have been green either way. Overtaken: *"find what else decides a lexical
+binding's storage"*. It was looked for at the two named places and not found, and the four
+configurations above rule out the front end as well; what the second attempt changed instead
+was **which tier** may admit a lexical name at all. See the landing section above for why that
+distinction is the load-bearing one, and for the plain statement that the defect is avoided
+rather than explained.
 
-`const` remains the cheaper half and worth separating once the storage question is answered: it
-cannot be reassigned at all, so its analysis reduces to checking the initializer.
+`const` did turn out to be the cheaper half, as this section predicted — it cannot be
+reassigned, so its analysis reduces to checking the initializer plus rejecting any write — but
+it was cheap enough that separating it from `let` bought nothing, and the two landed together.
+
+**Verify.** `LexicalNumericLocalTests`, 58 cases in eight groups: that the gate admits `let` and
+`const` *to the same numeric-local count as `var`* (without which every other case here passes
+vacuously); arithmetic over the values doubles make awkward (NaN, both zeroes, the infinities,
+`2**53`); the refusals — TDZ reads, every form of writing a `const`, a binding that later holds
+a string/object/null/undefined/BigInt, and a captured one; the nested-block shapes, including
+all three reproduction lines and a nested block's own dead zone; `for (let i …)` binding per
+iteration, which a single raw double cannot represent; and the sharpest shadowing case, a
+`for`-head `let` sharing its name with an eligible body-level one, where **both halves are
+numeric so nothing about the type distinguishes them** and conflating them returns the loop's
+final value instead of the outer binding's; and the two function kinds whose locals are not
+ordinary CLR locals — a **generator**, where a lexical value has to survive a `yield` because
+the body is rewritten into a state machine, and an **arrow**, whose concise form has no body
+block at all, so the body-block test must fail to match rather than misfire. Repository suite:
+**7 698 tests across 13 projects, 0 failures** on linux-x64, with the patch applied to a
+clean checkout of the pin.
+
+**And it exposed a gap in the conformance gate, which is closed here rather than noted.** No
+pinned manifest covered `let`/`const` at all — `test262-language-basics` is twelve entries about
+`throw`, commas and relational operators — so a change to how lexical bindings are *compiled*
+had nothing in §3.4 that could fail. `scripts/compliance/test262-lexical-declarations.txt` adds
+`language/statements/{let,const,variable}` and `language/block-scope`; it is **397 of 397
+passing on both arms** (§3.4), so it reports nothing today and guards those paths from here on.
+
+#### The block-scoped `var` — **landed, and it completes item 3-3**
+
+> **Delivered as a patch, not in the pin**, on the same terms as `0067`: the push to the
+> submodule remote returned 403, so the pointer is deliberately unbumped and the change ships as
+> [`patches/0068`](../patches/0068-js-block-scoped-numeric-var.patch), which **must be applied
+> after `0067`** — same file, and it builds on the gate `0067` restructures. Every figure below
+> was measured on a local build of the pinned `9bf9639b` plus `0067`, with and without `0068`,
+> both arms from the same tree.
+
+This is the half the item said needs "definite-assignment analysis", and what it actually needs
+is the **dominance argument the function body already gets, applied one level down**. The hazard
+is exact: a `var` is hoisted to the function but its initializer sits inside a block, so between
+function entry and that block the binding is observably `undefined` — and a raw double hoisted
+to 0 answers `0` instead. That is a silent wrong answer, not a lost optimization.
+
+**Two admissions, and they are different arguments.**
+
+| | Transparent | Confined |
+|---|---|---|
+| shape | an unlabelled `{ … }` that is a direct statement of the function body, or of another transparent block | a `var` that is a direct statement of any other block |
+| why the initializer has run | the block is entered whenever control reaches it, and the only ways out are `return`/`throw`, which leave the function — so it does not weaken the body's dominance at all | entering the block is itself the proof |
+| extra condition | none; the name behaves exactly like a body-level `var` | **every reference must be inside that block**, and after the declaration |
+| what it buys | the item's own probe shape — `{ var v = 3.5; }` then a loop that reads `v` | the case that matters in real code: a temporary declared and consumed inside a loop body |
+
+**Measured, both arms from one tree, `--local-alloc`: `block-var` 31.98 → 0.00 B/iteration and
+1 → 3 numeric locals**, identical to `top-level-var`, with **all twelve other rows byte-identical
+and every other numeric-local count unchanged** — one row moved, which is the whole diff.
+
+**Only a *direct* statement of the block qualifies, and that is load-bearing.** Keying on the
+innermost *enclosing* block instead would admit `if (c) var t = 1; return t;` — whose enclosing
+block is the function body, which does not dominate the declaration — and answer `0` where the
+program sees `undefined`. A label is excluded for the same reason: `break` can leave a labelled
+block before the declaration runs, and a labelled block is an `AstLabeledStatement` rather than
+an `AstBlock`, so the transparency test does not match it. A `catch` is excluded because it is a
+sibling of its `try`'s block, not inside it.
+
+**One hazard was found by testing and would have shipped otherwise.** The first cut marked a
+name readable at *whichever* declaration the walk reached first, which is how the existing
+analysis has always worked — sound while every declaration dominates. It stops being sound once
+a name can have both a dominating and a non-dominating declaration:
+
+```js
+if (c) { var t = 1; }      // non-dominating, but reached FIRST
+var r = String(t);         // → "undefined", and a raw double answers "0"
+{ var t = 2; }             // dominating, and what made the name a candidate
+```
+
+The fix is one line of principle — **a name becomes readable at its dominating declaration, not
+at any other declaration of the same name** — and it is why the analysis now records which
+initializer nodes are the dominating ones rather than only which names are.
+
+**And the fix for that immediately over-corrected, which a pre-existing test caught.** Making
+transparent blocks offer their declarations turned `var s = 0; { var s = 5; }` into a
+"declared twice" rejection, failing
+`NumericLocalWriteVisibilityTests.ANumericReDeclarationKeepsTheLocalSpecialized` — a test written
+for exactly this, whose comment reads *"this is the guard against over-fixing"*. It was right:
+two declarations that **both** dominate are not a hazard, because each dominates everything
+after itself and the type proof still runs over both values. That rejection was over-conservative
+even before this item — its stated reason ("the second may sit somewhere the first does not
+dominate") never applied to its own call site — and it is now gone.
+
+**Verify.** `BlockScopedVarNumericLocalTests`, 43 cases: the admissions with their numeric-local
+counts asserted (a value-only assertion passes vacuously here, since the right answer and the
+wrong storage often agree); and the refusals, each written as a value the program can observe —
+`String(t)` answering `"undefined"` where a raw double answers `"0"`. The refusals are the
+block that may not run, the declaration with no block of its own, the labelled block, the
+`catch` reading its `try`'s declaration, the reference before the declaration, two declarations
+in incomparable blocks, and a confined name reached from outside its block through `+=`, `++`
+and `typeof` — the three forms that never reach an ordinary identifier read. Repository suite:
+**7 741 tests across 13 projects, 0 failures** on linux-x64.
 
 ### 3-4 · A tagged value representation — *scope and cost, do not start*
 
@@ -3553,8 +3793,8 @@ and tested; what is missing is the part that makes entering tier-2 worth anythin
 
 | # | Item | Where | Note | Size |
 |---|---|---|---|---|
-| **4-3** | **Deoptimization** — **designed; see below** | `Runtime/FunctionTiering.cs`, `Engine/CallFrames.cs`, and for 4-3b `.Compiler` / `.ExpressionCompiler` | The safety net that makes everything else legal. "Bail out mid-function by reconstructing an interpreter frame" is **not expressible here** — there is no interpreter frame. Splits into **4-3a** (S, the restart contract the pilot already implements) and **4-3b** (M–L, a generic fallback branch inside the specialized method), and only 4-3b gates 4-4 | ~~XL~~ **S + M–L** |
-| **4-1** | **Type feedback collection** — *now also carries what was 2-6* | `Runtime/ObjectShape.cs`, `.Compiler` sites | The inline caches already observe shapes at property sites. Extend to record and retain observed shapes, **callee identities**, and numeric-vs-generic outcomes per site. Callee identity was phase 2's 2-6 until that item was measured: there is no repeated callee resolution to remove, so recording it is feedback and nothing else, and it pays only once 4-2 and 4-4 consume it | L |
+| **4-3** | **Deoptimization** — **designed; 4-3a and 4-3b both landed** | `Runtime/FunctionTiering.cs`, `Engine/CallFrames.cs`, and for 4-3b `.Compiler` / `.ExpressionCompiler` | The safety net that makes everything else legal. "Bail out mid-function by reconstructing an interpreter frame" is **not expressible here** — there is no interpreter frame. Splits into **4-3a** (S, the restart contract the pilot already implements) and **4-3b** (M–L, a generic fallback branch inside the specialized method), and only 4-3b gates 4-4 | ~~XL~~ **S + M–L** |
+| **4-1** | **Type feedback collection** — **shapes and callees landed; numeric-vs-generic outstanding** | `Runtime/TypeFeedback.cs`, `Runtime/ObjectShape.cs`, `LinqExpressions/JSFunctionBuilder.cs` | The inline caches already observe shapes at property sites but do not *retain* them. Now recorded per site and kept: receiver shapes at reads, callee identities at calls. **And it answers the question the rest of the phase rests on — see below.** Callee identity was phase 2's 2-6 until that item was measured: there is no repeated callee resolution to remove, so recording it is feedback and nothing else, and it pays only once 4-2 and 4-4 consume it | L |
 | **4-2** | **A specializing tier-2 compile** | `BuiltIns/Function/JSFunction.cs` — replace the `numericPlan == null` branch | Consume 4-1's feedback: monomorphic property access → shape check plus direct slot read; arithmetic → raw `double`/`int` where feedback says so | XL |
 | **4-4** | **Inlining of small JS callees** at monomorphic sites | `.Compiler` | What Richards and DeltaBlue actually need, and the measurement says why: **a call costs ~250 ns, about thirteen times the loop body it replaces** (2-6). Strictly downstream of 4-3, 4-1 and 4-2 — the callee-identity feedback it needs is 4-1's, not a separate phase-2 item | XL |
 
@@ -3572,6 +3812,93 @@ unspecialized answer. Then the full test262 matrix — **this phase can break an
 > struct. The three invariants that redesign asserts — a suspendable frame retaking a
 > slot under a different caller, unwinding refusing to grow back into abandoned slots,
 > and popping past stranded callees — are exactly the surface 4-3 has to preserve.
+
+### 4-1 · Type feedback collection — **landed, and it settles the phase's premise**
+
+> **Delivered as a patch, not in the pin**, on the same terms as `0067`/`0068`: the push
+> returned 403, so the pointer is unbumped and the change ships as
+> [`patches/0069`](../patches/0069-js-type-feedback-collection.patch). Independent of the other
+> two — different assemblies — so it applies in any order relative to them.
+
+**What it is, and why the inline cache is not already it.** The property cache observes shapes,
+but it observes them *to answer the current read*: it replaces entries when they go stale
+(item 2-12) and drops everything once a site passes four shapes. Feedback has to **retain**,
+because "this site only ever saw one shape" is a claim about history, and a structure designed
+to be overwritten cannot make it. `Runtime/TypeFeedback.cs` keeps, per site, the distinct
+receiver shapes at a read and the distinct callee identities at a call, plus the observation
+count and whether the site overflowed the four-entry cap — the same threshold the cache calls
+megamorphic, so the two words mean the same thing about the same site.
+
+**Two gates, deliberately, and they are not the same gate.** Property feedback is a runtime flag
+tested inside the site helper, which already pays a predictable branch per read for the
+cache-hit counter. Call feedback is gated at **compile** time: with the flag clear the compiler
+returns the call's target expression untouched, so the emitted call is the one emitted before
+this item existed — no extra hop, no extra branch, no extra argument. **A call costs ~255 ns
+(2-6) and is the path phase 4 exists to fix; instrumenting it unconditionally in order to
+measure it would be self-defeating.** The cost of that choice is that enabling the flag does not
+retrofit already-compiled code, which is pinned by a test rather than left to be discovered.
+
+#### What the feedback says, which is the actual deliverable
+
+4-1 buys no throughput — the item says so, and that is the reason to be careful about what it
+*is* for. **4-2 ("monomorphic property access → shape check plus direct slot read") and 4-4
+("inlining of small JS callees at monomorphic sites") are an XL each, and both are worth their
+cost only in proportion to how much real work happens at monomorphic sites. Nothing in this
+engine could report that number until now.** Seven Octane suites, three runs per benchmark,
+weighted by **executed operations** rather than by site count — because a tier only pays where
+the work is, and ten thousand cold monomorphic sites are worth nothing:
+
+| Suite | Reads | Monomorphic | Calls | Monomorphic | Megamorphic sites |
+|---|--:|--:|--:|--:|---|
+| Richards | 605 672 | **96.74%** | 121 404 | **83.76%** | none |
+| DeltaBlue | 1 001 675 | **77.10%** | 346 333 | **83.12%** | none |
+| RayTrace | 2 919 249 | **94.06%** | 476 934 | **95.56%** | none |
+| Box2D | 25 963 010 | **94.12%** | 1 501 362 | **99.67%** | 1 read, 3 call |
+| EarleyBoyer | 5 490 829 | **100%** | 1 537 115 | **97.68%** | 14 call |
+| Crypto | 1 891 024 | **73.82%** | 255 454 | **100%** | none |
+| NavierStokes | 428 | — | 630 | — | none |
+| **All seven** | **37 871 887** | **93.54%** | **4 239 232** | **96.70%** | 18 sites total |
+
+**The premise holds, and now it is measured rather than assumed: 93.5% of executed property
+reads and 96.7% of executed calls happen at a site that only ever saw one shape, or one
+callee.** Phase 4's two XL items are well-founded on this corpus. Three things worth keeping:
+
+- **Megamorphism is essentially absent** — 18 sites across 37.9 M reads and 4.2 M calls, and
+  five of seven suites have none at all. This corroborates 2-10, which found **0** megamorphic
+  read sites while decomposing DeltaBlue's misses, and it means the fallback path a
+  speculating tier needs will be cold in practice. It does not make the fallback optional:
+  4-3b still has to be correct, it just will not be hot.
+- **DeltaBlue is the worst read case at 77.10%**, and it is the suite that fails phase 2's
+  200× gate at 460×. Its 359 live read sites include 43 polymorphic ones against Richards's 1
+  — so what is left of DeltaBlue has a polymorphic-read component that phase 2's cache work
+  could not reach and 4-2 could. That is a lead, not a conclusion.
+- **NavierStokes exercises neither path**: 428 reads and 630 calls for a whole suite, against
+  Box2D's 26 M. Its work is typed-array *elements*, which no property site serves and no shape
+  can hold — the same observation §4.3's B3 table already makes about arrays. Its 100% is
+  arithmetically true and evidentially empty, and is reported as `—` rather than as a win.
+
+**Cost when off.** For calls it is **zero by construction**, not by measurement: the emitted
+expression is the same object when the flag is clear. For reads it is one static bool test per
+read, probed with six ABBA-interleaved process pairs over a 60 M-read loop — **median paired
+ratio 0.9835, spread 0.961–1.019**, i.e. the change arm came out nominally *faster*, which is
+this container's noise and not an effect. **The honest statement is that the probe bounds the
+cost at roughly ±2% and cannot resolve anything smaller**; a 1 ns-per-read cost would be 0.55%
+and would not be visible here.
+
+**Verify.** `TypeFeedbackTests`, 16 cases: that nothing is recorded while disabled; that a call
+compiled before enabling is *not* retrofitted (the compile-time gate's observable half); that a
+site seeing one shape is monomorphic, two is polymorphic and five is megamorphic, with the same
+three for callees; that cold sites are counted apart and excluded from the shares; and that six
+call and property shapes — including `new`, a prototype method, and an optional call — compute
+the same answer with feedback on as off. **`--cache-metrics` is byte-identical with and without
+the change**, which is what says the feedback does not perturb the caches it observes.
+
+**What is not done.** The item names a third signal, **numeric-vs-generic outcomes per site**,
+and it is not collected. Reads and callees are what 4-2 and 4-4 consume first, and the numeric
+signal has a complication the other two do not: the compiler already proves numeric-ness
+statically for locals (P2-2 item 3, item 3-3), so a runtime numeric counter would have to be
+defined against *that* to say anything new rather than re-reporting it. Left open rather than
+half-built.
 
 ### 4-3 · Deoptimization — **design spike; the item is mis-specified and the fix is cheaper**
 
@@ -3644,6 +3971,119 @@ says, and for (B) specifically: a test that forces every guard to fail at every 
 and asserts the generic path produces the unspecialized answer *with the same observable effect
 sequence* — the effects before the guard have already happened and must not be repeated, which
 is the one thing a branch gets right for free and a restart cannot.
+
+#### 4-3a · The restart contract — **landed, and one of its three conditions was held only by accident**
+
+> **Delivered as a patch, not in the pin**:
+> [`patches/0070`](../patches/0070-js-restart-contract.patch). Independent of `0067`–`0069`.
+
+The item was sized **S** and described as "mostly a rule and a test, since the mechanism ships
+today". That is what it turned out to be, and the interesting part is *why the rule was worth
+writing down*. The three conditions restart is sound under:
+
+| # | Condition | Held before? | Held **because**? |
+|---|---|---|---|
+| 1 | every guard fires before any observable effect | yes | yes — the specialized body reads its arguments and touches nothing but its own locals, so there is no effect to repeat |
+| 2 | the bailout leaves no `CallFrameStack` slot behind | yes | yes — the specialized delegate never pushes one (the push lives inside the compiled baseline), so on bailout the baseline pushes exactly once, as it would have without tiering |
+| 3 | the body is not suspendable | yes | **no — by accident, twice over** |
+
+**Condition 3 is the finding.** Nothing in the engine said a generator or async body must never
+be tiered. It was true anyway, for two unrelated reasons, *neither of which is about
+speculation*:
+
+- `EnableTiering` is called inside `FastCompiler.CreateFunction`'s **ordinary-function `else`
+  branch**; generators and async functions take earlier branches. That is branch placement, not
+  a rule.
+- `TryPlanScalarReplacement` returns `false` for `Async || Generator`, and the tiering gate
+  happens to require `CanScalarReplaceLocals`. That is a rule about *scalar-replacing locals*
+  that the tiering gate borrows by coincidence.
+
+**Both are the kind of thing a reasonable refactor removes.** Hoisting the `EnableTiering` call
+out of the branch is an ordinary tidy-up; teaching scalar replacement about state-machine fields
+is a plausible future optimization. So the hazard was measured rather than argued: with **both**
+accidental exclusions defeated and no explicit guard,
+
+```js
+async function sum(n) { var s = 0; for (var i = 0; i < n; i++) { s += i; } return s; }
+```
+
+— a legal async function whose body matches the planner's counted-reduction shape exactly and
+contains no `await` — starts returning **`number` instead of a Promise** from its second call
+onward — the first call returns `object`, every later one `number`. The specialized delegate replaces the one
+that builds the promise. That is a silent wrong answer, and it is two ordinary refactors away.
+
+**The fix is one condition at the decision point**: `NumericLoopPlanner.TryCreate` refuses a
+suspendable function outright, so the property survives the branch structure changing. Restoring
+just that guard, with both accidental exclusions still defeated, restores correct answers — the
+function keeps returning a Promise. What remains in that configuration is a *generic* re-compile
+(`numericPlan == null`), which re-runs the same code the same way and speculates on nothing, so
+it cannot violate a restart contract; §4's own header already calls that path "a hook, not a
+tier".
+
+**Verify.** `RestartContractTests`, 16 cases across the three conditions: a generator, an async
+function and an async generator with the exact matching shape are never tiered and keep
+returning their objects, with **the same body as an ordinary function tiered as the control** —
+without which the refusal could just be the shape failing to match; a yielding generator still
+iterates; the deoptimizing call produces **the same number of observable effects as the untiered
+engine** (counted through a `valueOf` on the argument, because adding a statement to the body
+would stop it being tiered and the test would pass vacuously); every guard — argument count,
+argument type, fractional, negative, NaN and `-0` limits — answers exactly what an untiered
+`JSContext` answers; and the bailout unwinds correctly from 200 frames deep and stays catchable.
+Repository suite: **7 773 tests across 13 projects, 0 failures**.
+
+**What this does not do.** It states and enforces the contract the pilot *already* runs under;
+it does not widen what may be speculated on. Speculation *inside* a body still needs **4-3b**,
+below.
+
+#### 4-3b · The in-method fallback — **the mechanism landed; it has no JavaScript-level consumer yet, and that is a finding**
+
+> **Delivered as a patch, not in the pin**:
+> [`patches/0071`](../patches/0071-js-in-method-fallback.patch). Independent of `0067`–`0070`.
+
+The transfer 4-3's design spike identified as the one restart cannot give: compile the
+specialized and generic forms into **one method** and make a failed guard a **branch**. The CLR
+locals are shared because it is the same method, so no transfer exists to get wrong; nothing is
+re-entered, so effects already performed are never repeated; and no `CallFrameStack` slot changes
+hands, so the three invariants 4-3a preserves are not engaged at all.
+
+`SpeculationBuilder.Guarded` emits it, and `Runtime/Speculation.cs` carries the site table.
+
+**The guarantee that justifies a facility rather than a hand-rolled conditional.** The subject is
+evaluated **exactly once**, into a temporary the guard and both arms share. The obvious
+hand-rolled spelling evaluates it in the guard *and again* in whichever arm runs — so a receiver
+with an effect (`f().x`) would run `f()` twice. That is a wrong answer visible only on effectful
+receivers, which is to say the ones nobody tests by hand. Swapping the facility for that spelling
+fails **12 of the 15 tests**, which is how it is known the tests can see it.
+
+**Poisoning is part of the mechanism, not a nicety.** A guard that keeps failing costs its own
+evaluation on every execution *plus* the generic path — strictly worse than never speculating.
+After four misses (the same threshold the inline cache and 4-1's tracking use) a site
+short-circuits straight to generic. **This is deliberately a stand-in**: the right answer once
+4-2 exists is to *re-emit the method without the guard*, because a poisoned site still pays one
+static array read here. Recorded so the successor knows it is owed.
+
+**What is NOT here, and why it is a finding rather than an omission.** No JavaScript-level
+speculation is emitted. That is not scope-trimming — **it is structural, and it sharpens the
+sequencing.** A guard needs something to speculate *on*: a shape, a callee, a numeric type. In a
+tier-1 method, compiled before anything has run, none of those is known — the compiler has no
+observations yet, which is precisely why 4-1 exists. So **the in-method branch only has meaning
+inside a tier-2 recompile**, and tier-2 emission *is* item 4-2. The mechanism therefore has to
+land before its first consumer, and its first consumer is the next item rather than this one.
+The roadmap's ordering (4-3b gates 4-4, and 4-2 consumes both) is right; what was not written
+down is that 4-3b cannot demonstrate itself on JavaScript until 4-2 emits something.
+
+**Verify.** `InMethodFallbackTests`, 15 cases, built as expression trees and compiled through
+the engine's own IL generator — testing it through JavaScript would test whatever chose to emit
+it instead. The phase's own stated verification is the centre of the file: *"forces every guard
+to fail at every point in a function body and asserts the generic path produces the unspecialized
+answer with the same observable effect sequence"*. Bodies of 1, 2, 3 and 5 guarded operations
+with effects before, between and after them are run against an **unspeculated control compiled
+from the same shape**, and the effect logs must match entry for entry; then each guard is failed
+individually while the rest hold, asserting that every prior effect happened exactly once and
+only the failing operation took the generic path. Plus the evaluate-once contract on both arms,
+poisoning after four misses (visible as the guard disappearing from the log while the answer
+holds), a never-missing site never poisoning, and a refused site index emitting the generic form
+alone. Repository suite: **7 788 tests across 13 projects, 0 failures**.
 
 ---
 
@@ -3838,13 +4278,11 @@ failure record byte-identical to the earlier runs.
 #### The single-match follow-up landed — the halving is exact
 
 > **Delivered as a patch, not in the pin.** The push to `Broiler-Platform/Broiler.JS` returned
-> **403** — the submodule remote is outside this session's GitHub scope — so per the patch
-> workflow the pointer is **not** bumped and the change ships as
-> [`patches/0059`](../patches/0059-js-single-match-replace-one-allocation.patch) for a maintainer
-> to apply. Every figure below was measured on a local build of the pinned `2ebc0c3c` **plus**
-> that patch, with the control built from the same tree minus it. No main-repo fallback is
-> needed: this is an allocation reduction with no behaviour difference, so CI is correct without
-> it and only more allocating.
+> **403** — the submodule remote was outside that session's GitHub scope — so the change shipped
+> as `patches/0059` with the pointer unbumped. **It has since been applied and pushed, and is now
+> `962ca06a`, an ancestor of the pinned `9bf9639b`.** Every figure below was measured on a local
+> build of the then-pinned `2ebc0c3c` **plus** that patch, with the control built from the same
+> tree minus it — so they describe the tree the pin now contains.
 
 `RegExp.prototype[@@replace]` accumulated into a `StringBuilder` whatever the match count. For a
 single match the answer is exactly `prefix + replacement + suffix`, so `string.Concat` over three
@@ -3923,10 +4361,9 @@ not provide; **not one failure is in a `replace` directory.** Repository suite
 
 #### The retained-result-list follow-up landed — 2 033 bytes a match, and the guard is the change
 
-> **Delivered as a patch, not in the pin**, for the same 403 as the section above, and it must be
-> applied *after* it: [`patches/0060`](../patches/0060-js-stream-global-replace.patch) builds on
-> the function [`patches/0059`](../patches/0059-js-single-match-replace-one-allocation.patch)
-> restructures. Figures below were measured on a local build of the pinned `2ebc0c3c` plus both.
+> **In the pin.** Shipped as `patches/0060` for the same 403 as the section above; since applied
+> and pushed, and it is now **`6f56d24f`**, an ancestor of the pinned `9bf9639b`. Figures below
+> were measured on a local build of the then-pinned `2ebc0c3c` plus it and `0059`.
 
 `RegExp.prototype[@@replace]` collects every match in step 14 and only reads their properties in
 step 16, so a global replace held one result array per match live before it assembled anything.
@@ -4039,11 +4476,11 @@ predicate at all.
 
 | Phase | Order within it | Size | Unblocks / expected effect | Exit gate |
 |---|---|---|---|---|
-| **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → **0-6 (CI — 17/17 established at the pin locally; the workflow run is still owed) → 0-7, 0-8** | — | Everything. 12 → **17 scores**, known noise band, and the first evidence any phase A–F can close on | 17/17, no timeout at the 180 s floor, band on record, `comparison.md` reporting the triad, **and the BenchmarkDotNet + RID-matrix rows collected** |
+| **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → 0-6 workflow run ✅ (17/17 committed at the pin) → **0-6's noise band (`--repetitions` in CI), then 0-7, 0-8** | — | Everything. 12 → **17 scores** ✅, known noise band, and the first evidence any phase A–F can close on | 17/17 ✅, no timeout at the 180 s floor ✅, `comparison.md` reporting the triad ✅, **band on record** and **the BenchmarkDotNet + RID-matrix rows collected** — the three still open |
 | **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-4 ✅** → **1-1 emission half ✅**, capture half open → 1-3 measure | 1-4 S, 1-1 remainder L | The two worst scores in the suite; page-load time generally. **1-4 took the Mandreel half (3.04×); 1-1's deferred emission takes 0.64–0.69× off jQuery, PdfJS and Box2D at 1.0009× steady state, and CodeLoad 94.6 → 104.0 (1.099×)** | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured: Richards PASSES (183× → 150× after 2-11/2-12), DeltaBlue FAILS (576× → 447×)**, five repetitions per engine on one machine |
-| **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → **3-3 `let`/`const`** → 3-1 → 3-2, then *cost* 3-4 | M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`; allocation reported per item alongside time |
-| **4** | 4-3 design ✅ → **4-1** (unblocked) → 4-3a (S) → 4-3b (M–L) → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured twice, agreeing: Richards PASSES (183× → 150× after 2-11/2-12 locally; 144.9× in CI), DeltaBlue FAILS (576× → 447× locally; 460× in CI)**, five repetitions per engine on one machine and the committed CI run on another |
+| **3** | 3-0 ✅ (both halves) → **3-3 ✅ complete** (parameters, `let`/`const`, block-scoped `var`) → **3-1** → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`, and — added by 3-3's `let`/`const` half — `test262-lexical-declarations`; allocation reported per item alongside time |
+| **4** | 4-3 design ✅ → **4-1 ✅** (shapes and callees; numeric-vs-generic left open) → **4-3a ✅** → **4-3b ✅** → **4-2** → 4-4 | XL | The remaining order of magnitude. **4-1 measured the premise: 93.5% of reads and 96.7% of calls are monomorphic by execution weight, so 4-2 and 4-4 are well-founded.** 4-3a stated and enforced the restart contract — and found its no-suspendable-bodies condition was held only by two unrelated accidents, two ordinary refactors away from an async function returning a number instead of a Promise | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → single-match `replace` without a builder ✅ (both builtins) → the global case's retained result list ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
 **Dependencies.**
