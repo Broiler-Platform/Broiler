@@ -1,0 +1,469 @@
+From 1171d434ffa3024c538ee62bc34b697cf87b18de Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 4 Aug 2026 22:02:05 +0000
+Subject: [PATCH] Count where the boxes are actually minted, item 3-1
+
+The guarded tree removed 12.2% of the corpus's boxes and left NavierStokes --
+the biggest boxer in it -- down 1.8%, so the question is where the remaining
+74.8 M are minted. The reading that suggests itself is that they are root
+boxes on their way into a JSValue slot or element, which is what a typed
+backing store would remove. Give the compiler's boxing conversion its own
+factory entry and it is refutable: JSNumber.CreateConversion, counted apart
+from Create and CreateLiteral exactly as the literal entry already is, with
+JSNumberBuilder.New pointing at it.
+
+It is 18.4% of the corpus's requests, and 5.0% of NavierStokes' against 31.0%
+of Crypto's -- the two suites the opposite way round from the item's premise,
+and Crypto is the one the guarded tree already served best.
+
+That first pass left 40.5% of the corpus's requests attributed to nothing at
+all, which is a claim about the census rather than about the engine. Two
+counters close it to 1.0%. BitwiseXor was the one generic binary operator the
+census never hooked -- a real gap, though the corpus says a small one, below
+the run-to-run spread. The rest is the unary operators, which no census had
+looked at: -x and ~x, the ++/-- step, and the ToNumeric that coerces the
+operand of ++/--.
+
+++ and -- are 30.9% of all boxing on the corpus, 51.6% on NavierStokes and
+80.4% on EarleyBoyer -- more than the compiler conversion and the numeric
+literal together. Exactly half of it is waste: ToNumeric ends
+
+    primitive.IsBigInt ? primitive : CreateNumber(primitive.DoubleValue)
+
+so an operand that is already a JSNumber is copied into a second, equal
+JSNumber to be handed back as the old value, and a Number has no observable
+identity. 17 281 232 requests, 15.4% of the corpus's boxing, for a value the
+engine is already holding.
+
+Four new fixtures. The three that assert on the unary columns are
+deliberately loop-free, and the reason is the finding in miniature: written
+with the `for (var i = 0; i < 10; i++)` the rest of the file uses, all three
+failed, because the loop counter's own i++ lands in the columns they assert
+on.
+
+Counters off by default, no behaviour change. Full repository suite 7 967
+tests, 0 failures.
+---
+ .../Number/JSNumber.cs                        | 30 ++++++-
+ .../Number/NumberBoxingDiagnostics.cs         | 16 +++-
+ .../ArithmeticOperandCensusTests.cs           | 90 ++++++++++++++++++-
+ .../LinqExpressions/JSNumberBuilder.cs        |  5 +-
+ .../ArithmeticOperandDiagnostics.cs           | 28 ++++++
+ .../Broiler.JavaScript.Runtime/JSValue.cs     | 24 ++++-
+ .../SpecializingTierMetrics.cs                | 15 ++++
+ 7 files changed, 200 insertions(+), 8 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
+index 4b156c79..de19392b 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
+@@ -195,6 +195,27 @@ public sealed partial class JSNumber : JSPrimitive
+         return Create(value);
+     }
+ 
++    /// <summary>
++    /// The <see cref="JSNumber"/> for a raw <c>double</c> the COMPILER is boxing to hand to
++    /// something that takes a <see cref="JSValue"/> — the root of an arithmetic tree on its way
++    /// into a local, a slot or an element, a return value, an argument
++    /// (docs/performance-roadmap.md item 3-1).
++    /// </summary>
++    /// <remarks>
++    /// Identical to <see cref="Create"/> but the counter, for the reason
++    /// <see cref="CreateLiteral"/> is: item 3-1's guarded tree removed 12.2% of the corpus's
++    /// boxes and left NavierStokes, the single biggest boxer in it, down only 1.8% — so the
++    /// question is where the rest are minted, and the sharpest division is between a box an
++    /// <em>operator</em> produced and a box the compiler minted to cross a representation
++    /// boundary. Only the second is what a typed backing store could remove.
++    /// </remarks>
++    public static JSValue CreateConversion(double value)
++    {
++        if (NumberBoxingDiagnostics.Enabled)
++            NumberBoxingDiagnostics.RecordConversionRequest();
++        return Create(value);
++    }
++
+     public override double DoubleValue => value;
+ 
+     public override bool BooleanValue => !double.IsNaN(value) && value != 0;
+@@ -383,7 +404,14 @@ public sealed partial class JSNumber : JSPrimitive
+ 
+     public static bool IsNaN(JSValue n) => double.IsNaN(n.DoubleValue);
+ 
+-    public override JSValue Negate() => Create(-value);
++    // Counted here as well as on the base, for the reason AddValue is: a Number receiver never
++    // reaches the base (item 3-1).
++    public override JSValue Negate()
++    {
++        if (ArithmeticOperandDiagnostics.Enabled)
++            ArithmeticOperandDiagnostics.RecordUnaryNegate();
++        return Create(-value);
++    }
+ 
+     public override JSValue AddValue(JSValue value)
+     {
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
+index 4703f8d8..4d3a46bb 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
+@@ -43,6 +43,7 @@ public static class NumberBoxingDiagnostics
+     private static long factoryAllocations;
+     private static long allocations;
+     private static long literalRequests;
++    private static long conversionRequests;
+ 
+     /// <summary>Whether boxing is counted. Off by default.</summary>
+     public static bool Enabled;
+@@ -57,6 +58,13 @@ public static class NumberBoxingDiagnostics
+     /// </summary>
+     internal static void RecordLiteralRequest() => Interlocked.Increment(ref literalRequests);
+ 
++    /// <summary>
++    /// A request from the compiler's boxing CONVERSION — a raw double crossing into a
++    /// <c>JSValue</c>. Disjoint from the literal count and from every operator result, so
++    /// `Requests - conversion - literal` is what the operators and builtins mint.
++    /// </summary>
++    internal static void RecordConversionRequest() => Interlocked.Increment(ref conversionRequests);
++
+     /// <summary>A request the small-integer table answered without allocating.</summary>
+     internal static void RecordCacheHit() => Interlocked.Increment(ref cacheHits);
+ 
+@@ -75,7 +83,8 @@ public static class NumberBoxingDiagnostics
+             Interlocked.Read(ref cacheHits),
+             Interlocked.Read(ref factoryAllocations),
+             Interlocked.Read(ref allocations),
+-            Interlocked.Read(ref literalRequests));
++            Interlocked.Read(ref literalRequests),
++            Interlocked.Read(ref conversionRequests));
+ 
+     public static void Reset()
+     {
+@@ -84,6 +93,7 @@ public static class NumberBoxingDiagnostics
+         Interlocked.Exchange(ref factoryAllocations, 0);
+         Interlocked.Exchange(ref allocations, 0);
+         Interlocked.Exchange(ref literalRequests, 0);
++        Interlocked.Exchange(ref conversionRequests, 0);
+     }
+ }
+ 
+@@ -92,12 +102,14 @@ public static class NumberBoxingDiagnostics
+ /// <param name="FactoryAllocations">Those the factory allocated for — the population an unboxed representation reaches.</param>
+ /// <param name="Allocations">Every <see cref="JSNumber"/> constructed, factory or not.</param>
+ /// <param name="LiteralRequests">Factory calls made by a compile-time numeric literal.</param>
++/// <param name="ConversionRequests">Factory calls made by the compiler boxing a raw double to cross into a <c>JSValue</c>.</param>
+ public readonly record struct NumberBoxingSnapshot(
+     long Requests,
+     long CacheHits,
+     long FactoryAllocations,
+     long Allocations,
+-    long LiteralRequests)
++    long LiteralRequests,
++    long ConversionRequests)
+ {
+     /// <summary>
+     /// Boxes minted by a builtin writing <c>new JSNumber(x)</c> instead of going through the
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/ArithmeticOperandCensusTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/ArithmeticOperandCensusTests.cs
+index 5100c28e..34260f1a 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/ArithmeticOperandCensusTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/ArithmeticOperandCensusTests.cs
+@@ -17,7 +17,13 @@ namespace Broiler.JavaScript.Compiler.Tests;
+ [Collection(Phase3DiagnosticsCollection.Name)]
+ public sealed class ArithmeticOperandCensusTests
+ {
+-    private readonly record struct Census(long Generic, long BothNumbers, long RawDouble);
++    private readonly record struct Census(
++        long Generic,
++        long BothNumbers,
++        long RawDouble,
++        long UnaryNegate,
++        long UnaryUpdate,
++        long UnaryToNumeric);
+ 
+     private static Census Count(string source, bool speculate = false)
+     {
+@@ -39,7 +45,10 @@ public sealed class ArithmeticOperandCensusTests
+             return new Census(
+                 ArithmeticOperandDiagnostics.Generic,
+                 ArithmeticOperandDiagnostics.BothNumbers,
+-                ArithmeticOperandDiagnostics.RawDoubleOperand);
++                ArithmeticOperandDiagnostics.RawDoubleOperand,
++                ArithmeticOperandDiagnostics.UnaryNegate,
++                ArithmeticOperandDiagnostics.UnaryUpdate,
++                ArithmeticOperandDiagnostics.UnaryToNumeric);
+         }
+         finally
+         {
+@@ -138,6 +147,83 @@ public sealed class ArithmeticOperandCensusTests
+         Assert.Equal(0, census.Generic);
+     }
+ 
++    [Fact]
++    public void ExclusiveOrIsCounted()
++    {
++        // This one is here because it was MISSING. The census's first version hooked every generic
++        // binary operator except `^`, so Crypto's exclusive-ors were minting boxes the census
++        // reported as coming from nowhere. Nothing failed — an unhooked operator is silent, which
++        // is exactly why the residue has to be checked against the counters rather than trusted.
++        var census = Count("""
++            var a = [3], b = [5];
++            var s = 0;
++            for (var i = 0; i < 10; i++) s = a[0] ^ b[0];
++            s;
++            """);
++
++        Assert.True(census.Generic >= 10, $"expected at least 10 generic operations, got {census.Generic}");
++        Assert.Equal(census.Generic, census.BothNumbers);
++    }
++
++    // The three unary fixtures below are deliberately loop-free, and the reason is the finding in
++    // miniature: written with the `for (var i = 0; i < 10; i++)` the rest of this file uses, all
++    // three failed, because the loop counter's OWN `i++` lands in the columns they assert on — a
++    // top-level `++` costs one ToNumeric box and one step box, ten iterations of it being exactly
++    // the 10 and 20 that showed up. Exact counts on a straight-line body say what the counter
++    // attributes without an incidental second source of the same operation.
++
++    [Fact]
++    public void UnaryNegationIsCountedExactlyOncePerOperation()
++    {
++        // `-x` mints a box, and the count must not double: JSValue.Negate coerces and then
++        // delegates to the coerced primitive, which for a Number lands on JSNumber.Negate. Both
++        // sites are hooked, so the base counts only the branch that mints.
++        var census = Count("""
++            var a = [1.5];
++            var s = -a[0];
++            s;
++            """);
++
++        Assert.Equal(1, census.UnaryNegate);
++        Assert.Equal(0, census.UnaryUpdate);
++        Assert.Equal(0, census.UnaryToNumeric);
++    }
++
++    [Fact]
++    public void AnUpdateOnAPropertyCostsTwoBoxesNotOne()
++    {
++        // The finding the counter was added for: `o.x++` boxes twice — once in ToNumeric, which
++        // re-boxes an operand that is already a Number to hand back the old value, and once in the
++        // step itself. Splitting the two is the difference between "++ is expensive" and knowing
++        // which half of it to remove.
++        var census = Count("""
++            var o = { x: 1 };
++            o.x++;
++            o.x;
++            """);
++
++        Assert.Equal(1, census.UnaryToNumeric);
++        Assert.Equal(1, census.UnaryUpdate);
++        Assert.Equal(0, census.UnaryNegate);
++    }
++
++    [Fact]
++    public void TheUnaryCountersStayStillOnBinaryArithmetic()
++    {
++        // The discriminating control for the pair above: binary arithmetic must not leak into the
++        // unary columns, or the attribution the residue is computed from is circular.
++        var census = Count("""
++            var a = [1.5, 2.5];
++            var s = a[0] * a[1];
++            s;
++            """);
++
++        Assert.True(census.Generic >= 1, $"expected at least one generic operation, got {census.Generic}");
++        Assert.Equal(0, census.UnaryNegate);
++        Assert.Equal(0, census.UnaryUpdate);
++        Assert.Equal(0, census.UnaryToNumeric);
++    }
++
+     [Fact]
+     public void TheCounterIsOffByDefault()
+     {
+diff --git a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs
+index 64fb3294..3c0cb392 100644
+--- a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs
++++ b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs
+@@ -10,6 +10,7 @@ public class JSNumberBuilder
+     private static Type type;
+     private static MethodInfo _create;
+     private static MethodInfo _createLiteral;
++    private static MethodInfo _createConversion;
+ 
+     public static Expression NaN;
+     public static Expression Zero;
+@@ -26,6 +27,8 @@ public class JSNumberBuilder
+         type = numberType;
+         _create = type.GetMethod("Create", [typeof(double)])
+             ?? throw new InvalidOperationException("JSNumber.Create(double) not found");
++        _createConversion = type.GetMethod("CreateConversion", [typeof(double)])
++            ?? throw new NotSupportedException();
+         _createLiteral = type.GetMethod("CreateLiteral", [typeof(double)])
+             ?? throw new InvalidOperationException("JSNumber.CreateLiteral(double) not found");
+ 
+@@ -46,7 +49,7 @@ public class JSNumberBuilder
+         if (exp.Type != typeof(double))
+             exp = Expression.Convert(exp, typeof(double));
+ 
+-        return Expression.Call(null, _create, exp);
++        return Expression.Call(null, _createConversion, exp);
+     }
+ 
+     /// <summary>
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/ArithmeticOperandDiagnostics.cs b/Broiler.JS/Broiler.JavaScript.Runtime/ArithmeticOperandDiagnostics.cs
+index 72b48ea4..9a2c670a 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/ArithmeticOperandDiagnostics.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/ArithmeticOperandDiagnostics.cs
+@@ -43,6 +43,9 @@ public static class ArithmeticOperandDiagnostics
+     private static long bothNumbers;
+     private static long rawDoubleOperand;
+     private static long rawDoubleOtherNumber;
++    private static long unaryNegate;
++    private static long unaryUpdate;
++    private static long unaryToNumeric;
+ 
+     /// <summary>Whether operand kinds are counted. Off by default.</summary>
+     public static bool Enabled;
+@@ -62,6 +65,19 @@ public static class ArithmeticOperandDiagnostics
+     /// <summary>Those of <see cref="RawDoubleOperand"/> whose other operand was a Number too.</summary>
+     public static long RawDoubleOtherNumber => Interlocked.Read(ref rawDoubleOtherNumber);
+ 
++    /// <summary>Boxes minted by unary <c>-</c> and <c>~</c>.</summary>
++    public static long UnaryNegate => Interlocked.Read(ref unaryNegate);
++
++    /// <summary>Boxes minted by the <c>++</c>/<c>--</c> step itself.</summary>
++    public static long UnaryUpdate => Interlocked.Read(ref unaryUpdate);
++
++    /// <summary>
++    /// Boxes minted re-coercing the operand of <c>++</c>/<c>--</c>. <c>ToNumeric</c> mints
++    /// unconditionally, so a Number that is already a Number is boxed a second time to be handed
++    /// back as the old value — <c>x++</c> on a property costs two boxes, not one.
++    /// </summary>
++    public static long UnaryToNumeric => Interlocked.Read(ref unaryToNumeric);
++
+     /// <summary>
+     /// Records one generic invocation and whether a native form guarded on "both are Numbers"
+     /// could have answered it.
+@@ -81,11 +97,23 @@ public static class ArithmeticOperandDiagnostics
+             Interlocked.Increment(ref rawDoubleOtherNumber);
+     }
+ 
++    /// <summary>Records a box minted by unary <c>-</c> or <c>~</c>.</summary>
++    internal static void RecordUnaryNegate() => Interlocked.Increment(ref unaryNegate);
++
++    /// <summary>Records a box minted by the <c>++</c>/<c>--</c> step.</summary>
++    internal static void RecordUnaryUpdate() => Interlocked.Increment(ref unaryUpdate);
++
++    /// <summary>Records a box minted coercing the operand of <c>++</c>/<c>--</c>.</summary>
++    internal static void RecordUnaryToNumeric() => Interlocked.Increment(ref unaryToNumeric);
++
+     public static void Reset()
+     {
+         Interlocked.Exchange(ref generic, 0);
+         Interlocked.Exchange(ref bothNumbers, 0);
+         Interlocked.Exchange(ref rawDoubleOperand, 0);
+         Interlocked.Exchange(ref rawDoubleOtherNumber, 0);
++        Interlocked.Exchange(ref unaryNegate, 0);
++        Interlocked.Exchange(ref unaryUpdate, 0);
++        Interlocked.Exchange(ref unaryToNumeric, 0);
+     }
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSValue.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSValue.cs
+index 51ef0181..aeff853b 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSValue.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSValue.cs
+@@ -493,12 +493,26 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyAcc
+     public virtual JSValue Negate()
+     {
+         var self = ToNumericPrimitive(this);
++        // Counted on the minting branch only: the other one delegates to the coerced primitive,
++        // which counts there (JSNumber.Negate, or this method re-entered).
++        if (ReferenceEquals(self, this) && ArithmeticOperandDiagnostics.Enabled)
++            ArithmeticOperandDiagnostics.RecordUnaryNegate();
+         return !ReferenceEquals(self, this) ? self.Negate() : CreateNumber(-DoubleValue);
+     }
+ 
+-    public virtual JSValue Increment() => CreateNumber(DoubleValue + 1);
++    public virtual JSValue Increment()
++    {
++        if (ArithmeticOperandDiagnostics.Enabled)
++            ArithmeticOperandDiagnostics.RecordUnaryUpdate();
++        return CreateNumber(DoubleValue + 1);
++    }
+ 
+-    public virtual JSValue Decrement() => CreateNumber(DoubleValue - 1);
++    public virtual JSValue Decrement()
++    {
++        if (ArithmeticOperandDiagnostics.Enabled)
++            ArithmeticOperandDiagnostics.RecordUnaryUpdate();
++        return CreateNumber(DoubleValue - 1);
++    }
+ 
+     // ToNumeric (ECMA-262 § 7.1.4 / § 7.1.3): coerce to a Number or BigInt primitive.
+     // Used by the update operators (`++`/`--`), whose result is the coerced numeric
+@@ -507,6 +521,8 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyAcc
+     public JSValue ToNumeric()
+     {
+         var primitive = ToNumericPrimitive(this);
++        if (!primitive.IsBigInt && ArithmeticOperandDiagnostics.Enabled)
++            ArithmeticOperandDiagnostics.RecordUnaryToNumeric();
+         return primitive.IsBigInt ? primitive : CreateNumber(primitive.DoubleValue);
+     }
+ 
+@@ -558,6 +574,8 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyAcc
+ 
+     public virtual JSValue BitwiseXor(JSValue value)
+     {
++        if (ArithmeticOperandDiagnostics.Enabled)
++            ArithmeticOperandDiagnostics.RecordGeneric(IsNumber, value.IsNumber);
+         var self = ToNumericPrimitive(this);
+         value = ToNumericPrimitive(value);
+         return !ReferenceEquals(self, this) ? self.BitwiseXor(value) : CreateNumber(IntValue ^ value.IntValue);
+@@ -566,6 +584,8 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyAcc
+     public virtual JSValue BitwiseNot()
+     {
+         var self = ToNumericPrimitive(this);
++        if (ReferenceEquals(self, this) && ArithmeticOperandDiagnostics.Enabled)
++            ArithmeticOperandDiagnostics.RecordUnaryNegate();
+         return !ReferenceEquals(self, this) ? self.BitwiseNot() : CreateNumber(~IntValue);
+     }
+ 
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index edb8b724..494c5a88 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -489,6 +489,9 @@ internal static class SpecializingTierMetrics
+         var arithmeticBothNumbers = ArithmeticOperandDiagnostics.BothNumbers;
+         var arithmeticRawDouble = ArithmeticOperandDiagnostics.RawDoubleOperand;
+         var arithmeticRawDoubleOtherNumber = ArithmeticOperandDiagnostics.RawDoubleOtherNumber;
++        var arithmeticUnaryNegate = ArithmeticOperandDiagnostics.UnaryNegate;
++        var arithmeticUnaryUpdate = ArithmeticOperandDiagnostics.UnaryUpdate;
++        var arithmeticUnaryToNumeric = ArithmeticOperandDiagnostics.UnaryToNumeric;
+         ArithmeticOperandDiagnostics.Enabled = false;
+ 
+         var compiler = Broiler.JavaScript.Compiler.CompilerSpecializationDiagnostics.Snapshot();
+@@ -545,6 +548,11 @@ internal static class SpecializingTierMetrics
+             boxesAllocatedTotal = boxing.Allocations,
+             boxesAllocatedDirect = boxing.DirectAllocations,
+             boxingLiteralRequests = boxing.LiteralRequests,
++            // Item 3-1: of the boxes that remain after the guarded tree, how many the COMPILER
++            // mints to carry a raw double across into a JSValue — the root of a tree on its way
++            // into a local, a slot or an element. Only these are what a typed backing store could
++            // remove; the rest an operator or a builtin produced.
++            boxingConversionRequests = boxing.ConversionRequests,
+ 
+             // Item 3-1's shared half, counted on the far side of the boundary: not what the
+             // compiler could prove, but what the operators were actually handed. arithmeticGeneric
+@@ -556,6 +564,13 @@ internal static class SpecializingTierMetrics
+             arithmeticBothNumbers,
+             arithmeticRawDouble,
+             arithmeticRawDoubleOtherNumber,
++            // The unary operators, which the binary census above cannot see and which mint through
++            // the same factory: -x and ~x, the ++/-- step, and the ToNumeric that re-boxes the
++            // operand of ++/-- to hand back the old value. Together with the binary count these
++            // name every operator box; what is left over a builtin minted directly.
++            arithmeticUnaryNegate,
++            arithmeticUnaryUpdate,
++            arithmeticUnaryToNumeric,
+ 
+             candidates = tiering.Candidates,
+             invocations = tiering.Invocations,
+-- 
+2.43.0
+
