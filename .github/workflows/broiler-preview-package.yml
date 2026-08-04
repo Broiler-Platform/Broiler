@@ -26,11 +26,73 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
 jobs:
+  # One build tag for the whole run, resolved once here instead of per job: every build job stamps
+  # it into the archive names it produces and the release job reuses it verbatim, so assets from two
+  # runs never collide in a download folder and an asset filename always names the release it came
+  # from. Composing it inside each job would hand every job its own timestamp and the five names
+  # would not line up. It also survives a partial re-run — a job that already succeeded is not
+  # re-run, so its output stands and the re-run jobs keep stamping the same tag.
+  resolve-preview-package-tag:
+    name: Resolve BPP Build Tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      build-tag: ${{ steps.build-tag.outputs.build_tag }}
+      release-tag: ${{ steps.build-tag.outputs.release_tag }}
+      short-sha: ${{ steps.build-tag.outputs.short_sha }}
+
+    steps:
+      # Shallow and without submodules: this job only needs the tip commit to name the build.
+      - name: Checkout selected branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 1
+
+      - name: Compose the build tag
+        id: build-tag
+        shell: pwsh
+        env:
+          RELEASE_BRANCH: ${{ github.event.inputs.branch }}
+        run: |
+          # Branch names carry '/' and other characters that are illegal in a file name, an upload
+          # artifact name and a git tag alike, so everything outside the safe set collapses to a dash.
+          $branchSlug = $env:RELEASE_BRANCH -replace '[^A-Za-z0-9._-]+', '-'
+          $branchSlug = $branchSlug.Trim('-')
+          if ([string]::IsNullOrWhiteSpace($branchSlug)) {
+            $branchSlug = 'branch'
+          }
+
+          # A branch name may be far longer than anything that belongs in a file name, and the tag
+          # is unique on the stamp, run number and commit whatever the slug says — the slug is there
+          # to be read, so cap it rather than let one dispatch produce unwieldy asset names.
+          if ($branchSlug.Length -gt 48) {
+            $branchSlug = $branchSlug.Substring(0, 48).TrimEnd('-', '.', '_')
+          }
+
+          # Hosted runners are on UTC already; -AsUTC says so out loud, so the stamps stay sortable
+          # against each other even if one of these jobs ever runs somewhere else.
+          $stamp = Get-Date -AsUTC -Format 'yyyyMMdd-HHmmss'
+          $shortSha = (git rev-parse --short HEAD).Trim()
+
+          # Branch and commit answer "what is in this build?", the stamp and the run number answer
+          # "which build is it?" — two runs of the same branch at the same commit are told apart by
+          # the run number, and a re-run of one run by the fresh stamp.
+          $buildTag = "$branchSlug-$stamp-$env:GITHUB_RUN_NUMBER-$shortSha"
+
+          "build_tag=$buildTag" >> $env:GITHUB_OUTPUT
+          "release_tag=broiler-preview-package-$buildTag" >> $env:GITHUB_OUTPUT
+          "short_sha=$shortSha" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Build tag for this run: $buildTag"
+
   build-windows-preview-package:
     name: Build BPP Win32 Packages
     runs-on: windows-latest
+    needs: resolve-preview-package-tag
     timeout-minutes: 120
     env:
+      BPP_BUILD_TAG: ${{ needs.resolve-preview-package-tag.outputs.build-tag }}
       BROWSER_PROJECT_PATH: src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj
       WRITER_PROJECT_PATH: src/Broiler.Writer.Windows/Broiler.Writer.Windows.csproj
       BOSS_PROJECT_PATH: Broiler.Office.Server/Broiler.Office.Server.csproj
@@ -193,16 +255,20 @@ jobs:
             }
           }
 
+          # $PackageName names the directory being archived, $ArchiveBaseName the archive written
+          # from it: the archive carries this run's build tag so downloads stay unique, while the
+          # directory inside it keeps the plain name testers already know.
           function New-WindowsArchive {
             param(
               [Parameter(Mandatory=$true)][string]$PackageParent,
               [Parameter(Mandatory=$true)][string]$PackageName,
+              [Parameter(Mandatory=$true)][string]$ArchiveBaseName,
               [Parameter(Mandatory=$true)][string]$AssetDirectory
             )
 
             $sevenZip = Get-Command 7z -ErrorAction SilentlyContinue
             if ($sevenZip -ne $null) {
-              $destination = Join-Path $AssetDirectory "$PackageName.7z"
+              $destination = Join-Path $AssetDirectory "$ArchiveBaseName.7z"
               Push-Location $PackageParent
               try {
                 & $sevenZip.Source a -t7z $destination $PackageName
@@ -219,7 +285,7 @@ jobs:
 
             Compress-Archive `
               -LiteralPath (Join-Path $PackageParent $PackageName) `
-              -DestinationPath (Join-Path $AssetDirectory "$PackageName.zip") `
+              -DestinationPath (Join-Path $AssetDirectory "$ArchiveBaseName.zip") `
               -Force
           }
 
@@ -227,6 +293,13 @@ jobs:
           $packageParent = Join-Path $env:RUNNER_TEMP 'packages'
           New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
           New-Item -ItemType Directory -Force -Path $packageParent | Out-Null
+
+          # An empty tag would silently produce the old colliding names, and the release job would
+          # then fail looking for tagged assets — so stop here, where the cause is obvious.
+          $buildTag = $env:BPP_BUILD_TAG
+          if ([string]::IsNullOrWhiteSpace($buildTag)) {
+            throw 'BPP_BUILD_TAG is empty: the resolve-preview-package-tag job published no build tag.'
+          }
 
           foreach ($variant in @('framework-dependent', 'self-contained')) {
             $packageName = "BPP-Win32-$variant"
@@ -254,28 +327,31 @@ jobs:
             New-WindowsArchive `
               -PackageParent $packageParent `
               -PackageName $packageName `
+              -ArchiveBaseName "$packageName-$buildTag" `
               -AssetDirectory $assetDir
           }
 
       - name: Upload Win32 framework-dependent BPP
         uses: actions/upload-artifact@v6
         with:
-          name: BPP-Win32-framework-dependent
-          path: ${{ runner.temp }}/release-assets/BPP-Win32-framework-dependent.*
+          name: BPP-Win32-framework-dependent-${{ needs.resolve-preview-package-tag.outputs.build-tag }}
+          path: ${{ runner.temp }}/release-assets/BPP-Win32-framework-dependent-${{ needs.resolve-preview-package-tag.outputs.build-tag }}.*
           if-no-files-found: error
 
       - name: Upload Win32 self-contained BPP
         uses: actions/upload-artifact@v6
         with:
-          name: BPP-Win32-self-contained
-          path: ${{ runner.temp }}/release-assets/BPP-Win32-self-contained.*
+          name: BPP-Win32-self-contained-${{ needs.resolve-preview-package-tag.outputs.build-tag }}
+          path: ${{ runner.temp }}/release-assets/BPP-Win32-self-contained-${{ needs.resolve-preview-package-tag.outputs.build-tag }}.*
           if-no-files-found: error
 
   build-linux-preview-package:
     name: Build BPP Linux Packages
     runs-on: ubuntu-24.04
+    needs: resolve-preview-package-tag
     timeout-minutes: 120
     env:
+      BPP_BUILD_TAG: ${{ needs.resolve-preview-package-tag.outputs.build-tag }}
       BROWSER_PROJECT_PATH: src/Broiler.Browser.Linux/Broiler.Browser.Linux.csproj
       WRITER_PROJECT_PATH: src/Broiler.Writer.Linux/Broiler.Writer.Linux.csproj
       BOSS_PROJECT_PATH: Broiler.Office.Server/Broiler.Office.Server.csproj
@@ -461,15 +537,19 @@ jobs:
             chmod +x $packageExecutable
           }
 
+          # $PackageName names the directory being archived, $ArchiveBaseName the archive written
+          # from it: the archive carries this run's build tag so downloads stay unique, while the
+          # directory inside it keeps the plain name testers already know.
           function New-LinuxArchive {
             param(
               [Parameter(Mandatory=$true)][string]$PackageParent,
               [Parameter(Mandatory=$true)][string]$PackageName,
+              [Parameter(Mandatory=$true)][string]$ArchiveBaseName,
               [Parameter(Mandatory=$true)][string]$AssetDirectory
             )
 
             if (Get-Command xz -ErrorAction SilentlyContinue) {
-              tar -cJf (Join-Path $AssetDirectory "$PackageName.tar.xz") -C $PackageParent $PackageName
+              tar -cJf (Join-Path $AssetDirectory "$ArchiveBaseName.tar.xz") -C $PackageParent $PackageName
               if ($LASTEXITCODE -ne 0) {
                 throw "tar.xz packaging exited with code $LASTEXITCODE."
               }
@@ -477,7 +557,7 @@ jobs:
               return
             }
 
-            tar -czf (Join-Path $AssetDirectory "$PackageName.tar.gz") -C $PackageParent $PackageName
+            tar -czf (Join-Path $AssetDirectory "$ArchiveBaseName.tar.gz") -C $PackageParent $PackageName
             if ($LASTEXITCODE -ne 0) {
               throw "tar.gz packaging exited with code $LASTEXITCODE."
             }
@@ -487,6 +567,13 @@ jobs:
           $packageParent = Join-Path $env:RUNNER_TEMP 'packages'
           New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
           New-Item -ItemType Directory -Force -Path $packageParent | Out-Null
+
+          # An empty tag would silently produce the old colliding names, and the release job would
+          # then fail looking for tagged assets — so stop here, where the cause is obvious.
+          $buildTag = $env:BPP_BUILD_TAG
+          if ([string]::IsNullOrWhiteSpace($buildTag)) {
+            throw 'BPP_BUILD_TAG is empty: the resolve-preview-package-tag job published no build tag.'
+          }
 
           foreach ($variant in @('framework-dependent', 'self-contained')) {
             $packageName = "BPP-Linux-$variant"
@@ -514,26 +601,28 @@ jobs:
             New-LinuxArchive `
               -PackageParent $packageParent `
               -PackageName $packageName `
+              -ArchiveBaseName "$packageName-$buildTag" `
               -AssetDirectory $assetDir
           }
 
       - name: Upload Linux framework-dependent BPP
         uses: actions/upload-artifact@v6
         with:
-          name: BPP-Linux-framework-dependent
-          path: ${{ runner.temp }}/release-assets/BPP-Linux-framework-dependent.tar.*
+          name: BPP-Linux-framework-dependent-${{ needs.resolve-preview-package-tag.outputs.build-tag }}
+          path: ${{ runner.temp }}/release-assets/BPP-Linux-framework-dependent-${{ needs.resolve-preview-package-tag.outputs.build-tag }}.tar.*
           if-no-files-found: error
 
       - name: Upload Linux self-contained BPP
         uses: actions/upload-artifact@v6
         with:
-          name: BPP-Linux-self-contained
-          path: ${{ runner.temp }}/release-assets/BPP-Linux-self-contained.tar.*
+          name: BPP-Linux-self-contained-${{ needs.resolve-preview-package-tag.outputs.build-tag }}
+          path: ${{ runner.temp }}/release-assets/BPP-Linux-self-contained-${{ needs.resolve-preview-package-tag.outputs.build-tag }}.tar.*
           if-no-files-found: error
 
   build-android-preview-package:
     name: Build BPP Android Package
     runs-on: ubuntu-24.04
+    needs: resolve-preview-package-tag
     # Four publishes rather than the two this job started with: a bundle and an arm64 APK per head.
     timeout-minutes: 150
     outputs:
@@ -541,6 +630,7 @@ jobs:
       # public by construction — this is what a download is checked against, not key material.
       signing-certificate-sha256: ${{ steps.sign-android-packages.outputs.certificate-sha256 }}
     env:
+      BPP_BUILD_TAG: ${{ needs.resolve-preview-package-tag.outputs.build-tag }}
       BROWSER_PROJECT_PATH: src/Broiler.Browser.Android/Broiler.Browser.Android.csproj
       WRITER_PROJECT_PATH: src/Broiler.Writer.Android/Broiler.Writer.Android.csproj
       # The compile API and the build-tools track the android workload's Microsoft.Android.Sdk
@@ -857,6 +947,13 @@ jobs:
           $packageName = 'BPP-Android'
           New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
 
+          # An empty tag would silently produce the old colliding names, and the release job would
+          # then fail looking for tagged assets — so stop here, where the cause is obvious.
+          $buildTag = $env:BPP_BUILD_TAG
+          if ([string]::IsNullOrWhiteSpace($buildTag)) {
+            throw 'BPP_BUILD_TAG is empty: the resolve-preview-package-tag job published no build tag.'
+          }
+
           ./scripts/write-bpp-build-info.ps1 `
             -PackageDirectory (Join-Path $packageParent $packageName) `
             -Platform android `
@@ -867,22 +964,25 @@ jobs:
 
           # A zip rather than the Linux job's tar.xz: these bundles are fed to Android tooling from
           # whatever desktop the developer has, and .zip opens on all three without extra tools.
+          # The zip is tagged with the build so downloads stay unique; the directory inside it keeps
+          # the plain name.
           Compress-Archive `
             -LiteralPath (Join-Path $packageParent $packageName) `
-            -DestinationPath (Join-Path $assetDir "$packageName.zip") `
+            -DestinationPath (Join-Path $assetDir "$packageName-$buildTag.zip") `
             -Force
 
       - name: Upload Android BPP
         uses: actions/upload-artifact@v6
         with:
-          name: BPP-Android
-          path: ${{ runner.temp }}/release-assets/BPP-Android.zip
+          name: BPP-Android-${{ needs.resolve-preview-package-tag.outputs.build-tag }}
+          path: ${{ runner.temp }}/release-assets/BPP-Android-${{ needs.resolve-preview-package-tag.outputs.build-tag }}.zip
           if-no-files-found: error
 
   create-preview-package-release:
     name: Create BPP Draft Release
     runs-on: ubuntu-24.04
     needs:
+      - resolve-preview-package-tag
       - build-windows-preview-package
       - build-linux-preview-package
       - build-android-preview-package
@@ -902,38 +1002,22 @@ jobs:
           path: ${{ runner.temp }}/release-assets
           merge-multiple: true
 
-      - name: Resolve release metadata
-        id: metadata
-        shell: pwsh
-        env:
-          RELEASE_BRANCH: ${{ github.event.inputs.branch }}
-        run: |
-          $branchSlug = $env:RELEASE_BRANCH -replace '[^A-Za-z0-9._-]+', '-'
-          $branchSlug = $branchSlug.Trim('-')
-          if ([string]::IsNullOrWhiteSpace($branchSlug)) {
-            $branchSlug = 'branch'
-          }
-
-          $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-          $shortSha = (git rev-parse --short HEAD).Trim()
-          $tagName = "broiler-preview-package-$branchSlug-$stamp-$env:GITHUB_RUN_NUMBER"
-          $releaseTitle = "Broiler Preview Package draft ($env:RELEASE_BRANCH @ $shortSha)"
-
-          "tag_name=$tagName" >> $env:GITHUB_OUTPUT
-          "release_title=$releaseTitle" >> $env:GITHUB_OUTPUT
-          "short_sha=$shortSha" >> $env:GITHUB_OUTPUT
-
+      # The release tag, the release title and every asset name come from the one build tag the
+      # resolve-preview-package-tag job composed, so the release is named after the same run its
+      # assets are — no second timestamp taken here, which would drift from the archives.
       - name: Create draft GitHub release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_BRANCH: ${{ github.event.inputs.branch }}
-          TAG_NAME: ${{ steps.metadata.outputs.tag_name }}
-          RELEASE_TITLE: ${{ steps.metadata.outputs.release_title }}
-          SHORT_SHA: ${{ steps.metadata.outputs.short_sha }}
+          BUILD_TAG: ${{ needs.resolve-preview-package-tag.outputs.build-tag }}
+          TAG_NAME: ${{ needs.resolve-preview-package-tag.outputs.release-tag }}
+          RELEASE_TITLE: Broiler Preview Package draft (${{ github.event.inputs.branch }} @ ${{ needs.resolve-preview-package-tag.outputs.short-sha }})
+          SHORT_SHA: ${{ needs.resolve-preview-package-tag.outputs.short-sha }}
           ANDROID_SIGNING_CERT_SHA256: ${{ needs.build-android-preview-package.outputs.signing-certificate-sha256 }}
         run: |
           $assetDir = Join-Path $env:RUNNER_TEMP 'release-assets'
+          $buildTag = $env:BUILD_TAG
 
           function Resolve-Asset {
             param(
@@ -951,11 +1035,11 @@ jobs:
             throw "Missing expected BPP asset for $BaseName. Tried: $($Extensions -join ', ')"
           }
 
-          $windowsFrameworkDependent = Resolve-Asset 'BPP-Win32-framework-dependent' @('.7z', '.zip')
-          $windowsSelfContained = Resolve-Asset 'BPP-Win32-self-contained' @('.7z', '.zip')
-          $linuxFrameworkDependent = Resolve-Asset 'BPP-Linux-framework-dependent' @('.tar.xz', '.tar.gz')
-          $linuxSelfContained = Resolve-Asset 'BPP-Linux-self-contained' @('.tar.xz', '.tar.gz')
-          $android = Resolve-Asset 'BPP-Android' @('.zip')
+          $windowsFrameworkDependent = Resolve-Asset "BPP-Win32-framework-dependent-$buildTag" @('.7z', '.zip')
+          $windowsSelfContained = Resolve-Asset "BPP-Win32-self-contained-$buildTag" @('.7z', '.zip')
+          $linuxFrameworkDependent = Resolve-Asset "BPP-Linux-framework-dependent-$buildTag" @('.tar.xz', '.tar.gz')
+          $linuxSelfContained = Resolve-Asset "BPP-Linux-self-contained-$buildTag" @('.tar.xz', '.tar.gz')
+          $android = Resolve-Asset "BPP-Android-$buildTag" @('.zip')
 
           $packages = @(
             $windowsFrameworkDependent,
@@ -972,8 +1056,9 @@ jobs:
           }
 
           # sha256sum-compatible manifest (hash, two spaces, file name) so `sha256sum -c` works as-is
-          # after downloading the archives next to it.
-          $checksumPath = Join-Path $assetDir 'SHA256SUMS.txt'
+          # after downloading the archives next to it. Tagged like the archives it covers, so two
+          # releases' manifests can sit in one folder without one overwriting the other.
+          $checksumPath = Join-Path $assetDir "SHA256SUMS-$buildTag.txt"
           $checksumLines = $packages | ForEach-Object {
             "{0}  {1}" -f (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant(), (Split-Path -Leaf $_)
           }
@@ -1022,8 +1107,8 @@ jobs:
           '@
 
           $androidNotes = @'
-          `BPP-Android.zip` carries the two Android application heads twice — as Release app bundles
-          to upload, and as arm64 Release APKs to install:
+          `__ANDROID_ARCHIVE__` carries the two Android application heads twice — as Release app
+          bundles to upload, and as arm64 Release APKs to install:
 
           * `Broiler.Browser.aab` / `Broiler.Browser-arm64.apk` — application ID `org.broiler.browser`.
           * `Broiler.Writer.aab` / `Broiler.Writer-arm64.apk` — application ID `org.broiler.writer`.
@@ -1077,17 +1162,30 @@ jobs:
           Android is an emulator-verified preview; physical-device validation is still outstanding.
           '@
 
+          # The names are placeholders rather than interpolation: these blocks are thick with
+          # Markdown backticks, which an expandable here-string would eat as escape characters.
           $verify = @'
-          Verify a download against `SHA256SUMS.txt`:
+          Verify a download against the checksum manifest published beside it:
 
           ```
-          sha256sum -c SHA256SUMS.txt --ignore-missing        # Linux
-          Get-FileHash .\BPP-Win32-self-contained.7z -Algorithm SHA256   # Windows
+          # Linux
+          sha256sum -c __CHECKSUM_MANIFEST__ --ignore-missing
+
+          # Windows
+          Get-FileHash .\__WINDOWS_ARCHIVE__ -Algorithm SHA256
           ```
           '@
 
+          $androidNotes = $androidNotes.Replace('__ANDROID_ARCHIVE__', (Split-Path -Leaf $android))
+          $verify = $verify.Replace('__CHECKSUM_MANIFEST__', (Split-Path -Leaf $checksumPath))
+          $verify = $verify.Replace('__WINDOWS_ARCHIVE__', (Split-Path -Leaf $windowsSelfContained))
+
           $body = @(
             "Draft Broiler Preview Package prepared from branch $env:RELEASE_BRANCH at commit $env:SHORT_SHA.",
+            '',
+            "Every asset here is tagged ``$buildTag`` — branch, build time (UTC), workflow run number",
+            'and commit — so packages downloaded from different runs never overwrite one another and',
+            'a file on disk still says which build it is.',
             '',
             $contents,
             '',

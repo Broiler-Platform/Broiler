@@ -528,6 +528,14 @@ signature is refused at install. So a preview build can now be put on a device w
 `adb install` and nothing else. A per-change Android build, the emulator smoke run,
 and store delivery remain open below.
 
+**Asset-naming update (2026-08-04):** every preview package asset now carries a
+build tag — `BPP-Android-<branch>-<UTC stamp>-<run number>-<commit>.zip`, and the
+same suffix on the desktop archives and the `SHA256SUMS` manifest. One tag is
+resolved per workflow run and reused by all four jobs, so the release tag and its
+assets name the same run. Until now every run produced identically named files, so
+two preview builds could not sit in one download folder and a file on disk did not
+say which build it was. The directory *inside* each archive keeps its plain name.
+
 **Next actions:**
 
 1. Extend that provisioning past the preview package —
