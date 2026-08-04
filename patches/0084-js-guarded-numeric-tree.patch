@@ -1,0 +1,920 @@
+From 9a27ab780607928fd6435b1e6c4ecd224eea91f3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 4 Aug 2026 21:04:02 +0000
+Subject: [PATCH] Build item 3-1's shared half: a guarded numeric tree
+
+The census in 0083 said the generic arithmetic operators are handed two Numbers on
+73 817 515 of 73 818 646 invocations -- 86.6% of every box the corpus allocates -- while
+the compiler's own proof reaches 0.75% of them. The operator already receives two Numbers
+whatever they are stored in; what it cannot do is hand one back, because its consumer is a
+JSValue. So the shared half is not a typed backing store. It is a run-time-guarded
+specialization of an arithmetic expression TREE: evaluate each leaf once into a temporary,
+test the leaves for Number, compute the whole tree on raw doubles, box only the root.
+
+Evaluation order is the whole correctness argument and is why the rule is narrower than
+the census. The ordinary emission evaluates a node's operands and THEN coerces them, so in
+a nested tree a coercion runs between two leaf evaluations -- and a coercion is observable,
+because ToPrimitive on an object runs valueOf. A tree is therefore eligible only when every
+leaf evaluated after the first internal node in postorder can neither cause nor observe
+anything: a numeric literal or a proven-numeric local. Leaves before the first coercion are
+unrestricted, which is not a corner -- precedence makes `s + a[0] * 1.5` right-leaning, so
+all three of its leaves qualify. `(a[0] * 2) + p.v` does not, and is refused.
+
+When the guard holds nothing is skipped: every operator here applies ToNumeric (for `+`,
+ToPrimitive then ToNumeric) to both operands, and on a Number each is the identity. The
+native forms are TryCreateNativeNumericValue's, the same ones the all-native path emits, so
+the arms are identical by construction rather than by inspection.
+
+Measured on the corpus, one build, the switch the only difference:
+
+  suite         generic off -> on   ratio      boxes off -> on   ratio  trees
+  Richards        55 198   49 204   0.891     13 659    10 743   0.787     12
+  DeltaBlue       14 533   13 933   0.959      6 765     6 765   1.000      6
+  RayTrace       844 051  796 759   0.944    841 017   823 293   0.979     27
+  Box2D       15 916 294 13 870 770 0.871 11 434 706 10 663 471  0.933    424
+  EarleyBoyer     26 116       79   0.003    563 997   563 997   1.000    129
+  Crypto      39 872 917 23 249 552 0.583 42 412 174 33 356 341  0.786    191
+  NavierStokes17 094 558 15 373 914 0.899 29 977 465 29 423 391  0.982     73
+  TOTAL       73 823 667 53 354 211 0.723 85 249 783 74 848 001  0.878    862
+
+10 401 782 boxes removed -- 12.2% of everything the corpus allocates, from 862 compiled
+sites. Items 3-0, 3-3, 3-5, 3-7 and 3-1's bitwise half moved 0.36% between them.
+
+It is well short of the 86.6% ceiling, and the per-suite column explains rather than
+excuses that. Crypto is what it was built for. NavierStokes loses 10.1% of its generic
+invocations and 1.8% of its boxes, and EarleyBoyer loses 99.7% of its invocations and not
+one box -- so the great majority of those two suites' boxes are minted somewhere that is
+not a binary arithmetic operator. The census bounded what the operators could reach; it did
+not say the boxes were all at the operators, and that is the next count.
+
+One mistake, caught by measuring. The first eligibility rule required two operators, on the
+argument that a single node mints one box either way -- true of the result and wrong,
+because it forgets the operand: `a[0] * 2` costs two boxes today, the literal and the
+result, since only `+` has a JSValue x double overload. That rule took the corpus from
+10.4 M boxes removed to 5.6 M, Crypto alone losing 4.7 M. What ships counts what the guard
+buys: (operators - 1) + native leaves >= 1.
+
+Not yet measured: wall clock. These are exact counters and no interleaved timing run has
+been taken.
+
+NumericSpeculationTests: 33 cases, each on both settings of BROILER_JS_NUMERIC_SPECULATION
+-- values (NaN, both infinities, -0, ToInt32 wrapping and shift masking), types (string
+concatenation, valueOf, BigInt mixing, null/undefined/booleans) and ORDER (a getter read
+once and left to right, a valueOf that mutates a later leaf, a getter that mutates a later
+leaf, a throwing leaf that must stop the next being read). Plus two counter assertions,
+because all 33 also pass when the specialization never fires. 0083's census fixture is
+updated to measure with speculation off -- it counts what reaches the generic path, and
+this is what takes shapes off it -- and now asserts that the same shape with speculation on
+reaches it zero times.
+
+Full repository suite 7 962 tests, 0 failures.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PvNJHaNMQPZcrrkmJpDF2x
+---
+ .../ArithmeticOperandCensusTests.cs           |  22 +-
+ .../NumericSpeculationTests.cs                | 334 ++++++++++++++++++
+ .../CompilerSpecializationDiagnostics.cs      |  23 +-
+ .../FastCompiler.NumericSpeculation.cs        | 297 ++++++++++++++++
+ .../FastCompiler.VisitBinaryExpression.cs     |   7 +
+ .../NumericSpeculation.cs                     |  36 ++
+ .../SpecializingTierMetrics.cs                |   7 +
+ 7 files changed, 723 insertions(+), 3 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericSpeculationTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler/NumericSpeculation.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/ArithmeticOperandCensusTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/ArithmeticOperandCensusTests.cs
+index b9ee9608..5100c28e 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/ArithmeticOperandCensusTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/ArithmeticOperandCensusTests.cs
+@@ -19,8 +19,14 @@ public sealed class ArithmeticOperandCensusTests
+ {
+     private readonly record struct Census(long Generic, long BothNumbers, long RawDouble);
+ 
+-    private static Census Count(string source)
++    private static Census Count(string source, bool speculate = false)
+     {
++        // Speculation OFF by default here, and that is the point of the parameter rather than an
++        // oversight: this census counts what reaches the GENERIC path, and item 3-1's guarded tree
++        // exists to take shapes off it. Measuring the population with the thing that consumes the
++        // population switched on would report the remainder, not the population.
++        var previousSpeculation = NumericSpeculation.Enabled;
++        NumericSpeculation.Enabled = speculate;
+         var previous = ArithmeticOperandDiagnostics.Enabled;
+         using var context = new JSContext();
+         // Built after the reset would still be counted, so the context is created first: creating
+@@ -38,6 +44,7 @@ public sealed class ArithmeticOperandCensusTests
+         finally
+         {
+             ArithmeticOperandDiagnostics.Enabled = previous;
++            NumericSpeculation.Enabled = previousSpeculation;
+         }
+     }
+ 
+@@ -55,6 +62,19 @@ public sealed class ArithmeticOperandCensusTests
+ 
+         Assert.True(census.Generic >= 200, $"expected at least 200 generic operations, got {census.Generic}");
+         Assert.Equal(census.Generic, census.BothNumbers);
++
++        // And the same shape with item 3-1's guarded tree ON reaches the generic path not at all.
++        // This is the census and the specialization checking each other: the first measured a
++        // population of 73.8 M invocations whose operands are always Numbers, the second was built
++        // to consume it, and one assertion says the second reaches what the first counted.
++        var specialized = Count("""
++            var a = [1.5, 2.5];
++            var s = 0;
++            for (var i = 0; i < 100; i++) s = s + a[0] * a[1];
++            s;
++            """, speculate: true);
++
++        Assert.Equal(0, specialized.Generic);
+     }
+ 
+     [Fact]
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericSpeculationTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericSpeculationTests.cs
+new file mode 100644
+index 00000000..3344bf13
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericSpeculationTests.cs
+@@ -0,0 +1,334 @@
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// An arithmetic tree whose operands the compiler cannot prove numeric is computed on raw doubles
++// behind one run-time type test, boxing only its root (docs/performance-roadmap.md item 3-1).
++//
++// The census this was built from says the guard holds on 73 817 515 of 73 818 646 invocations —
++// so the failing arm is what almost never runs, and is therefore exactly what a test suite has to
++// exercise. Every case below is asserted on BOTH settings of BROILER_JS_NUMERIC_SPECULATION, which
++// makes each one a statement about JavaScript semantics rather than a description of the fast path:
++// if the two arms ever disagree, the speculation is wrong and the test says so on the arm that
++// changed.
++//
++// The cases fall into three groups. Values — the arithmetic itself must be identical, including
++// NaN, the infinities, -0, and the ToInt32 wrapping the bitwise operators do. Types — a leaf that
++// is not a Number must take the generic arm and answer what it always answered, which for `+`
++// means string concatenation and for an object means running valueOf. And ORDER — the argument that
++// makes hoisting sound is about when a coercion runs relative to a leaf evaluation, so the fixtures
++// that matter most are the ones with an observable valueOf and an observable getter in the same
++// expression.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public sealed class NumericSpeculationTests
++{
++    private static string Eval(string body, bool speculate)
++    {
++        var previous = NumericSpeculation.Enabled;
++        NumericSpeculation.Enabled = speculate;
++        try
++        {
++            using var context = new JSContext();
++            return context.Eval("(function(){ " + body + " })()").ToString();
++        }
++        finally
++        {
++            NumericSpeculation.Enabled = previous;
++        }
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void TheOrdinaryArithmeticAnswersTheSame(bool speculate)
++    {
++        Assert.Equal("7", Eval("var a = [3, 4]; return a[0] + a[1];", speculate));
++        Assert.Equal("12", Eval("var a = [3, 4]; return a[0] * a[1];", speculate));
++        Assert.Equal("-1", Eval("var a = [3, 4]; return a[0] - a[1];", speculate));
++        Assert.Equal("0.75", Eval("var a = [3, 4]; return a[0] / a[1];", speculate));
++        Assert.Equal("1", Eval("var a = [3, 4]; return a[1] % a[0];", speculate));
++        Assert.Equal("81", Eval("var a = [3, 4]; return a[0] ** a[1];", speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void ANestedTreeAnswersTheSame(bool speculate)
++    {
++        // The shape the item is written around, and the one the measurement prices at three boxes
++        // of which two are intermediates. It parses right-leaning, so every leaf precedes the
++        // first coercion and the tree is eligible.
++        Assert.Equal("8.5", Eval("var s = 4, a = [3]; return s + a[0] * 1.5;", speculate));
++        Assert.Equal("25.5", Eval("var a = [3, 4]; return a[0] * a[1] + a[0] * 4.5;", speculate));
++        Assert.Equal("5", Eval("var a = [1, 2, 3]; return a[0] + a[1] + a[1];", speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void NaNAndTheInfinitiesAndNegativeZeroAnswerTheSame(bool speculate)
++    {
++        Assert.Equal("NaN", Eval("var a = [NaN, 1]; return a[0] + a[1];", speculate));
++        Assert.Equal("NaN", Eval("var a = [Infinity, Infinity]; return a[0] - a[1];", speculate));
++        Assert.Equal("Infinity", Eval("var a = [1, 0]; return a[0] / a[1];", speculate));
++        Assert.Equal("-Infinity", Eval("var a = [-1, 0]; return a[0] / a[1];", speculate));
++        Assert.Equal("NaN", Eval("var a = [0, 0]; return a[0] / a[1];", speculate));
++        // -0 is only observable through 1/x, which is the standard way to see it.
++        Assert.Equal("-Infinity", Eval("var a = [0, -1]; return 1 / (a[0] * a[1]);", speculate));
++        Assert.Equal("NaN", Eval("var a = [Infinity, 0]; return a[0] % a[1];", speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void TheBitwiseOperatorsKeepTheirToInt32Semantics(bool speculate)
++    {
++        // A CLR cast is undefined on overflow where ToInt32 wraps, which is why these live in
++        // JSNumericOperators; a speculative tree reaches them through the same helper.
++        Assert.Equal("1", Eval("var a = [5, 3]; return a[0] & a[1];", speculate));
++        Assert.Equal("7", Eval("var a = [5, 3]; return a[0] | a[1];", speculate));
++        Assert.Equal("6", Eval("var a = [5, 3]; return a[0] ^ a[1];", speculate));
++        Assert.Equal("40", Eval("var a = [5, 3]; return a[0] << a[1];", speculate));
++        Assert.Equal("-1", Eval("var a = [-1, 0]; return a[0] >> a[1];", speculate));
++        Assert.Equal("4294967295", Eval("var a = [-1, 0]; return a[0] >>> a[1];", speculate));
++        Assert.Equal("0", Eval("var a = [NaN, 1]; return a[0] & a[1] | 0;", speculate));
++        Assert.Equal("1", Eval("var a = [4294967297, 1]; return a[0] & a[1];", speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void AStringLeafStillConcatenates(bool speculate)
++    {
++        // The guard fails and the generic arm has to be the ordinary `+`, not numeric addition.
++        Assert.Equal("1x", Eval("var a = [1], b = ['x']; return a[0] + b[0];", speculate));
++        Assert.Equal("x1", Eval("var a = [1], b = ['x']; return b[0] + a[0];", speculate));
++        // ... while the other operators coerce the string to a number, as they always did.
++        Assert.Equal("6", Eval("var a = [2], b = ['3']; return a[0] * b[0];", speculate));
++        Assert.Equal("NaN", Eval("var a = [2], b = ['x']; return a[0] * b[0];", speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void AnObjectLeafStillRunsValueOf(bool speculate)
++    {
++        Assert.Equal("7", Eval(
++            "var o = { valueOf: function () { return 3; } }; var a = [o, 4]; return a[0] + a[1];",
++            speculate));
++        Assert.Equal("12", Eval(
++            "var o = { valueOf: function () { return 3; } }; var a = [o, 4]; return a[0] * a[1];",
++            speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void ValueOfRunsExactlyOncePerOperand(bool speculate)
++    {
++        // Both arms read saved values, so a leaf is evaluated once — but the COERCION is the thing
++        // that must also happen once, and it happens in the generic arm only.
++        Assert.Equal("3,1", Eval("""
++            var calls = 0;
++            var o = { valueOf: function () { calls++; return 3; } };
++            var a = [o];
++            var r = a[0] + 0;
++            return r + ',' + calls;
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void AGetterLeafIsReadExactlyOnceAndInSourceOrder(bool speculate)
++    {
++        // The leaves are hoisted into temporaries, so "once" and "left to right" are both
++        // properties that could break and neither is visible in a value assertion alone.
++        Assert.Equal("30,x,y", Eval("""
++            var log = [];
++            var o = {
++              get x() { log.push('x'); return 10; },
++              get y() { log.push('y'); return 20; }
++            };
++            var r = o.x + o.y;
++            return r + ',' + log.join(',');
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void ACoercionThatMutatesALaterLeafKeepsItsOrder(bool speculate)
++    {
++        // THE order fixture. `(o * 2) + p.v` is left-leaning, so the reference emission coerces o
++        // — running valueOf — BEFORE it reads p.v. Hoisting p.v ahead of that coercion would read
++        // the old value, so the eligibility rule refuses the tree. If that rule is ever loosened
++        // without this being re-derived, this is what fails.
++        Assert.Equal("28", Eval("""
++            var p = { v: 1 };
++            var o = { valueOf: function () { p.v = 20; return 4; } };
++            var a = [o];
++            return (a[0] * 2) + p.v;
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void AGetterThatMutatesALaterLeafKeepsItsOrder(bool speculate)
++    {
++        // The same hazard from the evaluation side rather than the coercion side: reading o.x
++        // changes o.y, so left-to-right is observable in the answer.
++        Assert.Equal("11", Eval("""
++            var o = {
++              _y: 1,
++              get x() { this._y = 10; return 1; },
++              get y() { return this._y; }
++            };
++            return o.x + o.y;
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void AThrowingLeafStillThrowsBeforeALaterLeafIsRead(bool speculate)
++    {
++        // A throw is an order too. The second getter must not have run.
++        Assert.Equal("caught,", Eval("""
++            var log = [];
++            var o = {
++              get x() { throw new Error('boom'); },
++              get y() { log.push('y'); return 1; }
++            };
++            try { var r = o.x + o.y; } catch (e) { return 'caught,' + log.join(','); }
++            return 'no throw';
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void ABigIntLeafStillThrowsOnMixing(bool speculate)
++    {
++        // IsNumber is false for a BigInt, so the generic arm must produce the TypeError it always
++        // did rather than the speculation silently coercing it.
++        Assert.Equal("TypeError", Eval("""
++            var a = [1n, 2];
++            try { return a[0] + a[1], 'no throw'; } catch (e) { return e.constructor.name; }
++            """, speculate));
++        Assert.Equal("3", Eval("var a = [1n, 2n]; return String(a[0] + a[1]);", speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void NullUndefinedAndBooleansCoerceAsBefore(bool speculate)
++    {
++        Assert.Equal("1", Eval("var a = [null, 1]; return a[0] + a[1];", speculate));
++        Assert.Equal("NaN", Eval("var a = [undefined, 1]; return a[0] + a[1];", speculate));
++        Assert.Equal("2", Eval("var a = [true, 1]; return a[0] + a[1];", speculate));
++        Assert.Equal("0", Eval("var a = [false, 1]; return a[0] * a[1];", speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void AMixOfProvenAndUnprovenOperandsAnswersTheSame(bool speculate)
++    {
++        // A numeric local is already a raw double and needs no guard; an element read needs one.
++        // The tree has to be able to hold both without boxing the proven side to reach the other.
++        Assert.Equal("11.5", Eval("""
++            var x = 2.5;
++            var a = [3, 3];
++            var s = 0;
++            for (var i = 0; i < 1; i++) s = x + a[0] * 3;
++            return s;
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void ALoopOverElementsAccumulatesTheSame(bool speculate)
++    {
++        // The NavierStokes-shaped kernel: read, arithmetic, store back, many times. Anything that
++        // goes wrong once goes wrong a thousand times here.
++        Assert.Equal("332833500", Eval("""
++            var a = [];
++            for (var i = 0; i < 1000; i++) a[i] = i;
++            var s = 0;
++            for (var i = 0; i < 1000; i++) s = s + a[i] * a[i];
++            return s;
++            """, speculate));
++    }
++
++    [Fact]
++    public void TheSwitchDefaultsOn()
++    {
++        Assert.True(NumericSpeculation.Enabled);
++    }
++
++    [Fact]
++    public void TheSpecializationActuallyFires()
++    {
++        // Every case above passes on both arms, which is what it is for and is also exactly what a
++        // specialization that never engages would do (§3.5: "an emitter that cannot be fed is not
++        // an optimization, and it will pass every test you write for it"). So the compile-time
++        // counter is asserted directly, and asserted to stay still with the switch off.
++        static long Trees(string source, bool speculate)
++        {
++            var previous = NumericSpeculation.Enabled;
++            NumericSpeculation.Enabled = speculate;
++            using var context = new JSContext();
++            CompilerSpecializationDiagnostics.Reset();
++            try
++            {
++                context.Eval(source);
++                return CompilerSpecializationDiagnostics.Snapshot().SpeculativeNumericTrees;
++            }
++            finally
++            {
++                NumericSpeculation.Enabled = previous;
++            }
++        }
++
++        const string source = "var a = [1, 2]; var s = 0; s = s + a[0] * 1.5; s;";
++
++        Assert.True(Trees(source, true) > 0, "the tree the item is written around must specialize");
++        Assert.Equal(0, Trees(source, false));
++    }
++
++    [Fact]
++    public void ATreeWhoseOrderCannotBePreservedIsRefused()
++    {
++        // The eligibility rule, asserted as a count rather than only as an answer. In
++        // `(a[0] * 2) + p.v` the multiply's coercion runs before `p.v` is read, so the WHOLE tree
++        // must be refused — and the assertion has to distinguish that from the tree specializing
++        // anyway, because the inner multiply is separately eligible on its own (a single binary
++        // node reorders nothing) and does specialize when the outer one is turned down.
++        //
++        // The guard count is what separates them: refusing the root leaves one tree with one
++        // guarded leaf, `a[0]`. Specializing the root would have hoisted `p.v` as well and read
++        // two. The value fixture above proves the answer is right; this proves it is right for
++        // the stated reason rather than because the guard happened to fail.
++        var previous = NumericSpeculation.Enabled;
++        NumericSpeculation.Enabled = true;
++        using var context = new JSContext();
++        CompilerSpecializationDiagnostics.Reset();
++        try
++        {
++            // Two operators inside the parentheses, so the inner tree clears the "at least one
++            // intermediate" bar on its own and the counts below distinguish "root refused" from
++            // "nothing was eligible".
++            context.Eval("var p = { v: 1 }; var a = [4]; var r = (a[0] * 2 * 3) + p.v; r;");
++            var snapshot = CompilerSpecializationDiagnostics.Snapshot();
++            Assert.Equal(1, snapshot.SpeculativeNumericTrees);
++            Assert.Equal(1, snapshot.SpeculativeNumericGuards);
++        }
++        finally
++        {
++            NumericSpeculation.Enabled = previous;
++        }
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs b/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
+index 1e6fe186..f49a2f5d 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
+@@ -13,7 +13,9 @@ public readonly record struct CompilerSpecializationSnapshot(
+     long NumericCandidatesRejected,
+     long NumericCandidatesDropped,
+     long NumericCandidatesSurviving,
+-    long[] NumericDropCauses);
++    long[] NumericDropCauses,
++    long SpeculativeNumericTrees,
++    long SpeculativeNumericGuards);
+ 
+ /// <summary>
+ /// Why a hoisted name did not become a raw <c>double</c> local, in the order the gate asks
+@@ -109,6 +111,8 @@ public static class CompilerSpecializationDiagnostics
+     private static long numericCandidatesDropped;
+     private static long numericCandidatesSurviving;
+     private static readonly long[] numericDropCauses = new long[9];
++    private static long speculativeNumericTrees;
++    private static long speculativeNumericGuards;
+ 
+     internal static void RecordScalarLocal() => Interlocked.Increment(ref scalarLocals);
+ 
+@@ -153,6 +157,17 @@ public static class CompilerSpecializationDiagnostics
+     internal static void RecordNumericDropCause(NumericDropCause cause)
+         => Interlocked.Increment(ref numericDropCauses[(int)cause]);
+ 
++    /// <summary>
++    /// One arithmetic tree emitted in item 3-1's guarded form, and how many of its leaves the
++    /// guard has to test — the second number is what says whether the sites reached are the
++    /// two-leaf kind or long chains.
++    /// </summary>
++    internal static void RecordSpeculativeNumericTree(int guardedLeaves)
++    {
++        Interlocked.Increment(ref speculativeNumericTrees);
++        Interlocked.Add(ref speculativeNumericGuards, guardedLeaves);
++    }
++
+     /// <summary>Records why one hoisted name did or did not reach the numeric tier.</summary>
+     internal static void RecordNumericLocalDecision(NumericLocalRejection reason)
+     {
+@@ -172,7 +187,9 @@ public static class CompilerSpecializationDiagnostics
+             Interlocked.Read(ref numericCandidatesRejected),
+             Interlocked.Read(ref numericCandidatesDropped),
+             Interlocked.Read(ref numericCandidatesSurviving),
+-            ReadDropCauses());
++            ReadDropCauses(),
++            Interlocked.Read(ref speculativeNumericTrees),
++            Interlocked.Read(ref speculativeNumericGuards));
+ 
+     private static long[] ReadDropCauses()
+     {
+@@ -195,6 +212,8 @@ public static class CompilerSpecializationDiagnostics
+         Interlocked.Exchange(ref scalarLocals, 0);
+         Interlocked.Exchange(ref numericLocals, 0);
+         Interlocked.Exchange(ref mixedNumericComparisons, 0);
++        Interlocked.Exchange(ref speculativeNumericTrees, 0);
++        Interlocked.Exchange(ref speculativeNumericGuards, 0);
+         Interlocked.Exchange(ref boxedNumericComparisons, 0);
+         Interlocked.Exchange(ref hoistedNames, 0);
+         Interlocked.Exchange(ref numericCandidatesOffered, 0);
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
+new file mode 100644
+index 00000000..6558a5b9
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
+@@ -0,0 +1,297 @@
++using System.Collections.Generic;
++using Broiler.JavaScript.Ast.Expressions;
++using Broiler.JavaScript.Ast.Misc;
++using Broiler.JavaScript.ExpressionCompiler.Core;
++using Broiler.JavaScript.ExpressionCompiler.Expressions;
++using Broiler.JavaScript.LinqExpressions.LinqExpressions;
++using Broiler.JavaScript.LinqExpressions.Utils;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.Compiler;
++
++/// <summary>
++/// Item 3-1's shared half: an arithmetic tree whose operands the compiler cannot prove numeric is
++/// computed on raw doubles behind one run-time type test, boxing only its root.
++/// </summary>
++/// <remarks>
++/// <para>
++/// <b>Why this and not a typed backing store.</b> The item is written around
++/// <c>ElementArray</c>'s <c>IPropertyValue[]</c>, and measured, a typed store by itself is a wash:
++/// it trades a write allocation for a read allocation. The count that re-specified it is on the
++/// other side of the boundary — <b>73 817 515 of 73 818 646 generic arithmetic invocations across
++/// the Octane corpus arrive with both operands already Numbers, every one but 1 131, and that
++/// population is 86.6% of every box the corpus allocates</b>. The operator already receives two
++/// Numbers whatever they are stored in. What it cannot do is <em>hand one back</em>, because its
++/// consumer is a <c>JSValue</c> local, slot or element — so every intermediate result of an
++/// expression is boxed, not just its value. <c>s = s + a[0] * 1.5</c> costs 96 bytes and three
++/// boxes, of which <em>two</em> are intermediates.
++/// </para>
++/// <para>
++/// <b>What the compiler could prove, for contrast: 0.75%.</b> The existing
++/// <c>isLeftNumber &amp;&amp; isRightNumber</c> gate — the one every phase-3 item so far has
++/// widened — reaches 556 053 of those 73.8 M invocations. This does not widen it. It leaves the
++/// proof alone and tests at run time instead, which is the only thing that reaches the other
++/// 99.25%.
++/// </para>
++/// <para>
++/// <b>Evaluation order is the whole correctness argument, and it is why this bails more often
++/// than it needs to.</b> The reference emission evaluates a node's two operands and then coerces
++/// them, so in a nested tree a coercion happens <em>between</em> two leaf evaluations. Hoisting
++/// every leaf into a temporary ahead of the test moves later leaves in front of that coercion —
++/// and a coercion is observable, because <c>ToPrimitive</c> on an object runs <c>valueOf</c>. So a
++/// tree is eligible only when every leaf evaluated <em>after</em> the first internal node in
++/// postorder is one that cannot observe or cause anything: a numeric literal or a proven-numeric
++/// local. Leaves before the first coercion are unrestricted, and that is not a narrow case —
++/// JavaScript's precedence makes <c>s + a[0] * 1.5</c> parse right-leaning, so all three of its
++/// leaves precede the multiply's coercion.
++/// </para>
++/// <para>
++/// <b>When the guard holds nothing is skipped.</b> Every operator here applies ToNumeric (or, for
++/// <c>+</c>, ToPrimitive then ToNumeric) to both operands, and both are of Number, where each is
++/// the identity — no <c>valueOf</c>, no <c>toString</c>, no observable step. The native forms are
++/// <see cref="FastCompiler.TryCreateNativeNumericValue"/>'s, the same ones the all-native path
++/// emits, so the two are identical by construction rather than by inspection; that is the argument
++/// item 3-1's bitwise half already used for <c>ToUint32</c>.
++/// </para>
++/// </remarks>
++partial class FastCompiler
++{
++    /// <summary>
++    /// The guarded form of <paramref name="root"/>, or <c>null</c> when it is not eligible.
++    /// </summary>
++    /// <remarks>
++    /// Called before either operand is visited, because the decision is made on the syntax: a
++    /// speculative compile whose result was thrown away would leak whatever the visit allocated on
++    /// the way, an inline-cache site among it. That is the rule <c>ToNativeExpression</c>'s own
++    /// recursion already follows.
++    /// </remarks>
++    private BExpression TryCreateSpeculativeNumericTree(AstBinaryExpression root)
++    {
++        if (!NumericSpeculation.Enabled)
++            return null;
++
++        // Not a numeric tree at all, or already one the all-native path handles without a guard.
++        if (!IsNativeNumericOperator(root.Operator) || IsNativeNumericAst(root))
++            return null;
++
++        // A `with` or an eval shadow can turn any identifier into a property read, which is
++        // exactly the "leaf that can observe something" this argument depends on not happening.
++        if (withBoundaries.Count != 0 || evalShadowBoundary != null)
++            return null;
++
++        // What the guard buys, counted on the syntax before anything is visited. Two things pay:
++        // every operator BUT the root produces an intermediate the guarded form never boxes, and
++        // every already-native leaf — a literal or a proven-numeric local — is one the generic
++        // form has to box to meet a JSValue operator. A tree with one operator and two unprovable
++        // leaves saves neither, so it would buy a type test and nothing else.
++        //
++        // The first version of this condition said "at least two operators", on the argument that
++        // a single node mints one box either way. That argument is right and the condition was
++        // wrong, because it forgot the operand: `a[0] * 2` costs TWO boxes today, the literal and
++        // the result. Measured, requiring two operators took the corpus from 10.4 M boxes removed
++        // to 5.6 M — Crypto alone lost 4.7 M — which is what says the single-node-with-a-literal
++        // case is most of the prize rather than a rounding error.
++        if (CountOperators(root) - 1 + CountNativeLeaves(root) < 1)
++            return null;
++
++        var seenCoercion = false;
++        if (!HoistingIsOrderSafe(root, ref seenCoercion))
++            return null;
++
++        var leaves = new List<AstExpression>();
++        CollectLeaves(root, leaves);
++
++        // One binary node has two leaves; the ceiling is arbitrary but a tree with dozens of
++        // guarded leaves is a long chain of tests to reach one saved box, and the shapes this is
++        // for have three or four.
++        if (leaves.Count > MaximumSpeculativeLeaves)
++            return null;
++
++        var compiled = new Dictionary<AstExpression, SpeculativeLeaf>(leaves.Count);
++        var locals = new Sequence<BParameterExpression>();
++        var body = new Sequence<BExpression>();
++        var guarded = 0;
++
++        foreach (var leaf in leaves)
++        {
++            // Visited exactly once, here, in source order — both arms then read what this
++            // produced rather than compiling the leaf again.
++            var (isString, isNumber, expression) = ToNativeExpression(leaf);
++
++            // A string literal makes the guard unsatisfiable, and for `+` it makes the answer a
++            // concatenation. Nothing to win; leave the tree to the ordinary emission.
++            if (isString)
++                return null;
++
++            if (isNumber)
++            {
++                // Already a raw double, and pure — a literal or a proven-numeric local — so it can
++                // be read in both arms without a temporary.
++                compiled[leaf] = new SpeculativeLeaf(expression, null);
++                continue;
++            }
++
++            // Block-declared rather than pooled, for the reason item 3-5 records: a pooled temp
++            // acquired after the operands were compiled can be one that compiling them released,
++            // and the next assignment would clobber a value already saved.
++            var local = BExpression.Parameter(typeof(JSValue), "#spec" + guarded);
++            locals.Add(local);
++            body.Add(BExpression.Assign(local, expression));
++            compiled[leaf] = new SpeculativeLeaf(null, local);
++            guarded++;
++        }
++
++        // Nothing to test means the all-native path already had it.
++        if (guarded == 0)
++            return null;
++
++        var nativeTree = BuildNativeTree(root, compiled);
++        if (nativeTree == null)
++            return null;
++
++        var genericTree = BuildGenericTree(root, compiled);
++        if (genericTree == null)
++            return null;
++
++        BExpression guard = null;
++        foreach (var leaf in leaves)
++        {
++            if (compiled[leaf].Local is not { } local)
++                continue;
++
++            var test = JSValueBuilder.IsNumber(local);
++            guard = guard == null ? test : BExpression.Binary(guard, BOperator.BooleanAnd, test);
++        }
++
++        body.Add(BExpression.Condition(
++            guard,
++            JSNumberBuilder.New(nativeTree),
++            genericTree,
++            typeof(JSValue)));
++
++        CompilerSpecializationDiagnostics.RecordSpeculativeNumericTree(guarded);
++        return BExpression.Block(locals, body);
++    }
++
++    /// <summary>
++    /// Leaves above which a chain of type tests stops being worth one saved box. Not a
++    /// correctness bound.
++    /// </summary>
++    private const int MaximumSpeculativeLeaves = 8;
++
++    /// <summary>One leaf of a speculative tree: either already a raw double, or a saved value.</summary>
++    private readonly record struct SpeculativeLeaf(BExpression Native, BParameterExpression Local);
++
++    /// <summary>
++    /// Operators in the tree — the number of results, of which all but the root's are
++    /// intermediates that the guarded form never boxes.
++    /// </summary>
++    private int CountOperators(AstExpression node)
++        => node is AstBinaryExpression binary && IsNativeNumericOperator(binary.Operator)
++            ? 1 + CountOperators(binary.Left) + CountOperators(binary.Right)
++            : 0;
++
++    /// <summary>
++    /// Leaves that are already unboxed doubles, decided syntactically — each one is a box the
++    /// ordinary emission mints to hand the value to a <c>JSValue</c> operator.
++    /// </summary>
++    private int CountNativeLeaves(AstExpression node)
++    {
++        if (node is AstBinaryExpression binary && IsNativeNumericOperator(binary.Operator))
++            return CountNativeLeaves(binary.Left) + CountNativeLeaves(binary.Right);
++
++        return IsNativeNumericAst(node) ? 1 : 0;
++    }
++
++    private void CollectLeaves(AstExpression node, List<AstExpression> leaves)
++    {
++        if (node is AstBinaryExpression binary && IsNativeNumericOperator(binary.Operator))
++        {
++            CollectLeaves(binary.Left, leaves);
++            CollectLeaves(binary.Right, leaves);
++            return;
++        }
++
++        leaves.Add(node);
++    }
++
++    /// <summary>
++    /// Whether hoisting every leaf ahead of the type test preserves what the ordinary emission
++    /// would have observed.
++    /// </summary>
++    /// <remarks>
++    /// Postorder is the reference evaluation order: a node's operands are evaluated, then coerced.
++    /// Everything before the first internal node is therefore evaluated before any coercion could
++    /// run, and hoisting it changes no order at all. Everything after one is being moved in front
++    /// of a coercion, so it has to be a leaf that neither causes nor observes an effect.
++    /// </remarks>
++    private bool HoistingIsOrderSafe(AstExpression node, ref bool seenCoercion)
++    {
++        if (node is AstBinaryExpression binary && IsNativeNumericOperator(binary.Operator))
++        {
++            if (!HoistingIsOrderSafe(binary.Left, ref seenCoercion))
++                return false;
++
++            if (!HoistingIsOrderSafe(binary.Right, ref seenCoercion))
++                return false;
++
++            seenCoercion = true;
++            return true;
++        }
++
++        return !seenCoercion || IsPureLeaf(node);
++    }
++
++    /// <summary>
++    /// Whether evaluating <paramref name="node"/> can be moved earlier without anything being able
++    /// to tell.
++    /// </summary>
++    /// <remarks>
++    /// Deliberately the narrowest useful set. A numeric literal is a constant. A proven-numeric
++    /// local is a raw CLR double the analysis has already established is assigned before it is
++    /// read, so reading it cannot throw and cannot run user code. Everything else — an element
++    /// read, a member read, a call, even a plain identifier, which can be a TDZ throw or a global
++    /// object property — is refused, because each of them can either run user code or throw, and
++    /// either one is an order the reference emission fixes.
++    /// </remarks>
++    private bool IsPureLeaf(AstExpression node)
++        => node is AstLiteral { TokenType: TokenTypes.Number }
++            || (node is AstIdentifier && TryGetNumericLocalStorage(node, out _));
++
++    private BExpression BuildNativeTree(AstExpression node, Dictionary<AstExpression, SpeculativeLeaf> compiled)
++    {
++        if (node is AstBinaryExpression binary && IsNativeNumericOperator(binary.Operator))
++        {
++            var left = BuildNativeTree(binary.Left, compiled);
++            var right = BuildNativeTree(binary.Right, compiled);
++            if (left == null || right == null)
++                return null;
++
++            return TryCreateNativeNumericValue(binary.Operator, left, right);
++        }
++
++        var leaf = compiled[node];
++        return leaf.Local is { } local ? JSValueBuilder.DoubleValue(local) : leaf.Native;
++    }
++
++    /// <summary>
++    /// The tree as the ordinary emission would have built it, over the saved leaves rather than
++    /// over the leaf expressions — so a leaf is evaluated once and the failing arm still coerces
++    /// in the order it always did.
++    /// </summary>
++    private BExpression BuildGenericTree(AstExpression node, Dictionary<AstExpression, SpeculativeLeaf> compiled)
++    {
++        if (node is AstBinaryExpression binary && IsNativeNumericOperator(binary.Operator))
++        {
++            var left = BuildGenericTree(binary.Left, compiled);
++            var right = BuildGenericTree(binary.Right, compiled);
++            if (left == null || right == null)
++                return null;
++
++            return BinaryOperation.Operation(left, right, binary.Operator);
++        }
++
++        var leaf = compiled[node];
++        return leaf.Local is { } local ? local : JSNumberBuilder.New(leaf.Native);
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs
+index df161f34..a35fef3d 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs
+@@ -32,6 +32,13 @@ partial class FastCompiler
+                 ToJSValueExpression(Visit(binaryExpression.Right)));
+         }
+ 
++        // Item 3-1's guarded numeric tree, asked BEFORE either operand is visited: the decision is
++        // made on the syntax, and a speculative compile whose result was discarded would leak what
++        // the visit allocated. It answers null unless the whole tree is arithmetic over operands
++        // the compiler cannot prove numeric — which is 99.25% of the arithmetic this engine runs.
++        if (TryCreateSpeculativeNumericTree(binaryExpression) is { } speculative)
++            return speculative;
++
+         var (isLeftString, isLeftNumber, left) = ToNativeExpression(binaryExpression.Left);
+         var (isRightString, isRightNumber, right) = ToNativeExpression(binaryExpression.Right);
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/NumericSpeculation.cs b/Broiler.JS/Broiler.JavaScript.Compiler/NumericSpeculation.cs
+new file mode 100644
+index 00000000..bcca8421
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/NumericSpeculation.cs
+@@ -0,0 +1,36 @@
++using System;
++using System.Threading;
++
++namespace Broiler.JavaScript.Compiler;
++
++/// <summary>
++/// Process-wide switch for item 3-1's guarded numeric tree.
++/// </summary>
++/// <remarks>
++/// Present for the same reason <c>BROILER_JS_NATIVE_BITWISE</c> and
++/// <c>BROILER_JS_NUMERIC_LOCALS</c> are: the change has a losing side — an arithmetic tree whose
++/// operands turn out not to be Numbers pays one type test per guarded leaf and then does exactly
++/// what it did before — so it has to be measurable against a build that differs in nothing else.
++/// Setting <c>BROILER_JS_NUMERIC_SPECULATION=0</c> restores the unguarded emission.
++/// </remarks>
++public static class NumericSpeculation
++{
++    public const string EnvironmentVariable = "BROILER_JS_NUMERIC_SPECULATION";
++
++    private static int enabled = ReadConfigured();
++
++    /// <summary>Whether an arithmetic tree over non-provable operands is speculated on.</summary>
++    public static bool Enabled
++    {
++        get => Volatile.Read(ref enabled) != 0;
++        set => Volatile.Write(ref enabled, value ? 1 : 0);
++    }
++
++    private static int ReadConfigured()
++        => string.Equals(
++            Environment.GetEnvironmentVariable(EnvironmentVariable),
++            "0",
++            StringComparison.Ordinal)
++            ? 0
++            : 1;
++}
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index 7eda5208..d91fa8fe 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -508,6 +508,13 @@ internal static class SpecializingTierMetrics
+             mixedComparisons = compiler.MixedNumericComparisons,
+             boxedComparisons = compiler.BoxedNumericComparisons,
+ 
++            // Item 3-1's guarded numeric tree: how many arithmetic trees took the speculative
++            // form, and how many leaf type tests that cost in total. Read against
++            // arithmeticGeneric below — the trees are compile-time sites, the invocations are
++            // run-time, and it is the second that has to collapse for this to have worked.
++            speculativeNumericTrees = compiler.SpeculativeNumericTrees,
++            speculativeNumericGuards = compiler.SpeculativeNumericGuards,
++
+             // Item 3-6: the waterfall. Every hoisted name attributed to the first conjunct of
+             // the numeric-local gate it fails, which is what says WHICH condition costs the
+             // coverage item 3-5 measured at 5.0%.
+-- 
+2.43.0
+
