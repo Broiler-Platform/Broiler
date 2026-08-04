@@ -4009,6 +4009,26 @@ against a reused old value — and a counter invariant, because "the box count w
 otherwise be consistent with the coercion having stopped happening: `UnaryToNumeric +
 UnaryToNumericReused` is equal on both arms and only the split moves.
 
+**This build also broke one of `0085`'s own fixtures, which is the fixture working rather than a
+cost.** `AnUpdateOnAPropertyCostsTwoBoxesNotOne` asserted the two-box cost, so it failed in all
+three of the first suite runs the moment the reuse landed. It is now a Theory on both settings
+asserting the invariant instead of the total — the **coercion count stays 1 either way**, and only
+which side of the split it falls on moves. *A census fixture that survives the change it measured
+would not have been measuring it.* Full repository suite **7 988 tests, 0 failures, on three
+consecutive runs**.
+
+**One caveat recorded rather than rounded off.** `Broiler.JavaScript.Integration.Tests` **stalled
+once** on an earlier build of this stack — its host measured at *one jiffy of CPU over eight
+seconds*, which is a hang and not slow progress. It did **not recur in six subsequent full-suite
+runs**, three of them under `--blame-hang --blame-hang-timeout 300s` with no sequence file
+produced, nor when that assembly was run alone, where it passed 4 571 in 47 s. It was not resource
+exhaustion (27 GB disk and 13.7 GB RAM free, no stray processes). **Unexplained, not reproduced,
+and not attributed to this change**; if it returns, `BROILER_JS_NUMERIC_UPDATE_REUSE=0` restores
+the previous behaviour exactly and is the bisection. Separately,
+`CapturedNumericLocalTests.SuspendingNestedFunctionsCaptureThroughTheSameBox` — the async-scheduling
+intermittent 3-7 already records as unresolved — failed **once in those six runs**, which is the
+first rate this document has for it.
+
 #### Re-specification
 
 **3-1 is no longer "the most contained item in the phase", and it is no longer optional.**
