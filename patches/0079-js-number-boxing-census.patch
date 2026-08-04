@@ -1,0 +1,1733 @@
+From 362b19aab8e0413bc1f2ac956021f82ceb0df91c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 4 Aug 2026 16:39:18 +0000
+Subject: [PATCH] Count what phase 3 is actually aimed at, item 3-8
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+3-6 specified this XL from one sentence — "the dropped candidates are dropped
+for want of a type, not for want of a rule" — and 3-7 made it the whole of
+what phase 3 has left. Counted before building any of it, the item is
+well-founded mechanically and aimed at almost none of the prize.
+
+Two numbers, neither previously taken.
+
+NumberBoxingDiagnostics counts every JSNumber.Create, split by whether the
+small-integer table answers it. Number boxing is 41.89% of everything the
+Octane corpus allocates -- 2.05 GB of 4.88 GB -- and the per-suite spread is
+what hid it: 66.96% of NavierStokes, 55.16% of Crypto, 35.98% of Box2D against
+0.31% of DeltaBlue. So the prize was always large.
+
+BROILER_JS_NUMERIC_LOCALS=0 removes the numeric-local tier entirely, which is
+the control four phase 3 items were each measured without. The whole tier --
+P2-2 item 3, 3-0, 3-3, 3-5 and 3-7 together -- removes 311 187 boxes of
+85.6 M, 0.36%, and 0.41% of allocation; six interleaved driver runs an arm do
+not separate on wall clock at all (21 261 vs 21 024 ms, ranges overlapping end
+to end). Four "invisible on the corpus" readings were never evidence about the
+mechanism; they were evidence that eight more names do not matter.
+
+A box is minted by the operator, not by the local. The drop-cause classifier
+says the same from the other side: of 1 916 drops, 894 (46.7%) take their
+value from a property read and 570 (29.7%) from a call -- 76.4% produced
+elsewhere -- against 47 (2.5%) from a parameter, the category 3-3 deferred to
+phase 4 as the one that mattered. 93.1% are roots rather than cascades.
+
+So 3-8 as written should not be started, and 3-1 and 3-2 move ahead of it:
+checked in their sources, NavierStokes and Crypto hold their numbers in
+new Array and read them by index with no field access at all, while Box2D
+allocates no arrays and has 240 .x/.y accesses.
+
+Also fixes a bookkeeping defect found writing the classifier's tests: the
+Collector descends into nested functions on purpose, but VisitBlock was also
+offering the blocks it met there, so a nested function's block-scoped var
+became a candidate of every enclosing function and was dropped and counted
+once per level. No answer changes -- the enclosing function's hoisting scope
+never contains the name -- and dropped, surviving, numericLocals, hoistedNames
+and every drop cause come back identical; item 3-7's offered/rejected pair is
+corrected from 2 521/359 to 2 295/133.
+
+Adds NumericDropCauseTests (14 cases). 7 910 tests pass.
+---
+ .../Number/JSNumber.cs                        |   4 +
+ .../Number/NumberBoxingDiagnostics.cs         |  70 ++
+ .../NumericDropCauseTests.cs                  | 143 ++++
+ .../CompilerSpecializationDiagnostics.cs      | 111 ++-
+ .../Declarations/NumericLocalAnalysis.cs      | 779 +++++++++++-------
+ .../NumericLocalSpecialization.cs             |  45 +
+ .../Statements/FastCompiler.VisitBlock.cs     |  87 +-
+ .../LocalAllocationMetrics.cs                 |  54 ++
+ .../SpecializingTierMetrics.cs                |  64 +-
+ 9 files changed, 955 insertions(+), 402 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericDropCauseTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler/NumericLocalSpecialization.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
+index 0b2c4698..fb0d9dba 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
+@@ -156,10 +156,14 @@ public sealed partial class JSNumber : JSPrimitive
+             if (index + CacheMinimum == value && (index != ZeroIndex || !IsNegativeZero(value)))
+             {
+                 var table = smallNumbers ??= new JSNumber[CacheSize];
++                if (NumberBoxingDiagnostics.Enabled)
++                    NumberBoxingDiagnostics.RecordCached();
+                 return table[index] ??= new JSNumber(value);
+             }
+         }
+ 
++        if (NumberBoxingDiagnostics.Enabled)
++            NumberBoxingDiagnostics.RecordAllocated();
+         return new JSNumber(value);
+     }
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
+new file mode 100644
+index 00000000..d58b296d
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
+@@ -0,0 +1,70 @@
++using System.Threading;
++
++namespace Broiler.JavaScript.BuiltIns.Number;
++
++/// <summary>
++/// Counts the JavaScript numbers the engine boxes, so phase 3's remaining prize can be bounded
++/// rather than argued (docs/performance-roadmap.md item 3-8).
++/// </summary>
++/// <remarks>
++/// <para>
++/// Every phase 3 item so far has been sized by a per-shape figure — 31.98 bytes an iteration,
++/// over and over — and every one of them has then moved the whole corpus by nothing. The number
++/// that would have predicted that is the one nobody had: how much of a real run's allocation is
++/// number boxing at all. A raw <c>double</c> local can only ever remove a box, so this count times
++/// the box size is the ceiling on 3-0, 3-3, 3-5, 3-7 and 3-8 together — and on 3-1 and 3-2's
++/// throughput halves as well.
++/// </para>
++/// <para>
++/// <c>Requests</c> counts every call to <see cref="JSNumber.Create"/>, which is what the compiler
++/// emits for a boxing conversion; <c>Cached</c> is the share the small-integer table answers
++/// without allocating, and <c>Allocated</c> is the rest. The split matters because a cached hit
++/// costs no memory at all, so a probe that counts boxing *operations* and calls the answer bytes
++/// overstates it by whatever the table absorbs.
++/// </para>
++/// <para>
++/// Off by default. The check is a plain static read on a branch that predicts perfectly while it
++/// is off, which is the same bargain <c>CallPathDiagnostics</c> makes — and unlike that one this
++/// sits on an allocation path, so a counter that costs a fraction of the allocation it counts is
++/// not worth gating more elaborately.
++/// </para>
++/// </remarks>
++public static class NumberBoxingDiagnostics
++{
++    private static long requests;
++    private static long cached;
++    private static long allocated;
++
++    /// <summary>Whether boxing is counted. Off by default.</summary>
++    public static bool Enabled;
++
++    internal static void RecordCached()
++    {
++        Interlocked.Increment(ref requests);
++        Interlocked.Increment(ref cached);
++    }
++
++    internal static void RecordAllocated()
++    {
++        Interlocked.Increment(ref requests);
++        Interlocked.Increment(ref allocated);
++    }
++
++    public static NumberBoxingSnapshot Snapshot()
++        => new(
++            Interlocked.Read(ref requests),
++            Interlocked.Read(ref cached),
++            Interlocked.Read(ref allocated));
++
++    public static void Reset()
++    {
++        Interlocked.Exchange(ref requests, 0);
++        Interlocked.Exchange(ref cached, 0);
++        Interlocked.Exchange(ref allocated, 0);
++    }
++}
++
++/// <param name="Requests">Boxing conversions asked for.</param>
++/// <param name="Cached">Those the small-integer table answered without allocating.</param>
++/// <param name="Allocated">Those that allocated a fresh <see cref="JSNumber"/>.</param>
++public readonly record struct NumberBoxingSnapshot(long Requests, long Cached, long Allocated);
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericDropCauseTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericDropCauseTests.cs
+new file mode 100644
+index 00000000..6012786f
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericDropCauseTests.cs
+@@ -0,0 +1,143 @@
++using Broiler.JavaScript.Compiler;
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// What defeated the numeric proof for each local the analysis's fixed point had to drop
++// (docs/performance-roadmap.md item 3-8). Item 3-6 counted the drops and read them as one
++// population — "dropped for want of a type" — and item 3-8 was specified from that sentence. The
++// causes are what says where a runtime guard would have to sit, so the classifier has to put each
++// shape in the right bucket rather than merely count.
++//
++// The classifier mirrors NumericLocalAnalysis.IsNumeric branch for branch, so these also pin that
++// correspondence: a shape IsNumeric accepts must produce no cause at all, and a shape it rejects
++// must produce exactly one.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public sealed class NumericDropCauseTests
++{
++    /// <summary>Compiles a function body and returns the drop causes it recorded.</summary>
++    private static (string Result, long[] Causes, long Dropped) Compile(string body)
++    {
++        using var context = new JSContext();
++        CompilerSpecializationDiagnostics.Reset();
++        var result = context.Eval("(function(){ " + body + " })()").ToString();
++        var snapshot = CompilerSpecializationDiagnostics.Snapshot();
++        return (result, snapshot.NumericDropCauses, snapshot.NumericCandidatesDropped);
++    }
++
++    private static long Cause(long[] causes, NumericDropCause cause) => causes[(int)cause];
++
++    [Theory]
++    // The three that account for 79% of the corpus's drops.
++    [InlineData("var o = { x: 1 }; var v = o.x; var s = 0; for (var i = 0; i < 3; i++) s += v; return s;",
++        NumericDropCause.PropertyRead)]
++    [InlineData("function g() { return 1; } var v = g(); var s = 0; for (var i = 0; i < 3; i++) s += v; return s;",
++        NumericDropCause.CallResult)]
++    [InlineData("var a = [1]; var v = a[0]; var s = 0; for (var i = 0; i < 3; i++) s += v; return s;",
++        NumericDropCause.ElementRead)]
++    // `new` is a call for this purpose: the analysis types neither.
++    [InlineData("function C() { this.n = 1; } var v = new C(); var s = 0; for (var i = 0; i < 3; i++) s += 1; return s;",
++        NumericDropCause.CallResult)]
++    // A literal that is simply not a number, and the object/array/function forms of the same.
++    [InlineData("var v = 'x'; var s = 0; for (var i = 0; i < 3; i++) s += 1; return s;",
++        NumericDropCause.NonNumericLiteral)]
++    [InlineData("var v = {}; var s = 0; for (var i = 0; i < 3; i++) s += 1; return s;",
++        NumericDropCause.NonNumericLiteral)]
++    [InlineData("var v = []; var s = 0; for (var i = 0; i < 3; i++) s += 1; return s;",
++        NumericDropCause.NonNumericLiteral)]
++    // An operator the analysis will not type at all.
++    [InlineData("var q = 1; var v = typeof q; var s = 0; for (var i = 0; i < 3; i++) s += 1; return s;",
++        NumericDropCause.UnhandledOperator)]
++    public void ADropIsAttributedToWhatDefeatedTheProof(string body, NumericDropCause expected)
++    {
++        var (_, causes, dropped) = Compile(body);
++
++        Assert.True(dropped >= 1, "expected the fixed point to drop at least one candidate");
++        Assert.True(Cause(causes, expected) >= 1,
++            $"expected at least one {expected}, got [{string.Join(", ", causes)}]");
++    }
++
++    [Fact]
++    public void AParameterIsDistinguishedFromAnyOtherName()
++    {
++        // The cause item 3-3 named as phase 4's job. It has to be told apart from a global,
++        // because an entry guard reaches one and not the other.
++        var (_, causes, _) = Compile("return (function (p) { var v = p; var s = 0; for (var i = 0; i < 3; i++) s += v; return s; })(1);");
++        Assert.Equal(1, Cause(causes, NumericDropCause.Parameter));
++        Assert.Equal(0, Cause(causes, NumericDropCause.OtherName));
++    }
++
++    [Fact]
++    public void AGlobalIsNotAParameter()
++    {
++        var (_, causes, _) = Compile("var v = globalThis; var s = 0; for (var i = 0; i < 3; i++) s += 1; return s;");
++        Assert.Equal(1, Cause(causes, NumericDropCause.OtherName));
++        Assert.Equal(0, Cause(causes, NumericDropCause.Parameter));
++    }
++
++    [Fact]
++    public void ACascadeIsNotCountedAsARootCause()
++    {
++        // `v` is dropped by the property read; `s` is then dropped only because `v` was. Fixing
++        // the root fixes the dependent for free, so counting both as "needs a guard" would
++        // double-count — which is the distinction the corpus figure rests on.
++        //
++        // The receiver arrives as a PARAMETER rather than an object literal on purpose: declaring
++        // it here would make `o` a third candidate, dropped by its own initializer, and the point
++        // of the test is the pair.
++        var (_, causes, dropped) = Compile("return (function (o) { var v = o.x; var s = 0; for (var i = 0; i < 3; i++) s = s + v; return s; })({ x: 1 });");
++
++        Assert.Equal(2, dropped);
++        Assert.Equal(1, Cause(causes, NumericDropCause.PropertyRead));
++        Assert.Equal(1, Cause(causes, NumericDropCause.DroppedCandidate));
++    }
++
++    [Fact]
++    public void TheFirstLeafWins()
++    {
++        // `a.x * 2 + 1` is charged to the property read, not to the operator and not to the
++        // literal: the cause is the first thing IsNumeric refuses, walked in evaluation order.
++        // The receiver is a parameter so that it contributes no drop of its own.
++        var (_, causes, dropped) = Compile("return (function (a) { var v = a.x * 2 + 1; var s = 0; for (var i = 0; i < 3; i++) s += 1; return s; })({ x: 1 });");
++
++        Assert.Equal(1, dropped);
++        Assert.Equal(1, Cause(causes, NumericDropCause.PropertyRead));
++        Assert.Equal(0, Cause(causes, NumericDropCause.UnhandledOperator));
++        Assert.Equal(0, Cause(causes, NumericDropCause.NonNumericLiteral));
++    }
++
++    [Fact]
++    public void AProvablyNumericLocalRecordsNoCauseAtAll()
++    {
++        // The other half of the correspondence with IsNumeric: nothing it accepts may be charged.
++        var (result, causes, dropped) = Compile("var v = 3.5; var s = 0; for (var i = 0; i < 3; i++) s = s + v * 2; return s;");
++
++        Assert.Equal("21", result);
++        Assert.Equal(0, dropped);
++        Assert.All(causes, c => Assert.Equal(0, c));
++    }
++
++    [Fact]
++    public void TheTierItselfCanBeTurnedOffForAControl()
++    {
++        // Every phase 3 item was measured as a delta against the tier as it stood; this switch is
++        // what makes the tier itself measurable. The answer must not change, only the count.
++        const string Body = "var s = 0; for (var i = 0; i < 10; i++) s += i; return s;";
++
++        var previous = NumericLocalSpecialization.Enabled;
++        try
++        {
++            NumericLocalSpecialization.Enabled = true;
++            var on = Compile(Body);
++            NumericLocalSpecialization.Enabled = false;
++            var off = Compile(Body);
++
++            Assert.Equal("45", on.Result);
++            Assert.Equal("45", off.Result);
++        }
++        finally
++        {
++            NumericLocalSpecialization.Enabled = previous;
++        }
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs b/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
+index e40f452c..1e6fe186 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
+@@ -2,17 +2,18 @@
+ 
+ namespace Broiler.JavaScript.Compiler;
+ 
+-public readonly record struct CompilerSpecializationSnapshot(
+-    long ScalarLocals,
+-    long NumericLocals,
+-    long MixedNumericComparisons,
++public readonly record struct CompilerSpecializationSnapshot(
++    long ScalarLocals,
++    long NumericLocals,
++    long MixedNumericComparisons,
+     long BoxedNumericComparisons,
+     long HoistedNames,
+     long[] NumericRejections,
+     long NumericCandidatesOffered,
+     long NumericCandidatesRejected,
+     long NumericCandidatesDropped,
+-    long NumericCandidatesSurviving);
++    long NumericCandidatesSurviving,
++    long[] NumericDropCauses);
+ 
+ /// <summary>
+ /// Why a hoisted name did not become a raw <c>double</c> local, in the order the gate asks
+@@ -52,37 +53,80 @@ public enum NumericLocalRejection
+     NotProvenNumeric,
+ }
+ 
++/// <summary>
++/// What defeated the numeric proof for one local the optimistic fixed point had to drop
++/// (docs/performance-roadmap.md item 3-8).
++/// </summary>
++/// <remarks>
++/// <para>
++/// Item 3-6 counted <em>how many</em> candidates the fixed point drops (1 916 of 2 521 offered on
++/// the Octane corpus) and read them all as one population — "dropped for want of a type, not for
++/// want of a rule" — which is the sentence item 3-8 was specified from. They are not one
++/// population, and the difference decides what a runtime guard would have to be: a value arriving
++/// from a property read wants a guard at the read, a parameter wants one at entry, and a name
++/// dropped because <em>another dropped candidate</em> appears in its right-hand side wants
++/// nothing at all — fixing its root fixes it for free.
++/// </para>
++/// <para>
++/// A drop is attributed to the FIRST leaf of the assigned expression that the analysis will not
++/// type, so `s = a.x * 2 + 1` is a property read rather than an operator. First drop wins: the
++/// fixed point can revisit a name, and the cause that mattered is the one that removed it.
++/// </para>
++/// </remarks>
++public enum NumericDropCause
++{
++    /// <summary>A name that was itself offered as a numeric candidate and has been dropped — a cascade.</summary>
++    DroppedCandidate,
++    /// <summary>A parameter of the enclosing function: the caller picks the type.</summary>
++    Parameter,
++    /// <summary>A named property read, `o.x`.</summary>
++    PropertyRead,
++    /// <summary>A computed element read, `a[i]`.</summary>
++    ElementRead,
++    /// <summary>The return value of a call or a `new`.</summary>
++    CallResult,
++    /// <summary>Any other name — a global, an outer-scope binding, a catch parameter, a function.</summary>
++    OtherName,
++    /// <summary>A literal that is not a number, or an object / array / function / template literal.</summary>
++    NonNumericLiteral,
++    /// <summary>An operator whose result the analysis does not type (`typeof`, `&amp;&amp;`, `instanceof`, …).</summary>
++    UnhandledOperator,
++    /// <summary>Anything else.</summary>
++    Other,
++}
++
+ /// <summary>Compilation counters used by Phase 3 tests and benchmark reports.</summary>
+ public static class CompilerSpecializationDiagnostics
+ {
+     private static long scalarLocals;
+     private static long numericLocals;
+-    private static long mixedNumericComparisons;
+-    private static long boxedNumericComparisons;
++    private static long mixedNumericComparisons;
++    private static long boxedNumericComparisons;
+     private static long hoistedNames;
+     private static readonly long[] numericRejections = new long[9];
+     private static long numericCandidatesOffered;
+     private static long numericCandidatesRejected;
+     private static long numericCandidatesDropped;
+     private static long numericCandidatesSurviving;
++    private static readonly long[] numericDropCauses = new long[9];
+ 
+     internal static void RecordScalarLocal() => Interlocked.Increment(ref scalarLocals);
+ 
+     /// <summary>A local held as a raw CLR <c>double</c> (docs/performance-roadmap.md P2-2 item 3).</summary>
+     internal static void RecordNumericLocal() => Interlocked.Increment(ref numericLocals);
+ 
+-    /// <summary>
+-    /// A <c>&lt;</c> or <c>&gt;</c> emitted with one operand an unboxed double and the other a
+-    /// <c>JSValue</c>, taking item 3-5's unbox-the-other-side form.
+-    /// </summary>
+-    internal static void RecordMixedNumericComparison() => Interlocked.Increment(ref mixedNumericComparisons);
+-
+-    /// <summary>
+-    /// A relational comparison that still boxes, because neither operand is an unboxed double —
+-    /// the denominator for the one above, and what says whether item 3-5's shape is common or rare.
+-    /// </summary>
+-    internal static void RecordBoxedNumericComparison() => Interlocked.Increment(ref boxedNumericComparisons);
+-
++    /// <summary>
++    /// A <c>&lt;</c> or <c>&gt;</c> emitted with one operand an unboxed double and the other a
++    /// <c>JSValue</c>, taking item 3-5's unbox-the-other-side form.
++    /// </summary>
++    internal static void RecordMixedNumericComparison() => Interlocked.Increment(ref mixedNumericComparisons);
++
++    /// <summary>
++    /// A relational comparison that still boxes, because neither operand is an unboxed double —
++    /// the denominator for the one above, and what says whether item 3-5's shape is common or rare.
++    /// </summary>
++    internal static void RecordBoxedNumericComparison() => Interlocked.Increment(ref boxedNumericComparisons);
++
+     /// <summary>How many names the analysis offered as numeric candidates before resolving.</summary>
+     internal static void RecordNumericCandidatesOffered(int count)
+         => Interlocked.Add(ref numericCandidatesOffered, count);
+@@ -105,6 +149,10 @@ public static class CompilerSpecializationDiagnostics
+     internal static void RecordNumericCandidatesSurviving(int count)
+         => Interlocked.Add(ref numericCandidatesSurviving, count);
+ 
++    /// <summary>Records what defeated the numeric proof for one dropped candidate (item 3-8).</summary>
++    internal static void RecordNumericDropCause(NumericDropCause cause)
++        => Interlocked.Increment(ref numericDropCauses[(int)cause]);
++
+     /// <summary>Records why one hoisted name did or did not reach the numeric tier.</summary>
+     internal static void RecordNumericLocalDecision(NumericLocalRejection reason)
+     {
+@@ -113,17 +161,26 @@ public static class CompilerSpecializationDiagnostics
+     }
+ 
+     public static CompilerSpecializationSnapshot Snapshot()
+-        => new(
+-            Interlocked.Read(ref scalarLocals),
+-            Interlocked.Read(ref numericLocals),
+-            Interlocked.Read(ref mixedNumericComparisons),
++        => new(
++            Interlocked.Read(ref scalarLocals),
++            Interlocked.Read(ref numericLocals),
++            Interlocked.Read(ref mixedNumericComparisons),
+             Interlocked.Read(ref boxedNumericComparisons),
+             Interlocked.Read(ref hoistedNames),
+             ReadRejections(),
+             Interlocked.Read(ref numericCandidatesOffered),
+             Interlocked.Read(ref numericCandidatesRejected),
+             Interlocked.Read(ref numericCandidatesDropped),
+-            Interlocked.Read(ref numericCandidatesSurviving));
++            Interlocked.Read(ref numericCandidatesSurviving),
++            ReadDropCauses());
++
++    private static long[] ReadDropCauses()
++    {
++        var copy = new long[numericDropCauses.Length];
++        for (var i = 0; i < copy.Length; i++)
++            copy[i] = Interlocked.Read(ref numericDropCauses[i]);
++        return copy;
++    }
+ 
+     private static long[] ReadRejections()
+     {
+@@ -137,8 +194,8 @@ public static class CompilerSpecializationDiagnostics
+     {
+         Interlocked.Exchange(ref scalarLocals, 0);
+         Interlocked.Exchange(ref numericLocals, 0);
+-        Interlocked.Exchange(ref mixedNumericComparisons, 0);
+-        Interlocked.Exchange(ref boxedNumericComparisons, 0);
++        Interlocked.Exchange(ref mixedNumericComparisons, 0);
++        Interlocked.Exchange(ref boxedNumericComparisons, 0);
+         Interlocked.Exchange(ref hoistedNames, 0);
+         Interlocked.Exchange(ref numericCandidatesOffered, 0);
+         Interlocked.Exchange(ref numericCandidatesRejected, 0);
+@@ -146,5 +203,7 @@ public static class CompilerSpecializationDiagnostics
+         Interlocked.Exchange(ref numericCandidatesSurviving, 0);
+         for (var i = 0; i < numericRejections.Length; i++)
+             Interlocked.Exchange(ref numericRejections[i], 0);
++        for (var i = 0; i < numericDropCauses.Length; i++)
++            Interlocked.Exchange(ref numericDropCauses[i], 0);
+     }
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
+index a2d73d26..d6ddf045 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
+@@ -1,4 +1,4 @@
+-using System.Collections.Generic;
++﻿using System.Collections.Generic;
+ using Broiler.JavaScript.Ast;
+ using Broiler.JavaScript.Ast.Expressions;
+ using Broiler.JavaScript.Ast.Misc;
+@@ -31,21 +31,21 @@ namespace Broiler.JavaScript.Compiler;
+ /// requires no reference to the name to appear textually before it. Together those mean the
+ /// initializer has always run before any read: a preceding top-level statement either
+ /// completes — and none of them mentions the name — or leaves the function, in which case
+-/// nothing after it runs.
+-/// </para>
+-/// <para>
+-/// A <c>var</c> declared inside a nested block gets the <em>same</em> argument, scoped to that
+-/// block instead of to the function body (docs/performance-roadmap.md item 3-3): the
+-/// declaration must be a direct statement of the block, and every reference to the name must
+-/// be inside that block and textually after it. Then any read is preceded by the initializer
+-/// for exactly the reason above — one level down. The containment half is what the function
+-/// body gets for free and a nested block does not: control can reach code *after* the block
+-/// without having entered it, so a reference outside the block could observe the binding
+-/// still <c>undefined</c>. This is a structural sufficient condition, not a full
+-/// definite-assignment dataflow; it admits the common case (a temporary declared and consumed
+-/// inside a loop body) and refuses everything it cannot see, including
+-/// <c>if (c) var x = 1;</c> with no block of its own, whose enclosing block does not dominate
+-/// it.
++/// nothing after it runs.
++/// </para>
++/// <para>
++/// A <c>var</c> declared inside a nested block gets the <em>same</em> argument, scoped to that
++/// block instead of to the function body (docs/performance-roadmap.md item 3-3): the
++/// declaration must be a direct statement of the block, and every reference to the name must
++/// be inside that block and textually after it. Then any read is preceded by the initializer
++/// for exactly the reason above — one level down. The containment half is what the function
++/// body gets for free and a nested block does not: control can reach code *after* the block
++/// without having entered it, so a reference outside the block could observe the binding
++/// still <c>undefined</c>. This is a structural sufficient condition, not a full
++/// definite-assignment dataflow; it admits the common case (a temporary declared and consumed
++/// inside a loop body) and refuses everything it cannot see, including
++/// <c>if (c) var x = 1;</c> with no block of its own, whose enclosing block does not dominate
++/// it.
+ /// </para>
+ /// </remarks>
+ internal sealed class NumericLocalAnalysis
+@@ -54,43 +54,43 @@ internal sealed class NumericLocalAnalysis
+     private readonly HashSet<string> rejected = new(System.StringComparer.Ordinal);
+     private readonly List<(string Name, AstExpression Value)> assignments = [];
+ 
+-    /// <summary>
+-    /// Names this function declares with <c>const</c> at body top level. A write to one is a
+-    /// TypeError raised by the binding's <c>JSVariable</c> cell, and a raw double has no cell
+-    /// to raise it, so any such name that is written anywhere is rejected rather than
+-    /// specialized into a store that would silently succeed.
+-    /// </summary>
+-    private readonly HashSet<string> constants = new(System.StringComparer.Ordinal);
+-
+-    /// <summary>
+-    /// For a <c>var</c> declared inside a nested block, the block whose entry proves its
+-    /// initializer has run. Every reference to such a name must be inside that block; one
+-    /// outside it could observe the binding still <c>undefined</c>, which a raw double hoisted
+-    /// to 0 cannot represent. Names declared at function-body top level are absent here — the
+-    /// function body dominates everything, so they carry no containment condition.
+-    /// </summary>
+-    private readonly Dictionary<string, AstBlock> confinedTo = new(System.StringComparer.Ordinal);
+-
+-    /// <summary>
+-    /// Names whose definite assignment rests on a declaration the function body dominates, and
+-    /// the initializer expressions of those declarations.
+-    /// </summary>
+-    /// <remarks>
+-    /// Such a name becomes readable at ITS declaration, not at any other declaration of the
+-    /// same name. Without that distinction a non-dominating declaration textually earlier —
+-    /// <c>if (c) { var t = 1; } s = t; { var t = 2; }</c> — marks the name as declared and
+-    /// masks the read between the two, which can observe <c>undefined</c>. The initializer
+-    /// node is the identity because a declarator is a compact struct with no reference of its
+-    /// own; every offered declarator has a non-null one.
+-    /// </remarks>
+-    private readonly HashSet<string> dominatingNames = new(System.StringComparer.Ordinal);
+-    private readonly HashSet<AstExpression> dominatingInits =
+-        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+-
+-    private bool HasDominatingDeclaration(string name) => dominatingNames.Contains(name);
+-
+-    private bool IsDominatingInit(AstExpression init) => init != null && dominatingInits.Contains(init);
+-
++    /// <summary>
++    /// Names this function declares with <c>const</c> at body top level. A write to one is a
++    /// TypeError raised by the binding's <c>JSVariable</c> cell, and a raw double has no cell
++    /// to raise it, so any such name that is written anywhere is rejected rather than
++    /// specialized into a store that would silently succeed.
++    /// </summary>
++    private readonly HashSet<string> constants = new(System.StringComparer.Ordinal);
++
++    /// <summary>
++    /// For a <c>var</c> declared inside a nested block, the block whose entry proves its
++    /// initializer has run. Every reference to such a name must be inside that block; one
++    /// outside it could observe the binding still <c>undefined</c>, which a raw double hoisted
++    /// to 0 cannot represent. Names declared at function-body top level are absent here — the
++    /// function body dominates everything, so they carry no containment condition.
++    /// </summary>
++    private readonly Dictionary<string, AstBlock> confinedTo = new(System.StringComparer.Ordinal);
++
++    /// <summary>
++    /// Names whose definite assignment rests on a declaration the function body dominates, and
++    /// the initializer expressions of those declarations.
++    /// </summary>
++    /// <remarks>
++    /// Such a name becomes readable at ITS declaration, not at any other declaration of the
++    /// same name. Without that distinction a non-dominating declaration textually earlier —
++    /// <c>if (c) { var t = 1; } s = t; { var t = 2; }</c> — marks the name as declared and
++    /// masks the read between the two, which can observe <c>undefined</c>. The initializer
++    /// node is the identity because a declarator is a compact struct with no reference of its
++    /// own; every offered declarator has a non-null one.
++    /// </remarks>
++    private readonly HashSet<string> dominatingNames = new(System.StringComparer.Ordinal);
++    private readonly HashSet<AstExpression> dominatingInits =
++        new(System.Collections.Generic.ReferenceEqualityComparer.Instance);
++
++    private bool HasDominatingDeclaration(string name) => dominatingNames.Contains(name);
++
++    private bool IsDominatingInit(AstExpression init) => init != null && dominatingInits.Contains(init);
++
+     /// <summary>
+     /// The names of the function's <c>var</c> locals that can be held as a CLR
+     /// <c>double</c>, or an empty set when none qualify.
+@@ -102,6 +102,19 @@ internal sealed class NumericLocalAnalysis
+         return analysis.Resolve();
+     }
+ 
++    /// <summary>
++    /// This function's parameter names, so a drop caused by reading one is attributed to the
++    /// parameter rather than lumped in with globals (docs/performance-roadmap.md item 3-8).
++    /// </summary>
++    private readonly HashSet<string> parameterNames = new(System.StringComparer.Ordinal);
++
++    /// <summary>
++    /// Every name that was ever offered as a numeric candidate. A drop caused by reading one of
++    /// these is a CASCADE — the name is dropped because its source was — and wants no guard of
++    /// its own, which is the distinction item 3-8's premise does not make.
++    /// </summary>
++    private readonly HashSet<string> everOffered = new(System.StringComparer.Ordinal);
++
+     private void Collect(AstFunctionExpression function)
+     {
+         // A parameter shares its name with no eligible var: the value arrives as a JSValue
+@@ -109,6 +122,7 @@ internal sealed class NumericLocalAnalysis
+         var parameters = function.Params.GetFastEnumerator();
+         while (parameters.MoveNext(out var parameter))
+         {
++            CollectParameterNames(parameter.Identifier);
+             RejectEveryNameIn(parameter.Identifier);
+             RejectEveryNameIn(parameter.Init);
+         }
+@@ -116,163 +130,163 @@ internal sealed class NumericLocalAnalysis
+         if (function.Body is not AstBlock body)
+             return;
+ 
+-        var collector = new Collector(this, body);
+-        OfferDominatedDeclarations(body, isFunctionBody: true);
+-        collector.Visit(body);
+-    }
+-
+-    /// <summary>
+-    /// Offers the declarations in <paramref name="block"/>'s own statement list that the
+-    /// function body dominates, and recurses through any plain nested block, which it also
+-    /// dominates.
+-    /// </summary>
+-    /// <remarks>
+-    /// An unlabelled <c>{ … }</c> that is a direct statement of a dominated block is entered
+-    /// whenever control reaches it, and the only ways out of it are <c>return</c> and
+-    /// <c>throw</c>, both of which leave the function — so nothing after it runs either. That
+-    /// makes it transparent to the dominance argument, and a <c>var</c> inside one needs no
+-    /// containment condition. A block reached through anything else — a label (which
+-    /// <c>break</c> can jump out of, skipping the declaration), an <c>if</c>, a loop, a
+-    /// <c>try</c>, a <c>switch</c> — is not transparent, and its declarations are handled by
+-    /// the confined path instead.
+-    /// </remarks>
+-    private void OfferDominatedDeclarations(AstBlock block, bool isFunctionBody)
+-    {
+-        var statements = block.Statements.GetFastEnumerator();
++        var collector = new Collector(this, body);
++        OfferDominatedDeclarations(body, isFunctionBody: true);
++        collector.Visit(body);
++    }
++
++    /// <summary>
++    /// Offers the declarations in <paramref name="block"/>'s own statement list that the
++    /// function body dominates, and recurses through any plain nested block, which it also
++    /// dominates.
++    /// </summary>
++    /// <remarks>
++    /// An unlabelled <c>{ … }</c> that is a direct statement of a dominated block is entered
++    /// whenever control reaches it, and the only ways out of it are <c>return</c> and
++    /// <c>throw</c>, both of which leave the function — so nothing after it runs either. That
++    /// makes it transparent to the dominance argument, and a <c>var</c> inside one needs no
++    /// containment condition. A block reached through anything else — a label (which
++    /// <c>break</c> can jump out of, skipping the declaration), an <c>if</c>, a loop, a
++    /// <c>try</c>, a <c>switch</c> — is not transparent, and its declarations are handled by
++    /// the confined path instead.
++    /// </remarks>
++    private void OfferDominatedDeclarations(AstBlock block, bool isFunctionBody)
++    {
++        var statements = block.Statements.GetFastEnumerator();
+         while (statements.MoveNext(out var statement))
+         {
+             switch (statement)
+             {
+-                // `let` and `const` are offered on the same terms as `var`, but only in the
+-                // function body itself: a lexical binding in a nested block is a fresh binding
+-                // per entry, which a single raw double cannot represent. The temporal dead
+-                // zone is discharged by the dominance argument rather than removed — a name
+-                // with any reference before its declaration is rejected, so the TDZ throw is
+-                // unreachable on exactly the names that qualify. Const-ness needs one addition,
+-                // in VisitBinaryExpression/VisitUnaryExpression below — a write to a const is a
+-                // TypeError raised by the binding's cell, so a const written anywhere is
+-                // rejected outright rather than specialized into a silent store.
+-                case AstVariableDeclaration
+-                {
+-                    Kind: FastVariableKind.Let or FastVariableKind.Const
+-                } lexical when isFunctionBody:
+-                    if (lexical.Kind == FastVariableKind.Const)
+-                        NoteConstDeclaration(lexical);
+-                    OfferDeclaration(lexical);
+-                    break;
+-
+-                case AstVariableDeclaration { Kind: FastVariableKind.Var } declaration:
++                // `let` and `const` are offered on the same terms as `var`, but only in the
++                // function body itself: a lexical binding in a nested block is a fresh binding
++                // per entry, which a single raw double cannot represent. The temporal dead
++                // zone is discharged by the dominance argument rather than removed — a name
++                // with any reference before its declaration is rejected, so the TDZ throw is
++                // unreachable on exactly the names that qualify. Const-ness needs one addition,
++                // in VisitBinaryExpression/VisitUnaryExpression below — a write to a const is a
++                // TypeError raised by the binding's cell, so a const written anywhere is
++                // rejected outright rather than specialized into a silent store.
++                case AstVariableDeclaration
++                {
++                    Kind: FastVariableKind.Let or FastVariableKind.Const
++                } lexical when isFunctionBody:
++                    if (lexical.Kind == FastVariableKind.Const)
++                        NoteConstDeclaration(lexical);
++                    OfferDeclaration(lexical);
++                    break;
++
++                case AstVariableDeclaration { Kind: FastVariableKind.Var } declaration:
+                     OfferDeclaration(declaration);
+                     break;
+ 
+-                // A `for` head declares into the loop's own scope for let/const (a fresh
+-                // binding per iteration), so only `var` is offered from there.
++                // A `for` head declares into the loop's own scope for let/const (a fresh
++                // binding per iteration), so only `var` is offered from there.
+                 case AstForStatement { Init: AstVariableDeclaration { Kind: FastVariableKind.Var } forInit }:
+                     OfferDeclaration(forInit);
+                     break;
+-
+-                // Transparent: see the remarks above.
+-                case AstBlock nested:
+-                    OfferDominatedDeclarations(nested, isFunctionBody: false);
+-                    break;
++
++                // Transparent: see the remarks above.
++                case AstBlock nested:
++                    OfferDominatedDeclarations(nested, isFunctionBody: false);
++                    break;
++            }
++        }
++    }
++
++    /// <summary>
++    /// Offers the <c>var</c> declarations that are DIRECT statements of <paramref name="block"/>,
++    /// each confined to it. Called on entry to every block but the function body's own, so the
++    /// offer is in place before the walk reaches any reference.
++    /// </summary>
++    /// <remarks>
++    /// Only a direct statement qualifies. A declaration one level further down — in an
++    /// <c>if</c> with no braces of its own, a <c>case</c>, a nested loop header — is not
++    /// dominated by the block's entry, so it is passed over here and stays ineligible.
++    /// </remarks>
++    private void OfferBlockConfinedDeclarations(AstBlock block)
++    {
++        var statements = block.Statements.GetFastEnumerator();
++        while (statements.MoveNext(out var statement))
++        {
++            switch (statement)
++            {
++                // `let`/`const` are absent on purpose: a lexical binding declared in a nested
++                // block is a fresh binding per entry, which a single raw double cannot
++                // represent. Only the function body's own lexical declarations are offered
++                // (in Collect), where there is exactly one entry per call.
++                case AstVariableDeclaration { Kind: FastVariableKind.Var } declaration:
++                    OfferConfinedDeclaration(declaration, block);
++                    break;
++
++                // The init of a `for` that is itself a direct statement of the block: it runs
++                // whenever the loop is reached, so the block's entry dominates it too.
++                case AstForStatement { Init: AstVariableDeclaration { Kind: FastVariableKind.Var } forInit }:
++                    OfferConfinedDeclaration(forInit, block);
++                    break;
+             }
+         }
+-    }
+-
+-    /// <summary>
+-    /// Offers the <c>var</c> declarations that are DIRECT statements of <paramref name="block"/>,
+-    /// each confined to it. Called on entry to every block but the function body's own, so the
+-    /// offer is in place before the walk reaches any reference.
+-    /// </summary>
+-    /// <remarks>
+-    /// Only a direct statement qualifies. A declaration one level further down — in an
+-    /// <c>if</c> with no braces of its own, a <c>case</c>, a nested loop header — is not
+-    /// dominated by the block's entry, so it is passed over here and stays ineligible.
+-    /// </remarks>
+-    private void OfferBlockConfinedDeclarations(AstBlock block)
+-    {
+-        var statements = block.Statements.GetFastEnumerator();
+-        while (statements.MoveNext(out var statement))
+-        {
+-            switch (statement)
+-            {
+-                // `let`/`const` are absent on purpose: a lexical binding declared in a nested
+-                // block is a fresh binding per entry, which a single raw double cannot
+-                // represent. Only the function body's own lexical declarations are offered
+-                // (in Collect), where there is exactly one entry per call.
+-                case AstVariableDeclaration { Kind: FastVariableKind.Var } declaration:
+-                    OfferConfinedDeclaration(declaration, block);
+-                    break;
+-
+-                // The init of a `for` that is itself a direct statement of the block: it runs
+-                // whenever the loop is reached, so the block's entry dominates it too.
+-                case AstForStatement { Init: AstVariableDeclaration { Kind: FastVariableKind.Var } forInit }:
+-                    OfferConfinedDeclaration(forInit, block);
+-                    break;
+-            }
+-        }
+-    }
+-
+-    private void OfferConfinedDeclaration(AstVariableDeclaration declaration, AstBlock block)
+-    {
+-        var declarators = declaration.Declarators.GetFastEnumerator();
+-        while (declarators.MoveNext(out var declarator))
+-        {
+-            if (declarator.Identifier is not AstIdentifier identifier)
+-            {
+-                RejectEveryNameIn(declarator.Identifier);
+-                continue;
+-            }
+-
+-            var name = identifier.Name.Value;
+-            if (declarator.Init == null)
+-            {
+-                // `var x;` leaves x as undefined, which a double cannot represent.
+-                rejected.Add(name);
+-                continue;
+-            }
+-
+-            // Already confined to some other block: two nested declarations, and neither
+-            // block dominates the other. Give up rather than reason about which one wins.
+-            if (confinedTo.ContainsKey(name))
+-            {
+-                rejected.Add(name);
+-                continue;
+-            }
+-
+-            // Already offered at function-body top level, which dominates this block. Leave it
+-            // unconfined — Collector.VisitVariableDeclarator still records this declaration's
+-            // value, so a non-numeric one here still drops the name.
+-            if (candidates.Contains(name))
+-                continue;
+-
+-            candidates.Add(name);
+-            confinedTo[name] = block;
+-            assignments.Add((name, declarator.Init));
+-        }
+     }
+ 
+-    private void NoteConstDeclaration(AstVariableDeclaration declaration)
+-    {
+-        var declarators = declaration.Declarators.GetFastEnumerator();
+-        while (declarators.MoveNext(out var declarator))
+-        {
+-            if (declarator.Identifier is AstIdentifier identifier)
+-                constants.Add(identifier.Name.Value);
+-        }
+-    }
+-
+-    /// <summary>
+-    /// Records a write to <paramref name="name"/>. A const declared at body top level cannot
+-    /// be assigned, so a write to one means the program is relying on the cell's TypeError and
+-    /// the name must keep its cell.
+-    /// </summary>
+-    private void NoteWrite(string name)
+-    {
+-        if (constants.Contains(name))
+-            rejected.Add(name);
+-    }
+-
++    private void OfferConfinedDeclaration(AstVariableDeclaration declaration, AstBlock block)
++    {
++        var declarators = declaration.Declarators.GetFastEnumerator();
++        while (declarators.MoveNext(out var declarator))
++        {
++            if (declarator.Identifier is not AstIdentifier identifier)
++            {
++                RejectEveryNameIn(declarator.Identifier);
++                continue;
++            }
++
++            var name = identifier.Name.Value;
++            if (declarator.Init == null)
++            {
++                // `var x;` leaves x as undefined, which a double cannot represent.
++                rejected.Add(name);
++                continue;
++            }
++
++            // Already confined to some other block: two nested declarations, and neither
++            // block dominates the other. Give up rather than reason about which one wins.
++            if (confinedTo.ContainsKey(name))
++            {
++                rejected.Add(name);
++                continue;
++            }
++
++            // Already offered at function-body top level, which dominates this block. Leave it
++            // unconfined — Collector.VisitVariableDeclarator still records this declaration's
++            // value, so a non-numeric one here still drops the name.
++            if (candidates.Contains(name))
++                continue;
++
++            candidates.Add(name);
++            confinedTo[name] = block;
++            assignments.Add((name, declarator.Init));
++        }
++    }
++
++    private void NoteConstDeclaration(AstVariableDeclaration declaration)
++    {
++        var declarators = declaration.Declarators.GetFastEnumerator();
++        while (declarators.MoveNext(out var declarator))
++        {
++            if (declarator.Identifier is AstIdentifier identifier)
++                constants.Add(identifier.Name.Value);
++        }
++    }
++
++    /// <summary>
++    /// Records a write to <paramref name="name"/>. A const declared at body top level cannot
++    /// be assigned, so a write to one means the program is relying on the cell's TypeError and
++    /// the name must keep its cell.
++    /// </summary>
++    private void NoteWrite(string name)
++    {
++        if (constants.Contains(name))
++            rejected.Add(name);
++    }
++
+     private void OfferDeclaration(AstVariableDeclaration declaration)
+     {
+         var declarators = declaration.Declarators.GetFastEnumerator();
+@@ -294,19 +308,19 @@ internal sealed class NumericLocalAnalysis
+                 continue;
+             }
+ 
+-            // Declared twice at DOMINATING positions — `var s = 0; { var s = 5; }`, or two
+-            // body-level declarations. That is not the hazard the old wording feared ("the
+-            // second may sit somewhere the first does not dominate"): every declaration offered
+-            // here dominates everything after itself, and `declared` opens at whichever comes
+-            // first in source order, so a read before all of them is still rejected and a read
+-            // after `declared` opens is after some initializer has run. The collector records
+-            // each declaration's value, so a non-numeric one still drops the name. Rejecting
+-            // here instead would undo the re-declaration case
+-            // `NumericLocalWriteVisibilityTests.ANumericReDeclarationKeepsTheLocalSpecialized`
+-            // pins — which is what caught it.
+-            candidates.Add(name);
+-            dominatingNames.Add(name);
+-            dominatingInits.Add(declarator.Init);
++            // Declared twice at DOMINATING positions — `var s = 0; { var s = 5; }`, or two
++            // body-level declarations. That is not the hazard the old wording feared ("the
++            // second may sit somewhere the first does not dominate"): every declaration offered
++            // here dominates everything after itself, and `declared` opens at whichever comes
++            // first in source order, so a read before all of them is still rejected and a read
++            // after `declared` opens is after some initializer has run. The collector records
++            // each declaration's value, so a non-numeric one still drops the name. Rejecting
++            // here instead would undo the re-declaration case
++            // `NumericLocalWriteVisibilityTests.ANumericReDeclarationKeepsTheLocalSpecialized`
++            // pins — which is what caught it.
++            candidates.Add(name);
++            dominatingNames.Add(name);
++            dominatingInits.Add(declarator.Init);
+             assignments.Add((name, declarator.Init));
+         }
+     }
+@@ -322,6 +336,123 @@ internal sealed class NumericLocalAnalysis
+             rejected.Add(name);
+     }
+ 
++    private void CollectParameterNames(AstExpression identifier)
++    {
++        if (identifier == null)
++            return;
++
++        var names = new NameCollector();
++        names.Visit(identifier);
++        foreach (var name in names.Names)
++            parameterNames.Add(name);
++    }
++
++    /// <summary>
++    /// What defeated <paramref name="expression"/>'s numeric proof, attributed to the first leaf
++    /// the analysis will not type (docs/performance-roadmap.md item 3-8).
++    /// </summary>
++    /// <remarks>
++    /// Mirrors <see cref="IsNumeric"/> branch for branch — it descends exactly where that method
++    /// recurses and stops exactly where it returns false — so the two cannot disagree about which
++    /// sub-expression is responsible. For a binary or a conditional the LEFT/consequent side is
++    /// checked first, matching evaluation order, so `a.x + f()` is charged to the property read.
++    /// </remarks>
++    private NumericDropCause Classify(AstExpression expression)
++    {
++        switch (expression)
++        {
++            case null:
++                return NumericDropCause.Other;
++
++            case AstLiteral { TokenType: TokenTypes.Number }:
++                return NumericDropCause.Other;
++
++            case AstLiteral:
++                return NumericDropCause.NonNumericLiteral;
++
++            case AstIdentifier identifier:
++                var name = identifier.Name.Value;
++                return everOffered.Contains(name) ? NumericDropCause.DroppedCandidate
++                    : parameterNames.Contains(name) ? NumericDropCause.Parameter
++                    : NumericDropCause.OtherName;
++
++            case AstMemberExpression member:
++                return member.Computed ? NumericDropCause.ElementRead : NumericDropCause.PropertyRead;
++
++            case AstCallExpression:
++            case AstNewExpression:
++                return NumericDropCause.CallResult;
++
++            case AstObjectLiteral:
++            case AstArrayExpression:
++            case AstFunctionExpression:
++            case AstTemplateExpression:
++                return NumericDropCause.NonNumericLiteral;
++
++            case AstSequenceExpression sequence:
++                return Classify(Last(sequence));
++
++            case AstUnaryExpression unary
++                when unary.Operator is UnaryOperator.Negate or UnaryOperator.BitwiseNot
++                    or UnaryOperator.Increment or UnaryOperator.Decrement:
++                return Classify(unary.Argument);
++
++            case AstUnaryExpression:
++                return NumericDropCause.UnhandledOperator;
++
++            case AstBinaryExpression binary:
++                return ClassifyBinary(binary);
++
++            case AstConditionalExpression conditional:
++                return !IsNumeric(conditional.True)
++                    ? Classify(conditional.True)
++                    : Classify(conditional.False);
++
++            default:
++                return NumericDropCause.Other;
++        }
++    }
++
++    private NumericDropCause ClassifyBinary(AstBinaryExpression binary)
++    {
++        switch (binary.Operator)
++        {
++            // The operators IsNumericBinary types from both operands.
++            case TokenTypes.Plus:
++            case TokenTypes.Minus:
++            case TokenTypes.Multiply:
++            case TokenTypes.Divide:
++            case TokenTypes.Mod:
++            case TokenTypes.Power:
++            case TokenTypes.BitwiseAnd:
++            case TokenTypes.BitwiseOr:
++            case TokenTypes.Xor:
++            case TokenTypes.LeftShift:
++            case TokenTypes.RightShift:
++            case TokenTypes.UnsignedRightShift:
++            case TokenTypes.AssignAdd:
++            case TokenTypes.AssignSubtract:
++            case TokenTypes.AssignMultiply:
++            case TokenTypes.AssignDivide:
++            case TokenTypes.AssignMod:
++            case TokenTypes.AssignPower:
++            case TokenTypes.AssignBitwideAnd:
++            case TokenTypes.AssignBitwideOr:
++            case TokenTypes.AssignXor:
++            case TokenTypes.AssignLeftShift:
++            case TokenTypes.AssignRightShift:
++            case TokenTypes.AssignUnsignedRightShift:
++                return !IsNumeric(binary.Left) ? Classify(binary.Left) : Classify(binary.Right);
++
++            // A plain assignment's value is its right-hand side alone.
++            case TokenTypes.Assign:
++                return Classify(binary.Right);
++
++            default:
++                return NumericDropCause.UnhandledOperator;
++        }
++    }
++
+     private IReadOnlySet<string> Resolve()
+     {
+         // Item 3-6 splits "not proven numeric" in two, because the halves call for opposite
+@@ -348,6 +479,10 @@ internal sealed class NumericLocalAnalysis
+         }
+ 
+         var beforeFixedPoint = candidates.Count;
++        // Item 3-8 needs to tell a name dropped because a PROPERTY READ reached it from one
++        // dropped because another dropped candidate did. Snapshot the survivors of the rejection
++        // pass, so an identifier met during classification can be told apart from a global.
++        everOffered.UnionWith(candidates);
+ 
+         // Optimistic fixed point: drop any candidate whose assigned value is not numeric
+         // under the current assumption, and repeat, because dropping one can invalidate
+@@ -364,6 +499,9 @@ internal sealed class NumericLocalAnalysis
+                 if (!IsNumeric(value))
+                 {
+                     candidates.Remove(name);
++                    // Classified at the moment of the drop, because this is the assignment that
++                    // removed the name — a later sweep would find a different one.
++                    CompilerSpecializationDiagnostics.RecordNumericDropCause(Classify(value));
+                     changed = true;
+                 }
+             }
+@@ -532,91 +670,100 @@ internal sealed class NumericLocalAnalysis
+         // initializer runs, so a read that can precede it disqualifies the name.
+         private readonly HashSet<string> declared = new(System.StringComparer.Ordinal);
+ 
+-        // The function's own body block, which is offered in Collect and needs no containment
+-        // condition — everything in the function is inside it.
+-        private readonly AstBlock functionBody;
+-
+-        // The blocks currently open, outermost first. A confined name is only legal while its
+-        // owning block is on this stack.
+-        private readonly List<AstBlock> openBlocks = [];
+-
+-        // How many nested functions the walk is currently inside. Writes are still recorded at
+-        // any depth — the walk conflates names, so a nested `s = 'x'` correctly drops an outer
+-        // numeric `s` — but a DECLARATION at depth > 0 must not open `declared` for the outer
+-        // name (docs/performance-roadmap.md item 3-7).
+-        private int functionDepth;
+-
+-        public Collector(NumericLocalAnalysis owner, AstBlock functionBody)
+-        {
+-            this.owner = owner;
+-            this.functionBody = functionBody;
+-        }
+-
+-        /// <summary>
+-        /// Descends into a nested function — the walk deliberately conflates names, so a write
+-        /// there drops the outer candidate — while recording that declarations inside it belong
+-        /// to a different binding, and rejecting the name a function DECLARATION binds.
+-        /// </summary>
+-        /// <remarks>
+-        /// A function declaration stores a function object into the very binding the analysis is
+-        /// typing: at body top level `var f = 1; function f() {}` leaves `f` holding the
+-        /// function, and `let f = 5; { function f() {} }` reaches the same binding through Annex
+-        /// B's copy-out. Neither is a write this walk can see — a declaration is not an
+-        /// assignment expression — and while every such name was refused for being *mentioned*
+-        /// by the declaration (its own identifier), the gap was covered by accident. Item 3-7
+-        /// lifts that refusal, so the store is rejected explicitly. A named function EXPRESSION
+-        /// is left alone: its name binds inside its own body, not out here.
+-        /// </remarks>
+-        protected override AstNode VisitFunctionExpression(AstFunctionExpression functionExpression)
+-        {
+-            if (functionExpression is { IsStatement: true, Id: AstIdentifier declaredName })
+-                owner.rejected.Add(declaredName.Name.Value);
+-
+-            functionDepth++;
+-            var result = base.VisitFunctionExpression(functionExpression);
+-            functionDepth--;
+-            return result;
+-        }
+-
+-        protected override AstNode VisitBlock(AstBlock block)
+-        {
+-            openBlocks.Add(block);
+-            // Offer this block's own direct `var` statements BEFORE descending, so the offer is
+-            // in place by the time the walk reaches a reference to one of them.
+-            if (!ReferenceEquals(block, functionBody))
+-                owner.OfferBlockConfinedDeclarations(block);
+-
+-            var result = base.VisitBlock(block);
+-            openBlocks.RemoveAt(openBlocks.Count - 1);
+-            return result;
+-        }
+-
+-        /// <summary>
+-        /// Rejects <paramref name="name"/> if it is confined to a block this reference is not
+-        /// inside. Applied to reads and writes alike: a plain write from outside would be
+-        /// harmless on its own, but distinguishing it costs more than it saves and being wrong
+-        /// about it is a miscompilation.
+-        /// </summary>
+-        private void NoteReference(string name)
+-        {
+-            if (!owner.confinedTo.TryGetValue(name, out var owningBlock))
+-                return;
+-
+-            for (var i = openBlocks.Count - 1; i >= 0; i--)
+-            {
+-                if (ReferenceEquals(openBlocks[i], owningBlock))
+-                    return;
+-            }
+-
+-            owner.rejected.Add(name);
+-        }
++        // The function's own body block, which is offered in Collect and needs no containment
++        // condition — everything in the function is inside it.
++        private readonly AstBlock functionBody;
++
++        // The blocks currently open, outermost first. A confined name is only legal while its
++        // owning block is on this stack.
++        private readonly List<AstBlock> openBlocks = [];
++
++        // How many nested functions the walk is currently inside. Writes are still recorded at
++        // any depth — the walk conflates names, so a nested `s = 'x'` correctly drops an outer
++        // numeric `s` — but a DECLARATION at depth > 0 must not open `declared` for the outer
++        // name (docs/performance-roadmap.md item 3-7).
++        private int functionDepth;
++
++        public Collector(NumericLocalAnalysis owner, AstBlock functionBody)
++        {
++            this.owner = owner;
++            this.functionBody = functionBody;
++        }
++
++        /// <summary>
++        /// Descends into a nested function — the walk deliberately conflates names, so a write
++        /// there drops the outer candidate — while recording that declarations inside it belong
++        /// to a different binding, and rejecting the name a function DECLARATION binds.
++        /// </summary>
++        /// <remarks>
++        /// A function declaration stores a function object into the very binding the analysis is
++        /// typing: at body top level `var f = 1; function f() {}` leaves `f` holding the
++        /// function, and `let f = 5; { function f() {} }` reaches the same binding through Annex
++        /// B's copy-out. Neither is a write this walk can see — a declaration is not an
++        /// assignment expression — and while every such name was refused for being *mentioned*
++        /// by the declaration (its own identifier), the gap was covered by accident. Item 3-7
++        /// lifts that refusal, so the store is rejected explicitly. A named function EXPRESSION
++        /// is left alone: its name binds inside its own body, not out here.
++        /// </remarks>
++        protected override AstNode VisitFunctionExpression(AstFunctionExpression functionExpression)
++        {
++            if (functionExpression is { IsStatement: true, Id: AstIdentifier declaredName })
++                owner.rejected.Add(declaredName.Name.Value);
++
++            functionDepth++;
++            var result = base.VisitFunctionExpression(functionExpression);
++            functionDepth--;
++            return result;
++        }
++
++        protected override AstNode VisitBlock(AstBlock block)
++        {
++            openBlocks.Add(block);
++            // Offer this block's own direct `var` statements BEFORE descending, so the offer is
++            // in place by the time the walk reaches a reference to one of them.
++            //
++            // Only while inside THIS function. The walk descends into nested functions on purpose
++            // — that is what lets a closure's `s = 'x'` drop an outer numeric `s` — but a block
++            // inside a nested function belongs to a different function's variable environment, and
++            // offering its `var`s here made every such name a candidate of the enclosing function
++            // as well as of its own. Harmless to the answer, since the enclosing function's
++            // hoisting scope never contains the name and so never reaches the hoist site with it,
++            // and pure inflation in the counts: a name three functions deep was offered, dropped
++            // and counted three times over (docs/performance-roadmap.md item 3-8).
++            if (functionDepth == 0 && !ReferenceEquals(block, functionBody))
++                owner.OfferBlockConfinedDeclarations(block);
++
++            var result = base.VisitBlock(block);
++            openBlocks.RemoveAt(openBlocks.Count - 1);
++            return result;
++        }
++
++        /// <summary>
++        /// Rejects <paramref name="name"/> if it is confined to a block this reference is not
++        /// inside. Applied to reads and writes alike: a plain write from outside would be
++        /// harmless on its own, but distinguishing it costs more than it saves and being wrong
++        /// about it is a miscompilation.
++        /// </summary>
++        private void NoteReference(string name)
++        {
++            if (!owner.confinedTo.TryGetValue(name, out var owningBlock))
++                return;
++
++            for (var i = openBlocks.Count - 1; i >= 0; i--)
++            {
++                if (ReferenceEquals(openBlocks[i], owningBlock))
++                    return;
++            }
++
++            owner.rejected.Add(name);
++        }
+ 
+         protected override AstNode VisitIdentifier(AstIdentifier identifier)
+         {
+             var name = identifier.Name.Value;
+             if (!declared.Contains(name))
+                 owner.rejected.Add(name);
+-            NoteReference(name);
++            NoteReference(name);
+             return identifier;
+         }
+ 
+@@ -645,28 +792,28 @@ internal sealed class NumericLocalAnalysis
+                 if (declarator.Init != null)
+                     owner.assignments.Add((identifier.Name.Value, declarator.Init));
+ 
+-                // A second declaration of a confined name from outside its block — one the
+-                // offer path never saw, because it is not a direct statement of any block
+-                // (`if (c) var t = 2;`). It re-binds the name where the confining block does
+-                // not dominate, so the name loses its raw double.
+-                NoteReference(identifier.Name.Value);
+-
+-                // A name that rests on a dominating declaration becomes readable at THAT
+-                // declaration only. Marking it declared at some other one would mask a read
+-                // sitting between the two, which can still observe `undefined`.
+-                //
+-                // A declaration inside a NESTED function never initializes the outer binding, so
+-                // it may not open `declared` either — a nested function's own parameter or var
+-                // sharing the name would otherwise mask a read of the outer one that really does
+-                // see `undefined`. That was unreachable while every name a nested function
+-                // mentions kept its cell; item 3-7 removes exactly that refusal, so the rule has
+-                // to be stated rather than inherited.
+-                if (functionDepth == 0
+-                    && (!owner.HasDominatingDeclaration(identifier.Name.Value)
+-                        || owner.IsDominatingInit(declarator.Init)))
+-                {
+-                    declared.Add(identifier.Name.Value);
+-                }
++                // A second declaration of a confined name from outside its block — one the
++                // offer path never saw, because it is not a direct statement of any block
++                // (`if (c) var t = 2;`). It re-binds the name where the confining block does
++                // not dominate, so the name loses its raw double.
++                NoteReference(identifier.Name.Value);
++
++                // A name that rests on a dominating declaration becomes readable at THAT
++                // declaration only. Marking it declared at some other one would mask a read
++                // sitting between the two, which can still observe `undefined`.
++                //
++                // A declaration inside a NESTED function never initializes the outer binding, so
++                // it may not open `declared` either — a nested function's own parameter or var
++                // sharing the name would otherwise mask a read of the outer one that really does
++                // see `undefined`. That was unreachable while every name a nested function
++                // mentions kept its cell; item 3-7 removes exactly that refusal, so the rule has
++                // to be stated rather than inherited.
++                if (functionDepth == 0
++                    && (!owner.HasDominatingDeclaration(identifier.Name.Value)
++                        || owner.IsDominatingInit(declarator.Init)))
++                {
++                    declared.Add(identifier.Name.Value);
++                }
+             }
+             else
+             {
+@@ -688,10 +835,10 @@ internal sealed class NumericLocalAnalysis
+                     // old value except in a compound form, which reads it through the operator
+                     // and is covered by IsNumericBinary.
+                     owner.assignments.Add((target.Name.Value, binary));
+-                    owner.NoteWrite(target.Name.Value);
+-                    // The target identifier is deliberately not visited, so the containment
+-                    // check has to be made here rather than in VisitIdentifier.
+-                    NoteReference(target.Name.Value);
++                    owner.NoteWrite(target.Name.Value);
++                    // The target identifier is deliberately not visited, so the containment
++                    // check has to be made here rather than in VisitIdentifier.
++                    NoteReference(target.Name.Value);
+                     if (binary.Operator != TokenTypes.Assign && !declared.Contains(target.Name.Value))
+                         owner.rejected.Add(target.Name.Value);
+                     Visit(binary.Right);
+@@ -726,8 +873,8 @@ internal sealed class NumericLocalAnalysis
+             {
+                 // `x++` stores ToNumeric(x), which is numeric exactly when x already is.
+                 owner.assignments.Add((target.Name.Value, unary));
+-                owner.NoteWrite(target.Name.Value);
+-                NoteReference(target.Name.Value);
++                owner.NoteWrite(target.Name.Value);
++                NoteReference(target.Name.Value);
+                 if (!declared.Contains(target.Name.Value))
+                     owner.rejected.Add(target.Name.Value);
+                 return unary;
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/NumericLocalSpecialization.cs b/Broiler.JS/Broiler.JavaScript.Compiler/NumericLocalSpecialization.cs
+new file mode 100644
+index 00000000..a3950579
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/NumericLocalSpecialization.cs
+@@ -0,0 +1,45 @@
++using System;
++using System.Threading;
++
++namespace Broiler.JavaScript.Compiler;
++
++/// <summary>
++/// Process-wide switch for the numeric-local tier as a whole — every raw CLR <c>double</c> local,
++/// not one item's increment to them (docs/performance-roadmap.md item 3-8).
++/// </summary>
++/// <remarks>
++/// <para>
++/// Items 3-0, 3-3, 3-5 and 3-7 were each measured as a <em>delta</em> against the tier as it stood,
++/// and each came out invisible on the Octane corpus: 0.997×, 1.0001×, and so on. Four such
++/// readings look like evidence that the mechanism does not matter, and they are not — they are
++/// evidence that *eight more names* do not matter. Nobody had ever measured the tier itself,
++/// because there was no way to turn it off.
++/// </para>
++/// <para>
++/// This is that control. With it off, every name the analysis proved numeric keeps a
++/// <c>JSValue</c>, so the difference between the arms is the whole of what the raw-double
++/// representation is worth on a real workload — which is the number item 3-8 has to be sized
++/// against, since 3-8 proposes to widen the same tier by an order of magnitude.
++/// </para>
++/// </remarks>
++public static class NumericLocalSpecialization
++{
++    public const string EnvironmentVariable = "BROILER_JS_NUMERIC_LOCALS";
++
++    private static int enabled = ReadConfigured();
++
++    /// <summary>Whether a local the analysis proved numeric is held in a raw <c>double</c>.</summary>
++    public static bool Enabled
++    {
++        get => Volatile.Read(ref enabled) != 0;
++        set => Volatile.Write(ref enabled, value ? 1 : 0);
++    }
++
++    private static int ReadConfigured()
++        => string.Equals(
++            Environment.GetEnvironmentVariable(EnvironmentVariable),
++            "0",
++            StringComparison.Ordinal)
++            ? 0
++            : 1;
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitBlock.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitBlock.cs
+index 16aba08f..e7d194b1 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitBlock.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitBlock.cs
+@@ -116,56 +116,57 @@ partial class FastCompiler
+                 }
+ 
+                 var hoistToDirectEvalRoot = isEvalRootHoist;
+-                // The preconditions both raw-local tiers share: the function's locals must be
+-                // scalar-replaceable at all, and `arguments` / `eval` keep their cell.
+-                var canUseRawLocal = !hoistToDirectEvalRoot
++                // The preconditions both raw-local tiers share: the function's locals must be
++                // scalar-replaceable at all, and `arguments` / `eval` keep their cell.
++                var canUseRawLocal = !hoistToDirectEvalRoot
+                     && scope.CanScalarReplaceLocals
+                     && scope.Function != null
+                     && !v.Equals("arguments")
+                     && !v.Equals("eval");
+                 var isCaptured = scope.CapturedByNestedFunctions.Contains(v.Value);
+-                // The JSValue tier stays closed to lexical names: a `let`'s temporal dead zone
+-                // and a `const`'s read-only-ness are properties of its JSVariable cell, and
+-                // nothing here proves either is unobservable. The numeric tier below is
+-                // different — its gate proves both.
+-                //
+-                // It also stays closed to a captured name. The sharing itself would survive —
+-                // a captured CLR local becomes a `Box<T>` that every closure over it reads
+-                // through — but a JSValue tier local carries no cell, and a cell is what a
+-                // direct `delete` of an eval-introduced binding, an EvalShadowVariable and a
+-                // JSVariable's own TDZ state are. Item 3-7 widens the NUMERIC tier only,
+-                // where the analysis has already proved each of those unreachable.
+-                var useScalarLocal = canUseRawLocal && !isCaptured && !isLexical;
++                // The JSValue tier stays closed to lexical names: a `let`'s temporal dead zone
++                // and a `const`'s read-only-ness are properties of its JSVariable cell, and
++                // nothing here proves either is unobservable. The numeric tier below is
++                // different — its gate proves both.
++                //
++                // It also stays closed to a captured name. The sharing itself would survive —
++                // a captured CLR local becomes a `Box<T>` that every closure over it reads
++                // through — but a JSValue tier local carries no cell, and a cell is what a
++                // direct `delete` of an eval-introduced binding, an EvalShadowVariable and a
++                // JSVariable's own TDZ state are. Item 3-7 widens the NUMERIC tier only,
++                // where the analysis has already proved each of those unreachable.
++                var useScalarLocal = canUseRawLocal && !isCaptured && !isLexical;
+                 // A name the analysis proved numeric lives in a raw double. Its hoisted value
+                 // is 0 rather than undefined, which is only sound because the analysis
+-                // rejected any name that can be READ before its initializer runs — which is
+-                // also what discharges a lexical name's temporal dead zone, so `let`/`const`
+-                // reach this tier even though they do not reach the JSValue one above (their
+-                // TDZ and const-ness are properties of the cell, and the numeric tier's gate
+-                // proves the TDZ unreachable and rejects any const that is written).
+-                //
+-                // A lexical name qualifies only in the function's OWN body block: `let` in a
+-                // nested block is a distinct binding per entry, while NumericLocals — which
+-                // every nested block scope inherits from the function — names only
+-                // body-top-level declarations. Without this test a nested `{ let v = … }`
+-                // would take the function's slot (docs/performance-roadmap.md item 3-3).
+-                var isFunctionBodyBlock = ReferenceEquals(block, scope.Function?.Body);
+-                // Item 3-7: a captured name may take the numeric tier, because a captured raw
+-                // local is a `Box<double>` and that IS the shared cell a closure needs — one
+-                // allocation instead of the `Box<JSVariable>` plus `JSVariable` pair, and no box
+-                // per write. What it may not do is inherit the hoisting argument: a function
+-                // declaration at body top level exists before the body runs, so its mention of
+-                // the name can execute before the name's initializer even though it is textually
+-                // after it, and a raw double hoisted to 0 would answer 0 where `undefined` is
+-                // the right answer. That conjunct is a correctness rule, so it holds on both
+-                // settings of the switch.
+-                var capturedRejectsNumeric = isCaptured
+-                    && (!CapturedNumericLocals.Enabled
+-                        || scope.CapturedByHoistedFunctions.Contains(v.Value));
+-                var useNumericLocal = canUseRawLocal
+-                    && !capturedRejectsNumeric
+-                    && (!isLexical || isFunctionBodyBlock)
+-                    && scope.NumericLocals.Contains(v.Value);
++                // rejected any name that can be READ before its initializer runs — which is
++                // also what discharges a lexical name's temporal dead zone, so `let`/`const`
++                // reach this tier even though they do not reach the JSValue one above (their
++                // TDZ and const-ness are properties of the cell, and the numeric tier's gate
++                // proves the TDZ unreachable and rejects any const that is written).
++                //
++                // A lexical name qualifies only in the function's OWN body block: `let` in a
++                // nested block is a distinct binding per entry, while NumericLocals — which
++                // every nested block scope inherits from the function — names only
++                // body-top-level declarations. Without this test a nested `{ let v = … }`
++                // would take the function's slot (docs/performance-roadmap.md item 3-3).
++                var isFunctionBodyBlock = ReferenceEquals(block, scope.Function?.Body);
++                // Item 3-7: a captured name may take the numeric tier, because a captured raw
++                // local is a `Box<double>` and that IS the shared cell a closure needs — one
++                // allocation instead of the `Box<JSVariable>` plus `JSVariable` pair, and no box
++                // per write. What it may not do is inherit the hoisting argument: a function
++                // declaration at body top level exists before the body runs, so its mention of
++                // the name can execute before the name's initializer even though it is textually
++                // after it, and a raw double hoisted to 0 would answer 0 where `undefined` is
++                // the right answer. That conjunct is a correctness rule, so it holds on both
++                // settings of the switch.
++                var capturedRejectsNumeric = isCaptured
++                    && (!CapturedNumericLocals.Enabled
++                        || scope.CapturedByHoistedFunctions.Contains(v.Value));
++                var useNumericLocal = NumericLocalSpecialization.Enabled
++                    && canUseRawLocal
++                    && !capturedRejectsNumeric
++                    && (!isLexical || isFunctionBodyBlock)
++                    && scope.NumericLocals.Contains(v.Value);
+                 // Item 3-6: why this name did or did not reach the numeric tier, attributed to
+                 // the FIRST conjunct it fails. Item 3-5 measured the coverage at 5.0% of scalar
+                 // locals and could not say which condition costs it; this is that count, and
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/LocalAllocationMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/LocalAllocationMetrics.cs
+index 970aaf16..6e92af08 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/LocalAllocationMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/LocalAllocationMetrics.cs
+@@ -147,6 +147,60 @@ internal static class LocalAllocationMetrics
+                 + "so reaching the loop without running the initializer is what has to be ruled "
+                 + "out"),
+ 
++        // ── item 3-8: the same value, not PROVABLY numeric ────────────────────────────────
++        //
++        // Three spellings of top-level-var differing only in where the value came from — a
++        // property read, a call, a parameter — which are the three causes that account for 79%
++        // of every candidate the analysis's fixed point drops. The value is hoisted out of the
++        // loop in each, so the loop body is identical to top-level-var's and the delta is the
++        // cost of the local not being PROVABLE rather than the cost of the read itself. That
++        // makes each row the ceiling on what a perfect runtime guard could win on that shape,
++        // measured before building one.
++
++        new(
++            "property-sourced-var",
++            "provability",
++            $$"""
++            (function (arg) {
++                var o = { x: 3.5 };
++                var v = o.x;
++                var s = 0;
++                for (var i = 0; i < {{Iterations}}; i++) { s = s + v * 2; }
++                return s;
++            })
++            """,
++            "the largest cause, 46.7% of dropped candidates: the value arrives from a named "
++                + "property read. Identical loop to top-level-var, so the delta is the whole "
++                + "prize a guard on this shape could take"),
++
++        new(
++            "call-sourced-var",
++            "provability",
++            $$"""
++            (function (arg) {
++                function get() { return 3.5; }
++                var v = get();
++                var s = 0;
++                for (var i = 0; i < {{Iterations}}; i++) { s = s + v * 2; }
++                return s;
++            })
++            """,
++            "the second cause, 29.7%: the value is a call's return. Same loop again"),
++
++        new(
++            "parameter-sourced-var",
++            "provability",
++            $$"""
++            (function (v0) {
++                var v = v0;
++                var s = 0;
++                for (var i = 0; i < {{Iterations}}; i++) { s = s + v * 2; }
++                return s;
++            })
++            """,
++            "the cause item 3-3 named as phase 4's job and the count puts at 2.5%: the value is "
++                + "copied out of a parameter"),
++
+         // ── item 3-7: the same value, captured ────────────────────────────────────────────
+         //
+         // Four spellings of top-level-var with a closure added, differing only in HOW the
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index 1435560a..b7f7d414 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -234,7 +234,11 @@ internal static class SpecializingTierMetrics
+                 // control loop's locals are raw doubles (item 3-3). So this says how much of a
+                 // call's cost is the value representation rather than the prologue — which is a
+                 // question about phase 3, and one no timing arm can answer on its own.
+-                var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
++                // Item 3-8: how much of this run's allocation is number boxing at all — the ceiling on
++        // every raw-double item in phase 3, counted rather than inferred from a per-shape figure.
++        Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Reset();
++        Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Enabled = true;
++        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                 var stopwatch = Stopwatch.StartNew();
+                 var answer = context.Eval($"hot({iterations});", "run.js").ToString();
+                 stopwatch.Stop();
+@@ -268,6 +272,15 @@ internal static class SpecializingTierMetrics
+     }
+ 
+     /// <summary>Names the waterfall's buckets so the JSON is readable without the enum.</summary>
++    private static object DescribeDropCauses(long[] counts)
++    {
++        var names = System.Enum.GetNames(typeof(Broiler.JavaScript.Compiler.NumericDropCause));
++        var described = new Dictionary<string, long>(names.Length);
++        for (var i = 0; i < names.Length && i < counts.Length; i++)
++            described[names[i]] = counts[i];
++        return described;
++    }
++
+     private static object DescribeRejections(long[] counts)
+     {
+         var names = System.Enum.GetNames(typeof(Broiler.JavaScript.Compiler.NumericLocalRejection));
+@@ -399,7 +412,7 @@ internal static class SpecializingTierMetrics
+         TypeFeedback.Reset();
+         Speculation.Reset();
+         PropertyOptimizationDiagnostics.Reset();
+-        Broiler.JavaScript.Compiler.CompilerSpecializationDiagnostics.Reset();
++        Broiler.JavaScript.Compiler.CompilerSpecializationDiagnostics.Reset();
+ 
+         // Cache hits are what makes the addressable surface COUNTABLE rather than argued. A read
+         // that takes the specialized path never calls PropertyInlineCacheSite.Get, so it records
+@@ -444,10 +457,14 @@ internal static class SpecializingTierMetrics
+             return new { suite = suite.Name, loaded = false, error = $"{e.GetType().Name}: {e.Message}" };
+         }
+ 
+-        // Allocation over the whole driver run. Deterministic where the wall clock is not, and
+-        // the direct corpus-level reading of item 3-5: a box per loop iteration removed shows up
+-        // here exactly, whether or not it is visible in the time.
+-        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
++        // Allocation over the whole driver run. Deterministic where the wall clock is not, and
++        // the direct corpus-level reading of item 3-5: a box per loop iteration removed shows up
++        // here exactly, whether or not it is visible in the time.
++        // Item 3-8: how much of this run's allocation is number boxing at all — the ceiling on
++        // every raw-double item in phase 3, counted rather than inferred from a per-shape figure.
++        Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Reset();
++        Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Enabled = true;
++        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+         stopwatch.Start();
+         try
+         {
+@@ -459,8 +476,10 @@ internal static class SpecializingTierMetrics
+         }
+ 
+         stopwatch.Stop();
+-        var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+-        var compiler = Broiler.JavaScript.Compiler.CompilerSpecializationDiagnostics.Snapshot();
++        var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
++        var boxing = Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Snapshot();
++        Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Enabled = false;
++        var compiler = Broiler.JavaScript.Compiler.CompilerSpecializationDiagnostics.Snapshot();
+         var tiering = context.FunctionTiering.Snapshot();
+         var speculation = Speculation.Snapshot();
+         var properties = PropertyOptimizationDiagnostics.Snapshot();
+@@ -474,15 +493,15 @@ internal static class SpecializingTierMetrics
+             benchmarksRun = int.TryParse(split[0], out var ran) ? ran : 0,
+             failures = split.Length > 1 && split[1].Length > 0 ? split[1] : null,
+             elapsedMs = stopwatch.ElapsedMilliseconds,
+-            allocatedBytes,
+-
+-            // Item 3-5's shape, counted at compile time: how many relational comparisons had one
+-            // operand already unboxed, against how many had neither — and how few locals reach the
+-            // numeric tier at all, which is what bounds the first number.
+-            scalarLocals = compiler.ScalarLocals,
+-            numericLocals = compiler.NumericLocals,
+-            mixedComparisons = compiler.MixedNumericComparisons,
+-            boxedComparisons = compiler.BoxedNumericComparisons,
++            allocatedBytes,
++
++            // Item 3-5's shape, counted at compile time: how many relational comparisons had one
++            // operand already unboxed, against how many had neither — and how few locals reach the
++            // numeric tier at all, which is what bounds the first number.
++            scalarLocals = compiler.ScalarLocals,
++            numericLocals = compiler.NumericLocals,
++            mixedComparisons = compiler.MixedNumericComparisons,
++            boxedComparisons = compiler.BoxedNumericComparisons,
+ 
+             // Item 3-6: the waterfall. Every hoisted name attributed to the first conjunct of
+             // the numeric-local gate it fails, which is what says WHICH condition costs the
+@@ -494,6 +513,17 @@ internal static class SpecializingTierMetrics
+             numericCandidatesDropped = compiler.NumericCandidatesDropped,
+             numericCandidatesSurviving = compiler.NumericCandidatesSurviving,
+ 
++            // Item 3-8: what defeated the proof for each name the fixed point dropped. The
++            // premise it was specified from reads all 1 916 as one population wanting one
++            // runtime guard; these counts are what says whether that is true.
++            numericDropCauses = DescribeDropCauses(compiler.NumericDropCauses),
++
++            // The ceiling on all of phase 3: a raw double can only ever remove a box, so
++            // boxesAllocated x 24 B is every byte the whole family could take.
++            boxingRequests = boxing.Requests,
++            boxesCached = boxing.Cached,
++            boxesAllocated = boxing.Allocated,
++
+             candidates = tiering.Candidates,
+             invocations = tiering.Invocations,
+             recompilationAttempts = tiering.RecompilationAttempts,
+-- 
+2.43.0
+
