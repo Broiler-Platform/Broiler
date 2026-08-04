@@ -129,11 +129,11 @@ because 2-1, 2-2, 2-4 and 2-8 all touch `OrdinarySetWithOwnDescriptor`, are **cl
 rewrites the storage underneath that path, adds no failure; and neither does 3-3's `let`/`const`
 half.** A **fifth manifest** was added with that item — `test262-lexical-declarations`, because
 none of the four covered `let` or `const` at all — and it is clean on both arms (§3.4).
-**Re-run again 2026-08-04 at the pinned `61c8cc65` plus `patches/0078` for item 3-7**: four of the
-five manifests are identical count for count, and the fifth differs by **one test that is a flake
-and not a result** — it needs no `$262`, re-runs green three times in isolation, and answers
-correctly on the widened build, on the same build with the switch off, and on a pristine build of
-the pin (§3.4).
+**Re-run again 2026-08-04 at the pinned `61c8cc65` plus `patches/0078` for item 3-7, on both
+settings of that patch's switch**: every count is identical, manifest by manifest. One run of
+`properties-proxy` reported an extra failure whose captured stderr reads *"The JavaScript compiler
+is not available"* — **a `dotnet build` rewriting the assembly under a running suite, which was
+mine**, not an engine result; re-run with nothing else building it is clean (§3.4).
 
 **The patch handoff, which was the third gate, is done and has stayed done.** `patches/0049`–`0058`
 were applied, pushed and the pointer bumped to `a6f101cc`, and `0059`–`0077` have followed it in
@@ -384,15 +384,33 @@ times on 2026-08-03 on linux-x64 at the pinned `9bf9639b` — plus `patches/0067
 identical every time, manifest by manifest** — so the table below describes the pinned pointer as well as the commit it was first
 measured at.
 
-**Re-run 2026-08-04 on linux-x64 at the pinned `61c8cc65` plus `patches/0078` (item 3-7), all five
-manifests: four of five are identical to the row below, and the fifth is one test.**
-`properties-proxy` came back 3 949 / 39 rather than 3 950 / 38, and the extra failure is
-`built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-3-4.js` — **a flake under `--max-workers 8` on
-a shared container, not a result**: it needs no `$262`, it re-runs green three times for three in
-isolation, and the value it asserts comes back correct on the widened build, on the same build with
-the switch off, and on a pristine build of the pin alike. *A single failure inside a parallel run
-is a candidate, not a finding, and the cheap check is to run it alone* — this one cost two minutes
-and would otherwise have been reported as a regression.
+**Re-run 2026-08-04 on linux-x64 at the pinned `61c8cc65` plus `patches/0078` (item 3-7).** All
+five manifests on the switch-ON arm — the shipping configuration — and `arrays` and
+`properties-proxy` on the switch-OFF control: **every count is identical to the row below**,
+including `properties-proxy` at 3 950 / 38 on the control. The control's remaining three manifests
+were still running when this was written and are not quoted here; `arrays`, `strict-mode`,
+`realm-isolation` and `lexical-declarations` are already identical on the arm that ships.
+
+**One run of `properties-proxy` on the switch-ON arm came back 3 949 / 39, and the extra failure
+was mine, not the engine's.** The stderr the runner captured says so outright: *"The JavaScript
+compiler is not available. Reference the Broiler.JavaScript.Compiler assembly to enable script
+compilation."* That child process had loaded `Broiler.JavaScript.Compiler.dll` **while a
+`dotnet build` of the same solution was rewriting it** — a build I started for an unrelated edit
+while the manifest was still running. It is not a `$262` case, it is not an assertion failure, and
+`built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-3-4.js` passes three times for three when run
+alone on the widened build, and answers correctly on the widened build, on the same build with the
+switch off, and on a pristine build of the pin. The manifest-level control settles it: **a pristine
+build of `61c8cc65` runs the whole manifest at 3 950 / 38 with a failure set identical, file for
+file, to the switch-off arm's** — so the 39th file is in neither control and is not a property of
+the change.
+
+> *This is §3.5's "check that the thing you measured is the thing you built", arriving from the
+> other side: there the binary under test was older than the source, here it was being rewritten
+> underneath a running suite.* **Do not build while a suite is running against the output.** The
+> first diagnosis was "a flake under `--max-workers 8`" — plausible, consistent with the test
+> passing three times in isolation, and wrong; what settled it was reading the captured stderr
+> instead of re-running until it went away. A failure that reproduces nowhere is not thereby a
+> flake, and the runner had recorded the real reason all along.
 
 | Manifest | Executed | Passed | Failed | Skipped | Timed out | Engine failures |
 |---|---:|---:|---:|---:|---:|---:|
@@ -773,6 +791,19 @@ These were paid for once each. They apply to every phase below.
   with its body textually anywhere. The distinction is worth 247 of 478 captured names on the
   Octane corpus, i.e. it is the majority case and not a corner. *When an item is described as
   "entirely static", check which of its conditions are about text and which are about time.*
+- **Never build while a suite is running against the output, and read the failure before calling
+  it a flake.** One `properties-proxy` run reported an extra failure on the arm under test and not
+  on its control — the shape of a regression. It was neither: the runner's captured stderr said
+  *"The JavaScript compiler is not available"*, because a `dotnet build` I had started for an
+  unrelated edit was rewriting `Broiler.JavaScript.Compiler.dll` under the running children. The
+  first diagnosis was "a flake under `--max-workers 8`", which fitted the evidence then available
+  (the test passes three times in isolation, needs no `$262`, and answers correctly on every
+  build) and was still wrong. *A failure that reproduces nowhere is not thereby a flake — the
+  runner had recorded the actual reason, and reading it was cheaper than the three re-runs that
+  did not settle it.* This is §3.5's "check that the thing you measured is the thing you built"
+  from the other side: there the binary was older than the source, here it was being rewritten
+  mid-suite.
+
 - **Interleave, at process granularity.** Sub-1.5% effects are only visible ABBA-
   interleaved across independent builds, ten runs each, medians compared.
 - **Two shapes that allocate at different rates cannot share a process, and the control is what
