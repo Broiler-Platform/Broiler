@@ -3912,6 +3912,57 @@ not noise and not builtins; it was the operator every one of these suites runs m
 outside the census because the census was written around binary arithmetic. Each correction took
 one counter and about ten minutes.*
 
+#### The `ToNumeric` copy, removed — built straight off the census
+
+`ToNumeric` coerces the operand of `++`/`--` and hands back the coerced old value, and it minted
+unconditionally. So `n++` on a Number copied the Number into a second, equal `JSNumber`. **Reusing
+it is sound because a JavaScript Number has no observable identity** — it compares by value, it
+cannot carry a property, and `Object.is` on two Numbers is a value comparison — which is the same
+argument the small-integer cache has rested on since P2-2, where unrelated call sites are already
+handed the same instance. The guard is `primitive.IsNumber`, not `!primitive.IsBigInt`: a String,
+a Boolean, `null` and `undefined` all reach this line and all still have to be coerced, which is
+the whole reason `ToNumeric` exists (`"1"++` yields the Number 1, not the String).
+
+Measured on the corpus, one build, `BROILER_JS_NUMERIC_UPDATE_REUSE` the only difference:
+
+| Suite | requests | | boxes allocated | | of the removed requests, real |
+|---|--:|--:|--:|--:|--:|
+| **NavierStokes** | 36 669 153 → 27 207 387 | **0.742×** | 29 423 391 → 22 665 084 | **0.770×** | 6 758 307 of 9 461 766 — 71.4% |
+| **EarleyBoyer** | 756 617 → 452 366 | **0.598×** | 563 997 → 282 000 | **0.500×** | 281 997 of 304 251 — 92.7% |
+| Richards | 90 589 → 75 031 | 0.828× | 10 743 → 6 852 | 0.638× | 3 891 of 15 558 — 25.0% |
+| Crypto | 55 327 970 → 48 114 381 | 0.870× | 33 357 396 → 33 352 279 | 1.000× | 5 117 of 7 213 589 — **0.1%** |
+| Box2D | 17 382 495 → 17 095 127 | 0.983× | 10 663 471 → 10 661 949 | 1.000× | 1 522 of 287 368 — 0.5% |
+| DeltaBlue | 147 941 → 144 560 | 0.977× | 6 765 → 6 765 | 1.000× | 0 of 3 381 — 0.0% |
+| RayTrace | 1 628 284 → 1 628 284 | 1.000× | 823 293 → 823 293 | 1.000× | no updates at all |
+| **Total** | **112 003 049 → 94 717 136** | **0.846×** | **74 849 056 → 67 798 222** | **0.906×** | 7 050 834 of 17 285 913 — 40.8% |
+
+**17 285 913 requests removed, 15.4% — the census predicted 17 281 232, so the thing built is the
+thing measured to 0.03%.** In allocations it is **7 050 834, 9.4%**, and *the gap between those two
+numbers is the small-integer cache, which is the most useful thing in the table*: Crypto removes
+7.2 M requests and **5 117 boxes**, because its updates are loop counters inside `[-128, 1024]`
+where P2-2 was already answering them for free. NavierStokes' indices run past that bound, so
+**71.4% of its removed requests were real allocations — 6.76 M boxes, 23.0% of everything it
+allocates.** *A `++` on a small integer was already free; a `++` on anything larger was not, and
+nothing before this said which suites were which.*
+
+Set against the guarded tree's 10 401 782, this is **7 050 834 from a nine-line guard** — and it
+lands on the suite the tree could not reach, NavierStokes, which the tree moved 1.8% and this moves
+23.0%. **Together the two take the corpus from 85 255 034 boxes with neither switched on to
+67 798 222 with both, 0.795×.** Five
+coercions still mint on the reuse arm, which is the guard discriminating rather than a leak: those
+operands are not Numbers.
+
+`NumericUpdateReuseTests` — 9 fixtures, **each on both settings of the switch**, so every one is a
+statement about JavaScript semantics rather than a description of the fast path: postfix and prefix
+results, the non-Number operands that must still be coerced, NaN and the infinities, `-0` asserted
+through both `1/x` and `Object.is` (it cannot survive the increment — `-0 + 1` is `1` — so the half
+that matters is the old value), a `valueOf` that must run exactly once, a getter read once with the
+setter seeing the increment, BigInt, the `Symbol` TypeError, and an element update. Plus **the
+identity argument asserted rather than assumed** — `===`, `==`, `Object.is` and a property write
+against a reused old value — and a counter invariant, because "the box count went down" would
+otherwise be consistent with the coercion having stopped happening: `UnaryToNumeric +
+UnaryToNumericReused` is equal on both arms and only the split moves.
+
 #### Re-specification
 
 **3-1 is no longer "the most contained item in the phase", and it is no longer optional.**
