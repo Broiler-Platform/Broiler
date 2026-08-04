@@ -3971,11 +3971,11 @@ that did *not* move:**
 
 | Suite | boxes removed | of its own | removed per second | median | pairs won |
 |---|--:|--:|--:|--:|--:|
-| **NavierStokes** | 6 758 307 | 23.0% | **4 240 000/s** | **0.906×** | **6 of 6** |
-| EarleyBoyer | 281 997 | **50.0%** | 82 000/s | 1.002× | 3 of 6 |
-| Richards | 3 891 | 36.2% | 5 800/s | 1.121× | 1 of 6 |
-| Crypto | 5 117 | 0.0% | 1 800/s | 0.984× | 3 of 6 |
-| Box2D | 1 522 | 0.0% | 300/s | 1.030× | 2 of 6 |
+| **NavierStokes** | 6 758 307 | 23.0% | **4 240 469/s** | **0.906×** | **6 of 6** |
+| EarleyBoyer | 281 997 | **50.0%** | 82 504/s | 1.002× | 3 of 6 |
+| Richards | 3 891 | 36.2% | 5 842/s | 1.121× | 1 of 6 |
+| Crypto | 5 117 | 0.0% | 1 767/s | 0.984× | 3 of 6 |
+| Box2D | 1 522 | 0.0% | 255/s | 1.030× | 2 of 6 |
 | RayTrace | 0 | 0.0% | 0 | 0.997× | 3 of 6 |
 | DeltaBlue | 0 | 0.0% | 0 | 1.029× | 3 of 6 |
 | **Driver total** | 7 050 834 | 9.4% | | **1.013×** | 2 of 6 |
