@@ -1,4 +1,4 @@
-From 9a27ab780607928fd6435b1e6c4ecd224eea91f3 Mon Sep 17 00:00:00 2001
+From 565bfb63a3849a7f10bc453aeaed3e59e3f984de Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Tue, 4 Aug 2026 21:04:02 +0000
 Subject: [PATCH] Build item 3-1's shared half: a guarded numeric tree
@@ -78,8 +78,8 @@ Claude-Session: https://claude.ai/code/session_01PvNJHaNMQPZcrrkmJpDF2x
  .../FastCompiler.NumericSpeculation.cs        | 297 ++++++++++++++++
  .../FastCompiler.VisitBinaryExpression.cs     |   7 +
  .../NumericSpeculation.cs                     |  36 ++
- .../SpecializingTierMetrics.cs                |   7 +
- 7 files changed, 723 insertions(+), 3 deletions(-)
+ .../SpecializingTierMetrics.cs                |  18 +-
+ 7 files changed, 732 insertions(+), 5 deletions(-)
  create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericSpeculationTests.cs
  create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
  create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler/NumericSpeculation.cs
@@ -898,10 +898,39 @@ index 00000000..bcca8421
 +            : 1;
 +}
 diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
-index 7eda5208..d91fa8fe 100644
+index 7eda5208..edb8b724 100644
 --- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
 +++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
-@@ -508,6 +508,13 @@ internal static class SpecializingTierMetrics
+@@ -458,12 +458,18 @@ internal static class SpecializingTierMetrics
+         // here exactly, whether or not it is visible in the time.
+         // Item 3-8: how much of this run's allocation is number boxing at all — the ceiling on
+         // every raw-double item in phase 3, counted rather than inferred from a per-shape figure.
++        //
++        // Gated on `counters` for the same reason the inline-cache ones above are, and here it is
++        // not merely noise: the arithmetic census increments once per generic invocation, and the
++        // two arms of item 3-1's switch differ by 20.5 M invocations. Leaving it on for a timing
++        // pass would charge the slower arm for 20.5 M interlocked increments it does not otherwise
++        // pay — a bias pointing the same way as the result, which is the worst kind.
+         Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Reset();
+-        Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Enabled = true;
++        Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Enabled = counters;
+         // Item 3-1's shared half: of the operators that mint those boxes, how many are handed two
+         // values that ARE Numbers — i.e. how many a native form guarded on that test could reach.
+         ArithmeticOperandDiagnostics.Reset();
+-        ArithmeticOperandDiagnostics.Enabled = true;
++        ArithmeticOperandDiagnostics.Enabled = counters;
+         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+         stopwatch.Start();
+         try
+@@ -484,6 +490,7 @@ internal static class SpecializingTierMetrics
+         var arithmeticRawDouble = ArithmeticOperandDiagnostics.RawDoubleOperand;
+         var arithmeticRawDoubleOtherNumber = ArithmeticOperandDiagnostics.RawDoubleOtherNumber;
+         ArithmeticOperandDiagnostics.Enabled = false;
++
+         var compiler = Broiler.JavaScript.Compiler.CompilerSpecializationDiagnostics.Snapshot();
+         var tiering = context.FunctionTiering.Snapshot();
+         var speculation = Speculation.Snapshot();
+@@ -508,6 +515,13 @@ internal static class SpecializingTierMetrics
              mixedComparisons = compiler.MixedNumericComparisons,
              boxedComparisons = compiler.BoxedNumericComparisons,
  
