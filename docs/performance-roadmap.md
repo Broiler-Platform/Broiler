@@ -41,13 +41,16 @@ so only the parent can hold the combined view.
   `9bf9639b` in that order. **So every figure recorded for those eight items now describes the
   pinned pointer directly**, rather than a local build of the pin plus a patch series applied in
   order, which is what their sections used to have to say.
-  **One patch is pending again: item 3-3's `let`/`const` half is
-  [`patches/0067`](../patches/0067-js-numeric-lexical-bindings.patch)**, on the usual terms — its
-  push to the submodule remote returned 403, so the pointer is deliberately unbumped and every
-  figure in its section was measured on a local build of `9bf9639b` with and without that one
-  patch, both arms from the same tree. It was verified to apply from a clean checkout of the pin
-  with **`git am`**, not merely `git apply`. It is independent of everything already cleared, and
-  needs no main-repo fallback: without it CI is correct and only allocates more.
+  **Two patches are pending again, both from item 3-3 and in this order:
+  [`patches/0067`](../patches/0067-js-numeric-lexical-bindings.patch)** (its `let`/`const` half)
+  **and [`patches/0068`](../patches/0068-js-block-scoped-numeric-var.patch)** (its block-scoped
+  `var` half), on the usual terms — each push to the submodule remote returned 403, so the
+  pointer is deliberately unbumped and every figure in their sections was measured on a local
+  build of `9bf9639b` with and without the patch under test, both arms from the same tree.
+  **The order is not optional**: `0068` edits the same file and builds on the gate `0067`
+  restructures. Both were verified to apply *in sequence* from a clean checkout of the pin with
+  **`git am`**, not merely `git apply`. They are independent of everything already cleared, and
+  need no main-repo fallback: without them CI is correct and only allocates more.
   **Measurements and the test262 run in §4.1 and §3.4 were taken at `cdb2fd41` and have not
   been repeated** — `685026c0` also carries a string-allocation fix (#936). Octane code
   sites verified at `45f4f679`. **Phase 2's own measurements — §0, and each 2-x section —
@@ -76,7 +79,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6's workflow run has happened and its results are committed** — 2026-08-03 at the pinned pointer, **15 of 15 suites `ok` and 17 of 17 scores** for Broiler, Jint and a same-machine Chromium alike, nothing errored or timed out. Geomean **351** against Chromium's 57 080 (**163×**) and Jint's 616 (**0.569×**), spread **139.8×**. That answers the coverage question and phase 2's exit criterion (below); **what 0-6 still owes is the noise band** — the run is one repetition per suite and says so, so magnitudes and pass/fail may be read from it and deltas may not — plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce |
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting. **New: 1-4 ✅.** Measuring 1-1's premise found the phase's actual dominant cost, and it was not lazy compilation: the closure rewrite held a lambda's in-scope bindings in a `List` and asked it `Contains` per parameter reference, so **emission was quadratic in a scope's binding count** — 2 000 top-level declarations emitted in 13 865 ms against 2.5 ms of parse. A reference-keyed multiset (list-backed below 32 bindings) makes it linear: **28.5× on that shape, and 3.04× on Mandreel end-to-end**, ABBA-interleaved, six pairs. **1-1 is still open and its premise now has a number** — 92–96% of compile time is function bodies on the large real programs — but the measurement also **splits phase 1 in two and re-targets 1-1**: Mandreel was *wide*, not deep, and never was a 1-1 case, while jQuery at 96.5% deferrable is the whole of it. **1-1's emission half then landed without needing the capture mechanism at all**: every risk the item names is settled by the front end, so deferring *IL generation* to first invocation is the same prize with none of them — **jQuery 0.661×, Box2D 0.636×, PdfJS 0.689× on compile, allocation ~0.52× across the board, and 1.0009× steady state**. **Octane CodeLoad, the benchmark the item names, was run and passes: 94.6 → 104.0, 1.099×, 24 samples an arm, 93% pairwise dominance** — and it took 24 because the first three-sample pair and its reverse disagreed. That ratio also re-frames the item: compilation is only ~27% of what CodeLoad measures, not the whole of it. Two mistakes were caught by measuring: a stack handoff per deferred function took the suite from 3.5 to 20 minutes, and a thunk that *called* its resolve cost 1.0247% on call-heavy code until the warm path was written in IL. Typescript is 1.034× slower and unexplained. **The Mandreel suite was then run too, and it overturns the phase's headline target**: a 3.04× faster compile of `mandreel.js` moves Mandreel 0.993× and MandreelLatency 0.992× — Octane compiles that file at script load and times only the run function, so MandreelLatency measures execution pauses and belongs to phase 3. The saving is real and outside every score: suite wall clock **358.2 → 350.0 s**, non-overlapping. What remains of 1-1 is the parse and tree construction, which on real source is the larger half |
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. Then **2-12** found why the misses that remained could never heal: the cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — **77.7% of DeltaBlue's misses**. Refreshing in place takes **DeltaBlue's read hit rate to 93.16%** (65.96% before both fixes) and Box2D's to 98.83%. **DeltaBlue still fails the gate at 447×**, but the cache is no longer the reason, and what remains is not property-cache-shaped. **0-6's CI run has since confirmed the split independently — Richards 144.9×, DeltaBlue 460×** — so the phase's exit criterion is answered by two measurements on different machines that agree on which side of 200× each benchmark falls, rather than by one. Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
-| **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. **Its `let`/`const` half is now landed**, on the second attempt: the first was withdrawn on a miscompile, and re-built scoped to the *numeric* tier alone it reproduces the predicted number and not the defect — **`let` and `const` both 31.98 → 0.00 B/iter and 1 → 3 numeric locals, identical to the eligible `var` floor, with all twelve other `--local-alloc` rows byte-identical**, both arms from one tree. The recorded reproduction was re-run against it and is green, including under the switches that restore the pre-1-4 and pre-1-1 front end — so the withdrawn attempt's defect is **not explained**, only not reproduced; what the second attempt does differently is leave the JSValue tier closed to lexical names, since a TDZ and const-ness live in the cell that tier removes while the numeric gate proves both unobservable. 3-4 is a cost, not a task |
+| **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. **Its `let`/`const` half is now landed**, on the second attempt: the first was withdrawn on a miscompile, and re-built scoped to the *numeric* tier alone it reproduces the predicted number and not the defect — **`let` and `const` both 31.98 → 0.00 B/iter and 1 → 3 numeric locals, identical to the eligible `var` floor, with all twelve other `--local-alloc` rows byte-identical**, both arms from one tree. The recorded reproduction was re-run against it and is green, including under the switches that restore the pre-1-4 and pre-1-1 front end — so the withdrawn attempt's defect is **not explained**, only not reproduced; what the second attempt does differently is leave the JSValue tier closed to lexical names, since a TDZ and const-ness live in the cell that tier removes while the numeric gate proves both unobservable. **The block-scoped `var` then landed too, and 3-3 is complete**: the "definite-assignment analysis" it asked for is the function body's own dominance argument applied one level down — an unconditional block is *transparent* (entered whenever reached, exits only via `return`/`throw`), and any other block *confines* its declaration, which then needs every reference inside it. **`block-var` 31.98 → 0.00 B/iter and 1 → 3, one row moved and twelve byte-identical.** Two defects were caught on the way, neither shipped: a non-dominating declaration could mark a name readable and mask a read that would see `undefined`, and the fix for that over-corrected into rejecting a benign numeric re-declaration — caught by a pre-existing test written as "the guard against over-fixing". All four of the item's categories are now at the eligible floor except `parameter`, which cannot reach the numeric tier at all. 3-4 is a cost, not a task |
 | **4** — tiering | Open. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 can start now** |
 | **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. The global case's retained result list then landed too — **2 032.8 → 478.3 B per match**, dead linear on both sides, by streaming when the receiver's `exec` is the pristine intrinsic and the replacement is a `$`-free string. **Every follow-up this phase named is now closed**; what is left is item 2's `Compiled` policy, deliberately unshipped |
 
@@ -113,10 +116,11 @@ does not:
   0-7's BenchmarkDotNet comparison and 0-8's RID matrix remain owed too, and a container
   cannot produce either.
 
-**The conformance gate is satisfied, and was re-run for item 3-3.** All four pinned manifests
-were run **2026-08-03 on linux-x64 at the pinned `9bf9639b` plus `patches/0067`**, against the
-pinned suite ref `ccaac100` — **8 220 passed, 84 failed, 44 skipped, 9 timed out, and every
-count is identical to §3.4's recorded run, manifest by manifest.** The 84 are the same
+**The conformance gate is satisfied, and was re-run twice for item 3-3.** All four pinned
+manifests were run **2026-08-03 on linux-x64 at the pinned `9bf9639b`** — once plus
+`patches/0067` and once plus `0067` and `0068` — against the pinned suite ref `ccaac100`:
+**8 220 passed, 84 failed, 44 skipped, 9 timed out, and every count is identical to §3.4's
+recorded run on both, manifest by manifest.** The 84 are the same
 `$262`-requiring files and the 9 the same integer-limit cases already tracked in
 `test262-failures.txt`. So `properties-proxy` and `strict-mode`, which phase 2's exit gate names
 because 2-1, 2-2, 2-4 and 2-8 all touch `OrdinarySetWithOwnDescriptor`, are **clean; 2-9, which
@@ -365,10 +369,10 @@ The pinned manifests are `test262-arrays`, `test262-properties-proxy`,
 `test262-strict-mode`, `test262-realm-isolation`, and — added 2026-08-03, see below —
 `test262-lexical-declarations`. First taken 2026-08-01 at `cdb2fd41`
 (suite ref `ccaac100`), **re-run 2026-08-02 at `a6f101cc` plus 2-9 with every count
-unchanged**, **re-run at `71dda1b7` plus 3-3 with every count unchanged**, and **re-run
-2026-08-03 on linux-x64 at the pinned `9bf9639b` plus `patches/0067`, again with every count
-identical, manifest by manifest** — so the table below describes the pinned pointer as well as
-the commit it was first measured at:
+unchanged**, **re-run at `71dda1b7` plus 3-3 with every count unchanged**, and **re-run twice on
+2026-08-03 on linux-x64 at the pinned `9bf9639b` — once plus `patches/0067`, once plus `0067`
+and `0068` — with every count identical both times, manifest by manifest** — so the table below
+describes the pinned pointer as well as the commit it was first measured at:
 
 | Manifest | Executed | Passed | Failed | Skipped | Timed out | Engine failures |
 |---|---:|---:|---:|---:|---:|---:|
@@ -389,11 +393,12 @@ lines 7–15, nine for nine, the integer-limit `slice`/`unshift`/`reduceRight`/
 Item 3-3's `let`/`const` half changes how lexical bindings are *compiled*, and **no pinned
 manifest covered `let` or `const` at all** — `test262-language-basics` is twelve entries about
 `throw`, commas and relational operators. The manifest is
-`language/statements/{let,const,variable}` plus `language/block-scope`, and it was run **both
-arms from the same tree**: at the pinned `9bf9639b`, and at that commit plus `patches/0067`.
-**Identical, 397 of 397 passing on each.** So it did not *detect* anything — its value is that
-a future regression on those paths now fails a pinned gate instead of passing unnoticed. The
-207 skips are the negative-syntax and module cases the runner excludes by design, not silent
+`language/statements/{let,const,variable}` plus `language/block-scope`, and it was run **three
+times from the same tree**: at the pinned `9bf9639b`, at that commit plus `patches/0067`, and at
+that commit plus `0067` and `0068`. **Identical, 397 of 397 passing on each.** So it did not
+*detect* anything — its value is that a future regression on those paths now fails a pinned gate
+instead of passing unnoticed, and `language/statements/variable` is exactly what `0068` touches.
+The 207 skips are the negative-syntax and module cases the runner excludes by design, not silent
 failures.
 
 **Still not covered:** the Annex B forbidden-extension paths that P0-3 gates on
@@ -3289,7 +3294,7 @@ and this gets cheaper.
 
 **Where.** `Runtime/JSObject.cs`, `Runtime/ObjectShape.cs`. **Size: L.**
 
-### 3-3 · Widen the unboxed-locals eligibility gate — **parameters and `let`/`const` landed; the block-scoped `var` is what remains**
+### 3-3 · Widen the unboxed-locals eligibility gate — **complete: all three halves landed**
 
 P2-2 item 3 covers a function-top-level `var` not named by any nested closure. Still
 ineligible when this item was written: **function parameters**, `let`/`const` (needs TDZ
@@ -3506,8 +3511,19 @@ without this would have widened a silent-NaN miscompilation to two more declarat
   downstream of it, which is the 1 → 3 in the table above.
 
 So the successor item was **`let`/`const` at the numeric tier first**, then the block-scoped
-`var` (which does need the definite-assignment analysis the item names). The first half is now
-done; the block-scoped `var` is not, and is what remains of 3-3.
+`var` (which does need the definite-assignment analysis the item names). **Both have now
+landed, and item 3-3 is complete**: all four categories the item named are at the eligible
+floor except `parameter`, which cannot reach the numeric tier at all — the value arrives as a
+`JSValue` and nothing proves it is a number, which is why its half landed at the *scalar* tier
+instead.
+
+| Site | Before 3-3 | After all three halves |
+|---|--:|--:|
+| `top-level-var` — the eligible floor | 0.00 B/iter, 3 | 0.00, 3 |
+| `let-binding` | 31.98, 1 | **0.00, 3** |
+| `const-binding` | 31.98, 1 | **0.00, 3** |
+| `block-var` | 31.98, 1 | **0.00, 3** |
+| `parameter` | 31.98, 1 | 31.98, 1 — *scalar* tier only; see the parameter section above |
 
 #### `let`/`const` — **landed on the second attempt**
 
@@ -3660,6 +3676,77 @@ pinned manifest covered `let`/`const` at all — `test262-language-basics` is tw
 had nothing in §3.4 that could fail. `scripts/compliance/test262-lexical-declarations.txt` adds
 `language/statements/{let,const,variable}` and `language/block-scope`; it is **397 of 397
 passing on both arms** (§3.4), so it reports nothing today and guards those paths from here on.
+
+#### The block-scoped `var` — **landed, and it completes item 3-3**
+
+> **Delivered as a patch, not in the pin**, on the same terms as `0067`: the push to the
+> submodule remote returned 403, so the pointer is deliberately unbumped and the change ships as
+> [`patches/0068`](../patches/0068-js-block-scoped-numeric-var.patch), which **must be applied
+> after `0067`** — same file, and it builds on the gate `0067` restructures. Every figure below
+> was measured on a local build of the pinned `9bf9639b` plus `0067`, with and without `0068`,
+> both arms from the same tree.
+
+This is the half the item said needs "definite-assignment analysis", and what it actually needs
+is the **dominance argument the function body already gets, applied one level down**. The hazard
+is exact: a `var` is hoisted to the function but its initializer sits inside a block, so between
+function entry and that block the binding is observably `undefined` — and a raw double hoisted
+to 0 answers `0` instead. That is a silent wrong answer, not a lost optimization.
+
+**Two admissions, and they are different arguments.**
+
+| | Transparent | Confined |
+|---|---|---|
+| shape | an unlabelled `{ … }` that is a direct statement of the function body, or of another transparent block | a `var` that is a direct statement of any other block |
+| why the initializer has run | the block is entered whenever control reaches it, and the only ways out are `return`/`throw`, which leave the function — so it does not weaken the body's dominance at all | entering the block is itself the proof |
+| extra condition | none; the name behaves exactly like a body-level `var` | **every reference must be inside that block**, and after the declaration |
+| what it buys | the item's own probe shape — `{ var v = 3.5; }` then a loop that reads `v` | the case that matters in real code: a temporary declared and consumed inside a loop body |
+
+**Measured, both arms from one tree, `--local-alloc`: `block-var` 31.98 → 0.00 B/iteration and
+1 → 3 numeric locals**, identical to `top-level-var`, with **all twelve other rows byte-identical
+and every other numeric-local count unchanged** — one row moved, which is the whole diff.
+
+**Only a *direct* statement of the block qualifies, and that is load-bearing.** Keying on the
+innermost *enclosing* block instead would admit `if (c) var t = 1; return t;` — whose enclosing
+block is the function body, which does not dominate the declaration — and answer `0` where the
+program sees `undefined`. A label is excluded for the same reason: `break` can leave a labelled
+block before the declaration runs, and a labelled block is an `AstLabeledStatement` rather than
+an `AstBlock`, so the transparency test does not match it. A `catch` is excluded because it is a
+sibling of its `try`'s block, not inside it.
+
+**One hazard was found by testing and would have shipped otherwise.** The first cut marked a
+name readable at *whichever* declaration the walk reached first, which is how the existing
+analysis has always worked — sound while every declaration dominates. It stops being sound once
+a name can have both a dominating and a non-dominating declaration:
+
+```js
+if (c) { var t = 1; }      // non-dominating, but reached FIRST
+var r = String(t);         // → "undefined", and a raw double answers "0"
+{ var t = 2; }             // dominating, and what made the name a candidate
+```
+
+The fix is one line of principle — **a name becomes readable at its dominating declaration, not
+at any other declaration of the same name** — and it is why the analysis now records which
+initializer nodes are the dominating ones rather than only which names are.
+
+**And the fix for that immediately over-corrected, which a pre-existing test caught.** Making
+transparent blocks offer their declarations turned `var s = 0; { var s = 5; }` into a
+"declared twice" rejection, failing
+`NumericLocalWriteVisibilityTests.ANumericReDeclarationKeepsTheLocalSpecialized` — a test written
+for exactly this, whose comment reads *"this is the guard against over-fixing"*. It was right:
+two declarations that **both** dominate are not a hazard, because each dominates everything
+after itself and the type proof still runs over both values. That rejection was over-conservative
+even before this item — its stated reason ("the second may sit somewhere the first does not
+dominate") never applied to its own call site — and it is now gone.
+
+**Verify.** `BlockScopedVarNumericLocalTests`, 43 cases: the admissions with their numeric-local
+counts asserted (a value-only assertion passes vacuously here, since the right answer and the
+wrong storage often agree); and the refusals, each written as a value the program can observe —
+`String(t)` answering `"undefined"` where a raw double answers `"0"`. The refusals are the
+block that may not run, the declaration with no block of its own, the labelled block, the
+`catch` reading its `try`'s declaration, the reference before the declaration, two declarations
+in incomparable blocks, and a confined name reached from outside its block through `+=`, `++`
+and `typeof` — the three forms that never reach an ordinary identifier read. Repository suite:
+**7 741 tests across 13 projects, 0 failures** on linux-x64.
 
 ### 3-4 · A tagged value representation — *scope and cost, do not start*
 
@@ -4184,7 +4271,7 @@ predicate at all.
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → 0-6 workflow run ✅ (17/17 committed at the pin) → **0-6's noise band (`--repetitions` in CI), then 0-7, 0-8** | — | Everything. 12 → **17 scores** ✅, known noise band, and the first evidence any phase A–F can close on | 17/17 ✅, no timeout at the 180 s floor ✅, `comparison.md` reporting the triad ✅, **band on record** and **the BenchmarkDotNet + RID-matrix rows collected** — the three still open |
 | **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-4 ✅** → **1-1 emission half ✅**, capture half open → 1-3 measure | 1-4 S, 1-1 remainder L | The two worst scores in the suite; page-load time generally. **1-4 took the Mandreel half (3.04×); 1-1's deferred emission takes 0.64–0.69× off jQuery, PdfJS and Box2D at 1.0009× steady state, and CodeLoad 94.6 → 104.0 (1.099×)** | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured twice, agreeing: Richards PASSES (183× → 150× after 2-11/2-12 locally; 144.9× in CI), DeltaBlue FAILS (576× → 447× locally; 460× in CI)**, five repetitions per engine on one machine and the committed CI run on another |
-| **3** | 3-0 ✅ (both halves) → 3-3 parameters ✅ → 3-3 `let`/`const` ✅ → **3-3 block-scoped `var`** (needs definite-assignment analysis) → 3-1 → 3-2, then *cost* 3-4 | S, M, then L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`, and — added by 3-3's `let`/`const` half — `test262-lexical-declarations`; allocation reported per item alongside time |
+| **3** | 3-0 ✅ (both halves) → **3-3 ✅ complete** (parameters, `let`/`const`, block-scoped `var`) → **3-1** → 3-2, then *cost* 3-4 | L–XL | Uniform lift across arithmetic and allocation-heavy suites | `test262-arrays`, `test262-binary-data`, and — added by 3-3's `let`/`const` half — `test262-lexical-declarations`; allocation reported per item alongside time |
 | **4** | 4-3 design ✅ → **4-1** (unblocked) → 4-3a (S) → 4-3b (M–L) → 4-2 → 4-4 | XL | The remaining order of magnitude | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → single-match `replace` without a builder ✅ (both builtins) → the global case's retained result list ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
