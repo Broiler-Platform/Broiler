@@ -87,7 +87,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting. **New: 1-4 ✅.** Measuring 1-1's premise found the phase's actual dominant cost, and it was not lazy compilation: the closure rewrite held a lambda's in-scope bindings in a `List` and asked it `Contains` per parameter reference, so **emission was quadratic in a scope's binding count** — 2 000 top-level declarations emitted in 13 865 ms against 2.5 ms of parse. A reference-keyed multiset (list-backed below 32 bindings) makes it linear: **28.5× on that shape, and 3.04× on Mandreel end-to-end**, ABBA-interleaved, six pairs. **1-1 is still open and its premise now has a number** — 92–96% of compile time is function bodies on the large real programs — but the measurement also **splits phase 1 in two and re-targets 1-1**: Mandreel was *wide*, not deep, and never was a 1-1 case, while jQuery at 96.5% deferrable is the whole of it. **1-1's emission half then landed without needing the capture mechanism at all**: every risk the item names is settled by the front end, so deferring *IL generation* to first invocation is the same prize with none of them — **jQuery 0.661×, Box2D 0.636×, PdfJS 0.689× on compile, allocation ~0.52× across the board, and 1.0009× steady state**. **Octane CodeLoad, the benchmark the item names, was run and passes: 94.6 → 104.0, 1.099×, 24 samples an arm, 93% pairwise dominance** — and it took 24 because the first three-sample pair and its reverse disagreed. That ratio also re-frames the item: compilation is only ~27% of what CodeLoad measures, not the whole of it. Two mistakes were caught by measuring: a stack handoff per deferred function took the suite from 3.5 to 20 minutes, and a thunk that *called* its resolve cost 1.0247% on call-heavy code until the warm path was written in IL. Typescript is 1.034× slower and unexplained. **The Mandreel suite was then run too, and it overturns the phase's headline target**: a 3.04× faster compile of `mandreel.js` moves Mandreel 0.993× and MandreelLatency 0.992× — Octane compiles that file at script load and times only the run function, so MandreelLatency measures execution pauses and belongs to phase 3. The saving is real and outside every score: suite wall clock **358.2 → 350.0 s**, non-overlapping. What remains of 1-1 is the parse and tree construction, which on real source is the larger half |
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. Then **2-12** found why the misses that remained could never heal: the cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — **77.7% of DeltaBlue's misses**. Refreshing in place takes **DeltaBlue's read hit rate to 93.16%** (65.96% before both fixes) and Box2D's to 98.83%. **DeltaBlue still fails the gate at 447×**, but the cache is no longer the reason, and what remains is not property-cache-shaped. **0-6's CI run has since confirmed the split independently — Richards 144.9×, DeltaBlue 460×** — so the phase's exit criterion is answered by two measurements on different machines that agree on which side of 200× each benchmark falls, rather than by one. Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. **Its `let`/`const` half is now landed**, on the second attempt: the first was withdrawn on a miscompile, and re-built scoped to the *numeric* tier alone it reproduces the predicted number and not the defect — **`let` and `const` both 31.98 → 0.00 B/iter and 1 → 3 numeric locals, identical to the eligible `var` floor, with all twelve other `--local-alloc` rows byte-identical**, both arms from one tree. The recorded reproduction was re-run against it and is green, including under the switches that restore the pre-1-4 and pre-1-1 front end — so the withdrawn attempt's defect is **not explained**, only not reproduced; what the second attempt does differently is leave the JSValue tier closed to lexical names, since a TDZ and const-ness live in the cell that tier removes while the numeric gate proves both unobservable. **The block-scoped `var` then landed too, and 3-3 is complete**: the "definite-assignment analysis" it asked for is the function body's own dominance argument applied one level down — an unconditional block is *transparent* (entered whenever reached, exits only via `return`/`throw`), and any other block *confines* its declaration, which then needs every reference inside it. **`block-var` 31.98 → 0.00 B/iter and 1 → 3, one row moved and twelve byte-identical.** Two defects were caught on the way, neither shipped: a non-dominating declaration could mark a name readable and mask a read that would see `undefined`, and the fix for that over-corrected into rejecting a benign numeric re-declaration — caught by a pre-existing test written as "the guard against over-fixing". All four of the item's categories are now at the eligible floor except `parameter`, which cannot reach the numeric tier at all. 3-4 is a cost, not a task |
-| **4** — tiering | Started. **4-3a is landed and it found a real hazard**: restart is only sound if the body is not suspendable, and nothing said so — the property held by two unrelated accidents (the `EnableTiering` call sitting inside the ordinary-function `else` branch, and the tiering gate borrowing `CanScalarReplaceLocals`, which refuses generators for its own reasons). Defeating both, a legal `async function` whose body matches the planner's shape returns **`number` instead of a Promise** from its second call on — measured, not argued. One condition at the decision point fixes it, and 16 tests pin all three conditions. **4-3b is landed too**: `SpeculationBuilder.Guarded` compiles the specialized and generic forms into one method so a failed guard is a *branch*, with the subject evaluated exactly once (the hand-rolled spelling fails 12 of its 15 tests) and per-site poisoning after four misses. **It emits no JavaScript-level speculation, and that is structural rather than scope-trimming** — a guard needs a shape or a callee to speculate on and a tier-1 method knows neither, so the branch only has meaning inside a tier-2 recompile, which is 4-2. The mechanism lands before its consumer because it has to. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 has landed and it settles the phase's premise.** Per-site feedback now *retains* what the inline caches only observe — receiver shapes at reads, callee identities at calls — and over seven Octane suites, weighted by executed operations, **93.54% of 37.9 M property reads and 96.70% of 4.24 M calls happen at a site that only ever saw one shape or one callee**. 4-2 and 4-4 are an XL each and both are worth their cost only in proportion to that number; nothing in the engine could report it until now, and it comes out high. **Megamorphism is essentially absent** — 18 sites in total, five of seven suites have none — corroborating 2-10's independent finding of zero megamorphic read sites; the fallback path 4-3b must still be correct, it just will not be hot. **DeltaBlue is the worst read case at 77.10%**, with 43 polymorphic read sites against Richards's 1, which is a lead on the suite still outside phase 2's gate. Collection is off by default, costs nothing on the call path *by construction*, and the item's third signal — numeric-vs-generic per site — is deliberately left uncollected rather than half-built. **4-2 has now landed too, and it splits the same way 4-3 did.** Measuring the branch it was told to replace found that it does **not** "recompile the same code the same way": a fresh top-level compilation builds a *second* function object and loses inherited strictness, so **DeltaBlue died on the shipping tier-2 hook** — `TypeError: Cannot get property call of undefined`, 0 of 1 benchmarks against 1 of 1 untiered, because its constructors read `X.superConstructor` off their own name and got the copy. Four of thirteen probes disagreed between tiered and untiered. **4-2a** states the recompile contract, refuses the identity cases and repairs strictness, at a cost of ~5% of promotions. **4-2b** then makes tier-2 re-emit tier-1's *own* site indices — which carries the warm caches across promotion and makes 4-1's feedback addressable — and emits a monomorphic read as a shape guard plus a direct slot load through 4-3b's in-method branch, whose **first JavaScript-level consumer** this is. **44.74% of the corpus's 37.9 M executed reads leave the inline-cache path** (counted exactly: cache misses are identical, so they were removed, not converted), carried by **1 130 sites**, with 156 guard misses and 30 poisoned — the monomorphism holds past the promotion point. **Each such read is 0.818× (46.83 → 37.12 ns, six pairs, 0.778–0.879), and the suite wall clock does not move: 0.9947 against a feedback-on control.** That is arithmetic, not failure — 16.9 M × 9.7 ns is 164 ms of a 19.7 s run, **0.83%**, under a ±2% floor. It also bounds the phase: the whole read path is ≤ ~9% of Octane's execution time here and the whole call path ≤ ~5.5%, so **the two paths phase 4 is built around are together at most ~15%**, which 4-4 should know before it starts. The item's arithmetic half is still not built, for 4-1's reason |
+| **4** — tiering | Started. **4-3a is landed and it found a real hazard**: restart is only sound if the body is not suspendable, and nothing said so — the property held by two unrelated accidents (the `EnableTiering` call sitting inside the ordinary-function `else` branch, and the tiering gate borrowing `CanScalarReplaceLocals`, which refuses generators for its own reasons). Defeating both, a legal `async function` whose body matches the planner's shape returns **`number` instead of a Promise** from its second call on — measured, not argued. One condition at the decision point fixes it, and 16 tests pin all three conditions. **4-3b is landed too**: `SpeculationBuilder.Guarded` compiles the specialized and generic forms into one method so a failed guard is a *branch*, with the subject evaluated exactly once (the hand-rolled spelling fails 12 of its 15 tests) and per-site poisoning after four misses. **It emits no JavaScript-level speculation, and that is structural rather than scope-trimming** — a guard needs a shape or a callee to speculate on and a tier-1 method knows neither, so the branch only has meaning inside a tier-2 recompile, which is 4-2. The mechanism lands before its consumer because it has to. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 has landed and it settles the phase's premise.** Per-site feedback now *retains* what the inline caches only observe — receiver shapes at reads, callee identities at calls — and over seven Octane suites, weighted by executed operations, **93.54% of 37.9 M property reads and 96.70% of 4.24 M calls happen at a site that only ever saw one shape or one callee**. 4-2 and 4-4 are an XL each and both are worth their cost only in proportion to that number; nothing in the engine could report it until now, and it comes out high. **Megamorphism is essentially absent** — 18 sites in total, five of seven suites have none — corroborating 2-10's independent finding of zero megamorphic read sites; the fallback path 4-3b must still be correct, it just will not be hot. **DeltaBlue is the worst read case at 77.10%**, with 43 polymorphic read sites against Richards's 1, which is a lead on the suite still outside phase 2's gate. Collection is off by default, costs nothing on the call path *by construction*, and the item's third signal — numeric-vs-generic per site — is deliberately left uncollected rather than half-built. **4-2 has now landed too, and it splits the same way 4-3 did.** Measuring the branch it was told to replace found that it does **not** "recompile the same code the same way": a fresh top-level compilation builds a *second* function object and loses inherited strictness, so **DeltaBlue died on the shipping tier-2 hook** — `TypeError: Cannot get property call of undefined`, 0 of 1 benchmarks against 1 of 1 untiered, because its constructors read `X.superConstructor` off their own name and got the copy. Four of thirteen probes disagreed between tiered and untiered. **4-2a** states the recompile contract, refuses the identity cases and repairs strictness, at a cost of ~5% of promotions. **4-2b** then makes tier-2 re-emit tier-1's *own* site indices — which carries the warm caches across promotion and makes 4-1's feedback addressable — and emits a monomorphic read as a shape guard plus a direct slot load through 4-3b's in-method branch, whose **first JavaScript-level consumer** this is. **44.74% of the corpus's 37.9 M executed reads leave the inline-cache path** (counted exactly: cache misses are identical, so they were removed, not converted), carried by **1 130 sites**, with 156 guard misses and 30 poisoned — the monomorphism holds past the promotion point. **Each such read is 0.818× (46.83 → 37.12 ns, six pairs, 0.778–0.879), and the suite wall clock does not move: 0.9947 against a feedback-on control.** That is arithmetic, not failure — 16.9 M × 9.7 ns is 164 ms of a 19.7 s run, **0.83%**, under a ±2% floor. It also bounds the phase: the whole read path is ≤ ~9% of Octane's execution time here and the whole call path ≤ ~5.5%, so **the two paths phase 4 is built around are together at most ~15%**, which 4-4 should know before it starts. The item's arithmetic half is still not built, for 4-1's reason. **4-4's premise has now been measured too, and it re-specifies the item before any of it was built.** Counting at the call rather than through 4-1's compile-time gate, the corpus makes **6 194 758** invocations, and **37% of them are to native builtins** — an emitted call site with no body to inline, which any ceiling counting them inflates by more than a third. That correction came out of writing the counter's tests, which also found that a builtin runs a JavaScript callback on a *different and much shorter* entry (`InvokeCallback`, one `using` scope against five); callback invocations turn out to be **zero** on all seven suites, so an earlier guess that they explained the gap to 4-1's figure was wrong and is recorded rather than quietly deleted. Of the 3 902 620 calls with a JavaScript callee, **64.0% are made from a promoted function** — inlining's whole surface, and an upper bound. Against a hand-inlined control in one run set, **inlining saves 149 ns a call (0.37×)** — so the ceiling is **372 ms of a 19 694 ms driver, 1.89%**. Inlining is **expressible** here, unlike 4-3's deopt: labels and goto exist, a real function scope handles the callee's names, and 4-1 retains the callee — so the blocker is value, plus one semantics decision nothing can undo (an inlined callee has no frame, so it leaves `Error().stack`, and this engine has nothing to reconstruct one from). **New item 4-5 beats it**: a call costs **142 ns before it carries any argument**, plus 17.1 ns each, so ~90% of the overhead is fixed — and reducing that reaches all 6.19 M calls with no speculation, no guard and no fallback. The same probe also bounds the phase: reads are **9.16%** of execution time and the fixed call prologue **4.47%** (paid by every invocation, native callee included), so **the two paths phases 2 and 4 are built around are together under 14%** — while the arithmetic-only control loop is 16.98 ns an iteration, which points at **3-4**, not at phase 4 |
 | **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. The global case's retained result list then landed too — **2 032.8 → 478.3 B per match**, dead linear on both sides, by streaming when the receiver's `exec` is the pristine intrinsic and the replacement is a `$`-free string. **Every follow-up this phase named is now closed**; what is left is item 2's `Compiled` policy, deliberately unshipped |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
@@ -3796,7 +3796,8 @@ and tested; what is missing is the part that makes entering tier-2 worth anythin
 | **4-3** | **Deoptimization** — **designed; 4-3a and 4-3b both landed** | `Runtime/FunctionTiering.cs`, `Engine/CallFrames.cs`, and for 4-3b `.Compiler` / `.ExpressionCompiler` | The safety net that makes everything else legal. "Bail out mid-function by reconstructing an interpreter frame" is **not expressible here** — there is no interpreter frame. Splits into **4-3a** (S, the restart contract the pilot already implements) and **4-3b** (M–L, a generic fallback branch inside the specialized method), and only 4-3b gates 4-4 | ~~XL~~ **S + M–L** |
 | **4-1** | **Type feedback collection** — **shapes and callees landed; numeric-vs-generic outstanding** | `Runtime/TypeFeedback.cs`, `Runtime/ObjectShape.cs`, `LinqExpressions/JSFunctionBuilder.cs` | The inline caches already observe shapes at property sites but do not *retain* them. Now recorded per site and kept: receiver shapes at reads, callee identities at calls. **And it answers the question the rest of the phase rests on — see below.** Callee identity was phase 2's 2-6 until that item was measured: there is no repeated callee resolution to remove, so recording it is feedback and nothing else, and it pays only once 4-2 and 4-4 consume it | L |
 | **4-2** | **A specializing tier-2 compile** — **split by measurement; 4-2a and 4-2b both landed, arithmetic half outstanding** | `BuiltIns/Function/JSFunction.cs` — replace the `numericPlan == null` branch, plus `Runtime/TypeFeedback.cs` and `.LinqExpressions` for 4-2b | Consume 4-1's feedback: monomorphic property access → shape check plus direct slot read; arithmetic → raw `double`/`int` where feedback says so. **Measuring the branch first found it unsound** — it does not recompile the same code the same way, and DeltaBlue died on it — so the item splits into **4-2a** (S, the recompile contract) and **4-2b** (L, the specializing emission). 4-2b specializes **44.7% of the corpus's executed reads at 0.818× each**, which is **0.83% of suite time**: real, and below the noise floor | ~~XL~~ **S + L** |
-| **4-4** | **Inlining of small JS callees** at monomorphic sites | `.Compiler` | What Richards and DeltaBlue actually need, and the measurement says why: **a call costs ~250 ns, about thirteen times the loop body it replaces** (2-6). Strictly downstream of 4-3, 4-1 and 4-2 — the callee-identity feedback it needs is 4-1's, not a separate phase-2 item | XL |
+| **4-4** | **Inlining of small JS callees** at monomorphic sites — **premise measured; re-specified, do not start as written** | `.Compiler` | What Richards and DeltaBlue actually need, and the measurement says why: **a call costs ~250 ns, about thirteen times the loop body it replaces** (2-6). Strictly downstream of 4-3, 4-1 and 4-2 — the callee-identity feedback it needs is 4-1's, not a separate phase-2 item. **Measured before starting, and the ceiling is 1.89%**: 6 194 758 invocations of which **37% are to native builtins with no body to inline**, 3 902 620 with a JavaScript callee, 64.0% of those from a promoted function, and a hand-inlined control says inlining saves 149 ns each. Inlining is *expressible* here — unlike 4-3's deopt, the mechanism exists — so the blocker is value, and it splits into **4-4a** (the stack-trace question) and **4-4b** (AST-level inlining). **New 4-5** — make the fixed 142 ns call prologue cheaper — addresses more calls for less risk | ~~XL~~ **deferred; 4-5 first** |
+| **4-5** | **The fixed cost of a call, before it carries anything** — *new, from 4-4's measurement* | `BuiltIns/Function/JSFunction.cs` — `InvokeFunction` | A call costs **142 ns before any argument**, plus 17.1 ns per argument, so ~90% of a one-argument call's overhead is fixed. 2-6 already ruled out the five `using` scopes; what is left is `ExecutingFunction`, the legacy-caller check, `SelectInvocationDelegate`, the sloppy-mode `this` coercion, the delegate dispatch and the frame. Applies to **all** 6 194 758 invocations rather than 4-4's 2 496 760 — 2.5× the calls — and `JSFunction.InvokeCallback`, the entry every native callback site already uses, is a shipping proof that most of the prologue is optional: one `using` scope against five, needs no speculation, no guard, no tier and no fallback, and cannot change a stack trace. **Wants an ablation pass before it is built** | M–L |
 
 **Do not start 4-2 before 4-3 has a design.** Speculation without a mid-function
 bailout is either unsound or restricted to functions with no observable side effect
@@ -4327,6 +4328,172 @@ are independently controllable — which is what made the three-arm measurement 
   prototype version and the holder's shape and slot, all four of which the cache already guards.
   That is a strictly larger guard and it is the same set 4-4's inlining needs, so it belongs with
   4-4 rather than here.
+
+### 4-4 · Inlining of small JS callees — **premise measured; the item is re-specified and should not be started as written**
+
+Written the way 4-3 was: the premise first, from the code and a probe, before an XL is started
+against it. §4's own ordering makes this the last item, and 4-2b's closing arithmetic already
+flagged that its ceiling looked smaller than the phase assumed. Measured directly, it is.
+
+#### The two numbers the item rests on, and one of them was not what the phase had
+
+**How many calls there are.** `--specializing-tier`'s counting pass counts at the invocation rather
+than at an instrumented site, which is deliberately **not** 4-1's count: 4-1's call feedback is
+gated at *compile* time, which is right for feedback and wrong for a denominator.
+
+**Building the counter is where the first correction came from.** Its tests — written because
+4-4's whole conclusion is arithmetic over its output — found two things a plausible-looking counter
+had wrong. A call to a **native builtin** reaches the same entry as a call to a JavaScript function
+and has an emitted call site, so 4-1 counts it, but it has **no body to inline**; counting the two
+together puts every `Math.floor` into 4-4's ceiling. And a builtin running a JavaScript **callback**
+does not use that entry at all — `Array.prototype.forEach` and friends call
+`JSFunction.InvokeCallback`, which takes *one* `using` scope where the emitted-call entry takes
+five, and skips the executing-function and legacy-caller bookkeeping entirely. Merging them prices
+a call at the average of two paths that differ by most of their cost. Split three ways:
+
+| Suite | All invocations | Native callee | **JS callee** | 4-1 recorded | From a promoted caller | Share of JS calls |
+|---|--:|--:|--:|--:|--:|--:|
+| Richards | 121 404 | 2 | 121 402 | 121 404 | 68 954 | 56.8% |
+| DeltaBlue | 348 772 | 13 146 | 335 626 | 346 333 | 290 060 | 86.4% |
+| RayTrace | 676 718 | 231 697 | 445 021 | 476 934 | 237 168 | 53.3% |
+| Box2D | 1 749 666 | 527 164 | 1 222 502 | 1 501 362 | 239 745 | 19.6% |
+| EarleyBoyer | 3 042 092 | 1 505 024 | 1 537 068 | 1 537 115 | 1 443 753 | 93.9% |
+| Crypto | 255 476 | 15 097 | 240 379 | 255 454 | 217 080 | 90.3% |
+| NavierStokes | 630 | 8 | 622 | 630 | 0 | — |
+| **All seven** | **6 194 758** | **2 292 138** | **3 902 620** | **4 239 232** | **2 496 760** | **64.0%** |
+
+**Callback invocations are zero on all seven suites** — so the earlier guess that they explained
+the gap to 4-1 was wrong, and it is recorded here rather than quietly deleted. **37% of all
+invocations are to a native builtin**, which is the number that actually matters: those are calls
+4-4 can never address, and any ceiling that includes them is inflated by more than a third.
+
+**4-1's figure sits between the two populations and matches neither** — above the JS-callee count
+on Box2D and RayTrace, equal to it on EarleyBoyer, equal to the total on Richards. It is a count of
+instrumented sites, which is what it says it is; the gap is **not decomposed here**, and the two
+plausible causes (4-1's 65 536-site cap, and call forms its wrapper does not reach) are left named
+rather than asserted.
+
+**Where inlining could be emitted.** 4-3b established that a guard needs an observation and a
+tier-1 method has none, so inlining only has meaning inside a tier-2 recompile — which makes the
+calls with a JavaScript callee made *from* a promoted function the whole surface: **2 496 760, or
+64.0% of JavaScript calls and 40.3% of all invocations**. Still an upper bound: the caller comes
+from `JSEngine.ExecutingFunction`, so a call made from inside a builtin is attributed to the
+JavaScript function that called the builtin.
+
+#### What inlining would save, measured against a hand-inlined control
+
+`--inlining-call-probe`, six rotated repetitions, 20 M iterations, all shapes in one run set
+against **one** control — which is what lets the read path and the call path finally be compared
+without crossing two probes. Each `-inlined` arm writes the callee's body out by hand with its work
+held identical, so it is what a perfect inliner would produce:
+
+| Shape | ns per iteration |
+|---|--:|
+| `no-call-control` — `s = s + (i + 1)` | **16.98** |
+| `plain-inlined` | 17.03 |
+| `property-read` — `s = s + o.x` | 64.62 |
+| `method-inlined` — `s = s + (i + box.k)` | 87.38 |
+| `call-0-args` — `callee()` | 159.06 |
+| `call-1-arg` | 174.60 |
+| `call-2-args` | 189.49 |
+| `call-3-args` | 210.33 |
+| `plain-call` — `s = s + callee(i)` | 186.94 |
+| `method-call` — `s = s + box.add(i)` | 236.47 |
+
+- **A call costs 142 ns before it carries anything**, plus **17.1 ns per argument**. So ~90% of a
+  one-argument call's overhead is *fixed*: `Arguments` and the per-argument boxing are the small
+  half, which corrects the natural reading of 2-6's list.
+- **Inlining saves 149 ns (method shape) to 170 ns (plain shape)** — the ratio is 0.37× and 0.09×,
+  which is the largest per-operation win anywhere in this document.
+- A marginal cached property read is **47.6 ns**, against 2-6's ~250 ns call. The call is **three
+  times** the read, not thirteen — 2-6's "thirteen times" was against a loop body, not a read, and
+  both statements are true of different things.
+
+#### The ceiling, and it is the finding
+
+> **2 496 760 inlinable calls × 149 ns = 372 ms, against a 19 694 ms driver: 1.89%.**
+> Inlining every call with a JavaScript callee, which nothing can do, would be **582 ms — 2.95%**.
+
+That is the whole prize, before anything is lost to a callee that is not monomorphic, a callee too
+large to inline, a guard that has to be paid on every execution, and the generic path 4-3b requires
+to be kept forever. **An XL whose perfect execution is 1.89%** — against 4-2b's 0.83%, so about
+twice it, and against the campaign's 163× gap, not the item that closes it.
+
+**And the same probe says where the time actually is.** Reads are 37 871 908 × 47.6 ns = **1 804 ms
+(9.16%)**. The call *prologue* is paid by all 6 194 758 invocations — a native callee takes the same
+entry as a JavaScript one — so at 142 ns fixed that is **880 ms (4.47%)**. The two paths phases 2
+and 4 are built around are together **under 14% of Octane's execution time in this engine**,
+measured directly rather than as the pair of upper bounds 4-2b could give. §4's header says phase 4
+is "the difference between ~100× and ~10×"; **that is not what these numbers say**, and the sentence
+should not survive them unqualified.
+
+The other ~86% has a visible candidate in the same table and it is the *control*: `s = s + (i + 1)`
+costs **16.98 ns an iteration** for three JSValue operations and a compare. A loop that touches no
+property and calls nothing is already tens of times slower than the engines Octane is scored
+against. That is item **3-4**'s territory — a tagged value representation — which this document
+currently marks *"scope and cost, do not start"*. **That marking is now the one worth revisiting**,
+and it is a phase 3 question rather than a phase 4 one.
+
+#### Is inlining even expressible here? Yes — and the blocker is value, not mechanism
+
+Answered from the code so the successor does not re-derive it. 4-3's spike had to conclude that
+V8's deopt model has no counterpart in this engine; this one concludes the opposite, which is worth
+being explicit about.
+
+1. **`return` is expressible.** The tree layer has `BExpression.Label`/`Goto`, and a function body
+   already compiles against `FastFunctionScope.ReturnLabel`. An inlined body gets its own label and
+   its `return` becomes a jump to the end of the inlined block rather than out of the caller.
+2. **Scope is expressible — at the *tree* level, and only there.** Splicing the callee's *source
+   text* into the caller resolves every free identifier in the caller's scope, which is item 4-2a's
+   defect generalized from the function's own name to all of its names. Pushing a real
+   `FastFunctionScope` for the inlined body instead gives it its own locals, its own return label
+   and its own `this` (the scope already takes a `previousThis`, for arrows), and leaves free names
+   resolving as they do for a top-level callee — globals, the same in both. So the condition is
+   **the callee must be a top-level function whose free names are global**, which is checkable.
+3. **The callee's body is reachable.** 4-1 retains callee identities, and a `JSFunction` carries
+   its `SourceSpan`, so the tier-2 compile can parse the callee and inline its AST. 4-1's retained
+   callees are currently private to `TypeFeedback`; exposing them is small.
+4. **The guard is cheap.** Reference equality against the recorded callee, through 4-3b's
+   `Guarded` — one compare, and the receiver is already evaluated once.
+
+**What it costs that is not code, and this is the part to decide first.** An inlined callee has no
+frame, so it does not appear in `Error().stack`, and `f.caller` cannot see it. 4-3's spike
+established that this engine has nothing to reconstruct a frame *from* — so unlike V8, there is no
+mechanism that could restore the missing frame on demand. Keeping the frame preserves the traces
+and gives back a share of the cost the item came for; dropping it is an observable semantic change
+that no guard can undo. **Neither is wrong, and the item cannot be sized until it is chosen.**
+
+#### Re-specification
+
+**4-4 as written should not be started.** Not because it does not work — it does, and the mechanism
+is available — but because its ceiling is 1.89% and two cheaper things address the same or more:
+
+- **4-5 (new, M–L): make the call prologue cheaper.** The measurement says 142 ns of every call is
+  fixed, and 2-6 already ruled out the five `using` scopes (removing all of them moved a call loop
+  by a single-digit percentage). What is left is `ExecutingFunction`, the legacy-caller check,
+  `SelectInvocationDelegate`, the sloppy-mode `this` coercion, the delegate dispatch and the frame.
+  **This applies to all 6 194 758 invocations rather than the 2 496 760 inlinable ones — 2.5× the
+  calls — needs no speculation, no guard, no tier and no fallback path, and cannot change a stack
+  trace.** Halving the fixed cost would be ~2.2%, more than 4-4's *ceiling*, at a fraction of the
+  risk.
+  **And there is already a shipping proof that most of the prologue is optional.**
+  `JSFunction.InvokeCallback` — the entry every native callback site uses — takes one `using` scope
+  against five and does none of the executing-function or legacy-caller bookkeeping. Two call paths
+  exist in this engine and one is much shorter; **pricing the difference between them is the first
+  thing 4-5 should do**, because it converts "the fixed cost could perhaps be reduced" into a
+  measured number, and it may also be a semantic question worth asking (the shorter path omits
+  `EnterStrictMode`).
+- **3-4, re-examined.** The 16.98 ns arithmetic-only loop is the larger number by a wide margin and
+  nothing in phase 4 touches it.
+
+**If 4-4 is built anyway**, it splits the way 4-3 and 4-2 did: **4-4a** — decide and pin the
+stack-trace question, with tests; **4-4b** — the AST-level inlining under the conditions in (2)
+above. Neither is XL on its own. The order matters: 4-4a is a semantics decision that changes what
+4-4b is allowed to emit.
+
+**Nothing is landed for this item.** The probe (`--inlining-call-probe`) and the call counting
+(`CallPathDiagnostics`, off by default) are, because the successor needs them and because a
+measurement nobody can re-run is not evidence.
 
 ---
 
