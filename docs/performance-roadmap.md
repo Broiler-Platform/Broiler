@@ -384,12 +384,13 @@ times on 2026-08-03 on linux-x64 at the pinned `9bf9639b` — plus `patches/0067
 identical every time, manifest by manifest** — so the table below describes the pinned pointer as well as the commit it was first
 measured at.
 
-**Re-run 2026-08-04 on linux-x64 at the pinned `61c8cc65` plus `patches/0078` (item 3-7).** All
-five manifests on the switch-ON arm — the shipping configuration — and `arrays` and
-`properties-proxy` on the switch-OFF control: **every count is identical to the row below**,
-including `properties-proxy` at 3 950 / 38 on the control. The control's remaining three manifests
-were still running when this was written and are not quoted here; `arrays`, `strict-mode`,
-`realm-isolation` and `lexical-declarations` are already identical on the arm that ships.
+**Re-run 2026-08-04 on linux-x64 at the pinned `61c8cc65`, plus `patches/0078` (item 3-7) and then
+plus `0078`–`0079` (item 3-8): every count is identical to the row below, manifest by manifest, on
+every arm.** All five manifests were run on 3-7's switch-ON arm — the shipping configuration — and
+all five again with `BROILER_JS_CAPTURED_NUMERIC_LOCALS=0`; `properties-proxy` was then run a third
+time at `0078`–`0079` with nothing else building, and a fourth on a **pristine build of the pin**
+as a control. The last two agree **file for file** on which 38 fail, which is what makes this a
+control rather than a matching total.
 
 **One run of `properties-proxy` on the switch-ON arm came back 3 949 / 39, and the extra failure
 was mine, not the engine's.** The stderr the runner captured says so outright: *"The JavaScript
@@ -399,10 +400,10 @@ compilation."* That child process had loaded `Broiler.JavaScript.Compiler.dll` *
 while the manifest was still running. It is not a `$262` case, it is not an assertion failure, and
 `built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-3-4.js` passes three times for three when run
 alone on the widened build, and answers correctly on the widened build, on the same build with the
-switch off, and on a pristine build of the pin. The manifest-level control settles it: **a pristine
-build of `61c8cc65` runs the whole manifest at 3 950 / 38 with a failure set identical, file for
-file, to the switch-off arm's** — so the 39th file is in neither control and is not a property of
-the change.
+switch off, and on a pristine build of the pin. The manifest-level controls settle it: **a pristine
+build of `61c8cc65`, the switch-off arm, and a re-run at `0078`–`0079` with nothing else building
+all report 3 950 / 38 and agree file for file on which 38 fail** — so the 39th file is in none of
+the three and is not a property of any change here.
 
 > *This is §3.5's "check that the thing you measured is the thing you built", arriving from the
 > other side: there the binary under test was older than the source, here it was being rewritten
