@@ -1,0 +1,1268 @@
+From 44cd4e091bcb866b87326b1caf9fb2c0b5e9a995 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 4 Aug 2026 19:15:53 +0000
+Subject: [PATCH] Measure item 1-1's remaining half, and remove the walk it
+ found repeated
+
+The roadmap sizes what is left of item 1-1 (lazy function compilation) as "the parse
+and the expression-tree construction are still eager, and on real source that is the
+larger half". That share was derived rather than measured -- the ceiling table's
+92-96%, minus the emission A/B's 17-36%, read off as the remainder -- which is the move
+performance-roadmap.md 3.5 has a rule about and item 3-6 paid for once already.
+
+Two instruments take it directly.
+
+--compile-phases splits parse / expression-tree construction / emission on the six real
+corpora rather than on --compile-scaling's synthetic declaration walls, against the same
+body-free control, with the closure rewrite as its own column and the end-to-end compile
+as a decomposition check. Deferral on, i.e. the engine as it ships: parse 9.4-13.5%,
+tree construction 33.6-63.9%, emission 25-57%. Tree construction is the single largest
+phase on five of six corpora, parse and tree together are 43-75% of compile, and the
+parse -- the part an early-error rule forbids deferring -- is a tenth of the whole. The
+end-to-end column is taken FIRST for a reason: every compile here registers a deferred
+site per relayed lambda under a GCHandle that is never freed, so taken last it read 3.4x
+the sum of the phases on Box2D and 1.0x on jQuery, which is exactly how many sites a
+deferred compile of each registers (982 against 1).
+
+--defer-population counts what the ceiling table never could. Item 1-1 already registers
+a deferred site per nested lambda and forces it on first invocation, both once per site,
+so registered - forced is exactly the functions a front-end deferral would never have had
+to look at. After evaluating each corpus the way its harness does -- which for CodeLoad
+is the whole benchmark -- 84-99.7% of a script's functions are never invoked: jQuery 347
+of 415, Closure 46 of 51, Box2D 877 of 978, PdfJS 699 of 804, Typescript 1339 of 1574,
+Mandreel 2689 of 2697.
+
+Together those say the remaining half is worth 43-75% of compile over a population that
+is almost entirely never needed. They also correct item 1-1's own ceiling table:
+--compile-profile stubs outermost function bodies and jQuery has exactly one, the IIFE
+the library is written inside (99.91% of its bytes), so its control is an empty file and
+the recorded "96.5% of its compile in bodies that are never called" is everything except
+the parse -- of a body CodeLoad calls first.
+
+Measuring the phases then found a repeat inside the half that already landed.
+LambdaRewriter.Rewrite descends through nested lambdas, because CheckForClosure threads a
+capture up the whole lambda chain and can only do that from a walk that sees the chain.
+RuntimeMethodBuilder.Relay called it again with the relayed lambda as its own root, so a
+lambda at depth d was walked d+1 times -- and with item 1-1's deferral on, relaying
+jQuery's single IIFE walked the entire program at the moment of deferring it.
+
+Counted rather than argued, and then counted again for the claim that matters. Every
+relay in a real compile is a repeat: 0 needing a rewrite of their own against 415, 51,
+978, 804 and 1574 that had already had one. And with the switch off, so the repeat still
+runs, it creates 0 captures the first walk had not -- the direct instrument, because
+"every relay is a repeat" and "the repeat does nothing" are two claims and the first
+counter only measures one of them.
+
+Relay now skips a lambda a descending walk has already entered, marked on the lambda
+itself. The mark is set only by a walk that rewrites nested lambdas, so RewriteRootOnly --
+the async pre-rewrite, which stops at each nested lambda by design -- leaves it clear, and
+anything built after that walk (a generator or async body rewritten into a state machine)
+is rewritten at relay exactly as before.
+
+Whole compile 0.782x on jQuery and 0.867x on Typescript, six of six ABBA pairs each, one
+corpus per process. Box2D does not separate on that instrument and its control arm's own
+spread is 55.6%, so the changed phase was measured directly instead: emission
+99.9 -> 54.8 ms (0.549x) and whole compile 267.4 -> 207.2 ms (0.775x), in the round where
+--compile-phases' built-in parse control held to 6%. The round where that control moved
+1.5-1.9x is discarded on that basis.
+
+BROILER_JS_RELAY_REWRITE_ONCE=0 restores the repeat. RelayRewriteTests adds 19 cases --
+transitive capture through three levels, a write back through one, per-instance loop cells
+two levels down, a generator and an async body nested in a closure, `this` through an
+arrow, a named function expression's own name, direct eval two levels down, five levels
+reading and writing every level, and the counter invariant -- each asserted on both
+settings of the switch.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01PvNJHaNMQPZcrrkmJpDF2x
+---
+ .../RelayRewriteTests.cs                      | 271 +++++++++++++
+ .../Expressions/BLambdaExpression.cs          |  12 +
+ .../LambdaRewriter.cs                         |   6 +
+ .../Runtime/DeferredMethod.cs                 |  43 ++
+ .../Runtime/RuntimeMethodBuilder.cs           | 137 ++++++-
+ .../CompilePhaseMetrics.cs                    | 371 ++++++++++++++++++
+ .../CompileProfileMetrics.cs                  |   9 +-
+ .../DeferPopulationMetrics.cs                 | 164 ++++++++
+ .../Program.cs                                |  15 +
+ 9 files changed, 1016 insertions(+), 12 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/RelayRewriteTests.cs
+ create mode 100644 Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompilePhaseMetrics.cs
+ create mode 100644 Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/RelayRewriteTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/RelayRewriteTests.cs
+new file mode 100644
+index 00000000..6fcd688c
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/RelayRewriteTests.cs
+@@ -0,0 +1,271 @@
++using Broiler.JavaScript.Engine;
++using Broiler.JavaScript.ExpressionCompiler.Runtime;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// A relayed lambda is no longer closure-rewritten a second time when the walk that emitted its
++// enclosing lambda already descended through it (docs/performance-roadmap.md item 1-1's
++// remaining half).
++//
++// LambdaRewriter.Rewrite descends through nested lambdas — that is how CheckForClosure threads a
++// capture up the whole chain — and RuntimeMethodBuilder.Relay then called it again with the
++// relayed lambda as its own root, so a lambda at depth d was walked d+1 times. Counted on the
++// real corpora, the second walk found nothing to do on any site: 0 of 415 on jQuery, 0 of 978 on
++// Box2D, 0 of 1 574 on Typescript.
++//
++// "Found nothing to do" is a count, not a proof, so what these assert is the behaviour the
++// second walk would have been protecting: a capture that has to be threaded through more than one
++// level, a write through such a capture, and the two rewrites that build lambdas AFTER the
++// descending walk has been through — a generator body and an async body, whose state machines are
++// synthesized later and whose lambdas therefore still carry the flag clear and are rewritten at
++// relay exactly as before. Every case is asserted on BOTH settings of the switch, so it is a
++// statement about closure semantics rather than a description of the skip.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public sealed class RelayRewriteTests
++{
++    private static string Eval(string source, bool skipRewritten)
++    {
++        var previous = ClosureRewriteDiagnostics.SkipRewrittenRelays;
++        ClosureRewriteDiagnostics.SkipRewrittenRelays = skipRewritten;
++        try
++        {
++            using var context = new JSContext();
++            return context.Eval(source).ToString();
++        }
++        finally
++        {
++            ClosureRewriteDiagnostics.SkipRewrittenRelays = previous;
++        }
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void ACaptureReadsThroughEveryInterveningLevel(bool skip)
++    {
++        // The case the relay-time rewrite would have to exist for: `outer` is bound at depth 0
++        // and read at depth 3, so each of the two lambdas in between has to carry a box it never
++        // mentions itself. Only a walk that sees the whole chain can set that up.
++        const string source = """
++            (function () {
++              var outer = 7;
++              return (function () {
++                return (function () {
++                  return (function () { return outer; })();
++                })();
++              })();
++            })();
++            """;
++
++        Assert.Equal("7", Eval(source, skip));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void AWriteThroughATransitiveCaptureIsSeenByTheBindingsOwner(bool skip)
++    {
++        // Same chain in the other direction. A by-value capture would read 1 here, and a chain
++        // that boxed at the wrong level would read 1 as well — the two failures the threading
++        // exists to prevent are indistinguishable from the outside, which is why the write is
++        // asserted from the scope that owns the binding.
++        const string source = """
++            (function () {
++              var counter = 1;
++              (function () {
++                (function () { counter = counter + 41; })();
++              })();
++              return counter;
++            })();
++            """;
++
++        Assert.Equal("42", Eval(source, skip));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void EachClosureInstanceKeepsItsOwnCellAcrossTwoLevels(bool skip)
++    {
++        // Per-instance boxes, two levels down. Sharing one cell reports the last iteration five
++        // times; capturing by value reports the first.
++        const string source = """
++            var fns = [];
++            for (let i = 0; i < 5; i++) {
++              fns.push((function () { return function () { return i * 10; }; })());
++            }
++            fns.map(function (f) { return f(); }).join(',');
++            """;
++
++        Assert.Equal("0,10,20,30,40", Eval(source, skip));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void AGeneratorNestedInAClosureStillCapturesIt(bool skip)
++    {
++        // GeneratorRewriter builds the state machine's lambdas after the descending walk has
++        // been through, so they carry the flag clear and are rewritten at relay as before. If
++        // the mark were set on them anyway, this is what would break.
++        const string source = """
++            (function () {
++              var base = 10;
++              function* g() { yield base + 1; yield base + 2; }
++              var out = [];
++              for (const v of g()) out.push(v);
++              return out.join(',');
++            })();
++            """;
++
++        Assert.Equal("11,12", Eval(source, skip));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void AnAsyncBodyNestedInAClosureStillCapturesIt(bool skip)
++    {
++        // The RewriteRootOnly path: an async body is pre-rewritten before its enclosing scope
++        // exists, and that pass deliberately stops at each nested lambda. It therefore must not
++        // mark anything, or the enclosing walk's threading would be skipped for a body that
++        // never had it.
++        const string source = """
++            (function () {
++              var base = 5;
++              var seen = 0;
++              (async function () { seen = base + 1; })();
++              return seen;
++            })();
++            """;
++
++        Assert.Equal("6", Eval(source, skip));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void AnArrowTwoLevelsDownKeepsTheEnclosingThis(bool skip)
++    {
++        // `this` is captured by the same mechanism as any other binding, and an arrow has none
++        // of its own at any depth.
++        const string source = """
++            var o = {
++              v: 3,
++              run: function () {
++                return (function (self) { return (() => self.v * 2)(); })(this);
++              }
++            };
++            o.run();
++            """;
++
++        Assert.Equal("6", Eval(source, skip));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void ANamedFunctionExpressionRecursesThroughItsOwnName(bool skip)
++    {
++        // The name binding of a named function expression is a capture of a cell the enclosing
++        // scope cannot see, created by the compiler rather than by the source.
++        const string source = """
++            (function () {
++              var fact = function f(n) { return n <= 1 ? 1 : n * f(n - 1); };
++              return fact(5);
++            })();
++            """;
++
++        Assert.Equal("120", Eval(source, skip));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void ADirectEvalTwoLevelsDownReadsAndWritesTheOuterBinding(bool skip)
++    {
++        // Direct eval resolves against the scope chain at run time, so it exercises the capture
++        // from the side the static threading does not cover.
++        const string source = """
++            (function () {
++              var x = 4;
++              (function () { (function () { eval('x = x * 3'); })(); })();
++              return x;
++            })();
++            """;
++
++        Assert.Equal("12", Eval(source, skip));
++    }
++
++    [Theory]
++    [InlineData(true)]
++    [InlineData(false)]
++    public void FiveLevelsOfNestingReadAndWriteEveryLevel(bool skip)
++    {
++        // The depth term. Each level both owns a binding and reaches past its parent for one, so
++        // no single level's repository is sufficient and every intermediate has to carry boxes.
++        const string source = """
++            (function () {
++              var a = 1;
++              return (function () {
++                var b = 2;
++                return (function () {
++                  var c = 4;
++                  return (function () {
++                    var d = 8;
++                    return (function () {
++                      a += 16; b += 16; c += 16; d += 16;
++                      return a + b + c + d;
++                    })();
++                  })();
++                })();
++              })() + ':' + a;
++            })();
++            """;
++
++        Assert.Equal("79:17", Eval(source, skip));
++    }
++
++    [Fact]
++    public void NoRelayInANestedProgramNeedsARewriteOfItsOwn()
++    {
++        // The claim itself, as an assertion rather than as a corpus reading. Compiling and
++        // running a program with lambdas at four depths relays every one of them, and none has
++        // anything left for a second walk to do — which is what makes the skip a removal of
++        // repeated work rather than a removal of work.
++        //
++        // Mutation-testing this the other way round is what the Theory cases above are: with the
++        // switch off, every one of them still passes, so the second walk is not what they were
++        // relying on.
++        const string source = """
++            (function () {
++              var a = 1;
++              var fns = [];
++              for (var i = 0; i < 3; i++) {
++                fns.push(function () {
++                  return function () { return function () { return a + i; }; };
++                });
++              }
++              return fns.map(function (f) { return f()()(); }).join(',');
++            })();
++            """;
++
++        var previous = ClosureRewriteDiagnostics.SkipRewrittenRelays;
++        ClosureRewriteDiagnostics.SkipRewrittenRelays = true;
++        try
++        {
++            using var context = new JSContext();
++            ClosureRewriteDiagnostics.Reset();
++            Assert.Equal("4,4,4", context.Eval(source).ToString());
++
++            Assert.True(
++                ClosureRewriteDiagnostics.SkippedRelays > 0,
++                "the program relays nested lambdas, so some relay must have been skippable");
++            Assert.Equal(0, ClosureRewriteDiagnostics.RewroteRelays);
++        }
++        finally
++        {
++            ClosureRewriteDiagnostics.SkipRewrittenRelays = previous;
++        }
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Expressions/BLambdaExpression.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Expressions/BLambdaExpression.cs
+index 6698ab1d..07e3ff2c 100644
+--- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Expressions/BLambdaExpression.cs
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Expressions/BLambdaExpression.cs
+@@ -64,6 +64,18 @@ public class BLambdaExpression: BExpression
+         Body.Print(writer);
+     }
+ 
++    /// <summary>
++    /// Whether a <see cref="LambdaRewriter"/> walk has already descended through this lambda and
++    /// set up its captures.
++    /// </summary>
++    /// <remarks>
++    /// Set only by a walk that rewrites nested lambdas, so a <c>RewriteRootOnly</c> pass — which
++    /// stops at each nested lambda by design — leaves this false and the lambda is still rewritten
++    /// when its enclosing scope exists. A tree is built once per compilation and never shared
++    /// between them, so this is a fact about this tree and not cached state.
++    /// </remarks>
++    internal bool ClosureRewritten { get; set; }
++
+     internal void SetupAsClosure()
+     {
+         This ??= Parameter(typeof(Closures), "this");
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/LambdaRewriter.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/LambdaRewriter.cs
+index 3574607f..316e0733 100644
+--- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/LambdaRewriter.cs
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/LambdaRewriter.cs
+@@ -51,6 +51,7 @@ public class ClosureRepository
+     {
+         if (Closures.TryGetValue(pe, out var value))
+             return value.local;
++        Runtime.ClosureRewriteDiagnostics.CaptureCreated();
+         var s = source();
+         bool isBox = typeof(Box).IsAssignableFrom(pe.Type);
+         var boxType = isBox ? pe.Type : BoxHelper.For(pe.Type).BoxType;
+@@ -65,6 +66,7 @@ public class ClosureRepository
+     {
+         if (Closures.TryGetValue(pe, out var value))
+             return value.local;
++        Runtime.ClosureRewriteDiagnostics.CaptureCreated();
+         bool isBox = typeof(Box).IsAssignableFrom(pe.Type);
+         var boxType = isBox ? pe.Type : BoxHelper.For(pe.Type).BoxType;
+         var converted = BExpression.Parameter(boxType, pe.Name + "`");
+@@ -294,6 +296,10 @@ public class LambdaRewriter: BExpressionMapVisitor
+             Root.Register(node.This.AsSequence());
+         }
+         Root.Register(node.Parameters.AsSequence());
++        // Recorded only on a walk that descends through nested lambdas, so a RewriteRootOnly
++        // pass — which stops at each of them on purpose — does not claim to have set them up.
++        // RuntimeMethodBuilder.Relay reads this to avoid walking a subtree a second time.
++        node.ClosureRewritten |= rewriteNestedLambdas;
+         return base.VisitLambda(node);
+     }
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/DeferredMethod.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/DeferredMethod.cs
+index 603e40a5..efd28186 100644
+--- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/DeferredMethod.cs
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/DeferredMethod.cs
+@@ -70,6 +70,7 @@ internal sealed class DeferredMethod
+         this.delegateType = lambda.Type;
+         this.methodBuilder = methodBuilder;
+         this.enableJavaScriptTailCalls = enableJavaScriptTailCalls;
++        DeferredMethodDiagnostics.Registered();
+     }
+ 
+     /// <summary>
+@@ -105,6 +106,7 @@ internal sealed class DeferredMethod
+             // consumed stack and segments onto a fresh one only when a tree is actually deep
+             // enough to need it. That is the mechanism 1-2 built for exactly this, and it costs
+             // nothing on the shallow trees that are almost all of them.
++            DeferredMethodDiagnostics.Forced();
+             var (emitted, _, _) = lambda.CompileToBoundDynamicMethod(
+                 methodBuilder: methodBuilder,
+                 captureDiagnostics: false,
+@@ -270,6 +272,47 @@ internal sealed class DeferredMethod
+             && ThunkFactory.CanForward(lambda?.Type);
+ }
+ 
++/// <summary>
++/// Counts deferred sites and the subset of them that is ever invoked.
++/// </summary>
++/// <remarks>
++/// <para>
++/// The population item 1-1's remaining half is sized by. Its emission half is already lazy
++/// <em>transitively</em> — emitting a lambda relays its immediate children, and generation of a
++/// child relays its own — so the sites that are never forced are exactly the functions a
++/// deferral of the <em>front end</em> would also never have to parse, build a tree for, or
++/// rewrite. Any ceiling on that work is bounded by this ratio, and nothing in the engine could
++/// report it before.
++/// </para>
++/// <para>
++/// Both counters are touched once per <em>site</em>, never per call: registration happens while
++/// the enclosing lambda is emitted, and <see cref="DeferredMethod.Force"/> runs once per site
++/// under its own lock. So the counting is off the call path by construction and needs no
++/// enable switch — the same argument item 4-1 makes for its collection, one layer down.
++/// </para>
++/// </remarks>
++public static class DeferredMethodDiagnostics
++{
++    private static long registered;
++    private static long forced;
++
++    /// <summary>Deferred sites created since the last <see cref="Reset"/>.</summary>
++    public static long RegisteredSites => Interlocked.Read(ref registered);
++
++    /// <summary>Deferred sites whose IL has been generated, i.e. that were invoked.</summary>
++    public static long ForcedSites => Interlocked.Read(ref forced);
++
++    internal static void Registered() => Interlocked.Increment(ref registered);
++
++    internal static void Forced() => Interlocked.Increment(ref forced);
++
++    public static void Reset()
++    {
++        Interlocked.Exchange(ref registered, 0);
++        Interlocked.Exchange(ref forced, 0);
++    }
++}
++
+ /// <summary>
+ /// Process-wide switch for item 1-1's deferred IL generation.
+ /// </summary>
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs
+index 640e0a02..13b220f7 100644
+--- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs
+@@ -1,5 +1,6 @@
+ ﻿using System;
+ using System.Reflection;
++using System.Threading;
+ using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
+ using Broiler.JavaScript.ExpressionCompiler.Core;
+ using Broiler.JavaScript.ExpressionCompiler.Expressions;
+@@ -19,11 +20,50 @@ public class RuntimeMethodBuilder(
+ 
+     public BExpression Relay(BExpression @this, IFastEnumerable<BExpression> closures, BLambdaExpression innerLambda)
+     {
+-        // Stays eager, and must: it decides which variables this lambda captures and boxes
+-        // them, and the boxes are referenced by the creation-site expression built below. Only
+-        // what comes after it — generating the machine code — is deferrable (item 1-1).
+-        LambdaRewriter.Rewrite(innerLambda);
+-
++        // The closure rewrite decides which variables this lambda captures and boxes them, and
++        // the boxes are referenced by the creation-site expression built below — so it has to
++        // have happened before the site is built. It does not have to happen *here*: the walk
++        // that emitted the enclosing lambda descended through this one already, because
++        // CheckForClosure is what threads a capture up the whole lambda chain and it can only do
++        // that from a walk that sees the chain. Rewriting again from this node re-walks the
++        // entire subtree and changes nothing.
++        //
++        // The cost is not the second walk, it is the nth: relay happens once per lambda per
++        // enclosing emission, so a lambda at depth d was walked d+1 times. It is also what
++        // item 1-1's deferral could not remove — the IL of a nested body is postponed to first
++        // invocation, and then this walked its whole subtree at the moment of deferring it.
++        //
++        // Only a lambda a descending walk actually entered is skipped; anything built after that
++        // walk (a generator or async body rewritten into a state machine, a lambda a later pass
++        // synthesizes) has the flag clear and is rewritten here as before.
++        if (!innerLambda.ClosureRewritten)
++        {
++            ClosureRewriteDiagnostics.Rewrote();
++            LambdaRewriter.Rewrite(innerLambda);
++        }
++        else if (ClosureRewriteDiagnostics.SkipRewrittenRelays)
++        {
++            ClosureRewriteDiagnostics.Skipped();
++        }
++        else
++        {
++            // The switch is off, so the repeat still runs — and this is where it is *measured*.
++            // "Every relay is a repeat" is what the two counters above establish; whether a
++            // repeat does anything is a different claim, and the only instrument that answers it
++            // is a count of the captures the repeat creates. Over the corpus it is zero, which
++            // is what makes the skip a removal of repeated work rather than of work.
++            ClosureRewriteDiagnostics.Skipped();
++            ClosureRewriteDiagnostics.BeginRepeatWalk();
++            try
++            {
++                LambdaRewriter.Rewrite(innerLambda);
++            }
++            finally
++            {
++                ClosureRewriteDiagnostics.EndRepeatWalk();
++            }
++        }
++
+         var repository = BExpression.Field(@this, Closures.repositoryField);
+         var id = methods is MethodRepository runtimeMethods
+             && DeferredMethod.CanDefer(innerLambda, captureDiagnostics)
+@@ -31,16 +71,95 @@ public class RuntimeMethodBuilder(
+                 new DeferredMethod(innerLambda, this, enableJavaScriptTailCalls),
+                 innerLambda.Type)
+             : RegisterGenerated(innerLambda);
+-
++
+         return BExpression.Call(repository, create, closures == null ? BExpression.Null : BExpression.NewArray(typeof(Box), closures), BExpression.Constant(id));
+     }
+-
++
+     private ulong RegisterGenerated(BLambdaExpression innerLambda)
+-    {
++    {
+         var (method, il, exp) = innerLambda.CompileToBoundDynamicMethod(
+             methodBuilder: this,
+             captureDiagnostics: captureDiagnostics,
+             enableJavaScriptTailCalls: enableJavaScriptTailCalls);
+         return methods.RegisterNew(method, il, exp, innerLambda.Type);
+-    }
++    }
++}
++
++/// <summary>
++/// Switch and counters for skipping a relay-time closure rewrite that an enclosing walk has
++/// already performed.
++/// </summary>
++/// <remarks>
++/// <para>
++/// The switch exists for the reason every other one in this campaign does: the change has to be
++/// measurable against a build that differs in nothing else. Setting
++/// <c>BROILER_JS_RELAY_REWRITE_ONCE=0</c> restores the unconditional rewrite.
++/// </para>
++/// <para>
++/// The counters are touched once per relayed site, never per call, so they are off every hot
++/// path by construction and need no enable flag of their own. <c>Rewrote</c> is the population
++/// the skip cannot reach — a lambda no descending walk had entered — and reading it is how the
++/// claim "the relay-time walk is a repeat" is checked rather than asserted.
++/// </para>
++/// </remarks>
++public static class ClosureRewriteDiagnostics
++{
++    public const string EnvironmentVariable = "BROILER_JS_RELAY_REWRITE_ONCE";
++
++    private static int skipRewritten = ReadConfigured();
++
++    private static long rewrote;
++    private static long skipped;
++    private static long capturesInRepeat;
++
++    [ThreadStatic]
++    private static bool inRepeatWalk;
++
++    /// <summary>Whether a relay skips a rewrite an enclosing walk already did.</summary>
++    public static bool SkipRewrittenRelays
++    {
++        get => Volatile.Read(ref skipRewritten) != 0;
++        set => Volatile.Write(ref skipRewritten, value ? 1 : 0);
++    }
++
++    /// <summary>Relayed sites whose subtree this rewrote.</summary>
++    public static long RewroteRelays => Interlocked.Read(ref rewrote);
++
++    /// <summary>Relayed sites whose subtree an enclosing walk had already rewritten.</summary>
++    public static long SkippedRelays => Interlocked.Read(ref skipped);
++
++    /// <summary>
++    /// Captures a relay-time rewrite of an already-rewritten lambda created. Only ever non-zero
++    /// with <see cref="SkipRewrittenRelays"/> off, since that is the only arm that runs one.
++    /// </summary>
++    public static long CapturesCreatedInRepeatWalk => Interlocked.Read(ref capturesInRepeat);
++
++    internal static void Rewrote() => Interlocked.Increment(ref rewrote);
++
++    internal static void Skipped() => Interlocked.Increment(ref skipped);
++
++    internal static void BeginRepeatWalk() => inRepeatWalk = true;
++
++    internal static void EndRepeatWalk() => inRepeatWalk = false;
++
++    internal static void CaptureCreated()
++    {
++        if (inRepeatWalk)
++            Interlocked.Increment(ref capturesInRepeat);
++    }
++
++    public static void Reset()
++    {
++        Interlocked.Exchange(ref rewrote, 0);
++        Interlocked.Exchange(ref skipped, 0);
++        Interlocked.Exchange(ref capturesInRepeat, 0);
++    }
++
++    private static int ReadConfigured()
++        => string.Equals(
++            Environment.GetEnvironmentVariable(EnvironmentVariable),
++            "0",
++            StringComparison.Ordinal)
++            ? 0
++            : 1;
+ }
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompilePhaseMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompilePhaseMetrics.cs
+new file mode 100644
+index 00000000..39b249a4
+--- /dev/null
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompilePhaseMetrics.cs
+@@ -0,0 +1,371 @@
++using System;
++using System.Collections.Generic;
++using System.Diagnostics;
++using System.Linq;
++using System.Text.Json;
++using Broiler.JavaScript.Ast;
++using Broiler.JavaScript.Ast.Expressions;
++using Broiler.JavaScript.Ast.Misc;
++using Broiler.JavaScript.Ast.Statements;
++using Broiler.JavaScript.ExpressionCompiler;
++using Broiler.JavaScript.ExpressionCompiler.Expressions;
++using Broiler.JavaScript.ExpressionCompiler.Runtime;
++using Broiler.JavaScript.Parser;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.Engine.Benchmarks;
++
++/// <summary>
++/// Splits the front end's cost three ways — parse, expression-tree construction, IL emission —
++/// on the six real corpora, and attributes each phase to function bodies by differencing against
++/// the body-free control.
++/// </summary>
++/// <remarks>
++/// <para>
++/// This sizes what is left of roadmap item 1-1. Its emission half landed and the roadmap records
++/// what remains as <em>"the parse and the expression-tree construction are still eager, and on
++/// real source that is the larger half"</em> — a share that has never been measured directly. It
++/// was derived: <see cref="CompileProfileMetrics"/>'s ceiling says 92-96% of compile is bodies,
++/// the deferral A/B says emission is 17-36% of compile, and the remainder was read off as tree
++/// construction. §3.5 — "a count you inferred is not a count, however well it reconciles" — is
++/// about exactly that move, and 3-6 paid for it once already.
++/// </para>
++/// <para>
++/// The split itself is not new: <see cref="CompileScalingMetrics"/> has taken it since item 1-4,
++/// but only on synthetic declaration walls, where it reads parse 0.5% / tree 11% / emit 89%. 1-1
++/// then established that figure does not carry to real source, so applying the same instrument to
++/// the corpora is what turns an inference into a reading.
++/// </para>
++/// <para>
++/// Four columns per corpus, each also taken on the control (the same source with every outermost
++/// function body replaced by <c>{}</c>):
++/// </para>
++/// <list type="bullet">
++/// <item><description><c>parse</c> — <c>FastParser.ParseProgram</c> alone.</description></item>
++/// <item><description><c>tree</c> — the registered <see cref="IJSCompiler"/>, which parses and
++/// then builds the <c>BExpression</c> tree, minus the parse above.</description></item>
++/// <item><description><c>emitDeferred</c> — <c>CompileWithNestedLambdas</c> with item 1-1's
++/// deferral on, i.e. what the engine does today.</description></item>
++/// <item><description><c>emitEager</c> — the same with it off, which is the pre-1-1
++/// engine.</description></item>
++/// </list>
++/// <para>
++/// The derived row is <c>bodyTreeMs = treeFull - treeStub</c>: the tree construction that exists
++/// only because the bodies do, and therefore the gross prize of deferring tree construction.
++/// Against it sits <c>scanMs</c>, the charge-back — a deferred body still has to be walked for the
++/// names it references, because the enclosing lambda's creation site has to box those bindings
++/// before the body is compiled, and the walk is what the capture mechanism cannot avoid. It is
++/// measured rather than assumed, the same way <see cref="CompileProfileMetrics"/> charges the
++/// early-error pre-parse back to the emission half.
++/// </para>
++/// </remarks>
++internal static class CompilePhaseMetrics
++{
++    public static void Write(string octaneDirectory, int repetitions, string only = null)
++    {
++        var corpora = CompileProfileMetrics.LoadCorpora(octaneDirectory);
++        // Same rule as --compile-profile: one corpus per process. A deferred site holds its
++        // expression tree until it is forced, so a corpus measured after Mandreel's 5 MB pays
++        // collection time that is not its own.
++        if (!string.IsNullOrEmpty(only))
++            corpora = corpora.Where(c => c.Name == only).ToList();
++
++        var rows = new List<object>(corpora.Count);
++
++        foreach (var corpus in corpora)
++        {
++            var stub = CompileProfileMetrics.StubFunctionBodies(corpus.Source, out var outermost, out var total, out var bodyBytes, out var skipped);
++
++            // One untimed pass of each phase: the first compile in the process pays for JIT of
++            // the pipeline itself, which is not what this is measuring.
++            Phases(corpus.Source, corpus.Name);
++            Phases(stub, corpus.Name + "-stub");
++
++            var full = Repeat(repetitions, () => Phases(corpus.Source, corpus.Name));
++            var control = Repeat(repetitions, () => Phases(stub, corpus.Name + "-stub"));
++            var scan = Repeat(repetitions, () => new Split(0, 0, 0, 0, 0, ScanNames(corpus.Source), 0)).Scan;
++
++            var bodyTree = full.Tree - control.Tree;
++            var bodyRewrite = full.Rewrite - control.Rewrite;
++            var bodyEmit = full.EmitEager - full.EmitDeferred;
++            var todayTotal = full.Parse + full.Tree + full.EmitDeferred;
++
++            rows.Add(new
++            {
++                corpus = corpus.Name,
++                sourceBytes = corpus.Source.Length,
++                functionsTotal = total,
++                functionsOutermost = outermost,
++                functionsNotStubbed = skipped,
++                bodyByteShare = Math.Round((double)bodyBytes / corpus.Source.Length, 4),
++
++                parseMs = Round(full.Parse),
++                treeMs = Round(full.Tree),
++                rewriteMs = Round(full.Rewrite),
++                emitDeferredMs = Round(full.EmitDeferred),
++                emitEagerMs = Round(full.EmitEager),
++
++                parseStubMs = Round(control.Parse),
++                treeStubMs = Round(control.Tree),
++                rewriteStubMs = Round(control.Rewrite),
++                emitStubMs = Round(control.EmitDeferred),
++
++                // What the engine spends today, deferral on, and how it divides.
++                todayMs = Round(todayTotal),
++                endToEndMs = Round(full.EndToEnd),
++                parseShare = Share(full.Parse, todayTotal),
++                treeShare = Share(full.Tree, todayTotal),
++                emitShare = Share(full.EmitDeferred, todayTotal),
++
++                // The two halves of 1-1, on the same scale: what deferring emission already
++                // removed, and what deferring tree construction could remove.
++                bodyEmitMs = Round(bodyEmit),
++                bodyTreeMs = Round(bodyTree),
++                bodyRewriteMs = Round(bodyRewrite),
++                scanMs = Round(scan),
++                // The charge-back applied: a deferred body still needs its names collected.
++                captureCeilingMs = Round(bodyTree + bodyRewrite - scan),
++                captureCeilingShare = Share(bodyTree + bodyRewrite - scan, todayTotal),
++            });
++
++            Console.Error.WriteLine(
++                $"{corpus.Name,-18} parse={full.Parse,8:F1} tree={full.Tree,9:F1} "
++                + $"emit={full.EmitDeferred,8:F1} (eager {full.EmitEager,8:F1})  "
++                + $"rewrite={full.Rewrite,8:F1} bodyTree={bodyTree,8:F1} bodyRw={bodyRewrite,8:F1} scan={scan,6:F1} => ceiling={bodyTree + bodyRewrite - scan,9:F1} ms "
++                + $"of {todayTotal,9:F1} ms (end-to-end {full.EndToEnd,9:F1})");
++        }
++
++        Console.WriteLine(JsonSerializer.Serialize(
++            new
++            {
++                metric = "compile-phases",
++                repetitions,
++                note = "todayMs = parseMs + treeMs + emitDeferredMs, the engine as it ships. "
++                    + "bodyTreeMs = treeMs - treeStubMs, the tree construction that exists only "
++                    + "because the bodies do. captureCeilingMs = bodyTreeMs - scanMs, what item "
++                    + "1-1's remaining half could remove once the free-name walk it cannot defer "
++                    + "is charged back to it.",
++                rows,
++            },
++            new JsonSerializerOptions { WriteIndented = true }));
++    }
++
++    private static double Round(double value) => Math.Round(value, 2);
++
++    private static double Share(double part, double whole)
++        => whole > 0 ? Math.Round(part / whole, 4) : 0d;
++
++    private readonly record struct Split(double Parse, double Tree, double Rewrite, double EmitDeferred, double EmitEager, double Scan, double EndToEnd);
++
++    /// <summary>
++    /// Times one pass of each phase over <paramref name="source"/>.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// Both emission arms need a tree of their own: <c>LambdaRewriter.Rewrite</c> mutates, so a
++    /// tree that has been emitted once cannot be emitted again. The tree column is the timed one
++    /// and the second build is untimed, which keeps the arms comparing emission and nothing else.
++    /// </para>
++    /// <para>
++    /// <c>DeferredMethodCompilation.Enabled</c> is toggled in-process rather than read from the
++    /// environment, because the question here is a difference between two emissions of the same
++    /// tree in the same process — an environment variable would make it a difference between two
++    /// processes as well. It is restored afterwards.
++    /// </para>
++    /// </remarks>
++    private static Split Phases(string source, string name)
++    {
++        var span = new StringSpan(source);
++        var compiler = CoreScript.Compiler;
++        var stopwatch = new Stopwatch();
++
++        // The decomposition's own check, and it is taken FIRST. Every compile in this method
++        // registers a deferred site per relayed lambda, each rooted by a GCHandle that is never
++        // freed and each holding its subtree — so a phase measured late in the sequence pays
++        // collection time the phases before it caused. Measured last, this column read 3.4x the
++        // sum of the phases on Box2D and 1.0x on jQuery, and the difference between those two
++        // corpora is exactly how many sites a deferred compile registers: 982 against 1. That is
++        // item 1-1's own retained-tree artifact, one level down from where the roadmap records
++        // it. Taken first, against a fresh collection, it is comparable with the sum.
++        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
++        var previousForEndToEnd = DeferredMethodCompilation.Enabled;
++        DeferredMethodCompilation.Enabled = true;
++        stopwatch.Restart();
++        CoreScript.Compile(source, name + ".js", codeCache: new NoCodeCache());
++        stopwatch.Stop();
++        DeferredMethodCompilation.Enabled = previousForEndToEnd;
++        var endToEnd = stopwatch.Elapsed.TotalMilliseconds;
++
++        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
++
++        stopwatch.Restart();
++        new Broiler.JavaScript.Parser.FastParser(new FastTokenStream(in span)).ParseProgram();
++        stopwatch.Stop();
++        var parse = stopwatch.Elapsed.TotalMilliseconds;
++
++        // The front end recurses over the source, so it takes the sized stack the engine gives
++        // it in production (item 1-2) rather than whatever this thread happens to have.
++        stopwatch.Restart();
++        var tree = CompilationStack.Run(
++            () => compiler.Compile(span, name + ".js", null, new NoCodeCache()),
++            source.Length);
++        stopwatch.Stop();
++        // compiler.Compile parses before it builds, so its own parse is subtracted out; leaving
++        // it in is what would make "tree" the number the roadmap already has.
++        var treeOnly = stopwatch.Elapsed.TotalMilliseconds - parse;
++
++        var previous = DeferredMethodCompilation.Enabled;
++        try
++        {
++            DeferredMethodCompilation.Enabled = true;
++            stopwatch.Restart();
++            CompilationStack.Run(() => tree.CompileWithNestedLambdas(), source.Length);
++            stopwatch.Stop();
++            var emitDeferred = stopwatch.Elapsed.TotalMilliseconds;
++
++            // Emission is two walks and only one of them is deferrable. LambdaRewriter.Rewrite
++            // recurses through every nested lambda — that is how a variable a nested function
++            // reads is registered as a capture in the scope that owns it — so with item 1-1's
++            // deferral on, the whole tree is still walked even though only the outermost lambda
++            // has IL generated. Timed on a tree of its own, because the rewrite mutates.
++            var rewriteTree = CompilationStack.Run(
++                () => compiler.Compile(span, name + ".js", null, new NoCodeCache()),
++                source.Length);
++            stopwatch.Restart();
++            if (rewriteTree is BLambdaExpression rewriteLambda)
++                CompilationStack.Run(() => LambdaRewriter.Rewrite(rewriteLambda), source.Length);
++            stopwatch.Stop();
++            var rewrite = stopwatch.Elapsed.TotalMilliseconds;
++
++            var eagerTree = CompilationStack.Run(
++                () => compiler.Compile(span, name + ".js", null, new NoCodeCache()),
++                source.Length);
++
++            DeferredMethodCompilation.Enabled = false;
++            stopwatch.Restart();
++            CompilationStack.Run(() => eagerTree.CompileWithNestedLambdas(), source.Length);
++            stopwatch.Stop();
++            var emitEager = stopwatch.Elapsed.TotalMilliseconds;
++
++            return new Split(parse, treeOnly, rewrite, emitDeferred, emitEager, 0, endToEnd);
++        }
++        finally
++        {
++            DeferredMethodCompilation.Enabled = previous;
++        }
++    }
++
++    private static Split Repeat(int repetitions, Func<Split> body)
++    {
++        var samples = new List<Split>(repetitions);
++        for (var i = 0; i < repetitions; i++)
++            samples.Add(body());
++
++        // Each column's own median: the repetition whose parse is the median need not be the one
++        // whose emission is.
++        static double Median(IEnumerable<double> values)
++        {
++            var ordered = values.OrderBy(v => v).ToArray();
++            return ordered[ordered.Length / 2];
++        }
++
++        return new Split(
++            Median(samples.Select(s => s.Parse)),
++            Median(samples.Select(s => s.Tree)),
++            Median(samples.Select(s => s.Rewrite)),
++            Median(samples.Select(s => s.EmitDeferred)),
++            Median(samples.Select(s => s.EmitEager)),
++            Median(samples.Select(s => s.Scan)),
++            Median(samples.Select(s => s.EndToEnd)));
++    }
++
++    /// <summary>
++    /// Parses, then walks every function body collecting the identifier names it mentions —
++    /// the charge-back against deferring tree construction.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// A deferred body cannot be compiled later against nothing. The enclosing lambda's creation
++    /// site passes a <c>Box[]</c>, and which bindings are in it is decided while the enclosing
++    /// lambda is emitted — before the deferred body exists as a tree. So the names the body
++    /// mentions have to be known eagerly even if nothing else about it is, and the cheapest form
++    /// of knowing them is this walk. Reporting <c>bodyTree</c> without subtracting it would credit
++    /// the capture half with a saving it is forbidden from taking, which is the same error
++    /// <see cref="CompileProfileMetrics"/> avoids by charging back the early-error pre-parse.
++    /// </para>
++    /// <para>
++    /// It is a lower bound on the real mechanism and deliberately so: a real scanner also has to
++    /// resolve each name against the enclosing scopes and distinguish a free reference from a
++    /// locally bound one. Both are proportional to this walk, so it bounds the charge-back from
++    /// below and the ceiling from above — and if the ceiling is small even at the lower bound,
++    /// nothing further needs measuring.
++    /// </para>
++    /// </remarks>
++    private static double ScanNames(string source)
++    {
++        var span = new StringSpan(source);
++        var program = new Broiler.JavaScript.Parser.FastParser(new FastTokenStream(in span)).ParseProgram();
++
++        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
++        var stopwatch = Stopwatch.StartNew();
++        var scanner = new NameScanner();
++        scanner.Visit(program);
++        stopwatch.Stop();
++
++        // Read so the walk cannot be optimized away, and so a scanner that collected nothing
++        // would be visible rather than fast.
++        if (scanner.Names.Count == 0 && source.Length > 1024)
++            throw new InvalidOperationException("Name scan collected nothing.");
++
++        return stopwatch.Elapsed.TotalMilliseconds;
++    }
++
++    /// <summary>
++    /// Collects every identifier name in the program.
++    /// </summary>
++    /// <remarks>
++    /// The three container overrides are the ones <see cref="AstReduce"/> leaves as leaves for
++    /// its rewriting visitors, and their absence here would make the walk skip
++    /// <c>var f = function () {}</c> — the dominant spelling in jQuery — and so under-report the
++    /// charge-back. (§3.5: "a comment that says missing one here is a miscompile is a checklist".)
++    /// </remarks>
++    private sealed class NameScanner : AstReduce
++    {
++        public readonly HashSet<string> Names = new(StringComparer.Ordinal);
++
++        protected override AstNode VisitIdentifier(AstIdentifier identifier)
++        {
++            Names.Add(identifier.Name.Value);
++            return identifier;
++        }
++
++        protected override VariableDeclarator VisitVariableDeclarator(VariableDeclarator declarator)
++        {
++            Visit(declarator.Identifier);
++            if (declarator.Init != null)
++                Visit(declarator.Init);
++            return declarator;
++        }
++
++        protected override ObjectProperty VisitObjectProperty(ObjectProperty property)
++        {
++            if (property.Key != null)
++                Visit(property.Key);
++            if (property.Value != null)
++                Visit(property.Value);
++            if (property.Init != null)
++                Visit(property.Init);
++            return property;
++        }
++
++        protected override Case VisitCase(Case @case)
++        {
++            if (@case.Test != null)
++                Visit(@case.Test);
++            var statements = @case.Statements.GetFastEnumerator();
++            while (statements.MoveNext(out var statement))
++                Visit(statement);
++            return @case;
++        }
++    }
++}
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileProfileMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileProfileMetrics.cs
+index 7a6fae68..6f44a8e7 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileProfileMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CompileProfileMetrics.cs
+@@ -143,7 +143,10 @@ internal static class CompileProfileMetrics
+ 
+     private static double Round(double value) => Math.Round(value, 2);
+ 
+-    private sealed record Corpus(string Name, string Note, string Source);
++    // Shared with CompilePhaseMetrics, which asks a different question of the same six corpora
++    // and the same body-free control. Duplicating either would duplicate the three container
++    // overrides on the collector below, which are the part that is easy to get wrong.
++    internal sealed record Corpus(string Name, string Note, string Source);
+ 
+     private readonly record struct Sample(double Milliseconds, long AllocatedBytes);
+ 
+@@ -188,7 +191,7 @@ internal static class CompileProfileMetrics
+         return new Sample(times[times.Length / 2], bytes[bytes.Length / 2]);
+     }
+ 
+-    private static List<Corpus> LoadCorpora(string octaneDirectory)
++    internal static List<Corpus> LoadCorpora(string octaneDirectory)
+     {
+         var corpora = new List<Corpus>();
+ 
+@@ -247,7 +250,7 @@ internal static class CompileProfileMetrics
+     /// Only the outermost bodies are rewritten, because removing one removes everything nested
+     /// in it; the spans therefore never overlap and can be spliced right-to-left.
+     /// </remarks>
+-    private static string StubFunctionBodies(string source, out int outermost, out int total, out long bodyBytes, out int skipped)
++    internal static string StubFunctionBodies(string source, out int outermost, out int total, out long bodyBytes, out int skipped)
+     {
+         skipped = 0;
+         var program = Parse(source);
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
+new file mode 100644
+index 00000000..0b4b2729
+--- /dev/null
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
+@@ -0,0 +1,164 @@
++using System;
++using System.Collections.Generic;
++using System.Linq;
++using System.Text.Json;
++using Broiler.JavaScript.ExpressionCompiler.Runtime;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.Engine.Benchmarks;
++
++/// <summary>
++/// Counts, per corpus, how many of a script's functions are ever invoked once the script has
++/// been evaluated — the population that decides what is left of roadmap item 1-1.
++/// </summary>
++/// <remarks>
++/// <para>
++/// 1-1's emission half defers IL generation to first invocation, and its remaining half proposes
++/// deferring the parse and the expression-tree construction as well. Both are worth exactly what
++/// the *never-invoked* functions cost, and that share has never been counted: the roadmap's
++/// ceiling table sizes 1-1 by stubbing every outermost function body, which for a corpus like
++/// jQuery removes the program — its 532 functions live inside one IIFE, and that IIFE runs.
++/// </para>
++/// <para>
++/// The counter used is the deferral's own. Item 1-1's registration happens once per syntactic
++/// site and <c>Force</c> once per site that is invoked, so <c>registered - forced</c> is the
++/// number of functions a front-end deferral would never have had to look at. Evaluating the
++/// script and stopping is not an approximation of CodeLoad's shape — it *is* CodeLoad's shape:
++/// the benchmark evaluates jQuery and the Closure base and calls nothing else.
++/// </para>
++/// <para>
++/// A corpus that throws while evaluating (a browser global this host does not provide) still
++/// reports its counts, with the failure named. A partial evaluation under-reports <c>forced</c>,
++/// so it bounds the never-invoked share from above and is labelled rather than dropped.
++/// </para>
++/// </remarks>
++internal static class DeferPopulationMetrics
++{
++    /// <summary>
++    /// The globals each corpus is evaluated against, lifted from the harness that evaluates it.
++    /// </summary>
++    /// <remarks>
++    /// A corpus that throws on its first line counts nothing, so these are not cosmetic: jQuery's
++    /// payload ends <c>})(windowmock)</c> and Octane's <c>runJQuery</c> supplies that mock and
++    /// the <c>MockElement</c> it holds, while the four benchmark files construct a
++    /// <c>BenchmarkSuite</c> at top level. They are stubs of the harness, not of the corpus —
++    /// nothing here changes how much of the corpus is compiled.
++    /// </remarks>
++    private const string Prologue = """
++        function BenchmarkSuite() {}
++        function Benchmark() {}
++        function MockElement() {
++          this.appendChild = function(a) {};
++          this.createComment = function(a) {};
++          this.createDocumentFragment = function() { return new MockElement(); };
++          this.createElement = function(a) { return new MockElement(); };
++          this.documentElement = this;
++          this.getElementById = function(a) { return 0; };
++          this.getElementsByTagName = function(a) { return [0]; };
++          this.insertBefore = function(a, b) {};
++          this.removeChild = function(a) {};
++          this.setAttribute = function(a, b) {};
++        }
++        var jQuerySalt = 1;
++        var googsalt = 1;
++        var windowmock = {
++          'document': new MockElement(),
++          'location': { 'href': '' },
++          'navigator': { 'userAgent': '' }
++        };
++        """;
++
++    /// <summary>
++    /// The call CodeLoad makes through each payload after evaluating it, verbatim from
++    /// <c>runJQuery</c> and <c>runClosure</c>.
++    /// </summary>
++    private static readonly Dictionary<string, string> Epilogue = new(StringComparer.Ordinal)
++    {
++        ["codeload-jquery"] = "(function(){return windowmock.jQuery.grep([jQuerySalt], function(a,b){return true;})[0];})();",
++        ["codeload-closure"] = "(function(){return goog.cloneObject(googsalt);})();",
++    };
++
++    public static void Write(string octaneDirectory, string only = null)
++    {
++        var corpora = CompileProfileMetrics.LoadCorpora(octaneDirectory);
++        if (!string.IsNullOrEmpty(only))
++            corpora = corpora.Where(c => c.Name == only).ToList();
++
++        var rows = new List<object>(corpora.Count);
++
++        foreach (var corpus in corpora)
++        {
++            // One context per corpus, and the counters reset after it is built: creating a
++            // context compiles built-in JavaScript of its own, and counting that as the
++            // corpus's would inflate every row by the same fixed amount.
++            using var context = BenchmarkContext.Create(new NoCodeCache());
++            context.Eval(Prologue, "defer-population-prologue.js", context);
++            DeferredMethodDiagnostics.Reset();
++            ClosureRewriteDiagnostics.Reset();
++
++            string failure = null;
++            try
++            {
++                context.Eval(corpus.Source, corpus.Name + ".js", context);
++                // CodeLoad does not stop at evaluating the payload: it calls one function
++                // through it, which is what makes the run a load rather than a parse. Running
++                // the same call is what keeps `forced` honest for the benchmark this item is
++                // justified by.
++                if (Epilogue.TryGetValue(corpus.Name, out var epilogue))
++                    context.Eval(epilogue, corpus.Name + "-epilogue.js", context);
++            }
++            catch (Exception ex)
++            {
++                failure = ex.GetType().Name + ": " + ex.Message;
++            }
++
++            var registered = DeferredMethodDiagnostics.RegisteredSites;
++            var forced = DeferredMethodDiagnostics.ForcedSites;
++            var relaysRewritten = ClosureRewriteDiagnostics.RewroteRelays;
++            var relaysSkipped = ClosureRewriteDiagnostics.SkippedRelays;
++            var capturesInRepeat = ClosureRewriteDiagnostics.CapturesCreatedInRepeatWalk;
++
++            rows.Add(new
++            {
++                corpus = corpus.Name,
++                sourceBytes = corpus.Source.Length,
++                registeredSites = registered,
++                forcedSites = forced,
++                neverForcedSites = registered - forced,
++                neverForcedShare = registered > 0
++                    ? Math.Round((registered - forced) / (double)registered, 4)
++                    : 0d,
++                // How many relayed sites needed their own closure rewrite and how many had
++                // already had one from the walk that emitted their parent.
++                relaysRewritten,
++                relaysSkipped,
++                // Non-zero only with BROILER_JS_RELAY_REWRITE_ONCE=0, which is the arm that still
++                // runs the repeat: how many captures the repeat created that the first walk had
++                // not. Zero is what makes the skip a removal of repeated work.
++                capturesInRepeat,
++                // Non-null means evaluation stopped early, so `forced` is a floor and the share
++                // above is a ceiling.
++                evaluationFailure = failure,
++            });
++
++            Console.Error.WriteLine(
++                $"{corpus.Name,-18} registered={registered,6} forced={forced,6} "
++                + $"never={registered - forced,6} ({(registered > 0 ? (registered - forced) * 100.0 / registered : 0):F1}%) "
++                + $"relayRewrote={relaysRewritten,6} relaySkipped={relaysSkipped,6} "
++                + $"capturesInRepeat={capturesInRepeat,6}"
++                + (failure == null ? string.Empty : $"  [{failure}]"));
++        }
++
++        Console.WriteLine(JsonSerializer.Serialize(
++            new
++            {
++                metric = "defer-population",
++                note = "registered = deferred sites created while compiling and running the "
++                    + "script; forced = those whose IL was generated, i.e. that were invoked. "
++                    + "neverForcedShare bounds what deferring the parse and the expression tree "
++                    + "as well could remove.",
++                rows,
++            },
++            new JsonSerializerOptions { WriteIndented = true }));
++    }
++}
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+index 10f71f58..335ba0ff 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+@@ -128,6 +128,21 @@ public static class Program
+             return;
+         }
+ 
++        if (args.Length >= 2 && args[0] == "--defer-population")
++        {
++            DeferPopulationMetrics.Write(args[1], args.Length >= 3 ? args[2] : null);
++            return;
++        }
++
++        if (args.Length >= 2 && args[0] == "--compile-phases")
++        {
++            CompilePhaseMetrics.Write(
++                args[1],
++                args.Length >= 3 ? int.Parse(args[2]) : 3,
++                args.Length >= 4 ? args[3] : null);
++            return;
++        }
++
+         if (args.Length >= 2 && args[0] == "--compile-profile")
+         {
+             CompileProfileMetrics.Write(
+-- 
+2.43.0
+

@@ -21,12 +21,12 @@ so only the parent can hold the combined view.
 - **Acceptance protocol:** unchanged and unchallenged —
   [`Broiler.JS/docs/performance.md`](../Broiler.JS/docs/performance.md) governs what
   may be *claimed*. **Nothing in this document closes on the numbers it quotes.**
-- **Provenance:** the pinned submodule pointer is **`61c8cc65`**, checked 2026-08-04 against
+- **Provenance:** the pinned submodule pointer is **`07adeb44`**, checked 2026-08-04 against
   the gitlink rather than against the prose — **and checking it is what caught that this line
-  said `9bf9639b`**, which the pointer had moved eleven commits past. That is the *third*
-  consecutive time this line was stale when read (`2ebc0c3c` and `71dda1b7` before that), which
-  is no longer a coincidence: **a pointer written into prose goes stale silently**, and the only
-  reliable reading of it is `git submodule status`. It is why §4.1's and §3.4's figures below carry the
+  said `61c8cc65`**, which the pointer had moved four commits past. That is the *fourth*
+  consecutive time this line was stale when read (`2ebc0c3c`, `71dda1b7` and `9bf9639b` before
+  that), which is no longer a coincidence: **a pointer written into prose goes stale silently**,
+  and the only reliable reading of it is `git submodule status`. It is why §4.1's and §3.4's figures below carry the
   commit they were taken at rather than "the pin". `2ebc0c3c`, `a6f101cc`, `71dda1b7`,
   `685026c0`, `cdb2fd41`, `7ef80c03` and `8228b0da` are all **ancestors** of the current pin
   (`merge-base --is-ancestor`), so nothing recorded against any of them is invalidated and item
@@ -42,22 +42,19 @@ so only the parent can hold the combined view.
   recorded for items 4-2, 4-4, 4-5, 3-5 and 3-6 now describes the pinned pointer directly**,
   rather than a local build plus a patch series applied in order, which is what their sections
   used to have to say.
-  **Four patches are pending again:
-  [`patches/0078`](../patches/0078-js-captured-numeric-locals.patch)** (item 3-7),
-  **[`0079`](../patches/0079-js-number-boxing-census.patch)** (item 3-8),
-  **[`0080`](../patches/0080-js-native-bitwise-operators.patch)** (item 3-1) and
-  **[`0081`](../patches/0081-js-numeric-read-signal.patch)** (item 3-2), on the usual
-  terms — each push to the submodule remote returned 403, so the pointer is deliberately unbumped
-  and every figure in their sections was measured on a local build of `61c8cc65` with and without
-  the patch under test, both arms from the same tree. **They must be applied in order** — each
-  edits the files the one before it does — and all four were verified to apply *in sequence* from
-  a clean checkout of the pin with **`git am --keep-cr`**, with the resulting tree diffed against
-  the branch they were generated from, identical, rather than merely with `git apply`. None needs
-  a main-repo fallback: `0078` answers the same values on both settings of its switch (24 tests
-  assert exactly that) and its two correctness conjuncts only ever *refuse* a specialization,
-  `0079` and `0081` add counters that are off by default, and `0080` changes how six operators are
-  emitted without changing what they answer (15 tests, each on both settings) and moves no count on
-  the corpus at all.
+  **The four patches pending at the last reading have been applied and the pointer bumped.**
+  `0078`–`0081` (items 3-7, 3-8, 3-1 and 3-2) are now `37905aeb`, `14ac195f`, `cb2e63c6` and
+  `07adeb44` — matched patch by patch to the submodule log rather than inferred from this prose,
+  and `61c8cc65` is an ancestor of the pin, so every figure recorded for those four items now
+  describes the pinned pointer directly rather than a local build plus a patch series.
+  **One patch is pending again:
+  [`patches/0082`](../patches/0082-js-relay-rewrite-once.patch)** (item 1-1's remaining half —
+  the measurement, its two instruments, and the repeated closure rewrite they found), on the usual
+  terms: the push to the submodule remote returned 403, so the pointer is deliberately unbumped
+  and every figure in its section was measured on a local build of `07adeb44` with and without the
+  patch under test, both arms from the same tree. It needs no main-repo fallback: it is a
+  compile-time change with a switch that defaults on, its two probes are new emitters nothing else
+  calls, and its counters are touched once per site rather than per call.
   **Measurements and the test262 run in §4.1 and §3.4 were taken at `cdb2fd41` and have not
   been repeated** — `685026c0` also carries a string-allocation fix (#936). Octane code
   sites verified at `45f4f679`. **Phase 2's own measurements — §0, and each 2-x section —
@@ -84,7 +81,7 @@ the item's own section below, and nothing here is *closed* — see the acceptanc
 | Phase | State |
 |---|---|
 | **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6's workflow run has happened and its results are committed** — 2026-08-03 at the pinned pointer, **15 of 15 suites `ok` and 17 of 17 scores** for Broiler, Jint and a same-machine Chromium alike, nothing errored or timed out. Geomean **351** against Chromium's 57 080 (**163×**) and Jint's 616 (**0.569×**), spread **139.8×**. That answers the coverage question and phase 2's exit criterion (below); **what 0-6 still owes is the noise band** — the run is one repetition per suite and says so, so magnitudes and pass/fail may be read from it and deltas may not — plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce |
-| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting. **New: 1-4 ✅.** Measuring 1-1's premise found the phase's actual dominant cost, and it was not lazy compilation: the closure rewrite held a lambda's in-scope bindings in a `List` and asked it `Contains` per parameter reference, so **emission was quadratic in a scope's binding count** — 2 000 top-level declarations emitted in 13 865 ms against 2.5 ms of parse. A reference-keyed multiset (list-backed below 32 bindings) makes it linear: **28.5× on that shape, and 3.04× on Mandreel end-to-end**, ABBA-interleaved, six pairs. **1-1 is still open and its premise now has a number** — 92–96% of compile time is function bodies on the large real programs — but the measurement also **splits phase 1 in two and re-targets 1-1**: Mandreel was *wide*, not deep, and never was a 1-1 case, while jQuery at 96.5% deferrable is the whole of it. **1-1's emission half then landed without needing the capture mechanism at all**: every risk the item names is settled by the front end, so deferring *IL generation* to first invocation is the same prize with none of them — **jQuery 0.661×, Box2D 0.636×, PdfJS 0.689× on compile, allocation ~0.52× across the board, and 1.0009× steady state**. **Octane CodeLoad, the benchmark the item names, was run and passes: 94.6 → 104.0, 1.099×, 24 samples an arm, 93% pairwise dominance** — and it took 24 because the first three-sample pair and its reverse disagreed. That ratio also re-frames the item: compilation is only ~27% of what CodeLoad measures, not the whole of it. Two mistakes were caught by measuring: a stack handoff per deferred function took the suite from 3.5 to 20 minutes, and a thunk that *called* its resolve cost 1.0247% on call-heavy code until the warm path was written in IL. Typescript is 1.034× slower and unexplained. **The Mandreel suite was then run too, and it overturns the phase's headline target**: a 3.04× faster compile of `mandreel.js` moves Mandreel 0.993× and MandreelLatency 0.992× — Octane compiles that file at script load and times only the run function, so MandreelLatency measures execution pauses and belongs to phase 3. The saving is real and outside every score: suite wall clock **358.2 → 350.0 s**, non-overlapping. What remains of 1-1 is the parse and tree construction, which on real source is the larger half |
+| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting. **New: 1-4 ✅.** Measuring 1-1's premise found the phase's actual dominant cost, and it was not lazy compilation: the closure rewrite held a lambda's in-scope bindings in a `List` and asked it `Contains` per parameter reference, so **emission was quadratic in a scope's binding count** — 2 000 top-level declarations emitted in 13 865 ms against 2.5 ms of parse. A reference-keyed multiset (list-backed below 32 bindings) makes it linear: **28.5× on that shape, and 3.04× on Mandreel end-to-end**, ABBA-interleaved, six pairs. **1-1 is still open and its premise now has a number** — 92–96% of compile time is function bodies on the large real programs — but the measurement also **splits phase 1 in two and re-targets 1-1**: Mandreel was *wide*, not deep, and never was a 1-1 case, while jQuery at 96.5% deferrable is the whole of it. **1-1's emission half then landed without needing the capture mechanism at all**: every risk the item names is settled by the front end, so deferring *IL generation* to first invocation is the same prize with none of them — **jQuery 0.661×, Box2D 0.636×, PdfJS 0.689× on compile, allocation ~0.52× across the board, and 1.0009× steady state**. **Octane CodeLoad, the benchmark the item names, was run and passes: 94.6 → 104.0, 1.099×, 24 samples an arm, 93% pairwise dominance** — and it took 24 because the first three-sample pair and its reverse disagreed. That ratio also re-frames the item: compilation is only ~27% of what CodeLoad measures, not the whole of it. Two mistakes were caught by measuring: a stack handoff per deferred function took the suite from 3.5 to 20 minutes, and a thunk that *called* its resolve cost 1.0247% on call-heavy code until the warm path was written in IL. Typescript is 1.034× slower and unexplained. **The Mandreel suite was then run too, and it overturns the phase's headline target**: a 3.04× faster compile of `mandreel.js` moves Mandreel 0.993× and MandreelLatency 0.992× — Octane compiles that file at script load and times only the run function, so MandreelLatency measures execution pauses and belongs to phase 3. The saving is real and outside every score: suite wall clock **358.2 → 350.0 s**, non-overlapping. **What remains of 1-1 has now been measured before being built, and both halves of its premise hold.** The three-way split was only ever taken on synthetic declaration walls; taken on the real corpora it reads **parse 9.4–13.5%, expression-tree construction 33.6–63.9%, emission 25–57%** — tree construction is the single largest phase on five of six, parse and tree together are **43–75%** of compile, and the parse, the part an early-error rule forbids deferring, is a tenth of it. The population was never counted at all, and it is **84–99.7% of a script's functions never invoked once it has been evaluated** (jQuery 347 of 415, Mandreel 2 689 of 2 697). So the remaining half is over half the compile across a population that is almost entirely never needed. **It also corrects this item's own ceiling table**: `--compile-profile` stubs *outermost* bodies and jQuery has exactly one — the IIFE the library is written inside, 99.91% of its bytes — so the "96.5% of its compile in bodies that are never called" is everything except the parse, and that body is called first. **And measuring the phases found a repeat inside the half that already landed**: `LambdaRewriter.Rewrite` descends through nested lambdas, and `Relay` called it *again* per relayed site, so a lambda at depth *d* was walked *d+1* times and jQuery's whole tree was walked twice by a compile that emits almost nothing. Counted, the second walk finds nothing on any site — **0 of 415, 0 of 978, 0 of 1 574** — and a second counter says the repeat, left to run, creates **0 captures** the first walk had not. It is now skipped for any lambda a descending walk has already entered, with `RewriteRootOnly`'s pass deliberately marking nothing so async and generator bodies are unaffected. Whole compile **0.782× on jQuery and 0.867× on Typescript, six of six pairs each**; **Box2D does not separate** and its control arm's own spread is 55.6%, so the phase was measured directly instead — **its emission phase 0.549× and its whole compile 0.775×**, in the round where `--compile-phases`' parse control held |
 | **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. Then **2-12** found why the misses that remained could never heal: the cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — **77.7% of DeltaBlue's misses**. Refreshing in place takes **DeltaBlue's read hit rate to 93.16%** (65.96% before both fixes) and Box2D's to 98.83%. **DeltaBlue still fails the gate at 447×**, but the cache is no longer the reason, and what remains is not property-cache-shaped. **0-6's CI run has since confirmed the split independently — Richards 144.9×, DeltaBlue 460×** — so the phase's exit criterion is answered by two measurements on different machines that agree on which side of 200× each benchmark falls, rather than by one. Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
 | **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. **Its `let`/`const` half is now landed**, on the second attempt: the first was withdrawn on a miscompile, and re-built scoped to the *numeric* tier alone it reproduces the predicted number and not the defect — **`let` and `const` both 31.98 → 0.00 B/iter and 1 → 3 numeric locals, identical to the eligible `var` floor, with all twelve other `--local-alloc` rows byte-identical**, both arms from one tree. The recorded reproduction was re-run against it and is green, including under the switches that restore the pre-1-4 and pre-1-1 front end — so the withdrawn attempt's defect is **not explained**, only not reproduced; what the second attempt does differently is leave the JSValue tier closed to lexical names, since a TDZ and const-ness live in the cell that tier removes while the numeric gate proves both unobservable. **The block-scoped `var` then landed too, and 3-3 is complete**: the "definite-assignment analysis" it asked for is the function body's own dominance argument applied one level down — an unconditional block is *transparent* (entered whenever reached, exits only via `return`/`throw`), and any other block *confines* its declaration, which then needs every reference inside it. **`block-var` 31.98 → 0.00 B/iter and 1 → 3, one row moved and twelve byte-identical.** Two defects were caught on the way, neither shipped: a non-dominating declaration could mark a name readable and mask a read that would see `undefined`, and the fix for that over-corrected into rejecting a benign numeric re-declaration — caught by a pre-existing test written as "the guard against over-fixing". All four of the item's categories are now at the eligible floor except `parameter`, which cannot reach the numeric tier at all. 3-4 is a cost, not a task. **New: 3-5 ✅, and it measured the ceiling on this whole phase.** 4-5's probe found that the control loop every measurement here treats as a *floor* was itself paying a box per iteration — and the cause is not the parameter: `i` is a raw double, `n` is a `JSValue`, and `<` had a native form only when **both** sides were doubles, so the raw side was boxed to meet the generic operator. Unboxing the *other* side instead needs no entry guard and covers more (`i < a.length` is a property read, boxed for the same reason), and is sound because ToPrimitive of a Number is that Number. **33.77 → 10.03 ns and 32 → 0 B an iteration, 3.4× on its shape**; 33 semantics tests, every one of which also passes on the unmodified compiler. **On the Octane corpus it is invisible — 0.997× bytes, 0.995× time — and the reason is the number this phase never had: only 5.0% of scalar locals (203 of 4 029) reach the numeric tier at all.** The emission is not the problem (390 comparisons take the new form, 59% of those that could); what is on the other side is. That is the ceiling on 3-0, 3-3 and 3-5 alike, it is the same `CanScalarReplaceLocals` gate that bounds phase 4's tiering candidates, and widening it became **new item 3-6**. It also answers what 3-4 was told to wait for: the gap largely survives unboxed locals, because the unboxing reaches 5% of them. **3-6 has since done its count, and it retired its own design — and 3-5's explanation with it.** Of 2 695 hoisted names, `CanScalarReplaceLocals` — the gate 3-5 blamed — rejects **2, 0.1%**; the causes are *not proven numeric* (2 012, 74.7%) and *captured by a nested function* (478, 17.7%). Counted again inside the analysis, the first is not "most locals are not numbers" either: only **~170 names are never offered**, while the optimistic fixed point **offers 2 335 and drops 1 842 (78.9%)**, because something assigned to them comes from a parameter, a property read, an element or a call — none knowable statically. The two counts reconcile exactly, and the residue is **290 names the analysis proved numeric that the hoist site refused for being captured**. So the work splits: **3-7** gives a captured numeric local a raw-`double` cell (290 names, **203 → ~493, 2.4×**, entirely static), and **3-8** guards a local's numeric-ness at run time — which is **4-3b's in-method branch pointed at a representation**, and means *the largest single obstacle in phase 3 is shaped like phase 4*. Nothing was built for 3-6: its own text said to count first, and the count retired the design, for the fourth item running. **New: 3-7 ✅, and its premise was wrong in both directions.** The cell it asked for already existed — the expression compiler rewrites any CLR local a nested lambda references into a `Box<T>`, and **`Box<double>` *is* the shared cell**, so a captured numeric local costs *one* allocation where the `JSVariable` form costs two. The population, though, is **36× smaller than 3-6 said**: of its 478 captured names, **247 (51.7%) are named by a hoisted function declaration** and can never be widened, 223 more are not proven numeric, and the widening is worth **eight names, 224 → 232, 1.036×**. 3-6's 290 was **inferred rather than counted**, from *offered minus dropped* — and `Resolve` removes a third population between those two counters that had no counter at all, so the real reconciliation is **offered 2 295 = rejected 133 + dropped 1 916 + surviving 246**, and only **22** provably-numeric names are refused at the hoist site for any reason. Lifting the conjunct exposed **two wrong answers and one compile failure that had been hiding behind it**: a hoisted `function g(){ return s; }` can read `s` before `var s = 0` runs while sitting textually after it (`"0"` for `"undefined"`); a nested function's own parameter could mark the outer name initialized and mask a read that really sees `undefined` (`"0,5"` for `"undefined,5"`); and a function declaration stores a function object into the binding being typed, which no assignment-expression walk sees (`let f = 5; { function f(){} }` died on *"Assignment target Call is not supported"*). The first is fixed by a conjunct that is **not** behind the switch, because it is correctness. On its shape the result is exact — **63.97 → 0.01 B/iter, −112 B an activation, and shape ÷ control 7.19× → 1.0000×**, i.e. a captured numeric local now runs at the speed of the same loop with no closure at all — against an equally exact **losing side of +32 B and 1.111× when the value is read *through* the closure**. On the corpus it is **1.0001×**, invisible for the third item running, and the count says why: 2 439 names are not proven numeric and 247 are held by a hoisting rule. **Nothing left in phase 3 is a matter of loosening a conjunction** — and **3-8 then said the conjunctions were never where the prize was**. Two numbers, neither previously taken: **number boxing is 41.89% of everything the corpus allocates** (2.05 GB of 4.88 GB; 66.96% on NavierStokes, 55.16% on Crypto, 35.98% on Box2D, against 0.31% on DeltaBlue — a spread that buries the prize in any corpus average), and the **entire** numeric-local tier, measured for the first time against a build with it switched off, removes **311 187 boxes of 85.6 M — 0.36%, and 0.41% of total allocation**. So four "invisible on the corpus" readings were never evidence that the mechanism does not matter; they were evidence that eight more names do not. A box is minted by the **operator**, whose operands arrive boxed from array elements and object fields, so the local is one link carrying 0.36% of the traffic. Counting what defeats each proof says the same: of 1 916 drops, **894 (46.7%) are a property read and 570 (29.7%) a call's return — 76.4% values produced elsewhere** — against **47 (2.5%) parameters**, the category 3-3 deferred to phase 4 as the one that mattered. **3-8 as written should not be started; 3-1 and 3-2 move to the front of the phase.** Writing the classifier's tests also found the analysis offering a nested function's block-scoped `var`s to its *enclosing* function too, so each was dropped and counted once per level — no answer changes and every downstream figure is identical, but 3-7's `offered`/`rejected` pair is corrected from 2 521/359 to **2 295/133** |
 | **4** — tiering | Started. **4-3a is landed and it found a real hazard**: restart is only sound if the body is not suspendable, and nothing said so — the property held by two unrelated accidents (the `EnableTiering` call sitting inside the ordinary-function `else` branch, and the tiering gate borrowing `CanScalarReplaceLocals`, which refuses generators for its own reasons). Defeating both, a legal `async function` whose body matches the planner's shape returns **`number` instead of a Promise** from its second call on — measured, not argued. One condition at the decision point fixes it, and 16 tests pin all three conditions. **4-3b is landed too**: `SpeculationBuilder.Guarded` compiles the specialized and generic forms into one method so a failed guard is a *branch*, with the subject evaluated exactly once (the hand-rolled spelling fails 12 of its 15 tests) and per-site poisoning after four misses. **It emits no JavaScript-level speculation, and that is structural rather than scope-trimming** — a guard needs a shape or a callee to speculate on and a tier-1 method knows neither, so the branch only has meaning inside a tier-2 recompile, which is 4-2. The mechanism lands before its consumer because it has to. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 has landed and it settles the phase's premise.** Per-site feedback now *retains* what the inline caches only observe — receiver shapes at reads, callee identities at calls — and over seven Octane suites, weighted by executed operations, **93.54% of 37.9 M property reads and 96.70% of 4.24 M calls happen at a site that only ever saw one shape or one callee**. 4-2 and 4-4 are an XL each and both are worth their cost only in proportion to that number; nothing in the engine could report it until now, and it comes out high. **Megamorphism is essentially absent** — 18 sites in total, five of seven suites have none — corroborating 2-10's independent finding of zero megamorphic read sites; the fallback path 4-3b must still be correct, it just will not be hot. **DeltaBlue is the worst read case at 77.10%**, with 43 polymorphic read sites against Richards's 1, which is a lead on the suite still outside phase 2's gate. Collection is off by default, costs nothing on the call path *by construction*, and the item's third signal — numeric-vs-generic per site — is deliberately left uncollected rather than half-built. **4-2 has now landed too, and it splits the same way 4-3 did.** Measuring the branch it was told to replace found that it does **not** "recompile the same code the same way": a fresh top-level compilation builds a *second* function object and loses inherited strictness, so **DeltaBlue died on the shipping tier-2 hook** — `TypeError: Cannot get property call of undefined`, 0 of 1 benchmarks against 1 of 1 untiered, because its constructors read `X.superConstructor` off their own name and got the copy. Four of thirteen probes disagreed between tiered and untiered. **4-2a** states the recompile contract, refuses the identity cases and repairs strictness, at a cost of ~5% of promotions. **4-2b** then makes tier-2 re-emit tier-1's *own* site indices — which carries the warm caches across promotion and makes 4-1's feedback addressable — and emits a monomorphic read as a shape guard plus a direct slot load through 4-3b's in-method branch, whose **first JavaScript-level consumer** this is. **44.74% of the corpus's 37.9 M executed reads leave the inline-cache path** (counted exactly: cache misses are identical, so they were removed, not converted), carried by **1 130 sites**, with 156 guard misses and 30 poisoned — the monomorphism holds past the promotion point. **Each such read is 0.818× (46.83 → 37.12 ns, six pairs, 0.778–0.879), and the suite wall clock does not move: 0.9947 against a feedback-on control.** That is arithmetic, not failure — 16.9 M × 9.7 ns is 164 ms of a 19.7 s run, **0.83%**, under a ±2% floor. It also bounds the phase: the whole read path is ≤ ~9% of Octane's execution time here and the whole call path ≤ ~5.5%, so **the two paths phase 4 is built around are together at most ~15%**, which 4-4 should know before it starts. The item's arithmetic half is still not built, for 4-1's reason. **4-4's premise has now been measured too, and it re-specifies the item before any of it was built.** Counting at the call rather than through 4-1's compile-time gate, the corpus makes **6 194 758** invocations, and **37% of them are to native builtins** — an emitted call site with no body to inline, which any ceiling counting them inflates by more than a third. That correction came out of writing the counter's tests, which also found that a builtin runs a JavaScript callback on a *different and much shorter* entry (`InvokeCallback`, one `using` scope against five); callback invocations turn out to be **zero** on all seven suites, so an earlier guess that they explained the gap to 4-1's figure was wrong and is recorded rather than quietly deleted. Of the 3 902 620 calls with a JavaScript callee, **64.0% are made from a promoted function** — inlining's whole surface, and an upper bound. Against a hand-inlined control in one run set, **inlining saves 149 ns a call (0.37×)** — so the ceiling is **372 ms of a 19 694 ms driver, 1.89%**. Inlining is **expressible** here, unlike 4-3's deopt: labels and goto exist, a real function scope handles the callee's names, and 4-1 retains the callee — so the blocker is value, plus one semantics decision nothing can undo (an inlined callee has no frame, so it leaves `Error().stack`, and this engine has nothing to reconstruct one from). **New item 4-5 beats it**: a call costs **142 ns before it carries any argument**, plus 17.1 ns each, so ~90% of the overhead is fixed — and reducing that reaches all 6.19 M calls with no speculation, no guard and no fallback. The same probe also bounds the phase: reads are **9.16%** of execution time and the fixed call prologue **4.47%** (paid by every invocation, native callee included), so **the two paths phases 2 and 4 are built around are together under 14%** — while the arithmetic-only control loop is 16.98 ns an iteration, which points at **3-4**, not at phase 4. **4-5's ablation has since run, and it falsifies most of its own premise**: five nested `using` scopes cost **0.011 ns**, EH 0.73 ns and dispatch 0.68 ns, so the prologue is not where a call's cost is. The one real cost is an **`AsyncLocal<bool>` read at 7.0 ns against a `[ThreadStatic]` at 0.31 ns** — read on every call, and documented in `JSEngine` as *"reads are cheap"*, **wrong by 24×**. Mirrored into a ThreadStatic with the AsyncLocal kept as the carrier (0.22% of the corpus; 9 tests, which also pass on the unmodified engine). **~85% of a call's fixed cost is still unattributable from outside the engine**, so the rest of 4-5 is blocked on a profiler rather than a design. **And the control every probe here has used turned out not to be a floor**: the same counted loop with a *literal* bound instead of a parameter one runs at **8.36 ns and 0 B an iteration** against **33.77 ns and 32 B** — same answer, **4.0× and a box per iteration**, because a parameter cannot reach the numeric tier (3-3's one acknowledged gap) so `i < n` boxes. `for (var i = 0; i < n; i++)` is the corpus's commonest shape; that is **new item 3-5**, and on this evidence it is worth more than anything left in phase 4 |
@@ -871,6 +868,24 @@ These were paid for once each. They apply to every phase below.
   operands can actually reach it — the population feeding a specialization is a different
   measurement from the specialization's own speed, and only the first one predicts the corpus.*
 
+- **A control built by deleting a syntactic category deletes the program when the program is one
+  of them.** `--compile-profile` sizes item 1-1 by replacing every *outermost* function body with
+  `{}`. jQuery has exactly one outermost function — the IIFE the library is written inside — so
+  its control is an empty file (`bodyByteShare` **0.9991**), `full − stub` is the whole compile,
+  and the resulting "96.5% ceiling" is *everything except the parse*. It is also unreachable, for
+  a reason the same table cannot see: CodeLoad evaluates jQuery, so that body is the first thing
+  called. The instrument that answers the question is a **count of what is never invoked**, and it
+  says 83.6% rather than 96.5% — a different measurement, not a corrected one. *A differencing
+  control is only a ceiling while the thing it removes is the thing that is optional; check the
+  share it removes before quoting the difference.*
+- **A phase that is deferred can still be walked, and the counter is one line.** Item 1-1 defers a
+  nested function's IL to first invocation, and the relay that registers the deferral then ran the
+  closure rewrite over that function's whole subtree — so deferring jQuery's single IIFE walked
+  the entire program. The rewrite descends through nested lambdas already, which makes the relay's
+  call a repeat at every level: a lambda at depth *d* was walked *d+1* times. Two counters on the
+  relay say so exactly — **0 rewrites needed against 415, 978 and 1 574 skips** on three corpora.
+  *After deferring a phase, count what the deferral still touches: the work that moves is easy to
+  measure and the work that stays is what nobody looks at.*
 - **Interleave, at process granularity.** Sub-1.5% effects are only visible ABBA-
   interleaved across independent builds, ten runs each, medians compared.
 - **Two shapes that allocate at different rates cannot share a process, and the control is what
@@ -1598,9 +1613,137 @@ payload Jint evaluates far faster, and 0.020× on MandreelLatency. *A managed in
 this engine by 25× and 50× on those two is the sharper statement of where phase 1 and phase 3
 have left to go, and it is a comparison no Chromium column makes visible.*
 
-**What is still open.** The parse and the expression-tree construction are still eager, and on
-real source that is the larger half. Closing it needs the capture mechanism described above,
-and this item stays open for it. **Size of what remains: L.**
+#### The remaining half, measured before it was built
+
+**"On real source that is the larger half" was an inference, and it is now a reading.** It had
+been derived — the ceiling table says 92–96% of compile is bodies, the deferral A/B says emission
+is 17–36% of compile, and the remainder was read off as tree construction — which is the move
+§3.5 has a rule about and item 3-6 paid for once already. `--compile-phases` takes the split
+directly, on the real corpora rather than on `--compile-scaling`'s declaration walls, one corpus
+per process, five repetitions (three for Mandreel), medians per column. Deferral on, i.e. the
+engine as it ships:
+
+| Corpus | parse | tree construction | emission | total | tree share | parse share |
+|---|--:|--:|--:|--:|--:|--:|
+| codeload-jquery | 14.7 ms | **79.9 ms** | 54.8 ms | 149.4 ms | **53.5%** | 9.8% |
+| codeload-closure | 4.2 ms | 15.0 ms | 25.4 ms | 44.7 ms | 33.6% | 9.4% |
+| box2d | 25.8 ms | **116.0 ms** | 99.2 ms | 240.9 ms | **48.2%** | 10.7% |
+| pdfjs | 93.4 ms | **427.0 ms** | 173.0 ms | 693.3 ms | **61.6%** | 13.5% |
+| typescript | 67.5 ms | **452.0 ms** | 188.3 ms | 707.7 ms | **63.9%** | 9.5% |
+| mandreel | 650.5 ms | **3 037.2 ms** | 2 724.5 ms | 6 412.3 ms | **47.4%** | 10.1% |
+
+**The claim holds and is sharper than it was stated.** Expression-tree construction is the single
+largest phase on five of six corpora, parse and tree together are 43–75% of what the engine spends
+compiling, and the parse — the part 1-1 may *never* defer, because a syntax error in a function
+that is never called is still a `SyntaxError` — is only **9.4–13.5%**. So what is left of the item
+is almost entirely tree construction, and the early-error risk that dominates the item's text
+costs a tenth of it.
+
+It also corrects the phase's own headline once more. `--compile-scaling`'s synthetic split reads
+parse 0.5% / tree 11% / **emit 89%**; on real source, with the emission half landed, emission is
+the *middle* term on five of six and the largest only on Closure, the smallest corpus here. The
+qualification already recorded — "a split measured on one shape is a fact about that shape" — is
+right, and the distance between the two shapes is larger than it was described.
+
+**And the population is now counted, which the ceiling table never did.** `--defer-population`
+reads item 1-1's own registration and forcing counters — both touched once per *site*, never per
+call — after evaluating each corpus the way its harness does. Evaluating and stopping is not an
+approximation of CodeLoad's shape, it *is* CodeLoad's shape:
+
+| Corpus | sites registered | forced (invoked) | never forced | share |
+|---|--:|--:|--:|--:|
+| codeload-jquery | 415 | 68 | 347 | **83.6%** |
+| codeload-closure | 51 | 5 | 46 | 90.2% |
+| box2d | 978 | 101 | 877 | 89.7% |
+| pdfjs | 804 | 105 | 699 | 86.9% |
+| typescript | 1 574 | 235 | 1 339 | 85.1% |
+| mandreel | 2 697 | 8 | 2 689 | **99.7%** |
+
+**84–99.7% of a real script's functions are never invoked at load**, so the population the
+remaining half would serve is nearly all of them. Between the two tables the item is well
+founded: the work is over half the compile and almost none of it is needed.
+
+**One correction the population count forces, and it is to this item's own ceiling table.**
+`--compile-profile` stubs every *outermost* function body, and **jQuery has exactly one** — the
+IIFE the library is written inside, 99.91% of the source by bytes. Its control is therefore an
+empty file, and the **96.5%** in the table above is *everything except the parse*, not anything a
+deferral can take: CodeLoad evaluates jQuery, which runs that IIFE. The sentence this document
+has carried since — "532 functions nested in one IIFE, 96.5% of its compile in bodies that are
+never called" — is wrong about the outermost body, which is called first and calls 67 more. The
+right figure for jQuery is the population one, **83.6%**, and it is a different measurement rather
+than a correction of the same one.
+
+#### What landed for it: the closure rewrite is no longer walked once per level
+
+**Measuring the phases found a repeat, in the phase 1-1 had already deferred.** With deferral on,
+emission is 25–57% of compile and the closure rewrite is about half of *that* — which is odd for a
+compile that generates IL for one lambda. It is not odd: `LambdaRewriter.Rewrite` descends through
+nested lambdas (that is how `CheckForClosure` threads a capture up the whole chain), and
+`RuntimeMethodBuilder.Relay` then called it **again** with the relayed lambda as its own root.
+A lambda at depth *d* was walked *d+1* times, and jQuery's single IIFE means its whole tree was
+walked twice by a compile that emitted almost nothing.
+
+**Counted rather than argued, and then counted again for the claim that matters.** Two counters on
+the relay, one per site: how many relayed sites needed a rewrite of their own, and how many had
+already had one from the walk that emitted their parent. On jQuery, Box2D and Typescript the first
+is **0 — 0 of 415, 0 of 978, 0 of 1 574.** But *"every relay is a repeat"* and *"the repeat does
+nothing"* are two claims and only the first is what that counter measures — §3.5's rule about
+indirect instruments, which this campaign has now paid for twice. A third counter answers the
+second directly: with the switch **off**, so the repeat still runs, count the captures it creates
+that the first walk had not. It is **0 on every corpus** — 0 against
+415, 51, 978, 804 and 1 574 repeats respectively — which is what makes the skip a removal of
+repeated work rather than of work.
+
+`Relay` now skips a lambda a descending walk has already entered, marked on the lambda itself.
+The mark is set only by a walk that rewrites nested lambdas, so `RewriteRootOnly` — the async
+pre-rewrite, which stops at each nested lambda *by design* — leaves it clear, and anything built
+after the walk (a generator or async body rewritten into a state machine) is rewritten at relay
+exactly as before. That is why the skip is a fact about this tree rather than a guess about which
+lambdas need rewriting. `BROILER_JS_RELAY_REWRITE_ONCE=0` restores the repeat.
+
+**Measured, and one corpus of three does not separate.** `--compile-profile`'s whole-compile
+number, ABBA-interleaved on one build with the switch as the only difference, one corpus per
+process, six pairs an arm:
+
+| Corpus | repeat (median) | skipped (median) | median pair ratio | pairs favouring the skip | control-arm spread |
+|---|--:|--:|--:|--:|--:|
+| codeload-jquery | 502.5 ms | 394.5 ms | **0.782×** | **6 of 6** | 13.0% |
+| typescript | 1 940.6 ms | 1 711.3 ms | **0.867×** | **6 of 6** | 15.9% |
+| box2d | 793.2 ms | 882.0 ms | 1.055× | 2 of 6 | **55.6%** |
+
+Box2D is reported rather than dropped, and the last column is why it cannot be read either way:
+its own *control* arm ranges 662–1 103 ms, a 55.6% spread against an effect near 10%. So the
+whole-compile instrument answers on two corpora and is silent on the third.
+
+**The phase that changed was then measured directly, and `--compile-phases` carries its own
+control**: `parse` cannot be affected by this change, so a round whose parse column moves is a
+round that measured the machine. Two rounds an arm; the first moved parse by 1.49× and 1.86× and
+is discarded on that basis alone. In the round where the control holds to 6%, **Box2D's emission
+phase goes 99.9 → 54.8 ms, 0.549×, and its whole compile 267.4 → 207.2 ms, 0.775×** — the same
+ratio jQuery's whole compile shows on the other instrument. jQuery's own phase round has its
+control drift 27%, so it is quoted only for direction: 59.1 → 28.4 ms.
+
+*Two instruments, three corpora, one discarded round and one non-separating corpus is a weaker
+result than a single clean table would be, and it is what the machine gave.* What is not
+weak is the mechanism: the walk removed is provably a repeat on every site of every corpus, and
+provably creates nothing.
+
+**What is still open.** Tree construction itself is still eager, and the two tables above say what
+it is worth: **43–75% of compile, over a population that is 84–99.7% never invoked.** Closing it
+needs the capture mechanism, and **one sentence of this item's cost side needs correcting before
+anyone starts.** "Baking the cells in as constants is not available — `EmitConstant` throws for
+any reference type that is not a `string`, `Type` or `MethodInfo`" is true and is not the
+obstacle: the engine already carries per-instance reference state into a generated method, through
+the `Box[]` the creation site passes and the `Closures` the delegate is bound to, and a compiler
+that knows a name's *index* in that array binds it with an array load rather than a name lookup.
+So the capture mechanism is not missing, it is **unaddressable**: the index is decided by
+`LambdaRewriter` from the tree, and a deferred body has no tree. What the remaining half has to
+build is the eager step that makes the array addressable without one — a free-name walk per
+deferred function, resolved against the enclosing scopes and recorded as a name → index map, which
+`--compile-phases` charges back as `scanMs` and measures at **0.9–164 ms against 15–3 037 ms of
+tree construction, 5.4–9.9% of it** — a lower bound, since a real scanner also has to resolve each
+name and tell a free reference from a locally bound one. **Size of what remains: L**, and the sub-project inside it is
+that map, not a pre-parser and not `EmitConstant`.
 
 **Verify.** `DeferredCompilationTests` — ten fixtures covering the item's four named risks
 against the implementation (a syntax error in a never-called function still throws at compile
@@ -1608,6 +1751,28 @@ time; per-instance loop captures; writes through a captured cell after first cal
 mutual recursion through a thunk; direct `eval` inside a deferred body; a deferred generator;
 100 instances of one site keeping distinct state; concurrent first calls). Full repository
 suite **7 640 tests, 0 failures**.
+
+**Verify (the relay-rewrite half).** `RelayRewriteTests` — 19 cases, and the point of every one is
+that a capture has to be threaded through levels that never mention it: a read three levels down,
+a write back through two, per-instance loop cells two levels down, a generator and an `async` body
+nested in a closure (the two rewrites that build lambdas *after* the descending walk), `this`
+through an arrow, a named function expression's own name, a direct `eval` two levels down, and
+five levels each reading and writing every binding above them. **Each is asserted on both settings
+of `BROILER_JS_RELAY_REWRITE_ONCE`**, so they are a statement about closure semantics rather than a
+description of the skip — and with the switch off they all still pass, which is what says the
+second walk was not what they were relying on. Plus the counter invariant, as a test rather than a
+corpus reading. Full repository suite **7 944 tests, 0 failures**, all thirteen projects.
+
+**A second unreproduced failure is on the record, and it is not the one above.** One full-suite
+run reported `CapturedNumericLocalTests.SuspendingNestedFunctionsCaptureThroughTheSameBox(captured:
+False)` — item 3-7's fixture — returning `"2,12"` for `"2,2"`. That case runs an `async` body with
+an `await 0` and asserts the continuation has *not* run when `Eval` returns, so what it observed is
+a scheduling order, not a capture: `out` was correct on both sides and only the post-`await`
+statement had run. It did not reproduce in **six further runs of that assembly, three on each
+setting of the switch**, nor twelve times in isolation on both settings, nor in the final full-suite
+run. Recorded rather than dismissed, on the same terms as the `ModuleExtensions` flake above: if it
+recurs, it is a test that asserts a microtask has not been drained, and that is what to look at
+first.
 
 **One unreproduced failure is on the record.** A single run of the full suite reported
 `Broiler.JavaScript.ModuleExtensions.Tests` 1 of 5 failed. It did not reproduce in **nine
@@ -5890,7 +6055,7 @@ predicate at all.
 | Phase | Order within it | Size | Unblocks / expected effect | Exit gate |
 |---|---|---|---|---|
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → 0-6 workflow run ✅ (17/17 committed at the pin) → **0-6's noise band (`--repetitions` in CI), then 0-7, 0-8** | — | Everything. 12 → **17 scores** ✅, known noise band, and the first evidence any phase A–F can close on | 17/17 ✅, no timeout at the 180 s floor ✅, `comparison.md` reporting the triad ✅, **band on record** and **the BenchmarkDotNet + RID-matrix rows collected** — the three still open |
-| **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-4 ✅** → **1-1 emission half ✅**, capture half open → 1-3 measure | 1-4 S, 1-1 remainder L | The two worst scores in the suite; page-load time generally. **1-4 took the Mandreel half (3.04×); 1-1's deferred emission takes 0.64–0.69× off jQuery, PdfJS and Box2D at 1.0009× steady state, and CodeLoad 94.6 → 104.0 (1.099×)** | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
+| **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-4 ✅** → **1-1 emission half ✅** → **1-1's remaining half measured, and the repeated closure rewrite it found is fixed ✅**; the capture mechanism itself is still open → 1-3 measure | 1-4 S, 1-1 remainder L | The two worst scores in the suite; page-load time generally. **1-4 took the Mandreel half (3.04×); 1-1's deferred emission takes 0.64–0.69× off jQuery, PdfJS and Box2D at 1.0009× steady state, and CodeLoad 94.6 → 104.0 (1.099×)**. **The remaining half is now sized rather than inferred**: parse 9.4–13.5% / tree construction 33.6–63.9% / emission 25–57% on the real corpora, over a population that is **84–99.7% never invoked**. What blocks it is not a pre-parser and not `EmitConstant` — the `Box[]` a creation site passes *is* the capture mechanism — but that its indices are decided by `LambdaRewriter` from a tree the deferred body does not have; the eager free-name map that would make it addressable measures at 5.4–9.9% of tree construction. **The repeated closure rewrite the measurement found is fixed and is worth 0.782× on jQuery's whole compile and 0.867× on Typescript's, six of six pairs each** | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured twice, agreeing: Richards PASSES (183× → 150× after 2-11/2-12 locally; 144.9× in CI), DeltaBlue FAILS (576× → 447× locally; 460× in CI)**, five repetitions per engine on one machine and the committed CI run on another |
 | **3** | 3-0 ✅ → **3-3 ✅** → 3-5 ✅ → 3-6 ✅ → 3-7 ✅ → 3-8 ✅ (counted, do not start as written) → **3-1 (85% of the corpus's boxes) → 3-2 (Box2D's 11.6 M), sharing one compiler half, and nothing else until they land** → then *cost* 3-4 | L–XL, 3-8 XL | Uniform lift across arithmetic and allocation-heavy suites. **3-7 closes the static half of the coverage question and 3-8 is what is left**: the widening reached 8 names of 2 920 (224 → 232), because 247 of 3-6's 478 captured names are held by a *hoisting* rule that is correctness rather than policy, and 2 439 are not proven numeric. **3-8 then measured the two numbers this phase never had, and they re-order it.** Number boxing is **41.89% of the corpus's allocation** (2.05 GB of 4.88, and 66.96% of NavierStokes) — so the prize was always large — while the **whole** raw-double local tier, every item from P2-2 onward, removes **0.36% of those boxes**. A box is minted by the operator, not by the local, and 76.4% of the names 3-8 would guard take their value from a property read or a call. **3-1 and 3-2 move to the front**: they unbox the sites that mint the boxes, and they have been ranked behind the locals work since the phase opened on no measurement at all. **3-1's own re-measurement then made that stronger.** The element chain decomposes exactly — 0.00 for a raw double, 31.98 for `s = s + a[0]`, 95.99 with a multiply, 159.67 for a read-modify-write — and the element STORE is in none of it: the boxes are minted by the operators, and the read is free today only because what it hands back is already a box. Two things fell out. A numeric literal is **re-boxed on every evaluation** (`a[0] * 1.5` costs two boxes where `a[0] * 2` costs one), measured at **1.2% of requests** and recorded rather than built. And the **bitwise and shift operators had no native form** although the analysis has always typed them — `s = i + 1023` costs 0.00 B/iter and `s = i & 1023` cost 31.84. That half **is built** (`JSNumericOperators`, all six through `ToUint32`, 15 tests on both arms) and takes its shape to **0.00** — **and removes no boxes at all on the corpus**: six suites identical to the digit, and Crypto (42.4 M boxes) differing by less than its own run-to-run variation, measured by running one arm twice. The native form needs both operands native and Crypto's digits live in `this.array[i]`. *Six items have now built machinery array-resident data cannot reach; every one is correct, every one is invisible, and every one is waiting on 3-1*. **3-2 was then measured too, and its one-sentence premise is wrong**: `o.x = 2` allocates **nothing** — a slot store is a reference copy — so `vector.x = 1.5` pays for the **literal**, not the slot, and the slot's own cost shows up only in `o.x = v * 1.5` where the value is a raw double (32 B, the same 32 B for the eleventh time). The field rows match the element rows **to the hundredth** — 31.98 and 96.00 both — so 3-1 and 3-2 are one mechanism with two backends. And 4-1's uncollected "numeric-vs-generic" signal, built at last, splits them exactly: **50.1% of all cache-answered reads hand back a number**, but **98% of those are Box2D's**, while **NavierStokes performs 388 property reads, zero numeric, and mints 29 977 471 boxes**. So **3-1 carries 85% of the corpus's boxes and 3-2 carries Box2D's**, and no work on shape slots reaches the other two suites | `test262-arrays`, `test262-binary-data`, and — added by 3-3's `let`/`const` half — `test262-lexical-declarations`; allocation reported per item alongside time |
 | **4** | 4-3 design ✅ → **4-1 ✅** (shapes and callees; numeric-vs-generic still open per site — item 3-2 collected the aggregate read share, 50.1%, for a phase 3 ranking) → **4-3a ✅** → **4-3b ✅** → **4-2a ✅** → **4-2b ✅** (arithmetic half left open) → 4-4 | XL | The remaining order of magnitude. **4-1 measured the premise: 93.5% of reads and 96.7% of calls are monomorphic by execution weight, so 4-2 and 4-4 are well-founded.** 4-3a stated and enforced the restart contract — and found its no-suspendable-bodies condition was held only by two unrelated accidents, two ordinary refactors away from an async function returning a number instead of a Promise. **4-2 then split the same way**: measuring the branch it was told to replace found it produced *wrong answers* — DeltaBlue died on the shipping tier-2 hook — which 4-2a fixes, and 4-2b's specialization takes **44.7% of the corpus's executed reads off the cache path at 0.818× each**, which is **0.83% of suite time**. That number is the phase's own warning: the whole read path is ≤ ~9% of Octane's execution time here and the whole call path ≤ ~5.5%, so **4-4's ceiling is smaller than the phase assumed** | Deopt correctness proven **before** any speculation ships; full test262 matrix |
@@ -5995,12 +6160,39 @@ dotnet $DLL --compile-profile /path/to/octane 3
 # Parse / expression-tree / IL-emission split, against declaration count and name length
 # (this is what found item 1-4). Streams a row per shape to stderr as it completes.
 dotnet $DLL --compile-scaling
+
+# The same three-way split as --compile-scaling, but on the REAL corpora and against the
+# body-free control, plus the closure rewrite as its own column (sizes 1-1's remaining half).
+# One corpus per process, for --compile-profile's reason. Third argument is repetitions.
+dotnet $DLL --compile-phases /path/to/octane 5 codeload-jquery
+
+# How many of a script's functions are ever invoked once it has been evaluated — the
+# population 1-1's remaining half is worth. Evaluating and stopping is CodeLoad's own shape.
+dotnet $DLL --defer-population /path/to/octane codeload-jquery
 ```
 
 `--compile-profile` builds its control by replacing every outermost function body with `{}`
 and **re-parses it before timing anything** — a control the parser rejects would measure
 failing early rather than compiling less. Set `BROILER_COMPILE_PROFILE_DUMP=<dir>` to write
 each control out; that is how Mandreel's residue was read.
+
+**`--compile-profile`'s control is not a ceiling for every corpus, and jQuery is the one it is
+wrong about.** It stubs every *outermost* function body, and jQuery has exactly one — the IIFE
+the whole library is written inside, which `bodyByteShare` reports as **99.91% of the source**.
+So its control is an empty file, `full − stub` is the whole compile, and the 96.5% "ceiling" in
+1-1's table is *everything except the parse* rather than anything a deferral can take: CodeLoad
+evaluates jQuery, which runs that IIFE. `--defer-population` is the instrument that answers the
+question the ceiling was being asked, because it counts what is never invoked instead of what is
+inside a body.
+
+**`--compile-phases` takes its end-to-end check first, and that ordering is the measurement.**
+Every compile in the probe registers a deferred site per relayed lambda, each rooted by a
+`GCHandle` that is never freed and each holding its subtree, so a phase timed late in the
+sequence pays collection time the phases before it caused. Taken last, the end-to-end column read
+**3.4× the sum of the phases on Box2D and 1.0× on jQuery** — and the difference between those two
+corpora is exactly how many sites a *deferred* compile registers: **982 against 1**, because
+jQuery's top level relays one IIFE and Box2D's relays every one of its top-level functions. That
+is item 1-1's own retained-tree artifact one level down from where this document records it.
 
 Both phase-1 changes carry a switch so they can be A/B'd on a single build, which is the only
 way to compare two compilers without also comparing two builds:
@@ -6012,6 +6204,15 @@ BROILER_JS_REWRITER_INDEX_THRESHOLD=1000000000 dotnet $DLL --compile-profile /pa
 
 # Item 1-1: 0 restores eager IL generation. Default is on.
 BROILER_JS_DEFER_IL=0 dotnet $DLL --compile-profile /path/to/octane 1
+
+# Item 1-1's remaining half: 0 restores the relay-time closure rewrite of a subtree an
+# enclosing walk has already rewritten. Default is on. --defer-population reports the three
+# counters behind it: relaysRewritten (0 on every corpus), relaysSkipped, and — only on the
+# arm below, which is the one that still runs the repeat — capturesInRepeat, the captures the
+# repeat creates that the first walk had not. Also 0 on every corpus, and it is the counter
+# that separates "the walk repeats" from "the walk is inert".
+BROILER_JS_RELAY_REWRITE_ONCE=0 dotnet $DLL --defer-population /path/to/octane codeload-jquery
+BROILER_JS_RELAY_REWRITE_ONCE=0 dotnet $DLL --compile-profile /path/to/octane 1 codeload-jquery
 
 # Item 3-7: 0 restores the JSVariable cell for a numeric local a closure names.
 # Default is on. The soundness conjunct it does NOT gate — a name a hoisted function
