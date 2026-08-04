@@ -1,0 +1,717 @@
+From 94c743bf8cda464b2bab094064c3c694c13528b7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 4 Aug 2026 18:10:49 +0000
+Subject: [PATCH] Measure item 3-2, and collect the signal 4-1 left out
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+3-2's premise is one sentence — "shapeSlots holds JSValue references, so
+`vector.x = 1.5` allocates" — and it names a cause. Taken literally as a probe,
+the line allocates and the slot does not: `o.x = 2` costs 0.00 bytes an
+iteration, because storing an already-boxed value into a slot is a reference
+copy. What the example pays for is the LITERAL, which VisitLiteral re-boxes on
+every evaluation and which item 3-1 measured at 1.2% of the corpus's boxing.
+The slot's own 32 B appears only in the row the item does not write —
+`o.x = v * 1.5`, where the value is a raw double at the point of the store.
+
+The field rows equal the element rows to the hundredth: 31.98 for a read into
+an addition, 96.00 for a read-modify-write, in an array and in an object field
+alike. 3-1 and 3-2 are not twins by analogy; they are one mechanism — a value
+that stays unboxed from producer to consumer — with two storage backends.
+
+Their populations are disjoint, and counting that needed item 4-1's third
+signal, "numeric-vs-generic per site", which 4-1 deliberately left uncollected
+and 3-8 named as the missing instrument. It is one IsNumber test on the inline
+cache's two hit returns. Over the corpus, 50.1% of cache-answered reads hand
+back a number — and the per-suite column is what decides the plan: 98% of
+those are Box2D's (9 853 002 of 18 241 436 reads, 54.0%), while NavierStokes
+performs 388 property reads, zero of them numeric, and mints 29 977 471 boxes.
+Crypto reads 651 289 and mints 42 423 644.
+
+So 3-1 carries 85% of the corpus's boxes and 3-2 carries Box2D's 11.6 M, no
+work on shape slots reaches NavierStokes or Crypto at all, and the shared
+compiler half should be built once. `vector.x = 1.5` should be struck from the
+item's rationale: it pointed at the wrong half of its own mechanism for as
+long as it stood unmeasured.
+
+Adds cacheHitsNumeric to PropertyOptimizationDiagnostics (off by default with
+the rest) and six `field` rows to --local-alloc. No behaviour change.
+---
+ .../Broiler.JavaScript.Runtime/ObjectShape.cs | 418 ++++++++++--------
+ .../LocalAllocationMetrics.cs                 |  95 ++++
+ .../SpecializingTierMetrics.cs                |   4 +
+ 3 files changed, 321 insertions(+), 196 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs b/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
+index 2e00f1ac..8dbff9d8 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/ObjectShape.cs
+@@ -1,4 +1,4 @@
+-using System;
++﻿using System;
+ using System.Collections.Concurrent;
+ using System.Collections.Generic;
+ using System.Threading;
+@@ -95,15 +95,16 @@ public readonly record struct PropertyOptimizationSnapshot(
+     long PrototypeVersion,
+     long StoreCacheHits,
+     long StoreCacheMisses,
+-    long StoreMegamorphicSites,
+-    long NamedPropertiesMaterializations,
+-    long MissMegamorphic,
+-    long MissNonObject,
+-    long MissCold,
+-    long MissKeyMismatch,
+-    long MissShape,
+-    long MissNotDescribable,
+-    long MissEntryAlreadyPresent);
++    long StoreMegamorphicSites,
++    long NamedPropertiesMaterializations,
++    long MissMegamorphic,
++    long MissNonObject,
++    long MissCold,
++    long MissKeyMismatch,
++    long MissShape,
++    long MissNotDescribable,
++    long MissEntryAlreadyPresent,
++    long CacheHitsNumeric);
+ 
+ /// <summary>
+ /// Counters for validating shape/cache invalidation behavior.
+@@ -127,14 +128,15 @@ public static class PropertyOptimizationDiagnostics
+     private static long storeCacheHits;
+     private static long storeCacheMisses;
+     private static long storeMegamorphicSites;
+-    private static long namedPropertiesMaterializations;
+-    private static long missMegamorphic;
+-    private static long missNonObject;
+-    private static long missCold;
+-    private static long missKeyMismatch;
+-    private static long missShape;
+-    private static long missNotDescribable;
+-    private static long missEntryAlreadyPresent;
++    private static long namedPropertiesMaterializations;
++    private static long missMegamorphic;
++    private static long missNonObject;
++    private static long missCold;
++    private static long missKeyMismatch;
++    private static long missShape;
++    private static long missNotDescribable;
++    private static long missEntryAlreadyPresent;
++    private static long cacheHitsNumeric;
+ 
+     /// <summary>
+     /// Whether the counters below are recorded. Defaults to <c>false</c>; while it is
+@@ -167,6 +169,28 @@ public static class PropertyOptimizationDiagnostics
+     internal static void RecordShapeTransition() { if (Enabled) Interlocked.Increment(ref shapeTransitions); }
+     internal static void RecordDictionaryFallback() { if (Enabled) Interlocked.Increment(ref dictionaryFallbacks); }
+     internal static void RecordCacheHit() { if (Enabled) Interlocked.Increment(ref cacheHits); }
++
++    /// <summary>
++    /// A cache-answered read, together with whether the value it returned was a number
++    /// (docs/performance-roadmap.md item 3-2).
++    /// </summary>
++    /// <remarks>
++    /// The signal item 4-1 deliberately left uncollected — "numeric-vs-generic per site" — and
++    /// which item 3-8 then named as the thing nobody could answer. It is the population item 3-2
++    /// exists for: a shape slot that held a raw <c>double</c> would serve exactly these reads
++    /// without a box, and every other read unchanged. Counted at the two hit returns only, so it
++    /// describes the reads the inline cache answers rather than every read; over the Octane corpus
++    /// the hit rate runs 93–99.97% per suite, so the two populations are close but not identical.
++    /// </remarks>
++    internal static void RecordCacheHit(JSValue value)
++    {
++        if (!Enabled)
++            return;
++
++        Interlocked.Increment(ref cacheHits);
++        if (value is not null && value.IsNumber)
++            Interlocked.Increment(ref cacheHitsNumeric);
++    }
+     internal static void RecordCacheMiss() { if (Enabled) Interlocked.Increment(ref cacheMisses); }
+     internal static void RecordPolymorphicPromotion() { if (Enabled) Interlocked.Increment(ref polymorphicPromotions); }
+     internal static void RecordMegamorphic() { if (Enabled) Interlocked.Increment(ref megamorphicSites); }
+@@ -174,26 +198,26 @@ public static class PropertyOptimizationDiagnostics
+     internal static void RecordStoreCacheHit() { if (Enabled) Interlocked.Increment(ref storeCacheHits); }
+     internal static void RecordStoreCacheMiss() { if (Enabled) Interlocked.Increment(ref storeCacheMisses); }
+     internal static void RecordStoreMegamorphic() { if (Enabled) Interlocked.Increment(ref storeMegamorphicSites); }
+-    // Item 2-9's losing-side hypothesis is that a deferred cell forces the trie to be
+-    // rebuilt; counting the rebuilds is what turns that from a reading of the code into a
+-    // measurement, and a strict function is the control that says whether the Annex B
+-    // cells are what causes them.
+-    internal static void RecordNamedPropertiesMaterialized() { if (Enabled) Interlocked.Increment(ref namedPropertiesMaterializations); }
+-    // Why a read MISSED, which the bare miss counter cannot say. DeltaBlue sits at a 69%
+-    // read hit rate against Richards's 99.97%, with megamorphism, dictionary mode and
+-    // prototype invalidation all ruled out, so the remaining question is which of the
+-    // lookup's own exits it takes. Recorded only while Enabled, like every counter here.
+-    internal static void RecordMissMegamorphic() { if (Enabled) Interlocked.Increment(ref missMegamorphic); }
+-    internal static void RecordMissNonObject() { if (Enabled) Interlocked.Increment(ref missNonObject); }
+-    internal static void RecordMissCold() { if (Enabled) Interlocked.Increment(ref missCold); }
+-    internal static void RecordMissKeyMismatch() { if (Enabled) Interlocked.Increment(ref missKeyMismatch); }
+-    internal static void RecordMissShape() { if (Enabled) Interlocked.Increment(ref missShape); }
+-    // A miss whose entry could NOT be built: TryDescribe found the key neither in an own
+-    // shape slot nor on a shape-tracked prototype, so nothing is cached and the same read
+-    // misses again forever. That is the difference between a site warming up and a site that
+-    // never can.
+-    internal static void RecordMissNotDescribable() { if (Enabled) Interlocked.Increment(ref missNotDescribable); }
+-    internal static void RecordMissEntryAlreadyPresent() { if (Enabled) Interlocked.Increment(ref missEntryAlreadyPresent); }
++    // Item 2-9's losing-side hypothesis is that a deferred cell forces the trie to be
++    // rebuilt; counting the rebuilds is what turns that from a reading of the code into a
++    // measurement, and a strict function is the control that says whether the Annex B
++    // cells are what causes them.
++    internal static void RecordNamedPropertiesMaterialized() { if (Enabled) Interlocked.Increment(ref namedPropertiesMaterializations); }
++    // Why a read MISSED, which the bare miss counter cannot say. DeltaBlue sits at a 69%
++    // read hit rate against Richards's 99.97%, with megamorphism, dictionary mode and
++    // prototype invalidation all ruled out, so the remaining question is which of the
++    // lookup's own exits it takes. Recorded only while Enabled, like every counter here.
++    internal static void RecordMissMegamorphic() { if (Enabled) Interlocked.Increment(ref missMegamorphic); }
++    internal static void RecordMissNonObject() { if (Enabled) Interlocked.Increment(ref missNonObject); }
++    internal static void RecordMissCold() { if (Enabled) Interlocked.Increment(ref missCold); }
++    internal static void RecordMissKeyMismatch() { if (Enabled) Interlocked.Increment(ref missKeyMismatch); }
++    internal static void RecordMissShape() { if (Enabled) Interlocked.Increment(ref missShape); }
++    // A miss whose entry could NOT be built: TryDescribe found the key neither in an own
++    // shape slot nor on a shape-tracked prototype, so nothing is cached and the same read
++    // misses again forever. That is the difference between a site warming up and a site that
++    // never can.
++    internal static void RecordMissNotDescribable() { if (Enabled) Interlocked.Increment(ref missNotDescribable); }
++    internal static void RecordMissEntryAlreadyPresent() { if (Enabled) Interlocked.Increment(ref missEntryAlreadyPresent); }
+ 
+     public static PropertyOptimizationSnapshot Snapshot() => new(
+         Interlocked.Read(ref shapeTransitions),
+@@ -206,15 +230,16 @@ public static class PropertyOptimizationDiagnostics
+         JSObject.PrototypeMutationVersion,
+         Interlocked.Read(ref storeCacheHits),
+         Interlocked.Read(ref storeCacheMisses),
+-        Interlocked.Read(ref storeMegamorphicSites),
+-        Interlocked.Read(ref namedPropertiesMaterializations),
+-        Interlocked.Read(ref missMegamorphic),
+-        Interlocked.Read(ref missNonObject),
+-        Interlocked.Read(ref missCold),
+-        Interlocked.Read(ref missKeyMismatch),
+-        Interlocked.Read(ref missShape),
+-        Interlocked.Read(ref missNotDescribable),
+-        Interlocked.Read(ref missEntryAlreadyPresent));
++        Interlocked.Read(ref storeMegamorphicSites),
++        Interlocked.Read(ref namedPropertiesMaterializations),
++        Interlocked.Read(ref missMegamorphic),
++        Interlocked.Read(ref missNonObject),
++        Interlocked.Read(ref missCold),
++        Interlocked.Read(ref missKeyMismatch),
++        Interlocked.Read(ref missShape),
++        Interlocked.Read(ref missNotDescribable),
++        Interlocked.Read(ref missEntryAlreadyPresent),
++        Interlocked.Read(ref cacheHitsNumeric));
+ 
+     public static void Reset()
+     {
+@@ -228,14 +253,15 @@ public static class PropertyOptimizationDiagnostics
+         Interlocked.Exchange(ref storeCacheHits, 0);
+         Interlocked.Exchange(ref storeCacheMisses, 0);
+         Interlocked.Exchange(ref storeMegamorphicSites, 0);
+-        Interlocked.Exchange(ref namedPropertiesMaterializations, 0);
+-        Interlocked.Exchange(ref missMegamorphic, 0);
+-        Interlocked.Exchange(ref missNonObject, 0);
+-        Interlocked.Exchange(ref missCold, 0);
+-        Interlocked.Exchange(ref missKeyMismatch, 0);
+-        Interlocked.Exchange(ref missShape, 0);
+-        Interlocked.Exchange(ref missNotDescribable, 0);
+-        Interlocked.Exchange(ref missEntryAlreadyPresent, 0);
++        Interlocked.Exchange(ref namedPropertiesMaterializations, 0);
++        Interlocked.Exchange(ref missMegamorphic, 0);
++        Interlocked.Exchange(ref missNonObject, 0);
++        Interlocked.Exchange(ref missCold, 0);
++        Interlocked.Exchange(ref missKeyMismatch, 0);
++        Interlocked.Exchange(ref missShape, 0);
++        Interlocked.Exchange(ref missNotDescribable, 0);
++        Interlocked.Exchange(ref missEntryAlreadyPresent, 0);
++        Interlocked.Exchange(ref cacheHitsNumeric, 0);
+     }
+ }
+ 
+@@ -265,14 +291,14 @@ public static class PropertyInlineCacheSite
+ 
+     public static JSValue Get(int site, JSValue target, KeyString key)
+     {
+-        // Item 4-1. The cache below observes shapes to answer THIS read and forgets them —
+-        // entries are replaced when stale and dropped entirely at megamorphic — so a
+-        // specializing tier cannot ask it what a site saw over a whole run. Recorded here,
+-        // where the site index is in hand, behind the same predictable branch the cache-hit
+-        // counter on the line below already pays.
+-        if (TypeFeedback.Enabled)
+-            TypeFeedback.RecordPropertyRead(site, target, in key);
+-
++        // Item 4-1. The cache below observes shapes to answer THIS read and forgets them —
++        // entries are replaced when stale and dropped entirely at megamorphic — so a
++        // specializing tier cannot ask it what a site saw over a whole run. Recorded here,
++        // where the site index is in hand, behind the same predictable branch the cache-hit
++        // counter on the line below already pays.
++        if (TypeFeedback.Enabled)
++            TypeFeedback.RecordPropertyRead(site, target, in key);
++
+         if ((uint)site >= MaxSites)
+             return target[key];
+ 
+@@ -403,17 +429,17 @@ public static class PropertyInlineCacheSite
+                 for (var i = 0; i < count; i++)
+                 {
+                     ref readonly var entry = ref entries[i];
+-                    if (entry.FromShape == null)
+-                    {
+-                        if (receiver.TryWriteShapeSlot(entry.ShapeId, entry.Slot, in property, value))
+-                        {
+-                            PropertyOptimizationDiagnostics.RecordStoreCacheHit();
+-                            return;
+-                        }
+-                    }
+-                    else if (ReferenceEquals(receiver.PrototypeChainObject, entry.ReceiverPrototype)
+-                        && entry.PrototypeVersion == JSObject.PrototypeMutationVersion
+-                        && receiver.TryCreateShapeSlot(entry.FromShape, entry.ToShape, entry.Slot, in property, value))
++                    if (entry.FromShape == null)
++                    {
++                        if (receiver.TryWriteShapeSlot(entry.ShapeId, entry.Slot, in property, value))
++                        {
++                            PropertyOptimizationDiagnostics.RecordStoreCacheHit();
++                            return;
++                        }
++                    }
++                    else if (ReferenceEquals(receiver.PrototypeChainObject, entry.ReceiverPrototype)
++                        && entry.PrototypeVersion == JSObject.PrototypeMutationVersion
++                        && receiver.TryCreateShapeSlot(entry.FromShape, entry.ToShape, entry.Slot, in property, value))
+                     {
+                         PropertyOptimizationDiagnostics.RecordStoreCacheHit();
+                         return;
+@@ -421,11 +447,11 @@ public static class PropertyInlineCacheSite
+                 }
+             }
+ 
+-            // The shape the receiver presents BEFORE the store, so a store that turns out to
+-            // have created a property can be recorded as the transition it performed. Read
+-            // here because after the store it is gone.
+-            var shapeBeforeStore = (target as JSObject)?.TransitionShape;
+-
++            // The shape the receiver presents BEFORE the store, so a store that turns out to
++            // have created a property can be recorded as the transition it performed. Read
++            // here because after the store it is gone.
++            var shapeBeforeStore = (target as JSObject)?.TransitionShape;
++
+             PropertyOptimizationDiagnostics.RecordStoreCacheMiss();
+             target[property] = value;
+ 
+@@ -456,13 +482,13 @@ public static class PropertyInlineCacheSite
+                 return;
+             }
+ 
+-            var overwriteForm = new Entry(shapeId, slot);
+-            var entryToAdd = shapeBeforeStore != null && !ReferenceEquals(shapeBeforeStore, ordinary.TransitionShape)
+-                ? DescribeTransition(ordinary, shapeBeforeStore, in property, slot, overwriteForm)
+-                : overwriteForm;
+-
++            var overwriteForm = new Entry(shapeId, slot);
++            var entryToAdd = shapeBeforeStore != null && !ReferenceEquals(shapeBeforeStore, ordinary.TransitionShape)
++                ? DescribeTransition(ordinary, shapeBeforeStore, in property, slot, overwriteForm)
++                : overwriteForm;
++
+             for (var i = 0; i < count; i++)
+-                if (entries[i].ShapeId == entryToAdd.ShapeId && entries[i].FromShape == entryToAdd.FromShape)
++                if (entries[i].ShapeId == entryToAdd.ShapeId && entries[i].FromShape == entryToAdd.FromShape)
+                     return;
+ 
+             if (count == MaxEntries)
+@@ -471,74 +497,74 @@ public static class PropertyInlineCacheSite
+                 return;
+             }
+ 
+-            entries[count++] = entryToAdd;
++            entries[count++] = entryToAdd;
+             if (count == 2)
+                 PropertyOptimizationDiagnostics.RecordPolymorphicPromotion();
+         }
+ 
+-        /// <summary>
+-        /// Describes a store that CREATED its property as the shape transition it performed,
+-        /// falling back to the plain overwrite form when the creation cannot be replayed safely.
+-        /// </summary>
+-        /// <remarks>
+-        /// The shape changing across the store is what identifies a creation — a shape is
+-        /// immutable, so a receiver reporting a different one has gained a tracked property, and
+-        /// the only one it can have gained at this site is this key.
+-        /// <para>
+-        /// Replaying it means performing CreateDataProperty directly, which is only the right
+-        /// answer while OrdinarySetWithOwnDescriptor would still reach it. It would not if the
+-        /// prototype chain supplied the key: a setter there has to run, and an inherited
+-        /// non-writable data property has to reject the write. So the chain is walked once here
+-        /// and required to be free of the key, and two guards keep that answer true at every
+-        /// later hit — the receiver still pointing at the same prototype, by reference, and the
+-        /// global prototype-mutation version, which any addition to any object used as a
+-        /// prototype publishes. Those are the same two the read cache's prototype form uses, and
+-        /// they are only affordable because 2-0 stopped `new` from advancing the version once
+-        /// per allocation; before that a transition entry retired on the next object built.
+-        /// </para>
+-        /// </remarks>
+-        private static Entry DescribeTransition(
+-            JSObject receiver,
+-            ObjectShape fromShape,
+-            in KeyString property,
+-            int slot,
+-            Entry overwriteForm)
+-        {
+-            // Not the shape the transition landed on — the receiver left shape mode during the
+-            // store, so there is no transition to record. Unreachable as things stand, because
+-            // the caller has already resolved a writable tracked slot on this receiver, which
+-            // dictionary mode cannot supply; kept because that is the caller's invariant to
+-            // hold, not this method's to assume.
+-            var toShape = receiver.TransitionShape;
+-            if (toShape == null || !toShape.TryGetSlot(property.Key, out var toSlot) || toSlot != slot)
+-                return overwriteForm;
+-
+-            // Walked through the raw chain link rather than GetPrototypeOf, which would fire a
+-            // Proxy's getPrototypeOf trap — a visible side effect that must not happen just
+-            // because a cache is warming up.
+-            for (var holder = receiver.PrototypeChainObject; holder != null; holder = holder.PrototypeChainObject)
+-            {
+-                // An exotic or proxied holder has its own [[GetOwnProperty]] and [[Set]], so
+-                // stop rather than reason about what a creation past it would mean.
+-                if (holder.GetType() != typeof(JSObject))
+-                    return overwriteForm;
+-
+-                // Present anywhere on the chain, in any form: a setter, a read-only data
+-                // property, or a plain writable one. Only the first two change the outcome, but
+-                // tested by presence because the cheap test is the conservative one.
+-                if (!holder.GetInternalProperty(property, inherited: false).IsEmpty)
+-                    return overwriteForm;
+-            }
+-
+-            return new Entry(
+-                toShape.Id,
+-                slot,
+-                fromShape,
+-                toShape,
+-                receiver.PrototypeChainObject,
+-                JSObject.PrototypeMutationVersion);
+-        }
+-
++        /// <summary>
++        /// Describes a store that CREATED its property as the shape transition it performed,
++        /// falling back to the plain overwrite form when the creation cannot be replayed safely.
++        /// </summary>
++        /// <remarks>
++        /// The shape changing across the store is what identifies a creation — a shape is
++        /// immutable, so a receiver reporting a different one has gained a tracked property, and
++        /// the only one it can have gained at this site is this key.
++        /// <para>
++        /// Replaying it means performing CreateDataProperty directly, which is only the right
++        /// answer while OrdinarySetWithOwnDescriptor would still reach it. It would not if the
++        /// prototype chain supplied the key: a setter there has to run, and an inherited
++        /// non-writable data property has to reject the write. So the chain is walked once here
++        /// and required to be free of the key, and two guards keep that answer true at every
++        /// later hit — the receiver still pointing at the same prototype, by reference, and the
++        /// global prototype-mutation version, which any addition to any object used as a
++        /// prototype publishes. Those are the same two the read cache's prototype form uses, and
++        /// they are only affordable because 2-0 stopped `new` from advancing the version once
++        /// per allocation; before that a transition entry retired on the next object built.
++        /// </para>
++        /// </remarks>
++        private static Entry DescribeTransition(
++            JSObject receiver,
++            ObjectShape fromShape,
++            in KeyString property,
++            int slot,
++            Entry overwriteForm)
++        {
++            // Not the shape the transition landed on — the receiver left shape mode during the
++            // store, so there is no transition to record. Unreachable as things stand, because
++            // the caller has already resolved a writable tracked slot on this receiver, which
++            // dictionary mode cannot supply; kept because that is the caller's invariant to
++            // hold, not this method's to assume.
++            var toShape = receiver.TransitionShape;
++            if (toShape == null || !toShape.TryGetSlot(property.Key, out var toSlot) || toSlot != slot)
++                return overwriteForm;
++
++            // Walked through the raw chain link rather than GetPrototypeOf, which would fire a
++            // Proxy's getPrototypeOf trap — a visible side effect that must not happen just
++            // because a cache is warming up.
++            for (var holder = receiver.PrototypeChainObject; holder != null; holder = holder.PrototypeChainObject)
++            {
++                // An exotic or proxied holder has its own [[GetOwnProperty]] and [[Set]], so
++                // stop rather than reason about what a creation past it would mean.
++                if (holder.GetType() != typeof(JSObject))
++                    return overwriteForm;
++
++                // Present anywhere on the chain, in any form: a setter, a read-only data
++                // property, or a plain writable one. Only the first two change the outcome, but
++                // tested by presence because the cheap test is the conservative one.
++                if (!holder.GetInternalProperty(property, inherited: false).IsEmpty)
++                    return overwriteForm;
++            }
++
++            return new Entry(
++                toShape.Id,
++                slot,
++                fromShape,
++                toShape,
++                receiver.PrototypeChainObject,
++                JSObject.PrototypeMutationVersion);
++        }
++
+         private void BecomeMegamorphic()
+         {
+             if (megamorphic)
+@@ -551,23 +577,23 @@ public static class PropertyInlineCacheSite
+         /// Where the key's value lives on a receiver of shape <see cref="ShapeId"/>. Unlike a
+         /// read entry there is no prototype form: a write that resolves on the chain either
+         /// runs a setter or creates an own property, and neither is a slot write on a holder.
+-        /// <para>
+-        /// Two forms, discriminated by <see cref="FromShape"/>. An <em>overwrite</em> entry
+-        /// (null) writes <see cref="Slot"/> on a receiver already of shape
+-        /// <see cref="ShapeId"/>. A <em>transition</em> entry creates it instead: the receiver
+-        /// presents <see cref="FromShape"/>, which does not carry the key, and the write moves
+-        /// it to <see cref="ToShape"/> — guarded additionally by
+-        /// <see cref="ReceiverPrototype"/> identity and <see cref="PrototypeVersion"/>, since a
+-        /// creation is only correct while the chain supplies nothing for the key.
+-        /// </para>
++        /// <para>
++        /// Two forms, discriminated by <see cref="FromShape"/>. An <em>overwrite</em> entry
++        /// (null) writes <see cref="Slot"/> on a receiver already of shape
++        /// <see cref="ShapeId"/>. A <em>transition</em> entry creates it instead: the receiver
++        /// presents <see cref="FromShape"/>, which does not carry the key, and the write moves
++        /// it to <see cref="ToShape"/> — guarded additionally by
++        /// <see cref="ReceiverPrototype"/> identity and <see cref="PrototypeVersion"/>, since a
++        /// creation is only correct while the chain supplies nothing for the key.
++        /// </para>
+         /// </summary>
+-        private readonly record struct Entry(
+-            int ShapeId,
+-            int Slot,
+-            ObjectShape FromShape = null,
+-            ObjectShape ToShape = null,
+-            JSObject ReceiverPrototype = null,
+-            long PrototypeVersion = 0);
++        private readonly record struct Entry(
++            int ShapeId,
++            int Slot,
++            ObjectShape FromShape = null,
++            ObjectShape ToShape = null,
++            JSObject ReceiverPrototype = null,
++            long PrototypeVersion = 0);
+     }
+ 
+     private sealed class PropertyInlineCache
+@@ -589,7 +615,7 @@ public static class PropertyInlineCacheSite
+                     {
+                         if (receiver.TryReadShapeSlot(entry.ShapeId, entry.Slot, out var own))
+                         {
+-                            PropertyOptimizationDiagnostics.RecordCacheHit();
++                            PropertyOptimizationDiagnostics.RecordCacheHit(own);
+                             return own;
+                         }
+                     }
+@@ -598,26 +624,26 @@ public static class PropertyInlineCacheSite
+                         && entry.PrototypeVersion == JSObject.PrototypeMutationVersion
+                         && entry.Holder.TryReadShapeSlot(entry.HolderShapeId, entry.Slot, out var inherited))
+                     {
+-                        PropertyOptimizationDiagnostics.RecordCacheHit();
++                        PropertyOptimizationDiagnostics.RecordCacheHit(inherited);
+                         return inherited;
+                     }
+                 }
+             }
+ 
+             PropertyOptimizationDiagnostics.RecordCacheMiss();
+-            if (PropertyOptimizationDiagnostics.Enabled)
+-            {
+-                if (megamorphic)
+-                    PropertyOptimizationDiagnostics.RecordMissMegamorphic();
+-                else if (target is not JSObject)
+-                    PropertyOptimizationDiagnostics.RecordMissNonObject();
+-                else if (key == 0)
+-                    PropertyOptimizationDiagnostics.RecordMissCold();
+-                else if (key != property.Key)
+-                    PropertyOptimizationDiagnostics.RecordMissKeyMismatch();
+-                else
+-                    PropertyOptimizationDiagnostics.RecordMissShape();
+-            }
++            if (PropertyOptimizationDiagnostics.Enabled)
++            {
++                if (megamorphic)
++                    PropertyOptimizationDiagnostics.RecordMissMegamorphic();
++                else if (target is not JSObject)
++                    PropertyOptimizationDiagnostics.RecordMissNonObject();
++                else if (key == 0)
++                    PropertyOptimizationDiagnostics.RecordMissCold();
++                else if (key != property.Key)
++                    PropertyOptimizationDiagnostics.RecordMissKeyMismatch();
++                else
++                    PropertyOptimizationDiagnostics.RecordMissShape();
++            }
+             var result = target[property];
+ 
+             if (megamorphic || target is not JSObject ordinary || property.Metadata.IsPrivateName)
+@@ -637,27 +663,27 @@ public static class PropertyInlineCacheSite
+             }
+ 
+             if (!TryDescribe(ordinary, in property, out var entryToAdd))
+-            {
+-                PropertyOptimizationDiagnostics.RecordMissNotDescribable();
++            {
++                PropertyOptimizationDiagnostics.RecordMissNotDescribable();
+                 return result;
+-            }
++            }
+ 
+             for (var i = 0; i < count; i++)
+                 if (entries[i].ShapeId == entryToAdd.ShapeId && entries[i].Holder == entryToAdd.Holder)
+-                {
+-                    PropertyOptimizationDiagnostics.RecordMissEntryAlreadyPresent();
+-
+-                    // REFRESH, do not decline. ShapeId and Holder identify the entry, but
+-                    // they are not what a hit checks: the prototype version, the receiver's
+-                    // prototype identity, and the holder's shape and slot are all guards too,
+-                    // and any of them can go stale while these two stay equal. Returning here
+-                    // left the stale entry in place with no way back — the site could never
+-                    // re-describe it, so it missed on this receiver for the rest of the
+-                    // process. entryToAdd was just built from the live receiver, so it is by
+-                    // construction the correct replacement.
+-                    entries[i] = entryToAdd;
++                {
++                    PropertyOptimizationDiagnostics.RecordMissEntryAlreadyPresent();
++
++                    // REFRESH, do not decline. ShapeId and Holder identify the entry, but
++                    // they are not what a hit checks: the prototype version, the receiver's
++                    // prototype identity, and the holder's shape and slot are all guards too,
++                    // and any of them can go stale while these two stay equal. Returning here
++                    // left the stale entry in place with no way back — the site could never
++                    // re-describe it, so it missed on this receiver for the rest of the
++                    // process. entryToAdd was just built from the live receiver, so it is by
++                    // construction the correct replacement.
++                    entries[i] = entryToAdd;
+                     return result;
+-                }
++                }
+ 
+             if (count == MaxEntries)
+             {
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/LocalAllocationMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/LocalAllocationMetrics.cs
+index 6eea323b..bb1d0295 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/LocalAllocationMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/LocalAllocationMetrics.cs
+@@ -324,6 +324,101 @@ internal static class LocalAllocationMetrics
+                 + "miniature, and the shape a typed backing store plus an unboxed read would "
+                 + "cover end to end"),
+ 
++        // ── item 3-2: the same value, living in an object FIELD ──────────────────────────
++        //
++        // 3-2's whole premise is one sentence: "shapeSlots holds JSValue references, so
++        // `vector.x = 1.5` allocates". These rows take that example literally and then vary the
++        // one thing it does not mention — where the stored value came from — because item 3-1
++        // found that the boxes on the array path are minted by the OPERATORS and never by the
++        // store, and the object path should answer the same way if the two items are twins.
++
++        new(
++            "field-write-static-literal",
++            "field",
++            $$"""
++            (function (arg) {
++                var o = { x: 0 };
++                var s = 0;
++                for (var i = 0; i < {{Iterations}}; i++) { o.x = 2; s = s + 1.5; }
++                return s;
++            })
++            """,
++            "the item's own example with a literal VisitLiteral has a shared static for. If the "
++                + "slot is what allocates, this row still pays"),
++
++        new(
++            "field-write-fresh-literal",
++            "field",
++            $$"""
++            (function (arg) {
++                var o = { x: 0 };
++                var s = 0;
++                for (var i = 0; i < {{Iterations}}; i++) { o.x = 1.5; s = s + 1.5; }
++                return s;
++            })
++            """,
++            "`vector.x = 1.5` exactly as item 3-2 writes it. The difference from the row above is "
++                + "the literal's own box, not the slot's"),
++
++        new(
++            "field-write-from-numeric-local",
++            "field",
++            $$"""
++            (function (arg) {
++                var o = { x: 0 };
++                var v = 3.5;
++                var s = 0;
++                for (var i = 0; i < {{Iterations}}; i++) { o.x = v * 1.5; s = s + 1.5; }
++                return s;
++            })
++            """,
++            "the store 3-2 is actually for: a value that IS a raw double at the point of the "
++                + "store, which the slot cannot hold and so must box. This is the object twin of "
++                + "3-1's write side"),
++
++        new(
++            "field-read-only",
++            "field",
++            $$"""
++            (function (arg) {
++                var o = { x: 3.5 };
++                var s = 0;
++                for (var i = 0; i < {{Iterations}}; i++) { s = s + o.x; }
++                return s;
++            })
++            """,
++            "the read into an addition, to pair with element-read-only"),
++
++        new(
++            "field-read-write-chain",
++            "field",
++            $$"""
++            (function (arg) {
++                var o = { x: 3.5 };
++                var s = 0;
++                for (var i = 0; i < {{Iterations}}; i++) { o.x = o.x * 0.5 + 0.25; s = s + 1.5; }
++                return s;
++            })
++            """,
++            "read, arithmetic and store back into the field — Box2D's shape, and the object twin "
++                + "of element-read-write-chain"),
++
++        new(
++            "local-write-control",
++            "field",
++            $$"""
++            (function (arg) {
++                var o = 0;
++                var v = 3.5;
++                var s = 0;
++                for (var i = 0; i < {{Iterations}}; i++) { o = v * 1.5; s = s + 1.5; }
++                return s + o;
++            })
++            """,
++            "the control for the rows above: the identical arithmetic stored into a raw-double "
++                + "LOCAL instead of a field, so every field row is read net of the loop that "
++                + "carries it"),
++
+         // ── item 3-8: the same value, not PROVABLY numeric ────────────────────────────────
+         //
+         // Three spellings of top-level-var differing only in where the value came from — a
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index 600126e0..442b5492 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -547,6 +547,10 @@ internal static class SpecializingTierMetrics
+             cacheHits = properties.CacheHits,
+             cacheMisses = properties.CacheMisses,
+ 
++            // Item 3-2's population: of the reads the inline cache answers, how many hand back a
++            // number. A shape slot holding a raw double would serve exactly these without a box.
++            cacheHitsNumeric = properties.CacheHitsNumeric,
++
+             // Item 4-4's surface: every JavaScript call, and the share of them made FROM a
+             // promoted function — the only calls a tier-2 recompile could ever inline.
+             calls = callPath.Calls,
+-- 
+2.43.0
+
