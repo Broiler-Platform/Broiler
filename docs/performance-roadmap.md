@@ -384,9 +384,11 @@ times on 2026-08-03 on linux-x64 at the pinned `9bf9639b` — plus `patches/0067
 identical every time, manifest by manifest** — so the table below describes the pinned pointer as well as the commit it was first
 measured at.
 
-**Re-run 2026-08-04 on linux-x64 at the pinned `61c8cc65`, plus `patches/0078` (item 3-7) and then
-plus `0078`–`0079` (item 3-8): every count is identical to the row below, manifest by manifest, on
-every arm.** All five manifests were run on 3-7's switch-ON arm — the shipping configuration — and
+**Re-run 2026-08-04 on linux-x64 at the pinned `61c8cc65`, plus `patches/0078` (item 3-7), plus
+`0078`–`0079` (item 3-8) and plus `0078`–`0080` (item 3-1): every count is identical to the row
+below, manifest by manifest, on every arm.** The `0080` run matters most of the five, because that
+patch changes what six core operators *emit* — `&`, `|`, `^`, `<<`, `>>`, `>>>` — and
+`test262-arrays` is thick with `ToUint32` edge cases. All five manifests were run on 3-7's switch-ON arm — the shipping configuration — and
 all five again with `BROILER_JS_CAPTURED_NUMERIC_LOCALS=0`; `properties-proxy` was then run a third
 time at `0078`–`0079` with nothing else building, and a fourth on a **pristine build of the pin**
 as a control. The last two agree **file for file** on which 38 fail, which is what makes this a
@@ -827,6 +829,24 @@ These were paid for once each. They apply to every phase below.
   nothing to win outvote three where it has almost everything. *Report the spread before the
   aggregate whenever the items are representation changes, because those are exactly the changes
   whose value is concentrated in a workload shape rather than spread across one.*
+
+- **Check a corpus counter is deterministic before reading a delta out of it.** Item 3-1's
+  bitwise change came back **+3 126 boxes on Crypto** — the wrong direction, on the suite it was
+  aimed at. Running the *same arm twice* gave 42 418 727 and 42 421 217: Crypto generates RSA keys
+  and its work is not fixed across runs, so its own variation is larger than any gap between the
+  arms. Six of the seven suites are identical to the digit and only that one is not. *"Allocation
+  is deterministic" is a property of most counters here and not of all of them, and the check
+  costs one extra run of the arm you already have.*
+
+- **An emitter that cannot be fed is not an optimization, and it will pass every test you write
+  for it.** The bitwise operators were given a native form that takes `s = i & 1023` from 31.84
+  bytes an iteration to **0.00**, is correct on 15 semantics cases, and removes **exactly zero
+  boxes on the whole Octane corpus** — including on Crypto, a BigInteger implementation built on
+  `&`, `|` and `>>` that mints 42.4 M boxes. The native form requires both operands to be numeric
+  locals, and Crypto's digits live in `this.array[i]`. That is the same shape as 3-5's finding a
+  phase earlier, and by now it is a rule: *before adding a fast path, count how many of its
+  operands can actually reach it — the population feeding a specialization is a different
+  measurement from the specialization's own speed, and only the first one predicts the corpus.*
 
 - **Interleave, at process granularity.** Sub-1.5% effects are only visible ABBA-
   interleaved across independent builds, ten runs each, medians compared.
@@ -3234,7 +3254,7 @@ Owner assemblies: `Broiler.JavaScript.Storage`, `.Runtime`, `.Compiler`.
 > indexed access boxes its index**, ~32 B on every array read and write in the engine, with no
 > read-side cost to removing it. That became **3-0**, and it goes first.
 
-### 3-1 · Unboxed backing stores for dense arrays — **measured; re-specified, and no longer first**
+### 3-1 · Unboxed backing stores for dense arrays — **re-measured; it is the precondition for the six items already built**
 
 **Where.** `Broiler.JavaScript.Storage/ElementArray.cs` — `private IPropertyValue[] dense`.
 
@@ -3308,6 +3328,111 @@ after a forced gen2 collection, every row net of an inert no-array loop control:
 *Neither the read-side cost nor the index boxing was visible from the item's text, and both
 came out of one probe run. §3.5's rule about a premise not being a finding, applied to an item
 that was right about its premise and wrong about its consequence.*
+
+#### Re-measured for the promotion 3-8 gave it — and the two findings say it is a *precondition*, not an option
+
+3-8 moved this item to the front of the phase on a census: **42.01% of the corpus's allocation is
+number boxing** (corrected from 41.89% once the constructor was counted as well as the factory —
+a builtin writing `new JSNumber(x)` directly turns out to be **0.3%** of all boxes, so the earlier
+figure was a lower bound and barely one). That promotion sat against this item's own 2026 finding
+that a typed backing store is *a wash*. Both are right, and reconciling them is what this item
+needed before anything was built.
+
+**The element chain decomposes exactly, and every term is a box the operators mint.** New
+`provability` and `element` rows in `--local-alloc`, each running the identical arithmetic the
+raw-double control runs at **0.00**:
+
+| Site | B/iter | |
+|---|--:|---|
+| `local-read-only` — `s = s + v`, `v` a raw double | **0.00** | the floor |
+| `element-read-only` — `s = s + a[0]` | 31.98 | one box: the add's result |
+| `literal-static-operand` — `a[0] * 2` | 32.00 | one box |
+| `literal-fresh-operand` — `a[0] * 1.5` | **64.00** | **two** — and the second one is the literal |
+| `element-multiply-only` — `s = a[0] * 1.5` | 64.00 | |
+| `element-read-constant-index` — `s = s + a[0] * 1.5` | 95.99 | = 64 + 32, exactly |
+| `element-read-variable-index` — `a[i & 1023]` | 128.08 | + one box for `i & 1023` |
+| `element-read-write-chain` — read, arithmetic, store back | 159.67 | five boxes, the NavierStokes kernel |
+
+Every figure is an exact multiple of 32 and the composition checks out to the hundredth, which is
+what says the model is right rather than approximately right. **The element store is not in any of
+them.** The boxes are minted by the *operators*, and the element read is free today precisely
+because the value it hands back is already a box. So 3-1's own verdict holds — a typed store alone
+trades a write allocation for a read allocation — while 3-8's promotion also holds, for a reason
+3-1 never stated: **the operators cannot stay unboxed while their operands come out of an array.**
+
+**Two things fell out of that decomposition, and both were measured rather than argued.**
+
+- **A numeric literal is re-boxed on every evaluation.** `VisitLiteral` has shared statics for
+  NaN, 0, 1 and 2 and emits a factory call for everything else, so `a[0] * 1.5` allocates *two*
+  boxes where `a[0] * 2` allocates one. Counted over the corpus through a separate factory entry,
+  literals are **1 671 331 of 133 936 952 requests — 1.2%, and at most 2.0% of fresh boxes**. Real,
+  exactly demonstrated, and too small to justify either a thread-shared constant (the small-integer
+  cache is `[ThreadStatic]` for a stated reason) or a per-activation local per literal. **Recorded
+  and not built**, with the number that says why.
+- **The bitwise and shift operators had no native form, and the analysis had been proving them
+  numeric all along.** `NumericLocalAnalysis.IsNumericBinary` lists `&`, `|`, `^`, `<<`, `>>` and
+  `>>>`, so a local assigned `i & 1023` stays numeric — while `TryCreateNativeNumericValue` did
+  not, so the value went out to a `JSValue` operator and came back. Measured:
+  **`s = i + 1023` is 0.00 B/iter and `s = i & 1023` is 31.84**, with both operands raw doubles and
+  the result stored straight into one. *The analysis proved something the emitter could not use.*
+
+#### The bitwise half is built, and its corpus result is the finding
+
+The exclusion had a real reason, and it is why the operators live in `JSNumericOperators` rather
+than as `BExpression` nodes: a bitwise operand is not the double but `ToInt32`/`ToUint32` of it
+(§7.1.5/§7.1.6) — truncated toward zero, reduced modulo 2^32, NaN and the infinities mapping to 0
+— and that reduction is **not** a CLR cast, which is undefined on overflow rather than wrapping.
+Routing all six through `JSValue.ToUint32`, the same helper `IntValue` uses, makes them identical
+to the boxed operators by construction. On its shape it removes the box completely:
+
+| Site | native | generic |
+|---|--:|--:|
+| `bitwise-on-numeric-locals` — `s = i & 1023` | **0.00** | 31.84 |
+| `element-read-variable-index` | **96.25** | 128.08 |
+| `element-read-write-chain` | **96.00** | 159.67 |
+
+**On the corpus it removes nothing.** Six of the seven suites come back with the box count
+identical to the digit — a difference of exactly zero — and the seventh is **Crypto**, a
+BigInteger implementation built on `&`, `|` and `>>` that mints 42.4 M boxes, 55% of its own
+allocation, where the two arms differ by 3 126 in the *wrong* direction. That is not a result
+either: running the **same arm twice** gives 42 418 727 and 42 421 217, so Crypto's own
+run-to-run variation is larger than the gap between the arms. (It generates RSA keys, so its work
+is not fixed across runs — worth knowing before quoting any Crypto delta, and the reason the
+census figures elsewhere in this item are quoted per suite rather than to the digit.) The reason is the whole point of this item: the native form is chosen when **both**
+operands are native, and Crypto's digits live in `this.array[i]`. An element read is not a numeric
+local, so the operator it feeds is never eligible, however good its native form is.
+
+*That is item 3-5's finding — "the emission is fine; what is on the other side is not" — arriving
+for the second time from a different direction, and it is the sharpest evidence this phase has
+produced about its own ordering.* Six items have now built machinery that array-resident data
+cannot reach: unboxed indices (3-0), unboxed locals in four categories (3-3), an unboxed
+comparison (3-5), a captured raw cell (3-7), and now unboxed bitwise operators. Every one of them
+is correct, every one is invisible on the corpus, and **every one of them is waiting on the same
+thing.**
+
+**Shipped on by default, with `BROILER_JS_NATIVE_BITWISE=0` to restore the generic operators**, on
+3-5's terms: 15 test cases pinning ToInt32 wrapping, NaN and both infinities, shift-count masking,
+`>>>`'s unsigned result, the coercions a non-numeric operand must still get and a getter that must
+run exactly once — **every one asserted on both settings of the switch**.
+
+#### Re-specification
+
+**3-1 is no longer "the most contained item in the phase", and it is no longer optional.**
+
+- **It is not contained.** The item's text describes a storage change — a typed backing store with
+  an elements-kind tag. Measured, a typed store *by itself* is the wash this section already
+  recorded, because the read has to hand back an `IPropertyValue`. The item that pays is
+  **storage plus an unboxed element READ that the numeric operators can consume**, which is a
+  joint `Broiler.JavaScript.Storage` and `Broiler.JavaScript.Compiler` change and an **XL**.
+- **It is the precondition for six landed items.** Nothing built in phase 3 so far reaches
+  array-resident data, and 42.01% of the corpus's allocation is boxing concentrated in exactly the
+  suites that hold their numbers in arrays. Until an element read can produce a raw double, every
+  further widening of the local tier is measuring the same 0.36%.
+- **3-2 is the same argument for object fields** and should be planned with it, not after it:
+  Box2D is 36.60% boxing with no arrays at all.
+- **The bitwise emission is already waiting for it.** It cost one file and 15 tests, it is correct
+  today, and the day an element read yields a raw double it starts collecting on Crypto's 42.4 M
+  boxes without another line being written.
 
 ### 3-0 · Stop boxing the index of an indexed access — **landed, both halves**
 
@@ -5663,7 +5788,7 @@ predicate at all.
 | **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → 0-6 workflow run ✅ (17/17 committed at the pin) → **0-6's noise band (`--repetitions` in CI), then 0-7, 0-8** | — | Everything. 12 → **17 scores** ✅, known noise band, and the first evidence any phase A–F can close on | 17/17 ✅, no timeout at the 180 s floor ✅, `comparison.md` reporting the triad ✅, **band on record** and **the BenchmarkDotNet + RID-matrix rows collected** — the three still open |
 | **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-4 ✅** → **1-1 emission half ✅**, capture half open → 1-3 measure | 1-4 S, 1-1 remainder L | The two worst scores in the suite; page-load time generally. **1-4 took the Mandreel half (3.04×); 1-1's deferred emission takes 0.64–0.69× off jQuery, PdfJS and Box2D at 1.0009× steady state, and CodeLoad 94.6 → 104.0 (1.099×)** | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
 | **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured twice, agreeing: Richards PASSES (183× → 150× after 2-11/2-12 locally; 144.9× in CI), DeltaBlue FAILS (576× → 447× locally; 460× in CI)**, five repetitions per engine on one machine and the committed CI run on another |
-| **3** | 3-0 ✅ (both halves) → **3-3 ✅ complete** → 3-5 ✅ → 3-6 ✅ (counted, closed) → 3-7 ✅ → **3-8 ✅ (counted, do not start as written)** → **3-1** → **3-2**, then *cost* 3-4 | L–XL, 3-8 XL | Uniform lift across arithmetic and allocation-heavy suites. **3-7 closes the static half of the coverage question and 3-8 is what is left**: the widening reached 8 names of 2 920 (224 → 232), because 247 of 3-6's 478 captured names are held by a *hoisting* rule that is correctness rather than policy, and 2 439 are not proven numeric. **3-8 then measured the two numbers this phase never had, and they re-order it.** Number boxing is **41.89% of the corpus's allocation** (2.05 GB of 4.88, and 66.96% of NavierStokes) — so the prize was always large — while the **whole** raw-double local tier, every item from P2-2 onward, removes **0.36% of those boxes**. A box is minted by the operator, not by the local, and 76.4% of the names 3-8 would guard take their value from a property read or a call. **3-1 and 3-2 move to the front**: they unbox the sites that mint the boxes, and they have been ranked behind the locals work since the phase opened on no measurement at all | `test262-arrays`, `test262-binary-data`, and — added by 3-3's `let`/`const` half — `test262-lexical-declarations`; allocation reported per item alongside time |
+| **3** | 3-0 ✅ → **3-3 ✅** → 3-5 ✅ → 3-6 ✅ → 3-7 ✅ → 3-8 ✅ (counted, do not start as written) → **3-1 + 3-2 together, and nothing else until they land** → then *cost* 3-4 | L–XL, 3-8 XL | Uniform lift across arithmetic and allocation-heavy suites. **3-7 closes the static half of the coverage question and 3-8 is what is left**: the widening reached 8 names of 2 920 (224 → 232), because 247 of 3-6's 478 captured names are held by a *hoisting* rule that is correctness rather than policy, and 2 439 are not proven numeric. **3-8 then measured the two numbers this phase never had, and they re-order it.** Number boxing is **41.89% of the corpus's allocation** (2.05 GB of 4.88, and 66.96% of NavierStokes) — so the prize was always large — while the **whole** raw-double local tier, every item from P2-2 onward, removes **0.36% of those boxes**. A box is minted by the operator, not by the local, and 76.4% of the names 3-8 would guard take their value from a property read or a call. **3-1 and 3-2 move to the front**: they unbox the sites that mint the boxes, and they have been ranked behind the locals work since the phase opened on no measurement at all. **3-1's own re-measurement then made that stronger.** The element chain decomposes exactly — 0.00 for a raw double, 31.98 for `s = s + a[0]`, 95.99 with a multiply, 159.67 for a read-modify-write — and the element STORE is in none of it: the boxes are minted by the operators, and the read is free today only because what it hands back is already a box. Two things fell out. A numeric literal is **re-boxed on every evaluation** (`a[0] * 1.5` costs two boxes where `a[0] * 2` costs one), measured at **1.2% of requests** and recorded rather than built. And the **bitwise and shift operators had no native form** although the analysis has always typed them — `s = i + 1023` costs 0.00 B/iter and `s = i & 1023` cost 31.84. That half **is built** (`JSNumericOperators`, all six through `ToUint32`, 15 tests on both arms) and takes its shape to **0.00** — **and removes no boxes at all on the corpus**: six suites identical to the digit, and Crypto (42.4 M boxes) differing by less than its own run-to-run variation, measured by running one arm twice. The native form needs both operands native and Crypto's digits live in `this.array[i]`. *Six items have now built machinery array-resident data cannot reach; every one is correct, every one is invisible, and every one is waiting on 3-1* | `test262-arrays`, `test262-binary-data`, and — added by 3-3's `let`/`const` half — `test262-lexical-declarations`; allocation reported per item alongside time |
 | **4** | 4-3 design ✅ → **4-1 ✅** (shapes and callees; numeric-vs-generic left open) → **4-3a ✅** → **4-3b ✅** → **4-2a ✅** → **4-2b ✅** (arithmetic half left open) → 4-4 | XL | The remaining order of magnitude. **4-1 measured the premise: 93.5% of reads and 96.7% of calls are monomorphic by execution weight, so 4-2 and 4-4 are well-founded.** 4-3a stated and enforced the restart contract — and found its no-suspendable-bodies condition was held only by two unrelated accidents, two ordinary refactors away from an async function returning a number instead of a Promise. **4-2 then split the same way**: measuring the branch it was told to replace found it produced *wrong answers* — DeltaBlue died on the shipping tier-2 hook — which 4-2a fixes, and 4-2b's specialization takes **44.7% of the corpus's executed reads off the cache path at 0.818× each**, which is **0.83% of suite time**. That number is the phase's own warning: the whole read path is ≤ ~9% of Octane's execution time here and the whole call path ≤ ~5.5%, so **4-4's ceiling is smaller than the phase assumed** | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → single-match `replace` without a builder ✅ (both builtins) → the global case's retained result list ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
@@ -5795,6 +5920,11 @@ BROILER_JS_CAPTURED_NUMERIC_LOCALS=0 dotnet $DLL --specializing-tier /path/to/oc
 # without, and the arm that says the whole mechanism is worth 0.36% of the engine's
 # number boxing. Default is on.
 BROILER_JS_NUMERIC_LOCALS=0 dotnet $DLL --specializing-tier /path/to/octane baseline counters
+
+# Item 3-1: 0 restores the generic JSValue operators for `&`, `|`, `^`, `<<`, `>>`, `>>>`
+# on two proven-numeric operands. Default is on. Worth a full box on its shape and
+# exactly nothing on the corpus, because the operands there are array elements.
+BROILER_JS_NATIVE_BITWISE=0 dotnet $DLL --local-alloc
 ```
 
 **`--specializing-tier … counters` also reports the boxing census** (item 3-8):
@@ -5915,8 +6045,8 @@ Where each item came from, so existing cross-references still resolve.
 | 2-5 | P0-2 remainder | 2-5 | **Closed** — measured at 0%; P0-2 had already taken the cost, and 2-1 narrowed what was left |
 | 2-6 | — | 2-6 | **Folded into 4-1** — no callee resolution to cache; a call costs ~250 ns and a call-site cache removes none of it |
 | 3-0 | — (found measuring 3-1) | — | **Landed, both halves** — an indexed access boxed its index. A read now allocates **0.00 B/element** against 31.67 and a write loses ~32 B; write-once-read-once goes 0.46x for a numeric element and 0.25x for a reference one. Compound assignment keeps its boxed index, on purpose |
-| 3-1 | — | 3-1 | **Open, re-specified twice, and now FIRST in the phase.** Its own measurement made it a live-memory item (a resident `double[1e6]` ~0.2x) whose throughput case was contingent on 3-4; item 3-8's boxing census overturns that ranking — **41.89% of the corpus's allocation is number boxes, 66.96% of NavierStokes**, and an unboxed backing store is what stops an element read handing the operator a boxed operand |
-| 3-2 | — | 3-2 | **Open, and promoted with 3-1** — the object-field twin, and the other half of what item 3-8's census points at: Box2D at 35.98% boxing streams doubles through `b2Vec2` fields rather than arrays. **4-2b's specialized read already resolves a monomorphic read to a literal slot index**, which is most of the machinery a raw slot needs |
+| 3-1 | — | 3-1 | **Open, re-specified three times, now FIRST and no longer contained.** Its own measurement made it a live-memory item; 3-8's census overturned that ranking (**42.01% of the corpus's allocation is number boxes, 66.96% of NavierStokes**); and its own re-measurement showed the element chain decomposes entirely into **operator** boxes, so a typed store *alone* stays the wash it always was and the item that pays is storage **plus an unboxed element read the numeric operators can consume** — a joint Storage + Compiler **XL**. It is the precondition for every item phase 3 has landed. Its premise measurement also **built the bitwise half** (`JSNumericOperators`) and found a literal is re-boxed per evaluation (1.2% of requests, not built) |
+| 3-2 | — | 3-2 | **Open, and to be planned WITH 3-1 rather than after it** — the object-field twin, and the other half of what 3-8's census points at: Box2D at **36.60%** boxing streams doubles through `b2Vec2` fields with no arrays at all. **4-2b's specialized read already resolves a monomorphic read to a literal slot index**, which is most of the machinery a raw slot needs |
 | 3-3 | P2-2 item 3 remainder | 3-3 | **Parameters landed; `let`/`const` and block `var` open and re-ranked ahead of them.** Measured before starting, and the item was right about the target and wrong about the tier: a parameter was excluded from the *scalar* gate, not the numeric one, so it allocated a `JSVariable` cell on every call — **56 B per parameter, a three-parameter call 230.2 → 62.2 B**. The numeric tier cannot be widened to parameters at all, because the caller picks the type; that is phase 4. All four ineligible categories cost the same per site, so the item's ordering was never a cost claim |
 | 3-6 | — (found measuring 3-5) | — | **Counted and closed** — the conjunction 3-5 blamed costs 0.1% of the coverage. Splits into 3-7 and 3-8; nothing built, deliberately |
 | 3-7 | — (3-6's static half) | — | **Landed** — a captured numeric local lives in the `Box<double>` the expression compiler already makes for any captured CLR local, so the "cell" the item asked for needed no code. Worth **8 names, 224 → 232**, not 3-6's predicted 290/2.4×: **247 of the 478 captured names are named by a hoisted function declaration** and are closed permanently, and 3-6's population was inferred from a subtraction with a missing term (`offered = rejected + dropped + surviving`, and `rejected` had no counter). Lifting the conjunct exposed **two wrong answers and one compile failure** that it had been masking. **63.97 → 0.01 B/iter and shape ÷ control 7.19× → 1.0000× on its shape; +32 B and 1.111× on the losing one; 1.0001× on the corpus.** Switch `BROILER_JS_CAPTURED_NUMERIC_LOCALS` |
