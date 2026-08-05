@@ -1,0 +1,506 @@
+From 0a6b8af1e40b7b20d167d1d70d2a16c074325c16 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 5 Aug 2026 09:26:42 +0000
+Subject: [PATCH] Count item 3-8a's population, with an instrument made to
+ discriminate
+
+The first attempt at this counter read zero on all seven Octane suites
+and was nearly reported as a zero, before anyone had shown it could read
+anything else. It could not, and it was reverted. This one is built the
+other way round: it is made to discriminate on constructed shapes first,
+and only then pointed at the corpus.
+
+AnalyzeSpeculative still works by difference against the real fixed
+point rather than by a new rule -- run the same resolution a second time
+with an identifier the function neither declares nor takes as a
+parameter assumed numeric, and subtract the real survivors -- so the set
+cannot drift from what the analysis actually does. Two fixes were needed
+over the first attempt. The population needs a set of names the function
+DECLARES, not just the ones it offered as candidates, or a local that
+never qualified (`var a = []`) is mistaken for a name from outside the
+function and assumed numeric. And the switch is a COMPILE-time one, so
+the driver turns it on before the corpus is compiled rather than beside
+the run-time censuses, which is where it went first.
+
+Seven fixtures pin the discrimination, and the two that matter are
+negatives: a local defeated by a Parameter is one slot away in the same
+enum and must stay out, because a parameter is a value the caller picks
+per call rather than a name from outside the function, and an instrument
+that could not separate them would report this population as everything
+item 3-3 already deferred; and the never-offered local above.
+
+Counted on the corpus: 26 names, numeric locals 232 -> 258, 1.11x. The
+distribution is the result rather than the total -- six suites gain one
+to three names each, and NavierStokes gains fifteen, going 24 -> 39,
+1.62x. That is the largest single-suite widening this phase has
+produced, and it lands on the suite carrying 9.46 M of the 16.95 M
+LocalSlot steps and 6.76 M of the 7.05 M real update boxes. For contrast
+item 3-7 widened by 8 names at 1.036x and was worth 1.0001x, because its
+eight were scattered where nothing hot lived.
+
+The count does not license the build. The mechanism is still the XL
+recorded with 0091: every fast path keys off NumericStorage and a
+speculative local is a double only while a flag holds. What the count
+settles is that the work would have something to reach.
+
+Counter off by default; it costs a second analysis pass per compiled
+function. No behaviour change.
+---
+ .../SpeculativeNumericPopulationTests.cs      | 129 ++++++++++++++++++
+ .../CompilerSpecializationDiagnostics.cs      |  18 ++-
+ .../FastCompiler.CreateFunction.cs            |   8 ++
+ .../Declarations/NumericLocalAnalysis.cs      |  91 ++++++++++--
+ .../SpeculativeNumericLocals.cs               |  44 ++++++
+ .../SpecializingTierMetrics.cs                |  10 ++
+ 6 files changed, 289 insertions(+), 11 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpeculativeNumericPopulationTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler/SpeculativeNumericLocals.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpeculativeNumericPopulationTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpeculativeNumericPopulationTests.cs
+new file mode 100644
+index 00000000..f3408000
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpeculativeNumericPopulationTests.cs
+@@ -0,0 +1,129 @@
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// The population instrument for item 3-8a: names a function's fixed point keeps ONLY when a name
++// from outside the function is assumed to hold a number
++// (docs/performance-roadmap.md item 3-8a).
++//
++// These tests exist because the FIRST version of this instrument read zero on all seven Octane
++// suites and that zero was nearly reported — before anyone had shown the thing could read anything
++// else. It could not, and it was reverted; §3.5 gained the rule that a counter never shown to read
++// non-zero is a claim about the counter. So the order in this file is the point of it: **the
++// instrument is made to discriminate on constructed shapes here, and only then pointed at the
++// corpus.**
++//
++// Every program below declares exactly ONE function, because the counters are process-wide and the
++// analysis walks into nested functions — reading an aggregate as though it described one function
++// is the specific mistake that sent item 3-8a's scoping down the wrong path in the first place.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public sealed class SpeculativeNumericPopulationTests
++{
++    private readonly record struct Population(long Speculative, long Numeric, long Offered, long Dropped);
++
++    private static Population Count(string source)
++    {
++        var previous = SpeculativeNumericLocals.Counting;
++        SpeculativeNumericLocals.Counting = true;
++        using var context = new JSContext();
++        CompilerSpecializationDiagnostics.Reset();
++        try
++        {
++            context.Eval(source);
++            var c = CompilerSpecializationDiagnostics.Snapshot();
++            return new Population(
++                c.SpeculativeNumericCandidates,
++                c.NumericLocals,
++                c.NumericCandidatesOffered,
++                c.NumericCandidatesDropped);
++        }
++        finally
++        {
++            SpeculativeNumericLocals.Counting = previous;
++        }
++    }
++
++    [Fact]
++    public void TheSwitchIsOffByDefault()
++    {
++        // It costs a second analysis pass per compiled function, which is compile time nothing
++        // else needs to pay.
++        Assert.False(SpeculativeNumericLocals.Counting);
++    }
++
++    [Fact]
++    public void AnInitializerReadingAnOuterNameIsInThePopulation()
++    {
++        // The shape item 3-8a exists for, and the assertion the first instrument failed silently.
++        var p = Count("gg = 3; function f(){ var c = 2 * gg; c++; return c; } f();");
++
++        Assert.Equal(1, p.Speculative);
++        Assert.Equal(0, p.Numeric);
++        Assert.Equal(1, p.Dropped);
++    }
++
++    [Fact]
++    public void TheCascadeResolvesRatherThanBeingCountedAsOneRootCause()
++    {
++        // `r` is dropped for OtherName and `c` for DroppedCandidate. The optimistic pass is a
++        // fixed point like the real one, so relaxing the first resolves the second for free and
++        // BOTH names come out — which is what makes this a population rather than a count of root
++        // causes, and it is the half a hand-written rule would most easily get wrong.
++        var p = Count("gg = 3; function f(){ var r = gg; var c = 2 * r; c++; return c + r; } f();");
++
++        Assert.Equal(2, p.Speculative);
++        Assert.Equal(2, p.Dropped);
++    }
++
++    [Fact]
++    public void AProvenNumericLocalIsNotInThePopulation()
++    {
++        // The control: a name the real analysis already keeps must not appear in a set defined as
++        // "kept only under the assumption", or the difference is not a difference.
++        var p = Count("function f(){ var c = 2 * 10; c++; return c; } f();");
++
++        Assert.Equal(1, p.Numeric);
++        Assert.Equal(0, p.Speculative);
++    }
++
++    [Fact]
++    public void AParameterInitializedLocalIsNotInThePopulation()
++    {
++        // THE discriminating negative. This name is dropped too, by a cause one slot away in the
++        // same enum — but a parameter is not a name from outside the function, it is a value the
++        // caller picks per call, and no test at an initializer decides it for the whole body. An
++        // instrument that could not separate these two would report 3-8a's population as
++        // everything item 3-3 already deferred to phase 4.
++        var p = Count("function f(n){ var c = 2 * n; c++; return c; } f(5);");
++
++        Assert.Equal(0, p.Numeric);
++        Assert.Equal(1, p.Dropped);
++        Assert.Equal(0, p.Speculative);
++    }
++
++    [Fact]
++    public void ALocalDefeatedByAPropertyReadIsNotInThePopulation()
++    {
++        // The other large drop cause on the corpus, refused for the same reason: a property read
++        // can hand back anything on every evaluation, so one test at the initializer decides
++        // nothing about the rest of the body.
++        var p = Count("function f(o){ var c = 2 * o.x; c++; return c; } f({ x: 1 });");
++
++        Assert.Equal(0, p.Speculative);
++        Assert.Equal(1, p.Dropped);
++    }
++
++    [Fact]
++    public void ALocalThatNeverQualifiedIsNotMistakenForAnOuterName()
++    {
++        // The bug the `declaredNames` set exists to stop, and it is the one that would have
++        // inflated the corpus figure rather than zeroed it. `a` is declared in this function and
++        // was never offered as a candidate, so it is not in `candidates` — and an instrument that
++        // asked only "is it a candidate?" would classify it as a name from OUTSIDE the function
++        // and assume it numeric, reporting `c` as reachable when no test on an enclosing value
++        // could reach it. The set has to tell "outside the function" from "inside and unqualified".
++        var p = Count("function f(){ var a = []; var c = 2 * a; c++; return c; } f();");
++
++        Assert.Equal(0, p.Speculative);
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs b/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
+index 20cfbae3..421e85cb 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
+@@ -17,7 +17,8 @@ public readonly record struct CompilerSpecializationSnapshot(
+     long SpeculativeNumericTrees,
+     long SpeculativeNumericGuards,
+     long[] NumericTreeRefusals,
+-    long[] NumericTreeOrderBlockers);
++    long[] NumericTreeOrderBlockers,
++    long SpeculativeNumericCandidates);
+ 
+ /// <summary>
+ /// Why a hoisted name did not become a raw <c>double</c> local, in the order the gate asks
+@@ -178,6 +179,7 @@ public static class CompilerSpecializationDiagnostics
+     private static long speculativeNumericGuards;
+     private static readonly long[] numericTreeRefusals = new long[9];
+     private static readonly long[] numericTreeOrderBlockers = new long[5];
++    private static long speculativeNumericCandidates;
+ 
+     internal static void RecordScalarLocal() => Interlocked.Increment(ref scalarLocals);
+ 
+@@ -246,6 +248,16 @@ public static class CompilerSpecializationDiagnostics
+     internal static void RecordNumericTreeOrderBlocker(NumericTreeOrderBlocker blocker)
+         => Interlocked.Increment(ref numericTreeOrderBlockers[(int)blocker]);
+ 
++    /// <summary>
++    /// Names item 3-8a could speculate on: proven numeric only when a name from outside the
++    /// function is assumed to hold a number. Recorded per compiled function, so a program with
++    /// one function reports that function's population exactly — which is how it is tested,
++    /// since the drop-cause counters beside it aggregate over every function in the program and
++    /// that is what made the first reading of this number unreadable.
++    /// </summary>
++    internal static void RecordSpeculativeNumericCandidates(int count)
++        => Interlocked.Add(ref speculativeNumericCandidates, count);
++
+     /// <summary>Records why one hoisted name did or did not reach the numeric tier.</summary>
+     internal static void RecordNumericLocalDecision(NumericLocalRejection reason)
+     {
+@@ -269,7 +281,8 @@ public static class CompilerSpecializationDiagnostics
+             Interlocked.Read(ref speculativeNumericTrees),
+             Interlocked.Read(ref speculativeNumericGuards),
+             Read(numericTreeRefusals),
+-            Read(numericTreeOrderBlockers));
++            Read(numericTreeOrderBlockers),
++            Interlocked.Read(ref speculativeNumericCandidates));
+ 
+     private static long[] Read(long[] counters)
+     {
+@@ -316,5 +329,6 @@ public static class CompilerSpecializationDiagnostics
+             Interlocked.Exchange(ref numericTreeRefusals[i], 0);
+         for (var i = 0; i < numericTreeOrderBlockers.Length; i++)
+             Interlocked.Exchange(ref numericTreeOrderBlockers[i], 0);
++        Interlocked.Exchange(ref speculativeNumericCandidates, 0);
+     }
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+index 85bcaeb5..36e4c171 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+@@ -81,6 +81,14 @@ partial class FastCompiler
+             // assumes no closure can capture the binding and no eval/with can rename it.
+             if (cs.CanScalarReplaceLocals)
+                 cs.NumericLocals = NumericLocalAnalysis.Analyze(functionDeclaration);
++
++            // Item 3-8a's population, counted rather than estimated. Gated because it costs a
++            // second analysis pass per compiled function, which is compile time nothing else
++            // needs to pay — and it is a COMPILE-time counter, so whoever turns it on has to do
++            // so before the corpus is compiled rather than beside the run-time censuses.
++            if (SpeculativeNumericLocals.Counting && cs.CanScalarReplaceLocals)
++                CompilerSpecializationDiagnostics.RecordSpeculativeNumericCandidates(
++                    NumericLocalAnalysis.AnalyzeSpeculative(functionDeclaration).Count);
+             // super() in a derived constructor (or an arrow nested in it) targets the
+             // superclass constructor, which differs from the home-object prototype.
+             cs.SuperConstructor = superConstructor ?? (functionDeclaration.IsArrowFunction ? previousScope.SuperConstructor : null);
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
+index d6ddf045..0365559e 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
+@@ -102,12 +102,66 @@ internal sealed class NumericLocalAnalysis
+         return analysis.Resolve();
+     }
+ 
++    /// <summary>
++    /// The names item 3-8a would speculate on: the ones this function's own fixed point keeps
++    /// <em>only</em> when a name from outside the function is assumed to hold a number.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// Computed by difference against the real fixed point rather than by a new rule, so the set
++    /// cannot drift from what the analysis actually does: run the same resolution a second time
++    /// with <see cref="IsNumeric"/> treating an identifier this function neither declares nor
++    /// takes as a parameter — a global, or a binding from an enclosing scope — as numeric, and
++    /// subtract the real survivors. A name dropped for a parameter, a property read, an element
++    /// read or a call's return survives neither pass and is therefore absent; those want a guard
++    /// at the value's own source and are a different item.
++    /// </para>
++    /// <para>
++    /// <b>The transitive case is included for free</b>, because the second pass is a fixed point
++    /// like the first: <c>var r = rowSize; var c = 2 * r;</c> keeps both, and the cascade the
++    /// drop-cause counter reports as <c>DroppedCandidate</c> resolves rather than being counted
++    /// separately.
++    /// </para>
++    /// </remarks>
++    public static IReadOnlySet<string> AnalyzeSpeculative(AstFunctionExpression function)
++    {
++        var real = new NumericLocalAnalysis();
++        real.Collect(function);
++        var proven = real.Resolve(count: false);
++
++        var optimistic = new NumericLocalAnalysis { assumeOuterNamesAreNumeric = true };
++        optimistic.Collect(function);
++        var withOuter = optimistic.Resolve(count: false);
++
++        if (withOuter.Count == 0)
++            return System.Collections.Immutable.ImmutableHashSet<string>.Empty;
++
++        var speculative = new HashSet<string>(withOuter, System.StringComparer.Ordinal);
++        speculative.ExceptWith(proven);
++        return speculative;
++    }
++
++    /// <summary>
++    /// Whether an identifier this function neither declares nor takes as a parameter is assumed
++    /// to hold a number. Set only for <see cref="AnalyzeSpeculative"/>'s second pass.
++    /// </summary>
++    private bool assumeOuterNamesAreNumeric;
++
+     /// <summary>
+     /// This function's parameter names, so a drop caused by reading one is attributed to the
+     /// parameter rather than lumped in with globals (docs/performance-roadmap.md item 3-8).
+     /// </summary>
+     private readonly HashSet<string> parameterNames = new(System.StringComparer.Ordinal);
+ 
++    /// <summary>
++    /// Every name this function declares at any depth, whether or not it was ever offered as a
++    /// numeric candidate. Item 3-8a's optimistic pass needs it to tell a name from OUTSIDE the
++    /// function — the thing it assumes numeric — from one inside it that simply never qualified
++    /// (<c>var a = []</c>). Without the distinction the pass would assume the second numeric too
++    /// and report a population that no run-time test on an enclosing value could ever reach.
++    /// </summary>
++    private readonly HashSet<string> declaredNames = new(System.StringComparer.Ordinal);
++
+     /// <summary>
+     /// Every name that was ever offered as a numeric candidate. A drop caused by reading one of
+     /// these is a CASCADE — the name is dropped because its source was — and wants no guard of
+@@ -453,14 +507,15 @@ internal sealed class NumericLocalAnalysis
+         }
+     }
+ 
+-    private IReadOnlySet<string> Resolve()
++    private IReadOnlySet<string> Resolve(bool count = true)
+     {
+         // Item 3-6 splits "not proven numeric" in two, because the halves call for opposite
+         // responses. A name never OFFERED is one whose declaration is not numeric at all —
+         // `var a = []`, `var s = ''` — and no analysis makes a string a double. A name offered
+         // and then DROPPED is one the fixed point could not keep, and that is the only part a
+         // stronger analysis could reach.
+-        CompilerSpecializationDiagnostics.RecordNumericCandidatesOffered(candidates.Count);
++        if (count)
++            CompilerSpecializationDiagnostics.RecordNumericCandidatesOffered(candidates.Count);
+ 
+         // The step between "offered" and "dropped" that had no counter, and it is the larger of
+         // the two: a name any rejection path named — read before its initializer, bound through
+@@ -470,11 +525,15 @@ internal sealed class NumericLocalAnalysis
+         // (docs/performance-roadmap.md item 3-7).
+         var beforeRejection = candidates.Count;
+         candidates.ExceptWith(rejected);
+-        CompilerSpecializationDiagnostics.RecordNumericCandidatesRejected(beforeRejection - candidates.Count);
++        if (count)
++            CompilerSpecializationDiagnostics.RecordNumericCandidatesRejected(beforeRejection - candidates.Count);
+         if (candidates.Count == 0)
+         {
+-            CompilerSpecializationDiagnostics.RecordNumericCandidatesDropped(0);
+-            CompilerSpecializationDiagnostics.RecordNumericCandidatesSurviving(0);
++            if (count)
++            {
++                CompilerSpecializationDiagnostics.RecordNumericCandidatesDropped(0);
++                CompilerSpecializationDiagnostics.RecordNumericCandidatesSurviving(0);
++            }
+             return System.Collections.Immutable.ImmutableHashSet<string>.Empty;
+         }
+ 
+@@ -501,15 +560,19 @@ internal sealed class NumericLocalAnalysis
+                     candidates.Remove(name);
+                     // Classified at the moment of the drop, because this is the assignment that
+                     // removed the name — a later sweep would find a different one.
+-                    CompilerSpecializationDiagnostics.RecordNumericDropCause(Classify(value));
++                    if (count)
++                        CompilerSpecializationDiagnostics.RecordNumericDropCause(Classify(value));
+                     changed = true;
+                 }
+             }
+         }
+         while (changed && candidates.Count > 0);
+ 
+-        CompilerSpecializationDiagnostics.RecordNumericCandidatesDropped(beforeFixedPoint - candidates.Count);
+-        CompilerSpecializationDiagnostics.RecordNumericCandidatesSurviving(candidates.Count);
++        if (count)
++        {
++            CompilerSpecializationDiagnostics.RecordNumericCandidatesDropped(beforeFixedPoint - candidates.Count);
++            CompilerSpecializationDiagnostics.RecordNumericCandidatesSurviving(candidates.Count);
++        }
+         return candidates;
+     }
+ 
+@@ -521,7 +584,16 @@ internal sealed class NumericLocalAnalysis
+     {
+         AstLiteral { TokenType: TokenTypes.Number } => true,
+ 
+-        AstIdentifier identifier => candidates.Contains(identifier.Name.Value),
++        AstIdentifier identifier => candidates.Contains(identifier.Name.Value)
++            // Item 3-8a's optimistic pass. A name this function neither declares nor takes as a
++            // parameter comes from an enclosing scope or from the global object, and the whole
++            // question the item asks is what happens if it holds a number. Parameters are
++            // deliberately excluded: they are item 3-3's one acknowledged gap and want a guard at
++            // entry rather than at an initializer, so counting them here would inflate the set
++            // with a population this item does not serve.
++            || (assumeOuterNamesAreNumeric
++                && !parameterNames.Contains(identifier.Name.Value)
++                && !declaredNames.Contains(identifier.Name.Value)),
+ 
+         // Parenthesised / sequence: the value is the last element.
+         AstSequenceExpression sequence => IsNumeric(Last(sequence)),
+@@ -808,6 +880,7 @@ internal sealed class NumericLocalAnalysis
+                 // see `undefined`. That was unreachable while every name a nested function
+                 // mentions kept its cell; item 3-7 removes exactly that refusal, so the rule has
+                 // to be stated rather than inherited.
++                owner.declaredNames.Add(identifier.Name.Value);
+                 if (functionDepth == 0
+                     && (!owner.HasDominatingDeclaration(identifier.Name.Value)
+                         || owner.IsDominatingInit(declarator.Init)))
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/SpeculativeNumericLocals.cs b/Broiler.JS/Broiler.JavaScript.Compiler/SpeculativeNumericLocals.cs
+new file mode 100644
+index 00000000..1c7a7ae9
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/SpeculativeNumericLocals.cs
+@@ -0,0 +1,44 @@
++using System;
++using System.Threading;
++
++namespace Broiler.JavaScript.Compiler;
++
++/// <summary>
++/// Item 3-8a's population counter: how many locals would be numeric if a name from outside their
++/// function were known to hold a number.
++/// </summary>
++/// <remarks>
++/// <para>
++/// <b>Counting is not speculating, and only the counting is built.</b> Item 3-1's update-target
++/// census put 98.1% of the corpus's <c>++</c>/<c>--</c> steps on a local the analysis did not prove
++/// numeric, and <c>NumericLocalDefeatTests</c> reduced the defeat on that shape to a single
++/// identifier — <c>var c = 2 * rowSize</c> is a slot where <c>var c = 2 * 10</c> is a raw double.
++/// <see cref="NumericLocalAnalysis.AnalyzeSpeculative"/> reports how many names that costs.
++/// </para>
++/// <para>
++/// <b>Off by default, and it must be turned on before the code being measured is compiled.</b>
++/// This is a compile-time counter, unlike every other census in this file's neighbourhood, and the
++/// first attempt at it was switched on beside the run-time ones — which run after the corpus has
++/// finished compiling — and so reported zero. That is the second time the same mistake has been
++/// made here (see item 3-1's <c>0083</c>), which is why it is written on the switch rather than
++/// left to the caller to remember.
++/// </para>
++/// </remarks>
++public static class SpeculativeNumericLocals
++{
++    public const string EnvironmentVariable = "BROILER_JS_SPECULATIVE_NUMERIC_COUNT";
++
++    private static int counting = string.Equals(
++        Environment.GetEnvironmentVariable(EnvironmentVariable),
++        "1",
++        StringComparison.Ordinal)
++        ? 1
++        : 0;
++
++    /// <summary>Whether each compiled function also reports its speculative-candidate count.</summary>
++    public static bool Counting
++    {
++        get => Volatile.Read(ref counting) != 0;
++        set => Volatile.Write(ref counting, value ? 1 : 0);
++    }
++}
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index 7a81fd56..d78d3cc8 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -456,6 +456,11 @@ internal static class SpecializingTierMetrics
+                 })
+             .Build();
+ 
++        // A COMPILE-time counter, so it goes on before the corpus is compiled below rather than
++        // beside the run-time censuses further down — which is where it went first, and why it
++        // read zero on all seven suites (item 3-1's `0083` failure mode, a second time).
++        Broiler.JavaScript.Compiler.SpeculativeNumericLocals.Counting = counters;
++
+         string outcome;
+         var stopwatch = new Stopwatch();
+         try
+@@ -598,6 +603,11 @@ internal static class SpecializingTierMetrics
+             // runtime guard; these counts are what says whether that is true.
+             numericDropCauses = DescribeDropCauses(compiler.NumericDropCauses),
+ 
++            // Item 3-8a: how many locals would be numeric if a name from outside their function
++            // were known to hold one. Read against numericLocals — it is what the one conjunct
++            // NumericLocalDefeatTests isolated is costing.
++            speculativeNumericCandidates = compiler.SpeculativeNumericCandidates,
++
+             // The ceiling on all of phase 3: a raw double can only ever remove a box, so
+             // boxesAllocated x 24 B is every byte the whole family could take.
+             boxingRequests = boxing.Requests,
+-- 
+2.43.0
+
