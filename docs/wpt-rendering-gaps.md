@@ -1080,6 +1080,32 @@ count late: it appeared not to reproduce until its reference was regenerated.)
   Re-baselining against the same reference set showed 346/490 either way. Compare
   runs only against references generated in the same pass.
 
+### `font-size: math` collapsed the element it was on — problem 30, **fixed**
+
+- **Test:** `css/css-fonts/math-script-level-and-math-style/font-size-math-001.tentative`,
+  3.9% on CI and 3.93% here.
+- **Owner:** `Broiler.Layout` (`Engine/CssBoxProperties.cs`). Main repo, so it is on
+  CI immediately.
+- **The keyword is `1em`, and the bug was not that it failed to scale.** MathML
+  Core makes `font-size: math` the inherited size times the math scaling factor,
+  and that factor is driven entirely by a *change* in `math-depth` — with no change
+  it is 1. Broiler models no math depth, so the keyword is always `1em`, which is
+  exactly what the test's reference asserts: it is the same document with `math`
+  written as `1em`. `math` had no arm in the font-size keyword switch, so it fell
+  through to the length parser, which reads an unrecognised token as **0** — and
+  the zero clamp turned that into a **0.001pt** font. Every relative size beneath
+  it then resolved against 0.001pt, so the whole subtree vanished. Ours rendered
+  99.6% white against a reference that is 96% black.
+- **Two call sites, because the computed and used sizes resolve keywords
+  separately** (`ComputedFontSizePoints` and `ActualFont`, the latter on the
+  non-zoom path).
+- **Measured: 3.93% → 99.86%**, and the one arm carries **five more tests** with
+  it — the 14-test `math-script-level-and-math-style` subset goes **7 → 13
+  passing**, including two at 67.92%. Swept the whole 552-test `css/css-fonts`
+  directory: **347 → 353 passing, nothing lost and nothing else moved.** Five tests
+  in `MathFontSizeTests` cover the resolution, case-insensitivity, that the
+  subtree no longer collapses, and that the arm does not swallow other keywords.
+
 ### An earlier verdict that no longer holds
 
 **Problem 7 (`css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative`)
@@ -1161,12 +1187,12 @@ owned by a section above). Re-reported problems point at that section.
 | 20 | `css-shadow/shadow-directionality-001.tentative` | 1.3% | **1.27% → 99.55%** | **fixed** — same change as problem 16 |
 | 21 | `css-position/overlay/overlay-transition-finished` | 1.8% | **1.81% → 100%** | **fixed** — the paint-time half of the `overlay` entry transition, main repo |
 | 22, 23 | `css-view-transitions/massive-element-left-of-viewport-partially-onscreen-{new,old}` | 1.8% | 1.81% | open — diagnosed above (snapshot geometry, not scrolling) |
-| 24 | `css-align/animation/row-gap-interpolation` | 2.6% | 2.59% | open — new |
+| 24 | `css-align/animation/row-gap-interpolation` | 2.6% | 2.59% | open — a **testharness** test: its reference is Chromium's results table, so closing it means passing the `row-gap` interpolation subtests, not one fix |
 | 25, 26 | `css-view-transitions/massive-element-right-of-viewport-partially-onscreen-{new,old}` | 2.6% | 2.65% | open — same root cause as 22/23 |
 | 27 | `css-masking/clip-path/clip-path-element-userSpaceOnUse-004` | 2.9% | 2.86% | open — SVG `<clipPath>` reference needs a real path clip |
 | 28 | `css-view-transitions/reset-state-after-scrolled-view-transition` | 3.6% | 3.61% | open — reproduces |
-| 29 | `html/…/form-validation-validity-textarea-defaultValue` | 3.8% | 3.78% | open — new |
-| 30 | `css-fonts/…/font-size-math-001.tentative` | 3.9% | 3.93% | open — new. The 14-test `math-script-level-and-math-style` subset is 7 passing |
+| 29 | `html/…/form-validation-validity-textarea-defaultValue` | 3.8% | 3.78% | open — a **testharness** test whose reference is Chromium's results table; three of its five subtests drive `test_driver.send_keys`, which the runner only stubs |
+| 30 | `css-fonts/…/font-size-math-001.tentative` | 3.9% | **3.93% → 99.86%** | **fixed** — `font-size: math` is `1em`; the subset goes 7 → 13 of 14, main repo |
 
 ## Reported problems, at a glance
 
