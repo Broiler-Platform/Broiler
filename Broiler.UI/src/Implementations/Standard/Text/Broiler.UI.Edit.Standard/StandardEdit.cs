@@ -104,15 +104,20 @@ public sealed class StandardEdit : UiEdit, IStandardThemedControl, IUiTextEditor
         return changed;
     }
 
-    public UiTextEditorState GetTextEditorState()
+    public UiTextEditorMetrics GetTextEditorMetrics()
     {
-        string text = IsPassword ? string.Empty : Text;
+        // A password field reports an empty document rather than its contents,
+        // so a platform text service cannot read the secret back out.
+        int length = IsPassword ? 0 : Text.Length;
         int selectionStart = IsPassword ? 0 : SelectionStart;
         int selectionEnd = IsPassword ? 0 : SelectionEnd;
         int composingStart = _compositionText.Length > 0 && !IsPassword ? CaretIndex : -1;
         int composingEnd = composingStart < 0 ? -1 : composingStart + _compositionText.Length;
-        return new UiTextEditorState(text, selectionStart, selectionEnd, composingStart, composingEnd);
+        return new UiTextEditorMetrics(length, selectionStart, selectionEnd, composingStart, composingEnd);
     }
+
+    public string GetTextEditorRange(int start, int maxLength) =>
+        IsPassword ? string.Empty : UiTextEditorRange.Slice(Text, start, maxLength);
 
     public bool DeleteSurroundingText(int beforeLength, int afterLength)
     {

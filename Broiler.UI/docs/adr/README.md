@@ -1,11 +1,15 @@
 # Broiler.UI ADR Index
 
 These records define the core UI architecture, RichEdit family, document-model
-promotion, filesystem topology, and Formatting Codes view. ADR 0018 supersedes
-the model *placement* in ADRs 0013 and 0014; their remaining design decisions
-still apply. Accepted and partially superseded records are retained for
-traceability. Current follow-up work is in
+promotion, filesystem topology, Formatting Codes view, and the controls Broiler
+Code needs. ADR 0018 supersedes the model *placement* in ADRs 0013 and 0014;
+their remaining design decisions still apply. Accepted and partially superseded
+records are retained for traceability. Current follow-up work is in
 [the component roadmap](../roadmap.md).
+
+ADRs 0021 to 0024 were approved during Broiler Code Phase 0. They record
+Broiler.UI decisions, not product decisions: the product context is in
+[the Broiler Code architecture](../../../docs/architecture/broiler-code.md).
 
 | ADR | Topic |
 |---|---|
@@ -29,3 +33,7 @@ traceability. Current follow-up work is in
 | [0018](0018-richedit-document-model-promotion.md) | RichEdit document model promotion (to `Broiler.Documents.Model`) |
 | [0019](0019-directory-structure-topology.md) | Directory structure topology |
 | [0020](0020-formatting-code-view-and-writer-integration.md) | Formatting Code view and Writer integration |
+| [0021](0021-code-editor-control-family.md) | CodeEditor control family |
+| [0022](0022-virtualized-text-semantics-and-ime.md) | Virtualized text semantics and bounded IME queries |
+| [0023](0023-tree-view-control.md) | TreeView control |
+| [0024](0024-tab-view-document-behavior.md) | TabView document behavior |

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.Code.Workspaces</RootNamespace>
+    <AssemblyName>Broiler.Code.Workspaces</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <!--
+      No references at all, deliberately. This assembly holds the text layer
+      that both the editor and the later workspace model sit on, and
+      docs/architecture/broiler-code.md fixes the dependency direction: it must
+      not depend on Broiler.UI, on Roslyn, or on a platform. Phase 2 adds the
+      workspace, solution, and project model on top of what is here.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.Code.Workspaces.Tests" />
+  </ItemGroup>
+
+</Project>

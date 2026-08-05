@@ -1,0 +1,171 @@
+﻿{
+  "schemaVersion": 1,
+  "workspace": "D:\\Broiler-Release\\tests\\broiler-code-phase0\\fixture",
+  "scenarios": [
+    {
+      "id": "broken-fixture-maps-back-to-its-snapshot",
+      "asserts": "A cross-project error is reported against a workspace-relative document, a zero-based span, and the SHA-256 of the exact bytes compiled \u2014 so the editor can prove the diagnostic belongs to the snapshot it granted.",
+      "passed": true,
+      "evidence": {
+        "outcome": "Failed",
+        "grantedSnapshotSha256": "fb905b87526d1c0e2d1fcc921ff0b1562d459d38dc7ec1251d81200a80e123ef",
+        "toolchain": {
+          "requestedBy": "global.json",
+          "globalJsonVersion": "10.0.302",
+          "globalJsonRollForward": "latestFeature",
+          "resolvedSdkVersion": "10.0.302",
+          "compilerVersion": "5.6.0-2.26329.109 (35b593bebfcba58f8e78298cef14c2761f5d86c6)",
+          "compilerUiLanguage": "de-DE"
+        },
+        "documentHashMatchesWorkspaceCopy": true,
+        "error": {
+          "id": "74a32899332ab6bb",
+          "code": "CS7036",
+          "severity": "Error",
+          "origin": "Compiler",
+          "helpUri": "https://msdn.microsoft.com/query/roslyn.query?appId=roslyn\u0026k=k(CS7036)",
+          "message": "Es wurde kein Argument angegeben, das dem erforderlichen Parameter \u0022options\u0022 von \u0022ReportFormatter.Format(Report, FormatOptions)\u0022 entspricht.",
+          "projectPath": "src/SampleReports.App/SampleReports.App.csproj",
+          "targetFramework": "net10.0",
+          "configuration": "Release",
+          "buildId": "c01d919769b946f3b1d787c2a61141ad",
+          "workspaceVersion": 1,
+          "documentPath": "src/SampleReports.App/Reporting/ReportRunner.Broken.cs",
+          "documentSha256": "63a748834cc32236ea51febce8e5477140ffe4b46e8aa33bd3aba30d07a74621",
+          "startLine": 17,
+          "startColumn": 31,
+          "endLine": 17,
+          "endColumn": 37,
+          "startOffset": 684,
+          "endOffset": 690
+        },
+        "warning": {
+          "id": "5fb3b703fabb75be",
+          "code": "CS0618",
+          "severity": "Warning",
+          "origin": "Compiler",
+          "helpUri": "https://msdn.microsoft.com/query/roslyn.query?appId=roslyn\u0026k=k(CS0618)",
+          "message": "\u0022ReportFormatter.FormatLegacy(Report)\u0022 ist veraltet: \u0022Call Format(Report, FormatOptions) instead.\u0022",
+          "projectPath": "src/SampleReports.App/SampleReports.App.csproj",
+          "targetFramework": "net10.0",
+          "configuration": "Release",
+          "buildId": "c01d919769b946f3b1d787c2a61141ad",
+          "workspaceVersion": 1,
+          "documentPath": "src/SampleReports.App/Reporting/LegacySummary.cs",
+          "documentSha256": "a750501d41246b9414cadc7ec3e7baab62257985d6928b9835a3c74b58940305",
+          "startLine": 15,
+          "startColumn": 15,
+          "endLine": 15,
+          "endColumn": 51,
+          "startOffset": 558,
+          "endOffset": 594
+        },
+        "inputCountsByOrigin": {
+          "Granted": 31,
+          "Restore": 21,
+          "Generated": 4
+        },
+        "diagnosticCount": 4
+      }
+    },
+    {
+      "id": "corrected-fixture-produces-verified-artifacts",
+      "asserts": "With FixtureCorrected=true the same snapshot builds, and every artifact is reported with its kind, size, and SHA-256 after a containment check.",
+      "passed": true,
+      "evidence": {
+        "outcome": "Succeeded",
+        "grantedSnapshotSha256": "fb905b87526d1c0e2d1fcc921ff0b1562d459d38dc7ec1251d81200a80e123ef",
+        "warningSurvivesCorrection": true,
+        "application": {
+          "relativePath": "src/SampleReports.App/bin/Release/net10.0/SampleReports.App.dll",
+          "kind": "assembly",
+          "sizeBytes": 9728,
+          "sha256": "717081d374f1a2e4673d06ed61e75aca69b642296f119ee4b99e2d2ef65a6c2c"
+        },
+        "library": {
+          "relativePath": "src/SampleReports.App/bin/Release/net10.0/SampleReports.Core.dll",
+          "kind": "assembly",
+          "sizeBytes": 8192,
+          "sha256": "75dafc33e878b5046926b94453da940fa45c1d5e2b86de66b7612dc37b4ce825"
+        },
+        "artifactCount": 9,
+        "inputCountsByOrigin": {
+          "Granted": 31,
+          "Restore": 23,
+          "Generated": 4
+        },
+        "generatedOrRestoreDiscovered": 27
+      }
+    },
+    {
+      "id": "dirty-overlay-is-what-gets-compiled",
+      "asserts": "Unsaved editor content reaches the build and is recorded in the input manifest as a dirty overlay, so a build can never compile something other than what the user is looking at.",
+      "passed": true,
+      "evidence": {
+        "outcome": "Succeeded",
+        "grantedSnapshotSha256": "9170c363734cd418a4df46c9538a899314435d2c8145380e9e16010218682c55",
+        "overlayInput": {
+          "relativePath": "src/SampleReports.App/Reporting/ReportRunner.Broken.cs",
+          "origin": "DirtyOverlay",
+          "sizeBytes": 236,
+          "sha256": "064de15d053b111ebd4aaec35b2d711de86fe9bc3e39ce50b3983e9cd87895e2"
+        }
+      }
+    },
+    {
+      "id": "diagnostics-are-locale-independent",
+      "asserts": "Structured diagnostic identity is byte-identical across compiler UI languages while the message text is not. Anything that keyed off the message would be a locale-dependent bug that this repository\u0027s own German-language toolchain would hit first.",
+      "passed": true,
+      "evidence": {
+        "structureIdentical": true,
+        "messagesDiffer": true,
+        "englishMessage": "There is no argument given that corresponds to the required parameter \u0027options\u0027 of \u0027ReportFormatter.Format(Report, FormatOptions)\u0027",
+        "japaneseMessage": "\u0027options\u0027 \u306E\u5FC5\u8981\u306A\u30D1\u30E9\u30E1\u30FC\u30BF\u30FC \u0027ReportFormatter.Format(Report, FormatOptions)\u0027 \u306B\u5BFE\u5FDC\u3059\u308B\u7279\u5B9A\u306E\u5F15\u6570\u304C\u3042\u308A\u307E\u305B\u3093",
+        "compilerVersion": "5.6.0-2.26329.109 (35b593bebfcba58f8e78298cef14c2761f5d86c6)"
+      }
+    },
+    {
+      "id": "unsatisfiable-global-json-fails-before-building",
+      "asserts": "A workspace pin the worker cannot satisfy is a toolchain diagnostic raised in preflight, not a source error and not a silent substitution of the worker\u0027s own SDK.",
+      "passed": true,
+      "evidence": {
+        "outcome": "ToolchainUnavailable",
+        "toolchain": {
+          "requestedBy": "global.json",
+          "globalJsonVersion": "99.0.100",
+          "globalJsonRollForward": "disable"
+        },
+        "diagnostic": {
+          "id": "BRC0101",
+          "code": "BRC0101",
+          "severity": "Error",
+          "origin": "Toolchain",
+          "message": "The workspace pins SDK \u002799.0.100\u0027 (rollForward \u0027disable\u0027), which is not installed on this worker. Install it or relax the pin; the worker does not substitute its own SDK. CLI output, display only: The command could not be loaded, possibly because:\r\n  * You intended to execute a .NET application:\r\n      The application \u0027--version\u0027 does not exist or is not a managed .dll or .exe.\r\n  * You intended to execute a .NET SDK command:\r\n      A compatible .NET SDK was not found.\r\n\r\nRequested SDK version: 99.0.100\r\nglobal.json file: C:\\Users\\proof\\AppData\\Local\\Temp\\broiler-code-worker\\b4d23ea1ed8a4499a3f0dce5f56c505c\\global.json\r\n\r\nInstalled SDKs:\r\n\r\nInstall the [99.0.100] .NET SDK or update [C:\\Users\\proof\\AppData\\Local\\Temp\\broiler-code-worker\\b4d23ea1ed8a4499a3f0dce5f56c505c\\global.json] to match an installed SDK.\r\n\r\nLearn about SDK resolution:\r\nhttps://aka.ms/dotnet/sdk-not-found",
+          "buildId": "b4d23ea1ed8a4499a3f0dce5f56c505c",
+          "workspaceVersion": 1
+        }
+      }
+    },
+    {
+      "id": "project-outside-the-grant-is-refused",
+      "asserts": "A traversal out of the granted roots is refused with an actionable capability diagnostic before anything is evaluated.",
+      "passed": true,
+      "evidence": {
+        "outcome": "RefusedByPolicy",
+        "diagnostics": [
+          {
+            "id": "BRC0001-b9c0116f",
+            "code": "BRC0001",
+            "severity": "Error",
+            "origin": "Worker",
+            "message": "The requested project \u0027../../../../elsewhere/Escape.csproj\u0027 is not inside the granted snapshot.",
+            "projectPath": "../../../../elsewhere/Escape.csproj",
+            "configuration": "Release",
+            "buildId": "b9c0116f70464ff1b9275bffdb2a3d4d",
+            "workspaceVersion": 1
+          }
+        ]
+      }
+    }
+  ]
+}

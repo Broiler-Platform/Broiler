@@ -1,0 +1,20 @@
+{
+  "id": "undo-redo-storm",
+  "description": "Types a short run, then walks the undo and redo stacks repeatedly. Undo and redo produce ordinary successor snapshots with new versions rather than restoring an old snapshot object, so a result computed before an undo can never reattach after it.",
+  "fixture": "csharp-100k-lines",
+  "fixtureLines": 100000,
+  "budget": "analysis latency and allocation under history navigation",
+  "steps": [
+    {
+      "kind": "Insert",
+      "anchorText": "int total = 0;",
+      "anchorOccurrence": 1200,
+      "column": 8,
+      "text": "q",
+      "repeat": 24
+    },
+    { "kind": "Undo", "repeat": 24 },
+    { "kind": "Redo", "repeat": 24 },
+    { "kind": "Undo", "repeat": 24 }
+  ]
+}

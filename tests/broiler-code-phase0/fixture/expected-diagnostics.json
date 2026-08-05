@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "comment": [
+    "The diagnostics the fixture must produce, expressed the way the normalized",
+    "diagnostic model expresses them: identity comes from ruleId, severity,",
+    "document, and span. Message text is deliberately absent — it is localized",
+    "(the recorded baseline was produced by a de-DE compiler) and no part of",
+    "Broiler Code may key behavior off it.",
+    "Spans are one-based line/column as reported by SARIF; the workspace stores",
+    "the zero-based offsets it derives from the same snapshot."
+  ],
+  "alsoObserved": {
+    "comment": [
+      "Not asserted, because the SDK's built-in analyzer set is a property of",
+      "the SDK version rather than of the fixture. Recorded because it matters:",
+      "SampleReports.Core produces two CA1510 diagnostics at SARIF level 'note',",
+      "which normalize to Information severity. `dotnet build` does not print",
+      "them at any default verbosity. A Problems pane fed from console text",
+      "would therefore be missing a severity class entirely — which is the",
+      "concrete reason the diagnostic channel is SARIF and not stdout.",
+      "It also supplies the Information severity that the Phase 3 exit gate",
+      "requires the UI to render and navigate."
+    ],
+    "ruleId": "CA1510",
+    "severity": "information",
+    "document": "src/SampleReports.Core/Reporting/ReportFormatter.cs",
+    "occurrences": 2
+  },
+  "variants": {
+    "broken": {
+      "properties": {},
+      "expectedExitCodeIsFailure": true,
+      "diagnostics": [
+        {
+          "ruleId": "CS7036",
+          "severity": "error",
+          "project": "src/SampleReports.App/SampleReports.App.csproj",
+          "targetFramework": "net10.0",
+          "document": "src/SampleReports.App/Reporting/ReportRunner.Broken.cs",
+          "startLine": 18,
+          "startColumn": 32,
+          "endLine": 18,
+          "endColumn": 38,
+          "declaredIn": "src/SampleReports.Core/Reporting/ReportFormatter.cs",
+          "purpose": "The cross-file, cross-project error the Phase 0 exit gate maps back to an exact document snapshot."
+        },
+        {
+          "ruleId": "CS0618",
+          "severity": "warning",
+          "project": "src/SampleReports.App/SampleReports.App.csproj",
+          "targetFramework": "net10.0",
+          "document": "src/SampleReports.App/Reporting/LegacySummary.cs",
+          "startLine": 16,
+          "startColumn": 16,
+          "endLine": 16,
+          "endColumn": 52,
+          "declaredIn": "src/SampleReports.Core/Reporting/ReportFormatter.cs",
+          "purpose": "A second severity from a second file, so the Problems pane cannot collapse the build into one row."
+        }
+      ]
+    },
+    "corrected": {
+      "properties": { "FixtureCorrected": "true" },
+      "expectedExitCodeIsFailure": false,
+      "diagnostics": [
+        {
+          "ruleId": "CS0618",
+          "severity": "warning",
+          "project": "src/SampleReports.App/SampleReports.App.csproj",
+          "targetFramework": "net10.0",
+          "document": "src/SampleReports.App/Reporting/LegacySummary.cs",
+          "startLine": 16,
+          "startColumn": 16,
+          "endLine": 16,
+          "endColumn": 52,
+          "declaredIn": "src/SampleReports.Core/Reporting/ReportFormatter.cs",
+          "purpose": "The warning survives correction, so 'build succeeded' must not mean 'Problems pane empty'."
+        }
+      ]
+    }
+  }
+}

@@ -118,38 +118,54 @@ public sealed class AndroidInputCoordinator : IDisposable, IAndroidEditorTextSou
         _text.NotifyFocusLost();
     }
 
+    // Every read below asks the editor for exactly the range the IME wants.
+    // These run on the InputConnection path, which fires on each keystroke: the
+    // previous shape fetched the whole document and then took a substring of
+    // it, so composing one character in a large file copied the file.
+
     public string GetTextBeforeCursor(int maxLength)
     {
-        UiTextEditorState state = EditorState();
-        int cursor = Math.Clamp(state.SelectionEnd, 0, state.Text.Length);
+        IUiTextEditor? editor = _getEditor();
+        if (editor is null)
+            return string.Empty;
+
+        UiTextEditorMetrics metrics = editor.GetTextEditorMetrics();
+        int cursor = Math.Clamp(metrics.SelectionEnd, 0, metrics.TextLength);
         int start = Math.Max(0, cursor - Math.Max(0, maxLength));
-        return state.Text.Substring(start, cursor - start);
+        return editor.GetTextEditorRange(start, cursor - start);
     }
 
     public string GetTextAfterCursor(int maxLength)
     {
-        UiTextEditorState state = EditorState();
-        int cursor = Math.Clamp(state.SelectionEnd, 0, state.Text.Length);
-        int length = Math.Min(Math.Max(0, maxLength), state.Text.Length - cursor);
-        return state.Text.Substring(cursor, length);
+        IUiTextEditor? editor = _getEditor();
+        if (editor is null)
+            return string.Empty;
+
+        UiTextEditorMetrics metrics = editor.GetTextEditorMetrics();
+        int cursor = Math.Clamp(metrics.SelectionEnd, 0, metrics.TextLength);
+        return editor.GetTextEditorRange(cursor, Math.Max(0, maxLength));
     }
 
     public string GetSelectedText()
     {
-        UiTextEditorState state = EditorState();
-        int start = Math.Clamp(Math.Min(state.SelectionStart, state.SelectionEnd), 0, state.Text.Length);
-        int end = Math.Clamp(Math.Max(state.SelectionStart, state.SelectionEnd), start, state.Text.Length);
-        return state.Text.Substring(start, end - start);
+        IUiTextEditor? editor = _getEditor();
+        if (editor is null)
+            return string.Empty;
+
+        UiTextEditorMetrics metrics = editor.GetTextEditorMetrics();
+        int start = Math.Clamp(Math.Min(metrics.SelectionStart, metrics.SelectionEnd), 0, metrics.TextLength);
+        int end = Math.Clamp(Math.Max(metrics.SelectionStart, metrics.SelectionEnd), start, metrics.TextLength);
+        return editor.GetTextEditorRange(start, end - start);
     }
 
     public AndroidEditorSelection GetSelection()
     {
-        UiTextEditorState state = EditorState();
+        UiTextEditorMetrics metrics = EditorMetrics();
         return new AndroidEditorSelection(
-            state.SelectionStart,
-            state.SelectionEnd,
-            state.ComposingStart,
-            state.ComposingEnd);
+            metrics.SelectionStart,
+            metrics.SelectionEnd,
+            metrics.ComposingStart,
+            metrics.ComposingEnd);
     }
 
     public void Dispose()
@@ -218,8 +234,8 @@ public sealed class AndroidInputCoordinator : IDisposable, IAndroidEditorTextSou
             (int)input.Source);
     }
 
-    private UiTextEditorState EditorState() =>
-        _getEditor()?.GetTextEditorState() ?? new UiTextEditorState(string.Empty, 0, 0);
+    private UiTextEditorMetrics EditorMetrics() =>
+        _getEditor()?.GetTextEditorMetrics() ?? new UiTextEditorMetrics(0, 0, 0);
 
     private void OnEditRequested(AndroidTextEditRequest request)
     {

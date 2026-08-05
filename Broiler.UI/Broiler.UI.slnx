@@ -1,4 +1,4 @@
-﻿<Solution>
+<Solution>
   <Configurations>
     <BuildType Name="Debug" />
     <BuildType Name="Release" />
@@ -190,6 +190,12 @@
     </Project>
   </Folder>
   <Folder Name="/src/Abstractions/ValueAndSelection/">
+    <Project Path="src/Abstractions/ValueAndSelection/Broiler.UI.TreeView/Broiler.UI.TreeView.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="src/Abstractions/ValueAndSelection/Broiler.UI.CheckBox/Broiler.UI.CheckBox.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
@@ -222,6 +228,12 @@
     </Project>
   </Folder>
   <Folder Name="/src/Abstractions/Text/">
+    <Project Path="src/Abstractions/Text/Broiler.UI.CodeEditor/Broiler.UI.CodeEditor.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="src/Abstractions/Text/Broiler.UI.FormatCodeView/Broiler.UI.FormatCodeView.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
@@ -346,6 +358,12 @@
     </Project>
   </Folder>
   <Folder Name="/src/Implementations/Standard/ValueAndSelection/">
+    <Project Path="src/Implementations/Standard/ValueAndSelection/Broiler.UI.TreeView.Standard/Broiler.UI.TreeView.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="src/Implementations/Standard/ValueAndSelection/Broiler.UI.CheckBox.Standard/Broiler.UI.CheckBox.Standard.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
@@ -378,6 +396,12 @@
     </Project>
   </Folder>
   <Folder Name="/src/Implementations/Standard/Text/">
+    <Project Path="src/Implementations/Standard/Text/Broiler.UI.CodeEditor.Standard/Broiler.UI.CodeEditor.Standard.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="src/Implementations/Standard/Text/Broiler.UI.FormatCodeView.Standard/Broiler.UI.FormatCodeView.Standard.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
@@ -443,6 +467,14 @@
   </Folder>
   <Folder Name="/tests/Layout/">
     <Project Path="tests/Layout/Broiler.UI.Splitter.Tests/Broiler.UI.Splitter.Tests.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/ValueAndSelection/">
+    <Project Path="tests/ValueAndSelection/Broiler.UI.TreeView.Tests/Broiler.UI.TreeView.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />

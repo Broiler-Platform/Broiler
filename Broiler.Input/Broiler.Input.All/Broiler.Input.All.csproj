@@ -5,7 +5,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <PackageId>Broiler.Input.All</PackageId>
-    <Description>Meta-package that pulls in the cross-platform Broiler.Input device contracts (keyboard, mouse, pen, touch, text, camera, microphone). Platform backends (*.Windows, *.Linux) are separate packages.</Description>
+    <Description>Meta-package that pulls in the cross-platform Broiler.Input device contracts (keyboard, mouse, pen, touch, text, camera, microphone). Platform backends (*.Windows, *.Linux, *.Android) are separate packages.</Description>
     <PackageTags>broiler;input;devices;meta</PackageTags>
 
     <!-- Meta-package: ship dependencies only, no assembly. -->

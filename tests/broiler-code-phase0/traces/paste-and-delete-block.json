@@ -1,0 +1,23 @@
+{
+  "id": "paste-and-delete-block",
+  "description": "Pastes a multi-line block into the middle of a 100,000-line file and then deletes a 4,000-character region. Both steps change the line count, so they exercise the line-index rebuild and the reuse arithmetic that shifts surviving lines by the line delta. Neither leaves a construct open, so the relex extent stays close to the number of lines the edit itself touched.",
+  "fixture": "csharp-100k-lines",
+  "fixtureLines": 100000,
+  "budget": "analysis latency for structural edits",
+  "steps": [
+    {
+      "kind": "Insert",
+      "anchorText": "int total = 0;",
+      "anchorOccurrence": 1600,
+      "column": 0,
+      "text": "// pasted region\nvar pasted0 = \"value\";\nvar pasted1 = 0x1F;\n/* pasted block\n   comment */\nvar pasted2 = @\"verbatim\";\n"
+    },
+    {
+      "kind": "Delete",
+      "anchorText": "int total = 0;",
+      "anchorOccurrence": 800,
+      "column": 0,
+      "deleteLength": 4000
+    }
+  ]
+}

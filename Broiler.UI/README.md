@@ -1,4 +1,4 @@
-﻿# Broiler.UI
+# Broiler.UI
 
 Broiler.UI is the platform-neutral retained-mode UI component for Broiler
 application chrome and general-purpose widgets.
@@ -43,6 +43,7 @@ src/Abstractions/Commands
   Broiler.UI.Menu
 
 src/Abstractions/ValueAndSelection
+  Broiler.UI.TreeView
   Broiler.UI.CheckBox
   Broiler.UI.RadioButton
   Broiler.UI.Slider
@@ -50,6 +51,7 @@ src/Abstractions/ValueAndSelection
   Broiler.UI.ComboBox
 
 src/Abstractions/Text
+  Broiler.UI.CodeEditor
   Broiler.UI.Edit
   Broiler.UI.FormatCodeView
   Broiler.UI.RichEdit
@@ -79,6 +81,7 @@ src/Implementations/Standard/Commands
   Broiler.UI.Menu.Standard
 
 src/Implementations/Standard/ValueAndSelection
+  Broiler.UI.TreeView.Standard
   Broiler.UI.CheckBox.Standard
   Broiler.UI.RadioButton.Standard
   Broiler.UI.Slider.Standard
@@ -87,6 +90,7 @@ src/Implementations/Standard/ValueAndSelection
 
 src/Implementations/Standard/Text
   Broiler.UI.Edit.Standard
+  Broiler.UI.CodeEditor.Standard
   Broiler.UI.FormatCodeView.Standard
   Broiler.UI.RichEdit.Standard
 
@@ -107,6 +111,7 @@ tests
   Broiler.UI.Toolbar.Tests
   Broiler.UI.Splitter.Tests
   Broiler.UI.FormatCodeView.Tests
+  Broiler.UI.CodeEditor.Standard
   Broiler.UI.FormatCodeView.Standard.Tests
   Broiler.UI.RichEdit.Tests
   Broiler.UI.RichEdit.Standard.Tests

@@ -1,0 +1,379 @@
+﻿{
+  "schemaVersion": 1,
+  "iterations": 9,
+  "framework": ".NET 10.0.10",
+  "operatingSystem": "Microsoft Windows 10.0.26200",
+  "architecture": "X64",
+  "processorCount": 16,
+  "checks": [
+    {
+      "name": "incremental-equals-full/block-comment",
+      "passed": true,
+      "detail": "49 insert/delete positions agree"
+    },
+    {
+      "name": "incremental-equals-full/doc-block-comment",
+      "passed": true,
+      "detail": "33 insert/delete positions agree"
+    },
+    {
+      "name": "incremental-equals-full/verbatim-string",
+      "passed": true,
+      "detail": "43 insert/delete positions agree"
+    },
+    {
+      "name": "incremental-equals-full/interpolated-verbatim",
+      "passed": true,
+      "detail": "42 insert/delete positions agree"
+    },
+    {
+      "name": "incremental-equals-full/raw-string",
+      "passed": true,
+      "detail": "51 insert/delete positions agree"
+    },
+    {
+      "name": "incremental-equals-full/raw-string-interpolated",
+      "passed": true,
+      "detail": "48 insert/delete positions agree"
+    },
+    {
+      "name": "incremental-equals-full/unterminated-string",
+      "passed": true,
+      "detail": "26 insert/delete positions agree"
+    },
+    {
+      "name": "incremental-equals-full/directive",
+      "passed": true,
+      "detail": "42 insert/delete positions agree"
+    },
+    {
+      "name": "incremental-equals-full/crlf-mixed",
+      "passed": true,
+      "detail": "36 insert/delete positions agree"
+    },
+    {
+      "name": "incremental-equals-full/empty",
+      "passed": true,
+      "detail": "1 insert/delete positions agree"
+    },
+    {
+      "name": "incremental-equals-full/no-trailing-newline",
+      "passed": true,
+      "detail": "11 insert/delete positions agree"
+    },
+    {
+      "name": "incremental-equals-full/large",
+      "passed": true,
+      "detail": "54 edits across a 4010-line file agree"
+    },
+    {
+      "name": "stale-transaction-rejected",
+      "passed": true,
+      "detail": "a transaction against a superseded version is refused, not rebased"
+    },
+    {
+      "name": "out-of-range-transaction-rejected",
+      "passed": true,
+      "detail": "a span past end of text is refused"
+    },
+    {
+      "name": "undo-redo-round-trip",
+      "passed": true,
+      "detail": "undo and redo restore text while versions keep moving forward"
+    },
+    {
+      "name": "line-index-agrees-with-split",
+      "passed": true,
+      "detail": "LF, CRLF, CR, empty, and trailing-terminator texts index identically"
+    },
+    {
+      "name": "completed-stale-run-rejected",
+      "passed": true,
+      "detail": "1 completed run(s) discarded; the painted result is the current snapshot"
+    }
+  ],
+  "largeFile": {
+    "id": "csharp-100k-lines",
+    "requestedLines": 100000,
+    "sourceBytes": 2352128,
+    "indexedLines": 100001,
+    "totalSpans": 291665,
+    "snapshotCreation": {
+      "samples": 9,
+      "medianMilliseconds": 3.1019,
+      "p95Milliseconds": 3.1498,
+      "maxMilliseconds": 3.1498,
+      "medianAllocatedBytes": 400408,
+      "maxAllocatedBytes": 400560
+    },
+    "fullClassification": {
+      "samples": 9,
+      "medianMilliseconds": 11.9593,
+      "p95Milliseconds": 14.7421,
+      "maxMilliseconds": 14.7421,
+      "medianAllocatedBytes": 9893528,
+      "maxAllocatedBytes": 9893680
+    },
+    "retainedBytes": 9865752
+  },
+  "wideFile": {
+    "id": "csharp-100k-lines-wide",
+    "requestedLines": 100000,
+    "sourceBytes": 10500000,
+    "indexedLines": 100001,
+    "totalSpans": 292947,
+    "snapshotCreation": {
+      "samples": 9,
+      "medianMilliseconds": 10.242,
+      "p95Milliseconds": 12.3509,
+      "maxMilliseconds": 12.3509,
+      "medianAllocatedBytes": 400408,
+      "maxAllocatedBytes": 400560
+    },
+    "fullClassification": {
+      "samples": 9,
+      "medianMilliseconds": 13.2036,
+      "p95Milliseconds": 15.3786,
+      "maxMilliseconds": 15.3786,
+      "medianAllocatedBytes": 9903784,
+      "maxAllocatedBytes": 9903936
+    },
+    "retainedBytes": 9875960
+  },
+  "solution": {
+    "fileCount": 1000,
+    "linesPerFile": 100,
+    "totalLines": 101000,
+    "totalSpans": 289019,
+    "sourceBytes": 2322030,
+    "generation": {
+      "samples": 1,
+      "medianMilliseconds": 6.4371,
+      "p95Milliseconds": 6.4371,
+      "maxMilliseconds": 6.4371,
+      "medianAllocatedBytes": 25983816,
+      "maxAllocatedBytes": 25983816
+    },
+    "classifyAllFiles": {
+      "samples": 1,
+      "medianMilliseconds": 8.8412,
+      "p95Milliseconds": 8.8412,
+      "maxMilliseconds": 8.8412,
+      "medianAllocatedBytes": 10776648,
+      "maxAllocatedBytes": 10776648
+    },
+    "retainedBytes": 9952480
+  },
+  "traces": [
+    {
+      "id": "block-comment-open",
+      "budget": "relex extent for a state-changing edit that reconverges",
+      "fixtureLines": 100000,
+      "edits": 2,
+      "maxLinesLexed": 35,
+      "medianLinesLexed": 35,
+      "publishedResults": 2,
+      "rejectedResults": 0,
+      "cancelledRuns": 0,
+      "finalSpanCount": 291666,
+      "incrementalMatchedFull": true,
+      "onlyCurrentSnapshotPainted": true,
+      "snapshotUpdate": {
+        "samples": 2,
+        "medianMilliseconds": 2.8732,
+        "p95Milliseconds": 3.3041,
+        "maxMilliseconds": 3.3041,
+        "medianAllocatedBytes": 5104960,
+        "maxAllocatedBytes": 5105664
+      },
+      "analysis": {
+        "samples": 2,
+        "medianMilliseconds": 0.1721,
+        "p95Milliseconds": 0.2196,
+        "maxMilliseconds": 0.2196,
+        "medianAllocatedBytes": 224,
+        "maxAllocatedBytes": 804272
+      }
+    },
+    {
+      "id": "paste-and-delete-block",
+      "budget": "analysis latency for structural edits",
+      "fixtureLines": 100000,
+      "edits": 2,
+      "maxLinesLexed": 7,
+      "medianLinesLexed": 7,
+      "publishedResults": 2,
+      "rejectedResults": 0,
+      "cancelledRuns": 0,
+      "finalSpanCount": 291190,
+      "incrementalMatchedFull": true,
+      "onlyCurrentSnapshotPainted": true,
+      "snapshotUpdate": {
+        "samples": 2,
+        "medianMilliseconds": 2.9268,
+        "p95Milliseconds": 2.9296,
+        "maxMilliseconds": 2.9296,
+        "medianAllocatedBytes": 5104544,
+        "maxAllocatedBytes": 5105904
+      },
+      "analysis": {
+        "samples": 2,
+        "medianMilliseconds": 0.1525,
+        "p95Milliseconds": 0.164,
+        "maxMilliseconds": 0.164,
+        "medianAllocatedBytes": 799808,
+        "maxAllocatedBytes": 801792
+      }
+    },
+    {
+      "id": "raw-string-runaway",
+      "budget": "full-reparse ceiling",
+      "fixtureLines": 100000,
+      "edits": 1,
+      "maxLinesLexed": 99983,
+      "medianLinesLexed": 99983,
+      "publishedResults": 1,
+      "rejectedResults": 0,
+      "cancelledRuns": 0,
+      "finalSpanCount": 88491,
+      "incrementalMatchedFull": true,
+      "onlyCurrentSnapshotPainted": true,
+      "snapshotUpdate": {
+        "samples": 1,
+        "medianMilliseconds": 2.7793,
+        "p95Milliseconds": 2.7793,
+        "maxMilliseconds": 2.7793,
+        "medianAllocatedBytes": 5105672,
+        "maxAllocatedBytes": 5105672
+      },
+      "analysis": {
+        "samples": 1,
+        "medianMilliseconds": 6.1747,
+        "p95Milliseconds": 6.1747,
+        "maxMilliseconds": 6.1747,
+        "medianAllocatedBytes": 7538384,
+        "maxAllocatedBytes": 7538384
+      }
+    },
+    {
+      "id": "stale-rejection",
+      "budget": "cancellation and stale-result rejection",
+      "fixtureLines": 100000,
+      "edits": 32,
+      "maxLinesLexed": 0,
+      "medianLinesLexed": 0,
+      "publishedResults": 1,
+      "rejectedResults": 1,
+      "cancelledRuns": 30,
+      "finalSpanCount": 291664,
+      "incrementalMatchedFull": true,
+      "onlyCurrentSnapshotPainted": true,
+      "snapshotUpdate": {
+        "samples": 32,
+        "medianMilliseconds": 3.0509,
+        "p95Milliseconds": 11.9542,
+        "maxMilliseconds": 12.3027,
+        "medianAllocatedBytes": 8625056,
+        "maxAllocatedBytes": 9260328
+      },
+      "analysis": {
+        "samples": 0,
+        "medianMilliseconds": 0,
+        "p95Milliseconds": 0,
+        "maxMilliseconds": 0,
+        "medianAllocatedBytes": 0,
+        "maxAllocatedBytes": 0
+      }
+    },
+    {
+      "id": "typing-burst-wide",
+      "budget": "input-to-present at the Phase 1 fixture size",
+      "fixtureLines": 100000,
+      "edits": 160,
+      "maxLinesLexed": 1,
+      "medianLinesLexed": 1,
+      "publishedResults": 160,
+      "rejectedResults": 0,
+      "cancelledRuns": 0,
+      "finalSpanCount": 292946,
+      "incrementalMatchedFull": true,
+      "onlyCurrentSnapshotPainted": true,
+      "snapshotUpdate": {
+        "samples": 160,
+        "medianMilliseconds": 11.0098,
+        "p95Milliseconds": 15.1642,
+        "maxMilliseconds": 23.113,
+        "medianAllocatedBytes": 21400896,
+        "maxAllocatedBytes": 21413888
+      },
+      "analysis": {
+        "samples": 160,
+        "medianMilliseconds": 0.1241,
+        "p95Milliseconds": 0.2269,
+        "maxMilliseconds": 0.3048,
+        "medianAllocatedBytes": 801120,
+        "maxAllocatedBytes": 803192
+      }
+    },
+    {
+      "id": "typing-burst",
+      "budget": "input-to-present and per-keystroke allocation",
+      "fixtureLines": 100000,
+      "edits": 160,
+      "maxLinesLexed": 1,
+      "medianLinesLexed": 1,
+      "publishedResults": 160,
+      "rejectedResults": 0,
+      "cancelledRuns": 0,
+      "finalSpanCount": 291664,
+      "incrementalMatchedFull": true,
+      "onlyCurrentSnapshotPainted": true,
+      "snapshotUpdate": {
+        "samples": 160,
+        "medianMilliseconds": 2.944,
+        "p95Milliseconds": 4.001,
+        "maxMilliseconds": 5.2138,
+        "medianAllocatedBytes": 5105224,
+        "maxAllocatedBytes": 5121192
+      },
+      "analysis": {
+        "samples": 160,
+        "medianMilliseconds": 0.0979,
+        "p95Milliseconds": 0.1942,
+        "maxMilliseconds": 0.764,
+        "medianAllocatedBytes": 801120,
+        "maxAllocatedBytes": 815568
+      }
+    },
+    {
+      "id": "undo-redo-storm",
+      "budget": "analysis latency and allocation under history navigation",
+      "fixtureLines": 100000,
+      "edits": 96,
+      "maxLinesLexed": 1,
+      "medianLinesLexed": 1,
+      "publishedResults": 96,
+      "rejectedResults": 0,
+      "cancelledRuns": 0,
+      "finalSpanCount": 291665,
+      "incrementalMatchedFull": true,
+      "onlyCurrentSnapshotPainted": true,
+      "snapshotUpdate": {
+        "samples": 96,
+        "medianMilliseconds": 3.4265,
+        "p95Milliseconds": 5.027,
+        "maxMilliseconds": 13.4099,
+        "medianAllocatedBytes": 5104944,
+        "maxAllocatedBytes": 5120264
+      },
+      "analysis": {
+        "samples": 96,
+        "medianMilliseconds": 0.1003,
+        "p95Milliseconds": 0.2028,
+        "maxMilliseconds": 0.8611,
+        "medianAllocatedBytes": 801120,
+        "maxAllocatedBytes": 817248
+      }
+    }
+  ]
+}

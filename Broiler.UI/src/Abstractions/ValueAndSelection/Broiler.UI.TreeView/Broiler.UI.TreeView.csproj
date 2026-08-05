@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.TreeView</RootNamespace>
+    <AssemblyName>Broiler.UI.TreeView</AssemblyName>
+    <PackageId>Broiler.UI.TreeView</PackageId>
+    <Description>Platform-neutral virtualized tree abstraction with a lazy hierarchical data source.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Foundation\Broiler.UI\Broiler.UI.csproj" />
+    <ProjectReference Include="..\..\..\..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.UI.TreeView.Tests" />
+    <InternalsVisibleTo Include="Broiler.UI.TreeView.Standard" />
+    <InternalsVisibleTo Include="Broiler.UI.TreeView.Standard.Tests" />
+  </ItemGroup>
+
+</Project>

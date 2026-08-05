@@ -1,0 +1,36 @@
+<Project>
+
+  <!--
+    This file deliberately does NOT chain up to the Broiler repository's own
+    Directory.Build.props. The fixture stands in for an arbitrary user workspace,
+    so it must evaluate identically whether it is read in place, copied to a
+    neutral per-job root by the build worker, or extracted somewhere else
+    entirely. Chaining up would let unrelated Broiler staging ancestors change
+    the fixture's evaluation and silently invalidate every Phase 0 measurement.
+
+    docs/architecture/broiler-code.md, "Ancestor isolation", records the rule.
+  -->
+
+  <PropertyGroup>
+    <FixtureSchemaVersion>1</FixtureSchemaVersion>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!--
+      Warnings stay warnings. The fixture's expected-diagnostic manifest asserts
+      one error and one warning; promoting warnings would collapse the two
+      severities the Problems pane has to tell apart.
+    -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!--
+      Deterministic paths in diagnostics and in the SARIF log, so a diagnostic
+      recorded from a materialized per-job root compares equal to one recorded
+      from the checkout.
+    -->
+    <Deterministic>true</Deterministic>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+</Project>
