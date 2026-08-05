@@ -150,6 +150,11 @@ public sealed partial class DomBridge
         ApplyCssomStyleSheetMutations(root);
         InlineStyleSheetImports(root);
         ApplyAdoptedStyleSheets(root);
+        // A shadow root's <style> is serialized inline as a global rule, so its ordinary
+        // selectors must be restricted to that root's own tree — otherwise a shadow tree's
+        // `div { background: red }` repaints every div in the page. Runs BEFORE the :host
+        // pass, which rewrites the keyword this one keys off.
+        ScopeShadowTreeSelectors(root);
         // A shadow root's <style> is serialized inline as a global rule, so its :host
         // selectors must be rewritten to target that root's own host — otherwise the
         // renderer's lenient :host matching paints every element.
