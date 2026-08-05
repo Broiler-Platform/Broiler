@@ -1,57 +1,64 @@
-From 6e4290ec0cb9c4953049a1157b423c5a4217c427 Mon Sep 17 00:00:00 2001
+From 15766490a0877ae525d08229aa2472e9391b3eef Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Wed, 5 Aug 2026 17:05:56 +0000
-Subject: [PATCH] Widen the type-feedback census past the seven suites it could
- reach
+Date: Wed, 5 Aug 2026 17:41:11 +0000
+Subject: [PATCH] Widen the type-feedback and specializing-tier censuses past
+ their seven suites
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-Item 2-13 established that this engine's largest private deficiency is zlib —
-12.0x behind Jint relative to Chromium — so the next step was to ask what the
-censuses say about it. They say nothing: zlib is in none of them, and neither
-are Mandreel, Gameboy, PdfJS, Typescript, CodeLoad, Splay or RegExp.
-
-TypeFeedbackMetrics, SpecializingTierMetrics and PropertyMapDistributionMetrics
-all ran the same seven suites, and the roadmap quotes their output as "the
-corpus" — the phrase every phase-3 and phase-4 headline uses, over a denominator
-that was never stated.
+Item 2-13 said this engine's largest private deficiency is zlib, 12.0x behind
+Jint relative to Chromium. Asking what the censuses say about zlib turned up
+that they say nothing: TypeFeedbackMetrics, SpecializingTierMetrics and
+PropertyMapDistributionMetrics all ran the same seven suites, and the roadmap
+quotes their output as "the corpus" — the phrase every phase-3 and phase-4
+headline uses — over a denominator it never states.
 
 Why it was seven had not been written down, and is not a choice about cost.
-Widening the list and running it aborts at the ninth suite with an uncatchable
-.NET stack overflow in Mandreel's global_init. Item 0-2's 16 MiB thread and
-4 MiB reserve are a property of Broiler.JavaScript/Program.cs — the shell — and
-BenchmarkContext.Create built a plain JSContext on whatever stack the runtime
-handed Main. Every benchmark host in this campaign has been running without the
-reserve the shell has had since phase 0.
+Widening the list aborts at the ninth suite with an uncatchable .NET stack
+overflow in Mandreel's global_init. Item 0-2's 16 MiB thread and 4 MiB reserve
+are a property of Broiler.JavaScript/Program.cs — the shell — and the benchmark
+hosts built plain contexts on whatever stack the runtime handed Main. Every
+benchmark host in this campaign has been running without the reserve the shell
+has had since phase 0. Both censuses also serialized once at the end, so that
+abort discarded every suite before it.
 
-The census also serialized its report once, at the end, so that abort discarded
-the eight suites that had already run — a partial corpus that cannot produce a
-partial result.
+Fixed for both: they run on the shell's thread with the shell's
+MaxStackUsageBytes, and checkpoint after every suite. Mandreel now fails the way
+the shell makes it fail, catchably. TypeFeedbackMetrics also emits the corpus
+aggregate with its suite count beside it, rather than leaving it to be totalled
+by whoever quotes it — which is the step where the suite list stopped travelling
+with the number.
 
-Both fixed. The census runs on the shell's thread with the shell's
-MaxStackUsageBytes, and writes after every suite. Mandreel now fails the way the
-shell makes it fail, catchably, instead of taking the process down. The corpus
-aggregate is emitted by the instrument with its suite count beside it, rather
-than left to be totalled by whoever quotes it.
+Both widened counts move a headline, and both reproduce their old value over the
+old seven, so each is the same instrument over more suites.
 
-The widened count moves phase 4's premise. The old seven reproduce to the digit
-— 93.54% of 37.9 M reads, 96.70% of 4.24 M calls — so this is the same
-instrument over a bigger corpus. Every suite that runs: 80.11% of 307.9 M reads
-and 86.35% of 52.9 M calls, with 87.7% of the reads outside the seven. The two
-suites that move it had never been counted: Gameboy at 34.60% monomorphic with
-1 282 polymorphic sites, and Splay at 10.15%.
+  reads, monomorphic:  93.54% of 37.9 M  ->  80.11% of 307.9 M
+  calls, monomorphic:  96.70% of 4.24 M  ->  86.35% of 52.9 M
+  boxes allocated:        31,401,346     ->     90,641,738
+  allocated bytes:           3.13 GB     ->       12.93 GB
 
-Three suites still report setup-only counts — zlib needs the shell's `read`
-builtin, Mandreel now hits the guard, RegExp has its pre-existing checksum
-defect — together 0.09% of reads, so the headline is over 12 suites and says so.
+87.7% of the corpus's property reads and 65.4% of its boxes were outside the
+seven. Gameboy — never in a census — is 34.60% monomorphic with 1 282
+polymorphic sites and allocates 41.3 M boxes on its own, 1.32x the whole
+previously measured corpus. Splay is 10.15% monomorphic. Typescript is 67% of
+the corpus's reads and allocates 4.96 GB.
+
+0090's GC denominator survives the widening: collection is 1.80% of the wider
+corpus against 2.29% of the seven.
+
+zlib, Mandreel and RegExp still report setup-only counts for three pre-existing
+reasons — the `read` builtin lives in the shell, Mandreel now hits the guard,
+RegExp has its checksum defect — so both headlines are over 12 suites and the
+output says so.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01LqMsVZEFfMkp52dejVuRif
 ---
  .../BenchmarkContext.cs                       |  65 ++-
+ .../SpecializingTierMetrics.cs                | 189 +++---
  .../TypeFeedbackMetrics.cs                    | 546 +++++++++++-------
- 2 files changed, 396 insertions(+), 215 deletions(-)
+ 3 files changed, 519 insertions(+), 281 deletions(-)
 
 diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/BenchmarkContext.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/BenchmarkContext.cs
 index cb05141a..65b1beb6 100644
@@ -135,6 +142,288 @@ index cb05141a..65b1beb6 100644
 +        failure?.Throw();
 +    }
  }
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index 97f5d379..2d34ba03 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -234,7 +234,7 @@ internal static class SpecializingTierMetrics
+                 // control loop's locals are raw doubles (item 3-3). So this says how much of a
+                 // call's cost is the value representation rather than the prologue — which is a
+                 // question about phase 3, and one no timing arm can answer on its own.
+-                var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
++                var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                 var stopwatch = Stopwatch.StartNew();
+                 var answer = context.Eval($"hot({iterations});", "run.js").ToString();
+                 stopwatch.Stop();
+@@ -307,15 +307,43 @@ internal static class SpecializingTierMetrics
+ 
+     private sealed record Suite(string Name, string[] Files);
+ 
++    /// <summary>
++    /// **Every Octane suite, not the seven this census used to run** — the same widening
++    /// `TypeFeedbackMetrics` took, for the same reason and with more at stake.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// This is where phase 3's headline numbers come from: <em>"85 249 783 boxes"</em>,
++    /// <em>"41.89% of everything the corpus allocates"</em>, <em>"54.0% of the corpus's
++    /// allocation"</em>, <em>"the corpus goes 0.366×"</em>, and the GC-pause denominator that
++    /// prices the whole remaining phase. Every one of those said <em>"the corpus"</em> and meant
++    /// **7 of Octane's 15 suites** — excluding Typescript, which the widened read census found is
++    /// **67% of the corpus's property reads on its own**, and Gameboy, the most polymorphic suite
++    /// in the set.
++    /// </para>
++    /// <para>
++    /// The seven were not chosen: Mandreel aborted the census host with an uncatchable .NET stack
++    /// overflow, because item 0-2's stack reserve is a property of the shell and no benchmark host
++    /// had it. See <see cref="BenchmarkContext.RunOnScriptHostStack"/>.
++    /// </para>
++    /// </remarks>
+     private static readonly Suite[] Suites =
+     [
+         new("Richards", ["richards.js"]),
+         new("DeltaBlue", ["deltablue.js"]),
++        new("Crypto", ["crypto.js"]),
+         new("RayTrace", ["raytrace.js"]),
+-        new("Box2D", ["box2d.js"]),
+         new("EarleyBoyer", ["earley-boyer.js"]),
+-        new("Crypto", ["crypto.js"]),
++        new("RegExp", ["regexp.js"]),
++        new("Splay", ["splay.js"]),
+         new("NavierStokes", ["navier-stokes.js"]),
++        new("PdfJS", ["pdfjs.js"]),
++        new("Mandreel", ["mandreel.js"]),
++        new("Gameboy", ["gbemu-part1.js", "gbemu-part2.js"]),
++        new("CodeLoad", ["code-load.js"]),
++        new("Box2D", ["box2d.js"]),
++        new("zlib", ["zlib.js", "zlib-data.js"]),
++        new("Typescript", ["typescript.js", "typescript-input.js", "typescript-compiler.js"]),
+     ];
+ 
+     private const int RunsPerBenchmark = 3;
+@@ -378,15 +406,33 @@ internal static class SpecializingTierMetrics
+ 
+         var baseSource = File.ReadAllText(basePath);
+         var rows = new List<object>();
+-        foreach (var suite in Suites)
++
++        // On the shell's stack, and checkpointed after every suite. Mandreel's global_init takes
++        // the default stack down with an UNCATCHABLE overflow, and a census that serializes only
++        // at the end loses every suite before the one that aborts.
++        BenchmarkContext.RunOnScriptHostStack(() =>
+         {
+-            Console.Error.WriteLine($"{suite.Name}: running ...");
+-            var row = RunSuite(octaneDirectory, baseSource, suite, arm, counters);
+-            if (row != null)
+-                rows.Add(row);
+-        }
++            foreach (var suite in Suites)
++            {
++                Console.Error.WriteLine($"{suite.Name}: running ...");
++                var row = RunSuite(octaneDirectory, baseSource, suite, arm, counters);
++                if (row != null)
++                    rows.Add(row);
+ 
+-        Console.WriteLine(JsonSerializer.Serialize(
++                File.WriteAllText(PartialPath, Report(rows, arm, counters));
++            }
++        });
++
++        Console.WriteLine(Report(rows, arm, counters));
++    }
++
++    /// <summary>Where an in-progress census parks its rows so an abort cannot discard them.</summary>
++    internal static string PartialPath { get; } =
++        Path.Combine(Path.GetTempPath(), "broiler-specializing-tier-partial.json");
++
++    private static string Report(List<object> rows, Arm arm, bool counters)
++    {
++        return JsonSerializer.Serialize(
+             new
+             {
+                 schema = "broiler.specializing-tier-metrics/1",
+@@ -399,9 +445,11 @@ internal static class SpecializingTierMetrics
+                     + "share of EXECUTED property reads that happen at a site owned by a promoted "
+                     + "function — the specializing tier's entire addressable surface, and the "
+                     + "number the item rests on.",
++                suiteCount = rows.Count,
++                expectedSuiteCount = Suites.Length,
+                 suites = rows,
+             },
+-            new JsonSerializerOptions { WriteIndented = true }));
++            new JsonSerializerOptions { WriteIndented = true });
+     }
+ 
+     private static object RunSuite(string octaneDirectory, string baseSource, Suite suite, Arm arm, bool counters)
+@@ -443,6 +491,15 @@ internal static class SpecializingTierMetrics
+         CallPathDiagnostics.Reset();
+ 
+         using var context = new JavaScriptContextBuilder()
++            // The shell's stack budget, so deep recursion raises a catchable "Maximum call stack
++            // size exceeded" rather than aborting the process. Paired with the sized thread in
++            // Write(): the budget is measured against the stack the code stands on, so a budget
++            // without the thread is a guard that cannot fire (§3.5).
++            .UseOptions(new JSContextOptions
++            {
++                MaxStackUsageBytes = BenchmarkContext.ScriptHostStackBytes
++                    - BenchmarkContext.ScriptHostStackReserveBytes,
++            })
+             .UseFunctionTiering(arm == Arm.None
+                 ? FunctionTieringOptions.Disabled
+                 : new FunctionTieringOptions
+@@ -484,18 +541,18 @@ internal static class SpecializingTierMetrics
+         // here exactly, whether or not it is visible in the time.
+         // Item 3-8: how much of this run's allocation is number boxing at all — the ceiling on
+         // every raw-double item in phase 3, counted rather than inferred from a per-shape figure.
+-        //
+-        // Gated on `counters` for the same reason the inline-cache ones above are, and here it is
+-        // not merely noise: the arithmetic census increments once per generic invocation, and the
+-        // two arms of item 3-1's switch differ by 20.5 M invocations. Leaving it on for a timing
+-        // pass would charge the slower arm for 20.5 M interlocked increments it does not otherwise
+-        // pay — a bias pointing the same way as the result, which is the worst kind.
++        //
++        // Gated on `counters` for the same reason the inline-cache ones above are, and here it is
++        // not merely noise: the arithmetic census increments once per generic invocation, and the
++        // two arms of item 3-1's switch differ by 20.5 M invocations. Leaving it on for a timing
++        // pass would charge the slower arm for 20.5 M interlocked increments it does not otherwise
++        // pay — a bias pointing the same way as the result, which is the worst kind.
+         Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Reset();
+-        Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Enabled = counters;
+-        // Item 3-1's shared half: of the operators that mint those boxes, how many are handed two
+-        // values that ARE Numbers — i.e. how many a native form guarded on that test could reach.
+-        ArithmeticOperandDiagnostics.Reset();
+-        ArithmeticOperandDiagnostics.Enabled = counters;
++        Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Enabled = counters;
++        // Item 3-1's shared half: of the operators that mint those boxes, how many are handed two
++        // values that ARE Numbers — i.e. how many a native form guarded on that test could reach.
++        ArithmeticOperandDiagnostics.Reset();
++        ArithmeticOperandDiagnostics.Enabled = counters;
+         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+ 
+         // The denominator phase 3 has never had. Every item in it is priced in boxes removed, and
+@@ -527,17 +584,17 @@ internal static class SpecializingTierMetrics
+         var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+         var boxing = Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Snapshot();
+         Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Enabled = false;
+-        var arithmeticGeneric = ArithmeticOperandDiagnostics.Generic;
+-        var arithmeticBothNumbers = ArithmeticOperandDiagnostics.BothNumbers;
+-        var arithmeticRawDouble = ArithmeticOperandDiagnostics.RawDoubleOperand;
+-        var arithmeticRawDoubleOtherNumber = ArithmeticOperandDiagnostics.RawDoubleOtherNumber;
+-        var arithmeticUnaryNegate = ArithmeticOperandDiagnostics.UnaryNegate;
+-        var arithmeticUnaryUpdate = ArithmeticOperandDiagnostics.UnaryUpdate;
++        var arithmeticGeneric = ArithmeticOperandDiagnostics.Generic;
++        var arithmeticBothNumbers = ArithmeticOperandDiagnostics.BothNumbers;
++        var arithmeticRawDouble = ArithmeticOperandDiagnostics.RawDoubleOperand;
++        var arithmeticRawDoubleOtherNumber = ArithmeticOperandDiagnostics.RawDoubleOtherNumber;
++        var arithmeticUnaryNegate = ArithmeticOperandDiagnostics.UnaryNegate;
++        var arithmeticUnaryUpdate = ArithmeticOperandDiagnostics.UnaryUpdate;
+         var arithmeticUpdateTargets = ArithmeticOperandDiagnostics.UpdateTargets;
+-        var arithmeticUnaryToNumeric = ArithmeticOperandDiagnostics.UnaryToNumeric;
+-        var arithmeticUnaryToNumericReused = ArithmeticOperandDiagnostics.UnaryToNumericReused;
+-        ArithmeticOperandDiagnostics.Enabled = false;
+-
++        var arithmeticUnaryToNumeric = ArithmeticOperandDiagnostics.UnaryToNumeric;
++        var arithmeticUnaryToNumericReused = ArithmeticOperandDiagnostics.UnaryToNumericReused;
++        ArithmeticOperandDiagnostics.Enabled = false;
++
+         var compiler = Broiler.JavaScript.Compiler.CompilerSpecializationDiagnostics.Snapshot();
+         var tiering = context.FunctionTiering.Snapshot();
+         var speculation = Speculation.Snapshot();
+@@ -572,13 +629,13 @@ internal static class SpecializingTierMetrics
+             mixedComparisons = compiler.MixedNumericComparisons,
+             boxedComparisons = compiler.BoxedNumericComparisons,
+ 
+-            // Item 3-1's guarded numeric tree: how many arithmetic trees took the speculative
+-            // form, and how many leaf type tests that cost in total. Read against
+-            // arithmeticGeneric below — the trees are compile-time sites, the invocations are
+-            // run-time, and it is the second that has to collapse for this to have worked.
+-            speculativeNumericTrees = compiler.SpeculativeNumericTrees,
+-            speculativeNumericGuards = compiler.SpeculativeNumericGuards,
+-
++            // Item 3-1's guarded numeric tree: how many arithmetic trees took the speculative
++            // form, and how many leaf type tests that cost in total. Read against
++            // arithmeticGeneric below — the trees are compile-time sites, the invocations are
++            // run-time, and it is the second that has to collapse for this to have worked.
++            speculativeNumericTrees = compiler.SpeculativeNumericTrees,
++            speculativeNumericGuards = compiler.SpeculativeNumericGuards,
++
+             // Item 3-1's refusal waterfall: every candidate arithmetic node attributed to the
+             // first eligibility condition it fails. speculativeNumericTrees says how many sites
+             // took the guarded form; this says what the OTHER ones ran into, which is the number
+@@ -627,33 +684,33 @@ internal static class SpecializingTierMetrics
+             boxesAllocatedTotal = boxing.Allocations,
+             boxesAllocatedDirect = boxing.DirectAllocations,
+             boxingLiteralRequests = boxing.LiteralRequests,
+-            // Item 3-1: of the boxes that remain after the guarded tree, how many the COMPILER
+-            // mints to carry a raw double across into a JSValue — the root of a tree on its way
+-            // into a local, a slot or an element. Only these are what a typed backing store could
+-            // remove; the rest an operator or a builtin produced.
+-            boxingConversionRequests = boxing.ConversionRequests,
++            // Item 3-1: of the boxes that remain after the guarded tree, how many the COMPILER
++            // mints to carry a raw double across into a JSValue — the root of a tree on its way
++            // into a local, a slot or an element. Only these are what a typed backing store could
++            // remove; the rest an operator or a builtin produced.
++            boxingConversionRequests = boxing.ConversionRequests,
+             // Item 3-8a: of those, the ones minted READING a speculative local, i.e. what the dual
+             // representation still costs. Read it against the fall in arithmeticUpdateTargets'
+             // LocalSlot row, which is what the representation buys: the item pays exactly while
+             // the second number exceeds the first.
+             boxingSpeculativeReadRequests = boxing.SpeculativeReadRequests,
+ 
+-            // Item 3-1's shared half, counted on the far side of the boundary: not what the
+-            // compiler could prove, but what the operators were actually handed. arithmeticGeneric
+-            // is every invocation of a two-JSValue arithmetic or bitwise operator;
+-            // arithmeticBothNumbers is the subset a native form guarded on "both are Numbers"
+-            // could answer. arithmeticRawDouble is the shape item 3-5 specialized for < and > and
+-            // no arithmetic operator has — one side already an unboxed double, the other a JSValue.
+-            arithmeticGeneric,
+-            arithmeticBothNumbers,
+-            arithmeticRawDouble,
+-            arithmeticRawDoubleOtherNumber,
+-            // The unary operators, which the binary census above cannot see and which mint through
+-            // the same factory: -x and ~x, the ++/-- step, and the ToNumeric that re-boxes the
+-            // operand of ++/-- to hand back the old value. Together with the binary count these
+-            // name every operator box; what is left over a builtin minted directly.
+-            arithmeticUnaryNegate,
+-            arithmeticUnaryUpdate,
++            // Item 3-1's shared half, counted on the far side of the boundary: not what the
++            // compiler could prove, but what the operators were actually handed. arithmeticGeneric
++            // is every invocation of a two-JSValue arithmetic or bitwise operator;
++            // arithmeticBothNumbers is the subset a native form guarded on "both are Numbers"
++            // could answer. arithmeticRawDouble is the shape item 3-5 specialized for < and > and
++            // no arithmetic operator has — one side already an unboxed double, the other a JSValue.
++            arithmeticGeneric,
++            arithmeticBothNumbers,
++            arithmeticRawDouble,
++            arithmeticRawDoubleOtherNumber,
++            // The unary operators, which the binary census above cannot see and which mint through
++            // the same factory: -x and ~x, the ++/-- step, and the ToNumeric that re-boxes the
++            // operand of ++/-- to hand back the old value. Together with the binary count these
++            // name every operator box; what is left over a builtin minted directly.
++            arithmeticUnaryNegate,
++            arithmeticUnaryUpdate,
+ 
+             // Item 3-1: where each of those steps' operands lived. The rows sum to
+             // arithmeticUnaryUpdate by construction — the total is recorded by Increment itself
+@@ -662,12 +719,12 @@ internal static class SpecializingTierMetrics
+             // the suite's own request-to-allocation ratio before reading them as memory, since the
+             // small-integer cache answers Crypto's updates for free and NavierStokes' barely at all.
+             arithmeticUpdateTargets = DescribeUpdateTargets(arithmeticUpdateTargets),
+-            arithmeticUnaryToNumeric,
+-            // The coercions handed back instead of copied. This plus arithmeticUnaryToNumeric is
+-            // the coercion count and is invariant across the two settings of
+-            // BROILER_JS_NUMERIC_UPDATE_REUSE, so the split measures the switch and not the run.
+-            arithmeticUnaryToNumericReused,
+-
++            arithmeticUnaryToNumeric,
++            // The coercions handed back instead of copied. This plus arithmeticUnaryToNumeric is
++            // the coercion count and is invariant across the two settings of
++            // BROILER_JS_NUMERIC_UPDATE_REUSE, so the split measures the switch and not the run.
++            arithmeticUnaryToNumericReused,
++
+             candidates = tiering.Candidates,
+             invocations = tiering.Invocations,
+             recompilationAttempts = tiering.RecompilationAttempts,
 diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/TypeFeedbackMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/TypeFeedbackMetrics.cs
 index 37ad578c..d8617aa1 100644
 --- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/TypeFeedbackMetrics.cs
