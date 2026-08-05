@@ -1106,6 +1106,55 @@ count late: it appeared not to reproduce until its reference was regenerated.)
   in `MathFontSizeTests` cover the resolution, case-insensitivity, that the
   subtree no longer collapses, and that the arm does not swallow other keywords.
 
+### Problem 28 is two things, and only the smaller one is fixed
+
+- **Test:** `css/css-view-transitions/reset-state-after-scrolled-view-transition`,
+  3.6% on CI and 3.61% here.
+- **The transition machinery is not what fails.** Rendering the test and its own
+  `-ref.html` — which performs the same scroll without a transition — gives
+  **byte-identical output here**, 100% `lightblue` for both, against a Chromium
+  reference that is 96.36% `lightgreen` / 3.61% `lightblue`. When a test and its
+  reference agree with each other and both disagree with the other engine, the gap
+  is in what they share.
+- **Half of it was a scroll that never stopped at the end — fixed.** CSSOM View
+  §"scroll an element" normalizes the requested position to the scrolling box's
+  scrolling area, so a scroll past either end comes to rest at the end.
+  `scrollTo`/`scrollBy` — window and element alike — passed `clamp: false`, so
+  `scrollBy({top: scrollHeight})`, the standard "scroll to the bottom" idiom (since
+  `scrollHeight` is always at least the maximum offset), landed *beyond* the content
+  and painted the bare canvas. Reduced to a probe: a page with a `lightblue` canvas,
+  a `lightgreen` body and a 200vh block renders 96.36/3.61 unscrolled — Chromium's
+  numbers exactly — and 100% canvas after that `scrollBy`. With the clamp it is
+  98.42/1.56.
+- **Measured honestly: this closes no test.** `css/cssom-view` is 193/234 and
+  `css/css-view-transitions` 345/490 **both before and after, with nothing changing
+  state in either direction.** It is a conformance fix found while diagnosing, kept
+  because it is right and covered (`ScrollClampingTests`, five cases, four of which
+  fail without it), not because it moved a number.
+- **The other half keeps the test failing, and it is already tracked.** With a 2s
+  `::view-transition-group(*)` animation the transition is still running at
+  screenshot time, so what paints is the root snapshot — and the root capture
+  carries only a background colour, which is the `lightblue` we render. That is the
+  rasterised-root-snapshot gap from
+  [problems 19/21/23 of the #1491 list](#view-transitions-do-not-capture-the-document--still-open-2-will-not-be-won-here),
+  where cloning the DOM into the snapshot was implemented, measured at +8/−7 and
+  reverted. Problem 28 belongs to that item, not to a scroll bug.
+
+### Problems 12 and 13 are an unshipped draft feature, not a layout bug
+
+`css-grid/…/subgrid/grid-subgridded-to-grid-lanes/…` (0.80% and 0.89%, both
+reproduced here) are built on `display: inline grid-lanes` — CSS Grid Level 3 —
+combined with `grid-template-columns: subgrid` and `repeat(auto-fill, [line-names])`.
+Broiler already **deliberately** treats `grid-lanes` as an invalid display value so
+the declaration is dropped and the element keeps its default display, on the stated
+grounds that no stable browser ships it unflagged
+(`Broiler.Layout/Engine/CssUtils.cs`, and the pinned `Broiler.CSS` rejects it at
+validation). So both engines lack the feature and what remains is a difference in
+how the *unfeatured fallback* lays out — 93.98% between our render of the test and
+our render of its own reference. Worth a maintainer's call on whether these belong
+in the "reference is the unfeatured render" bucket before any engine work; chasing
+byte-compatibility on a dropped declaration is not the same as implementing subgrid.
+
 ### An earlier verdict that no longer holds
 
 **Problem 7 (`css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative`)
@@ -1178,7 +1227,7 @@ owned by a section above). Re-reported problems point at that section.
 | 9 | `resource-timing/initiator-type/frameset` | 0.0% | — | re-report of #1491 problem 26 — [frameset frames render nothing](#frameset-frames-render-nothing) |
 | 10 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | — | **won't fix** — #1497 problem 25: Chromium fails this reftest against its own reference |
 | 11 | `css-pseudo/backdrop-animate-002` | 0.8% | **0.77% → 99.74%** | **fixed** — property-indexed keyframes + `animate({pseudoElement})`, main repo |
-| 12, 13 | `css-grid/…/subgrid/…` (2) | 0.8%, 0.9% | 0.80%, 0.89% | open — new; subgrid track sizing. The 241-test `grid-subgridded-to-grid-lanes` subset is 122 passing, so these two head a large family |
+| 12, 13 | `css-grid/…/subgrid/…` (2) | 0.8%, 0.9% | 0.80%, 0.89% | open — built on `display: inline grid-lanes`, which Broiler deliberately drops as invalid because no stable browser ships it unflagged. See above. The 241-test `grid-subgridded-to-grid-lanes` subset is 122 passing |
 | 14, 15 | `css-masking/clip-path/clip-path-document-element{,-will-change}` (2) | 1.0% | 0.95% | open — `polygon()` needs a real path clip; see above |
 | 16 | `css-shadow/shadow-directionality-002.tentative` | 1.1% | **1.09% → 99.55%** | **fixed** — shadow-tree scoping (main repo) + `:dir()` ([`patches/0102`](../patches/README.md)) |
 | 17 | `css-view-transitions/auto-name-from-id` | 1.3% | 1.27% | open — **it does reproduce**; the earlier 97.46% was a stale reference (see the method note above). `auto-name` family — see problem 18 |
@@ -1190,7 +1239,7 @@ owned by a section above). Re-reported problems point at that section.
 | 24 | `css-align/animation/row-gap-interpolation` | 2.6% | 2.59% | open — a **testharness** test: its reference is Chromium's results table, so closing it means passing the `row-gap` interpolation subtests, not one fix |
 | 25, 26 | `css-view-transitions/massive-element-right-of-viewport-partially-onscreen-{new,old}` | 2.6% | 2.65% | open — same root cause as 22/23 |
 | 27 | `css-masking/clip-path/clip-path-element-userSpaceOnUse-004` | 2.9% | 2.86% | open — SVG `<clipPath>` reference needs a real path clip |
-| 28 | `css-view-transitions/reset-state-after-scrolled-view-transition` | 3.6% | 3.61% | open — reproduces |
+| 28 | `css-view-transitions/reset-state-after-scrolled-view-transition` | 3.6% | 3.61% | **part-fixed** — the scroll no longer overshoots the end (CSSOM View clamp, main repo); still failing on the rasterised root snapshot, which is #1491's problems 19/21/23 |
 | 29 | `html/…/form-validation-validity-textarea-defaultValue` | 3.8% | 3.78% | open — a **testharness** test whose reference is Chromium's results table; three of its five subtests drive `test_driver.send_keys`, which the runner only stubs |
 | 30 | `css-fonts/…/font-size-math-001.tentative` | 3.9% | **3.93% → 99.86%** | **fixed** — `font-size: math` is `1em`; the subset goes 7 → 13 of 14, main repo |
 

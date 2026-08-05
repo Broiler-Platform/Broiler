@@ -20,14 +20,22 @@ internal static class WindowScrollBinding
     public static JSValue ScrollTo(IWindowScrollHost host, in Arguments a)
     {
         var (left, top, behavior) = host.GetScrollArguments(in a);
-        host.SetElementScrollOffsetsWithBehavior(host.DocumentElement, left, top, relative: false, clamp: false, behavior: behavior);
+        // CSSOM View §"scroll an element": the requested position is normalized to the scrolling
+        // box's scrolling area, so a scroll past either end comes to rest at the end rather than
+        // off the document. `clamp: false` here let `scrollBy({top: scrollHeight})` — the standard
+        // "scroll to the bottom" idiom, since scrollHeight >= the maximum offset — land beyond the
+        // content and paint the bare canvas. WPT
+        // css/css-view-transitions/reset-state-after-scrolled-view-transition (issue #1538
+        // problem 28) is that and nothing else: its own reference performs the same scroll, so
+        // both rendered identically here and both disagreed with Chromium.
+        host.SetElementScrollOffsetsWithBehavior(host.DocumentElement, left, top, relative: false, clamp: true, behavior: behavior);
         return JSUndefined.Value;
     }
 
     public static JSValue ScrollBy(IWindowScrollHost host, in Arguments a)
     {
         var (left, top, behavior) = host.GetScrollArguments(in a);
-        host.SetElementScrollOffsetsWithBehavior(host.DocumentElement, left, top, relative: true, clamp: false, behavior: behavior);
+        host.SetElementScrollOffsetsWithBehavior(host.DocumentElement, left, top, relative: true, clamp: true, behavior: behavior);
         return JSUndefined.Value;
     }
 }
