@@ -282,10 +282,15 @@ public sealed partial class DomBridge
         if (body == null)
             return;
 
-        // The replaced root paints only the image; neither the root nor the
-        // (box-less) body background reaches the canvas.
-        BakedInlineStyle(html)["background"] = "none";
-        BakedInlineStyle(html)["background-color"] = "transparent";
+        // Replacing the root's *contents* does not remove the root's own box, so the root's
+        // background still becomes the canvas background (CSS Backgrounds 3 §2.11.1 — WPT
+        // css/css-content/element-replacement-root-canvas-bg asserts exactly this, and clearing it
+        // here left the canvas white where the reference is aquamarine).
+        //
+        // The body is a different matter and stays cleared: the root's descendants generate no
+        // boxes once it is replaced, so a background on <body> has no box to propagate from and
+        // must not reach the canvas (WPT ...-root-canvas-bg-from-body, #1316, pinned by
+        // RootContentReplacementTests).
         BakedInlineStyle(body)["margin"] = "0";
         BakedInlineStyle(body)["padding"] = "0";
         BakedInlineStyle(body)["background"] = "none";

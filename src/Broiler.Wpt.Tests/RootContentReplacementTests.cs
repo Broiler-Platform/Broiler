@@ -69,6 +69,55 @@ public class RootContentReplacementTests : IDisposable
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
 
+    /// <summary>
+    /// The companion case, and the one the body rule must not swallow: a background on the
+    /// <em>root itself</em> still becomes the canvas background when <c>content</c> replaces the
+    /// root. Replacing the root's contents does not remove the root's own box (CSS Backgrounds 3
+    /// §2.11.1), so WPT <c>css/css-content/element-replacement-root-canvas-bg</c> expects an
+    /// aquamarine canvas. The render prep used to clear the root's background alongside the
+    /// body's, leaving a white canvas — 1.3% pixel match against the Chromium reference.
+    /// </summary>
+    [Fact]
+    public void RootContentUrl_RootOwnBackgroundStillReachesCanvas()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "broiler-rootcontent-" + System.Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(dir, "resources"));
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "resources", "rect.svg"),
+                "<svg width=\"100\" height=\"100\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\">" +
+                "<rect x=\"0\" y=\"0\" width=\"100\" height=\"100\" fill=\"green\" /></svg>");
+
+            const string html =
+                "<!DOCTYPE html><title>t</title>" +
+                "<style>:root{content:url('resources/rect.svg');background-color:aquamarine}</style>" +
+                "<p>This text should not be visible</p>";
+            string file = Path.Combine(dir, "t.html");
+            File.WriteAllText(file, html);
+
+            var runner = new WptTestRunner(W, H);
+            using var bmp = runner.RenderHtmlFileBitmapPublic(file, dir);
+
+            int aqua = 0, greenTopLeft = 0;
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    var p = bmp.GetPixel(x, y);
+                    if (p.R is > 100 and < 180 && p.G > 220 && p.B is > 170 and < 240)
+                        aqua++;
+                    if (p.G > 100 && p.R < 80 && p.B < 80 && x < 100 && y < 100)
+                        greenTopLeft++;
+                }
+
+            // Everything outside the 100x100 image is the root's aquamarine canvas.
+            Assert.True(aqua > (W * H - 100 * 100) * 0.9,
+                $"aquamarine pixels={aqua}; the root's own background did not reach the canvas.");
+            Assert.True(greenTopLeft > 100 * 100 * 0.8,
+                $"green-top-left={greenTopLeft}; replaced-content image not rendered at the origin.");
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
+
     // A normal page (no root `content`) must be unaffected: the body background
     // still propagates to the canvas.
     [Fact]
