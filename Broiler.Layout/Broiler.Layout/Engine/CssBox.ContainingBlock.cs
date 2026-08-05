@@ -153,6 +153,23 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         CssContainingBlock.CreatedByTransformContainOrWillChange(Transform, Contain, WillChange);
 
     /// <summary>
+    /// A non-atomic inline box — <c>display: inline</c>, not one of the atomic inline-level
+    /// displays (<c>inline-block</c>, <c>inline-flex</c>, …). Neither layout/paint containment
+    /// (CSS Containment §2) nor a <c>transform</c> (CSS Transforms 1 §3, "transformable element")
+    /// applies to one, so it never becomes a containing block for out-of-flow descendants through
+    /// those properties. WPT css-contain/contain-paint-012 is exactly this case: <c>contain:
+    /// paint</c> sits on a <c>&lt;span&gt;</c> wrapping a fixed-position child, and the child has
+    /// to resolve against the transformed <em>block</em> above the span instead.
+    /// <para>Deliberately checked at the call site rather than folded into
+    /// <see cref="EstablishesNonPositionAbsPosContainingBlock"/>: that predicate is the engine
+    /// mirror of the bridge's property-only <c>EstablishesContainingBlock</c>, and
+    /// <c>NativeAnchorPlacementTests.EstablishesNonPositionAbsPosContainingBlock_MirrorsBridgePredicate</c>
+    /// pins the two to the same answer for a given transform/contain/will-change triple.</para>
+    /// </summary>
+    private bool IsNonAtomicInline =>
+        string.Equals(Display, CssConstants.Inline, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// RF-BRIDGE-1b Track 3.2: the viewport a <c>position:fixed</c> descendant of this
     /// box resolves against — its used size (for inset percentages and viewport-basis
     /// sizing) and its origin (for placement). When the box is inside a nested browsing
@@ -170,6 +187,24 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         for (var box = ParentBox; box != null; box = box.ParentBox)
         {
+            // CSS Transforms 1 §4 / CSS Containment §2: a transform, a layout/paint containment,
+            // or will-change:transform makes an ancestor the containing block for *all* its
+            // descendants — fixed-position ones included, not just absolutely-positioned ones.
+            // Only when no such ancestor exists does the viewport take over. Without this a fixed
+            // box always sized and placed against the viewport, so WPT css-contain/contain-paint-012
+            // (a `width/height: 100%` fixed child under a `transform: translateX(0)` 100x100 block)
+            // painted green over the whole page instead of a 100px square.
+            // Reuse the abspos padding-box resolution rather than recomputing it: heights resolve
+            // bottom-up, so a containing block's ActualBottom is often still unsettled while its
+            // out-of-flow children are being placed, and that method already recovers the height
+            // from a definite specified one (and handles grid areas and the vertical-flow frame).
+            if (!box.IsNonAtomicInline && box.EstablishesNonPositionAbsPosContainingBlock())
+            {
+                GetAbsoluteContainingBlockPaddingBox(box, out var cbLeft, out var cbTop, out var cbWidth, out var cbHeight);
+                if (cbWidth > 0 && cbHeight > 0)
+                    return new RectangleF((float)cbLeft, (float)cbTop, (float)cbWidth, (float)cbHeight);
+            }
+
             if (!box.IsNestedViewportRoot)
                 continue;
 
