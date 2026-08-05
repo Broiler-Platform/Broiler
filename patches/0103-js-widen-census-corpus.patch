@@ -1,64 +1,66 @@
-From 15766490a0877ae525d08229aa2472e9391b3eef Mon Sep 17 00:00:00 2001
+From 41825bd403107dfc7f7eebf9cd89319174c85674 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Wed, 5 Aug 2026 17:41:11 +0000
-Subject: [PATCH] Widen the type-feedback and specializing-tier censuses past
- their seven suites
+Date: Wed, 5 Aug 2026 18:06:31 +0000
+Subject: [PATCH] Widen all three censuses past the suites they could reach
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
 Item 2-13 said this engine's largest private deficiency is zlib, 12.0x behind
-Jint relative to Chromium. Asking what the censuses say about zlib turned up
-that they say nothing: TypeFeedbackMetrics, SpecializingTierMetrics and
-PropertyMapDistributionMetrics all ran the same seven suites, and the roadmap
-quotes their output as "the corpus" — the phrase every phase-3 and phase-4
-headline uses — over a denominator it never states.
+Jint relative to Chromium. Asking what the censuses say about it turned up that
+none of the three can answer, for two different reasons.
 
-Why it was seven had not been written down, and is not a choice about cost.
-Widening the list aborts at the ninth suite with an uncatchable .NET stack
-overflow in Mandreel's global_init. Item 0-2's 16 MiB thread and 4 MiB reserve
-are a property of Broiler.JavaScript/Program.cs — the shell — and the benchmark
-hosts built plain contexts on whatever stack the runtime handed Main. Every
-benchmark host in this campaign has been running without the reserve the shell
-has had since phase 0. Both censuses also serialized once at the end, so that
-abort discarded every suite before it.
+TypeFeedbackMetrics and SpecializingTierMetrics both ran seven of Octane's
+fifteen suites, and the roadmap quotes their output as "the corpus" — the phrase
+every phase-3 and phase-4 headline uses — over a denominator it never states.
+PropertyMapDistributionMetrics lists all fifteen and reaches nine: it aborts on
+Mandreel and, serializing only at the end, emits nothing at all when it does. So
+items 2-7 and 2-9's map figures were not reproducible from a clean tree; the
+only way to get output was BROILER_MAP_DISTRIBUTION_SKIP, and the recorded
+numbers do not say what was skipped.
 
-Fixed for both: they run on the shell's thread with the shell's
-MaxStackUsageBytes, and checkpoint after every suite. Mandreel now fails the way
-the shell makes it fail, catchably. TypeFeedbackMetrics also emits the corpus
-aggregate with its suite count beside it, rather than leaving it to be totalled
-by whoever quotes it — which is the step where the suite list stopped travelling
-with the number.
+The abort is the same in all three: Mandreel's global_init overflows the stack
+uncatchably, because item 0-2's 16 MiB thread and 4 MiB reserve are a property
+of Broiler.JavaScript/Program.cs — the shell — and the benchmark hosts built
+plain contexts on whatever stack the runtime handed Main. Every benchmark host
+in this campaign has been running without the reserve the shell has had since
+phase 0.
 
-Both widened counts move a headline, and both reproduce their old value over the
-old seven, so each is the same instrument over more suites.
+All three now run on the shell's thread with the shell's MaxStackUsageBytes and
+checkpoint after every suite, so an abort keeps what ran. Mandreel fails the way
+the shell makes it fail, catchably. TypeFeedbackMetrics also emits its corpus
+aggregate with the suite count beside it, rather than leaving it to be totalled
+by whoever quotes it.
 
-  reads, monomorphic:  93.54% of 37.9 M  ->  80.11% of 307.9 M
-  calls, monomorphic:  96.70% of 4.24 M  ->  86.35% of 52.9 M
-  boxes allocated:        31,401,346     ->     90,641,738
-  allocated bytes:           3.13 GB     ->       12.93 GB
+Each widened count reproduces its old value over the old suites, so each is the
+same instrument over more of them:
 
-87.7% of the corpus's property reads and 65.4% of its boxes were outside the
-seven. Gameboy — never in a census — is 34.60% monomorphic with 1 282
-polymorphic sites and allocates 41.3 M boxes on its own, 1.32x the whole
-previously measured corpus. Splay is 10.15% monomorphic. Typescript is 67% of
-the corpus's reads and allocates 4.96 GB.
+  reads, monomorphic   93.54% of 37.9 M  ->  80.11% of 307.9 M
+  calls, monomorphic   96.70% of 4.24 M  ->  86.35% of 52.9 M
+  boxes allocated         31,401,346     ->     90,641,738
+  allocated bytes            3.13 GB     ->       12.93 GB
+  property maps                    —     ->      2,202,782
 
-0090's GC denominator survives the widening: collection is 1.80% of the wider
-corpus against 2.29% of the seven.
+87.7% of the corpus's reads and 65.4% of its boxes were outside the seven.
+Gameboy — never in a census — is 34.60% monomorphic with 1 282 polymorphic
+sites and allocates 41.3 M boxes on its own, 1.32x the whole previously
+measured corpus. 2-9 is corroborated at 2.2 M maps. 2-7 splits: live memory
+still favours the shipped policy but by less than recorded (0.644x against
+0.56x), while its allocated-bytes win changes sign, 0.82x becoming 1.044x,
+because geometric growth pays 33x the node copying on suites it never saw.
 
-zlib, Mandreel and RegExp still report setup-only counts for three pre-existing
-reasons — the `read` builtin lives in the shell, Mandreel now hits the guard,
-RegExp has its checksum defect — so both headlines are over 12 suites and the
-output says so.
+Two instrument defects are surfaced rather than fixed silently: the policy table
+still labels round-up-16 "current" though 2-7 replaced it, and one histogram
+bucket reads -15, so negativeBucketCounts now ships in the output.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01LqMsVZEFfMkp52dejVuRif
 ---
- .../BenchmarkContext.cs                       |  65 ++-
- .../SpecializingTierMetrics.cs                | 189 +++---
- .../TypeFeedbackMetrics.cs                    | 546 +++++++++++-------
- 3 files changed, 519 insertions(+), 281 deletions(-)
+ .../BenchmarkContext.cs                       |  65 +-
+ .../PropertyMapDistributionMetrics.cs         | 828 +++++++++---------
+ .../SpecializingTierMetrics.cs                | 189 ++--
+ .../TypeFeedbackMetrics.cs                    | 546 +++++++-----
+ 4 files changed, 945 insertions(+), 683 deletions(-)
 
 diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/BenchmarkContext.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/BenchmarkContext.cs
 index cb05141a..65b1beb6 100644
@@ -142,6 +144,839 @@ index cb05141a..65b1beb6 100644
 +        failure?.Throw();
 +    }
  }
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/PropertyMapDistributionMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/PropertyMapDistributionMetrics.cs
+index c83fc928..1adbdc6b 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/PropertyMapDistributionMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/PropertyMapDistributionMetrics.cs
+@@ -1,402 +1,426 @@
+-using System;
+-using System.Collections.Generic;
+-using System.IO;
+-using System.Linq;
+-using System.Text.Json;
+-using Broiler.JavaScript.Runtime;
+-using Broiler.JavaScript.Storage;
+-
+-namespace Broiler.JavaScript.Engine.Benchmarks;
+-
+-/// <summary>
+-/// Emits the distribution of property-map sizes over a real workload, and what each candidate
+-/// growth policy would cost against that distribution.
+-/// </summary>
+-/// <remarks>
+-/// <para>
+-/// This is the measurement roadmap item 2-7 is blocked on, and it is blocked on it for a
+-/// specific reason. `--object-alloc` showed that a property map's memory is a fixed block rather
+-/// than per-field storage: <see cref="VirtualMemory{T}"/> rounds its first request up to 16
+-/// nodes, so **one field costs the same as three and ~1 040 B more than none**. A smaller floor
+-/// halves a one-field object — and makes an eight-field object worse, because it pays repeated
+-/// resize-and-copy. Which side wins is a question about the distribution of *real* objects, and
+-/// every synthetic probe answers it by construction.
+-/// </para>
+-/// <para>
+-/// So: run Octane's own suites, record where each map's life ended, and simulate the policies
+-/// against that. The simulation mirrors <see cref="VirtualMemory{T}.Allocate"/> step for step
+-/// rather than modelling it, and the node size comes from
+-/// <see cref="SAUint32Map{T}.NodeSizeBytes"/> rather than from a hand-added field list, so the
+-/// arithmetic cannot drift from the code it is about.
+-/// </para>
+-/// <para>
+-/// Needs an Octane 2.0 checkout — the corpus is not vendored. Suites run in a fresh context each,
+-/// with the histogram reset between them, so a per-suite disagreement is visible instead of
+-/// averaged away. A suite that throws still reports the maps it built before it did; that is
+-/// data, not a gap, and the failure is named in the output.
+-/// </para>
+-/// </remarks>
+-internal static class PropertyMapDistributionMetrics
+-{
+-    /// <summary>
+-    /// Runs per benchmark, overridable with the <c>BROILER_MAP_DISTRIBUTION_RUNS</c> environment
+-    /// variable. Octane's scoring loop runs for a wall-clock second per benchmark and repeats;
+-    /// the *distribution* of map sizes converges long before that, because it is set by the
+-    /// shapes a workload builds rather than by how many times it builds them. Raising this is
+-    /// still worth doing to check that claim rather than assume it — if the shares move with the
+-    /// run count, the sample was too small and the answer was not converged.
+-    /// </summary>
+-    private static int RunsPerBenchmark =>
+-        int.TryParse(Environment.GetEnvironmentVariable("BROILER_MAP_DISTRIBUTION_RUNS"), out var runs) && runs > 0
+-            ? runs
+-            : 10;
+-
+-    /// <summary>
+-    /// Suites to skip, comma-separated, via <c>BROILER_MAP_DISTRIBUTION_SKIP</c>. Everything runs
+-    /// in one process with no per-suite timeout, so Mandreel — which needs upwards of five
+-    /// minutes just to compile — is worth being able to set aside while iterating, and worth
+-    /// putting back for the run of record.
+-    /// </summary>
+-    private static string[] Skipped =>
+-        (Environment.GetEnvironmentVariable("BROILER_MAP_DISTRIBUTION_SKIP") ?? string.Empty)
+-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+-
+-    /// <summary>The map this item is about; the rest share the implementation.</summary>
+-    private const string PropertyMapType = "JSObjectProperty";
+-
+-    /// <summary>x64: object header plus the array length field, which every array pays.</summary>
+-    private const int ArrayHeaderBytes = 24;
+-
+-    private sealed record Suite(string Name, string[] Files);
+-
+-    // scripts/octane-suites.json's load order, duplicated here rather than read from it: this
+-    // emitter has to run from the benchmarks project with no repository layout assumed.
+-    private static readonly Suite[] Suites =
+-    [
+-        new("Richards", ["richards.js"]),
+-        new("DeltaBlue", ["deltablue.js"]),
+-        new("Crypto", ["crypto.js"]),
+-        new("RayTrace", ["raytrace.js"]),
+-        new("EarleyBoyer", ["earley-boyer.js"]),
+-        new("RegExp", ["regexp.js"]),
+-        new("Splay", ["splay.js"]),
+-        new("NavierStokes", ["navier-stokes.js"]),
+-        new("PdfJS", ["pdfjs.js"]),
+-        new("Mandreel", ["mandreel.js"]),
+-        new("Gameboy", ["gbemu-part1.js", "gbemu-part2.js"]),
+-        new("CodeLoad", ["code-load.js"]),
+-        new("Box2D", ["box2d.js"]),
+-        new("zlib", ["zlib.js", "zlib-data.js"]),
+-        new("Typescript", ["typescript.js", "typescript-input.js", "typescript-compiler.js"]),
+-    ];
+-
+-    /// <summary>
+-    /// Drives every registered benchmark's Setup / run / TearDown directly instead of going
+-    /// through BenchmarkSuite.RunSuites, which would spend a second per benchmark scoring. Each
+-    /// failure is collected rather than thrown, so one broken suite does not lose the run.
+-    /// </summary>
+-    private const string Driver = """
+-        (function () {
+-            var suites = (typeof BenchmarkSuite !== 'undefined' && BenchmarkSuite.suites) || [];
+-            var ran = 0, failures = [];
+-            for (var i = 0; i < suites.length; i++) {
+-                var suite = suites[i];
+-                for (var j = 0; j < suite.benchmarks.length; j++) {
+-                    var benchmark = suite.benchmarks[j];
+-                    try {
+-                        benchmark.Setup();
+-                        for (var k = 0; k < __runs; k++) benchmark.run();
+-                        benchmark.TearDown();
+-                        ran++;
+-                    } catch (e) {
+-                        failures.push(suite.name + '/' + benchmark.name + ': ' + e);
+-                    }
+-                }
+-            }
+-            return ran + '|' + failures.join(' ;; ');
+-        })()
+-        """;
+-
+-    /// <summary>How a candidate policy picks the new capacity when the backing array must grow.</summary>
+-    /// <remarks>
+-    /// Signature matches the decision <see cref="VirtualMemory{T}.Allocate"/> makes: given the
+-    /// slots already handed out and the slots now needed, return the capacity to allocate.
+-    /// </remarks>
+-    private sealed record Policy(string Name, string Note, Func<int, int, int> NextCapacity);
+-
+-    private static readonly Policy[] Policies =
+-    [
+-        new("round-up-16", "current: VirtualMemory.Allocate as written", static (last, needed) => RoundUp(last, needed, 16)),
+-        new("round-up-8", "halve the floor, keep the shape of the formula", static (last, needed) => RoundUp(last, needed, 8)),
+-        new("round-up-4", "floor = one node group, the smallest the trie can use", static (last, needed) => RoundUp(last, needed, 4)),
+-        new("min-4-then-double", "no over-allocation at the bottom, geometric after", static (last, needed) => Math.Max(Math.Max(last * 2, needed), 4)),
+-    ];
+-
+-    /// <summary>`((max / round) + 1) * round`, guarded by the doubling branch, exactly as written.</summary>
+-    private static int RoundUp(int last, int needed, int round)
+-    {
+-        var capacity = last * 2;
+-        return capacity <= needed ? ((needed / round) + 1) * round : capacity;
+-    }
+-
+-    internal static void Write(string octaneDirectory)
+-    {
+-        if (!Directory.Exists(octaneDirectory))
+-        {
+-            Console.Error.WriteLine($"octane directory not found: {octaneDirectory}");
+-            Console.Error.WriteLine("Clone https://github.com/chromium/octane and pass its path.");
+-            Environment.ExitCode = 2;
+-            return;
+-        }
+-
+-        var basePath = Path.Combine(octaneDirectory, "base.js");
+-        if (!File.Exists(basePath))
+-        {
+-            Console.Error.WriteLine($"not an Octane checkout (no base.js): {octaneDirectory}");
+-            Environment.ExitCode = 2;
+-            return;
+-        }
+-
+-        var baseSource = File.ReadAllText(basePath);
+-        var suiteRows = new List<object>();
+-        var aggregate = new long[PropertyStorageMetrics.MaxTrackedGroups + 2];
+-        var skipped = Skipped;
+-
+-        foreach (var suite in Suites)
+-        {
+-            if (Array.Exists(skipped, name => string.Equals(name, suite.Name, StringComparison.OrdinalIgnoreCase)))
+-            {
+-                Console.Error.WriteLine($"{suite.Name}: skipped by BROILER_MAP_DISTRIBUTION_SKIP");
+-                continue;
+-            }
+-
+-            Console.Error.WriteLine($"{suite.Name}: running ...");
+-            var row = RunSuite(octaneDirectory, baseSource, suite, aggregate);
+-            if (row != null)
+-                suiteRows.Add(row);
+-        }
+-
+-        Console.WriteLine(JsonSerializer.Serialize(
+-            new
+-            {
+-                schema = "broiler.property-map-distribution/1",
+-                runsPerBenchmark = RunsPerBenchmark,
+-                skipped,
+-                nodeSizeBytes = SAUint32Map<JSObjectProperty>.NodeSizeBytes,
+-                arrayHeaderBytes = ArrayHeaderBytes,
+-                note = "Final node-group count per SAUint32Map<JSObjectProperty>, over Octane 2.0. "
+-                    + "histogram[k] = maps whose life ended at k four-node groups; a map that never "
+-                    + "allocated is an object with no named properties and is not counted. "
+-                    + "See docs/performance-roadmap.md item 2-7.",
+-                suites = suiteRows,
+-                aggregate = Describe(aggregate),
+-                policies = SimulatePolicies(aggregate),
+-            },
+-            new JsonSerializerOptions { WriteIndented = true }));
+-    }
+-
+-    private static object RunSuite(string octaneDirectory, string baseSource, Suite suite, long[] aggregate)
+-    {
+-        var sources = new List<string> { baseSource };
+-        foreach (var file in suite.Files)
+-        {
+-            var path = Path.Combine(octaneDirectory, file);
+-            if (!File.Exists(path))
+-            {
+-                Console.Error.WriteLine($"{suite.Name}: missing {file}, skipped");
+-                return null;
+-            }
+-
+-            sources.Add(File.ReadAllText(path));
+-        }
+-
+-        using var context = BenchmarkContext.Create();
+-
+-        string outcome;
+-        long[] histogram;
+-        PropertyStorageSnapshot snapshot;
+-
+-        // The window covers the LOAD as well as the run, and it has to. The histogram records
+-        // each map's *final* size by moving it out of one bucket and into the next, so a reset
+-        // part-way through a map's life decrements a bucket the map was never counted in — which
+-        // is exactly what an earlier version of this did, and it produced negative buckets.
+-        // Counting the load is also the more honest denominator: the maps a suite's top-level
+-        // code builds are maps the workload allocates.
+-        using (PropertyStorageMetrics.Enable())
+-        {
+-            PropertyStorageMetrics.Reset();
+-            try
+-            {
+-                // Octane's zlib writes progress with `print`, which a bare JSContext has no
+-                // more than a browser page does. A no-op keeps the suite running; nothing here
+-                // reads its output.
+-                context.Eval("if (typeof print === 'undefined') { var print = function () { }; }", "shim.js");
+-
+-                for (var i = 0; i < sources.Count; i++)
+-                    context.Eval(sources[i], i == 0 ? "base.js" : suite.Files[i - 1]);
+-
+-                context.Eval($"var __runs = {RunsPerBenchmark};", "runs.js");
+-            }
+-            catch (Exception e)
+-            {
+-                Console.Error.WriteLine($"{suite.Name}: failed to load — {e.GetType().Name}: {e.Message}");
+-                return new { suite = suite.Name, loaded = false, error = $"{e.GetType().Name}: {e.Message}" };
+-            }
+-
+-            try
+-            {
+-                outcome = context.Eval(Driver, "driver.js").ToString();
+-            }
+-            catch (Exception e)
+-            {
+-                outcome = $"0|driver threw {e.GetType().Name}: {e.Message}";
+-            }
+-
+-            snapshot = PropertyStorageMetrics.Snapshot();
+-        }
+-
+-        histogram = snapshot.FinalGroupCountsByValueType.TryGetValue(PropertyMapType, out var found)
+-            ? found
+-            : new long[PropertyStorageMetrics.MaxTrackedGroups + 2];
+-
+-        for (var i = 0; i < histogram.Length && i < aggregate.Length; i++)
+-            aggregate[i] += histogram[i];
+-
+-        var split = outcome.Split('|', 2);
+-
+-        return new
+-        {
+-            suite = suite.Name,
+-            loaded = true,
+-            benchmarksRun = int.TryParse(split[0], out var ran) ? ran : 0,
+-            failures = split.Length > 1 && split[1].Length > 0 ? split[1] : null,
+-            groupAllocations = snapshot.GroupAllocations,
+-            backingArrayResizes = snapshot.BackingArrayResizes,
+-            nodesCopiedByResizes = snapshot.NodesCopiedByResizes,
+-            propertyMaps = Describe(histogram),
+-            otherMapTypes = snapshot.FinalGroupCountsByValueType
+-                .Where(pair => pair.Key != PropertyMapType && pair.Value.Sum() > 0)
+-                .ToDictionary(pair => pair.Key, pair => pair.Value.Sum()),
+-        };
+-    }
+-
+-    private static object Describe(long[] histogram)
+-    {
+-        var total = histogram.Sum();
+-        var buckets = new Dictionary<string, long>();
+-        for (var groups = 1; groups < histogram.Length; groups++)
+-        {
+-            if (histogram[groups] == 0)
+-                continue;
+-
+-            var label = groups > PropertyStorageMetrics.MaxTrackedGroups
+-                ? $">{PropertyStorageMetrics.MaxTrackedGroups}"
+-                : groups.ToString();
+-            buckets[label] = histogram[groups];
+-        }
+-
+-        // The share at one group is the whole question: it is the population a smaller floor
+-        // helps, and the population a larger floor is charging for growth it never uses.
+-        // A negative bucket can only mean a map's life straddled a Reset, which would make the
+-        // whole table untrustworthy. Surface it rather than let it average away.
+-        var negatives = 0L;
+-        foreach (var count in histogram)
+-            if (count < 0)
+-                negatives += -count;
+-
+-        var oneGroup = histogram.Length > 1 ? histogram[1] : 0;
+-        var upToFour = 0L;
+-        for (var groups = 1; groups <= 4 && groups < histogram.Length; groups++)
+-            upToFour += histogram[groups];
+-
+-        return new
+-        {
+-            maps = total,
+-            byGroupCount = buckets,
+-            shareAtOneGroup = total == 0 ? 0 : Math.Round((double)oneGroup / total, 4),
+-            shareWithinTheCurrentFloor = total == 0 ? 0 : Math.Round((double)upToFour / total, 4),
+-            negativeBucketCounts = negatives,
+-        };
+-    }
+-
+-    private sealed record PolicyCost(
+-        string Policy,
+-        string Note,
+-        long LiveBytes,
+-        long AllocatedBytes,
+-        long BackingArrayAllocations,
+-        long NodesCopied);
+-
+-    private static object[] SimulatePolicies(long[] histogram)
+-    {
+-        var nodeSize = SAUint32Map<JSObjectProperty>.NodeSizeBytes;
+-        var costs = Policies.Select(policy => Cost(policy, histogram, nodeSize)).ToArray();
+-
+-        // Deltas against the policy in the code, which is what the decision turns on.
+-        var current = costs[0];
+-
+-        return costs.Select(cost => (object)new
+-        {
+-            policy = cost.Policy,
+-            note = cost.Note,
+-            liveBytes = cost.LiveBytes,
+-            allocatedBytes = cost.AllocatedBytes,
+-            backingArrayAllocations = cost.BackingArrayAllocations,
+-            nodesCopied = cost.NodesCopied,
+-            liveVsCurrent = Ratio(cost.LiveBytes, current.LiveBytes),
+-            allocatedVsCurrent = Ratio(cost.AllocatedBytes, current.AllocatedBytes),
+-        }).ToArray();
+-    }
+-
+-    private static double Ratio(long value, long baseline)
+-        => baseline == 0 ? 0 : Math.Round((double)value / baseline, 4);
+-
+-    private static PolicyCost Cost(Policy policy, long[] histogram, int nodeSize)
+-    {
+-        long liveBytes = 0, allocatedBytes = 0, copiedNodes = 0, allocations = 0;
+-
+-        for (var groups = 1; groups < histogram.Length; groups++)
+-        {
+-            var maps = histogram[groups];
+-            if (maps == 0)
+-                continue;
+-
+-            var (finalCapacity, totalSlots, copied, grows) = Simulate(groups, policy);
+-            liveBytes += maps * (ArrayHeaderBytes + (long)finalCapacity * nodeSize);
+-            allocatedBytes += maps * ((long)totalSlots * nodeSize + grows * ArrayHeaderBytes);
+-            copiedNodes += maps * copied;
+-            allocations += maps * grows;
+-        }
+-
+-        return new PolicyCost(policy.Name, policy.Note, liveBytes, allocatedBytes, allocations, copiedNodes);
+-    }
+-
+-    /// <summary>
+-    /// Replays <paramref name="groups"/> successive four-node allocations under one policy,
+-    /// mirroring <see cref="VirtualMemory{T}.Allocate"/>: it grows when the backing array cannot
+-    /// hold what is now needed, and a grow copies everything handed out so far.
+-    /// </summary>
+-    private static (int FinalCapacity, int TotalSlots, long CopiedNodes, long Grows) Simulate(int groups, Policy policy)
+-    {
+-        int last = 0, capacity = 0, totalSlots = 0;
+-        long copied = 0, grows = 0;
+-
+-        for (var group = 0; group < groups; group++)
+-        {
+-            var needed = last + SAUint32Map<JSObjectProperty>.NodeBlock;
+-            if (capacity == 0 || capacity <= needed)
+-            {
+-                var next = policy.NextCapacity(last, needed);
+-                totalSlots += next;
+-                grows++;
+-                if (capacity > 0)
+-                    copied += last;
+-                capacity = next;
+-            }
+-
+-            last += SAUint32Map<JSObjectProperty>.NodeBlock;
+-        }
+-
+-        return (capacity, totalSlots, copied, grows);
+-    }
+-}
++﻿using System;
++using System.Collections.Generic;
++using System.IO;
++using System.Linq;
++using System.Text.Json;
++using Broiler.JavaScript.Runtime;
++using Broiler.JavaScript.Storage;
++
++namespace Broiler.JavaScript.Engine.Benchmarks;
++
++/// <summary>
++/// Emits the distribution of property-map sizes over a real workload, and what each candidate
++/// growth policy would cost against that distribution.
++/// </summary>
++/// <remarks>
++/// <para>
++/// This is the measurement roadmap item 2-7 is blocked on, and it is blocked on it for a
++/// specific reason. `--object-alloc` showed that a property map's memory is a fixed block rather
++/// than per-field storage: <see cref="VirtualMemory{T}"/> rounds its first request up to 16
++/// nodes, so **one field costs the same as three and ~1 040 B more than none**. A smaller floor
++/// halves a one-field object — and makes an eight-field object worse, because it pays repeated
++/// resize-and-copy. Which side wins is a question about the distribution of *real* objects, and
++/// every synthetic probe answers it by construction.
++/// </para>
++/// <para>
++/// So: run Octane's own suites, record where each map's life ended, and simulate the policies
++/// against that. The simulation mirrors <see cref="VirtualMemory{T}.Allocate"/> step for step
++/// rather than modelling it, and the node size comes from
++/// <see cref="SAUint32Map{T}.NodeSizeBytes"/> rather than from a hand-added field list, so the
++/// arithmetic cannot drift from the code it is about.
++/// </para>
++/// <para>
++/// Needs an Octane 2.0 checkout — the corpus is not vendored. Suites run in a fresh context each,
++/// with the histogram reset between them, so a per-suite disagreement is visible instead of
++/// averaged away. A suite that throws still reports the maps it built before it did; that is
++/// data, not a gap, and the failure is named in the output.
++/// </para>
++/// </remarks>
++internal static class PropertyMapDistributionMetrics
++{
++    /// <summary>
++    /// Runs per benchmark, overridable with the <c>BROILER_MAP_DISTRIBUTION_RUNS</c> environment
++    /// variable. Octane's scoring loop runs for a wall-clock second per benchmark and repeats;
++    /// the *distribution* of map sizes converges long before that, because it is set by the
++    /// shapes a workload builds rather than by how many times it builds them. Raising this is
++    /// still worth doing to check that claim rather than assume it — if the shares move with the
++    /// run count, the sample was too small and the answer was not converged.
++    /// </summary>
++    private static int RunsPerBenchmark =>
++        int.TryParse(Environment.GetEnvironmentVariable("BROILER_MAP_DISTRIBUTION_RUNS"), out var runs) && runs > 0
++            ? runs
++            : 10;
++
++    /// <summary>
++    /// Suites to skip, comma-separated, via <c>BROILER_MAP_DISTRIBUTION_SKIP</c>. Everything runs
++    /// in one process with no per-suite timeout, so Mandreel — which needs upwards of five
++    /// minutes just to compile — is worth being able to set aside while iterating, and worth
++    /// putting back for the run of record.
++    /// </summary>
++    private static string[] Skipped =>
++        (Environment.GetEnvironmentVariable("BROILER_MAP_DISTRIBUTION_SKIP") ?? string.Empty)
++            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
++
++    /// <summary>The map this item is about; the rest share the implementation.</summary>
++    private const string PropertyMapType = "JSObjectProperty";
++
++    /// <summary>x64: object header plus the array length field, which every array pays.</summary>
++    private const int ArrayHeaderBytes = 24;
++
++    private sealed record Suite(string Name, string[] Files);
++
++    // scripts/octane-suites.json's load order, duplicated here rather than read from it: this
++    // emitter has to run from the benchmarks project with no repository layout assumed.
++    private static readonly Suite[] Suites =
++    [
++        new("Richards", ["richards.js"]),
++        new("DeltaBlue", ["deltablue.js"]),
++        new("Crypto", ["crypto.js"]),
++        new("RayTrace", ["raytrace.js"]),
++        new("EarleyBoyer", ["earley-boyer.js"]),
++        new("RegExp", ["regexp.js"]),
++        new("Splay", ["splay.js"]),
++        new("NavierStokes", ["navier-stokes.js"]),
++        new("PdfJS", ["pdfjs.js"]),
++        new("Mandreel", ["mandreel.js"]),
++        new("Gameboy", ["gbemu-part1.js", "gbemu-part2.js"]),
++        new("CodeLoad", ["code-load.js"]),
++        new("Box2D", ["box2d.js"]),
++        new("zlib", ["zlib.js", "zlib-data.js"]),
++        new("Typescript", ["typescript.js", "typescript-input.js", "typescript-compiler.js"]),
++    ];
++
++    /// <summary>
++    /// Drives every registered benchmark's Setup / run / TearDown directly instead of going
++    /// through BenchmarkSuite.RunSuites, which would spend a second per benchmark scoring. Each
++    /// failure is collected rather than thrown, so one broken suite does not lose the run.
++    /// </summary>
++    private const string Driver = """
++        (function () {
++            var suites = (typeof BenchmarkSuite !== 'undefined' && BenchmarkSuite.suites) || [];
++            var ran = 0, failures = [];
++            for (var i = 0; i < suites.length; i++) {
++                var suite = suites[i];
++                for (var j = 0; j < suite.benchmarks.length; j++) {
++                    var benchmark = suite.benchmarks[j];
++                    try {
++                        benchmark.Setup();
++                        for (var k = 0; k < __runs; k++) benchmark.run();
++                        benchmark.TearDown();
++                        ran++;
++                    } catch (e) {
++                        failures.push(suite.name + '/' + benchmark.name + ': ' + e);
++                    }
++                }
++            }
++            return ran + '|' + failures.join(' ;; ');
++        })()
++        """;
++
++    /// <summary>How a candidate policy picks the new capacity when the backing array must grow.</summary>
++    /// <remarks>
++    /// Signature matches the decision <see cref="VirtualMemory{T}.Allocate"/> makes: given the
++    /// slots already handed out and the slots now needed, return the capacity to allocate.
++    /// </remarks>
++    private sealed record Policy(string Name, string Note, Func<int, int, int> NextCapacity);
++
++    private static readonly Policy[] Policies =
++    [
++        new("round-up-16", "current: VirtualMemory.Allocate as written", static (last, needed) => RoundUp(last, needed, 16)),
++        new("round-up-8", "halve the floor, keep the shape of the formula", static (last, needed) => RoundUp(last, needed, 8)),
++        new("round-up-4", "floor = one node group, the smallest the trie can use", static (last, needed) => RoundUp(last, needed, 4)),
++        new("min-4-then-double", "no over-allocation at the bottom, geometric after", static (last, needed) => Math.Max(Math.Max(last * 2, needed), 4)),
++    ];
++
++    /// <summary>`((max / round) + 1) * round`, guarded by the doubling branch, exactly as written.</summary>
++    private static int RoundUp(int last, int needed, int round)
++    {
++        var capacity = last * 2;
++        return capacity <= needed ? ((needed / round) + 1) * round : capacity;
++    }
++
++    internal static void Write(string octaneDirectory)
++    {
++        if (!Directory.Exists(octaneDirectory))
++        {
++            Console.Error.WriteLine($"octane directory not found: {octaneDirectory}");
++            Console.Error.WriteLine("Clone https://github.com/chromium/octane and pass its path.");
++            Environment.ExitCode = 2;
++            return;
++        }
++
++        var basePath = Path.Combine(octaneDirectory, "base.js");
++        if (!File.Exists(basePath))
++        {
++            Console.Error.WriteLine($"not an Octane checkout (no base.js): {octaneDirectory}");
++            Environment.ExitCode = 2;
++            return;
++        }
++
++        var baseSource = File.ReadAllText(basePath);
++        var suiteRows = new List<object>();
++        var aggregate = new long[PropertyStorageMetrics.MaxTrackedGroups + 2];
++        var skipped = Skipped;
++
++        // On the shell's stack, and checkpointed after every suite.
++        //
++        // **This census lists all fifteen suites and reached nine.** Mandreel's global_init took it
++        // down with an uncatchable .NET stack overflow — item 0-2's reserve is a property of the
++        // shell, not of any benchmark host — and because the report was serialized once at the end,
++        // an aborted run produced NOTHING AT ALL. So items 2-7 and 2-9's map figures were not
++        // reproducible from a clean tree: the only way to get output was BROILER_MAP_DISTRIBUTION_SKIP,
++        // and the recorded numbers do not say what was skipped. Listing a suite is not measuring it.
++        BenchmarkContext.RunOnScriptHostStack(() =>
++        {
++            foreach (var suite in Suites)
++            {
++                if (Array.Exists(skipped, name => string.Equals(name, suite.Name, StringComparison.OrdinalIgnoreCase)))
++                {
++                    Console.Error.WriteLine($"{suite.Name}: skipped by BROILER_MAP_DISTRIBUTION_SKIP");
++                    continue;
++                }
++
++                Console.Error.WriteLine($"{suite.Name}: running ...");
++                var row = RunSuite(octaneDirectory, baseSource, suite, aggregate);
++                if (row != null)
++                    suiteRows.Add(row);
++
++                File.WriteAllText(PartialPath, Report(suiteRows, aggregate, skipped));
++            }
++        });
++
++        Console.WriteLine(Report(suiteRows, aggregate, skipped));
++    }
++
++    /// <summary>Where an in-progress census parks its rows so an abort cannot discard them.</summary>
++    internal static string PartialPath { get; } =
++        Path.Combine(Path.GetTempPath(), "broiler-property-map-partial.json");
++
++    private static string Report(List<object> suiteRows, long[] aggregate, string[] skipped)
++    {
++        return JsonSerializer.Serialize(
++            new
++            {
++                schema = "broiler.property-map-distribution/1",
++                runsPerBenchmark = RunsPerBenchmark,
++                skipped,
++                nodeSizeBytes = SAUint32Map<JSObjectProperty>.NodeSizeBytes,
++                arrayHeaderBytes = ArrayHeaderBytes,
++                note = "Final node-group count per SAUint32Map<JSObjectProperty>, over Octane 2.0. "
++                    + "histogram[k] = maps whose life ended at k four-node groups; a map that never "
++                    + "allocated is an object with no named properties and is not counted. "
++                    + "See docs/performance-roadmap.md item 2-7.",
++                suiteCount = suiteRows.Count,
++                expectedSuiteCount = Suites.Length,
++                suites = suiteRows,
++                aggregate = Describe(aggregate),
++                policies = SimulatePolicies(aggregate),
++            },
++            new JsonSerializerOptions { WriteIndented = true });
++    }
++
++    private static object RunSuite(string octaneDirectory, string baseSource, Suite suite, long[] aggregate)
++    {
++        var sources = new List<string> { baseSource };
++        foreach (var file in suite.Files)
++        {
++            var path = Path.Combine(octaneDirectory, file);
++            if (!File.Exists(path))
++            {
++                Console.Error.WriteLine($"{suite.Name}: missing {file}, skipped");
++                return null;
++            }
++
++            sources.Add(File.ReadAllText(path));
++        }
++
++        using var context = BenchmarkContext.Create(scriptHostStackBudget: true);
++
++        string outcome;
++        long[] histogram;
++        PropertyStorageSnapshot snapshot;
++
++        // The window covers the LOAD as well as the run, and it has to. The histogram records
++        // each map's *final* size by moving it out of one bucket and into the next, so a reset
++        // part-way through a map's life decrements a bucket the map was never counted in — which
++        // is exactly what an earlier version of this did, and it produced negative buckets.
++        // Counting the load is also the more honest denominator: the maps a suite's top-level
++        // code builds are maps the workload allocates.
++        using (PropertyStorageMetrics.Enable())
++        {
++            PropertyStorageMetrics.Reset();
++            try
++            {
++                // Octane's zlib writes progress with `print`, which a bare JSContext has no
++                // more than a browser page does. A no-op keeps the suite running; nothing here
++                // reads its output.
++                context.Eval("if (typeof print === 'undefined') { var print = function () { }; }", "shim.js");
++
++                for (var i = 0; i < sources.Count; i++)
++                    context.Eval(sources[i], i == 0 ? "base.js" : suite.Files[i - 1]);
++
++                context.Eval($"var __runs = {RunsPerBenchmark};", "runs.js");
++            }
++            catch (Exception e)
++            {
++                Console.Error.WriteLine($"{suite.Name}: failed to load — {e.GetType().Name}: {e.Message}");
++                return new { suite = suite.Name, loaded = false, error = $"{e.GetType().Name}: {e.Message}" };
++            }
++
++            try
++            {
++                outcome = context.Eval(Driver, "driver.js").ToString();
++            }
++            catch (Exception e)
++            {
++                outcome = $"0|driver threw {e.GetType().Name}: {e.Message}";
++            }
++
++            snapshot = PropertyStorageMetrics.Snapshot();
++        }
++
++        histogram = snapshot.FinalGroupCountsByValueType.TryGetValue(PropertyMapType, out var found)
++            ? found
++            : new long[PropertyStorageMetrics.MaxTrackedGroups + 2];
++
++        for (var i = 0; i < histogram.Length && i < aggregate.Length; i++)
++            aggregate[i] += histogram[i];
++
++        var split = outcome.Split('|', 2);
++
++        return new
++        {
++            suite = suite.Name,
++            loaded = true,
++            benchmarksRun = int.TryParse(split[0], out var ran) ? ran : 0,
++            failures = split.Length > 1 && split[1].Length > 0 ? split[1] : null,
++            groupAllocations = snapshot.GroupAllocations,
++            backingArrayResizes = snapshot.BackingArrayResizes,
++            nodesCopiedByResizes = snapshot.NodesCopiedByResizes,
++            propertyMaps = Describe(histogram),
++            otherMapTypes = snapshot.FinalGroupCountsByValueType
++                .Where(pair => pair.Key != PropertyMapType && pair.Value.Sum() > 0)
++                .ToDictionary(pair => pair.Key, pair => pair.Value.Sum()),
++        };
++    }
++
++    private static object Describe(long[] histogram)
++    {
++        var total = histogram.Sum();
++        var buckets = new Dictionary<string, long>();
++        for (var groups = 1; groups < histogram.Length; groups++)
++        {
++            if (histogram[groups] == 0)
++                continue;
++
++            var label = groups > PropertyStorageMetrics.MaxTrackedGroups
++                ? $">{PropertyStorageMetrics.MaxTrackedGroups}"
++                : groups.ToString();
++            buckets[label] = histogram[groups];
++        }
++
++        // The share at one group is the whole question: it is the population a smaller floor
++        // helps, and the population a larger floor is charging for growth it never uses.
++        // A negative bucket can only mean a map's life straddled a Reset, which would make the
++        // whole table untrustworthy. Surface it rather than let it average away.
++        var negatives = 0L;
++        foreach (var count in histogram)
++            if (count < 0)
++                negatives += -count;
++
++        var oneGroup = histogram.Length > 1 ? histogram[1] : 0;
++        var upToFour = 0L;
++        for (var groups = 1; groups <= 4 && groups < histogram.Length; groups++)
++            upToFour += histogram[groups];
++
++        return new
++        {
++            maps = total,
++            byGroupCount = buckets,
++            shareAtOneGroup = total == 0 ? 0 : Math.Round((double)oneGroup / total, 4),
++            shareWithinTheCurrentFloor = total == 0 ? 0 : Math.Round((double)upToFour / total, 4),
++            negativeBucketCounts = negatives,
++        };
++    }
++
++    private sealed record PolicyCost(
++        string Policy,
++        string Note,
++        long LiveBytes,
++        long AllocatedBytes,
++        long BackingArrayAllocations,
++        long NodesCopied);
++
++    private static object[] SimulatePolicies(long[] histogram)
++    {
++        var nodeSize = SAUint32Map<JSObjectProperty>.NodeSizeBytes;
++        var costs = Policies.Select(policy => Cost(policy, histogram, nodeSize)).ToArray();
++
++        // Deltas against the policy in the code, which is what the decision turns on.
++        var current = costs[0];
++
++        return costs.Select(cost => (object)new
++        {
++            policy = cost.Policy,
++            note = cost.Note,
++            liveBytes = cost.LiveBytes,
++            allocatedBytes = cost.AllocatedBytes,
++            backingArrayAllocations = cost.BackingArrayAllocations,
++            nodesCopied = cost.NodesCopied,
++            liveVsCurrent = Ratio(cost.LiveBytes, current.LiveBytes),
++            allocatedVsCurrent = Ratio(cost.AllocatedBytes, current.AllocatedBytes),
++        }).ToArray();
++    }
++
++    private static double Ratio(long value, long baseline)
++        => baseline == 0 ? 0 : Math.Round((double)value / baseline, 4);
++
++    private static PolicyCost Cost(Policy policy, long[] histogram, int nodeSize)
++    {
++        long liveBytes = 0, allocatedBytes = 0, copiedNodes = 0, allocations = 0;
++
++        for (var groups = 1; groups < histogram.Length; groups++)
++        {
++            var maps = histogram[groups];
++            if (maps == 0)
++                continue;
++
++            var (finalCapacity, totalSlots, copied, grows) = Simulate(groups, policy);
++            liveBytes += maps * (ArrayHeaderBytes + (long)finalCapacity * nodeSize);
++            allocatedBytes += maps * ((long)totalSlots * nodeSize + grows * ArrayHeaderBytes);
++            copiedNodes += maps * copied;
++            allocations += maps * grows;
++        }
++
++        return new PolicyCost(policy.Name, policy.Note, liveBytes, allocatedBytes, allocations, copiedNodes);
++    }
++
++    /// <summary>
++    /// Replays <paramref name="groups"/> successive four-node allocations under one policy,
++    /// mirroring <see cref="VirtualMemory{T}.Allocate"/>: it grows when the backing array cannot
++    /// hold what is now needed, and a grow copies everything handed out so far.
++    /// </summary>
++    private static (int FinalCapacity, int TotalSlots, long CopiedNodes, long Grows) Simulate(int groups, Policy policy)
++    {
++        int last = 0, capacity = 0, totalSlots = 0;
++        long copied = 0, grows = 0;
++
++        for (var group = 0; group < groups; group++)
++        {
++            var needed = last + SAUint32Map<JSObjectProperty>.NodeBlock;
++            if (capacity == 0 || capacity <= needed)
++            {
++                var next = policy.NextCapacity(last, needed);
++                totalSlots += next;
++                grows++;
++                if (capacity > 0)
++                    copied += last;
++                capacity = next;
++            }
++
++            last += SAUint32Map<JSObjectProperty>.NodeBlock;
++        }
++
++        return (capacity, totalSlots, copied, grows);
++    }
++}
 diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
 index 97f5d379..2d34ba03 100644
 --- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
