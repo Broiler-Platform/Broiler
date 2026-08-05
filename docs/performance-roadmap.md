@@ -86,7 +86,11 @@ so only the parent can hold the combined view.
   and the gates for `0095` are what found it — and
   **[`0097`](../patches/0097-js-execution-exclusion.patch)**, which closes the residual `0096` wrote
   down (measured at 172 overlaps in 200 rounds) and states the embedding contract that the engine
-  cannot enforce alone. `0090` and `0091` are tests only. Usual terms: the push to the
+  cannot enforce alone — and
+  **[`0098`](../patches/0098-js-blocking-host-wait.patch)**, which fixes the two deadlocks those two
+  introduced between them, one each, and gives a host a supported way to wait on a `Task` from
+  inside JavaScript. *Each of the three was found by measuring what the one before it claimed.*
+  `0090` and `0091` are tests only. Usual terms: the push to the
   submodule remote returned 403, so the pointer is deliberately unbumped and every figure in their
   sections was measured on a local build of `cca39b4d` plus those patches. They are independent of
   everything cleared above, **`0087` → `0088` → `0089` → `0090` → `0091` → `0092` → `0093` is the
@@ -1102,6 +1106,13 @@ These were paid for once each. They apply to every phase below.
   same shape as item 3-6's 290 names being *inferred* from offered-minus-dropped rather than
   counted. *A population and a traffic figure that live in the same suite still need multiplying,
   and the multiplication is an A/B, not an argument.*
+- **A cost you write down as the price of a change should be measured before it is written down,
+  because it may not be that change's price at all.** `0097` recorded one deadlock as what the
+  execution lock cost. Measured, there were **two**, and the first belonged to `0096`'s job queue —
+  a change earlier than the note blaming the lock for it. The control row is what separates them: a
+  host wait on unrelated work completes on both builds, so the two failures are mechanisms rather
+  than one symptom seen twice. *A named cost is a claim; run it against each build that could have
+  caused it before attributing it to the newest one.*
 - **A concurrency counter measures the wrong thing by default, and the default is plausible enough
   to ship.** The detector built to check "one thread runs JavaScript in a context at a time" counted
   threads inside JavaScript **process-wide** on its first version. That is not the invariant: two
@@ -6349,10 +6360,10 @@ using (context.EnterExecution())
 *Wrap host-initiated entry into JavaScript, unless it is already inside one.* A call made from within
 an engine-owned execution needs nothing, and wrapping it anyway is harmless.
 
-**What the lock costs is a bounded wait, and the pattern it cannot support was already unsound.**
-JavaScript blocking on a host task whose completion has to re-enter the same context now deadlocks
-where it used to "work" — by running that job concurrently and mutating the heap underneath the code
-waiting for it. **Measured, it costs nothing on the suite**: the integration suite runs in 46–47 s
+**What the lock costs is a bounded wait, and one pattern it cannot support: JavaScript blocking on a
+host task whose completion has to re-enter the same context.** That was written here as one thing
+the lock broke, and measuring it found the attribution wrong and the problem twice as large — see
+the section after next. **Measured, it costs nothing on the suite**: the integration suite runs in 46–47 s
 against a 43–57 s baseline, and the earlier reading of 3 m 4 s was a concurrently-running sweep
 rather than the lock, which is worth recording because it was nearly believed. One allocation was
 found and removed on the way — the public handle is a class, so the per-job path uses the struct
@@ -6365,6 +6376,58 @@ residual shape, two host threads evaluating on one context, the contract API, re
 jobs queued under a host scope drain when it is released. Whole engine suite green — **8 098 tests
 across 13 projects, no deadlock** — with `test262-promise-jobs` and `test262-for-await` at 5/5 and
 2/2 and the five pinned manifests recorded in §3.4.
+
+
+#### The blocking host wait — one deadlock from each of the last two changes: **`0098`**
+
+`0097` recorded that the lock cost "one pattern it cannot support". Measured, **the attribution was
+wrong and there are two patterns, one contributed by each change**:
+
+| Host function called from a script, waiting on a `Task` completed by… | `0096` queue | `0097` + lock |
+|---|:--:|:--:|
+| **a promise reaction on this context** | **hangs** | hangs |
+| **host work that must enter this context** | completes | **hangs** |
+| unrelated host work (control) | completes | completes |
+
+The first is the *queue's*, not the lock's, and it arrived a change earlier than the note that
+blamed the lock for it: a host frame called from a script is inside an execution, so a reaction it
+waits for is **queued** and cannot run until that execution ends — which it never does. The second is
+the lock's: the execution lock the frame holds keeps out the host work that would complete the task.
+*Two mechanisms, two deadlocks, and writing one of them down as the other's cost is what the control
+row exists to prevent.*
+
+**`JSContext.WaitFor(task)` is the supported wait, and it answers one shape each.** It **drains** the
+queue — which releases the first — and then **releases the context** while it blocks, retaking it
+afterwards — which releases the second. The drain happens *before* the release, so a job queued by
+the execution being suspended runs on the thread that queued it and in the order it was queued,
+rather than being handed to whichever thread takes the context next.
+
+```csharp
+context["readFile"] = JSValue.CreateFunction((in Arguments a) =>
+    (JSValue)context.WaitFor(File.ReadAllTextAsync(a.Get1().ToString())));
+```
+
+**The hazard it trades for is real, and is why the API is explicit rather than automatic.** While
+the context is released, other JavaScript can run on it — queued jobs, another host thread — so
+state the waiting frame read before the wait may differ after it. That is inherent in blocking a
+single-threaded agent: *the alternative is not "safe", it is "hangs".* `task.Wait()` and `task.Result`
+still deadlock, and are still the wrong thing to write; nothing detects them automatically, because
+"this thread is blocked waiting for something that needs the context" is not a question a lock can
+be asked.
+
+**Two details that are easy to get wrong and are pinned by their own fixtures.** The depth released
+is also the number of `Monitor` entries the thread holds, so a wait made two levels deep has to give
+up both and take both back — getting that wrong leaks the lock and the *next* entry deadlocks, which
+no value assertion would catch. And the fault is re-observed **after** the context is retaken and
+through the awaiter rather than through `Wait`, so a host function sees the exception the task
+actually carried instead of the `AggregateException` wrapping it, with the context held so it can
+turn that into a JavaScript throw.
+
+**Gates.** Seven fixtures, **each on a worker with a 15-second budget**, so a regression fails in
+seconds instead of hanging the suite — which is not caution: the last deadlock met here took twelve
+minutes and `--blame-hang` to identify. Against a plain blocking wait they fail **4 of 7**, three of
+them reporting `deadlocked` explicitly; with `WaitFor`, 7 of 7. Whole engine suite green, and the
+conformance manifests are recorded in §3.4.
 
 ---
 
