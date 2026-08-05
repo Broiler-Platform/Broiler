@@ -195,6 +195,28 @@ jobs:
           path: ${{ env.REFERENCE_DIR }}
           key: wpt-refs-${{ env.CACHE_EPOCH }}-shard-${{ matrix.shard-index }}
 
+      # Keep the Chromium build itself between runs, so a run only depends on the
+      # download being reachable when Playwright is actually bumped. There is no
+      # mirror to fall back to: for linux64 Playwright serves Chromium as a Chrome
+      # for Testing build, and every URL for it — cdn.playwright.dev included — is
+      # a redirect to the one Google bucket that geo-blocked shard 0 in issue
+      # #1534. Its ESRP mirror carries no x64 Linux Chromium at all. Caching is the
+      # only fallback that keeps the *same* binary, and the binary has to stay the
+      # same: references are compared at a 99% pixel threshold, so regenerating a
+      # slice with a different Chrome build would read as an engine regression.
+      #
+      # Keyed on the lockfile rather than CACHE_EPOCH: bumping the epoch refreshes
+      # WPT master and the reference slices, which is exactly when you still want
+      # the browser. The restore-key prefix means an unrelated lockfile edit reuses
+      # the existing browser instead of re-downloading it, while a genuine
+      # Playwright bump misses and fetches the new revision.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: wpt-playwright-${{ runner.os }}-${{ hashFiles('tests/wpt/package-lock.json') }}
+          restore-keys: wpt-playwright-${{ runner.os }}-
+
       # Apply any submodule fix that could not be pushed to its remote (push 403
       # → captured under patches/) and is NOT yet in the pinned pointer, so the
       # runner exercises it. Live again as of issue #1497: PENDING_PATCHES carries
