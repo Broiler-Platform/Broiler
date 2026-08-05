@@ -1,0 +1,381 @@
+From daa1a7aaf35ba4e330df3f883a2400a32b52f807 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 5 Aug 2026 22:02:46 +0000
+Subject: [PATCH] Attribute item 4-5's call bookkeeping: 92% of it is Annex B's
+ caller/arguments
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+0108 measured 4-5's missing cost at 50 ns of a 115 ns call entry and named eight
+operations it could be in. This attributes it, and the sum closes to within
+0.5 ns of its own target.
+
+The isolating control needs no engine change: AddLegacyCallerAndArguments is
+emitted for ordinary non-strict function declarations and expressions, so an
+arrow and a shorthand method are sloppy callees with no legacy frame. Through the
+same long entry an arrow costs 71.79 ns against an ordinary function's 116.19 —
+and only 3.81 ns more than the short entry that skips all the bookkeeping.
+
+  bookkeeping (long - short)          48.21 ns
+  legacy frame (long - arrow)         44.40 ns   92% of it
+  executing function save/set/restore  2.14 ns
+  Current cast + Options.ScriptHostMode 2.14 ns
+  with-scope pushes                    0.01 ns
+  sum                                 48.69 ns
+
+So the answer to "where is a call's fixed cost" is a web-compatibility feature:
+PushLegacyFrame copies the Arguments struct into a LegacyFrame and again into the
+function, and pops it back, on every call to every ordinary non-strict function.
+As an upper bound that is 2.52% of the corpus. Item 2-9 already recorded that
+these cells cost something at function CREATION; they also cost 44 ns per CALL,
+which nothing had measured.
+
+The strict control the measurement started from found something else instead, and
+it is larger. A strict callee entered from sloppy code costs 102.87 ns and 224
+bytes MORE than a sloppy one, because StrictModeScope writes the strict-mode
+AsyncLocal on entry and again on exit. That file's own comment says the write
+happens "only on a transition, so the common case is now a ThreadStatic read and
+a compare" — true of a uniformly strict or uniformly sloppy call graph, false at
+every boundary between them. 4-5 fixed the read side and left the write side
+resting on an argument about frequency that nothing could check.
+
+So this counts the crossings. CallPathDiagnostics gains RecordStrictTransition,
+recorded inside the `changed` branch where the claim lives and behind the same
+off-by-default flag the call counting already uses, and the census emits it.
+
+Compiler suite green: 1 267 tests.
+---
+ .../Core/JSEngine.cs                          |   8 +
+ .../CallPathDiagnostics.cs                    |  32 +++-
+ .../CallEntryCostMetrics.cs                   | 169 +++++++++++++++---
+ .../SpecializingTierMetrics.cs                |   1 +
+ 4 files changed, 184 insertions(+), 26 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Engine/Core/JSEngine.cs b/Broiler.JS/Broiler.JavaScript.Engine/Core/JSEngine.cs
+index b5defd81..dad086b5 100644
+--- a/Broiler.JS/Broiler.JavaScript.Engine/Core/JSEngine.cs
++++ b/Broiler.JS/Broiler.JavaScript.Engine/Core/JSEngine.cs
+@@ -271,7 +271,15 @@ public static class JSEngine
+             previous = strictMode;
+             changed = previous != enabled;
+             if (changed)
++            {
++                // Counted here rather than at the call site, because this is where the claim lives:
++                // the write happens only on a transition, and how often that is has never been
++                // measured. Behind the same off-by-default flag the call counting already uses.
++                if (Runtime.CallPathDiagnostics.Enabled)
++                    Runtime.CallPathDiagnostics.RecordStrictTransition();
++
+                 _strictMode.Value = enabled;
++            }
+         }
+ 
+         public void Dispose()
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/CallPathDiagnostics.cs b/Broiler.JS/Broiler.JavaScript.Runtime/CallPathDiagnostics.cs
+index 5055d698..1a238883 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/CallPathDiagnostics.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/CallPathDiagnostics.cs
+@@ -15,11 +15,16 @@ namespace Broiler.JavaScript.Runtime;
+ /// item 4-4's addressable surface, since inlining needs both a body to inline and a call site
+ /// inside a tier-2 recompile to inline it at.
+ /// </param>
++/// <param name="StrictTransitions">
++/// Entries to a call whose callee's strictness differs from the currently executing code's, each
++/// of which writes the strict-mode <c>AsyncLocal</c> twice — once on entry and once on exit.
++/// </param>
+ public readonly record struct CallPathSnapshot(
+     long Calls,
+     long CallbackCalls,
+     long UserCalls,
+-    long UserCallsFromPromoted);
++    long UserCallsFromPromoted,
++    long StrictTransitions);
+ 
+ /// <summary>
+ /// How many JavaScript calls actually happen, and how many of them are made from a function the
+@@ -59,6 +64,7 @@ public static class CallPathDiagnostics
+     private static long callbackCalls;
+     private static long userCalls;
+     private static long userCallsFromPromoted;
++    private static long strictTransitions;
+ 
+     /// <summary>
+     /// Records one invocation through the emitted-call entry.
+@@ -96,12 +102,33 @@ public static class CallPathDiagnostics
+         Interlocked.Increment(ref callbackCalls);
+     }
+ 
++    /// <summary>
++    /// Records one call that crosses a strictness boundary, and therefore writes the strict-mode
++    /// <c>AsyncLocal</c> on the way in and again on the way out.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// <b>Item 4-5 fixed the READ side and left the write side unmeasured, on the strength of an
++    /// argument about how often a transition happens.</b> <c>StrictModeScope</c>'s own comment says
++    /// *"the write only on a transition, so … the common case is now a ThreadStatic read and a
++    /// compare, with no AsyncLocal touched at all"*, which is true of a uniformly strict or
++    /// uniformly sloppy call graph and false at every boundary between them — where the cost is
++    /// **95.70 ns and 224 bytes per call**, measured, most of a whole call.
++    /// </para>
++    /// <para>
++    /// Whether that matters is a question about the corpus rather than about the mechanism, and
++    /// nothing could answer it. This counts the crossings so it can be.
++    /// </para>
++    /// </remarks>
++    public static void RecordStrictTransition() => Interlocked.Increment(ref strictTransitions);
++
+     public static CallPathSnapshot Snapshot()
+         => new(
+             Interlocked.Read(ref calls),
+             Interlocked.Read(ref callbackCalls),
+             Interlocked.Read(ref userCalls),
+-            Interlocked.Read(ref userCallsFromPromoted));
++            Interlocked.Read(ref userCallsFromPromoted),
++            Interlocked.Read(ref strictTransitions));
+ 
+     public static void Reset()
+     {
+@@ -109,5 +136,6 @@ public static class CallPathDiagnostics
+         Interlocked.Exchange(ref callbackCalls, 0);
+         Interlocked.Exchange(ref userCalls, 0);
+         Interlocked.Exchange(ref userCallsFromPromoted, 0);
++        Interlocked.Exchange(ref strictTransitions, 0);
+     }
+ }
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CallEntryCostMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CallEntryCostMetrics.cs
+index 38977d5b..159104b1 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CallEntryCostMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/CallEntryCostMetrics.cs
+@@ -4,6 +4,7 @@ using System.Linq;
+ using System.Reflection;
+ using System.Text.Json;
+ using Broiler.JavaScript.BuiltIns.Function;
++using Broiler.JavaScript.Engine.Core;
+ using Broiler.JavaScript.Runtime;
+ 
+ namespace Broiler.JavaScript.Engine.Benchmarks;
+@@ -87,7 +88,27 @@ internal static class CallEntryCostMetrics
+         if (!string.Equals(longAnswer, shortAnswer, StringComparison.Ordinal))
+             throw new InvalidOperationException($"entries disagree: {longAnswer} vs {shortAnswer}");
+ 
+-        var arms = Measure(callee, arguments, callback);
++        // The STRICT control, which needs no engine change and which item 2-9 already established
++        // as the right one: AddLegacyCallerAndArguments runs for non-strict functions only, so a
++        // strict callee has HasLegacyCallerArguments false and InvokeFunction skips the legacy
++        // frame entirely. The difference between the two callees through the SAME entry is
++        // therefore that one piece of the bookkeeping, isolated without touching the engine.
++        var strictCallee = (JSFunction)context.Eval(
++            "(function () { 'use strict'; return function (x) { return x + 1; }; })()",
++            "strict-callee.js");
++
++        // Two more sloppy shapes. AddLegacyCallerAndArguments is emitted for ordinary non-strict
++        // function declarations and expressions; an arrow and a shorthand method are neither, so
++        // if the legacy frame is what the long entry is paying for, these separate from `callee`
++        // without dragging in the strict-mode transition the strict arm turned out to be dominated
++        // by. Two shapes rather than one, because a single one that separated could be separating
++        // for a reason particular to arrows.
++        var arrowCallee = (JSFunction)context.Eval("((x) => x + 1)", "arrow-callee.js");
++        var methodCallee = (JSFunction)context.Eval(
++            "({ m(x) { return x + 1; } }).m",
++            "method-callee.js");
++
++        var arms = Measure(callee, strictCallee, arrowCallee, methodCallee, arguments, callback);
+         var longArm = arms[0];
+         var shortArm = arms[1];
+ 
+@@ -125,17 +146,78 @@ internal static class CallEntryCostMetrics
+             + $"({shortArm.NanosecondsPerCall / longArm.NanosecondsPerCall:F3}x)");
+     }
+ 
+-    private static Arm[] Measure(JSFunction callee, Arguments arguments, CallbackEntry callback)
++    private sealed record Plan(string Name, string Note, Func<double> Body);
++
++    private static Arm[] Measure(
++        JSFunction callee,
++        JSFunction strictCallee,
++        JSFunction arrowCallee,
++        JSFunction methodCallee,
++        Arguments arguments,
++        CallbackEntry callback)
+     {
++        // The component arms call the ENGINE's own accessors, not local replicas of the
++        // mechanisms — which is the whole correction 0108 rests on. Only the pieces that are
++        // publicly reachable are here; the two that are not (`HasLegacyCallerArguments` and the
++        // legacy frame it gates) are isolated instead by the strict/sloppy pair above, and the
++        // strict-mode scope is left to its own already-measured figure rather than reached by
++        // reflection, because binding a delegate to it would box the scope struct and price an
++        // allocation the real path does not make.
++        var context = (JSContext)JSEngine.Current;
++        var localArguments = arguments;
++        var plan = new[]
++        {
++            new Plan("InvokeFunction", "every emitted JavaScript call site: five `using` scopes, "
++                + "the executing-function save/set/restore, the legacy-caller check and frame, the "
++                + "strict-mode scope, the with-scope pushes, two try/finally regions and the "
++                + "tail-call loop",
++                () => RunLong(callee, in localArguments)),
++            new Plan("InvokeCallback", "the engine's own short path, used by every native builtin "
++                + "running a JavaScript callback: one `using` scope, the same delegate selection "
++                + "and `this` coercion, and none of the bookkeeping above",
++                () => RunShort(callback, callee, in localArguments)),
++            new Plan("InvokeFunction-strict", "the same long entry on a STRICT callee, which has no "
++                + "legacy caller/arguments — so the legacy frame is skipped and this arm's distance "
++                + "from InvokeFunction is that piece alone",
++                () => RunLong(strictCallee, in localArguments)),
++            new Plan("InvokeCallback-strict", "the short entry on the strict callee, as the control "
++                + "for the pair above: it never pushes a legacy frame either way, so the two "
++                + "callback arms should NOT separate — and if they do, the strict pair is measuring "
++                + "something other than the frame",
++                () => RunShort(callback, strictCallee, in localArguments)),
++
++            new Plan("InvokeFunction-arrow", "a SLOPPY arrow callee through the long entry. An "
++                + "arrow gets no legacy caller/arguments, so this isolates the legacy frame from "
++                + "the strict-mode transition the strict arm turned out to be dominated by",
++                () => RunLong(arrowCallee, in localArguments)),
++            new Plan("InvokeFunction-method", "a sloppy object METHOD through the long entry, as a "
++                + "second shape with the same property",
++                () => RunLong(methodCallee, in localArguments)),
++
++            new Plan("component-empty", "the loop itself, subtracted from the component arms below",
++                RunEmpty),
++            new Plan("component-executing-function", "JSEngine.ExecutingFunction saved, set and "
++                + "restored — three accesses to the [ThreadStatic] the long entry keeps in step",
++                RunExecutingFunction),
++            new Plan("component-current-and-options", "`JSEngine.Current as JSContext` and the "
++                + "`Options.ScriptHostMode` read the long entry makes on every call to decide "
++                + "whether to suspend with-scopes",
++                RunCurrentAndOptions),
++            new Plan("component-with-scope-pushes", "the two with-scope pushes under `using`. Both "
++                + "return null early here (nothing captured), so this prices the calls and the null "
++                + "disposes rather than the scopes",
++                () => RunWithScopePushes(context)),
++        };
++
+         for (var warmUp = 0; warmUp < WarmUpPasses; warmUp++)
+         {
+-            RunLong(callee, in arguments);
+-            RunShort(callback, callee, in arguments);
++            foreach (var arm in plan)
++                arm.Body();
+         }
+ 
+-        var samples = new double[2][];
+-        var bytes = new double[2][];
+-        for (var i = 0; i < 2; i++)
++        var samples = new double[plan.Length][];
++        var bytes = new double[plan.Length][];
++        for (var i = 0; i < plan.Length; i++)
+         {
+             samples[i] = new double[Rounds];
+             bytes[i] = new double[Rounds];
+@@ -143,19 +225,16 @@ internal static class CallEntryCostMetrics
+ 
+         for (var round = 0; round < Rounds; round++)
+         {
+-            for (var step = 0; step < 2; step++)
++            for (var step = 0; step < plan.Length; step++)
+             {
+-                var i = round % 2 == 0 ? step : 1 - step;
++                var i = round % 2 == 0 ? step : plan.Length - 1 - step;
+ 
+                 GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+                 GC.WaitForPendingFinalizers();
+ 
+                 var before = GC.GetAllocatedBytesForCurrentThread();
+                 var watch = Stopwatch.StartNew();
+-                if (i == 0)
+-                    RunLong(callee, in arguments);
+-                else
+-                    RunShort(callback, callee, in arguments);
++                plan[i].Body();
+                 watch.Stop();
+                 var after = GC.GetAllocatedBytesForCurrentThread();
+ 
+@@ -164,17 +243,59 @@ internal static class CallEntryCostMetrics
+             }
+         }
+ 
+-        return
+-        [
+-            Build("InvokeFunction", samples[0], bytes[0],
+-                "every emitted JavaScript call site: five `using` scopes, the executing-function "
+-                    + "save/set/restore, the legacy-caller check, the strict-mode scope, the "
+-                    + "with-scope pushes, two try/finally regions and the tail-call loop"),
+-            Build("InvokeCallback", samples[1], bytes[1],
+-                "the engine's own short path, used by every native builtin running a JavaScript "
+-                    + "callback: one `using` scope, the same delegate selection and `this` coercion, "
+-                    + "and none of the bookkeeping above"),
+-        ];
++        var arms = new Arm[plan.Length];
++        for (var i = 0; i < plan.Length; i++)
++            arms[i] = Build(plan[i].Name, samples[i], bytes[i], plan[i].Note);
++
++        return arms;
++    }
++
++    private static double RunEmpty()
++    {
++        var accumulator = 0.0;
++        for (var i = 0; i < Iterations; i++)
++            accumulator += i & 1;
++
++        return accumulator;
++    }
++
++    private static double RunExecutingFunction()
++    {
++        var accumulator = 0.0;
++        for (var i = 0; i < Iterations; i++)
++        {
++            var previous = JSEngine.ExecutingFunction;
++            JSEngine.ExecutingFunction = null;
++            accumulator += previous == null ? 1 : 0;
++            JSEngine.ExecutingFunction = previous;
++        }
++
++        return accumulator;
++    }
++
++    private static double RunCurrentAndOptions()
++    {
++        var accumulator = 0.0;
++        for (var i = 0; i < Iterations; i++)
++        {
++            var context = JSEngine.Current as JSContext;
++            accumulator += context?.Options.ScriptHostMode == true ? 1 : 0;
++        }
++
++        return accumulator;
++    }
++
++    private static double RunWithScopePushes(JSContext context)
++    {
++        var accumulator = 0.0;
++        for (var i = 0; i < Iterations; i++)
++        {
++            using var fallback = context?.PushWithFallbackScopes(null);
++            using var scope = context?.PushWithScopes(null);
++            accumulator += fallback == null && scope == null ? 1 : 0;
++        }
++
++        return accumulator;
+     }
+ 
+     private static Arm Build(string name, double[] samples, double[] bytes, string note)
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index 9338179c..e64e53dc 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -761,6 +761,7 @@ internal static class SpecializingTierMetrics
+             callbackCalls = callPath.CallbackCalls,
+             userCalls = callPath.UserCalls,
+             userCallsFromPromoted = callPath.UserCallsFromPromoted,
++            strictTransitions = callPath.StrictTransitions,
+         };
+     }
+ }
+-- 
+2.43.0
+
