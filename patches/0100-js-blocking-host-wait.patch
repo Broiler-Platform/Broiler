@@ -3,12 +3,12 @@ From: Claude <noreply@anthropic.com>
 Date: Wed, 5 Aug 2026 13:14:14 +0000
 Subject: [PATCH] Give a host a way to wait on a Task from inside JavaScript
 
-0097 recorded one deadlock as the price of the execution lock. Measured,
+0099 recorded one deadlock as the price of the execution lock. Measured,
 the attribution was wrong and there are two, one contributed by each of
 the last two changes:
 
   host function called from a script, waiting on a Task completed by
-                                        0096 queue   0097 + lock
+                                        0098 queue   0099 + lock
   a promise reaction on this context      hangs        hangs
   host work that must enter this context  completes    hangs
   unrelated host work (control)           completes    completes

@@ -29,7 +29,7 @@ eight is read from an assignment inside the function that captures it.
 The instrument was made to discriminate before it was pointed anywhere:
 nine constructed fixtures, three of which read non-zero, each re-checked
 by disabling the probe and confirming it fails. That is the discipline
-0094 added after three of its own fixtures passed against the bug they
+0096 added after three of its own fixtures passed against the bug they
 were written to catch. The negatives are the interesting half -- a
 global and a dropped outer name separate this from 3-8a, and an inner
 declaration or parameter sharing a spelling separates it from a

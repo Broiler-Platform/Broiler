@@ -4,7 +4,7 @@ Date: Wed, 5 Aug 2026 12:44:54 +0000
 Subject: [PATCH] Make JavaScript execution on a context mutually exclusive,
  and name the contract
 
-0096 fixed where a promise job is dispatched, and recorded what that could
+0098 fixed where a promise job is dispatched, and recorded what that could
 not reach: a job posted while nothing is executing takes a host context or
 the thread pool, because the queue is deliberately refused at depth zero --
 that refusal is what makes stranding a job impossible -- so it could then
