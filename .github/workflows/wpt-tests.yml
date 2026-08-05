@@ -18,6 +18,12 @@ name: WPT Tests
 #
 # Reference generation (Chromium via Playwright) is expensive, so each shard
 # caches its reference slice. Bump CACHE_EPOCH to refresh WPT master + refs.
+#
+# A shard that cannot obtain Chromium at all — the CDN answers some runners with
+# a 403 "not available in your location" — stops immediately instead of running a
+# browserless slice that would report every test as a missing reference, and
+# records why it stopped so the merged report names that cause rather than
+# guessing at a runner eviction. See scripts/lib/wpt-browser-install.sh.
 
 on:
   workflow_dispatch:
@@ -255,9 +261,31 @@ jobs:
           if ! [[ "$EXIT" =~ ^[0-9]+$ ]]; then
             EXIT=1
           fi
-          printf '{"shardIndex":%s,"exitCode":%s}\n' \
-            "${{ matrix.shard-index }}" "$EXIT" \
-            > "shard-out/wpt-shard-${{ matrix.shard-index }}-status.json"
+          # run-wpt-tests.sh leaves a marker when the shard could not run a single
+          # test — e.g. the Playwright CDN refused its Chromium download. Folding
+          # that into the status file is what lets the merge step name the real
+          # cause instead of guessing at one (issue #1534).
+          python3 - "${{ matrix.shard-index }}" "$EXIT" \
+            "$RESULTS_DIR/wpt-shard-failure.json" \
+            "shard-out/wpt-shard-${{ matrix.shard-index }}-status.json" <<'PY'
+          import json, sys
+
+          shard_index, exit_code, marker_path, out_path = sys.argv[1:5]
+          status = {"shardIndex": int(shard_index), "exitCode": int(exit_code)}
+          try:
+              with open(marker_path, encoding="utf-8") as handle:
+                  marker = json.load(handle)
+          except (OSError, ValueError):
+              marker = None
+          if isinstance(marker, dict):
+              if marker.get("reason"):
+                  status["failureReason"] = str(marker["reason"])
+              if marker.get("detail"):
+                  status["failureDetail"] = str(marker["detail"])
+          with open(out_path, "w", encoding="utf-8") as handle:
+              json.dump(status, handle)
+              handle.write("\n")
+          PY
 
       - name: Shard step summary
         if: always()
