@@ -39,9 +39,23 @@ class MergeWptShardsTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def _write_status(self, root: Path, shard_index: int, exit_code: int) -> None:
+    def _write_status(
+        self,
+        root: Path,
+        shard_index: int,
+        exit_code: int,
+        failure_reason: str | None = None,
+        failure_detail: str | None = None,
+    ) -> None:
+        status = {"shardIndex": shard_index, "exitCode": exit_code}
+        # The workflow's "Collect shard result" step folds these in from the marker
+        # run-wpt-tests.sh leaves when a shard dies before running a single test.
+        if failure_reason is not None:
+            status["failureReason"] = failure_reason
+        if failure_detail is not None:
+            status["failureDetail"] = failure_detail
         (root / f"wpt-shard-{shard_index}-status.json").write_text(
-            json.dumps({"shardIndex": shard_index, "exitCode": exit_code}),
+            json.dumps(status),
             encoding="utf-8",
         )
 
@@ -322,6 +336,92 @@ class MergeWptShardsTests(unittest.TestCase):
 
             merged = MODULE.merge(shard_dir, expected_shard_indexes={0})
             self.assertEqual([], merged["incompleteShards"])
+
+    def test_recorded_failure_reason_replaces_the_eviction_guess(self) -> None:
+        # Issue #1534: shard 0 exited 1 because the Playwright CDN refused its
+        # Chromium download, so no test ran. The report used to attribute every
+        # incomplete shard to a runner eviction, which sent triage looking for a
+        # cancelled job that never existed.
+        detail = (
+            "The Playwright CDN refused this runner's Chromium download "
+            "(HTTP 403 / AccessDenied). No test ran."
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_status(
+                shard_dir,
+                shard_index=0,
+                exit_code=69,
+                failure_reason="BrowserDownloadBlocked",
+                failure_detail=detail,
+            )
+
+            merged = MODULE.merge(shard_dir, expected_shard_indexes={0})
+            self.assertEqual(
+                [
+                    {
+                        "shardIndex": 0,
+                        "exitCode": 69,
+                        "failureReason": "BrowserDownloadBlocked",
+                        "failureDetail": detail,
+                    }
+                ],
+                merged["incompleteShards"],
+            )
+
+            problem = merged["biggestProblems"][0]
+            self.assertEqual("IncompleteShards", problem["kind"])
+            self.assertIn("shard 0 (Chromium download refused)", problem["detail"])
+            self.assertIn(f"Shard 0: {detail}", problem["detail"])
+            self.assertIn("CI infrastructure outage", problem["detail"])
+            self.assertNotIn("eviction", problem["detail"])
+            # The recovery action is unchanged — the block clears on its own.
+            self.assertIn("set shard_index=0", problem["detail"])
+
+    def test_unexplained_shard_keeps_the_eviction_guess(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_status(shard_dir, shard_index=2, exit_code=134)
+
+            problem = MODULE.merge(shard_dir)["biggestProblems"][0]
+            self.assertIn("shard 2 (exit 134)", problem["detail"])
+            self.assertIn("eviction", problem["detail"])
+            self.assertNotIn("CI infrastructure outage", problem["detail"])
+
+    def test_mixed_shards_explain_each_cause_separately(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_status(
+                shard_dir,
+                shard_index=0,
+                exit_code=69,
+                failure_reason="BrowserInstallFailed",
+                failure_detail="Installing Playwright Chromium failed. No test ran.",
+            )
+            self._write_status(shard_dir, shard_index=5, exit_code=1)
+
+            merged = MODULE.merge(shard_dir)
+            problem = merged["biggestProblems"][0]
+            self.assertIn("shard 0 (Chromium install failed)", problem["detail"])
+            self.assertIn("shard 5 (exit 1)", problem["detail"])
+            self.assertIn("Shard 0: Installing Playwright Chromium failed.", problem["detail"])
+            self.assertIn("eviction", problem["detail"])
+            self.assertIn(
+                "re-dispatch once per shard, setting shard_index to 0, 5", problem["detail"]
+            )
+
+    def test_unknown_failure_reason_is_surfaced_verbatim(self) -> None:
+        # A reason added to the runner but not yet to the label table must not be
+        # silently swallowed back into a bare exit code.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_status(
+                shard_dir, shard_index=1, exit_code=70, failure_reason="DiskFull"
+            )
+
+            merged = MODULE.merge(shard_dir)
+            markdown = MODULE.render_issue_markdown(merged, "https://example.test/run/1")
+            self.assertIn("shard 1 (DiskFull)", markdown)
 
     def test_merge_into_preserves_out_of_scope_entries(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

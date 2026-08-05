@@ -117,17 +117,65 @@ def _iter_shard_statuses(shard_dir: Path):
             yield path, data
 
 
+# Human-readable labels for the failure reasons a shard can record before it runs
+# a single test (written by scripts/lib/wpt-browser-install.sh). A shard reporting
+# one of these went unmeasured for an infrastructure reason, not an engine one.
+FAILURE_REASON_LABELS = {
+    "BrowserDownloadBlocked": "Chromium download refused",
+    "BrowserInstallFailed": "Chromium install failed",
+}
+
+
 def _format_incomplete_shard(status: dict) -> str:
-    """Human-readable label for an incomplete shard. A numeric exit code means the
-    shard crashed after running; the ``"missing"`` sentinel means it uploaded
-    nothing at all — its runner was lost before the ``if: always()`` collect/upload
-    steps could run (typically a spot-runner shutdown signal, i.e. the WPT step ends
-    with ``exit code 143`` / "The runner has received a shutdown signal"), so the
-    whole slice went unmeasured rather than crashing on a specific test."""
+    """Human-readable label for an incomplete shard.
+
+    A recorded ``failureReason`` is the most specific thing available — the shard
+    said why it could not run — so it wins over the bare exit code. Failing that,
+    a numeric exit code means the shard crashed after running; the ``"missing"``
+    sentinel means it uploaded nothing at all — its runner was lost before the
+    ``if: always()`` collect/upload steps could run (typically a spot-runner
+    shutdown signal, i.e. the WPT step ends with ``exit code 143`` / "The runner
+    has received a shutdown signal"), so the whole slice went unmeasured rather
+    than crashing on a specific test."""
+    reason = status.get("failureReason")
+    if reason:
+        # An unrecognised reason is still more informative than the exit code, so
+        # it is shown as-is rather than dropped.
+        return f"shard {status['shardIndex']} ({FAILURE_REASON_LABELS.get(reason, reason)})"
     exit_code = status["exitCode"]
     if exit_code == "missing":
         return f"shard {status['shardIndex']} (no report uploaded)"
     return f"shard {status['shardIndex']} (exit {exit_code})"
+
+
+def _incomplete_shard_cause_sentences(shards: list[dict]) -> list[str]:
+    """Explain *why* the incomplete shards are incomplete.
+
+    A shard that recorded a ``failureDetail`` said exactly why it never ran a
+    test, so that explanation is quoted rather than guessed at. Only shards with
+    nothing recorded fall back to the eviction guess — the common cause of a
+    silent "no report uploaded", but flatly wrong for issue #1534, where shard 0
+    exited 1 because the Playwright CDN geo-blocked its Chromium download."""
+    sentences: list[str] = []
+
+    explained = [status for status in shards if status.get("failureDetail")]
+    for status in explained:
+        sentences.append(f"Shard {status['shardIndex']}: {status['failureDetail']}")
+    if explained:
+        sentences.append(
+            "A shard that could not provision its browser is a CI infrastructure "
+            "outage rather than a test regression — no code change fixes it, and it "
+            "clears on its own."
+        )
+
+    if any(not status.get("failureDetail") for status in shards):
+        sentences.append(
+            "A shard that recorded no reason is usually a transient CI-runner "
+            "eviction (the runner received a shutdown signal before its upload step "
+            "ran), which is likewise not a test regression."
+        )
+
+    return sentences
 
 
 def _incomplete_shard_recovery_hint(shards: list[dict]) -> str:
@@ -200,14 +248,15 @@ def _rank_biggest_problems(
                 "severity": len(shards),
                 "impact": len(shards),
                 "title": f"{len(shards)} shard(s) did not complete",
-                "detail": (
-                    "A whole shard's tests are unaccounted for — the pass/fail of that "
-                    f"slice is unknown. {listing}. A shard reported as \"no report "
-                    "uploaded\" is usually a transient CI-runner eviction (the runner "
-                    "received a shutdown signal before its upload step ran), not a test "
-                    "regression, so its slice can be remeasured without a code change: "
-                    f"re-run the WPT Tests workflow and {_incomplete_shard_recovery_hint(shards)} "
-                    "(cached references make the rerun fast)."
+                "detail": " ".join(
+                    [
+                        "A whole shard's tests are unaccounted for — the pass/fail of "
+                        f"that slice is unknown. {listing}.",
+                        *_incomplete_shard_cause_sentences(shards),
+                        "The slice can be remeasured without a code change: re-run the "
+                        f"WPT Tests workflow and {_incomplete_shard_recovery_hint(shards)} "
+                        "(cached references make the rerun fast).",
+                    ]
                 ),
             }
         )
@@ -482,6 +531,12 @@ def merge(
     # Exit code left behind by each shard that got far enough to run the
     # "Collect shard result" step (index -> exit code).
     shard_exit_codes: dict[int, int] = {}
+    # Why a shard could not run, for the shards that managed to say so
+    # (index -> the marker fields). run-wpt-tests.sh records this for failures
+    # that stop a shard before any test executes — a browser it could not
+    # download, say — so the report can name the cause instead of inferring one
+    # from a bare non-zero exit.
+    shard_failure_reasons: dict[int, dict[str, str]] = {}
     for _path, status in _iter_shard_statuses(shard_dir):
         try:
             shard_index = int(status["shardIndex"])
@@ -489,6 +544,13 @@ def merge(
         except (TypeError, ValueError):
             continue
         shard_exit_codes[shard_index] = exit_code
+        marker = {
+            field: status[field].strip()
+            for field in ("failureReason", "failureDetail")
+            if isinstance(status.get(field), str) and status[field].strip()
+        }
+        if marker:
+            shard_failure_reasons[shard_index] = marker
 
     # A shard is incomplete when it produced no conclusive report. There are two
     # ways that happens, and the second one used to be invisible:
@@ -521,7 +583,11 @@ def merge(
         incomplete_shards.append(
             # A dispatched shard that left no status file at all never uploaded
             # anything — record it as "missing" rather than a numeric exit code.
-            {"shardIndex": shard_index, "exitCode": exit_code if exit_code is not None else "missing"}
+            {
+                "shardIndex": shard_index,
+                "exitCode": exit_code if exit_code is not None else "missing",
+                **shard_failure_reasons.get(shard_index, {}),
+            }
         )
 
     if incomplete_shards:

@@ -157,44 +157,16 @@ if ! [[ "$PLAYWRIGHT_INSTALL_RETRY_DELAY_SECONDS" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
-run_with_retries_tail() {
-    local description="$1"
-    local max_attempts="$2"
-    local delay_seconds="$3"
-    local success_tail_lines="$4"
-    local failure_tail_lines="$5"
-    shift 5
-
-    local attempt=1
-    local status=0
-    local log_file
-    log_file="$(mktemp)"
-
-    while (( attempt <= max_attempts )); do
-        if "$@" >"$log_file" 2>&1; then
-            tail -n "$success_tail_lines" "$log_file" || true
-            rm -f "$log_file"
-            return 0
-        fi
-
-        status=$?
-        echo "  $description failed on attempt $attempt/$max_attempts (exit $status)." >&2
-        tail -n "$failure_tail_lines" "$log_file" >&2 || true
-
-        if (( attempt == max_attempts )); then
-            echo "  $description failed after $max_attempts attempt(s)." >&2
-            rm -f "$log_file"
-            return "$status"
-        fi
-
-        echo "  Retrying $description in ${delay_seconds}s..." >&2
-        sleep "$delay_seconds"
-        attempt=$((attempt + 1))
-        delay_seconds=$((delay_seconds * 2))
-    done
-}
+# shellcheck source=lib/wpt-browser-install.sh
+source "$SCRIPT_DIR/lib/wpt-browser-install.sh"
 
 mkdir -p "$OUTPUT_DIR"
+
+# Marker describing why this shard could not run at all, read by the workflow's
+# "Collect shard result" step. Cleared up front so a stale marker from an earlier
+# run in the same workspace cannot be attributed to this one.
+FAILURE_MARKER="$OUTPUT_DIR/wpt-shard-failure.json"
+rm -f "$FAILURE_MARKER"
 
 LOGFILE="$OUTPUT_DIR/wpt-results.log"
 
@@ -258,13 +230,35 @@ elif command -v npx &>/dev/null; then
         npm install 2>&1 | tail -10
     fi
     echo "  Installing Playwright Chromium (up to $PLAYWRIGHT_INSTALL_RETRIES attempt(s))"
-    run_with_retries_tail \
+    INSTALL_STATUS=0
+    WPT_RETRY_ABORT_CLASSIFIER=wpt_is_browser_download_blocked
+    wpt_run_with_retries_tail \
         "Playwright Chromium install" \
         "$PLAYWRIGHT_INSTALL_RETRIES" \
         "$PLAYWRIGHT_INSTALL_RETRY_DELAY_SECONDS" \
         10 \
         40 \
-        npx playwright install --with-deps chromium
+        npx playwright install --with-deps chromium || INSTALL_STATUS=$?
+    unset WPT_RETRY_ABORT_CLASSIFIER
+
+    # Without Chromium there is nothing to generate references *from*, so every
+    # test in this slice would be reported as "missing reference image" — a whole
+    # shard of noise that looks like an engine regression. Stop here instead, and
+    # leave behind why, so the merged report can say so (issue #1534).
+    if (( INSTALL_STATUS != 0 )); then
+        if [[ "$WPT_RETRY_NON_RETRYABLE" == "true" ]]; then
+            REASON="$WPT_REASON_BROWSER_BLOCKED"
+            DETAIL="The Playwright CDN refused this runner's Chromium download (HTTP 403 / AccessDenied — the build is not served to every location). No test ran."
+        else
+            REASON="$WPT_REASON_BROWSER_INSTALL_FAILED"
+            DETAIL="Installing Playwright Chromium failed after $PLAYWRIGHT_INSTALL_RETRIES attempt(s). No test ran."
+        fi
+        echo "  ✗ $DETAIL" >&2
+        echo "    This is a browser-provisioning outage, not a test regression:" >&2
+        echo "    re-run the shard once the download succeeds again." >&2
+        wpt_write_failure_marker "$FAILURE_MARKER" "$REASON" "$DETAIL"
+        exit "$WPT_EXIT_BROWSER_UNAVAILABLE"
+    fi
 
     # Set NODE_PATH so require('playwright') resolves from the local
     # node_modules installed above (Node.js resolves modules relative to

@@ -120,6 +120,7 @@ internal sealed class CssLayoutEngineTable
         // children that are direct children of the table without an
         // intermediate table-row wrapper.
         GenerateAnonymousTableRows(baseUrl);
+        GenerateAnonymousRowsInRowGroups(baseUrl);
 
         foreach (var box in _tableBox.Boxes)
         {
@@ -330,11 +331,75 @@ internal sealed class CssLayoutEngineTable
     /// it, and appends the row to the table.  Children that are not table-cell
     /// are additionally wrapped in anonymous table-cell boxes (CSS2.1 §17.2.1).
     /// </summary>
-    private void FlushAnonymousRow(List<CssBox> children, Uri baseUrl)
+    /// <summary>
+    /// CSS2.1 §17.2.1, the same rule <see cref="GenerateAnonymousTableRows"/> applies one level
+    /// up: a row group may contain only rows, so a run of non-row children has to be wrapped in
+    /// an anonymous <c>table-row</c> (and, inside it, anonymous cells).
+    /// <para>Without this the collection loop below — which takes a row group's children only when
+    /// their display is <c>table-row</c> — silently dropped every other child, so it never laid
+    /// out and never painted, and its height did not reach the table. WPT
+    /// css/css-page/monolithic-overflow-011-print puts a 350vh block straight inside a
+    /// <c>table-row-group</c>: the block vanished and the table collapsed to its text line.</para>
+    /// </summary>
+    private void GenerateAnonymousRowsInRowGroups(Uri baseUrl)
+    {
+        foreach (var group in _tableBox.Boxes)
+        {
+            if (group.Display != CssConstants.TableRowGroup
+                && group.Display != CssConstants.TableHeaderGroup
+                && group.Display != CssConstants.TableFooterGroup)
+                continue;
+
+            bool needsWrapping = false;
+            foreach (var child in group.Boxes)
+            {
+                if (child.Display != CssConstants.TableRow)
+                {
+                    needsWrapping = true;
+                    break;
+                }
+            }
+
+            if (!needsWrapping)
+                continue;
+
+            var children = new List<CssBox>(group.Boxes);
+            group.Boxes.Clear();
+
+            List<CssBox>? pendingNonRow = null;
+
+            foreach (var child in children)
+            {
+                if (child.Display == CssConstants.TableRow)
+                {
+                    if (pendingNonRow != null)
+                    {
+                        FlushAnonymousRow(pendingNonRow, baseUrl, group);
+                        pendingNonRow = null;
+                    }
+
+                    group.Boxes.Add(child);
+                }
+                else
+                {
+                    pendingNonRow ??= [];
+                    pendingNonRow.Add(child);
+                }
+            }
+
+            if (pendingNonRow != null)
+                FlushAnonymousRow(pendingNonRow, baseUrl, group);
+        }
+    }
+
+    private void FlushAnonymousRow(List<CssBox> children, Uri baseUrl) =>
+        FlushAnonymousRow(children, baseUrl, _tableBox);
+
+    private void FlushAnonymousRow(List<CssBox> children, Uri baseUrl, CssBox container)
     {
         // Create the anonymous row. The CssBox(parent, tag) constructor
         // automatically adds the new box to parent.Boxes.
-        var anonRow = new CssBox(_tableBox, null, baseUrl) { Display = CssConstants.TableRow };
+        var anonRow = new CssBox(container, null, baseUrl) { Display = CssConstants.TableRow };
         
         foreach (var child in children)
         {
