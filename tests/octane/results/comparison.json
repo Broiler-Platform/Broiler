@@ -1,39 +1,39 @@
 {
-  "generatedAt": "2026-08-04T18:47:41.598Z",
+  "generatedAt": "2026-08-05T06:00:39.429Z",
   "octaneVersion": "9",
   "engines": {
     "chromium": {
       "label": "Chromium 149.0.7827.55",
-      "geomean": 56135
+      "geomean": 55394
     },
     "broiler": {
       "label": "Broiler.JS (BroilerJS --script-host)",
-      "geomean": 349
+      "geomean": 355
     },
     "jint": {
       "label": "Jint 4.15.3 (interpreter)",
-      "geomean": 620
+      "geomean": 616
     }
   },
   "benchmarks": [
     {
       "name": "Box2D",
       "chromium": {
-        "score": 100206,
+        "score": 101050,
         "status": "ok"
       },
       "broiler": {
-        "score": 666,
+        "score": 650,
         "status": "ok"
       },
       "jint": {
-        "score": 634,
+        "score": 632,
         "status": "ok"
       },
-      "broilerVsChromium": 0.007,
-      "broilerTimesSlower": 150.5,
+      "broilerVsChromium": 0.006,
+      "broilerTimesSlower": 155.5,
       "jintVsChromium": 0.006,
-      "broilerVsJint": 1.05,
+      "broilerVsJint": 1.028,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -43,21 +43,21 @@
     {
       "name": "CodeLoad",
       "chromium": {
-        "score": 31027,
+        "score": 30301,
         "status": "ok"
       },
       "broiler": {
-        "score": 135,
+        "score": 137,
         "status": "ok"
       },
       "jint": {
-        "score": 4287,
+        "score": 4242,
         "status": "ok"
       },
-      "broilerVsChromium": 0.004,
-      "broilerTimesSlower": 229.8,
-      "jintVsChromium": 0.138,
-      "broilerVsJint": 0.031,
+      "broilerVsChromium": 0.005,
+      "broilerTimesSlower": 221.2,
+      "jintVsChromium": 0.14,
+      "broilerVsJint": 0.032,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -67,21 +67,21 @@
     {
       "name": "Crypto",
       "chromium": {
-        "score": 37543,
+        "score": 37786,
         "status": "ok"
       },
       "broiler": {
-        "score": 208,
+        "score": 256,
         "status": "ok"
       },
       "jint": {
-        "score": 150,
+        "score": 146,
         "status": "ok"
       },
-      "broilerVsChromium": 0.006,
-      "broilerTimesSlower": 180.5,
+      "broilerVsChromium": 0.007,
+      "broilerTimesSlower": 147.6,
       "jintVsChromium": 0.004,
-      "broilerVsJint": 1.387,
+      "broilerVsJint": 1.753,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -91,21 +91,21 @@
     {
       "name": "DeltaBlue",
       "chromium": {
-        "score": 103382,
+        "score": 102503,
         "status": "ok"
       },
       "broiler": {
-        "score": 224,
+        "score": 232,
         "status": "ok"
       },
       "jint": {
-        "score": 184,
+        "score": 183,
         "status": "ok"
       },
       "broilerVsChromium": 0.002,
-      "broilerTimesSlower": 461.5,
+      "broilerTimesSlower": 441.8,
       "jintVsChromium": 0.002,
-      "broilerVsJint": 1.217,
+      "broilerVsJint": 1.268,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -115,21 +115,21 @@
     {
       "name": "EarleyBoyer",
       "chromium": {
-        "score": 90272,
+        "score": 89570,
         "status": "ok"
       },
       "broiler": {
-        "score": 399,
+        "score": 417,
         "status": "ok"
       },
       "jint": {
         "score": 412,
         "status": "ok"
       },
-      "broilerVsChromium": 0.004,
-      "broilerTimesSlower": 226.2,
+      "broilerVsChromium": 0.005,
+      "broilerTimesSlower": 214.8,
       "jintVsChromium": 0.005,
-      "broilerVsJint": 0.968,
+      "broilerVsJint": 1.012,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -139,21 +139,21 @@
     {
       "name": "Gameboy",
       "chromium": {
-        "score": 88583,
+        "score": 82717,
         "status": "ok"
       },
       "broiler": {
-        "score": 1156,
+        "score": 1171,
         "status": "ok"
       },
       "jint": {
-        "score": 938,
+        "score": 908,
         "status": "ok"
       },
-      "broilerVsChromium": 0.013,
-      "broilerTimesSlower": 76.6,
+      "broilerVsChromium": 0.014,
+      "broilerTimesSlower": 70.6,
       "jintVsChromium": 0.011,
-      "broilerVsJint": 1.232,
+      "broilerVsJint": 1.29,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -163,21 +163,21 @@
     {
       "name": "Mandreel",
       "chromium": {
-        "score": 45448,
+        "score": 44730,
         "status": "ok"
       },
       "broiler": {
-        "score": 169,
+        "score": 182,
         "status": "ok"
       },
       "jint": {
-        "score": 91.8,
+        "score": 94.1,
         "status": "ok"
       },
       "broilerVsChromium": 0.004,
-      "broilerTimesSlower": 268.9,
+      "broilerTimesSlower": 245.8,
       "jintVsChromium": 0.002,
-      "broilerVsJint": 1.841,
+      "broilerVsJint": 1.934,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -187,7 +187,7 @@
     {
       "name": "MandreelLatency",
       "chromium": {
-        "score": 65595,
+        "score": 63913,
         "status": "ok"
       },
       "broiler": {
@@ -195,11 +195,11 @@
         "status": "ok"
       },
       "jint": {
-        "score": 775,
+        "score": 788,
         "status": "ok"
       },
       "broilerVsChromium": 0,
-      "broilerTimesSlower": 4492.8,
+      "broilerTimesSlower": 4377.6,
       "jintVsChromium": 0.012,
       "broilerVsJint": 0.019,
       "stability": {
@@ -211,21 +211,21 @@
     {
       "name": "NavierStokes",
       "chromium": {
-        "score": 35397,
+        "score": 35319,
         "status": "ok"
       },
       "broiler": {
-        "score": 351,
+        "score": 365,
         "status": "ok"
       },
       "jint": {
-        "score": 259,
+        "score": 252,
         "status": "ok"
       },
       "broilerVsChromium": 0.01,
-      "broilerTimesSlower": 100.8,
+      "broilerTimesSlower": 96.8,
       "jintVsChromium": 0.007,
-      "broilerVsJint": 1.355,
+      "broilerVsJint": 1.448,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -235,21 +235,21 @@
     {
       "name": "PdfJS",
       "chromium": {
-        "score": 58374,
+        "score": 50524,
         "status": "ok"
       },
       "broiler": {
-        "score": 488,
+        "score": 504,
         "status": "ok"
       },
       "jint": {
-        "score": 907,
+        "score": 913,
         "status": "ok"
       },
-      "broilerVsChromium": 0.008,
-      "broilerTimesSlower": 119.6,
-      "jintVsChromium": 0.016,
-      "broilerVsJint": 0.538,
+      "broilerVsChromium": 0.01,
+      "broilerTimesSlower": 100.2,
+      "jintVsChromium": 0.018,
+      "broilerVsJint": 0.552,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -259,21 +259,21 @@
     {
       "name": "RayTrace",
       "chromium": {
-        "score": 113588,
+        "score": 117658,
         "status": "ok"
       },
       "broiler": {
-        "score": 474,
+        "score": 493,
         "status": "ok"
       },
       "jint": {
-        "score": 454,
+        "score": 447,
         "status": "ok"
       },
       "broilerVsChromium": 0.004,
-      "broilerTimesSlower": 239.6,
+      "broilerTimesSlower": 238.7,
       "jintVsChromium": 0.004,
-      "broilerVsJint": 1.044,
+      "broilerVsJint": 1.103,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -283,7 +283,7 @@
     {
       "name": "RegExp",
       "chromium": {
-        "score": 9900,
+        "score": 10032,
         "status": "ok"
       },
       "broiler": {
@@ -291,13 +291,13 @@
         "status": "ok"
       },
       "jint": {
-        "score": 208,
+        "score": 207,
         "status": "ok"
       },
       "broilerVsChromium": 0.012,
-      "broilerTimesSlower": 81.1,
+      "broilerTimesSlower": 82.2,
       "jintVsChromium": 0.021,
-      "broilerVsJint": 0.587,
+      "broilerVsJint": 0.589,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -307,21 +307,21 @@
     {
       "name": "Richards",
       "chromium": {
-        "score": 37897,
+        "score": 38462,
         "status": "ok"
       },
       "broiler": {
-        "score": 264,
+        "score": 265,
         "status": "ok"
       },
       "jint": {
-        "score": 188,
+        "score": 187,
         "status": "ok"
       },
       "broilerVsChromium": 0.007,
-      "broilerTimesSlower": 143.5,
+      "broilerTimesSlower": 145.1,
       "jintVsChromium": 0.005,
-      "broilerVsJint": 1.404,
+      "broilerVsJint": 1.417,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -331,21 +331,21 @@
     {
       "name": "Splay",
       "chromium": {
-        "score": 43117,
+        "score": 42546,
         "status": "ok"
       },
       "broiler": {
-        "score": 631,
+        "score": 549,
         "status": "ok"
       },
       "jint": {
-        "score": 782,
+        "score": 778,
         "status": "ok"
       },
-      "broilerVsChromium": 0.015,
-      "broilerTimesSlower": 68.3,
+      "broilerVsChromium": 0.013,
+      "broilerTimesSlower": 77.5,
       "jintVsChromium": 0.018,
-      "broilerVsJint": 0.807,
+      "broilerVsJint": 0.706,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -355,21 +355,21 @@
     {
       "name": "SplayLatency",
       "chromium": {
-        "score": 70972,
+        "score": 68849,
         "status": "ok"
       },
       "broiler": {
-        "score": 2196,
+        "score": 1995,
         "status": "ok"
       },
       "jint": {
-        "score": 3188,
+        "score": 3229,
         "status": "ok"
       },
-      "broilerVsChromium": 0.031,
-      "broilerTimesSlower": 32.3,
-      "jintVsChromium": 0.045,
-      "broilerVsJint": 0.689,
+      "broilerVsChromium": 0.029,
+      "broilerTimesSlower": 34.5,
+      "jintVsChromium": 0.047,
+      "broilerVsJint": 0.618,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -379,21 +379,21 @@
     {
       "name": "Typescript",
       "chromium": {
-        "score": 87753,
+        "score": 91336,
         "status": "ok"
       },
       "broiler": {
-        "score": 2476,
+        "score": 2412,
         "status": "ok"
       },
       "jint": {
-        "score": 2574,
+        "score": 2560,
         "status": "ok"
       },
-      "broilerVsChromium": 0.028,
-      "broilerTimesSlower": 35.4,
-      "jintVsChromium": 0.029,
-      "broilerVsJint": 0.962,
+      "broilerVsChromium": 0.026,
+      "broilerTimesSlower": 37.9,
+      "jintVsChromium": 0.028,
+      "broilerVsJint": 0.942,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -403,21 +403,21 @@
     {
       "name": "zlib",
       "chromium": {
-        "score": 80218,
+        "score": 79966,
         "status": "ok"
       },
       "broiler": {
-        "score": 394,
+        "score": 427,
         "status": "ok"
       },
       "jint": {
-        "score": 5370,
+        "score": 5273,
         "status": "ok"
       },
       "broilerVsChromium": 0.005,
-      "broilerTimesSlower": 203.6,
-      "jintVsChromium": 0.067,
-      "broilerVsJint": 0.073,
+      "broilerTimesSlower": 187.3,
+      "jintVsChromium": 0.066,
+      "broilerVsJint": 0.081,
       "stability": {
         "chromium": null,
         "broiler": null,
@@ -433,23 +433,23 @@
       "expected": 17
     },
     "geomean": {
-      "chromium": 56135,
-      "broiler": 349,
-      "jint": 620
+      "chromium": 55394,
+      "broiler": 355,
+      "jint": 616
     },
     "spread": {
-      "factor": 139.1,
+      "factor": 126.9,
       "best": {
         "name": "SplayLatency",
-        "timesSlower": 32.3
+        "timesSlower": 34.5
       },
       "worst": {
         "name": "MandreelLatency",
-        "timesSlower": 4492.8
+        "timesSlower": 4377.6
       }
     },
     "broilerVsJint": {
-      "ratio": 0.562,
+      "ratio": 0.577,
       "benchmarks": 17
     },
     "repetitionsByEngine": {
