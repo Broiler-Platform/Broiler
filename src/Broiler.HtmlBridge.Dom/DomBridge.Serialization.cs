@@ -168,6 +168,9 @@ public sealed partial class DomBridge
         // so it can be reverted on the geometry-snapshot path; pseudo/progress below depend on
         // the baked sizes and must run after it.
         ApplyZoomPseudoSerializationOverrides(root);
+        // A Web Animation targeting a pseudo-element has no node to bake onto, so it is emitted as
+        // an author rule instead.
+        ApplyAnimatedPseudoSerializationOverrides(root);
         ApplyProgressLikeSerializationPlaceholders(root);
         // Flatten the #shadow-root wrapper LAST: it is not an HTML element, so the renderer would
         // paint its serialized "<#shadow-root>" open tag as literal text. It must run after every
@@ -356,6 +359,16 @@ public sealed partial class DomBridge
         var rules = new List<string>();
         int pseudoIndex = 0;
         CollectZoomPseudoSerializationOverrides(root, 1.0, rules, ref pseudoIndex);
+        InjectBridgeStyleRules(root, rules);
+    }
+
+    /// <summary>
+    /// Appends a bridge-owned <c>&lt;style&gt;</c> carrying <paramref name="rules"/> to the render
+    /// document — in <c>&lt;head&gt;</c> when there is one, else first in the root. A no-op for an
+    /// empty rule list, so a document that needs no overrides serializes byte-identically.
+    /// </summary>
+    private void InjectBridgeStyleRules(DomElement root, List<string> rules)
+    {
         if (rules.Count == 0)
             return;
 
@@ -372,6 +385,53 @@ public sealed partial class DomBridge
 
         SetParent(styleElement, root);
         InsertChildAt(root, 0, styleElement);
+    }
+
+    /// <summary>
+    /// Emits the values baked by <c>element.animate(…, { pseudoElement })</c> as author rules, so a
+    /// Web Animation on a pseudo-element reaches the renderer through the ordinary cascade.
+    /// <para>
+    /// A pseudo-element has no node, so the element-inline bake <c>animate()</c> normally performs
+    /// has nowhere to land, and the animation was silently dropped: WPT
+    /// <c>css/css-pseudo/backdrop-animate-002</c> (issue #1538 problem 11) animates
+    /// <c>::backdrop</c> to a 10%-opacity green and got the UA modal scrim instead. Its own
+    /// reference writes the same declarations as CSS and already rendered correctly, which is what
+    /// says the gap is the API and not the pseudo-element.
+    /// </para>
+    /// <para>
+    /// <c>!important</c> matches the zoom overrides above and the cascade position an animation
+    /// actually has: an animation's effect outranks author declarations, and this is the only lever
+    /// a serialized rule has to say so.
+    /// </para>
+    /// </summary>
+    private void ApplyAnimatedPseudoSerializationOverrides(DomElement root)
+    {
+        var rules = new List<string>();
+        int pseudoIndex = 0;
+        CollectAnimatedPseudoSerializationOverrides(root, rules, ref pseudoIndex);
+        InjectBridgeStyleRules(root, rules);
+    }
+
+    private void CollectAnimatedPseudoSerializationOverrides(DomElement element, List<string> rules, ref int pseudoIndex)
+    {
+        if (!IsText(element) && !element.TagName.StartsWith('#'))
+        {
+            foreach (var pseudoElement in AnimatedPseudoElementsOf(element))
+            {
+                if (AnimatedPseudoStyle(element, pseudoElement) is not { Count: > 0 } properties)
+                    continue;
+
+                if (string.IsNullOrWhiteSpace(element.Id))
+                    element.Id = $"broiler-animated-pseudo-{++pseudoIndex}";
+
+                var declarations = properties
+                    .Select(property => $"{property.Key}: {property.Value} !important");
+                rules.Add($"#{element.Id}{pseudoElement} {{ {string.Join("; ", declarations)}; }}");
+            }
+        }
+
+        foreach (var child in ChildElements(element))
+            CollectAnimatedPseudoSerializationOverrides(child, rules, ref pseudoIndex);
     }
 
     private void CollectZoomPseudoSerializationOverrides(DomElement element, double parentZoom, List<string> rules, ref int pseudoIndex)

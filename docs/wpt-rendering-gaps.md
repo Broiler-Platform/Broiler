@@ -914,9 +914,10 @@ contradict an earlier verdict.
 
 Every local number below is this container measured against a locally generated
 Chromium reference, over a sparse WPT checkout of the directories the list names.
-**Twenty-one of the thirty reproduce locally to within 0.1 of CI** — every one
-that was measured except three — which is what makes the diagnoses in this section
-worth writing down; those three are called out individually.
+**Twenty-two of the thirty reproduce locally to within 0.1 of CI** — every one
+that was measured except two — which is what makes the diagnoses in this section
+worth writing down; those two are called out individually. (Problem 17 joined that
+count late: it appeared not to reproduce until its reference was regenerated.)
 
 ### Shadow trees leaked their styles into the whole page — problems 16 and 20, **fixed**
 
@@ -985,6 +986,100 @@ worth writing down; those three are called out individually.
   them pass *for the right reason*, and it is why the fix is not resting on that
   coincidence.
 
+### An `overlay` entry transition that never finished — problem 21, **fixed**
+
+- **Test:** `css/css-position/overlay/overlay-transition-finished`, 1.8% on CI and
+  1.81% here.
+- **Owner:** HtmlBridge (`DomBridge/AnchorResolver/Dialogs.cs`). Main repo, so it
+  is on CI immediately.
+- **The CSSOM answer and the painted answer are taken at different instants, and
+  conflating them made the test unwinnable.** It reads
+  `getComputedStyle(el).overlay` synchronously after `showPopover()` and paints
+  itself pink unless it sees `none` — the transition must be observed *running* at
+  script time — then screenshots from `transitionend`, by which point the popover
+  must be in the top layer covering a fixed red div.
+  `PopoverHeldOutByOverlayTransitionIn` answered "held out" for both, because it
+  returns true whenever an element merely *declares* a discrete `overlay`
+  transition. Our render was 98.2% red with an 8px green band: the popover painted
+  beneath the fixed div, which is "held out" exactly.
+- **What landed.** `ComputeOverlayValue` keeps answering for t≈0; only the two
+  paint sites move, through `PopoverHeldOutOfTopLayerForPaint`. The renderer has no
+  clock, so "which instant" is read from what the page says — the same thing the
+  runner already does for `takeScreenshotDelayed(N)` via
+  `WptTestRunner.ScreenshotPresentationTime`. A test that gates its screenshot on
+  `transitionend` is making that statement without a number, and
+  `ScreenshotWaitsForTransitionEnd` recognises the shape: the document is still
+  `reftest-wait` *and* a `transitionend` listener is reachable from the element
+  (itself, an ancestor, the document, or the window — it bubbles).
+- **The `reftest-wait` half is what keeps it from being a one-way door.** Broiler
+  dispatches no transition events, so a page waiting on one waits forever and the
+  class survives to serialization. If transition events are implemented later, the
+  natural shape — dispatch `transitionend`, the listener calls `takeScreenshot()`,
+  the class goes — makes the predicate false while the transition is genuinely
+  over, and the ordinary path elevates the popover. The rule degrades into the real
+  one rather than inverting.
+- **Nothing else in the directory matches the shape**, which is what says this is a
+  rule and not a fit to one test: the three tests that must keep the popover held
+  out — `-in-rendering` (60s), `-backdrop-entry` (2s delay + 2s), `-out-rendering`
+  — screenshot immediately and register no such listener, and
+  `overlay-transition-dialog` is `reftest-wait` but releases it from a
+  `requestAnimationFrame`.
+- **Measured: 1.81% → 100%**, and the 382-test `css-position` subset goes
+  **238 → 239 passing with nothing lost**. Four tests in
+  `OverlayTransitionScreenshotTimeTests` cover both directions, the ancestor
+  listener, and the script-time half that must not move.
+
+### A Web Animation on a pseudo-element was silently inert — problem 11, **fixed**
+
+- **Test:** `css/css-pseudo/backdrop-animate-002`, 0.8% on CI and 0.77% here.
+- **Owner:** HtmlBridge (`DomBridge/WebAnimations.cs`, `DomBridge.Serialization.cs`,
+  `Dialogs.cs`). Main repo.
+- **Two gaps, and the test needs both.** It animates `::backdrop` to a
+  10%-opacity green with
+  `{opacity: [0.1, 0.1], backgroundColor: ["green", "green"]}` and got the UA modal
+  scrim. **Its own reference writes the same declarations as CSS and already
+  rendered correctly** — which is what said the gap was the API rather than the
+  pseudo-element.
+  1. **The property-indexed keyframe form was not parsed at all.**
+     `ParseAnimationKeyframes` required a `JSArray`, so
+     `{ opacity: [0, 1] }` — the other half of the Web Animations keyframe
+     argument — resolved to zero keyframes and the whole animation was inert. Each
+     property is now turned into its own keyframes, which is exactly how
+     `ResolveKeyframeProperties` reads them: it brackets each property against only
+     the keyframes that define it, so properties with different list lengths need
+     no common offset grid.
+  2. **`pseudoElement` was ignored.** A pseudo-element has no node, so the
+     element-inline bake `animate()` performs has nowhere to land. Those values are
+     kept aside per element and pseudo, and emitted at serialization as
+     `#id::pseudo { … !important }` author rules.
+- **The rule alone did not close it, and the reason is worth recording.** With the
+  rule emitted and verifiably present in the serialized HTML, the backdrop went
+  green but stayed opaque. The WPT path renders a modal backdrop as a *synthesized*
+  `<div>`, and a `#id::backdrop` selector cannot match a `<div>` — the div is
+  filled from the bridge's own `::backdrop` cascade instead. So the animated values
+  are merged into that cascade too, in `BackdropDeclarationsFor`, which both the
+  synthesized div and the native marker read. The serialized rule is still what
+  carries the native `::backdrop` box and any other pseudo.
+- **Measured: 0.77% → 99.74%**, and the 358-test `css-pseudo` subset goes
+  **236 → 237 passing with nothing lost**. Five tests in `AnimatePseudoElementTests`
+  pin the animated backdrop against the equivalent style rule, the two keyframe
+  forms, the single-value case, and that one element's pseudo bake does not reach
+  another's.
+- **Checked wider, because keyframe parsing touches every `animate()` call:**
+  `css-view-transitions` 346/490, `css-masking` 222/439, `css-shadow` 157/207,
+  `css-transforms/animation` 30/64 and `css-align/animation` 4/6 — all unchanged,
+  no test changing state in either direction. Four `transform-interpolation-*`
+  testharness tests move (two up, two down, none crossing the threshold) because
+  more of their subtests now actually run.
+- **A method note that cost real time.** The first `css-view-transitions` diff
+  showed `auto-name-from-id` falling 97.46% → 1.27% and `auto-name-from-id-shadow`
+  98.73% → 0.64%. Neither was this change: the reference set had been regenerated
+  between the two runs, and **this directory's references are timing-sensitive
+  enough to differ between generations**. Rendering the test three times on each
+  build gives a deterministic 1.27% on *both* — and 1.27% is what CI reports.
+  Re-baselining against the same reference set showed 346/490 either way. Compare
+  runs only against references generated in the same pass.
+
 ### An earlier verdict that no longer holds
 
 **Problem 7 (`css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative`)
@@ -1014,16 +1109,6 @@ than from reading code.
   the snapshot containing block contains. The family is 20 tests locally (2
   passing), scoring from 1.8% to 98.8%, so it is one root cause worth more than
   the four tests the list names.
-- **Problem 21 (`css-position/overlay/overlay-transition-finished`, 1.8%) is a
-  missing notion of "the transition has finished".**
-  `PopoverHeldOutByOverlayTransitionIn` returns true whenever an element merely
-  *declares* a discrete `overlay` transition, with no sense of when the screenshot
-  is taken. That is right for `overlay-transition-in-rendering`, which screenshots
-  mid-transition, and wrong for this test, which screenshots from `transitionend`
-  and must have the popover in the top layer by then. Our render is 98.2% red with
-  an 8px green band — the popover painted beneath the fixed red div, which is
-  exactly "held out" — so the fail-path (`pink`) never triggered and the only thing
-  missing is which side of `transitionend` the render is on.
 - **Problems 14, 15 and 27 (`clip-path`, ~1.0% and 2.9%) need a real path clip.**
   `TryCreateInsetClipPathItem` in `Broiler.HTML`'s `PaintWalker.Geometry` models
   `clip-path` as a **rectangle** — it parses `inset()` and nothing else. Problems
@@ -1033,7 +1118,7 @@ than from reading code.
   than a `ClipItem` rect, in a submodule this session cannot push to. Our render
   is the unclipped page in every case.
 
-### Three that do not reproduce here
+### Two that do not reproduce here
 
 Judge them from a CI artifact, not from this container. Per the caveats above, a
 *better* local score than CI usually means the offline render is not the one CI
@@ -1066,15 +1151,15 @@ owned by a section above). Re-reported problems point at that section.
 | 8 | `css-view-transitions/nothing-captured` | 0.0% | **99.54% (passes)** | does not reproduce — judge from CI |
 | 9 | `resource-timing/initiator-type/frameset` | 0.0% | — | re-report of #1491 problem 26 — [frameset frames render nothing](#frameset-frames-render-nothing) |
 | 10 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | — | **won't fix** — #1497 problem 25: Chromium fails this reftest against its own reference |
-| 11 | `css-pseudo/backdrop-animate-002` | 0.8% | 0.77% | open — reproduces |
+| 11 | `css-pseudo/backdrop-animate-002` | 0.8% | **0.77% → 99.74%** | **fixed** — property-indexed keyframes + `animate({pseudoElement})`, main repo |
 | 12, 13 | `css-grid/…/subgrid/…` (2) | 0.8%, 0.9% | 0.80%, 0.89% | open — new; subgrid track sizing. The 241-test `grid-subgridded-to-grid-lanes` subset is 122 passing, so these two head a large family |
 | 14, 15 | `css-masking/clip-path/clip-path-document-element{,-will-change}` (2) | 1.0% | 0.95% | open — `polygon()` needs a real path clip; see above |
 | 16 | `css-shadow/shadow-directionality-002.tentative` | 1.1% | **1.09% → 99.55%** | **fixed** — shadow-tree scoping (main repo) + `:dir()` ([`patches/0102`](../patches/README.md)) |
-| 17 | `css-view-transitions/auto-name-from-id` | 1.3% | 97.46% | does not reproduce; `auto-name` family — see problem 18 |
+| 17 | `css-view-transitions/auto-name-from-id` | 1.3% | 1.27% | open — **it does reproduce**; the earlier 97.46% was a stale reference (see the method note above). `auto-name` family — see problem 18 |
 | 18 | `css-view-transitions/auto-name` | 1.3% | 1.27% | **won't fix** — #1491 problems 14/15: reference is the unfeatured render |
 | 19 | `css-view-transitions/view-transition-waituntil-animation-manipulation` | 1.3% | 98.46% | does not reproduce — judge from CI |
 | 20 | `css-shadow/shadow-directionality-001.tentative` | 1.3% | **1.27% → 99.55%** | **fixed** — same change as problem 16 |
-| 21 | `css-position/overlay/overlay-transition-finished` | 1.8% | 1.81% | open — diagnosed above (no "transition finished" notion) |
+| 21 | `css-position/overlay/overlay-transition-finished` | 1.8% | **1.81% → 100%** | **fixed** — the paint-time half of the `overlay` entry transition, main repo |
 | 22, 23 | `css-view-transitions/massive-element-left-of-viewport-partially-onscreen-{new,old}` | 1.8% | 1.81% | open — diagnosed above (snapshot geometry, not scrolling) |
 | 24 | `css-align/animation/row-gap-interpolation` | 2.6% | 2.59% | open — new |
 | 25, 26 | `css-view-transitions/massive-element-right-of-viewport-partially-onscreen-{new,old}` | 2.6% | 2.65% | open — same root cause as 22/23 |
