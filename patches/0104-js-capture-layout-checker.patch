@@ -1,0 +1,801 @@
+From 088cfee8a41ca40d8600d5f603fbc6a30172a6e6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 5 Aug 2026 18:42:41 +0000
+Subject: [PATCH] Build the checker for item 1-1's capture layout, and find two
+ obstacles
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Item 1-1's remaining half is blocked on one stated thing: a captured name's
+index in the enclosing lambda's Box[] is decided by LambdaRewriter from the
+tree, and a deferred body has no tree, so the layout must come from source
+alone. 0101 built the free-name walk that would derive it. This builds the
+checker that says whether such a derivation is correct.
+
+The property that matters is asymmetric. Over-approximating costs a box per
+creation site and the enclosing function's numeric tier for that name;
+under-approximating means a deferred body resolves a name to a box that is not
+there, which is a miscompile. So a single missed capture disqualifies the
+approach, and the checker exists to make a zero mean something. Nine fixtures,
+including one that deliberately records an empty prediction against a non-empty
+truth and asserts the miss is reported — without it the rest are vacuous.
+
+Two obstacles the item's statement does not name.
+
+ClosureRepository holds two populations, and "which variables this lambda
+captures" means one of them: bindings handed in from an enclosing scope (Setup,
+appended to Inputs, index >= 0), and the lambda's own locals that something
+nested captures (Convert, index == -1). A free-name walk answers the first and
+correctly does not name the second. Compared against the whole repository,
+`function outer(){ var q = 1; var inner = function(){ return q; }; }` reports
+outer missing q — a function missing its own local. The prediction was right and
+the comparison was wrong. So the deferral needs two derivations: the enclosing
+function learns which of its own locals to box from its children's free-name
+sets, and the deferred body learns its own free names' indices.
+FreeNameScan.ForProgram already computes bottom-up and can serve both.
+
+And every function is handed a ScriptInfo_* binding — script metadata the
+compiler threads in — that no source identifier names, alongside this, arguments
+and new.target. The layout needs a reserved region for compiler-introduced
+captures beside the source-derived one.
+
+What is not established, and is left that way. With the comparison corrected the
+corpus reports 170 missed sites of 5 762 and 6 138 missed names, but the same
+run reports Mandreel at 2 622 exact against 1 476 predicted sites — more checks
+than predictions — so the per-site figures double-count somewhere. A miss rate
+from an instrument that disagrees with itself is not a finding, so no go/no-go
+is claimed and the item is not declared blocked on it. Next: the double-count,
+then the three unexplained sample shapes, in that order.
+
+Off by default (BROILER_JS_CAPTURE_LAYOUT_CHECK=1); changes no emission on any
+setting. Compiler suite green: 1 250 tests.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LqMsVZEFfMkp52dejVuRif
+---
+ .../CaptureLayoutTests.cs                     | 234 +++++++++++++++
+ .../FastCompiler.CreateFunction.cs            |  61 +++-
+ .../DeferredCaptureLayout.cs                  | 276 ++++++++++++++++++
+ .../Runtime/RuntimeMethodBuilder.cs           |  41 +--
+ .../DeferPopulationMetrics.cs                 |  19 ++
+ 5 files changed, 613 insertions(+), 18 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs
+new file mode 100644
+index 00000000..78b1d811
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs
+@@ -0,0 +1,234 @@
++using Broiler.JavaScript.Engine;
++using Broiler.JavaScript.ExpressionCompiler;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// Item 1-1's remaining half: the capture layout derived from SOURCE, checked against the one
++// LambdaRewriter derives from the TREE (docs/performance-roadmap.md item 1-1).
++//
++// The item's obstacle is that a captured name's index in the enclosing lambda's Box[] is decided
++// by a walk over the enclosing tree, and a deferred body has no tree to walk. So the layout has to
++// be derivable without one — and the only property that matters about that derivation is that it
++// never MISSES.
++//
++//   * over-approximating boxes a binding that did not need it. A cost: one box per creation site,
++//     and the enclosing function loses that name's numeric tier.
++//   * under-approximating means a deferred body resolves a name to a box that is not there. A
++//     miscompile.
++//
++// The two are not comparable, so `MissedSites` is the go/no-go number and everything here exists
++// to make a zero in it mean something. A checker that predicted "every binding in scope" would
++// never miss and would be useless; a checker that predicted nothing would never be exercised. The
++// fixtures below pin both ends.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public sealed class CaptureLayoutTests
++{
++    private readonly record struct Layout(
++        long Sites,
++        long Exact,
++        long Over,
++        long Missed,
++        long PredictedNames,
++        long ActualNames,
++        long MissedNames,
++        long Synthetic);
++
++    private static Layout Check(string source)
++    {
++        var previous = DeferredCaptureLayout.Checking;
++        DeferredCaptureLayout.Checking = true;
++        using var context = new JSContext();
++        DeferredCaptureLayout.Reset();
++        try
++        {
++            context.Eval(source);
++            return new Layout(
++                DeferredCaptureLayout.Sites,
++                DeferredCaptureLayout.ExactSites,
++                DeferredCaptureLayout.OverApproximatedSites,
++                DeferredCaptureLayout.MissedSites,
++                DeferredCaptureLayout.PredictedNames,
++                DeferredCaptureLayout.ActualNames,
++                DeferredCaptureLayout.MissedNames,
++                DeferredCaptureLayout.SyntheticNames);
++        }
++        finally
++        {
++            DeferredCaptureLayout.Checking = previous;
++        }
++    }
++
++    [Fact]
++    public void TheSwitchIsOffByDefault()
++        => Assert.False(DeferredCaptureLayout.Checking);
++
++    [Fact]
++    public void ASimpleCaptureIsPredictedExactly()
++    {
++        var l = Check("""
++            function outer() {
++              var q = 1;
++              var inner = function () { return q; };
++              return inner();
++            }
++            outer();
++            """);
++
++        Assert.True(l.Missed == 0, "missed: " + string.Join(", ", DeferredCaptureLayout.MissedNameSamples));
++        Assert.True(l.ActualNames >= 1, "the rewrite should have handed q in");
++        Assert.Equal(0, l.MissedNames);
++    }
++
++    [Fact]
++    public void ACaptureThreeLevelsDownIsPredictedAtEveryLevel()
++    {
++        // The transitive case, and the one a per-function walk gets wrong if it does not compose:
++        // `q` is free in the reader AND in every function between it and the binding, because each
++        // of those has to hand the box on.
++        var l = Check("""
++            function outer() {
++              var q = 1;
++              return (function () {
++                return (function () {
++                  return (function () { return q; })();
++                })();
++              })();
++            }
++            outer();
++            """);
++
++        Assert.Equal(0, l.Missed);
++        Assert.Equal(0, l.MissedNames);
++    }
++
++    [Fact]
++    public void AWriteThroughACaptureIsPredicted()
++    {
++        // A capture the body only ever ASSIGNS. A walk that collects reads and forgets writes
++        // passes every read-shaped fixture and misses this one.
++        var l = Check("""
++            function outer() {
++              var q = 1;
++              var bump = function () { q = q + 1; };
++              bump(); bump();
++              return q;
++            }
++            outer();
++            """);
++
++        Assert.Equal(0, l.Missed);
++        Assert.Equal(0, l.MissedNames);
++    }
++
++    [Fact]
++    public void APerIterationLoopCellIsPredicted()
++    {
++        // `let` in a for-head is a distinct binding per iteration, which is the case where the
++        // rewrite creates the most cells and where an off-by-one in the layout would show.
++        var l = Check("""
++            var fs = [];
++            for (let i = 0; i < 3; i++) { fs.push(function () { return i; }); }
++            fs[0]() + fs[1]() + fs[2]();
++            """);
++
++        Assert.Equal(0, l.Missed);
++        Assert.Equal(0, l.MissedNames);
++    }
++
++    [Fact]
++    public void ACaptureInsideACatchAndAWithFreeBodyIsPredicted()
++    {
++        var l = Check("""
++            function outer() {
++              var q = 1;
++              try { throw 2; } catch (e) {
++                var inner = function () { return q + e; };
++                return inner();
++              }
++            }
++            outer();
++            """);
++
++        Assert.Equal(0, l.Missed);
++        Assert.Equal(0, l.MissedNames);
++    }
++
++    [Fact]
++    public void AShadowedNameIsNotPredictedAndIsNotCaptured()
++    {
++        // The over-approximation guard. `q` is mentioned and bound by the inner function, so
++        // neither the prediction nor the rewrite should treat it as a capture. A checker that
++        // predicted on mentions would report an over-approximation here.
++        var l = Check("""
++            function outer() {
++              var q = 1;
++              var inner = function (q) { return q; };
++              return inner(2);
++            }
++            outer();
++            """);
++
++        Assert.Equal(0, l.Missed);
++        Assert.Equal(0, l.MissedNames);
++        Assert.Equal(0, l.Over);
++    }
++
++    [Fact]
++    public void TheCheckerIsShownToCatchAMissBeforeItsZeroIsTrusted()
++    {
++        // **The fixture that makes every zero above mean something**, and §3.5's rule from 0096
++        // applied to a checker rather than an emitter: a comparison that has never reported a
++        // failure is a claim about the comparison.
++        //
++        // A miss is "the rewrite captured a binding the source-derived prediction did not name".
++        // It cannot be produced from JavaScript — if the prediction were wrong on real source,
++        // that would be the defect this exists to find — so it is produced directly: record a
++        // prediction that deliberately omits everything, then check it against a non-empty actual
++        // set. If that does not register a miss, the comparison is inert and every other test in
++        // this file is vacuous.
++        var previous = DeferredCaptureLayout.Checking;
++        DeferredCaptureLayout.Checking = true;
++        try
++        {
++            DeferredCaptureLayout.Reset();
++
++            var captured = ExpressionCompiler.Expressions.BExpression.Parameter(typeof(object), "q");
++            var lambda = ExpressionCompiler.Expressions.BExpression.Lambda(
++                typeof(System.Action),
++                ExpressionCompiler.Expressions.BExpression.Empty,
++                "probe",
++                []);
++
++            DeferredCaptureLayout.Predict(lambda, []);
++            DeferredCaptureLayout.Check(lambda, [captured]);
++
++            Assert.Equal(1, DeferredCaptureLayout.MissedSites);
++            Assert.Equal(1, DeferredCaptureLayout.MissedNames);
++        }
++        finally
++        {
++            DeferredCaptureLayout.Checking = previous;
++        }
++    }
++
++    [Fact]
++    public void SyntheticBindingsAreExcludedRatherThanCountedAsMisses()
++    {
++        // `this` and `arguments` are captured by the rewrite and are not identifiers a free-name
++        // walk can see. They must be excluded, or every method in the corpus reads as a miss and
++        // the go/no-go number is noise. The exclusion is narrow on purpose — anything it lets
++        // through is charged to the prediction.
++        var l = Check("""
++            function Outer() {
++              this.v = 1;
++              var self = this;
++              this.get = function () { return self.v + arguments.length; };
++            }
++            var o = new Outer();
++            o.get();
++            """);
++
++        Assert.Equal(0, l.Missed);
++        Assert.True(l.Synthetic >= 0);
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+index 9e74b36d..f5ad327f 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+@@ -1,4 +1,4 @@
+-using System;
++﻿using System;
+ using Broiler.JavaScript.ExpressionCompiler.Expressions;
+ using System.Collections.Generic;
+ using System.Reflection;
+@@ -441,6 +441,14 @@ partial class FastCompiler
+             else
+             {
+                 lambda = BExpression.Lambda(typeof(JSFunctionDelegate), block, in scriptFunctionName, [cs.Arguments]);
++                // Item 1-1's remaining half. Record what this body captures, derived from source
++                // alone the way a DEFERRED body would have to derive it — before the rewrite that
++                // decides the real Box[] layout from the tree has run. RuntimeMethodBuilder.Relay
++                // compares the two.
++                if (ExpressionCompiler.DeferredCaptureLayout.Checking)
++                    ExpressionCompiler.DeferredCaptureLayout.Predict(
++                        lambda,
++                        PredictCaptures(functionDeclaration, previousScope));
+                 jsf = JSFunctionBuilder.New(ToDelegate(lambda), fxName, code, functionLength, createPrototype: createPrototype && !functionDeclaration.IsArrowFunction);
+                 if (!isStrictFunction)
+                     jsf = JSFunctionBuilder.EnableNonStrictThis(jsf);
+@@ -625,6 +633,57 @@ partial class FastCompiler
+             cellBacked);
+     }
+ 
++    /// <summary>
++    /// The bindings a deferred body would have to be handed boxes for, computed from source alone
++    /// (docs/performance-roadmap.md item 1-1's remaining half).
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// <b>The same two steps the deferral itself would run</b>, and no others:
++    /// <see cref="FreeNameScan"/> for the names the body references and does not bind, then the
++    /// enclosing scope for where each resolves. A name that resolves to nothing this compilation
++    /// holds is looked up dynamically at run time and needs no box; a name whose binding has no CLR
++    /// local of its own has no box to point at. What is left is exactly the set an addressable
++    /// <c>Box[]</c> has to cover.
++    /// </para>
++    /// <para>
++    /// <b>A <see cref="FreeNameScan.Dynamic"/> body predicts nothing and is not counted</b>, because
++    /// the mechanism refuses to defer it — a direct <c>eval</c>, a <c>with</c> or a <c>debugger</c>
++    /// can reach a binding the text never names, so there is no set to be right about.
++    /// </para>
++    /// </remarks>
++    private static HashSet<BParameterExpression> PredictCaptures(
++        AstFunctionExpression function,
++        FastFunctionScope enclosing)
++    {
++        var captures = new HashSet<BParameterExpression>(ExpressionCompiler.Core.ReferenceEqualityComparer.Instance);
++        if (enclosing == null)
++            return captures;
++
++        var scan = FreeNameScan.Of(function);
++        if (scan.Dynamic)
++            return captures;
++
++        foreach (var name in scan.Free)
++        {
++            if (!enclosing.TryResolveBinding(name, out var binding))
++            {
++                ExpressionCompiler.DeferredCaptureLayout.NoteUnresolved(name);
++                continue;
++            }
++
++            if (binding.Variable == null)
++            {
++                ExpressionCompiler.DeferredCaptureLayout.NoteNoCell(name);
++                continue;
++            }
++
++            captures.Add(binding.Variable);
++        }
++
++        return captures;
++    }
++
+     private static int GetExpectedArgumentCount(IFastEnumerable<VariableDeclarator> parameters)
+     {
+         var count = 0;
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs
+new file mode 100644
+index 00000000..dcb9764b
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs
+@@ -0,0 +1,276 @@
++#nullable enable
++using System.Collections.Generic;
++using System.Linq;
++using System.Runtime.CompilerServices;
++using System.Threading;
++using Broiler.JavaScript.ExpressionCompiler.Expressions;
++
++namespace Broiler.JavaScript.ExpressionCompiler;
++
++/// <summary>
++/// Item 1-1's remaining half: the capture layout computed <em>without</em> a body tree, checked
++/// against the one <see cref="LambdaRewriter"/> derives <em>from</em> the tree.
++/// </summary>
++/// <remarks>
++/// <para>
++/// <b>This is the item's own named sub-project, and it is the whole of what blocks it.</b> The
++/// roadmap states the obstacle precisely: the capture mechanism is not missing — a creation site
++/// already passes a <c>Box[]</c> and a compiler that knows a name's <em>index</em> in it binds
++/// that name with an array load — it is <em>unaddressable</em>, because the index is decided by
++/// <c>LambdaRewriter</c> walking the enclosing tree, and a deferred body has no tree to walk.
++/// </para>
++/// <para>
++/// <b>So the layout has to be derivable from the source alone, and the only thing that matters
++/// about it is that it never misses.</b> Over-approximating boxes a binding that did not need it —
++/// a cost, paid once per creation site, and the enclosing function loses that name's numeric tier.
++/// Under-approximating means a deferred body resolves a name to a box that is not there, which is
++/// a <em>miscompile</em>. The two failure modes are not comparable, and the go/no-go for the whole
++/// item is whether the tree-free prediction ever misses on real source.
++/// </para>
++/// <para>
++/// <b>Prediction and truth are compared by reference identity on the
++/// <see cref="BParameterExpression"/>, not by name</b>, because names are exactly what a
++/// comparison here must not trust: two bindings can share a spelling across scopes, and an
++/// agreement on spellings would hide a disagreement on bindings. The predicted set is recorded by
++/// the front end against the lambda it belongs to; the actual set is read off
++/// <see cref="ClosureRepository"/> at relay, once the rewrite that populates it has run.
++/// </para>
++/// <para>
++/// Off by default. It costs a <c>FreeNameScan</c> and a scope resolution per compiled function,
++/// which is compile time nothing that ships needs to pay.
++/// </para>
++/// </remarks>
++public static class DeferredCaptureLayout
++{
++    public const string EnvironmentVariable = "BROILER_JS_CAPTURE_LAYOUT_CHECK";
++
++    private static int checking = string.Equals(
++        System.Environment.GetEnvironmentVariable(EnvironmentVariable),
++        "1",
++        System.StringComparison.Ordinal)
++        ? 1
++        : 0;
++
++    /// <summary>Whether the front end records a predicted capture set and the relay checks it.</summary>
++    public static bool Checking
++    {
++        get => Volatile.Read(ref checking) != 0;
++        set => Volatile.Write(ref checking, value ? 1 : 0);
++    }
++
++    private static readonly ConditionalWeakTable<BLambdaExpression, HashSet<BParameterExpression>> predicted = [];
++
++    /// <summary>
++    /// The same prediction keyed by SPELLING rather than by reference, kept beside the identity
++    /// one because the gap between them is a finding rather than an implementation detail — see
++    /// <see cref="MissedNamesByName"/>.
++    /// </summary>
++    private static readonly ConditionalWeakTable<BLambdaExpression, HashSet<string>> predictedNamesBySpelling = [];
++
++    private static long missedByName;
++
++    /// <summary>
++    /// Missed captures when prediction and truth are matched on the binding's SPELLING instead of
++    /// on the <see cref="BParameterExpression"/> instance. Compared against
++    /// <see cref="MissedNames"/>, the difference is the population the front end re-binds after a
++    /// nested function has already been created.
++    /// </summary>
++    public static long MissedNamesByName => Interlocked.Read(ref missedByName);
++
++    private static long sites;
++    private static long exact;
++    private static long over;
++    private static long missed;
++    private static long predictedNames;
++    private static long actualNames;
++    private static long missedNames;
++    private static long overNames;
++    private static long syntheticNames;
++
++    /// <summary>
++    /// Spellings of the first few missed bindings. A count alone cannot be acted on — the whole
++    /// question is <em>which</em> binding a source-derived walk failed to name.
++    /// </summary>
++    private static readonly List<string> missedSamples = [];
++
++    public static IReadOnlyList<string> MissedNameSamples
++    {
++        get { lock (missedSamples) return missedSamples.ToArray(); }
++    }
++
++    /// <summary>Sites where prediction and truth agreed exactly.</summary>
++    public static long ExactSites => Interlocked.Read(ref exact);
++
++    /// <summary>Sites where the prediction was a strict superset — safe, and a cost.</summary>
++    public static long OverApproximatedSites => Interlocked.Read(ref over);
++
++    /// <summary>
++    /// Sites where a real capture was NOT predicted. The number that decides the item: any value
++    /// above zero is a miscompile waiting for the mechanism to be built on it.
++    /// </summary>
++    public static long MissedSites => Interlocked.Read(ref missed);
++
++    /// <summary>Sites the front end recorded a prediction for.</summary>
++    public static long Sites => Interlocked.Read(ref sites);
++
++    public static long PredictedNames => Interlocked.Read(ref predictedNames);
++
++    public static long ActualNames => Interlocked.Read(ref actualNames);
++
++    public static long MissedNames => Interlocked.Read(ref missedNames);
++
++    public static long OverApproximatedNames => Interlocked.Read(ref overNames);
++
++    /// <summary>
++    /// Captured bindings that are not identifiers in the source at all — <c>this</c>,
++    /// <c>arguments</c>, <c>new.target</c>, a compiler temporary. A free-name walk cannot predict
++    /// them and must not be charged for them; the mechanism handles them by their own rules, the
++    /// way the enclosing scope already does.
++    /// </summary>
++    public static long SyntheticNames => Interlocked.Read(ref syntheticNames);
++
++    /// <summary>Records what the front end predicts this lambda captures, from source alone.</summary>
++    public static void Predict(BLambdaExpression lambda, HashSet<BParameterExpression> captures)
++    {
++        predicted.AddOrUpdate(lambda, captures);
++        var spellings = new HashSet<string>(System.StringComparer.Ordinal);
++        foreach (var c in captures)
++            if (!string.IsNullOrEmpty(c.Name))
++                spellings.Add(c.Name);
++        predictedNamesBySpelling.AddOrUpdate(lambda, spellings);
++        Interlocked.Increment(ref sites);
++        Interlocked.Add(ref predictedNames, captures.Count);
++    }
++
++    /// <summary>
++    /// Compares the recorded prediction against what the rewrite actually decided. Called at
++    /// relay, after <see cref="LambdaRewriter"/> has populated the repository.
++    /// </summary>
++    /// <summary>
++    /// Compares the prediction against the bindings this lambda has <em>handed in</em>.
++    /// </summary>
++    /// <remarks>
++    /// <b>The set to compare against is not <c>Closures.Keys</c>, and getting that wrong is the
++    /// first thing this checker found.</b> A lambda's repository holds two populations that the
++    /// item's statement of the obstacle conflates: bindings threaded in from an enclosing scope
++    /// (<c>Setup</c>, which appends to <c>Inputs</c> and records <c>index >= 0</c>) and the
++    /// lambda's <em>own</em> locals that something nested captures, which must live in a cell but
++    /// are not handed to it (<c>Convert</c>, <c>index == -1</c>). Only the first is what a
++    /// deferred body needs a <c>Box[]</c> index for; the second is what the enclosing function
++    /// must box on its children's behalf, and a free-name walk of the enclosing function correctly
++    /// does not name it. Compared against the whole repository, every function that holds a
++    /// captured local reads as a miss — which is what happened, on the simplest fixture there is.
++    /// </remarks>
++    public static void Check(BLambdaExpression lambda, ClosureRepository repository)
++    {
++        var actual = new List<BParameterExpression>();
++        foreach (var entry in repository.Closures)
++            if (entry.Value.index >= 0)
++                actual.Add(entry.Key);
++
++        Check(lambda, actual);
++    }
++
++    public static void Check(BLambdaExpression lambda, ICollection<BParameterExpression> actual)
++    {
++        if (!predicted.TryGetValue(lambda, out var expected))
++            return;
++
++        predictedNamesBySpelling.TryGetValue(lambda, out var expectedNames);
++
++        long missCount = 0;
++        long realCount = 0;
++        foreach (var capture in actual)
++        {
++            // A binding with no name, or one whose name is not an identifier the source could
++            // have written, is outside a free-name walk's reach by construction.
++            if (IsSynthetic(capture))
++            {
++                Interlocked.Increment(ref syntheticNames);
++                continue;
++            }
++
++            realCount++;
++            if (expectedNames != null && !expectedNames.Contains(capture.Name!))
++                Interlocked.Increment(ref missedByName);
++
++            if (!expected.Contains(capture))
++            {
++                missCount++;
++                lock (missedSamples)
++                {
++                    if (missedSamples.Count < 32)
++                        missedSamples.Add((lambda.Name.ToString() ?? "?") + "/" + (capture.Name ?? "<null>")
++                            + " predicted{" + string.Join("|", expectedNames ?? []) + "}");
++                }
++            }
++        }
++
++        Interlocked.Add(ref actualNames, realCount);
++        Interlocked.Add(ref missedNames, missCount);
++        var overCount = expected.Count - (realCount - missCount);
++        if (overCount > 0)
++            Interlocked.Add(ref overNames, overCount);
++
++        if (missCount > 0)
++            Interlocked.Increment(ref missed);
++        else if (overCount > 0)
++            Interlocked.Increment(ref over);
++        else
++            Interlocked.Increment(ref exact);
++    }
++
++    /// <summary>
++    /// Whether a captured binding is one no source identifier names. Deliberately a name test and
++    /// deliberately narrow: anything it lets through is charged to the prediction, so the bias is
++    /// towards reporting a miss rather than excusing one.
++    /// </summary>
++    private static bool IsSynthetic(BParameterExpression capture)
++    {
++        var name = capture.Name;
++        if (string.IsNullOrEmpty(name))
++            return true;
++
++        return name is "this" or "arguments" or "new.target"
++            || name[0] is '<' or '`'
++            || name.Contains('`')
++            // Script metadata the compiler threads into every function. No source identifier
++            // names it, so a free-name walk cannot predict it — and every function captures one,
++            // which is why it has to be recognised rather than counted.
++            || name.StartsWith("ScriptInfo_", System.StringComparison.Ordinal);
++    }
++
++    private static readonly List<string> unresolved = [];
++    private static readonly List<string> noCell = [];
++
++    public static IReadOnlyList<string> UnresolvedSamples { get { lock (unresolved) return unresolved.ToArray(); } }
++
++    public static IReadOnlyList<string> NoCellSamples { get { lock (noCell) return noCell.ToArray(); } }
++
++    public static void NoteUnresolved(string name)
++    {
++        lock (unresolved) { if (unresolved.Count < 32) unresolved.Add(name); }
++    }
++
++    public static void NoteNoCell(string name)
++    {
++        lock (noCell) { if (noCell.Count < 32) noCell.Add(name); }
++    }
++
++    public static void Reset()
++    {
++        Interlocked.Exchange(ref sites, 0);
++        Interlocked.Exchange(ref exact, 0);
++        Interlocked.Exchange(ref over, 0);
++        Interlocked.Exchange(ref missed, 0);
++        Interlocked.Exchange(ref predictedNames, 0);
++        Interlocked.Exchange(ref actualNames, 0);
++        Interlocked.Exchange(ref missedNames, 0);
++        Interlocked.Exchange(ref overNames, 0);
++        Interlocked.Exchange(ref syntheticNames, 0);
++        Interlocked.Exchange(ref missedByName, 0);
++        lock (missedSamples) missedSamples.Clear();
++        lock (unresolved) unresolved.Clear();
++        lock (noCell) noCell.Clear();
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs
+index 13b220f7..9338da09 100644
+--- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Runtime/RuntimeMethodBuilder.cs
+@@ -64,25 +64,32 @@ public class RuntimeMethodBuilder(
+             }
+         }
+ 
+-        var repository = BExpression.Field(@this, Closures.repositoryField);
+-        var id = methods is MethodRepository runtimeMethods
+-            && DeferredMethod.CanDefer(innerLambda, captureDiagnostics)
+-            ? runtimeMethods.RegisterDeferred(
+-                new DeferredMethod(innerLambda, this, enableJavaScriptTailCalls),
+-                innerLambda.Type)
+-            : RegisterGenerated(innerLambda);
+-
+-        return BExpression.Call(repository, create, closures == null ? BExpression.Null : BExpression.NewArray(typeof(Box), closures), BExpression.Constant(id));
+-    }
+-
+-    private ulong RegisterGenerated(BLambdaExpression innerLambda)
++        // Item 1-1's remaining half: the rewrite above has just decided this lambda's Box[]
++        // layout FROM THE TREE. If the front end recorded what it predicted from source alone,
++        // this is the only place the two can be compared — before it the truth does not exist,
++        // and after it the tree is gone.
++        if (DeferredCaptureLayout.Checking)
++            DeferredCaptureLayout.Check(innerLambda, ClosureRepository.For(innerLambda));
++
++        var repository = BExpression.Field(@this, Closures.repositoryField);
++        var id = methods is MethodRepository runtimeMethods
++            && DeferredMethod.CanDefer(innerLambda, captureDiagnostics)
++            ? runtimeMethods.RegisterDeferred(
++                new DeferredMethod(innerLambda, this, enableJavaScriptTailCalls),
++                innerLambda.Type)
++            : RegisterGenerated(innerLambda);
++
++        return BExpression.Call(repository, create, closures == null ? BExpression.Null : BExpression.NewArray(typeof(Box), closures), BExpression.Constant(id));
++    }
++
++    private ulong RegisterGenerated(BLambdaExpression innerLambda)
+     {
+         var (method, il, exp) = innerLambda.CompileToBoundDynamicMethod(
+             methodBuilder: this,
+             captureDiagnostics: captureDiagnostics,
+             enableJavaScriptTailCalls: enableJavaScriptTailCalls);
+-        return methods.RegisterNew(method, il, exp, innerLambda.Type);
+-    }
++        return methods.RegisterNew(method, il, exp, innerLambda.Type);
++    }
+ }
+ 
+ /// <summary>
+@@ -120,7 +127,7 @@ public static class ClosureRewriteDiagnostics
+     {
+         get => Volatile.Read(ref skipRewritten) != 0;
+         set => Volatile.Write(ref skipRewritten, value ? 1 : 0);
+-    }
++    }
+ 
+     /// <summary>Relayed sites whose subtree this rewrote.</summary>
+     public static long RewroteRelays => Interlocked.Read(ref rewrote);
+@@ -146,14 +153,14 @@ public static class ClosureRewriteDiagnostics
+     {
+         if (inRepeatWalk)
+             Interlocked.Increment(ref capturesInRepeat);
+-    }
++    }
+ 
+     public static void Reset()
+     {
+         Interlocked.Exchange(ref rewrote, 0);
+         Interlocked.Exchange(ref skipped, 0);
+         Interlocked.Exchange(ref capturesInRepeat, 0);
+-    }
++    }
+ 
+     private static int ReadConfigured()
+         => string.Equals(
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
+index 5606d334..413f2d8a 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
+@@ -90,6 +90,9 @@ internal static class DeferPopulationMetrics
+         // has to be on before anything is compiled — a compile-time counter enabled among the
+         // run-time censuses reads zero, which phase 3 paid for twice.
+         Compiler.DeferrableFunctions.Counting = true;
++        // Item 1-1's remaining half: check the source-derived capture layout against the one the
++        // rewrite derives from the tree, on the same corpora and in the same run.
++        ExpressionCompiler.DeferredCaptureLayout.Checking = true;
+ 
+         foreach (var corpus in corpora)
+         {
+@@ -101,6 +104,7 @@ internal static class DeferPopulationMetrics
+             DeferredMethodDiagnostics.Reset();
+             ClosureRewriteDiagnostics.Reset();
+             Compiler.CompilerSpecializationDiagnostics.Reset();
++            ExpressionCompiler.DeferredCaptureLayout.Reset();
+ 
+             string failure = null;
+             try
+@@ -177,6 +181,20 @@ internal static class DeferPopulationMetrics
+ 
+                 // Non-null means evaluation stopped early, so `forced` is a floor and the share
+                 // above is a ceiling.
++                // Item 1-1's capture layout, predicted from source against the rewrite's own
++                // answer. missedSites is the go/no-go: over-approximating costs a box, missing is
++                // a miscompile.
++                layoutSites = ExpressionCompiler.DeferredCaptureLayout.Sites,
++                layoutExact = ExpressionCompiler.DeferredCaptureLayout.ExactSites,
++                layoutOver = ExpressionCompiler.DeferredCaptureLayout.OverApproximatedSites,
++                layoutMissed = ExpressionCompiler.DeferredCaptureLayout.MissedSites,
++                layoutPredictedNames = ExpressionCompiler.DeferredCaptureLayout.PredictedNames,
++                layoutActualNames = ExpressionCompiler.DeferredCaptureLayout.ActualNames,
++                layoutMissedNames = ExpressionCompiler.DeferredCaptureLayout.MissedNames,
++                layoutOverNames = ExpressionCompiler.DeferredCaptureLayout.OverApproximatedNames,
++                layoutSynthetic = ExpressionCompiler.DeferredCaptureLayout.SyntheticNames,
++                layoutMissedSamples = ExpressionCompiler.DeferredCaptureLayout.MissedNameSamples,
++
+                 evaluationFailure = failure,
+             });
+ 
+@@ -196,6 +214,7 @@ internal static class DeferPopulationMetrics
+         }
+ 
+         Compiler.DeferrableFunctions.Counting = false;
++        ExpressionCompiler.DeferredCaptureLayout.Checking = false;
+ 
+         Console.WriteLine(JsonSerializer.Serialize(
+             new
+-- 
+2.43.0
+
