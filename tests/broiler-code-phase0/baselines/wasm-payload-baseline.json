@@ -1,0 +1,96 @@
+﻿{
+    "schemaVersion":  1,
+    "recordedOn":  {
+                       "architecture":  "X64",
+                       "framework":  "10.0.302",
+                       "operatingSystem":  "Microsoft Windows 10.0.26200 "
+                   },
+    "profile":  "browser-wasm, self-contained, PublishTrimmed=true, RunAOTCompilation=false, InvariantGlobalization=true",
+    "caveat":  "Size only. Roslyn trim warnings are unreviewed, so this does not claim the trimmed composition runs.",
+    "probes":  [
+                   {
+                       "probe":  "Probe.Wasm.Baseline",
+                       "fileCount":  8,
+                       "rawBytes":  3023195,
+                       "brotliBytes":  908604,
+                       "compressedFiles":  16,
+                       "satelliteFileCount":  0,
+                       "satelliteRawBytes":  0,
+                       "satelliteBrotliBytes":  0,
+                       "largestAssemblies":  [
+                                                 {
+                                                     "name":  "dotnet.native.d3wf9n2wr4.wasm",
+                                                     "bytes":  1484372
+                                                 },
+                                                 {
+                                                     "name":  "System.Private.CoreLib.onjoytnjip.wasm",
+                                                     "bytes":  1018133
+                                                 },
+                                                 {
+                                                     "name":  "System.Runtime.InteropServices.JavaScript.he5dheo0u3.wasm",
+                                                     "bytes":  40213
+                                                 },
+                                                 {
+                                                     "name":  "System.Console.rhaxqx88pa.wasm",
+                                                     "bytes":  14613
+                                                 },
+                                                 {
+                                                     "name":  "Probe.Wasm.Baseline.hth0hfb9b1.wasm",
+                                                     "bytes":  4885
+                                                 }
+                                             ]
+                   },
+                   {
+                       "probe":  "Probe.Wasm.Roslyn",
+                       "fileCount":  42,
+                       "rawBytes":  11308148,
+                       "brotliBytes":  2788561,
+                       "compressedFiles":  84,
+                       "satelliteFileCount":  26,
+                       "satelliteRawBytes":  6440482,
+                       "satelliteBrotliBytes":  1395328,
+                       "largestAssemblies":  [
+                                                 {
+                                                     "name":  "dotnet.native.xvu3essri5.wasm",
+                                                     "bytes":  1485730
+                                                 },
+                                                 {
+                                                     "name":  "Microsoft.CodeAnalysis.CSharp.fi98fcq1mv.wasm",
+                                                     "bytes":  1362197
+                                                 },
+                                                 {
+                                                     "name":  "System.Private.CoreLib.ikfafgl5bv.wasm",
+                                                     "bytes":  1118485
+                                                 },
+                                                 {
+                                                     "name":  "Microsoft.CodeAnalysis.CSharp.resources.jogtuy4qo6.wasm",
+                                                     "bytes":  618773
+                                                 },
+                                                 {
+                                                     "name":  "Microsoft.CodeAnalysis.CSharp.resources.qi58amcgrv.wasm",
+                                                     "bytes":  510741
+                                                 },
+                                                 {
+                                                     "name":  "Microsoft.CodeAnalysis.CSharp.resources.230dwxaqre.wasm",
+                                                     "bytes":  469269
+                                                 },
+                                                 {
+                                                     "name":  "Microsoft.CodeAnalysis.CSharp.resources.2850hrip2t.wasm",
+                                                     "bytes":  468757
+                                                 },
+                                                 {
+                                                     "name":  "Microsoft.CodeAnalysis.CSharp.resources.yukpxea6p1.wasm",
+                                                     "bytes":  467221
+                                                 }
+                                             ]
+                   }
+               ],
+    "delta":  {
+                  "rawBytes":  8284953,
+                  "brotliBytes":  1879957
+              },
+    "deltaWithoutSatellites":  {
+                                   "rawBytes":  1844471,
+                                   "brotliBytes":  484629
+                               }
+}

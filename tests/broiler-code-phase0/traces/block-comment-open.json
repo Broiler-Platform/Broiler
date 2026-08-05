@@ -1,0 +1,23 @@
+{
+  "id": "block-comment-open",
+  "description": "Opens an unterminated block comment near the top of a 100,000-line file, then closes it again. Every following line's start state changes until the comment is closed by the next '*/' already in the file, at which point the state reconverges and the rest of the document is reused. This is the trace that shows reconvergence bounding the damage of a state-changing edit; raw-string-runaway is the case where it cannot.",
+  "fixture": "csharp-100k-lines",
+  "fixtureLines": 100000,
+  "budget": "relex extent for a state-changing edit that reconverges",
+  "steps": [
+    {
+      "kind": "Insert",
+      "anchorText": "int total = 0;",
+      "anchorOccurrence": 1,
+      "column": 0,
+      "text": "/* opened"
+    },
+    {
+      "kind": "Insert",
+      "anchorText": "/* opened",
+      "anchorOccurrence": 1,
+      "column": 9,
+      "text": " */"
+    }
+  ]
+}

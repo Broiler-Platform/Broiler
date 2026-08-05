@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.Code.Language.CSharp.Syntax</RootNamespace>
+    <AssemblyName>Broiler.Code.Language.CSharp.Syntax</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    The control-facing classification contracts and nothing else. No Roslyn,
+    deliberately: this is the fallback a browser or Android host composes when
+    it cannot carry the semantic service, and a reference here would put Roslyn
+    in that host's transitive closure — which is exactly the composition Phase 0
+    measured and declined.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Text\Broiler.UI.CodeEditor\Broiler.UI.CodeEditor.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.Code.Language.CSharp.Tests" />
+  </ItemGroup>
+
+</Project>

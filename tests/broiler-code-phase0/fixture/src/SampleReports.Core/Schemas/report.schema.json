@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SampleReports report",
+  "type": "object",
+  "required": ["title", "entries"],
+  "properties": {
+    "title": { "type": "string" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "amount"],
+        "properties": {
+          "label": { "type": "string" },
+          "amount": { "type": "number" },
+          "recorded": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "typing-burst",
+  "description": "160 single-character insertions inside an inert statement of a 100,000-line file, the shape of a user typing at speed. The anchor is matched by content so the step keeps landing on a line that neither opens nor closes a multi-line construct; each keystroke must therefore relex a bounded number of lines.",
+  "fixture": "csharp-100k-lines",
+  "fixtureLines": 100000,
+  "budget": "input-to-present and per-keystroke allocation",
+  "steps": [
+    {
+      "kind": "Insert",
+      "anchorText": "int total = 0;",
+      "anchorOccurrence": 2000,
+      "column": 8,
+      "text": "x",
+      "repeat": 160
+    }
+  ]
+}

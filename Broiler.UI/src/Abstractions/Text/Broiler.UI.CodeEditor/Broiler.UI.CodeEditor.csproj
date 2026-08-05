@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.UI.CodeEditor</RootNamespace>
+    <AssemblyName>Broiler.UI.CodeEditor</AssemblyName>
+    <PackageId>Broiler.UI.CodeEditor</PackageId>
+    <Description>Platform-neutral source-editor abstraction with virtualized text, classification, and diagnostic contracts.</Description>
+  </PropertyGroup>
+
+  <!--
+    Broiler.UI and Broiler.Graphics only. Per ADR 0021 this assembly defines its
+    own control-facing document, snapshot, and span interfaces and takes no
+    dependency on Roslyn, on a product workspace, on the filesystem, or on a
+    platform. The architecture test asserts exactly this list.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Foundation\Broiler.UI\Broiler.UI.csproj" />
+    <ProjectReference Include="..\..\..\..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.UI.CodeEditor.Tests" />
+    <InternalsVisibleTo Include="Broiler.UI.CodeEditor.Standard" />
+    <InternalsVisibleTo Include="Broiler.UI.CodeEditor.Standard.Tests" />
+  </ItemGroup>
+
+</Project>

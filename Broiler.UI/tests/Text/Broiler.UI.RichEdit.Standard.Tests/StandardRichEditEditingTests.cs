@@ -52,14 +52,21 @@ public sealed class StandardRichEditEditingTests
         IUiTextEditor editor = scene.Edit;
 
         Assert.True(editor.SetEditorSelection(2, 4));
-        UiTextEditorState selected = editor.GetTextEditorState();
-        Assert.Equal("abcdef", selected.Text);
+        UiTextEditorMetrics selected = editor.GetTextEditorMetrics();
+        Assert.Equal(6, selected.TextLength);
         Assert.Equal(2, selected.SelectionStart);
         Assert.Equal(4, selected.SelectionEnd);
 
+        // Bounded reads: the contract hands over the range asked for, and
+        // clamps rather than throwing when more is requested than exists.
+        Assert.Equal("abcdef", editor.GetTextEditorRange(0, 6));
+        Assert.Equal("cd", editor.GetTextEditorRange(2, 2));
+        Assert.Equal("ef", editor.GetTextEditorRange(4, 999));
+        Assert.Equal(string.Empty, editor.GetTextEditorRange(99, 4));
+
         Assert.True(editor.DeleteSurroundingText(1, 1));
         Assert.Equal("abf", scene.Edit.GetPlainText());
-        UiTextEditorState deleted = editor.GetTextEditorState();
+        UiTextEditorMetrics deleted = editor.GetTextEditorMetrics();
         Assert.Equal(2, deleted.SelectionStart);
         Assert.Equal(2, deleted.SelectionEnd);
         scene.Session.Dispose();

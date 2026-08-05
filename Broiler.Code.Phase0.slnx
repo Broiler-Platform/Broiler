@@ -1,0 +1,12 @@
+<Solution>
+  <!-- Generated from eng/solutions.json by scripts/update-solutions.ps1. -->
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+  </Configurations>
+  <Folder Name="/Entry points/">
+    <Project Path="tests/broiler-code-phase0/Broiler.Code.Phase0.Prototype/Broiler.Code.Phase0.Prototype.csproj" />
+    <Project Path="tests/broiler-code-phase0/Broiler.Code.Phase0.Roslyn/Broiler.Code.Phase0.Roslyn.csproj" />
+    <Project Path="tests/broiler-code-phase0/Broiler.Code.Phase0.Worker/Broiler.Code.Phase0.Worker.csproj" />
+  </Folder>
+</Solution>

@@ -93,15 +93,23 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
 
     protected override bool IsCompositionActive => _compositionText.Length > 0;
 
-    public UiTextEditorState GetTextEditorState()
+    public UiTextEditorMetrics GetTextEditorMetrics()
     {
-        string text = Document.PlainText;
         int start = FlatIndex(Selection.Start);
         int end = FlatIndex(Selection.End);
         int compositionStart = _compositionText.Length > 0 ? FlatIndex(Selection.Focus) : -1;
         int compositionEnd = compositionStart < 0 ? -1 : compositionStart + _compositionText.Length;
-        return new UiTextEditorState(text, start, end, compositionStart, compositionEnd);
+        return new UiTextEditorMetrics(Document.PlainText.Length, start, end, compositionStart, compositionEnd);
     }
+
+    /// <summary>
+    /// A formatted document materializes its plain text to answer this. That is
+    /// acceptable for RichEdit's document sizes and would not be for a source
+    /// buffer, which is why the contract is a bounded range rather than a whole
+    /// string: the cost stays with the implementation that can afford it.
+    /// </summary>
+    public string GetTextEditorRange(int start, int maxLength) =>
+        UiTextEditorRange.Slice(Document.PlainText, start, maxLength);
 
     public bool DeleteSurroundingText(int beforeLength, int afterLength)
     {

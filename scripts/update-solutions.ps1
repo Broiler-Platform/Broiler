@@ -154,6 +154,32 @@ function New-SolutionText {
         [void] $rootSet.Add((Convert-ToRepositoryPath -FullPath (Join-Path $repositoryRoot $root)))
     }
 
+    # Solution-level deploy flags. Visual Studio's F5 and `msbuild /t:Deploy` on
+    # the solution use these to install an application head; `dotnet build` does
+    # not, which is why nothing in CI depends on them. They live in the manifest
+    # rather than in the .slnx because a hand-edit to a generated file is silently
+    # reverted by the next generator run.
+    $deployByProject = @{}
+    foreach ($entry in @($Definition.deploy)) {
+        if ($null -eq $entry) {
+            continue
+        }
+
+        $deployProject = Convert-ToRepositoryPath -FullPath (Join-Path $repositoryRoot $entry.project)
+        if ($deployProject -notin $Projects) {
+            throw (
+                "$($Definition.path) declares a deploy entry for '$($entry.project)', " +
+                'which is not in its project closure.')
+        }
+
+        $solutionExpression = [string] $entry.solution
+        if ([string]::IsNullOrWhiteSpace($solutionExpression)) {
+            throw "$($Definition.path) declares a deploy entry for '$($entry.project)' with no solution expression."
+        }
+
+        $deployByProject[$deployProject] = $solutionExpression
+    }
+
     $groups = [ordered]@{}
     $groups['Entry points'] = @($Projects | Where-Object { $rootSet.Contains($_) })
     foreach ($project in $Projects | Where-Object { -not $rootSet.Contains($_) }) {
@@ -182,7 +208,15 @@ function New-SolutionText {
         $lines.Add("  <Folder Name=`"$folderName`">")
         foreach ($project in $group.Value | Sort-Object) {
             $projectPath = Convert-ToXmlAttribute -Value $project
-            $lines.Add("    <Project Path=`"$projectPath`" />")
+            if ($deployByProject.ContainsKey($project)) {
+                $deploySolution = Convert-ToXmlAttribute -Value $deployByProject[$project]
+                $lines.Add("    <Project Path=`"$projectPath`">")
+                $lines.Add("      <Deploy Solution=`"$deploySolution`" />")
+                $lines.Add('    </Project>')
+            }
+            else {
+                $lines.Add("    <Project Path=`"$projectPath`" />")
+            }
         }
         $lines.Add('  </Folder>')
     }

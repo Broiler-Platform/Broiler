@@ -1,0 +1,16 @@
+{
+  "id": "raw-string-runaway",
+  "description": "Opens an eleven-quote raw string at the top of a 100,000-line file. A raw string closes only on a run of at least as many quotes, and no such run exists anywhere in the fixture, so the start state of every following line changes and never reconverges. This is the genuine worst case for a line-state classifier and the input the full-reparse budget is stated against. It is a pathological literal, not representative code — which is the point: the budget has to hold for the input a user can produce by accident, not only for the input that behaves.",
+  "fixture": "csharp-100k-lines",
+  "fixtureLines": 100000,
+  "budget": "full-reparse ceiling",
+  "steps": [
+    {
+      "kind": "Insert",
+      "anchorText": "int total = 0;",
+      "anchorOccurrence": 1,
+      "column": 0,
+      "text": "\"\"\"\"\"\"\"\"\"\"\""
+    }
+  ]
+}

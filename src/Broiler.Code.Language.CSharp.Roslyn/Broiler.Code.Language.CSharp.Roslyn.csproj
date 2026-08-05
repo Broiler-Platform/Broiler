@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.Code.Language.CSharp.Roslyn</RootNamespace>
+    <AssemblyName>Broiler.Code.Language.CSharp.Roslyn</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      One pinned toolset. The SDK on the recorded baseline compiles with
+      5.6.0-2.26329.109, so the language service and the authoritative build do
+      not share a compiler build. That gap is reported at runtime rather than
+      hidden: CSharpLanguageService.CompilerIdentity is shown next to the
+      resolved SDK so a diagnostic the build does not agree with is explicable.
+
+      Raising this pin is a reviewed change, not a routine bump: the language
+      service and the build worker have to agree about what the language means.
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
+  </ItemGroup>
+
+  <!--
+    Nothing else references this assembly except a composition root. Keeping
+    Roslyn out of Broiler.Code.Core's closure is what lets a browser or Android
+    host compose the portable classifier alone, which is the decision Phase 0's
+    payload measurements produced.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Text\Broiler.UI.CodeEditor\Broiler.UI.CodeEditor.csproj" />
+    <ProjectReference Include="..\Broiler.Code.Workspaces\Broiler.Code.Workspaces.csproj" />
+  </ItemGroup>
+
+</Project>

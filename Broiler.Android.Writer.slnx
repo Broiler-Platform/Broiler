@@ -1,10 +1,14 @@
 <Solution>
+  <!-- Generated from eng/solutions.json by scripts/update-solutions.ps1. -->
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+  </Configurations>
   <Folder Name="/Entry points/">
     <Project Path="src/Broiler.Writer.Android/Broiler.Writer.Android.csproj">
       <Deploy Solution="Debug|*" />
     </Project>
   </Folder>
-  <Folder Name="/Dependencies/" />
   <Folder Name="/Dependencies/Broiler.Documents/">
     <Project Path="Broiler.Documents/Broiler.Documents.Docx/Broiler.Documents.Docx.csproj" />
     <Project Path="Broiler.Documents/Broiler.Documents.FormatCodes/Broiler.Documents.FormatCodes.csproj" />

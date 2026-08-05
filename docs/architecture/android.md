@@ -35,6 +35,17 @@ The generated roots are `Broiler.Android.Writer.slnx`,
 `Broiler.Android.Tests.slnx`. Their forbidden-project patterns exclude Windows,
 Linux, and WebAssembly heads from Android closures.
 
+`Broiler.Android.Writer.slnx` marks its head for solution-level deploy in Debug,
+which is what makes Visual Studio install the APK on F5. Because the solution
+files are generated, that flag is declared by a `deploy` entry in
+[`eng/solutions.json`](../../eng/solutions.json) rather than edited into the
+`.slnx` — a hand-edit there is silently reverted by the next generator run,
+which is how the flag was nearly lost. `dotnet build` ignores it, so no CI job
+depends on it; the packaging workflow builds
+`src/Broiler.Writer.Android/Broiler.Writer.Android.csproj` directly.
+`Broiler.Android.Browser.slnx` declares no deploy entry. That asymmetry is
+inherited rather than intended, and settling it belongs to the Android owner.
+
 ## Development environment
 
 Verified on Windows on 2026-08-01:

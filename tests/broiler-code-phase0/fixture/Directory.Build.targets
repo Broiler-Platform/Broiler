@@ -1,0 +1,9 @@
+<Project>
+
+  <!--
+    Present only to terminate the upward Directory.Build.targets search at the
+    fixture root, for the same reason as Directory.Build.props. Adding real
+    logic here would make the fixture less representative, not more.
+  -->
+
+</Project>

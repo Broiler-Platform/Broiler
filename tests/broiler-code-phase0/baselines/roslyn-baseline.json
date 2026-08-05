@@ -1,0 +1,110 @@
+﻿{
+  "schemaVersion": 1,
+  "iterations": 5,
+  "framework": ".NET 10.0.10",
+  "operatingSystem": "Microsoft Windows 10.0.26200",
+  "architecture": "X64",
+  "processorCount": 16,
+  "languageServiceCompiler": "5.3.0-2.26078.5\u002B16f9bd284cd49604ac82998bfe778a8eb16d4347",
+  "payload": {
+    "totalBytes": 9961536,
+    "assemblies": [
+      {
+        "name": "Microsoft.CodeAnalysis.CSharp.dll",
+        "bytes": 6895408
+      },
+      {
+        "name": "Microsoft.CodeAnalysis.dll",
+        "bytes": 3066128
+      }
+    ]
+  },
+  "graph": {
+    "compileItemCount": 3,
+    "metadataReferenceCount": 168,
+    "metadataReferenceBytes": 6054360,
+    "preprocessorSymbolCount": 18,
+    "languageVersion": "latest",
+    "nullableContext": "enable",
+    "note": "Obtained from MSBuild\u0027s structured -getItem/-getProperty JSON. A host without a trusted evaluation cannot construct this, and a compilation without it reports every framework type as missing \u2014 which is why local semantic diagnostics are gated on graph delivery and not on the Roslyn payload alone."
+  },
+  "syntax": {
+    "lines": 100000,
+    "sourceBytes": 2344464,
+    "tokens": 466671,
+    "nodes": 288893,
+    "parse": {
+      "samples": 5,
+      "medianMilliseconds": 84.322,
+      "p95Milliseconds": 247.4589,
+      "maxMilliseconds": 247.4589,
+      "medianAllocatedBytes": 13218864,
+      "maxAllocatedBytes": 13219568
+    },
+    "retainedBytes": 11078792
+  },
+  "fixtureAgreement": {
+    "agrees": true,
+    "sourceFiles": 3,
+    "metadataReferences": 168,
+    "errorDocument": "src/SampleReports.App/Reporting/ReportRunner.Broken.cs",
+    "errorLine": 17,
+    "errorColumn": 31,
+    "errorId": "CS7036",
+    "warningId": "CS0618",
+    "errorCount": 1,
+    "compileAndDiagnose": {
+      "samples": 1,
+      "medianMilliseconds": 715.3856,
+      "p95Milliseconds": 715.3856,
+      "maxMilliseconds": 715.3856,
+      "medianAllocatedBytes": 11819392,
+      "maxAllocatedBytes": 11819392
+    }
+  },
+  "solution": {
+    "fileCount": 1000,
+    "linesPerFile": 100,
+    "totalLines": 100000,
+    "diagnosticCount": 0,
+    "parse": {
+      "samples": 1,
+      "medianMilliseconds": 61.5757,
+      "p95Milliseconds": 61.5757,
+      "maxMilliseconds": 61.5757,
+      "medianAllocatedBytes": 18879480,
+      "maxAllocatedBytes": 18879480
+    },
+    "compileAndDiagnose": {
+      "samples": 1,
+      "medianMilliseconds": 781.8894,
+      "p95Milliseconds": 781.8894,
+      "maxMilliseconds": 781.8894,
+      "medianAllocatedBytes": 209496240,
+      "maxAllocatedBytes": 209496240
+    },
+    "retainedBytes": 47837152
+  },
+  "unmeasured": [
+    {
+      "id": "android-jit-untrimmed-cold-start",
+      "what": "Cold start and peak resident memory of the semantic service on an Android device.",
+      "why": "Needs a physical device or emulator running the composed host. Not available on the recording machine, and a desktop figure is not a substitute \u2014 the JIT, the memory ceiling, and the storage are all different."
+    },
+    {
+      "id": "android-trimmed-payload-delta",
+      "what": "Installed size delta of an APK that embeds the Roslyn assemblies, trimmed and untrimmed.",
+      "why": "Measurable here in principle; recorded as owed because trimming Roslyn requires a reflection-safety review that Phase 0 has not done, and an untrimmed number quoted as a trimmed one would be misleading."
+    },
+    {
+      "id": "webassembly-interpreted-cold-start",
+      "what": "Browser cold start and peak heap for the trimmed interpreted profile with Roslyn composed.",
+      "why": "Needs a browser harness driving the published profile. The published payload size is measurable without one and is recorded separately by the payload probe script."
+    },
+    {
+      "id": "webassembly-aot",
+      "what": "AOT profile measurements with Roslyn composed.",
+      "why": "Deliberately not measured. Phase 0\u0027s instruction is to measure AOT only if that IDE host mode will be claimed, and no such claim is being made."
+    }
+  ]
+}

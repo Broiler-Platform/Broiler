@@ -1,0 +1,18 @@
+{
+  "id": "stale-rejection",
+  "description": "Applies a burst of edits without letting any background classification publish between them, then drains the dispatcher once. Every run except the last was started against a snapshot the buffer has since replaced. Most are cancelled before they finish and a few complete and are discarded; which of the two happens is a race, so the assertion is the invariant that holds either way — exactly one result is published, and it is the current snapshot. The deterministic rejection path is covered separately by the completed-stale-run-rejected check.",
+  "fixture": "csharp-100k-lines",
+  "fixtureLines": 100000,
+  "budget": "cancellation and stale-result rejection",
+  "steps": [
+    {
+      "kind": "Insert",
+      "anchorText": "int total = 0;",
+      "anchorOccurrence": 2000,
+      "column": 8,
+      "text": "z",
+      "repeat": 32,
+      "withoutDraining": true
+    }
+  ]
+}

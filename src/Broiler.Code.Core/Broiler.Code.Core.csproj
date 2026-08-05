@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.Code.Core</RootNamespace>
+    <AssemblyName>Broiler.Code.Core</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    The seam described in docs/architecture/broiler-code.md: this assembly
+    adapts workspace snapshots to the control-facing CodeEditor interfaces. It
+    is the only place that knows about both, which is what keeps the control
+    independent of a product workspace and the workspace independent of UI
+    packages. Phase 2 adds the shell here; Phase 1 adds only the adapter and the
+    analysis controller.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.Code.Workspaces\Broiler.Code.Workspaces.csproj" />
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Text\Broiler.UI.CodeEditor\Broiler.UI.CodeEditor.csproj" />
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\ValueAndSelection\Broiler.UI.TreeView\Broiler.UI.TreeView.csproj" />
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Layout\Broiler.UI.TabView\Broiler.UI.TabView.csproj" />
+    <!--
+      Shell composition. Abstractions only: the head chooses implementations,
+      which is what keeps the shell hostable anywhere and testable with none.
+    -->
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Layout\Broiler.UI.Panel\Broiler.UI.Panel.csproj" />
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Layout\Broiler.UI.Splitter\Broiler.UI.Splitter.csproj" />
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Commands\Broiler.UI.Button\Broiler.UI.Button.csproj" />
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Commands\Broiler.UI.Menu\Broiler.UI.Menu.csproj" />
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Commands\Broiler.UI.Toolbar\Broiler.UI.Toolbar.csproj" />
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Content\Broiler.UI.Label\Broiler.UI.Label.csproj" />
+    <!--
+      Input and Graphics for the shared desktop input routing. Both are
+      platform-neutral contract assemblies, not backends: a platform backend
+      here would defeat the point of the heads being thin.
+    -->
+    <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" />
+    <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" />
+    <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Text\Broiler.Input.Text.csproj" />
+    <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.Code.Core.Tests" />
+  </ItemGroup>
+
+</Project>

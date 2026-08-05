@@ -1,0 +1,17 @@
+{
+  "id": "typing-burst-wide",
+  "description": "The same typing burst against the 100,000-line, 10 MiB variant that the Phase 1 exit gate names. The extra width is trailing whitespace, so the span count is unchanged and the difference from typing-burst isolates one variable: what a four-times-larger document costs per keystroke. It is the trace that shows whether snapshot cost scales with document size.",
+  "fixture": "csharp-100k-lines-wide",
+  "fixtureLines": 100000,
+  "budget": "input-to-present at the Phase 1 fixture size",
+  "steps": [
+    {
+      "kind": "Insert",
+      "anchorText": "int total = 0;",
+      "anchorOccurrence": 2000,
+      "column": 8,
+      "text": "x",
+      "repeat": 160
+    }
+  ]
+}
