@@ -286,11 +286,25 @@ public sealed partial class DomBridge
                 };
 
                 OverlayBackdropAuthorGeometry(backdropDecls, backdropStyle);
+                OverlayBackdropAuthorPainting(backdropDecls, backdropStyle);
 
                 var backdrop = CreateBridgeElement("div");
                 foreach (var kv in backdropStyle)
                     BakedInlineStyle(backdrop)[kv.Key] = kv.Value;
                 SetParent(backdrop, parent);
+
+                // A ::backdrop is a top-layer box just like the element that generates it (CSS
+                // Position 4 §top-layer), so mark the synthesized <div> with the *same* order as
+                // its dialog/popover. Without this the div stayed an ordinary in-tree box: it
+                // painted inside its DOM ancestors' stacking context, so an ancestor transform
+                // moved it, an ancestor filter tinted it, and any high z-index sibling covered it
+                // — the scrim vanished from under the dialog, which the top-layer pass still
+                // painted correctly above everything (WPT the-dialog-element/top-layer-parent-
+                // transform, -filter). Sharing the dialog's order keeps the pairing exact when
+                // several dialogs are open, and the div is inserted immediately before the dialog
+                // below, so the pass's document-order tiebreak still paints it beneath its own.
+                if (NativeTopLayer)
+                    StampTopLayerOrder(backdrop, TopLayerOrderOf(dialog));
 
                 int idx = ChildIndexOf(parent, dialog);
                 if (idx >= 0)
@@ -329,6 +343,42 @@ public sealed partial class DomBridge
         "width", "height", "left", "right", "top", "bottom",
         "position", "position-anchor", "position-try-fallbacks", "position-try",
     ];
+
+    /// <summary>
+    /// Painted (non-geometry) properties an author <c>::backdrop</c> rule can set that change
+    /// how the scrim composites rather than where it sits. Only <c>background</c> /
+    /// <c>background-color</c> were being carried across — folded into the resolved backdrop
+    /// colour by <see cref="GetBackdropBackground"/> — so everything else in the
+    /// <c>::backdrop</c> cascade was silently dropped: <c>opacity: 0.5</c> on a green scrim
+    /// painted fully opaque green instead of compositing to <c>rgb(127,191,127)</c> over the
+    /// white canvas (WPT <c>the-dialog-element/modal-dialog-backdrop-opacity</c>, 2.2% match).
+    /// <para>Deliberately narrow: these are the properties whose effect on the synthesized
+    /// <c>&lt;div&gt;</c> is the same as on a real <c>::backdrop</c> box. Inherited and
+    /// layout-affecting properties stay out — the div is a bridge implementation detail, not a
+    /// faithful pseudo-element, and copying those across would leak into its subtree.</para>
+    /// </summary>
+    private static readonly string[] BackdropPaintingProps =
+    [
+        "opacity", "mix-blend-mode", "border-radius", "box-shadow",
+    ];
+
+    /// <summary>
+    /// Overlays author-declared <c>::backdrop</c> painting properties (see
+    /// <see cref="BackdropPaintingProps"/>) onto the synthesized backdrop div's style. The
+    /// background is not among them — it is already resolved into the div's
+    /// <c>background-color</c>, folded with the UA modal/popover scrim default.
+    /// </summary>
+    private static void OverlayBackdropAuthorPainting(
+        IReadOnlyDictionary<string, string> declarations,
+        Dictionary<string, string> backdropStyle)
+    {
+        foreach (var prop in BackdropPaintingProps)
+        {
+            if (declarations.TryGetValue(prop, out var value) &&
+                !string.IsNullOrWhiteSpace(value))
+                backdropStyle[prop] = value.Trim();
+        }
+    }
 
     /// <summary>
     /// Overlays author-declared <c>::backdrop</c> geometry / fallback
