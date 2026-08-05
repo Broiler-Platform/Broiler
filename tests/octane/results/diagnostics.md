@@ -1,6 +1,6 @@
 # Octane failure diagnostics
 
-- Generated: `2026-08-05T06:00:39.429Z`
+- Generated: `2026-08-05T14:56:55.463Z`
 - Broiler: `Broiler.JS (BroilerJS --script-host)` — per-suite timeout 1800s (floor; a suite may raise its own — the budget each ran under is in its section below)
 - Jint: `Jint 4.15.3 (interpreter)` — per-suite timeout 1800s (floor; a suite may raise its own — the budget each ran under is in its section below)
 

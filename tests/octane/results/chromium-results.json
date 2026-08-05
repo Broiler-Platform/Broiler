@@ -6,117 +6,117 @@
   "repetitions": 1,
   "noiseBandPercent": 7.5,
   "benchmarks": {
-    "Richards": 38462,
-    "DeltaBlue": 102503,
-    "Crypto": 37786,
-    "RayTrace": 117658,
-    "EarleyBoyer": 89570,
-    "RegExp": 10032,
-    "Splay": 42546,
-    "SplayLatency": 68849,
-    "NavierStokes": 35319,
-    "PdfJS": 50524,
-    "Mandreel": 44730,
-    "MandreelLatency": 63913,
-    "Gameboy": 82717,
-    "CodeLoad": 30301,
-    "Box2D": 101050,
-    "zlib": 79966,
-    "Typescript": 91336
+    "Richards": 49320,
+    "DeltaBlue": 126232,
+    "Crypto": 49408,
+    "RayTrace": 152290,
+    "EarleyBoyer": 110540,
+    "RegExp": 12988,
+    "Splay": 56416,
+    "SplayLatency": 89673,
+    "NavierStokes": 45217,
+    "PdfJS": 79352,
+    "Mandreel": 64547,
+    "MandreelLatency": 99704,
+    "Gameboy": 120086,
+    "CodeLoad": 40803,
+    "Box2D": 136091,
+    "zlib": 103463,
+    "Typescript": 118170
   },
   "stability": {},
   "suiteStatus": {
     "Richards": {
       "status": "ok",
-      "durationMs": 2139,
+      "durationMs": 2119,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Richards.log"
     },
     "DeltaBlue": {
       "status": "ok",
-      "durationMs": 2111,
+      "durationMs": 2103,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/DeltaBlue.log"
     },
     "Crypto": {
       "status": "ok",
-      "durationMs": 4195,
+      "durationMs": 4183,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Crypto.log"
     },
     "RayTrace": {
       "status": "ok",
-      "durationMs": 2110,
+      "durationMs": 2101,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/RayTrace.log"
     },
     "EarleyBoyer": {
       "status": "ok",
-      "durationMs": 4204,
+      "durationMs": 4192,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/EarleyBoyer.log"
     },
     "RegExp": {
       "status": "ok",
-      "durationMs": 2169,
+      "durationMs": 2162,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/RegExp.log"
     },
     "Splay": {
       "status": "ok",
-      "durationMs": 2171,
+      "durationMs": 2151,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Splay.log"
     },
     "NavierStokes": {
       "status": "ok",
-      "durationMs": 2115,
+      "durationMs": 2106,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/NavierStokes.log"
     },
     "PdfJS": {
       "status": "ok",
-      "durationMs": 1430,
+      "durationMs": 1360,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/PdfJS.log"
     },
     "Mandreel": {
       "status": "ok",
-      "durationMs": 1826,
+      "durationMs": 1616,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Mandreel.log"
     },
     "Gameboy": {
       "status": "ok",
-      "durationMs": 1177,
+      "durationMs": 1141,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Gameboy.log"
     },
     "CodeLoad": {
       "status": "ok",
-      "durationMs": 2213,
+      "durationMs": 2190,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/CodeLoad.log"
     },
     "Box2D": {
       "status": "ok",
-      "durationMs": 1129,
+      "durationMs": 1117,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Box2D.log"
     },
     "zlib": {
       "status": "ok",
-      "durationMs": 2034,
+      "durationMs": 1587,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/zlib.log"
     },
     "Typescript": {
       "status": "ok",
-      "durationMs": 1720,
+      "durationMs": 1321,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Typescript.log"
     }
   },
-  "geomean": 55394,
-  "generatedAt": "2026-08-05T06:00:39.429Z"
+  "geomean": 74297,
+  "generatedAt": "2026-08-05T14:56:55.463Z"
 }
