@@ -4,14 +4,19 @@
 #
 # Run it from the extracted preview package, as root:
 #
-#   sudo ./BOSS/service/install-service.sh                        # auto-detect systemd or SysV
-#   sudo ./BOSS/service/install-service.sh --urls http://0.0.0.0:5555
-#   sudo ./BOSS/service/install-service.sh --init sysv --prefix /srv/boss --user www-data
+#   sudo ./service/install-service.sh                        # auto-detect systemd or SysV
+#   sudo ./service/install-service.sh --urls http://0.0.0.0:5555
+#   sudo ./service/install-service.sh --init sysv --prefix /srv/boss --user www-data
 #
 # It copies the server next to its vendored wwwroot into --prefix, creates the service account,
 # installs the unit / init script plus its configuration file, and (unless --no-start) enables and
 # starts the service. Re-running it upgrades the payload in place; an existing configuration file is
 # never overwritten (the new one is written alongside as *.new).
+#
+# The payload is the whole extracted package directory: the server shares its runtime files with
+# Broiler.Browser and Broiler.Writer, which sit in the same folder, so those two ride along into
+# --prefix as well. They are inert there — nothing starts them, and the service only ever runs
+# Broiler.Office.Server.
 #
 # Undo with ./uninstall-service.sh.
 
@@ -25,10 +30,14 @@ INIT=auto
 START=1
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# This script lives in <package>/service/, so the parent is the package root — which is also where
+# the server, its appsettings.json and its wwwroot/ are published.
 PAYLOAD_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 
 usage() {
-    sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'
+    # The header comment above is the help text: print from line 3 up to the first line that is not
+    # a comment, so editing the header cannot leave --help printing shell code after it.
+    sed -n '3,$ { /^#/!q; s/^# \{0,1\}//p; }' "$0"
     cat <<EOF
 
 Options:

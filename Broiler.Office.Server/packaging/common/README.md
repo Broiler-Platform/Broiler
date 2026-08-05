@@ -7,6 +7,10 @@ server, no Node, no Python `http.server`.
 Everything the server needs is in this directory: the executable, `appsettings.json`, and `wwwroot/`
 holding the complete Writer bundle (the mono-wasm runtime and its content-hashed assets).
 
+This is the root of a Broiler Preview Package, so `Broiler.Browser` and `Broiler.Writer` — the
+desktop applications — sit here too and share the runtime files around them. They are independent of
+the server; starting or deleting one has no effect on the others.
+
 ---
 
 ## Quick start
@@ -173,13 +177,21 @@ Turn up the detail when something is unclear:
 ## What is in this package
 
 ```
-BOSS/
-├── Broiler.Office.Server[.exe]   the server
-├── appsettings.json              configuration
-├── wwwroot/                      the Broiler Writer WebAssembly bundle
-├── README.md                     this file
+BPP-<os>-<variant>/
+├── Broiler.Office.Server[.exe]   the server (BOSS)
+├── appsettings.json              its configuration
+├── wwwroot/                      the Broiler Writer WebAssembly bundle it serves
 ├── run-boss.sh / Start-BOSS.cmd  foreground launcher
-└── service/                      unit files, install scripts, reverse-proxy samples
+├── service/                      unit files, install scripts, reverse-proxy samples
+├── README.md                     this file
+│
+├── Broiler.Browser[.exe]         the Broiler web browser (desktop)
+├── Broiler.Writer[.exe]          the Broiler word processor (desktop)
+├── BUILD-INFO.txt                which build this is: branch, commit, build time
+└── *.dll                         the runtime and libraries all three applications share
 ```
+
+The three applications live side by side in one flat folder because they share those runtime files;
+each is started directly and none of them needs the others.
 
 Source and issue tracker: <https://github.com/Broiler-Platform/Broiler>.

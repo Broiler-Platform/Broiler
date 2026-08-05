@@ -20,8 +20,9 @@
 
     Used by .github/workflows/broiler-preview-package.yml after each publish.
 
-.PARAMETER BossDirectory
-    Directory holding the published Broiler.Office.Server and its wwwroot.
+.PARAMETER PackageDirectory
+    Directory holding the published Broiler.Office.Server and its wwwroot — the package root, since
+    the server publishes into it directly rather than into a BOSS/ subfolder.
 
 .PARAMETER Port
     Loopback port to listen on. Default 5555.
@@ -31,11 +32,11 @@
     a cold CI runner is not instant.
 
 .EXAMPLE
-    ./scripts/smoke-test-boss.ps1 -BossDirectory /tmp/packages/BPP-Linux-self-contained/BOSS
+    ./scripts/smoke-test-boss.ps1 -PackageDirectory /tmp/packages/BPP-Linux-self-contained
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string] $BossDirectory,
+    [Parameter(Mandatory = $true)][string] $PackageDirectory,
     [int] $Port = 5555,
     [int] $TimeoutSeconds = 120
 )
@@ -43,9 +44,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$BossDirectory = (Resolve-Path -LiteralPath $BossDirectory).Path
+$PackageDirectory = (Resolve-Path -LiteralPath $PackageDirectory).Path
 $executableName = if ($IsWindows) { 'Broiler.Office.Server.exe' } else { 'Broiler.Office.Server' }
-$executable = Join-Path $BossDirectory $executableName
+$executable = Join-Path $PackageDirectory $executableName
 if (-not (Test-Path -LiteralPath $executable)) {
     throw "Server executable not found: $executable"
 }
@@ -55,7 +56,7 @@ $logDirectory = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Pat
 $stdout = Join-Path $logDirectory "boss-smoke-$Port.out.log"
 $stderr = Join-Path $logDirectory "boss-smoke-$Port.err.log"
 
-# Not $BossDirectory: a service manager starts the server from an unrelated directory, and this is
+# Not $PackageDirectory: a service manager starts the server from an unrelated directory, and this is
 # the cheapest way to catch a content root that silently follows the caller's cwd.
 $foreignWorkingDirectory = [System.IO.Path]::GetTempPath()
 
@@ -65,7 +66,7 @@ function Invoke-BossRequest {
     Invoke-WebRequest -Uri "$baseUrl$Path" -NoProxy -TimeoutSec 30 -SkipHttpErrorCheck -UseBasicParsing
 }
 
-Write-Host "==> starting BOSS from $BossDirectory on $baseUrl"
+Write-Host "==> starting BOSS from $PackageDirectory on $baseUrl"
 $server = Start-Process -FilePath $executable `
     -ArgumentList '--urls', $baseUrl `
     -WorkingDirectory $foreignWorkingDirectory `

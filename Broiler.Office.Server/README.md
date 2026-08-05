@@ -95,18 +95,21 @@ Windows service.
 ## Shipping: preview packages and service files
 
 BOSS ships inside every **Broiler Preview Package** (BPP) — Linux and Windows, self-contained and
-framework-dependent — under `BOSS/`, alongside `Broiler.Browser` and `Broiler.Writer`. The
+framework-dependent — in the **package root**, alongside `Broiler.Browser` and `Broiler.Writer`,
+whose runtime files it shares. The
 [`Prepare Broiler Preview Package`](../.github/workflows/broiler-preview-package.yml) workflow
 publishes the server, lays the packaging assets around it
 ([`scripts/package-boss.ps1`](../scripts/package-boss.ps1)), and smoke-tests the result
 ([`scripts/smoke-test-boss.ps1`](../scripts/smoke-test-boss.ps1)) before anything reaches a release.
+Every desktop assembly in a BPP is published ReadyToRun, so the server starts without JITting its
+startup path.
 
 What a user gets next to the binary — end-user README, foreground launcher, and ready-to-install
 service definitions (a hardened systemd unit, an LSB SysV init script, a Windows service installer,
 nginx/Apache reverse-proxy samples) — lives in [`packaging/`](packaging/README.md).
 
 ```bash
-sudo ./BOSS/service/install-service.sh --urls http://0.0.0.0:5555     # systemd or SysV
+sudo ./service/install-service.sh --urls http://0.0.0.0:5555     # systemd or SysV
 ```
 
 ## Adding more Office apps

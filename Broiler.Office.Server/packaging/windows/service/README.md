@@ -39,6 +39,11 @@ restart-on-crash after 5 s / 10 s / 60 s), grants the service account read+execu
 tree, and starts it. **Re-running upgrades in place** — the service is stopped, `wwwroot\` is
 replaced wholesale, and the service starts again.
 
+The payload is the whole extracted package folder, because the server shares its runtime files with
+`Broiler.Browser.exe` and `Broiler.Writer.exe` in the same folder. Those two are copied to
+`-InstallPath` along with it and sit there inert — the service only ever runs
+`Broiler.Office.Server.exe`.
+
 Check it:
 
 ```powershell

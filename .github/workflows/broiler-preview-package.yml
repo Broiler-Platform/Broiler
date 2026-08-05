@@ -126,13 +126,18 @@ jobs:
       - name: Restore Windows runtime graphs
         shell: pwsh
         run: |
-          dotnet restore $env:BROWSER_PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION
-          dotnet restore $env:WRITER_PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION
-          dotnet restore $env:BOSS_PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION
+          # PublishReadyToRun is set here as well as on the publish: the crossgen2 compiler ships as
+          # a NuGet package (Microsoft.NETCore.App.Crossgen2.win-x64) that only enters the graph when
+          # restore already knows R2R is wanted. Publishing with --no-restore after a restore that
+          # did not would fail with NETSDK1094 ("a required package is missing").
+          dotnet restore $env:BROWSER_PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION -p:PublishReadyToRun=true
+          dotnet restore $env:WRITER_PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION -p:PublishReadyToRun=true
+          dotnet restore $env:BOSS_PROJECT_PATH --runtime win-x64 -p:Configuration=$env:WINDOWS_CONFIGURATION -p:PublishReadyToRun=true
 
           # The Writer WebAssembly client is not a ProjectReference of BOSS — the server publishes it
           # through an MSBuild task and vendors the result — so it needs its own restore, and one
-          # without the Windows RID: the client always targets browser-wasm.
+          # without the Windows RID: the client always targets browser-wasm. No R2R either: it is a
+          # CoreCLR ahead-of-time format, and browser-wasm runs on mono.
           dotnet restore $env:WRITER_CLIENT_PROJECT_PATH -p:Configuration=$env:WINDOWS_CONFIGURATION
 
       - name: Build Windows targets
@@ -150,6 +155,10 @@ jobs:
             --runtime win-x64 `
             --no-restore
 
+      # -p:PublishReadyToRun=true on every publish below: the assemblies are crossgen2-compiled to
+      # native code ahead of time, so the apps start without JITting their startup path. It needs a
+      # RID (--runtime win-x64, already here) and the matching restore above; it applies to the
+      # framework-dependent variant just as much as the self-contained one.
       - name: Publish Windows framework-dependent apps
         shell: pwsh
         run: |
@@ -162,7 +171,8 @@ jobs:
             --self-contained false `
             --no-restore `
             --output $output `
-            -p:UseAppHost=true
+            -p:UseAppHost=true `
+            -p:PublishReadyToRun=true
 
           dotnet publish $env:WRITER_PROJECT_PATH `
             --framework net10.0-windows `
@@ -171,17 +181,21 @@ jobs:
             --self-contained false `
             --no-restore `
             --output $output `
-            -p:UseAppHost=true
+            -p:UseAppHost=true `
+            -p:PublishReadyToRun=true
 
-          # BOSS goes into its own subfolder: it ships a vendored wwwroot, an appsettings.json and a
-          # service/ tree, none of which belong loose beside the desktop apps.
+          # BOSS publishes into the package root, not a BOSS/ subfolder: the server, its
+          # appsettings.json and its vendored wwwroot sit directly beside the desktop apps, and the
+          # packaging step lays the launcher, README and service/ tree around them there. It goes
+          # last so its vendored wwwroot is written after the desktop publishes have settled.
           dotnet publish $env:BOSS_PROJECT_PATH `
             --configuration $env:WINDOWS_CONFIGURATION `
             --runtime win-x64 `
             --self-contained false `
             --no-restore `
-            --output (Join-Path $output 'BOSS') `
-            -p:UseAppHost=true
+            --output $output `
+            -p:UseAppHost=true `
+            -p:PublishReadyToRun=true
 
       - name: Publish Windows self-contained apps
         shell: pwsh
@@ -194,7 +208,8 @@ jobs:
             --runtime win-x64 `
             --self-contained true `
             --no-restore `
-            --output $output
+            --output $output `
+            -p:PublishReadyToRun=true
 
           dotnet publish $env:WRITER_PROJECT_PATH `
             --framework net10.0-windows `
@@ -202,14 +217,16 @@ jobs:
             --runtime win-x64 `
             --self-contained true `
             --no-restore `
-            --output $output
+            --output $output `
+            -p:PublishReadyToRun=true
 
           dotnet publish $env:BOSS_PROJECT_PATH `
             --configuration $env:WINDOWS_CONFIGURATION `
             --runtime win-x64 `
             --self-contained true `
             --no-restore `
-            --output (Join-Path $output 'BOSS')
+            --output $output `
+            -p:PublishReadyToRun=true
 
       - name: Assemble and smoke-test the BOSS payloads
         shell: pwsh
@@ -217,14 +234,15 @@ jobs:
           # Lay the README, launcher and service files around each published server, then start it
           # and check it really serves the Writer — a package whose wwwroot did not survive the
           # publish still starts and answers /healthz, so only a real request catches it.
+          # The package root *is* the BOSS directory now, so both scripts take it directly.
           $packageParent = Join-Path $env:RUNNER_TEMP 'packages'
           $port = 5555
 
           foreach ($variant in @('framework-dependent', 'self-contained')) {
-            $bossDir = Join-Path $packageParent "BPP-Win32-$variant\BOSS"
+            $packageRoot = Join-Path $packageParent "BPP-Win32-$variant"
 
-            ./scripts/package-boss.ps1 -BossDirectory $bossDir -Platform windows
-            ./scripts/smoke-test-boss.ps1 -BossDirectory $bossDir -Port $port
+            ./scripts/package-boss.ps1 -PackageDirectory $packageRoot -Platform windows
+            ./scripts/smoke-test-boss.ps1 -PackageDirectory $packageRoot -Port $port
 
             # A fresh port per variant: Windows can hold a listening socket in TIME_WAIT briefly
             # after the previous server exits.
@@ -385,13 +403,18 @@ jobs:
       - name: Restore Linux runtime graphs
         shell: pwsh
         run: |
-          dotnet restore $env:BROWSER_PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION
-          dotnet restore $env:WRITER_PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION
-          dotnet restore $env:BOSS_PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION
+          # PublishReadyToRun is set here as well as on the publish: the crossgen2 compiler ships as
+          # a NuGet package (Microsoft.NETCore.App.Crossgen2.linux-x64) that only enters the graph
+          # when restore already knows R2R is wanted. Publishing with --no-restore after a restore
+          # that did not would fail with NETSDK1094 ("a required package is missing").
+          dotnet restore $env:BROWSER_PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION -p:PublishReadyToRun=true
+          dotnet restore $env:WRITER_PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION -p:PublishReadyToRun=true
+          dotnet restore $env:BOSS_PROJECT_PATH --runtime linux-x64 -p:Configuration=$env:LINUX_CONFIGURATION -p:PublishReadyToRun=true
 
           # The Writer WebAssembly client is not a ProjectReference of BOSS — the server publishes it
           # through an MSBuild task and vendors the result — so it needs its own restore, and one
-          # without the Linux RID: the client always targets browser-wasm.
+          # without the Linux RID: the client always targets browser-wasm. No R2R either: it is a
+          # CoreCLR ahead-of-time format, and browser-wasm runs on mono.
           dotnet restore $env:WRITER_CLIENT_PROJECT_PATH -p:Configuration=$env:LINUX_CONFIGURATION
 
       - name: Build Linux targets
@@ -432,6 +455,10 @@ jobs:
             --offscreen `
             --duration-ms=1
 
+      # -p:PublishReadyToRun=true on every publish below: the assemblies are crossgen2-compiled to
+      # native code ahead of time, so the apps start without JITting their startup path. It needs a
+      # RID (--runtime linux-x64, already here) and the matching restore above; it applies to the
+      # framework-dependent variant just as much as the self-contained one.
       - name: Publish Linux framework-dependent apps
         shell: pwsh
         run: |
@@ -444,7 +471,8 @@ jobs:
             --self-contained false `
             --no-restore `
             --output $output `
-            -p:UseAppHost=true
+            -p:UseAppHost=true `
+            -p:PublishReadyToRun=true
 
           dotnet publish $env:WRITER_PROJECT_PATH `
             --framework net10.0 `
@@ -453,17 +481,21 @@ jobs:
             --self-contained false `
             --no-restore `
             --output $output `
-            -p:UseAppHost=true
+            -p:UseAppHost=true `
+            -p:PublishReadyToRun=true
 
-          # BOSS goes into its own subfolder: it ships a vendored wwwroot, an appsettings.json and a
-          # service/ tree, none of which belong loose beside the desktop apps.
+          # BOSS publishes into the package root, not a BOSS/ subfolder: the server, its
+          # appsettings.json and its vendored wwwroot sit directly beside the desktop apps, and the
+          # packaging step lays the launcher, README and service/ tree around them there. It goes
+          # last so its vendored wwwroot is written after the desktop publishes have settled.
           dotnet publish $env:BOSS_PROJECT_PATH `
             --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --self-contained false `
             --no-restore `
-            --output (Join-Path $output 'BOSS') `
-            -p:UseAppHost=true
+            --output $output `
+            -p:UseAppHost=true `
+            -p:PublishReadyToRun=true
 
       - name: Publish Linux self-contained apps
         shell: pwsh
@@ -476,7 +508,8 @@ jobs:
             --runtime linux-x64 `
             --self-contained true `
             --no-restore `
-            --output $output
+            --output $output `
+            -p:PublishReadyToRun=true
 
           dotnet publish $env:WRITER_PROJECT_PATH `
             --framework net10.0 `
@@ -484,14 +517,16 @@ jobs:
             --runtime linux-x64 `
             --self-contained true `
             --no-restore `
-            --output $output
+            --output $output `
+            -p:PublishReadyToRun=true
 
           dotnet publish $env:BOSS_PROJECT_PATH `
             --configuration $env:LINUX_CONFIGURATION `
             --runtime linux-x64 `
             --self-contained true `
             --no-restore `
-            --output (Join-Path $output 'BOSS')
+            --output $output `
+            -p:PublishReadyToRun=true
 
       - name: Assemble and smoke-test the BOSS payloads
         shell: pwsh
@@ -499,14 +534,15 @@ jobs:
           # Lay the README, launcher and service files around each published server, then start it
           # and check it really serves the Writer — a package whose wwwroot did not survive the
           # publish still starts and answers /healthz, so only a real request catches it.
+          # The package root *is* the BOSS directory now, so both scripts take it directly.
           $packageParent = Join-Path $env:RUNNER_TEMP 'packages'
           $port = 5555
 
           foreach ($variant in @('framework-dependent', 'self-contained')) {
-            $bossDir = Join-Path $packageParent "BPP-Linux-$variant/BOSS"
+            $packageRoot = Join-Path $packageParent "BPP-Linux-$variant"
 
-            ./scripts/package-boss.ps1 -BossDirectory $bossDir -Platform linux
-            ./scripts/smoke-test-boss.ps1 -BossDirectory $bossDir -Port $port
+            ./scripts/package-boss.ps1 -PackageDirectory $packageRoot -Platform linux
+            ./scripts/smoke-test-boss.ps1 -PackageDirectory $packageRoot -Port $port
 
             $port++
           }
@@ -724,6 +760,10 @@ jobs:
           dotnet restore $env:BROWSER_PROJECT_PATH -p:Configuration=$env:ANDROID_CONFIGURATION
           dotnet restore $env:WRITER_PROJECT_PATH -p:Configuration=$env:ANDROID_CONFIGURATION
 
+      # No -p:PublishReadyToRun here or on the APK publish below, unlike the desktop jobs: R2R is a
+      # CoreCLR format produced by crossgen2, and net10.0-android runs on mono, which has no
+      # crossgen2 pack for the android-* RIDs. Mono's own ahead-of-time story is RunAOTCompilation,
+      # a different (and much slower to build) switch the heads currently pin off.
       - name: Publish Android app bundles
         shell: pwsh
         run: |
@@ -1069,35 +1109,41 @@ jobs:
           # Single-quoted here-string: the notes are full of Markdown backticks, and in an
           # interpolating string PowerShell would eat them as escape characters.
           $contents = @'
-          Each desktop package (`BPP-Win32-*`, `BPP-Linux-*`) contains:
+          Each desktop package (`BPP-Win32-*`, `BPP-Linux-*`) extracts to a single flat folder
+          holding all three applications side by side:
 
           * `Broiler.Browser` — the Broiler web browser.
           * `Broiler.Writer` — the Broiler word processor (desktop).
-          * `BOSS/` — **Broiler Office Standalone Server**: a Kestrel host that serves the Broiler
-            Writer web app (WebAssembly), so the Writer runs in a browser with no other web server
-            involved.
+          * `Broiler.Office.Server` — **BOSS**, the Broiler Office Standalone Server: a Kestrel host
+            that serves the Broiler Writer web app (WebAssembly) from the `wwwroot/` beside it, so
+            the Writer runs in a browser with no other web server involved.
 
           Starting BOSS after extracting a package:
 
           ```
-          ./BOSS/run-boss.sh --urls http://0.0.0.0:5555        # Linux
-          BOSS\Start-BOSS.cmd                                  # Windows
+          ./run-boss.sh --urls http://0.0.0.0:5555             # Linux
+          Start-BOSS.cmd                                       # Windows
           ```
 
           Then open <http://localhost:5555/>. Liveness probe at `/healthz`, server details at
           `/api/info`.
 
-          To keep it serving across reboots, `BOSS/service/` carries prepared unit files and
-          installers — a hardened systemd unit (`Type=notify`), an LSB SysV init script, a Windows
-          service installer, plus nginx and Apache reverse-proxy samples:
+          To keep it serving across reboots, `service/` carries prepared unit files and installers —
+          a hardened systemd unit (`Type=notify`), an LSB SysV init script, a Windows service
+          installer, plus nginx and Apache reverse-proxy samples:
 
           ```
-          sudo ./BOSS/service/install-service.sh --urls http://0.0.0.0:5555
-          powershell -ExecutionPolicy Bypass -File BOSS\service\Install-BossService.ps1 -OpenFirewall
+          sudo ./service/install-service.sh --urls http://0.0.0.0:5555
+          powershell -ExecutionPolicy Bypass -File service\Install-BossService.ps1 -OpenFirewall
           ```
 
-          Full documentation ships in the package: `BOSS/README.md` and `BOSS/service/README.md`.
-          Each package root also carries a `BUILD-INFO.txt` naming the branch, commit and build time.
+          Full documentation ships in the package: `README.md` and `service/README.md`. The package
+          root also carries a `BUILD-INFO.txt` naming the branch, commit and build time.
+
+          The application assemblies in a desktop package are **ReadyToRun**-compiled — precompiled
+          to native code for the target architecture, so the applications start without JITting
+          their startup path. The IL is still there, so the JIT retains its usual freedom to
+          re-optimize hot code at run time.
 
           Variants:
 
