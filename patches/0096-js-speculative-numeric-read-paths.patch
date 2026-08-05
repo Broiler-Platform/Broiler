@@ -1,0 +1,857 @@
+From b22d1032b2ac5d6bff58bb0da4f87891a5bb7e77 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 5 Aug 2026 10:33:19 +0000
+Subject: [PATCH] Finish item 3-8a's consumers, price them at the read, and
+ close the item
+
+The dual-representation local built in the previous change was a 2.1%
+regression because every read went through the variable's readable
+expression, which boxes the raw half back up. This adds the three
+consumers that can take a raw double, and then the counter that should
+have come first.
+
+The consumers. The guarded arithmetic tree offers a speculative local as
+a leaf -- OrderedNode already IS a raw double, a flag and a fallback, so
+the shape needed nothing invented -- snapshotted into three CLR locals at
+the leaf's own postorder position, because a later leaf can write the
+same local. The element read and the element write each emit two arms
+over item 3-0's GetElementByNumber / SetElementByNumber and the ordinary
+indexer.
+
+Two defects found building them.
+
+A speculative leaf is NOT IsLeaf. That flag means "the saved operand is
+the value whichever way the test went", true of an ordinary guarded leaf
+which saved the JSValue it was handed, and false of this one, whose slot
+is deliberately stale exactly while the flag is up. A tree falling to its
+generic arm read a value several increments old -- x++ three times then
+x + tail answered "0!" instead of "3!", with no exception and no NaN.
+
+And the leaf was nearly unreachable. Eligibility is
+CountOperators - 1 + CountNativeLeaves >= 1, and a speculative local
+counts as neither, so `c + p.v` -- the shape the population is made of --
+was refused for having no saving to make. Counted as its own term, which
+is self-gating: with the switch off no variable carries a flag.
+
+The counter. JSNumber.CreateSpeculativeRead is a fourth factory entry
+beside CreateLiteral and CreateConversion, attributing a box at the read.
+It settles the item in one line: NavierStokes mints 393 705 boxes reading
+a speculative local and the whole item removes about 5 300. The 835 584
+steps it takes off Increment mostly save no allocation, because they are
+x[++i] and the result is boxed to be an index either way.
+
+Measured, one build, the switch the only difference: 1.021x storage
+alone, 1.017x with the tree leaf and the element read, 1.012x with the
+element write. The item is closed as a measured regression and stays off
+by default; what makes it lose is the read/write ratio of the code it
+targets, which is a property of the workload rather than of how many
+consumers the compiler grows.
+
+Tests. 20 read-path fixtures, every one on both settings of the switch.
+Three of them initially passed against the broken emitter -- two because
+the tree was refused before the leaf ran, one because its `i = "2"` was
+provably non-numeric and defeated the local's candidacy at compile time
+-- so each was then re-checked by breaking the emitter deliberately and
+confirming it fails. The ordering fixture could not be repaired and
+became a pair asserting why: to disturb the index from a receiver a
+getter must close over it, and a captured binding is a JSVariable cell,
+which is not a candidate for either numeric tier.
+
+Full engine suite green on both settings: 1 191 compiler, 4 571
+integration, 2 103 built-ins, plus runtime, core, parser, modules,
+storage and CLR.
+---
+ .../Number/JSNumber.cs                        |  18 +
+ .../Number/NumberBoxingDiagnostics.cs         |  23 +-
+ .../NumericLocalDefeatTests.cs                |   4 +-
+ .../SpeculativeNumericReadPathTests.cs        | 318 ++++++++++++++++++
+ .../FastCompiler.CreateMemberExpression.cs    |  63 +++-
+ .../FastCompiler.NumericSpeculation.cs        |  79 ++++-
+ .../FastCompiler.VisitBinaryExpression.cs     |  38 ++-
+ .../FastCompiler.VisitMemberExpression.cs     |  24 ++
+ .../Scope/FastFunctionScope.cs                |   2 +-
+ .../LinqExpressions/JSNumberBuilder.cs        |  11 +
+ .../SpecializingTierMetrics.cs                |   5 +
+ 11 files changed, 558 insertions(+), 27 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpeculativeNumericReadPathTests.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
+index 7c8a4965..e0384f6e 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
+@@ -213,6 +213,24 @@ public sealed partial class JSNumber : JSPrimitive
+     {
+         if (NumberBoxingDiagnostics.Enabled)
+             NumberBoxingDiagnostics.RecordConversionRequest();
++        return Create(value);
++    }
++
++    /// <summary>
++    /// The <see cref="JSNumber"/> for the raw half of item 3-8a's speculative local, boxed because
++    /// the consumer of this read cannot take a raw <c>double</c>
++    /// (docs/performance-roadmap.md item 3-8a).
++    /// </summary>
++    /// <remarks>
++    /// Separate from <see cref="CreateConversion"/>, which it would otherwise be a case of, because
++    /// the two answer opposite questions. A conversion box is the cost of a representation that
++    /// PAID somewhere else; this one is the cost of a representation that has not paid yet, and the
++    /// item is worth keeping exactly while the steps it removes outnumber these.
++    /// </remarks>
++    public static JSValue CreateSpeculativeRead(double value)
++    {
++        if (NumberBoxingDiagnostics.Enabled)
++            NumberBoxingDiagnostics.RecordSpeculativeReadRequest();
+         return Create(value);
+     }
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
+index 521c9457..b6043eec 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
+@@ -44,6 +44,7 @@ public static class NumberBoxingDiagnostics
+     private static long allocations;
+     private static long literalRequests;
+     private static long conversionRequests;
++    private static long speculativeReadRequests;
+ 
+     /// <summary>Whether boxing is counted. Off by default.</summary>
+     public static bool Enabled;
+@@ -65,6 +66,21 @@ public static class NumberBoxingDiagnostics
+     /// </summary>
+     internal static void RecordConversionRequest() => Interlocked.Increment(ref conversionRequests);
+ 
++    /// <summary>
++    /// A request made READING item 3-8a's speculative local — the box its dual representation
++    /// costs whenever a consumer cannot take the raw <c>double</c>
++    /// (docs/performance-roadmap.md item 3-8a).
++    /// </summary>
++    /// <remarks>
++    /// This is the counter that decides the item, and it exists because three guarded consumers
++    /// were built without it. The storage half alone measured a 2.1% regression, the guarded tree
++    /// leaf and the element index took it to 1.7%, the element write to 1.2% — each step a guess
++    /// at where the remaining boxes were, checked only after the fact by whether the total moved.
++    /// A count attributed at the read says directly how much is left to win, and therefore whether
++    /// a fourth consumer is worth building at all.
++    /// </remarks>
++    internal static void RecordSpeculativeReadRequest() => Interlocked.Increment(ref speculativeReadRequests);
++
+     /// <summary>A request the small-integer table answered without allocating.</summary>
+     internal static void RecordCacheHit() => Interlocked.Increment(ref cacheHits);
+ 
+@@ -84,7 +100,8 @@ public static class NumberBoxingDiagnostics
+             Interlocked.Read(ref factoryAllocations),
+             Interlocked.Read(ref allocations),
+             Interlocked.Read(ref literalRequests),
+-            Interlocked.Read(ref conversionRequests));
++            Interlocked.Read(ref conversionRequests),
++            Interlocked.Read(ref speculativeReadRequests));
+ 
+     public static void Reset()
+     {
+@@ -103,13 +120,15 @@ public static class NumberBoxingDiagnostics
+ /// <param name="Allocations">Every <see cref="JSNumber"/> constructed, factory or not.</param>
+ /// <param name="LiteralRequests">Factory calls made by a compile-time numeric literal.</param>
+ /// <param name="ConversionRequests">Factory calls made by the compiler boxing a raw double to cross into a <c>JSValue</c>.</param>
++/// <param name="SpeculativeReadRequests">Factory calls made reading item 3-8a's speculative local.</param>
+ public readonly record struct NumberBoxingSnapshot(
+     long Requests,
+     long CacheHits,
+     long FactoryAllocations,
+     long Allocations,
+     long LiteralRequests,
+-    long ConversionRequests)
++    long ConversionRequests,
++    long SpeculativeReadRequests)
+ {
+     /// <summary>
+     /// Boxes minted by a builtin writing <c>new JSNumber(x)</c> instead of going through the
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericLocalDefeatTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericLocalDefeatTests.cs
+index 3dd9df6d..f342940b 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericLocalDefeatTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumericLocalDefeatTests.cs
+@@ -210,7 +210,9 @@ public sealed class NumericLocalDefeatTests
+         Assert.Equal(0, Dropped(d, NumericDropCause.OtherName));
+     }
+ 
+-    [Theory]    [InlineData(false)]    [InlineData(true)]
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
+     public void TheEnclosingNameIsTheBindingConstraintAndOneCharacterProvesIt(bool speculate)
+     {
+         // The A/B item 3-8a's population rests on, reduced to a single difference. Two programs
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpeculativeNumericReadPathTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpeculativeNumericReadPathTests.cs
+new file mode 100644
+index 00000000..3f865b7a
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/SpeculativeNumericReadPathTests.cs
+@@ -0,0 +1,318 @@
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// Item 3-8a's two CONSUMING read paths: the guarded arithmetic tree's leaf and the element index
++// (docs/performance-roadmap.md item 3-8a).
++//
++// The storage half — a raw double, a JSValue slot and a flag saying which is live — was measured on
++// its own and came out a 2.1% REGRESSION, because every read still went through the variable's
++// readable expression, which boxes the raw half back up. These are the two paths that can consume
++// the raw double directly, and they are the half that makes the item pay.
++//
++// They also introduce the item's one genuinely new hazard, and it is the reason this file exists.
++// While the flag is live the slot is DELIBERATELY STALE: `i++` on the fast arm is a native double
++// add that writes nothing back. So every consumer has to answer from the flag, and any path that
++// reaches for the slot without testing it reads a value that is merely old rather than wrong-looking
++// — no exception, no NaN, just a number from several iterations ago.
++//
++// Asserted on BOTH settings of BROILER_JS_SPECULATIVE_NUMERIC_LOCALS. The control arm has one
++// representation and cannot have the bug; a disagreement between the arms IS the bug.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public sealed class SpeculativeNumericReadPathTests
++{
++    private static string Eval(string source, bool speculate)
++    {
++        var previous = SpeculativeNumericLocals2.Enabled;
++        var speculation = NumericSpeculation.Enabled;
++        SpeculativeNumericLocals2.Enabled = speculate;
++        NumericSpeculation.Enabled = true;
++        try
++        {
++            using var context = new JSContext();
++            return context.Eval(source).ToString();
++        }
++        finally
++        {
++            SpeculativeNumericLocals2.Enabled = previous;
++            NumericSpeculation.Enabled = speculation;
++        }
++    }
++
++    private static long Emitted(string source)
++    {
++        var previous = SpeculativeNumericLocals2.Enabled;
++        var speculation = NumericSpeculation.Enabled;
++        SpeculativeNumericLocals2.Enabled = true;
++        NumericSpeculation.Enabled = true;
++        using var context = new JSContext();
++        CompilerSpecializationDiagnostics.Reset();
++        try
++        {
++            context.Eval(source);
++            return CompilerSpecializationDiagnostics.Snapshot().SpeculativeNumericLocalsEmitted;
++        }
++        finally
++        {
++            SpeculativeNumericLocals2.Enabled = previous;
++            NumericSpeculation.Enabled = speculation;
++        }
++    }
++
++    // The shape every fixture below is built on: a local whose initializer reads a name from
++    // outside the function, which is the entire population item 3-8a's count found (26 names on the
++    // Octane corpus, 15 of them NavierStokes'). The real analysis drops it for that read; the
++    // speculative one keeps it and tests the assumption at run time.
++    private const string StaleSlot = """
++        gg = 0;
++        function f(tail) {
++          var x = gg;
++          x++; x++; x++;
++          return x + tail;
++        }
++        f("!");
++        """;
++
++    [Fact]
++    public void TheFixturesActuallyReachTheMechanism()
++    {
++        // Every other assertion in this file is an answer that must hold on both arms, which a
++        // fixture that never compiled a speculative local would satisfy trivially. §3.5's rule
++        // about counters applies to tests too: pin that the thing under test was built at all,
++        // or the file is a description of nothing.
++        Assert.True(Emitted(StaleSlot) > 0);
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public void TheStaleSlotIsNeverHandedToTheGenericArm(bool speculate)
++    {
++        // The hazard, at its shortest. Three `x++` on the fast arm leave raw at 3 and the slot at
++        // 0; then `x + tail` meets a String and has to take the tree's GENERIC arm, which wants
++        // both operands as JSValues. Reading x's slot there answers "0!".
++        //
++        // This is why a speculative leaf is NOT `IsLeaf: true`. That flag means "the saved operand
++        // is the value whichever way the test went", which is true of an ordinary guarded leaf —
++        // it saved the JSValue it was handed — and false of this one, whose saved slot is only
++        // correct while the flag is DOWN.
++        Assert.Equal("3!", Eval(StaleSlot, speculate));
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public void AnElementReadFollowsTheRawIndexWhileTheFlagHolds(bool speculate)
++    {
++        // The element path's version of the same hazard: `i++` between two reads never touches the
++        // slot, so an `a[i]` that indexes by the slot reads a[0] every time and answers 30.
++        Assert.Equal("60", Eval("""
++            gg = 0;
++            function f() {
++              var a = [10, 20, 30, 40];
++              var i = gg;
++              var s = a[i]; i++;
++              s += a[i]; i++;
++              s += a[i];
++              return s;
++            }
++            f();
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public void AnElementReadFallsBackToTheSlotWhenTheFlagIsDown(bool speculate)
++    {
++        // The losing arm, which has to keep working rather than merely not crash: the local is
++        // compiled speculative — that is a static decision — and turns out to hold a String, so
++        // the read has to go through the ordinary indexer and index by "1".
++        Assert.Equal("20", Eval("""
++            gg = "1";
++            function f() {
++              var a = [10, 20, 30];
++              var i = gg;
++              i = gg;
++              return a[i];
++            }
++            f();
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public void AnElementWriteFollowsTheRawIndexWhileTheFlagHolds(bool speculate)
++    {
++        // The write is here rather than with the storage half because the MEASUREMENT put it here:
++        // with only the two reads guarded the item was still a regression, and NavierStokes' inner
++        // loop is `x[currentRow] = (x0[currentRow] + …)` — the local read four ways and written
++        // through once, with the one write boxing an index the reads had stopped boxing.
++        Assert.Equal("11,22,33", Eval("""
++            gg = 0;
++            function f() {
++              var a = [1, 2, 3];
++              var i = gg;
++              a[i] = 11; i++;
++              a[i] = 22; i++;
++              a[i] = 33;
++              return a.join(",");
++            }
++            f();
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public void AnElementWriteFallsBackToTheSlotWhenTheFlagIsDown(bool speculate)
++    {
++        // Its losing arm, and the assignment's own value with it — `a[i] = v` evaluates to v on
++        // both arms, which the outer `+ ""` here would lose if the conditional returned the slot.
++        Assert.Equal("1,99,3:99", Eval("""
++            gg = "1";
++            function f() {
++              var a = [1, 2, 3];
++              var i = gg;
++              i = gg;
++              var v = (a[i] = 99);
++              return a.join(",") + ":" + v;
++            }
++            f();
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public void AnElementWriteEvaluatesItsRightHandSideAfterItsReceiver(bool speculate)
++    {
++        // §13.15.2 order: the receiver first, the right-hand side after it. Both are bound to
++        // temps here — the receiver because both arms need it, the value because `compileValue`
++        // is a COMPILATION and calling it once per arm would emit the right-hand side twice —
++        // so the order is the emitter's to get right rather than the tree's.
++        Assert.Equal("base,rhs:7", Eval("""
++            gg = 0;
++            function f() {
++              var log = [];
++              var a = [1, 2, 3];
++              var i = gg;
++              i = gg;
++              var o = { get p() { log.push("base"); return a; } };
++              o.p[i] = (log.push("rhs"), 7);
++              return log.join(",") + ":" + a[0];
++            }
++            f();
++            """, speculate));
++    }
++
++    [Fact]
++    public void AnIndexThatTheReceiverCouldDisturbIsNotSpeculativeAtAll()
++    {
++        // `a[i]` evaluates the receiver before it reads i, so a receiver that changed i's flag
++        // would make that order observable — read the flag too early and the raw arm is taken on a
++        // speculation the receiver has since taken down, indexing by the 0 the write path leaves
++        // behind. This is the fixture that says the case does not exist: to write i from inside a
++        // getter the getter must CLOSE OVER i, and a captured binding lives in a JSVariable cell,
++        // which is not a candidate for either numeric tier. The two properties are mutually
++        // exclusive by construction, not by an ordering rule in the emitter.
++        //
++        // Asserted as a pair because only the pair says it. The captured program alone emitting
++        // nothing is equally consistent with the fixture being malformed — which is exactly how
++        // the first version of this test passed against an emitter deliberately broken to read the
++        // flag first.
++        const string uncaptured = """
++            gg = 1; hh = "2";
++            function f() {
++              var a = [10, 20, 30];
++              var i = gg;
++              i = gg;
++              var o = { get p() { return a; } };
++              return o.p[i];
++            }
++            f();
++            """;
++        const string captured = """
++            gg = 1; hh = "2";
++            function f() {
++              var a = [10, 20, 30];
++              var i = gg;
++              i = gg;
++              var o = { get p() { i = hh; return a; } };
++              return o.p[i];
++            }
++            f();
++            """;
++
++        Assert.True(Emitted(uncaptured) > 0);
++        Assert.Equal(0, Emitted(captured));
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public void AnIndexedReadEvaluatesItsReceiverExactlyOnce(bool speculate)
++    {
++        // A pin rather than a discriminator, and worth having as one: a conditional runs one arm,
++        // so duplicating the receiver into both would not change this count today. What it would
++        // change is code size and inline-cache-site identity, neither of which a test can see — so
++        // this stands guard over the property that IS visible if the emitter ever grows a shape
++        // that evaluates both sides.
++        Assert.Equal("20:1", Eval("""
++            gg = 1;
++            function f() {
++              var n = 0;
++              var a = [10, 20, 30];
++              var i = gg;
++              i = gg;
++              var o = { get p() { n++; return a; } };
++              var v = o.p[i];
++              return v + ":" + n;
++            }
++            f();
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public void ATreeLeafReadsTheLocalAtItsOwnPositionAndNotAtTheOperator(bool speculate)
++    {
++        // Why the leaf SNAPSHOTS the three halves instead of reading them where the operator needs
++        // them. `c + p.v` reads c first and the getter second, and the getter writes c — so the
++        // operator must see the value c had before it ran. Reading the storage at the node answers
++        // 100 + 10.
++        Assert.Equal("11", Eval("""
++            gg = 1;
++            function f() {
++              var c = gg;
++              c++; c--;
++              var p = { get v() { c = 100; return 10; } };
++              return c + p.v;
++            }
++            f();
++            """, speculate));
++    }
++
++    [Theory]
++    [InlineData(false)]
++    [InlineData(true)]
++    public void TheSnapshotCoversTheFlagAndNotOnlyTheValue(bool speculate)
++    {
++        // The half of the snapshot that is easiest to leave out, because the value alone looks
++        // sufficient. Here the getter does not change what c is worth, it changes what c IS — a
++        // Number becomes a String — so a leaf that copied the double but re-read the flag at the
++        // operator would find the speculation down, take the generic arm, and concatenate: "x10".
++        Assert.Equal("11", Eval("""
++            gg = 1;
++            function f() {
++              var c = gg;
++              c++; c--;
++              var p = { get v() { c = "x"; return 10; } };
++              return c + p.v;
++            }
++            f();
++            """, speculate));
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateMemberExpression.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateMemberExpression.cs
+index a23eb708..61d69693 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateMemberExpression.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateMemberExpression.cs
+@@ -39,6 +39,32 @@ partial class FastCompiler
+             : null;
+     }
+ 
++    /// <summary>
++    /// The three halves of item 3-8a's speculative local when it is used as a computed key, or
++    /// <c>null</c> when the key is not one.
++    /// </summary>
++    /// <remarks>
++    /// Separate from <see cref="TryGetNumericKeyStorage"/> and deliberately so: that one answers
++    /// "this key IS a raw double", which lets its caller emit one unconditional read. A
++    /// speculative key is a raw double only while its flag holds, so its caller has to emit both
++    /// arms — and a site that confused the two would read a dead double whenever the speculation
++    /// was not live.
++    /// </remarks>
++    private (BExpression Raw, BExpression Flag, BExpression Slot)? TryGetSpeculativeKeyStorage(
++        AstExpression property)
++    {
++        if (property.Type != FastNodeType.Identifier)
++            return null;
++
++        if (!TryGetStaticIdentifierVariable((AstIdentifier)property, out var variable)
++            || variable?.SpeculativeNumericFlag == null)
++        {
++            return null;
++        }
++
++        return (variable.SpeculativeNumericStorage, variable.SpeculativeNumericFlag, variable.SpeculativeSlot);
++    }
++
+     /// <summary>
+     /// Lowers `a[i] = value` to a write that keeps its index unboxed, or returns null when this
+     /// member is not a plain numeric-local element write (roadmap item 3-0, write half).
+@@ -71,11 +97,42 @@ partial class FastCompiler
+         }
+ 
+         var index = TryGetNumericKeyStorage(member.Property, member.Computed);
+-        if (index == null)
++        if (index != null)
++        {
++            var numericTarget = VisitExpression(member.Object);
++            return JSValueBuilder.SetIndexByNumber(numericTarget, index, compileValue());
++        }
++
++        // Item 3-8a: the same write keyed by a SPECULATIVE local. The read half of the item was
++        // measured without this and came out a regression on NavierStokes, whose inner loop is
++        //
++        //     lastX = x[currentRow] = (x0[currentRow] + a * (...)) * invC;
++        //
++        // — the local is read four ways and WRITTEN through once, and the one write was boxing an
++        // index the three reads no longer box.
++        if (!member.Computed)
+             return null;
+ 
+-        var target = VisitExpression(member.Object);
+-        return JSValueBuilder.SetIndexByNumber(target, index, compileValue());
++        if (TryGetSpeculativeKeyStorage(member.Property) is not { } speculative)
++            return null;
++
++        // Receiver, then value, then the store — the order §13.15.2 asks for, given that the key
++        // "evaluation" here is a pair of register reads that cannot be observed. Both are bound to
++        // temps because both arms need them and `compileValue` may be called only once: it is a
++        // compilation, not a value, and running it twice would emit the right-hand side twice and
++        // mint a second inline-cache site for it.
++        using var receiver = scope.Top.GetTempVariable(typeof(JSValue));
++        using var stored = scope.Top.GetTempVariable(typeof(JSValue));
++        return BExpression.Block(
++            BExpression.Assign(receiver.Expression, VisitExpression(member.Object)),
++            BExpression.Assign(stored.Expression, ToJSValueExpression(compileValue())),
++            BExpression.Condition(
++                speculative.Flag,
++                JSValueBuilder.SetIndexByNumber(receiver.Expression, speculative.Raw, stored.Expression),
++                BExpression.Assign(
++                    JSValueBuilder.Index(receiver.Expression, speculative.Slot),
++                    stored.Expression),
++                typeof(JSValue)));
+     }
+ 
+     private BExpression CreatePropertyKeyExpression(AstExpression property, bool computed)
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
+index 4d52e393..c0d7e0c1 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
+@@ -102,7 +102,7 @@ partial class FastCompiler
+         // the result. Measured, requiring two operators took the corpus from 10.4 M boxes removed
+         // to 5.6 M — Crypto alone lost 4.7 M — which is what says the single-node-with-a-literal
+         // case is most of the prize rather than a rounding error.
+-        if (CountOperators(root) - 1 + CountNativeLeaves(root) < 1)
++        if (CountOperators(root) - 1 + CountNativeLeaves(root) + CountSpeculativeLeaves(root) < 1)
+             return Refuse(NumericTreeRefusal.NoSavingToMake);
+ 
+         // The hoisting form's order gate. Under the order-preserving emission nothing is hoisted,
+@@ -280,7 +280,10 @@ partial class FastCompiler
+     /// </param>
+     /// <param name="IsLeaf">
+     /// A guarded leaf's <see cref="Value"/> is the operand itself and is correct whether or not
+-    /// the test holds, so it needs no conditional to read; an internal node's does.
++    /// the test holds, so it needs no conditional to read; an internal node's does. Read as a
++    /// property of the VALUE rather than of the syntax — item 3-8a's speculative leaf is a leaf
++    /// and sets this <c>false</c>, because the slot it carries is stale exactly while its test
++    /// holds.
+     /// </param>
+     private readonly record struct OrderedNode(
+         BExpression Native,
+@@ -353,6 +356,44 @@ partial class FastCompiler
+             return new OrderedNode(value, ok, boxed, IsLeaf: false);
+         }
+ 
++        // Item 3-8a: a speculative local is ALREADY the shape this tree wants — a raw double, a
++        // flag saying it is live, and a JSValue to fall back on. Offering it directly is what
++        // makes the dual representation pay: without this the leaf goes through `Expression`,
++        // which boxes on the very arm the item exists to keep unboxed.
++        //
++        // It is still SNAPSHOTTED rather than read in place, and that is not caution. A later
++        // leaf can assign to the same local — `c + f()` where `f` writes `c` — and the reference
++        // emission reads `c` before `f` runs. Copying two CLR locals and a reference preserves
++        // that for nothing; reading the storage at the node instead would answer with the value
++        // the side effect left. The flag is snapshotted for the same reason and it is the half
++        // easiest to leave out: a side effect that turns the local into a String changes which
++        // ARM is correct, not just what the double is worth.
++        //
++        // NOT a leaf for AsJSValue's purposes, and this is the one place the two representations
++        // are not interchangeable. `IsLeaf` means "the saved operand is the value whichever way
++        // the test went" — true of a guarded leaf, which saved the JSValue it was handed, and
++        // false of this one, whose slot is DELIBERATELY STALE while the flag is up. So the
++        // generic arm has to re-materialize from the flag, which costs a box on exactly the arm
++        // that was going to box anyway.
++        if (NumericTreeOrdering.Enabled
++            && node is AstIdentifier speculativeName
++            && TryGetStaticIdentifierVariable(speculativeName, out var speculativeVariable)
++            && speculativeVariable?.SpeculativeNumericFlag != null)
++        {
++            var rawCopy = BExpression.Parameter(typeof(double), "#specnum" + guarded);
++            var flagCopy = BExpression.Parameter(typeof(bool), "#specok" + guarded);
++            var slotCopy = BExpression.Parameter(typeof(JSValue), "#specval" + guarded);
++            locals.Add(rawCopy);
++            locals.Add(flagCopy);
++            locals.Add(slotCopy);
++            body.Add(BExpression.Assign(flagCopy, speculativeVariable.SpeculativeNumericFlag));
++            body.Add(BExpression.Assign(rawCopy, speculativeVariable.SpeculativeNumericStorage));
++            body.Add(BExpression.Assign(slotCopy, speculativeVariable.SpeculativeSlot));
++            guarded++;
++
++            return new OrderedNode(rawCopy, flagCopy, slotCopy, IsLeaf: false);
++        }
++
+         // A leaf. Visited exactly once, here, at its own position in the reference order.
+         var (isString, isNumber, expression) = ToNativeExpression(node);
+ 
+@@ -440,6 +481,40 @@ partial class FastCompiler
+         return IsNativeNumericAst(node) ? 1 : 0;
+     }
+ 
++    /// <summary>
++    /// Leaves that are item 3-8a's speculative locals — each one a box the ordinary emission mints
++    /// <em>conditionally</em>, because the variable's readable expression boxes the raw half back
++    /// up whenever the flag is live.
++    /// </summary>
++    /// <remarks>
++    /// Counted alongside <see cref="CountNativeLeaves"/> rather than inside it, because it is not
++    /// the same kind of saving: a proven-numeric leaf is one box removed, and this is one box
++    /// removed on the arm the speculation wins and nothing changed on the arm it loses.
++    /// <para>
++    /// It is nevertheless the difference between a tree being built and refused. <c>c + p.v</c> has
++    /// one operator and no native leaf, so <c>CountOperators - 1 + CountNativeLeaves</c> is zero and
++    /// the tree is turned down for having no saving to make — which is <b>the shape item 3-8a's
++    /// population is mostly made of</b>. Without this term the speculative leaf below is reachable
++    /// only from trees that were already eligible for some other reason, i.e. it is very nearly
++    /// dead code, and the read half of the item does not happen.
++    /// </para>
++    /// <para>
++    /// Self-gating: with <c>BROILER_JS_SPECULATIVE_NUMERIC_LOCALS</c> off no variable carries a
++    /// flag, so this is zero and the eligibility rule is byte-for-byte the one the control arm had.
++    /// </para>
++    /// </remarks>
++    private int CountSpeculativeLeaves(AstExpression node)
++    {
++        if (node is AstBinaryExpression binary && IsNativeNumericOperator(binary.Operator))
++            return CountSpeculativeLeaves(binary.Left) + CountSpeculativeLeaves(binary.Right);
++
++        return node is AstIdentifier name
++            && TryGetStaticIdentifierVariable(name, out var variable)
++            && variable?.SpeculativeNumericFlag != null
++            ? 1
++            : 0;
++    }
++
+     private void CollectLeaves(AstExpression node, List<AstExpression> leaves)
+     {
+         if (node is AstBinaryExpression binary && IsNativeNumericOperator(binary.Operator))
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs
+index 27b22fea..138a7e5b 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs
+@@ -426,24 +426,6 @@ partial class FastCompiler
+                 ? AssignToSpeculativeVariable(variable, value)
+                 : BExpression.Assign(variable.Expression, value);
+ 
+-    /// <summary>
+-    /// A store into item 3-8a's dual-representation local: land the value in the slot, decide the
+-    /// flag from it, and mirror the raw double when it holds.
+-    /// </summary>
+-    /// <remarks>
+-    /// <para>
+-    /// Branch-free on purpose. The obvious spelling is <c>if (flag) num = slot.DoubleValue;</c>,
+-    /// but the assignment is an EXPRESSION whose value the caller may use, and a conditional with
+-    /// a void arm is not one — so the raw half is written unconditionally from a conditional
+-    /// source instead. When the flag does not hold, the double is garbage that nothing reads:
+-    /// every consumer goes through <c>Expression</c>, which selects the slot.
+-    /// </para>
+-    /// <para>
+-    /// <b>The value is evaluated exactly once</b>, into the slot, and the flag and the double are
+-    /// then read back OFF the slot rather than off the expression — so a value with a side effect
+-    /// cannot run twice, which is the failure this shape most invites.
+-    /// </para>
+-    /// </remarks>
+     /// <summary>
+     /// Brings item 3-8a's <c>JSValue</c> slot back up to date, so a path that treats the binding
+     /// as an ordinary assignable <c>JSValue</c> can go on doing so.
+@@ -481,6 +463,26 @@ partial class FastCompiler
+             inPlace(variable.SpeculativeSlot),
+             ResyncSpeculative(variable),
+             variable.SpeculativeSlot);
++
++    /// <summary>
++    /// A store into item 3-8a's dual-representation local: land the value in the slot, decide the
++    /// flag from it, and mirror the raw double when it holds.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// Branch-free on purpose. The obvious spelling is <c>if (flag) num = slot.DoubleValue;</c>,
++    /// but the assignment is an EXPRESSION whose value the caller may use, and a conditional with
++    /// a void arm is not one — so the raw half is written unconditionally from a conditional
++    /// source instead. When the flag does not hold the double is <b>0</b>, and it is 0 rather than
++    /// left alone so that a consumer which reads it out of order reads a wrong answer loudly
++    /// instead of a plausible stale one.
++    /// </para>
++    /// <para>
++    /// <b>The value is evaluated exactly once</b>, into the slot, and the flag and the double are
++    /// then read back OFF the slot rather than off the expression — so a value with a side effect
++    /// cannot run twice, which is the failure this shape most invites.
++    /// </para>
++    /// </remarks>
+     private static BExpression AssignToSpeculativeVariable(
+         FastFunctionScope.VariableScope variable, BExpression value)
+     {
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitMemberExpression.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitMemberExpression.cs
+index e61ded1c..d4978eb3 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitMemberExpression.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitMemberExpression.cs
+@@ -134,6 +134,30 @@ partial class FastCompiler
+                     var numericKey = TryGetNumericKeyStorage(mp, computed: true);
+                     if (numericKey != null)
+                         return JSValueBuilder.IndexByNumber(target, numericKey);
++
++                    // Item 3-8a: the same read where the index is a SPECULATIVE local — a raw
++                    // double only while its flag holds, so unlike the path above this one has to
++                    // emit both arms.
++                    //
++                    // The receiver is bound to a temp so the COMPILED receiver appears once. Not
++                    // an ordering rule: only one arm of a conditional runs, and the order between
++                    // evaluating the receiver and reading the key cannot be observed here anyway
++                    // — a receiver could only disturb the key by closing over it, and a captured
++                    // binding is a JSVariable cell, which is not a candidate for either numeric
++                    // tier. What the temp buys is that `target` is not duplicated into two arms,
++                    // where it would be emitted twice and would put one inline-cache site behind
++                    // two call sites.
++                    if (TryGetSpeculativeKeyStorage(mp) is { } speculativeKey)
++                    {
++                        using var receiver = scope.Top.GetTempVariable(typeof(JSValue));
++                        return BExpression.Block(
++                            BExpression.Assign(receiver.Expression, target),
++                            BExpression.Condition(
++                                speculativeKey.Flag,
++                                JSValueBuilder.IndexByNumber(receiver.Expression, speculativeKey.Raw),
++                                JSValueBuilder.Index(receiver.Expression, speculativeKey.Slot),
++                                typeof(JSValue)));
++                    }
+                 }
+ 
+                 // Computed identifier key (`a?.[b]` where b parsed as an Identifier reference).
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Scope/FastFunctionScope.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Scope/FastFunctionScope.cs
+index c8a8b457..dd46972e 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Scope/FastFunctionScope.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Scope/FastFunctionScope.cs
+@@ -874,7 +874,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
+             : variableType == typeof(double)
+                 ? JSNumberBuilder.New(pe)
+                 : speculativeFlag != null
+-                    ? BExpression.Condition(speculativeFlag, JSNumberBuilder.New(speculativeDouble), pe, typeof(JSValue))
++                    ? BExpression.Condition(speculativeFlag, JSNumberBuilder.NewSpeculativeRead(speculativeDouble), pe, typeof(JSValue))
+                     : pe;
+         
+         v = new VariableScope
+diff --git a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs
+index 46bb3f77..e8322c12 100644
+--- a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs
++++ b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs
+@@ -11,6 +11,7 @@ public class JSNumberBuilder
+     private static MethodInfo _create;
+     private static MethodInfo _createLiteral;
+     private static MethodInfo _createConversion;
++    private static MethodInfo _createSpeculativeRead;
+ 
+     public static Expression NaN;
+     public static Expression Zero;
+@@ -31,6 +32,8 @@ public class JSNumberBuilder
+             ?? throw new NotSupportedException();
+         _createLiteral = type.GetMethod("CreateLiteral", [typeof(double)])
+             ?? throw new InvalidOperationException("JSNumber.CreateLiteral(double) not found");
++        _createSpeculativeRead = type.GetMethod("CreateSpeculativeRead", [typeof(double)])
++            ?? throw new InvalidOperationException("JSNumber.CreateSpeculativeRead(double) not found");
+ 
+         NaN = Expression.Field(null, type.GetField("NaN"));
+         Zero = Expression.Field(null, type.GetField("Zero"));
+@@ -59,4 +62,12 @@ public class JSNumberBuilder
+     /// </summary>
+     public static Expression NewLiteral(double value)
+         => Expression.Call(null, _createLiteral, Expression.Constant(value));
++
++    /// <summary>
++    /// Emits the creation of a number for a READ of item 3-8a's speculative local. Same factory,
++    /// separate entry, so a run can be asked how much of its boxing the dual representation is
++    /// still paying (docs/performance-roadmap.md item 3-8a).
++    /// </summary>
++    public static Expression NewSpeculativeRead(Expression exp)
++        => Expression.Call(null, _createSpeculativeRead, exp);
+ }
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index fa6bd33e..f3f7ba7a 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -622,6 +622,11 @@ internal static class SpecializingTierMetrics
+             // into a local, a slot or an element. Only these are what a typed backing store could
+             // remove; the rest an operator or a builtin produced.
+             boxingConversionRequests = boxing.ConversionRequests,
++            // Item 3-8a: of those, the ones minted READING a speculative local, i.e. what the dual
++            // representation still costs. Read it against the fall in arithmeticUpdateTargets'
++            // LocalSlot row, which is what the representation buys: the item pays exactly while
++            // the second number exceeds the first.
++            boxingSpeculativeReadRequests = boxing.SpeculativeReadRequests,
+ 
+             // Item 3-1's shared half, counted on the far side of the boundary: not what the
+             // compiler could prove, but what the operators were actually handed. arithmeticGeneric
+-- 
+2.43.0
+

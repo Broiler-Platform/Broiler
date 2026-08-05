@@ -1,0 +1,97 @@
+From 94ca0ddd3bd25dcbeb3504996552b91f308d66bf Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 5 Aug 2026 08:11:53 +0000
+Subject: [PATCH] Price what a box is actually worth, item 3-1
+
+Phase 3 has run for eight items on box counts, and three of them
+measured an allocation cut against wall clock and got roughly a sixth of
+the share back -- 12.2% -> 1.9% for the guarded tree, 54.0% -> 3.1% for
+the order-preserving emission -- with the ratio recorded three times and
+never explained. Nothing in the driver said what the collector was
+costing in the first place.
+
+GC.GetTotalPauseDuration is exact rather than sampled: it is the
+runtime's own accounting of time with execution suspended. Reported per
+suite with the three collection counts beside it, because pause time
+alone cannot separate many cheap gen0s from a few expensive gen2s and
+those want opposite follow-ups.
+
+Measured on both arms of the order-preserving emission, three runs each:
+collection is 1.8-2.0% of the driver, and of the 768 ms that change
+removes only 54 ms -- 7% -- is collection. The other 714 ms is the
+mutator's own allocation work: the pointer bump, the zeroing, the write
+barriers and the cache traffic of touching a gigabyte of fresh memory.
+A box costs about fourteen times more to create than to collect here,
+which turns the roadmap's "the collector is not the problem" from an
+assertion into a measurement.
+
+The same run corroborates the box counters from outside them: allocated
+bytes fall 4.00 GB -> 2.92 GB against a prediction of ~1.0 GB from
+36 633 528 boxes, so an object counter at the factory and a byte counter
+at the allocator agree.
+
+At the measured 711 ms per GB, the 0.70 GB of number boxes still
+standing is worth about 495 ms, 2.6% of the driver -- so everything left
+in phase 3 is an XL bidding for under 2%, and future items should be
+argued with a rate rather than a share.
+
+Four GC reads per suite, on unconditionally since they are not on any
+hot path. No behaviour change.
+---
+ .../SpecializingTierMetrics.cs                | 26 +++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index 505e30be..ba635ced 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -487,6 +487,18 @@ internal static class SpecializingTierMetrics
+         ArithmeticOperandDiagnostics.Reset();
+         ArithmeticOperandDiagnostics.Enabled = counters;
+         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
++
++        // The denominator phase 3 has never had. Every item in it is priced in boxes removed, and
++        // the exchange rate into wall clock has come out at roughly a sixth of that share three
++        // times running with no explanation. GC.GetTotalPauseDuration is exact rather than sampled
++        // — it is the runtime's own accounting of how long execution was suspended for collection
++        // — so it says directly what share of a suite an allocation item is even bidding for.
++        // Collection counts are taken with it because pause time alone cannot distinguish "many
++        // cheap gen0s" from "a few expensive gen2s", and those want opposite follow-ups.
++        var pauseBefore = GC.GetTotalPauseDuration();
++        var gen0Before = GC.CollectionCount(0);
++        var gen1Before = GC.CollectionCount(1);
++        var gen2Before = GC.CollectionCount(2);
+         stopwatch.Start();
+         try
+         {
+@@ -498,6 +510,10 @@ internal static class SpecializingTierMetrics
+         }
+ 
+         stopwatch.Stop();
++        var gcPauseMs = (GC.GetTotalPauseDuration() - pauseBefore).TotalMilliseconds;
++        var gen0Collections = GC.CollectionCount(0) - gen0Before;
++        var gen1Collections = GC.CollectionCount(1) - gen1Before;
++        var gen2Collections = GC.CollectionCount(2) - gen2Before;
+         var allocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+         var boxing = Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Snapshot();
+         Broiler.JavaScript.BuiltIns.Number.NumberBoxingDiagnostics.Enabled = false;
+@@ -527,6 +543,16 @@ internal static class SpecializingTierMetrics
+             elapsedMs = stopwatch.ElapsedMilliseconds,
+             allocatedBytes,
+ 
++            // How much of elapsedMs the runtime spent with execution suspended for collection,
++            // from its own accounting rather than from a sampled profile. This is the ceiling on
++            // every allocation item in phase 3 at once: a change that removed EVERY box could not
++            // buy back more than this from the collector, and three items have now measured an
++            // exchange rate into wall clock that this is the missing half of the explanation for.
++            gcPauseMs,
++            gen0Collections,
++            gen1Collections,
++            gen2Collections,
++
+             // Item 3-5's shape, counted at compile time: how many relational comparisons had one
+             // operand already unboxed, against how many had neither — and how few locals reach the
+             // numeric tier at all, which is what bounds the first number.
+-- 
+2.43.0
+
