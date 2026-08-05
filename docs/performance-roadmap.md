@@ -83,7 +83,10 @@ so only the parent can hold the combined view.
   instrument and no mechanism — and
   **[`0096`](../patches/0096-js-async-job-scheduling.patch)**, which is a **correctness** fix rather
   than a performance one: a promise job could run JavaScript beside the JavaScript that queued it,
-  and the gates for `0095` are what found it. `0090` and `0091` are tests only. Usual terms: the push to the
+  and the gates for `0095` are what found it — and
+  **[`0097`](../patches/0097-js-execution-exclusion.patch)**, which closes the residual `0096` wrote
+  down (measured at 172 overlaps in 200 rounds) and states the embedding contract that the engine
+  cannot enforce alone. `0090` and `0091` are tests only. Usual terms: the push to the
   submodule remote returned 403, so the pointer is deliberately unbumped and every figure in their
   sections was measured on a local build of `cca39b4d` plus those patches. They are independent of
   everything cleared above, **`0087` → `0088` → `0089` → `0090` → `0091` → `0092` → `0093` is the
@@ -1099,6 +1102,18 @@ These were paid for once each. They apply to every phase below.
   same shape as item 3-6's 290 names being *inferred* from offered-minus-dropped rather than
   counted. *A population and a traffic figure that live in the same suite still need multiplying,
   and the multiplication is an A/B, not an argument.*
+- **A concurrency counter measures the wrong thing by default, and the default is plausible enough
+  to ship.** The detector built to check "one thread runs JavaScript in a context at a time" counted
+  threads inside JavaScript **process-wide** on its first version. That is not the invariant: two
+  independent contexts running in parallel is exactly what an embedder is supposed to be able to do,
+  so the counter would have reported legitimate concurrency as a violation and fired on any
+  full-suite run, where xUnit evaluates several test classes at once. *Before trusting a counter that
+  checks an invariant, state the invariant's scope and check the counter has the same one.*
+- **"In principle" in a written-up residual is a measurement not taken.** `0096` recorded that a job
+  posted with nothing running "could in principle land during a later execution". Measured, it did
+  so in **172 of 200 rounds**. The honesty of naming the gap was worth something; the estimate inside
+  it was worth nothing, and the two are easy to mistake for each other in a document that otherwise
+  insists on numbers.
 - **A test that fails only under load is a race, and the race is more likely in the engine than in
   the test.** `SuspendingNestedFunctionsCaptureThroughTheSameBox` had passed every full-suite run in
   this phase; a saturated container made it fail three times in four, and what it was reporting was
@@ -6277,7 +6292,8 @@ posted, which is every in-script `await` and every reaction queued by a running 
 while *nothing* is executing still takes the host context or the pool, and could in principle land
 during a later execution. Closing that too means the embedding contract has to name a JavaScript
 thread the engine can serialize against, which is a change to the API rather than to a dispatch
-site, and it is not attempted here.
+site. **That residual was then measured and closed — see below; "in principle" turned out to be 172
+overlaps in 200 rounds.**
 
 **Gates.** The eight new fixtures are written to **lose the race deterministically** — a spin after
 the call, so a racing thread reliably wins — which is the difference between them and the test that
@@ -6287,6 +6303,68 @@ green, and the two job-ordering test262 manifests — `test262-promise-jobs` and
 whose `ticks-with-*` cases assert exact microtask tick counts and are the sharpest check available
 on this change — pass **5/5 and 2/2**. The five pinned manifests were re-run against it as well;
 their counts are recorded in §3.4.
+
+#### The embedding contract — the residual, measured at 86% and closed: **`0097`**
+
+`0096` fixed where a job is *dispatched* and named what that could not reach: **a job posted while
+nothing is executing** takes a host context or the thread pool, because the queue is deliberately
+refused at depth zero — that refusal is what makes stranding a job impossible. Such a job could then
+run JavaScript while a later `Eval` was running JavaScript.
+
+**"In principle" was doing a lot of work in that sentence.** Reaching the case needs a JavaScript
+entry point that is not `Eval`, and a host invoking a `JSValue` directly is exactly one — arm a
+promise, settle it from a host thread with nothing running, and evaluate meanwhile. Measured:
+
+| | peak threads in one context | overlaps / 200 rounds |
+|---|--:|--:|
+| `0096` — dispatch fixed, no lock | **2** | **172 (86%)** |
+| `0097` — with the execution lock | **1** | **0** |
+
+**The counter had to be built twice, and the first version is the more instructive one.** It counted
+threads inside JavaScript *process-wide*, which is not the invariant: **two independent contexts
+running in parallel is exactly what an embedder is supposed to be able to do**, so a process-wide
+count reports legitimate concurrency as a violation and would fire on any full-suite run, where
+xUnit evaluates several test classes at once. Detection is per context; only the aggregate is static,
+because an overlap is a real violation whichever context produced it. *A concurrency counter measures
+the wrong thing by default, and the default is plausible enough to ship.*
+
+**The fix is one lock and one contract.**
+
+A per-context `Monitor` is taken by every execution the engine owns — `Eval`, `Execute`,
+`ExecuteAsync`, the queue drain, and **every job wherever it was dispatched** — so an evaluation and
+a job are mutually exclusive even when the job runs on a pool thread. Re-entrancy is required rather
+than convenient: a host callback that evaluates more source is the same agent going deeper and must
+not deadlock against itself.
+
+What the engine cannot see is a host reaching in by another route — invoking a `JSValue`, reading a
+property whose getter is a JavaScript function, calling back from a thread of its own. Those are
+ordinary calls on ordinary objects and **guarding each one would put a mutex on the engine's hottest
+path**. So the rule is stated and given an API instead:
+
+```csharp
+using (context.EnterExecution())
+    callback.InvokeFunction(new Arguments(JSUndefined.Value, value));
+```
+
+*Wrap host-initiated entry into JavaScript, unless it is already inside one.* A call made from within
+an engine-owned execution needs nothing, and wrapping it anyway is harmless.
+
+**What the lock costs is a bounded wait, and the pattern it cannot support was already unsound.**
+JavaScript blocking on a host task whose completion has to re-enter the same context now deadlocks
+where it used to "work" — by running that job concurrently and mutating the heap underneath the code
+waiting for it. **Measured, it costs nothing on the suite**: the integration suite runs in 46–47 s
+against a 43–57 s baseline, and the earlier reading of 3 m 4 s was a concurrently-running sweep
+rather than the lock, which is worth recording because it was nearly believed. One allocation was
+found and removed on the way — the public handle is a class, so the per-job path uses the struct
+scopes directly rather than putting an allocation on every microtask.
+
+**Gates.** Five new fixtures asserting the *property* rather than a value, which is the point: a
+value assertion catches an overlap only when the overlap happens to change that value, and that is
+how the original defect survived a phase of full-suite runs at a 0.6% hit rate. They cover the
+residual shape, two host threads evaluating on one context, the contract API, re-entrancy, and that
+jobs queued under a host scope drain when it is released. Whole engine suite green — **8 098 tests
+across 13 projects, no deadlock** — with `test262-promise-jobs` and `test262-for-await` at 5/5 and
+2/2 and the five pinned manifests recorded in §3.4.
 
 ---
 
