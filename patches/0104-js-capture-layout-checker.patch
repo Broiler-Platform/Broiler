@@ -1,8 +1,8 @@
-From 4265156e01657b3661b1c70918bb639e327b6438 Mon Sep 17 00:00:00 2001
+From 306d14d036be8cb088a3215bf98639be3593cecf Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Wed, 5 Aug 2026 19:00:56 +0000
-Subject: [PATCH] Validate item 1-1's capture layout, and fix a soundness
- defect in the free-name scan
+Date: Wed, 5 Aug 2026 19:10:36 +0000
+Subject: [PATCH] Validate item 1-1's capture layout, and close both gaps it
+ exposed
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -10,13 +10,13 @@ Content-Transfer-Encoding: 8bit
 Item 1-1's remaining half is blocked on one stated thing: a captured name's
 Box[] index is decided by LambdaRewriter from the tree, and a deferred body has
 none, so the layout must come from source alone. 0101 built the walk that would
-derive it. This builds the checker that decides whether such a derivation is
+derive it. This builds the checker that decides whether the derivation is
 correct, and answers it.
 
 The property is asymmetric: over-approximating costs a box per creation site and
 that name's numeric tier, while under-approximating means a deferred body
-resolves a name to a box that is not there — a miscompile. So one missed capture
-disqualifies the approach, and the checker exists to make a zero mean something.
+resolves a name to a box that is not there — a miscompile. One missed capture
+disqualifies the approach, so the checker exists to make a zero mean something.
 Eleven fixtures, one of which deliberately records an empty prediction against a
 non-empty truth and asserts the miss is reported.
 
@@ -28,67 +28,68 @@ index >= 0) and the lambda's own locals that something nested captures (Convert,
 index == -1). A free-name walk answers the first and correctly does not name the
 second, so compared against the whole repository the simplest possible fixture
 reports `outer` missing `q` — a function missing its own local. The deferral
-needs two derivations, not one; FreeNameScan.ForProgram composes bottom-up and
-can serve both. And every function is handed a ScriptInfo_* binding no source
-identifier names, so the layout needs a reserved region for compiler-introduced
-captures.
+needs two derivations, not one. And every function is handed a ScriptInfo_*
+binding no source identifier names, so the layout needs a reserved region for
+compiler-introduced captures.
 
-Then three corrections, in the order they had to be made.
+Then the instrument had to be made to agree with itself. Repeats are recognised
+rather than counted — Mandreel relays 1 336 of its 1 358 sites twice, with 0
+disagreements, so the repeat is duplication rather than the rewrite deciding
+differently. Undeferrable bodies are excluded: a Dynamic body has no set to be
+right about, and recording it as an empty prediction reported every one of its
+captures as a miss.
 
-Repeats are recognised rather than counted: a layout is a property of a site, and
-Mandreel relays 1 336 of its 1 358 sites twice. Repeat disagreements are 0 on
-every corpus, so the repeat is pure duplication and the rewrite decides the same
-set each time.
+That left two real defects, both about a function's own name.
 
-Undeferrable bodies are excluded — a defect in this checker. A Dynamic body has
-no set to be right about, but recording it as an empty prediction reports every
-one of its captures as a miss. That was the whole predicted{} population on
-Mandreel, PdfJS and Typescript; 7 sites.
+A function DECLARATION's name is bound in the ENCLOSING scope, so a
+self-reference is free and a deferred body must be handed a box for it.
+EnterFunction bound it inside the function as well, under a comment describing
+only the named-function-expression case: 138 sites across five corpora reported
+as capturing nothing.
 
-And one real defect, in 0101's own code. With the noise gone every remaining miss
-was the same shape: a function referencing its own name. EnterFunction bound the
-function's own name inside the function unconditionally, under a comment
-describing the named-function-expression case. A function DECLARATION's name is
-bound in the ENCLOSING scope, so a self-reference is free and a deferred body
-must be handed a box for it. 138 sites across five corpora reported as capturing
-nothing. The fix is one condition and it is soundness, not precision.
+And a named function EXPRESSION's name, which the specification does bind
+inside, is materialised by this engine as a JSVariable parameter in the
+enclosing scope that the body captures — so the layout must carry it even though
+it is correctly not free. The binding is registered with a deliberately null
+Variable and exposed through EvalCaptureExpression alone, which is what a first
+attempt testing `Variable != null` missed. Item 0097's rule, ask what the
+compiler built rather than what the analysis proved, deciding a mechanism rather
+than a measurement for the first time.
 
-With those three the corpus reports zero missed sites on 5 157 checked, and
-over-approximates on 2 712 of them — safe, and the cost side the mechanism must
-be measured against.
+Adding the self-name unconditionally over-approximated 126 sites, so FreeNameScan
+now gives it a scope of its own — where the specification puts it too — and
+reports SelfNameReferenced exactly. A parameter of the same spelling shadows it
+correctly, and a reference reaching it can be told from one reaching a parameter.
 
-One shape the corpus does not contain is still missed: a named function
-expression's own name, which the specification binds inside and which this
-engine materialises as a handed-in cell anyway. That is 0097's lesson a third
-time — ask what the compiler built, not what the analysis proved — and the first
-time it has decided a mechanism rather than a measurement. Recorded rather than
-papered over, pinned by a fixture written to go off when it is closed. Zero on a
-corpus is not zero.
+Result on the corpus: zero missed sites of 5 157 checked, and 2 445 exact, which
+is the same precision as before the self-name was predicted at all. The
+derivation over-approximates on 2 712 sites — safe, and the cost side the
+mechanism must be measured against.
 
 The deferral mechanism itself remains unbuilt and remains L. Checker off by
-default (BROILER_JS_CAPTURE_LAYOUT_CHECK=1); the FreeNameScan fix is
-unconditional, because it is a correctness fix. Compiler suite green: 1 252
-tests.
+default (BROILER_JS_CAPTURE_LAYOUT_CHECK=1); the FreeNameScan changes are
+unconditional, because they are correctness. Compiler suite green: 1 252 tests,
+including all 23 of 0101's own fixtures and its independent oracle.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01LqMsVZEFfMkp52dejVuRif
 ---
- .../CaptureLayoutTests.cs                     | 295 ++++++
- .../FastCompiler.CreateFunction.cs            |  70 +-
- .../Declarations/FreeNameScan.cs              | 995 +++++++++---------
- .../DeferredCaptureLayout.cs                  | 375 +++++++
- .../Runtime/RuntimeMethodBuilder.cs           |  41 +-
- .../DeferPopulationMetrics.cs                 |  26 +
- 6 files changed, 1291 insertions(+), 511 deletions(-)
+ .../CaptureLayoutTests.cs                     |  284 +++++
+ .../FastCompiler.CreateFunction.cs            |  100 +-
+ .../Declarations/FreeNameScan.cs              | 1034 +++++++++--------
+ .../DeferredCaptureLayout.cs                  |  375 ++++++
+ .../Runtime/RuntimeMethodBuilder.cs           |   41 +-
+ .../DeferPopulationMetrics.cs                 |   26 +
+ 6 files changed, 1349 insertions(+), 511 deletions(-)
  create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs
  create mode 100644 Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs
 
 diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs
 new file mode 100644
-index 00000000..bad1cc7f
+index 00000000..7f226e06
 --- /dev/null
 +++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs
-@@ -0,0 +1,295 @@
+@@ -0,0 +1,284 @@
 +using Broiler.JavaScript.Engine;
 +using Broiler.JavaScript.ExpressionCompiler;
 +
@@ -286,43 +287,32 @@ index 00000000..bad1cc7f
 +    }
 +
 +    [Fact]
-+    public void ANamedFunctionEXPRESSIONSelfNameIsTheONERemainingGAP()
++    public void ANamedFunctionEXPRESSIONSelfNameIsHandedInAndIsPredicted()
 +    {
-+        // The other half of the pair, and the reason the fix is a condition rather than a
-+        // deletion: an expression's name IS bound inside itself, so it is not free and not a
-+        // capture. Without this the fix above could be "always treat the name as free", which
-+        // would over-approximate every named function expression in the corpus.
++        // **The one shape the corpus does not contain, and it took two attempts.** A named
++        // function expression's own name is bound INSIDE the function by the specification, so
++        // FreeNameScan is right to leave it out of the free set — and this engine gives it a
++        // JSVariable parameter in the ENCLOSING scope which the body captures, so the layout has
++        // to carry it anyway.
 +        //
-+        // Asserted by PAIRING rather than by an absolute count. Over-approximating is safe, so
-+        // "this program predicts nothing extra" is not a property worth pinning and is not even
-+        // true — other bindings in the same program are legitimately over-predicted. What the
-+        // fix has to preserve is the DIFFERENCE: the same recursive body predicts one more name
-+        // as a declaration than as an expression, and exactly one.
++        // The first attempt looked the name up in the function's own scope and tested
++        // `Variable != null`, which is exactly the field this binding deliberately leaves null:
++        // its own comment says it "is not a local Variable of this scope (it is captured
++        // read-only), so it is exposed via EvalCaptureExpression only". Item 0097's rule, for
++        // the third time and the first time deciding a mechanism rather than a measurement — ask
++        // what the compiler BUILT, not what the analysis PROVED.
 +        var expression = Check("var f = function g(n) { return n < 1 ? 0 : g(n - 1); }; f(3);");
 +        var expressionMisses = string.Join(", ", DeferredCaptureLayout.MissedNameSamples);
 +        var declaration = Check("function g(n) { return n < 1 ? 0 : g(n - 1); } g(3);");
 +
-+        // **The declaration half is fixed and the expression half is not**, and this fixture
-+        // is written to GO OFF when it is — §3.5's rule that a fixture asserting a refusal is
-+        // an alarm for the next item.
-+        //
-+        // A named function expression's own name is bound inside itself by the specification, so
-+        // FreeNameScan is right that it is not free — and this engine nonetheless materialises
-+        // that binding as a cell HANDED IN to the lambda, which the layout must therefore carry.
-+        // That is item 0097's lesson for the third time (ask what the compiler BUILT, not what
-+        // the analysis PROVED) and the first time it has decided a mechanism rather than a
-+        // measurement. An attempt to add the self-name from the function's own scope at
-+        // prediction time did not resolve it, so the gap is recorded rather than papered over.
-+        //
-+        // The whole Octane corpus reports ZERO missed sites, so this shape is not exercised
-+        // there — which is exactly why it is pinned here: zero-on-a-corpus is not zero.
-+        Assert.Equal(1, expression.Missed);
-+        Assert.Contains("g/g", expressionMisses);
-+
-+        // What the declaration fix does buy, asserted by pairing so it cannot pass by accident:
-+        // the same recursive body predicts one more name as a declaration than as an expression.
++        Assert.True(expression.Missed == 0, "expression missed: " + expressionMisses);
 +        Assert.Equal(0, declaration.Missed);
-+        Assert.Equal(expression.PredictedNames + 1, declaration.PredictedNames);
++
++        // And the two are predicted by DIFFERENT routes, which is why the fix is two conditions
++        // rather than one: the declaration's name is free and resolves through the enclosing
++        // scope, the expression's is not free and is added from its own scope. Asserted by
++        // pairing so neither can pass by accident — both name exactly one binding here.
++        Assert.Equal(declaration.PredictedNames, expression.PredictedNames);
 +    }
 +
 +    [Fact]
@@ -385,7 +375,7 @@ index 00000000..bad1cc7f
 +    }
 +}
 diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
-index 9e74b36d..fab9f3be 100644
+index 9e74b36d..ed0abae4 100644
 --- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
 +++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
 @@ -1,4 +1,4 @@
@@ -413,12 +403,12 @@ index 9e74b36d..fab9f3be 100644
 +                    else
 +                        ExpressionCompiler.DeferredCaptureLayout.Predict(
 +                            lambda,
-+                            PredictCaptures(functionDeclaration, previousScope));
++                            PredictCaptures(functionDeclaration, previousScope, cs));
 +                }
                  jsf = JSFunctionBuilder.New(ToDelegate(lambda), fxName, code, functionLength, createPrototype: createPrototype && !functionDeclaration.IsArrowFunction);
                  if (!isStrictFunction)
                      jsf = JSFunctionBuilder.EnableNonStrictThis(jsf);
-@@ -625,6 +642,57 @@ partial class FastCompiler
+@@ -625,6 +642,87 @@ partial class FastCompiler
              cellBacked);
      }
  
@@ -443,7 +433,8 @@ index 9e74b36d..fab9f3be 100644
 +    /// </remarks>
 +    private static HashSet<BParameterExpression> PredictCaptures(
 +        AstFunctionExpression function,
-+        FastFunctionScope enclosing)
++        FastFunctionScope enclosing,
++        FastFunctionScope own)
 +    {
 +        var captures = new HashSet<BParameterExpression>(ExpressionCompiler.Core.ReferenceEqualityComparer.Instance);
 +        if (enclosing == null)
@@ -461,13 +452,42 @@ index 9e74b36d..fab9f3be 100644
 +                continue;
 +            }
 +
-+            if (binding.Variable == null)
++            // Variable OR EvalCaptureExpression, which is the same disjunction VariableScope's
++            // own CaptureExpression makes. A binding can be captured without being a local of the
++            // scope that holds it — a named function expression's self-name is the case that
++            // matters, and testing Variable alone silently drops it.
++            var cell = binding.Variable ?? binding.EvalCaptureExpression as BParameterExpression;
++            if (cell == null)
 +            {
 +                ExpressionCompiler.DeferredCaptureLayout.NoteNoCell(name);
 +                continue;
 +            }
 +
-+            captures.Add(binding.Variable);
++            captures.Add(cell);
++        }
++
++        // **A named function EXPRESSION's own name, which is not free and is still handed in.**
++        // The specification binds it inside the function, so FreeNameScan is right to leave it out
++        // of the free set — and this engine gives it a JSVariable parameter in the ENCLOSING scope
++        // that the body captures, so the layout has to carry it anyway. The binding is registered
++        // on this function's own scope with a deliberately null Variable, exposed through
++        // EvalCaptureExpression alone, which is what the first attempt at this missed.
++        //
++        // Gated on SelfNameReferenced rather than on "has a name", because adding it
++        // unconditionally over-approximated 126 sites — a named function expression that never
++        // mentions its own name is handed no cell for it. FreeNameScan gives the self-name its own
++        // scope precisely so that a reference reaching it can be told from one reaching a
++        // parameter of the same spelling.
++        //
++        // Item 0097's rule, deciding a mechanism rather than a measurement for the first time:
++        // ask what the compiler BUILT, not what the analysis PROVED.
++        if (own != null
++            && scan.SelfNameReferenced
++            && function.Id != null
++            && own.TryGetOwnVariable(function.Id.Name.Value, out var self)
++            && (self.Variable ?? self.EvalCaptureExpression as BParameterExpression) is { } selfCell)
++        {
++            captures.Add(selfCell);
 +        }
 +
 +        return captures;
@@ -477,10 +497,10 @@ index 9e74b36d..fab9f3be 100644
      {
          var count = 0;
 diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs
-index 3b7fef50..8f3f20f3 100644
+index 3b7fef50..f5697056 100644
 --- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs
 +++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs
-@@ -1,493 +1,502 @@
+@@ -1,493 +1,541 @@
 -using System.Collections.Generic;
 -using Broiler.JavaScript.Ast;
 -using Broiler.JavaScript.Ast.Expressions;
@@ -1033,6 +1053,19 @@ index 3b7fef50..8f3f20f3 100644
 +    public bool Dynamic { get; internal set; }
 +
 +    /// <summary>
++    /// The function is a named function <em>expression</em> whose body references its own name.
++    /// </summary>
++    /// <remarks>
++    /// <b>Not a free name, and still a capture.</b> The specification binds a named function
++    /// expression's own name inside the function, so it is correctly absent from
++    /// <see cref="Free"/> — and this engine materialises that binding as a <c>JSVariable</c>
++    /// parameter in the ENCLOSING scope which the body captures, so item 1-1's layout has to carry
++    /// it. Reported separately rather than folded into <see cref="Free"/>, because the two answer
++    /// different questions and only one of them is about scoping.
++    /// </remarks>
++    public bool SelfNameReferenced { get; internal set; }
++
++    /// <summary>
 +    /// Every function in <paramref name="root"/> with its own free-name set, computed in ONE
 +    /// bottom-up pass.
 +    /// </summary>
@@ -1101,26 +1134,41 @@ index 3b7fef50..8f3f20f3 100644
 +        /// </summary>
 +        private readonly List<int> functionScopeBase = [];
 +
++        /// <summary>Index in <see cref="scopes"/> of each function's self-name scope, or -1.</summary>
++        private readonly List<int> selfScopes = [];
++
 +        public void EnterFunction(AstFunctionExpression function)
 +        {
 +            var own = All == null ? scan : new FreeNameScan();
 +            functionScans.Add(own);
 +            functionScopeBase.Add(scopes.Count);
++
++            // A named function EXPRESSION's own name goes in a scope of its OWN, below the
++            // function scope, which is where the specification puts it too. Two things follow
++            // that a single scope cannot give: a parameter or a body binding of the same spelling
++            // shadows it correctly, and a reference that reaches it can be TOLD APART from one
++            // that reaches a parameter — which is what makes SelfNameReferenced exact instead of
++            // "the function has a name". It is not a function scope, so BindHoisted still finds
++            // the real one below it.
++            var selfScope = -1;
++            if (function.Id != null && !function.IsStatement)
++            {
++                selfScope = scopes.Count;
++                scopes.Add(new Scope(isFunctionScope: false));
++                scopes[^1].Bound.Add(function.Id.Name.Value);
++            }
++
++            selfScopes.Add(selfScope);
 +            scopes.Add(new Scope(isFunctionScope: true));
 +
-+            // A named function EXPRESSION binds its own name inside itself, which is how
-+            // `var f = function g () { return g; }` captures nothing.
-+            //
-+            // A function DECLARATION does not: its name is bound in the ENCLOSING scope (bound
-+            // there by VisitFunctionExpression and by Hoister, both of which already test
-+            // IsStatement), so `function F () { return F; }` reads F through that binding and a
-+            // deferred body must be handed a box for it. Binding it here as well made every
-+            // self-referential declaration in the corpus report as capturing nothing — 138 sites
-+            // across five corpora, and every remaining miss the capture-layout checker had
-+            // (docs/performance-roadmap.md item 1-1). The two cases were collapsed because the
-+            // comment above describes only the expression one.
-+            if (function.Id != null && !function.IsStatement)
-+                Bind(function.Id.Name.Value);
++            // The self-name is bound above, in its own scope. A function DECLARATION's name is
++            // NOT bound here at all: it belongs to the ENCLOSING scope (bound there by
++            // VisitFunctionExpression and by Hoister, both of which test IsStatement), so
++            // `function F () { return F; }` reads F through that binding and a deferred body must
++            // be handed a box for it. Binding it here as well made every self-referential
++            // declaration in the corpus report as capturing nothing — 138 sites across five
++            // corpora, and every remaining miss the capture-layout checker had
++            // (docs/performance-roadmap.md item 1-1).
 +
 +            var parameters = function.Params.GetFastEnumerator();
 +            while (parameters.MoveNext(out var parameter))
@@ -1143,6 +1191,9 @@ index 3b7fef50..8f3f20f3 100644
 +
 +            Visit(function.Body);
 +            scopes.RemoveAt(scopes.Count - 1);
++            if (selfScopes[^1] >= 0)
++                scopes.RemoveAt(scopes.Count - 1);
++            selfScopes.RemoveAt(selfScopes.Count - 1);
 +            functionScans.RemoveAt(functionScans.Count - 1);
 +            functionScopeBase.RemoveAt(functionScopeBase.Count - 1);
 +
@@ -1235,15 +1286,21 @@ index 3b7fef50..8f3f20f3 100644
 +            }
 +        }
 +
-+        private bool IsBound(string name)
++        private bool IsBound(string name) => TryFindBinder(name, out _);
++
++        private bool TryFindBinder(string name, out int scopeIndex)
 +        {
 +            var floor = functionScopeBase.Count == 0 ? 0 : functionScopeBase[^1];
 +            for (var i = scopes.Count - 1; i >= floor; i--)
 +            {
 +                if (scopes[i].Bound.Contains(name))
++                {
++                    scopeIndex = i;
 +                    return true;
++                }
 +            }
 +
++            scopeIndex = -1;
 +            return false;
 +        }
 +
@@ -1252,8 +1309,10 @@ index 3b7fef50..8f3f20f3 100644
 +        protected override AstNode VisitIdentifier(AstIdentifier identifier)
 +        {
 +            var name = identifier.Name.Value;
-+            if (!IsBound(name))
++            if (!TryFindBinder(name, out var binder))
 +                Current.Free.Add(name);
++            else if (selfScopes.Count != 0 && binder == selfScopes[^1])
++                Current.SelfNameReferenced = true;
 +
 +            return identifier;
 +        }
