@@ -1,74 +1,94 @@
-From 088cfee8a41ca40d8600d5f603fbc6a30172a6e6 Mon Sep 17 00:00:00 2001
+From 4265156e01657b3661b1c70918bb639e327b6438 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Wed, 5 Aug 2026 18:42:41 +0000
-Subject: [PATCH] Build the checker for item 1-1's capture layout, and find two
- obstacles
+Date: Wed, 5 Aug 2026 19:00:56 +0000
+Subject: [PATCH] Validate item 1-1's capture layout, and fix a soundness
+ defect in the free-name scan
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
 Item 1-1's remaining half is blocked on one stated thing: a captured name's
-index in the enclosing lambda's Box[] is decided by LambdaRewriter from the
-tree, and a deferred body has no tree, so the layout must come from source
-alone. 0101 built the free-name walk that would derive it. This builds the
-checker that says whether such a derivation is correct.
+Box[] index is decided by LambdaRewriter from the tree, and a deferred body has
+none, so the layout must come from source alone. 0101 built the walk that would
+derive it. This builds the checker that decides whether such a derivation is
+correct, and answers it.
 
-The property that matters is asymmetric. Over-approximating costs a box per
-creation site and the enclosing function's numeric tier for that name;
-under-approximating means a deferred body resolves a name to a box that is not
-there, which is a miscompile. So a single missed capture disqualifies the
-approach, and the checker exists to make a zero mean something. Nine fixtures,
-including one that deliberately records an empty prediction against a non-empty
-truth and asserts the miss is reported — without it the rest are vacuous.
+The property is asymmetric: over-approximating costs a box per creation site and
+that name's numeric tier, while under-approximating means a deferred body
+resolves a name to a box that is not there — a miscompile. So one missed capture
+disqualifies the approach, and the checker exists to make a zero mean something.
+Eleven fixtures, one of which deliberately records an empty prediction against a
+non-empty truth and asserts the miss is reported.
 
-Two obstacles the item's statement does not name.
+Two structural obstacles the item's statement does not name.
 
 ClosureRepository holds two populations, and "which variables this lambda
 captures" means one of them: bindings handed in from an enclosing scope (Setup,
-appended to Inputs, index >= 0), and the lambda's own locals that something
-nested captures (Convert, index == -1). A free-name walk answers the first and
-correctly does not name the second. Compared against the whole repository,
-`function outer(){ var q = 1; var inner = function(){ return q; }; }` reports
-outer missing q — a function missing its own local. The prediction was right and
-the comparison was wrong. So the deferral needs two derivations: the enclosing
-function learns which of its own locals to box from its children's free-name
-sets, and the deferred body learns its own free names' indices.
-FreeNameScan.ForProgram already computes bottom-up and can serve both.
+index >= 0) and the lambda's own locals that something nested captures (Convert,
+index == -1). A free-name walk answers the first and correctly does not name the
+second, so compared against the whole repository the simplest possible fixture
+reports `outer` missing `q` — a function missing its own local. The deferral
+needs two derivations, not one; FreeNameScan.ForProgram composes bottom-up and
+can serve both. And every function is handed a ScriptInfo_* binding no source
+identifier names, so the layout needs a reserved region for compiler-introduced
+captures.
 
-And every function is handed a ScriptInfo_* binding — script metadata the
-compiler threads in — that no source identifier names, alongside this, arguments
-and new.target. The layout needs a reserved region for compiler-introduced
-captures beside the source-derived one.
+Then three corrections, in the order they had to be made.
 
-What is not established, and is left that way. With the comparison corrected the
-corpus reports 170 missed sites of 5 762 and 6 138 missed names, but the same
-run reports Mandreel at 2 622 exact against 1 476 predicted sites — more checks
-than predictions — so the per-site figures double-count somewhere. A miss rate
-from an instrument that disagrees with itself is not a finding, so no go/no-go
-is claimed and the item is not declared blocked on it. Next: the double-count,
-then the three unexplained sample shapes, in that order.
+Repeats are recognised rather than counted: a layout is a property of a site, and
+Mandreel relays 1 336 of its 1 358 sites twice. Repeat disagreements are 0 on
+every corpus, so the repeat is pure duplication and the rewrite decides the same
+set each time.
 
-Off by default (BROILER_JS_CAPTURE_LAYOUT_CHECK=1); changes no emission on any
-setting. Compiler suite green: 1 250 tests.
+Undeferrable bodies are excluded — a defect in this checker. A Dynamic body has
+no set to be right about, but recording it as an empty prediction reports every
+one of its captures as a miss. That was the whole predicted{} population on
+Mandreel, PdfJS and Typescript; 7 sites.
+
+And one real defect, in 0101's own code. With the noise gone every remaining miss
+was the same shape: a function referencing its own name. EnterFunction bound the
+function's own name inside the function unconditionally, under a comment
+describing the named-function-expression case. A function DECLARATION's name is
+bound in the ENCLOSING scope, so a self-reference is free and a deferred body
+must be handed a box for it. 138 sites across five corpora reported as capturing
+nothing. The fix is one condition and it is soundness, not precision.
+
+With those three the corpus reports zero missed sites on 5 157 checked, and
+over-approximates on 2 712 of them — safe, and the cost side the mechanism must
+be measured against.
+
+One shape the corpus does not contain is still missed: a named function
+expression's own name, which the specification binds inside and which this
+engine materialises as a handed-in cell anyway. That is 0097's lesson a third
+time — ask what the compiler built, not what the analysis proved — and the first
+time it has decided a mechanism rather than a measurement. Recorded rather than
+papered over, pinned by a fixture written to go off when it is closed. Zero on a
+corpus is not zero.
+
+The deferral mechanism itself remains unbuilt and remains L. Checker off by
+default (BROILER_JS_CAPTURE_LAYOUT_CHECK=1); the FreeNameScan fix is
+unconditional, because it is a correctness fix. Compiler suite green: 1 252
+tests.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01LqMsVZEFfMkp52dejVuRif
 ---
- .../CaptureLayoutTests.cs                     | 234 +++++++++++++++
- .../FastCompiler.CreateFunction.cs            |  61 +++-
- .../DeferredCaptureLayout.cs                  | 276 ++++++++++++++++++
- .../Runtime/RuntimeMethodBuilder.cs           |  41 +--
- .../DeferPopulationMetrics.cs                 |  19 ++
- 5 files changed, 613 insertions(+), 18 deletions(-)
+ .../CaptureLayoutTests.cs                     | 295 ++++++
+ .../FastCompiler.CreateFunction.cs            |  70 +-
+ .../Declarations/FreeNameScan.cs              | 995 +++++++++---------
+ .../DeferredCaptureLayout.cs                  | 375 +++++++
+ .../Runtime/RuntimeMethodBuilder.cs           |  41 +-
+ .../DeferPopulationMetrics.cs                 |  26 +
+ 6 files changed, 1291 insertions(+), 511 deletions(-)
  create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs
  create mode 100644 Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs
 
 diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs
 new file mode 100644
-index 00000000..78b1d811
+index 00000000..bad1cc7f
 --- /dev/null
 +++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/CaptureLayoutTests.cs
-@@ -0,0 +1,234 @@
+@@ -0,0 +1,295 @@
 +using Broiler.JavaScript.Engine;
 +using Broiler.JavaScript.ExpressionCompiler;
 +
@@ -245,6 +265,67 @@ index 00000000..78b1d811
 +    }
 +
 +    [Fact]
++    public void ASelfReferentialFUNCTIONDECLARATIONCapturesItsOwnName()
++    {
++        // **The defect the corpus run found, as a fixture.** A function DECLARATION's name is
++        // bound in the ENCLOSING scope, so a self-reference reads through that binding and a
++        // deferred body must be handed a box for it. FreeNameScan bound the name inside the
++        // function as well — correct for a named function expression and wrong here — so every
++        // self-referential declaration reported as capturing nothing. That was 138 sites across
++        // five corpora and every remaining miss the checker had.
++        var l = Check("""
++            function outer() {
++              function fact(n) { return n < 2 ? 1 : n * fact(n - 1); }
++              return fact(5);
++            }
++            outer();
++            """);
++
++        Assert.True(l.Missed == 0, "missed: " + string.Join(", ", DeferredCaptureLayout.MissedNameSamples));
++        Assert.Equal(0, l.MissedNames);
++    }
++
++    [Fact]
++    public void ANamedFunctionEXPRESSIONSelfNameIsTheONERemainingGAP()
++    {
++        // The other half of the pair, and the reason the fix is a condition rather than a
++        // deletion: an expression's name IS bound inside itself, so it is not free and not a
++        // capture. Without this the fix above could be "always treat the name as free", which
++        // would over-approximate every named function expression in the corpus.
++        //
++        // Asserted by PAIRING rather than by an absolute count. Over-approximating is safe, so
++        // "this program predicts nothing extra" is not a property worth pinning and is not even
++        // true — other bindings in the same program are legitimately over-predicted. What the
++        // fix has to preserve is the DIFFERENCE: the same recursive body predicts one more name
++        // as a declaration than as an expression, and exactly one.
++        var expression = Check("var f = function g(n) { return n < 1 ? 0 : g(n - 1); }; f(3);");
++        var expressionMisses = string.Join(", ", DeferredCaptureLayout.MissedNameSamples);
++        var declaration = Check("function g(n) { return n < 1 ? 0 : g(n - 1); } g(3);");
++
++        // **The declaration half is fixed and the expression half is not**, and this fixture
++        // is written to GO OFF when it is — §3.5's rule that a fixture asserting a refusal is
++        // an alarm for the next item.
++        //
++        // A named function expression's own name is bound inside itself by the specification, so
++        // FreeNameScan is right that it is not free — and this engine nonetheless materialises
++        // that binding as a cell HANDED IN to the lambda, which the layout must therefore carry.
++        // That is item 0097's lesson for the third time (ask what the compiler BUILT, not what
++        // the analysis PROVED) and the first time it has decided a mechanism rather than a
++        // measurement. An attempt to add the self-name from the function's own scope at
++        // prediction time did not resolve it, so the gap is recorded rather than papered over.
++        //
++        // The whole Octane corpus reports ZERO missed sites, so this shape is not exercised
++        // there — which is exactly why it is pinned here: zero-on-a-corpus is not zero.
++        Assert.Equal(1, expression.Missed);
++        Assert.Contains("g/g", expressionMisses);
++
++        // What the declaration fix does buy, asserted by pairing so it cannot pass by accident:
++        // the same recursive body predicts one more name as a declaration than as an expression.
++        Assert.Equal(0, declaration.Missed);
++        Assert.Equal(expression.PredictedNames + 1, declaration.PredictedNames);
++    }
++
++    [Fact]
 +    public void TheCheckerIsShownToCatchAMissBeforeItsZeroIsTrusted()
 +    {
 +        // **The fixture that makes every zero above mean something**, and §3.5's rule from 0096
@@ -304,7 +385,7 @@ index 00000000..78b1d811
 +    }
 +}
 diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
-index 9e74b36d..f5ad327f 100644
+index 9e74b36d..fab9f3be 100644
 --- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
 +++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
 @@ -1,4 +1,4 @@
@@ -313,7 +394,7 @@ index 9e74b36d..f5ad327f 100644
  using Broiler.JavaScript.ExpressionCompiler.Expressions;
  using System.Collections.Generic;
  using System.Reflection;
-@@ -441,6 +441,14 @@ partial class FastCompiler
+@@ -441,6 +441,23 @@ partial class FastCompiler
              else
              {
                  lambda = BExpression.Lambda(typeof(JSFunctionDelegate), block, in scriptFunctionName, [cs.Arguments]);
@@ -322,13 +403,22 @@ index 9e74b36d..f5ad327f 100644
 +                // decides the real Box[] layout from the tree has run. RuntimeMethodBuilder.Relay
 +                // compares the two.
 +                if (ExpressionCompiler.DeferredCaptureLayout.Checking)
-+                    ExpressionCompiler.DeferredCaptureLayout.Predict(
-+                        lambda,
-+                        PredictCaptures(functionDeclaration, previousScope));
++                {
++                    // A body that can reach bindings its text never names has no layout to be
++                    // right about, and the mechanism refuses to defer it — so it is EXCLUDED
++                    // rather than given an empty prediction, which would report every one of its
++                    // captures as a miss.
++                    if (FreeNameScan.Of(functionDeclaration).Dynamic)
++                        ExpressionCompiler.DeferredCaptureLayout.Undeferrable(lambda);
++                    else
++                        ExpressionCompiler.DeferredCaptureLayout.Predict(
++                            lambda,
++                            PredictCaptures(functionDeclaration, previousScope));
++                }
                  jsf = JSFunctionBuilder.New(ToDelegate(lambda), fxName, code, functionLength, createPrototype: createPrototype && !functionDeclaration.IsArrowFunction);
                  if (!isStrictFunction)
                      jsf = JSFunctionBuilder.EnableNonStrictThis(jsf);
-@@ -625,6 +633,57 @@ partial class FastCompiler
+@@ -625,6 +642,57 @@ partial class FastCompiler
              cellBacked);
      }
  
@@ -386,12 +476,1012 @@ index 9e74b36d..f5ad327f 100644
      private static int GetExpectedArgumentCount(IFastEnumerable<VariableDeclarator> parameters)
      {
          var count = 0;
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs
+index 3b7fef50..8f3f20f3 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs
+@@ -1,493 +1,502 @@
+-using System.Collections.Generic;
+-using Broiler.JavaScript.Ast;
+-using Broiler.JavaScript.Ast.Expressions;
+-using Broiler.JavaScript.Ast.Misc;
+-using Broiler.JavaScript.Ast.Patterns;
+-using Broiler.JavaScript.Ast.Statements;
+-
+-namespace Broiler.JavaScript.Compiler;
+-
+-/// <summary>
+-/// The names a function body references but does not itself bind — what item 1-1's remaining half
+-/// has to know about a function it has NOT built a tree for
+-/// (docs/performance-roadmap.md item 1-1).
+-/// </summary>
+-/// <remarks>
+-/// <para>
+-/// <b>This is the sub-project the item names, and it exists to be priced before anything is built
+-/// on it.</b> Deferring expression-tree construction is worth 43–75% of compile over a population
+-/// that is 84–99.7% never invoked, and the one thing standing in the way is that a captured name's
+-/// index in the enclosing lambda's <c>Box[]</c> is decided by <c>LambdaRewriter</c> <em>from the
+-/// tree</em> — and a deferred body has no tree. The eager step that makes the array addressable
+-/// without one is this walk.
+-/// </para>
+-/// <para>
+-/// <b>It is deliberately not the walk that already exists.</b> <c>NestedFunctionScanner</c>
+-/// collects every identifier a nested function <em>mentions</em>, which is sound for deciding what
+-/// cannot be scalar-replaced and useless for deciding what to box: it cannot tell
+-/// <c>function (x) { return x; }</c> — which captures nothing — from <c>function () { return x; }</c>,
+-/// which captures one binding. Boxing on a mention would box a local that merely shares a spelling
+-/// with an inner parameter, and every such box costs the enclosing function its numeric tier.
+-/// </para>
+-/// <para>
+-/// <b>Scoping is tracked because the answer depends on it and not because it is tidy.</b> A
+-/// <c>var</c> is function-scoped and a <c>let</c>/<c>const</c>/class is block-scoped, so
+-/// <c>{ let x; } x</c> has a free <c>x</c> and <c>{ var x; } x</c> does not. Parameters, catch
+-/// bindings, a named function expression's own name, and nested function declarations all bind.
+-/// Getting any of them wrong changes the set, which is why this is measured as itself rather than
+-/// approximated by an identifier count — <c>--compile-phases</c>' <c>scanMs</c> is that count, and
+-/// the roadmap records it as a lower bound for exactly this reason.
+-/// </para>
+-/// <para>
+-/// <b>Over-approximation is safe and under-approximation is a miscompile</b>, so every construct
+-/// this does not understand contributes its names as free. A direct <c>eval</c>, a <c>with</c> or a
+-/// <c>debugger</c> can reach a binding that is never mentioned at all, so a body containing one is
+-/// reported as <see cref="Dynamic"/> and must be compiled eagerly rather than deferred.
+-/// </para>
+-/// </remarks>
+-public sealed class FreeNameScan
+-{
+-    /// <summary>Names referenced and not bound anywhere inside the function.</summary>
+-    public readonly HashSet<string> Free = new(System.StringComparer.Ordinal);
+-
+-    /// <summary>
+-    /// The body can reach a binding it never names — a direct <c>eval</c>, a <c>with</c>, or
+-    /// <c>debugger</c>. No free-name set describes it, so the function cannot be deferred.
+-    /// </summary>
+-    public bool Dynamic { get; internal set; }
+-
+-    /// <summary>
+-    /// Every function in <paramref name="root"/> with its own free-name set, computed in ONE
+-    /// bottom-up pass.
+-    /// </summary>
+-    /// <remarks>
+-    /// <para>
+-    /// <b>This is the shippable shape, and the per-function <see cref="Of"/> is not.</b> Calling
+-    /// <c>Of</c> once per function re-walks every nested function once per enclosing level, so the
+-    /// cost is superlinear in nesting depth — measured against body tree construction it runs
+-    /// 5.8% on Closure and **47.7% on Box2D**, whose 978 functions are deeply nested, against the
+-    /// 5.4–9.9% the roadmap recorded from an identifier count. Half the prize is not a charge-back
+-    /// worth paying when the same answer is available for one pass.
+-    /// </para>
+-    /// <para>
+-    /// One pass gives it because free names compose: a function's free set is its own references,
+-    /// plus its children's free sets, minus what it binds. So a child is walked once and its
+-    /// result is propagated into the parent as if the parent had referenced those names directly —
+-    /// which is also exactly what capture means, and why the transitive case needs no special
+-    /// handling.
+-    /// </para>
+-    /// </remarks>
+-    public static Dictionary<AstFunctionExpression, FreeNameScan> ForProgram(AstNode root)
+-    {
+-        var all = new Dictionary<AstFunctionExpression, FreeNameScan>();
+-        var walker = new Walker(new FreeNameScan()) { All = all };
+-        walker.Visit(root);
+-        return all;
+-    }
+-
+-    /// <summary>
+-    /// The free names of <paramref name="function"/> alone. A convenience over
+-    /// <see cref="ForProgram"/> and not a second implementation — the walk is the same one, so a
+-    /// defect cannot hide in the difference between them. The independent oracle these are checked
+-    /// against lives in the tests, where it belongs.
+-    /// </summary>
+-    public static FreeNameScan Of(AstFunctionExpression function)
+-        => ForProgram(function)[function];
+-
+-    /// <summary>
+-    /// A scope: the names it binds, and whether a <c>var</c> declared inside it stops here. Only a
+-    /// function scope stops one; a block scope passes it up, which is what makes
+-    /// <c>{ var x; } x</c> bound and <c>{ let x; } x</c> free.
+-    /// </summary>
+-    private sealed class Scope(bool isFunctionScope)
+-    {
+-        public readonly HashSet<string> Bound = new(System.StringComparer.Ordinal);
+-        public readonly bool IsFunctionScope = isFunctionScope;
+-    }
+-
+-    private sealed class Walker(FreeNameScan scan) : AstReduce
+-    {
+-        private readonly List<Scope> scopes = [];
+-
+-        /// <summary>
+-        /// When set, each function's own free set is recorded here and propagated to its parent,
+-        /// which is what makes one pass enough.
+-        /// </summary>
+-        public Dictionary<AstFunctionExpression, FreeNameScan> All;
+-
+-        private readonly List<FreeNameScan> functionScans = [];
+-
+-        /// <summary>
+-        /// Where each function's own scopes begin in <see cref="scopes"/>. A free name is one this
+-        /// FUNCTION does not bind, so the search stops at its own base rather than running on into
+-        /// the enclosing function's scopes — which would report a captured name as bound and drop
+-        /// it from the set that has to box it.
+-        /// </summary>
+-        private readonly List<int> functionScopeBase = [];
+-
+-        public void EnterFunction(AstFunctionExpression function)
+-        {
+-            var own = All == null ? scan : new FreeNameScan();
+-            functionScans.Add(own);
+-            functionScopeBase.Add(scopes.Count);
+-            scopes.Add(new Scope(isFunctionScope: true));
+-
+-            // A named function expression binds its own name inside itself, which is how
+-            // `var f = function g () { return g; }` captures nothing.
+-            if (function.Id != null)
+-                Bind(function.Id.Name.Value);
+-
+-            var parameters = function.Params.GetFastEnumerator();
+-            while (parameters.MoveNext(out var parameter))
+-            {
+-                // A parameter's PATTERN binds and its default INITIALIZER references, so the two
+-                // sides of one declarator go opposite ways.
+-                BindPattern(parameter.Identifier);
+-                if (parameter.Init != null)
+-                    Visit(parameter.Init);
+-            }
+-
+-            // `arguments` is bound by every non-arrow function whether or not it is declared.
+-            if (!function.IsArrowFunction)
+-                Bind("arguments");
+-
+-            // Hoisting: a `var` or a function declaration anywhere in the body is bound from
+-            // function entry, so a reference textually before it is still bound. Collect them
+-            // before walking, or `f(); function f(){}` would report `f` free.
+-            new Hoister(this).Visit(function.Body);
+-
+-            Visit(function.Body);
+-            scopes.RemoveAt(scopes.Count - 1);
+-            functionScans.RemoveAt(functionScans.Count - 1);
+-            functionScopeBase.RemoveAt(functionScopeBase.Count - 1);
+-
+-            if (All == null)
+-                return;
+-
+-            All[function] = own;
+-
+-            // A child's free names are references the parent has not yet resolved: it may bind
+-            // them itself, in which case they stop here, or pass them further up. Routing them
+-            // through the ordinary reference path is what makes capture transitive for free.
+-            var parent = functionScans.Count == 0 ? scan : functionScans[^1];
+-            foreach (var name in own.Free)
+-            {
+-                if (!IsBound(name))
+-                    parent.Free.Add(name);
+-            }
+-
+-            if (own.Dynamic)
+-                parent.Dynamic = true;
+-        }
+-
+-        internal void Bind(string name)
+-        {
+-            if (scopes.Count != 0)
+-                scopes[^1].Bound.Add(name);
+-        }
+-
+-        /// <summary>Binds a <c>var</c> or function declaration at the nearest FUNCTION scope.</summary>
+-        internal void BindHoisted(string name)
+-        {
+-            var floor = functionScopeBase.Count == 0 ? 0 : functionScopeBase[^1];
+-            for (var i = scopes.Count - 1; i >= floor; i--)
+-            {
+-                if (!scopes[i].IsFunctionScope)
+-                    continue;
+-
+-                scopes[i].Bound.Add(name);
+-                return;
+-            }
+-        }
+-
+-        internal void BindPattern(AstNode target)
+-        {
+-            switch (target)
+-            {
+-                case null:
+-                    return;
+-
+-                case AstIdentifier identifier:
+-                    Bind(identifier.Name.Value);
+-                    return;
+-
+-                case AstArrayPattern array:
+-                    var elements = array.Elements.GetFastEnumerator();
+-                    while (elements.MoveNext(out var element))
+-                        BindPattern(element);
+-                    return;
+-
+-                case AstObjectPattern pattern:
+-                    var properties = pattern.Properties.GetFastEnumerator();
+-                    while (properties.MoveNext(out var property))
+-                    {
+-                        // A computed key is an expression, not a binding: `{ [k]: v } = o` reads k.
+-                        if (property.Computed && property.Key != null)
+-                            Visit(property.Key);
+-
+-                        BindPattern(property.Value ?? property.Key);
+-                        if (property.Init != null)
+-                            Visit(property.Init);
+-                    }
+-
+-                    return;
+-
+-                case AstBinaryExpression { Operator: TokenTypes.Assign } withDefault:
+-                    // `function (a = expr)`: the target binds, the default references.
+-                    BindPattern(withDefault.Left);
+-                    Visit(withDefault.Right);
+-                    return;
+-
+-                case AstUnaryExpression spread:
+-                    BindPattern(spread.Argument);
+-                    return;
+-
+-                default:
+-                    // Anything unrecognised in binding position: walk it as a reference, which
+-                    // can only add names to the free set.
+-                    Visit(target);
+-                    return;
+-            }
+-        }
+-
+-        private bool IsBound(string name)
+-        {
+-            var floor = functionScopeBase.Count == 0 ? 0 : functionScopeBase[^1];
+-            for (var i = scopes.Count - 1; i >= floor; i--)
+-            {
+-                if (scopes[i].Bound.Contains(name))
+-                    return true;
+-            }
+-
+-            return false;
+-        }
+-
+-        private FreeNameScan Current => functionScans.Count == 0 ? scan : functionScans[^1];
+-
+-        protected override AstNode VisitIdentifier(AstIdentifier identifier)
+-        {
+-            var name = identifier.Name.Value;
+-            if (!IsBound(name))
+-                Current.Free.Add(name);
+-
+-            return identifier;
+-        }
+-
+-        protected override AstNode VisitFunctionExpression(AstFunctionExpression function)
+-        {
+-            // A nested function's own free names are free HERE too unless this function binds
+-            // them — capture is transitive, and a body two levels down reaching a name one level
+-            // up is the shape RelayRewriteTests exists for.
+-            var declarationName = function.IsStatement ? function.Id?.Name.Value : null;
+-            if (declarationName != null)
+-                BindHoisted(declarationName);
+-
+-            EnterFunction(function);
+-            return function;
+-        }
+-
+-        protected override AstNode VisitBlock(AstBlock block)
+-        {
+-            scopes.Add(new Scope(isFunctionScope: false));
+-            var statements = block.Statements.GetFastEnumerator();
+-            while (statements.MoveNext(out var statement))
+-                Visit(statement);
+-
+-            scopes.RemoveAt(scopes.Count - 1);
+-            return block;
+-        }
+-
+-        protected override AstNode VisitVariableDeclaration(AstVariableDeclaration declaration)
+-        {
+-            var declarators = declaration.Declarators.GetFastEnumerator();
+-            while (declarators.MoveNext(out var declarator))
+-            {
+-                // `var` was already bound by the hoist pass at the function scope; `let`, `const`
+-                // and `using` bind here, in the block being walked.
+-                if (declaration.Kind != FastVariableKind.Var)
+-                    BindPattern(declarator.Identifier);
+-
+-                if (declarator.Init != null)
+-                    Visit(declarator.Init);
+-            }
+-
+-            return declaration;
+-        }
+-
+-        protected override AstNode VisitTryStatement(AstTryStatement statement)
+-        {
+-            Visit(statement.Block);
+-
+-            if (statement.Catch != null)
+-            {
+-                scopes.Add(new Scope(isFunctionScope: false));
+-                if (statement.CatchParam != null)
+-                    BindPattern(statement.CatchParam);
+-
+-                Visit(statement.Catch);
+-                scopes.RemoveAt(scopes.Count - 1);
+-            }
+-
+-            if (statement.Finally != null)
+-                Visit(statement.Finally);
+-
+-            return statement;
+-        }
+-
+-        protected override AstNode VisitObjectLiteral(AstObjectLiteral literal)
+-        {
+-            // Overridden because the base walks a literal's properties GENERICALLY — unlike
+-            // VisitObjectPattern, which routes through VisitObjectProperty explicitly — so the
+-            // override below never sees them and every `{ a: 1 }` key reads as a reference to `a`.
+-            // Caught by a fixture rather than by inspection, which is the whole reason the
+-            // property-name case has one.
+-            var properties = literal.Properties.GetFastEnumerator();
+-            while (properties.MoveNext(out var node))
+-            {
+-                if (node is not AstClassProperty property)
+-                {
+-                    Visit(node);
+-                    continue;
+-                }
+-
+-                // A shorthand `{ a }` has no Init and IS a reference to `a`; a `{ a: v }` key is
+-                // not. That is the one place a property name and a reference share a node.
+-                if (property.Computed || property.Init == null)
+-                    Visit(property.Key);
+-
+-                if (property.Init != null)
+-                    Visit(property.Init);
+-            }
+-
+-            return literal;
+-        }
+-
+-        protected override AstNode VisitMemberExpression(AstMemberExpression member)
+-        {
+-            Visit(member.Object);
+-
+-            // `o.a` does not read a binding called `a`; `o[a]` does. Without this every property
+-            // name in the program joins the free set, and the deferral would box a binding for
+-            // each one — which is the failure mode the "over-approximation is safe" rule hides,
+-            // because it is safe and ruinous at the same time.
+-            if (member.Computed)
+-                Visit(member.Property);
+-
+-            return member;
+-        }
+-
+-        protected override AstNode VisitWithStatement(AstWithStatement statement)
+-        {
+-            Current.Dynamic = true;
+-            return base.VisitWithStatement(statement);
+-        }
+-
+-        protected override AstNode VisitCallExpression(AstCallExpression call)
+-        {
+-            if (call.Callee is AstIdentifier { } callee && callee.Name.Equals("eval"))
+-                Current.Dynamic = true;
+-
+-            return base.VisitCallExpression(call);
+-        }
+-
+-        // The containers AstReduce leaves to specialized rewriters. Missing one is not a missed
+-        // optimization but a miscompile, so they are overridden here for the same reason
+-        // NestedFunctionScanner overrides them.
+-        protected override VariableDeclarator VisitVariableDeclarator(VariableDeclarator declarator)
+-        {
+-            Visit(declarator.Identifier);
+-            if (declarator.Init != null)
+-                Visit(declarator.Init);
+-            return declarator;
+-        }
+-
+-        protected override ObjectProperty VisitObjectProperty(ObjectProperty property)
+-        {
+-            // A non-computed key is a property name, not a reference: `{ a: 1 }` does not read `a`.
+-            if (property.Computed && property.Key != null)
+-                Visit(property.Key);
+-
+-            if (property.Value != null)
+-                Visit(property.Value);
+-            if (property.Init != null)
+-                Visit(property.Init);
+-            return property;
+-        }
+-
+-        protected override Case VisitCase(Case @case)
+-        {
+-            if (@case.Test != null)
+-                Visit(@case.Test);
+-            var statements = @case.Statements.GetFastEnumerator();
+-            while (statements.MoveNext(out var statement))
+-                Visit(statement);
+-            return @case;
+-        }
+-    }
+-
+-    /// <summary>
+-    /// Binds the <c>var</c>s and function declarations of one function body before it is walked,
+-    /// without descending into nested functions — whose own <c>var</c>s belong to them.
+-    /// </summary>
+-    private sealed class Hoister(Walker walker) : AstReduce
+-    {
+-        protected override AstNode VisitFunctionExpression(AstFunctionExpression function)
+-        {
+-            // The declaration's NAME hoists into this body; its own vars do not.
+-            if (function.IsStatement && function.Id != null)
+-                walker.BindHoisted(function.Id.Name.Value);
+-
+-            return function;
+-        }
+-
+-        protected override AstNode VisitVariableDeclaration(AstVariableDeclaration declaration)
+-        {
+-            if (declaration.Kind != FastVariableKind.Var)
+-                return declaration;
+-
+-            var declarators = declaration.Declarators.GetFastEnumerator();
+-            while (declarators.MoveNext(out var declarator))
+-                HoistPattern(declarator.Identifier);
+-
+-            return declaration;
+-        }
+-
+-        private void HoistPattern(AstNode target)
+-        {
+-            switch (target)
+-            {
+-                case AstIdentifier identifier:
+-                    walker.BindHoisted(identifier.Name.Value);
+-                    return;
+-
+-                case AstArrayPattern array:
+-                    var elements = array.Elements.GetFastEnumerator();
+-                    while (elements.MoveNext(out var element))
+-                        HoistPattern(element);
+-                    return;
+-
+-                case AstObjectPattern pattern:
+-                    var properties = pattern.Properties.GetFastEnumerator();
+-                    while (properties.MoveNext(out var property))
+-                        HoistPattern(property.Value ?? property.Key);
+-                    return;
+-
+-                case AstBinaryExpression { Operator: TokenTypes.Assign } withDefault:
+-                    HoistPattern(withDefault.Left);
+-                    return;
+-
+-                case AstUnaryExpression spread:
+-                    HoistPattern(spread.Argument);
+-                    return;
+-            }
+-        }
+-
+-        protected override Case VisitCase(Case @case)
+-        {
+-            var statements = @case.Statements.GetFastEnumerator();
+-            while (statements.MoveNext(out var statement))
+-                Visit(statement);
+-            return @case;
+-        }
+-    }
+-}
++﻿using System.Collections.Generic;
++using Broiler.JavaScript.Ast;
++using Broiler.JavaScript.Ast.Expressions;
++using Broiler.JavaScript.Ast.Misc;
++using Broiler.JavaScript.Ast.Patterns;
++using Broiler.JavaScript.Ast.Statements;
++
++namespace Broiler.JavaScript.Compiler;
++
++/// <summary>
++/// The names a function body references but does not itself bind — what item 1-1's remaining half
++/// has to know about a function it has NOT built a tree for
++/// (docs/performance-roadmap.md item 1-1).
++/// </summary>
++/// <remarks>
++/// <para>
++/// <b>This is the sub-project the item names, and it exists to be priced before anything is built
++/// on it.</b> Deferring expression-tree construction is worth 43–75% of compile over a population
++/// that is 84–99.7% never invoked, and the one thing standing in the way is that a captured name's
++/// index in the enclosing lambda's <c>Box[]</c> is decided by <c>LambdaRewriter</c> <em>from the
++/// tree</em> — and a deferred body has no tree. The eager step that makes the array addressable
++/// without one is this walk.
++/// </para>
++/// <para>
++/// <b>It is deliberately not the walk that already exists.</b> <c>NestedFunctionScanner</c>
++/// collects every identifier a nested function <em>mentions</em>, which is sound for deciding what
++/// cannot be scalar-replaced and useless for deciding what to box: it cannot tell
++/// <c>function (x) { return x; }</c> — which captures nothing — from <c>function () { return x; }</c>,
++/// which captures one binding. Boxing on a mention would box a local that merely shares a spelling
++/// with an inner parameter, and every such box costs the enclosing function its numeric tier.
++/// </para>
++/// <para>
++/// <b>Scoping is tracked because the answer depends on it and not because it is tidy.</b> A
++/// <c>var</c> is function-scoped and a <c>let</c>/<c>const</c>/class is block-scoped, so
++/// <c>{ let x; } x</c> has a free <c>x</c> and <c>{ var x; } x</c> does not. Parameters, catch
++/// bindings, a named function expression's own name, and nested function declarations all bind.
++/// Getting any of them wrong changes the set, which is why this is measured as itself rather than
++/// approximated by an identifier count — <c>--compile-phases</c>' <c>scanMs</c> is that count, and
++/// the roadmap records it as a lower bound for exactly this reason.
++/// </para>
++/// <para>
++/// <b>Over-approximation is safe and under-approximation is a miscompile</b>, so every construct
++/// this does not understand contributes its names as free. A direct <c>eval</c>, a <c>with</c> or a
++/// <c>debugger</c> can reach a binding that is never mentioned at all, so a body containing one is
++/// reported as <see cref="Dynamic"/> and must be compiled eagerly rather than deferred.
++/// </para>
++/// </remarks>
++public sealed class FreeNameScan
++{
++    /// <summary>Names referenced and not bound anywhere inside the function.</summary>
++    public readonly HashSet<string> Free = new(System.StringComparer.Ordinal);
++
++    /// <summary>
++    /// The body can reach a binding it never names — a direct <c>eval</c>, a <c>with</c>, or
++    /// <c>debugger</c>. No free-name set describes it, so the function cannot be deferred.
++    /// </summary>
++    public bool Dynamic { get; internal set; }
++
++    /// <summary>
++    /// Every function in <paramref name="root"/> with its own free-name set, computed in ONE
++    /// bottom-up pass.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// <b>This is the shippable shape, and the per-function <see cref="Of"/> is not.</b> Calling
++    /// <c>Of</c> once per function re-walks every nested function once per enclosing level, so the
++    /// cost is superlinear in nesting depth — measured against body tree construction it runs
++    /// 5.8% on Closure and **47.7% on Box2D**, whose 978 functions are deeply nested, against the
++    /// 5.4–9.9% the roadmap recorded from an identifier count. Half the prize is not a charge-back
++    /// worth paying when the same answer is available for one pass.
++    /// </para>
++    /// <para>
++    /// One pass gives it because free names compose: a function's free set is its own references,
++    /// plus its children's free sets, minus what it binds. So a child is walked once and its
++    /// result is propagated into the parent as if the parent had referenced those names directly —
++    /// which is also exactly what capture means, and why the transitive case needs no special
++    /// handling.
++    /// </para>
++    /// </remarks>
++    public static Dictionary<AstFunctionExpression, FreeNameScan> ForProgram(AstNode root)
++    {
++        var all = new Dictionary<AstFunctionExpression, FreeNameScan>();
++        var walker = new Walker(new FreeNameScan()) { All = all };
++        walker.Visit(root);
++        return all;
++    }
++
++    /// <summary>
++    /// The free names of <paramref name="function"/> alone. A convenience over
++    /// <see cref="ForProgram"/> and not a second implementation — the walk is the same one, so a
++    /// defect cannot hide in the difference between them. The independent oracle these are checked
++    /// against lives in the tests, where it belongs.
++    /// </summary>
++    public static FreeNameScan Of(AstFunctionExpression function)
++        => ForProgram(function)[function];
++
++    /// <summary>
++    /// A scope: the names it binds, and whether a <c>var</c> declared inside it stops here. Only a
++    /// function scope stops one; a block scope passes it up, which is what makes
++    /// <c>{ var x; } x</c> bound and <c>{ let x; } x</c> free.
++    /// </summary>
++    private sealed class Scope(bool isFunctionScope)
++    {
++        public readonly HashSet<string> Bound = new(System.StringComparer.Ordinal);
++        public readonly bool IsFunctionScope = isFunctionScope;
++    }
++
++    private sealed class Walker(FreeNameScan scan) : AstReduce
++    {
++        private readonly List<Scope> scopes = [];
++
++        /// <summary>
++        /// When set, each function's own free set is recorded here and propagated to its parent,
++        /// which is what makes one pass enough.
++        /// </summary>
++        public Dictionary<AstFunctionExpression, FreeNameScan> All;
++
++        private readonly List<FreeNameScan> functionScans = [];
++
++        /// <summary>
++        /// Where each function's own scopes begin in <see cref="scopes"/>. A free name is one this
++        /// FUNCTION does not bind, so the search stops at its own base rather than running on into
++        /// the enclosing function's scopes — which would report a captured name as bound and drop
++        /// it from the set that has to box it.
++        /// </summary>
++        private readonly List<int> functionScopeBase = [];
++
++        public void EnterFunction(AstFunctionExpression function)
++        {
++            var own = All == null ? scan : new FreeNameScan();
++            functionScans.Add(own);
++            functionScopeBase.Add(scopes.Count);
++            scopes.Add(new Scope(isFunctionScope: true));
++
++            // A named function EXPRESSION binds its own name inside itself, which is how
++            // `var f = function g () { return g; }` captures nothing.
++            //
++            // A function DECLARATION does not: its name is bound in the ENCLOSING scope (bound
++            // there by VisitFunctionExpression and by Hoister, both of which already test
++            // IsStatement), so `function F () { return F; }` reads F through that binding and a
++            // deferred body must be handed a box for it. Binding it here as well made every
++            // self-referential declaration in the corpus report as capturing nothing — 138 sites
++            // across five corpora, and every remaining miss the capture-layout checker had
++            // (docs/performance-roadmap.md item 1-1). The two cases were collapsed because the
++            // comment above describes only the expression one.
++            if (function.Id != null && !function.IsStatement)
++                Bind(function.Id.Name.Value);
++
++            var parameters = function.Params.GetFastEnumerator();
++            while (parameters.MoveNext(out var parameter))
++            {
++                // A parameter's PATTERN binds and its default INITIALIZER references, so the two
++                // sides of one declarator go opposite ways.
++                BindPattern(parameter.Identifier);
++                if (parameter.Init != null)
++                    Visit(parameter.Init);
++            }
++
++            // `arguments` is bound by every non-arrow function whether or not it is declared.
++            if (!function.IsArrowFunction)
++                Bind("arguments");
++
++            // Hoisting: a `var` or a function declaration anywhere in the body is bound from
++            // function entry, so a reference textually before it is still bound. Collect them
++            // before walking, or `f(); function f(){}` would report `f` free.
++            new Hoister(this).Visit(function.Body);
++
++            Visit(function.Body);
++            scopes.RemoveAt(scopes.Count - 1);
++            functionScans.RemoveAt(functionScans.Count - 1);
++            functionScopeBase.RemoveAt(functionScopeBase.Count - 1);
++
++            if (All == null)
++                return;
++
++            All[function] = own;
++
++            // A child's free names are references the parent has not yet resolved: it may bind
++            // them itself, in which case they stop here, or pass them further up. Routing them
++            // through the ordinary reference path is what makes capture transitive for free.
++            var parent = functionScans.Count == 0 ? scan : functionScans[^1];
++            foreach (var name in own.Free)
++            {
++                if (!IsBound(name))
++                    parent.Free.Add(name);
++            }
++
++            if (own.Dynamic)
++                parent.Dynamic = true;
++        }
++
++        internal void Bind(string name)
++        {
++            if (scopes.Count != 0)
++                scopes[^1].Bound.Add(name);
++        }
++
++        /// <summary>Binds a <c>var</c> or function declaration at the nearest FUNCTION scope.</summary>
++        internal void BindHoisted(string name)
++        {
++            var floor = functionScopeBase.Count == 0 ? 0 : functionScopeBase[^1];
++            for (var i = scopes.Count - 1; i >= floor; i--)
++            {
++                if (!scopes[i].IsFunctionScope)
++                    continue;
++
++                scopes[i].Bound.Add(name);
++                return;
++            }
++        }
++
++        internal void BindPattern(AstNode target)
++        {
++            switch (target)
++            {
++                case null:
++                    return;
++
++                case AstIdentifier identifier:
++                    Bind(identifier.Name.Value);
++                    return;
++
++                case AstArrayPattern array:
++                    var elements = array.Elements.GetFastEnumerator();
++                    while (elements.MoveNext(out var element))
++                        BindPattern(element);
++                    return;
++
++                case AstObjectPattern pattern:
++                    var properties = pattern.Properties.GetFastEnumerator();
++                    while (properties.MoveNext(out var property))
++                    {
++                        // A computed key is an expression, not a binding: `{ [k]: v } = o` reads k.
++                        if (property.Computed && property.Key != null)
++                            Visit(property.Key);
++
++                        BindPattern(property.Value ?? property.Key);
++                        if (property.Init != null)
++                            Visit(property.Init);
++                    }
++
++                    return;
++
++                case AstBinaryExpression { Operator: TokenTypes.Assign } withDefault:
++                    // `function (a = expr)`: the target binds, the default references.
++                    BindPattern(withDefault.Left);
++                    Visit(withDefault.Right);
++                    return;
++
++                case AstUnaryExpression spread:
++                    BindPattern(spread.Argument);
++                    return;
++
++                default:
++                    // Anything unrecognised in binding position: walk it as a reference, which
++                    // can only add names to the free set.
++                    Visit(target);
++                    return;
++            }
++        }
++
++        private bool IsBound(string name)
++        {
++            var floor = functionScopeBase.Count == 0 ? 0 : functionScopeBase[^1];
++            for (var i = scopes.Count - 1; i >= floor; i--)
++            {
++                if (scopes[i].Bound.Contains(name))
++                    return true;
++            }
++
++            return false;
++        }
++
++        private FreeNameScan Current => functionScans.Count == 0 ? scan : functionScans[^1];
++
++        protected override AstNode VisitIdentifier(AstIdentifier identifier)
++        {
++            var name = identifier.Name.Value;
++            if (!IsBound(name))
++                Current.Free.Add(name);
++
++            return identifier;
++        }
++
++        protected override AstNode VisitFunctionExpression(AstFunctionExpression function)
++        {
++            // A nested function's own free names are free HERE too unless this function binds
++            // them — capture is transitive, and a body two levels down reaching a name one level
++            // up is the shape RelayRewriteTests exists for.
++            var declarationName = function.IsStatement ? function.Id?.Name.Value : null;
++            if (declarationName != null)
++                BindHoisted(declarationName);
++
++            EnterFunction(function);
++            return function;
++        }
++
++        protected override AstNode VisitBlock(AstBlock block)
++        {
++            scopes.Add(new Scope(isFunctionScope: false));
++            var statements = block.Statements.GetFastEnumerator();
++            while (statements.MoveNext(out var statement))
++                Visit(statement);
++
++            scopes.RemoveAt(scopes.Count - 1);
++            return block;
++        }
++
++        protected override AstNode VisitVariableDeclaration(AstVariableDeclaration declaration)
++        {
++            var declarators = declaration.Declarators.GetFastEnumerator();
++            while (declarators.MoveNext(out var declarator))
++            {
++                // `var` was already bound by the hoist pass at the function scope; `let`, `const`
++                // and `using` bind here, in the block being walked.
++                if (declaration.Kind != FastVariableKind.Var)
++                    BindPattern(declarator.Identifier);
++
++                if (declarator.Init != null)
++                    Visit(declarator.Init);
++            }
++
++            return declaration;
++        }
++
++        protected override AstNode VisitTryStatement(AstTryStatement statement)
++        {
++            Visit(statement.Block);
++
++            if (statement.Catch != null)
++            {
++                scopes.Add(new Scope(isFunctionScope: false));
++                if (statement.CatchParam != null)
++                    BindPattern(statement.CatchParam);
++
++                Visit(statement.Catch);
++                scopes.RemoveAt(scopes.Count - 1);
++            }
++
++            if (statement.Finally != null)
++                Visit(statement.Finally);
++
++            return statement;
++        }
++
++        protected override AstNode VisitObjectLiteral(AstObjectLiteral literal)
++        {
++            // Overridden because the base walks a literal's properties GENERICALLY — unlike
++            // VisitObjectPattern, which routes through VisitObjectProperty explicitly — so the
++            // override below never sees them and every `{ a: 1 }` key reads as a reference to `a`.
++            // Caught by a fixture rather than by inspection, which is the whole reason the
++            // property-name case has one.
++            var properties = literal.Properties.GetFastEnumerator();
++            while (properties.MoveNext(out var node))
++            {
++                if (node is not AstClassProperty property)
++                {
++                    Visit(node);
++                    continue;
++                }
++
++                // A shorthand `{ a }` has no Init and IS a reference to `a`; a `{ a: v }` key is
++                // not. That is the one place a property name and a reference share a node.
++                if (property.Computed || property.Init == null)
++                    Visit(property.Key);
++
++                if (property.Init != null)
++                    Visit(property.Init);
++            }
++
++            return literal;
++        }
++
++        protected override AstNode VisitMemberExpression(AstMemberExpression member)
++        {
++            Visit(member.Object);
++
++            // `o.a` does not read a binding called `a`; `o[a]` does. Without this every property
++            // name in the program joins the free set, and the deferral would box a binding for
++            // each one — which is the failure mode the "over-approximation is safe" rule hides,
++            // because it is safe and ruinous at the same time.
++            if (member.Computed)
++                Visit(member.Property);
++
++            return member;
++        }
++
++        protected override AstNode VisitWithStatement(AstWithStatement statement)
++        {
++            Current.Dynamic = true;
++            return base.VisitWithStatement(statement);
++        }
++
++        protected override AstNode VisitCallExpression(AstCallExpression call)
++        {
++            if (call.Callee is AstIdentifier { } callee && callee.Name.Equals("eval"))
++                Current.Dynamic = true;
++
++            return base.VisitCallExpression(call);
++        }
++
++        // The containers AstReduce leaves to specialized rewriters. Missing one is not a missed
++        // optimization but a miscompile, so they are overridden here for the same reason
++        // NestedFunctionScanner overrides them.
++        protected override VariableDeclarator VisitVariableDeclarator(VariableDeclarator declarator)
++        {
++            Visit(declarator.Identifier);
++            if (declarator.Init != null)
++                Visit(declarator.Init);
++            return declarator;
++        }
++
++        protected override ObjectProperty VisitObjectProperty(ObjectProperty property)
++        {
++            // A non-computed key is a property name, not a reference: `{ a: 1 }` does not read `a`.
++            if (property.Computed && property.Key != null)
++                Visit(property.Key);
++
++            if (property.Value != null)
++                Visit(property.Value);
++            if (property.Init != null)
++                Visit(property.Init);
++            return property;
++        }
++
++        protected override Case VisitCase(Case @case)
++        {
++            if (@case.Test != null)
++                Visit(@case.Test);
++            var statements = @case.Statements.GetFastEnumerator();
++            while (statements.MoveNext(out var statement))
++                Visit(statement);
++            return @case;
++        }
++    }
++
++    /// <summary>
++    /// Binds the <c>var</c>s and function declarations of one function body before it is walked,
++    /// without descending into nested functions — whose own <c>var</c>s belong to them.
++    /// </summary>
++    private sealed class Hoister(Walker walker) : AstReduce
++    {
++        protected override AstNode VisitFunctionExpression(AstFunctionExpression function)
++        {
++            // The declaration's NAME hoists into this body; its own vars do not.
++            if (function.IsStatement && function.Id != null)
++                walker.BindHoisted(function.Id.Name.Value);
++
++            return function;
++        }
++
++        protected override AstNode VisitVariableDeclaration(AstVariableDeclaration declaration)
++        {
++            if (declaration.Kind != FastVariableKind.Var)
++                return declaration;
++
++            var declarators = declaration.Declarators.GetFastEnumerator();
++            while (declarators.MoveNext(out var declarator))
++                HoistPattern(declarator.Identifier);
++
++            return declaration;
++        }
++
++        private void HoistPattern(AstNode target)
++        {
++            switch (target)
++            {
++                case AstIdentifier identifier:
++                    walker.BindHoisted(identifier.Name.Value);
++                    return;
++
++                case AstArrayPattern array:
++                    var elements = array.Elements.GetFastEnumerator();
++                    while (elements.MoveNext(out var element))
++                        HoistPattern(element);
++                    return;
++
++                case AstObjectPattern pattern:
++                    var properties = pattern.Properties.GetFastEnumerator();
++                    while (properties.MoveNext(out var property))
++                        HoistPattern(property.Value ?? property.Key);
++                    return;
++
++                case AstBinaryExpression { Operator: TokenTypes.Assign } withDefault:
++                    HoistPattern(withDefault.Left);
++                    return;
++
++                case AstUnaryExpression spread:
++                    HoistPattern(spread.Argument);
++                    return;
++            }
++        }
++
++        protected override Case VisitCase(Case @case)
++        {
++            var statements = @case.Statements.GetFastEnumerator();
++            while (statements.MoveNext(out var statement))
++                Visit(statement);
++            return @case;
++        }
++    }
++}
 diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs
 new file mode 100644
-index 00000000..dcb9764b
+index 00000000..aac9a3cb
 --- /dev/null
 +++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs
-@@ -0,0 +1,276 @@
+@@ -0,0 +1,375 @@
 +#nullable enable
 +using System.Collections.Generic;
 +using System.Linq;
@@ -462,6 +1552,69 @@ index 00000000..dcb9764b
 +    private static readonly ConditionalWeakTable<BLambdaExpression, HashSet<string>> predictedNamesBySpelling = [];
 +
 +    private static long missedByName;
++
++    /// <summary>
++    /// A lambda's first verdict, kept so a second relay of the same site can be recognised rather
++    /// than counted again.
++    /// </summary>
++    private sealed class Verdict
++    {
++        public int Missed;
++        public int Over;
++        public int Real;
++    }
++
++    private static readonly ConditionalWeakTable<BLambdaExpression, Verdict> verdicts = [];
++
++    private static readonly ConditionalWeakTable<BLambdaExpression, object> undeferrable = [];
++    private static long excludedSites;
++
++    /// <summary>
++    /// Sites excluded from the comparison because the mechanism refuses to defer them at all — a
++    /// direct <c>eval</c>, a <c>with</c> or a <c>debugger</c> in the body.
++    /// </summary>
++    /// <remarks>
++    /// <b>Recording these as an empty prediction was a defect in this checker, and a costly one to
++    /// read.</b> A <see cref="FreeNameScan.Dynamic"/> body can reach bindings its text never names,
++    /// so there is no set to be right about — but an empty prediction compared against a real
++    /// capture set reports every one of those captures as a <em>miss</em>, which is the strongest
++    /// signal this instrument has. Mandreel, PdfJS and Typescript each contributed misses reading
++    /// <c>predicted{}</c> for exactly that reason. Excluding them is not leniency: a site the
++    /// mechanism will not defer needs no layout.
++    /// </remarks>
++    public static long ExcludedSites => Interlocked.Read(ref excludedSites);
++
++    /// <summary>Records that this lambda cannot be deferred, so its layout is not a question.</summary>
++    public static void Undeferrable(BLambdaExpression lambda)
++    {
++        undeferrable.AddOrUpdate(lambda, null!);
++        Interlocked.Increment(ref excludedSites);
++    }
++
++    private static long checks;
++    private static long repeatChecks;
++    private static long repeatDisagreements;
++
++    /// <summary>Calls to <see cref="Check"/> that found a prediction, repeats included.</summary>
++    public static long Checks => Interlocked.Read(ref checks);
++
++    /// <summary>
++    /// Calls that were a SECOND (or later) relay of a lambda already checked.
++    /// </summary>
++    /// <remarks>
++    /// <b>The first corpus run reported more checks than predictions</b> — Mandreel 2 622 exact
++    /// against 1 476 predicted sites — which can only mean a site is relayed more than once, since
++    /// a lambda with no prediction is not counted at all. A per-site question must be answered once
++    /// per site, so repeats are recognised here instead of being added to the totals.
++    /// </remarks>
++    public static long RepeatChecks => Interlocked.Read(ref repeatChecks);
++
++    /// <summary>
++    /// Repeats whose verdict differed from the first. Zero makes the repeat pure duplication;
++    /// non-zero would mean the rewrite decides a different capture set on a later relay, which is
++    /// a finding about the rewrite rather than about the counter.
++    /// </summary>
++    public static long RepeatDisagreements => Interlocked.Read(ref repeatDisagreements);
 +
 +    /// <summary>
 +    /// Missed captures when prediction and truth are matched on the binding's SPELLING instead of
@@ -567,10 +1720,18 @@ index 00000000..dcb9764b
 +
 +    public static void Check(BLambdaExpression lambda, ICollection<BParameterExpression> actual)
 +    {
++        if (undeferrable.TryGetValue(lambda, out _))
++            return;
++
 +        if (!predicted.TryGetValue(lambda, out var expected))
 +            return;
 +
 +        predictedNamesBySpelling.TryGetValue(lambda, out var expectedNames);
++
++        // Known up front so the per-name side effects below — the missed-name samples and the
++        // by-spelling counter — are not repeated either. Recording them per relay would make the
++        // samples a list of the same few sites over and over.
++        var isRepeat = verdicts.TryGetValue(lambda, out var first);
 +
 +        long missCount = 0;
 +        long realCount = 0;
@@ -585,24 +1746,48 @@ index 00000000..dcb9764b
 +            }
 +
 +            realCount++;
-+            if (expectedNames != null && !expectedNames.Contains(capture.Name!))
++            if (!isRepeat && expectedNames != null && !expectedNames.Contains(capture.Name!))
 +                Interlocked.Increment(ref missedByName);
 +
 +            if (!expected.Contains(capture))
 +            {
 +                missCount++;
-+                lock (missedSamples)
++                if (!isRepeat)
 +                {
-+                    if (missedSamples.Count < 32)
-+                        missedSamples.Add((lambda.Name.ToString() ?? "?") + "/" + (capture.Name ?? "<null>")
-+                            + " predicted{" + string.Join("|", expectedNames ?? []) + "}");
++                    lock (missedSamples)
++                    {
++                        if (missedSamples.Count < 32)
++                            missedSamples.Add((lambda.Name.ToString() ?? "?") + "/" + (capture.Name ?? "<null>")
++                                + " predicted{" + string.Join("|", expectedNames ?? []) + "}");
++                    }
 +                }
 +            }
 +        }
 +
++        var overCount = expected.Count - (realCount - missCount);
++        Interlocked.Increment(ref checks);
++
++        // A repeat is recognised and NOT added to the totals: the layout is a property of the
++        // site, so counting it once per relay would make every aggregate a function of how many
++        // times the enclosing lambda happened to be emitted. Whether the repeat AGREES is the
++        // interesting half, and it is counted rather than assumed.
++        if (isRepeat)
++        {
++            Interlocked.Increment(ref repeatChecks);
++            if (first.Missed != missCount || first.Over != overCount || first.Real != realCount)
++                Interlocked.Increment(ref repeatDisagreements);
++            return;
++        }
++
++        verdicts.AddOrUpdate(lambda, new Verdict
++        {
++            Missed = (int)missCount,
++            Over = (int)overCount,
++            Real = (int)realCount,
++        });
++
 +        Interlocked.Add(ref actualNames, realCount);
 +        Interlocked.Add(ref missedNames, missCount);
-+        var overCount = expected.Count - (realCount - missCount);
 +        if (overCount > 0)
 +            Interlocked.Add(ref overNames, overCount);
 +
@@ -663,6 +1848,10 @@ index 00000000..dcb9764b
 +        Interlocked.Exchange(ref overNames, 0);
 +        Interlocked.Exchange(ref syntheticNames, 0);
 +        Interlocked.Exchange(ref missedByName, 0);
++        Interlocked.Exchange(ref checks, 0);
++        Interlocked.Exchange(ref repeatChecks, 0);
++        Interlocked.Exchange(ref repeatDisagreements, 0);
++        Interlocked.Exchange(ref excludedSites, 0);
 +        lock (missedSamples) missedSamples.Clear();
 +        lock (unresolved) unresolved.Clear();
 +        lock (noCell) noCell.Clear();
@@ -746,7 +1935,7 @@ index 13b220f7..9338da09 100644
      private static int ReadConfigured()
          => string.Equals(
 diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
-index 5606d334..413f2d8a 100644
+index 5606d334..ac7ce283 100644
 --- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
 +++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
 @@ -90,6 +90,9 @@ internal static class DeferPopulationMetrics
@@ -767,7 +1956,7 @@ index 5606d334..413f2d8a 100644
  
              string failure = null;
              try
-@@ -177,6 +181,20 @@ internal static class DeferPopulationMetrics
+@@ -177,6 +181,27 @@ internal static class DeferPopulationMetrics
  
                  // Non-null means evaluation stopped early, so `forced` is a floor and the share
                  // above is a ceiling.
@@ -783,12 +1972,19 @@ index 5606d334..413f2d8a 100644
 +                layoutMissedNames = ExpressionCompiler.DeferredCaptureLayout.MissedNames,
 +                layoutOverNames = ExpressionCompiler.DeferredCaptureLayout.OverApproximatedNames,
 +                layoutSynthetic = ExpressionCompiler.DeferredCaptureLayout.SyntheticNames,
++                // Checks against sites: a site relayed more than once is recognised rather than
++                // counted again, and whether the repeats AGREE is what says the repeat is pure
++                // duplication instead of the rewrite deciding differently on a later relay.
++                layoutExcluded = ExpressionCompiler.DeferredCaptureLayout.ExcludedSites,
++                layoutChecks = ExpressionCompiler.DeferredCaptureLayout.Checks,
++                layoutRepeatChecks = ExpressionCompiler.DeferredCaptureLayout.RepeatChecks,
++                layoutRepeatDisagreements = ExpressionCompiler.DeferredCaptureLayout.RepeatDisagreements,
 +                layoutMissedSamples = ExpressionCompiler.DeferredCaptureLayout.MissedNameSamples,
 +
                  evaluationFailure = failure,
              });
  
-@@ -196,6 +214,7 @@ internal static class DeferPopulationMetrics
+@@ -196,6 +221,7 @@ internal static class DeferPopulationMetrics
          }
  
          Compiler.DeferrableFunctions.Counting = false;
