@@ -1,0 +1,613 @@
+From 909561dead7f29b786c9377b994a6c98cc3fe7d2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 5 Aug 2026 11:17:27 +0000
+Subject: [PATCH] Count item 3-9's population, and close the item at zero
+
+3-9's specification made this count its own precondition and predicted
+where the answer would come from: it does not reach NavierStokes, because
+there the readers of rowSize are hoisted function declarations and item
+3-7 proved those must keep their JSVariable cell. So the population is
+names whose enclosing binding is captured only by function expressions,
+and nobody had counted how many of those the corpus has.
+
+It has none. Zero on all seven suites, against 3-8a's 26 reported from
+the same call site in the same run -- so the zero is the corpus and not
+the harness.
+
+A single zero cannot separate "nested functions never read an enclosing
+numeric local" from "they read them constantly and never anywhere
+typable", and the follow-up differs completely between them. So a second
+counter records how often the enclosing scope chain answers that a name
+is already a raw double while the pass runs. It answers never: 0 offers
+on the whole corpus. The reads do not exist.
+
+That reconciles with item 3-7 exactly. 3-9 can only import from a name
+that is both proven numeric AND still a raw double despite being
+captured, which is 3-7's population of eight names, and not one of the
+eight is read from an assignment inside the function that captures it.
+
+The instrument was made to discriminate before it was pointed anywhere:
+nine constructed fixtures, three of which read non-zero, each re-checked
+by disabling the probe and confirming it fails. That is the discipline
+0094 added after three of its own fixtures passed against the bug they
+were written to catch. The negatives are the interesting half -- a
+global and a dropped outer name separate this from 3-8a, and an inner
+declaration or parameter sharing a spelling separates it from a
+miscompile.
+
+It also settles a design question by flipping two fixtures. The probe
+must ask what the compiler BUILT (NumericStorage) and not what the
+analysis PROVED: pointed at the enclosing analysis's conclusion, the
+hoisted-declaration fixture flips from 0 to 1 -- a name 3-7 leaves in a
+cell for correctness would read as a win -- and the two-levels-out
+fixture flips from 1 to 0, because a per-frame set is not what a lexical
+reference resolves through.
+
+So the mechanism is declined rather than built. Unlike 3-8a it needs no
+run-time test, no flag and no fallback representation, and its failure
+mode is structurally absent -- a name it typed would be an ordinary
+numeric local every fast path reads unchanged. It is a good mechanism
+with nothing to point it at, and building it would buy an extra analysis
+pass and a scope-chain probe per compiled function for zero names.
+
+Both counters are off by default and change no emission on any setting.
+They stay in the tree with the condition that would re-open the item
+written down: 3-9's supply is bounded by 3-7's eight captured numeric
+locals, so widening 3-7 is the only thing that changes the answer.
+---
+ .../ImportedOuterNumericPopulationTests.cs    | 244 ++++++++++++++++++
+ .../CompilerSpecializationDiagnostics.cs      |  40 ++-
+ .../FastCompiler.CreateFunction.cs            |  21 ++
+ .../Declarations/NumericLocalAnalysis.cs      |  70 ++++-
+ .../ImportedOuterNumerics.cs                  |  53 ++++
+ .../SpecializingTierMetrics.cs                |  10 +
+ 6 files changed, 435 insertions(+), 3 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/ImportedOuterNumericPopulationTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler/ImportedOuterNumerics.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/ImportedOuterNumericPopulationTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/ImportedOuterNumericPopulationTests.cs
+new file mode 100644
+index 00000000..f5957d80
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/ImportedOuterNumericPopulationTests.cs
+@@ -0,0 +1,244 @@
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// The population instrument for item 3-9: locals that become numeric once an ENCLOSING function's
++// proven-numeric conclusion is carried across the closure boundary
++// (docs/performance-roadmap.md item 3-9).
++//
++// Written before the corpus is measured, and in this order deliberately. Item 3-8a's first
++// population instrument read zero on all seven Octane suites and was nearly published as a finding
++// before anyone had shown it could read anything else; §3.5 gained the rule that a counter never
++// shown to read non-zero is a claim about the counter. So the discrimination is established here on
++// constructed shapes first.
++//
++// The negatives are the interesting half, and there are two distinct kinds:
++//
++//   * shapes that separate 3-9 from **3-8a** — a global, or an outer name the enclosing analysis
++//     dropped. 3-8a assumes any outer name holds a number; 3-9 accepts only one already proved to.
++//     An instrument that could not tell them apart would report 3-8a's 26 names again.
++//   * shapes that separate 3-9 from a **wrong answer** — an inner binding that merely shares a
++//     spelling with an outer numeric local. Typing one of those from the other is not a missed
++//     opportunity, it is a miscompile.
++//
++// And one bound that comes free: **3-9's population is a subset of 3-8a's by construction**, since
++// everything an enclosing scope has proved numeric is also something an optimistic pass assumes
++// numeric. Every fixture asserts it, so a reading that violates it fails here rather than on the
++// corpus.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public sealed class ImportedOuterNumericPopulationTests
++{
++    private readonly record struct Population(long Imported, long Speculative, long Numeric);
++
++    private static Population Count(string source)
++    {
++        var previousOuter = ImportedOuterNumerics.Counting;
++        var previousSpeculative = SpeculativeNumericLocals.Counting;
++        ImportedOuterNumerics.Counting = true;
++        SpeculativeNumericLocals.Counting = true;
++        using var context = new JSContext();
++        CompilerSpecializationDiagnostics.Reset();
++        try
++        {
++            context.Eval(source);
++            var c = CompilerSpecializationDiagnostics.Snapshot();
++            return new Population(
++                c.ImportedOuterNumericCandidates,
++                c.SpeculativeNumericCandidates,
++                c.NumericLocals);
++        }
++        finally
++        {
++            ImportedOuterNumerics.Counting = previousOuter;
++            SpeculativeNumericLocals.Counting = previousSpeculative;
++        }
++    }
++
++    private static Population CountAndCheckBound(string source)
++    {
++        var p = Count(source);
++
++        // 3-9 ⊆ 3-8a, by construction rather than by measurement. Asserted on every shape so the
++        // relation is a property of the instrument and not an observation about one program.
++        Assert.True(
++            p.Imported <= p.Speculative,
++            $"imported={p.Imported} exceeded speculative={p.Speculative}, which is impossible");
++        return p;
++    }
++
++    [Fact]
++    public void TheSwitchIsOffByDefault()
++    {
++        // It costs two extra analysis passes per compiled function, which is compile time nothing
++        // else needs to pay.
++        Assert.False(ImportedOuterNumerics.Counting);
++    }
++
++    [Fact]
++    public void AnEnclosingNumericLocalReadThroughAFunctionExpressionIsInThePopulation()
++    {
++        // The shape item 3-9 exists for, and the only one it can reach. `rowSize` is proven
++        // numeric by `o`'s own analysis AND survives to a raw double because its single capturer
++        // is a function EXPRESSION — item 3-7 gives that a Box<double> rather than a JSVariable
++        // cell. So the conclusion is available to carry, and `c` becomes an ordinary numeric local
++        // with no run-time test anywhere.
++        var p = CountAndCheckBound("""
++            function o() {
++              var rowSize = 10;
++              var f = function () { var c = 2 * rowSize; c++; return c; };
++              return f();
++            }
++            o();
++            """);
++
++        Assert.Equal(1, p.Imported);
++    }
++
++    [Fact]
++    public void AnEnclosingNameHeldByAHoistedDeclarationIsNotInThePopulation()
++    {
++        // **The item's own prediction, and the reason it was expected not to reach NavierStokes.**
++        // One character of difference from the fixture above — `function f()` instead of
++        // `var f = function ()` — and `rowSize` is now captured by a hoisted function DECLARATION,
++        // which item 3-7 proved must keep its JSVariable cell for correctness. It is still proven
++        // numeric by the analysis and it is still not a raw double, so there is no conclusion to
++        // carry and 3-9 reaches nothing.
++        //
++        // This is also why the probe asks `NumericStorage != null` — what the compiler BUILT —
++        // rather than asking the enclosing analysis what it proved. The two differ exactly here,
++        // and an instrument built on the second would report this shape as a win.
++        var p = CountAndCheckBound("""
++            function o() {
++              var rowSize = 10;
++              function f() { var c = 2 * rowSize; c++; return c; }
++              return f();
++            }
++            o();
++            """);
++
++        Assert.Equal(0, p.Imported);
++
++        // And it is in 3-8a's population, which is what says the fixture reaches the analysis at
++        // all rather than failing to compile the shape.
++        Assert.True(p.Speculative > 0);
++    }
++
++    [Fact]
++    public void AGlobalIsNotInThePopulationAlthoughItIsIn3_8aS()
++    {
++        // The sharpest separation from 3-8a, because this is the shape 3-8a's own count was
++        // demonstrated on. A global has no enclosing binding to have proved anything about, so
++        // there is no static conclusion to import and only a run-time test could type `c`.
++        var p = CountAndCheckBound("gg = 3; function f(){ var c = 2 * gg; c++; return c; } f();");
++
++        Assert.Equal(0, p.Imported);
++        Assert.Equal(1, p.Speculative);
++    }
++
++    [Fact]
++    public void AnEnclosingNameTheAnalysisDroppedIsNotInThePopulation()
++    {
++        // The second separation from 3-8a: the outer name exists and is a local, and the enclosing
++        // analysis could not type it. 3-8a assumes it anyway and pays a guard; 3-9 has nothing to
++        // import and correctly declines.
++        var p = CountAndCheckBound("""
++            function o(size) {
++              var rowSize = size.width;
++              var f = function () { var c = 2 * rowSize; c++; return c; };
++              return f();
++            }
++            o({ width: 10 });
++            """);
++
++        Assert.Equal(0, p.Imported);
++        Assert.True(p.Speculative > 0);
++    }
++
++    [Fact]
++    public void AnInnerDeclarationSharingTheSpellingIsNotTypedFromTheOuterOne()
++    {
++        // A wrong-answer negative rather than a coverage one. `rowSize` inside `f` is `f`'s own
++        // binding and holds a string; that it shares a spelling with `o`'s numeric local is a fact
++        // about names, not about values. An instrument that typed `c` here would be describing a
++        // miscompile.
++        var p = CountAndCheckBound("""
++            function o() {
++              var rowSize = 10;
++              var f = function () {
++                var rowSize = "wide";
++                var c = 2 * rowSize;
++                c++;
++                return c;
++              };
++              return f();
++            }
++            o();
++            """);
++
++        Assert.Equal(0, p.Imported);
++    }
++
++    [Fact]
++    public void AnInnerParameterSharingTheSpellingIsNotTypedFromTheOuterOne()
++    {
++        // The same hazard through the other binding form, and the one 3-8a's instrument also had
++        // to exclude: a parameter is a value the caller picks per call, so no conclusion about an
++        // enclosing local says anything about it. Item 3-3's acknowledged gap, and a different
++        // item.
++        var p = CountAndCheckBound("""
++            function o() {
++              var rowSize = 10;
++              var f = function (rowSize) { var c = 2 * rowSize; c++; return c; };
++              return f("wide");
++            }
++            o();
++            """);
++
++        Assert.Equal(0, p.Imported);
++    }
++
++    [Fact]
++    public void TheCascadeResolvesRatherThanBeingCountedAsOneRootCause()
++    {
++        // The imported pass is a fixed point like the real one, so relaxing the first name
++        // resolves the second for free and BOTH come out. That is what makes this a population
++        // rather than a count of root causes, and it is the half a hand-written rule would most
++        // easily get wrong.
++        var p = CountAndCheckBound("""
++            function o() {
++              var rowSize = 10;
++              var f = function () {
++                var r = rowSize;
++                var c = 2 * r;
++                c++;
++                return c + r;
++              };
++              return f();
++            }
++            o();
++            """);
++
++        Assert.Equal(2, p.Imported);
++    }
++
++    [Fact]
++    public void TwoLevelsOutIsStillOneLookup()
++    {
++        // The probe resolves through the whole enclosing chain rather than one frame, which is
++        // what a lexical reference does. Worth pinning because the alternative — checking only the
++        // immediately enclosing function — would silently under-count on any nested helper.
++        var p = CountAndCheckBound("""
++            function o() {
++              var rowSize = 10;
++              var mid = function () {
++                var inner = function () { var c = 2 * rowSize; c++; return c; };
++                return inner();
++              };
++              return mid();
++            }
++            o();
++            """);
++
++        Assert.Equal(1, p.Imported);
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs b/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
+index 893ec5d6..24edf8f6 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/CompilerSpecializationDiagnostics.cs
+@@ -19,7 +19,9 @@ public readonly record struct CompilerSpecializationSnapshot(
+     long[] NumericTreeRefusals,
+     long[] NumericTreeOrderBlockers,
+     long SpeculativeNumericCandidates,
+-    long SpeculativeNumericLocalsEmitted);
++    long SpeculativeNumericLocalsEmitted,
++    long ImportedOuterNumericCandidates,
++    long ImportedOuterNumericOffers);
+ 
+ /// <summary>
+ /// Why a hoisted name did not become a raw <c>double</c> local, in the order the gate asks
+@@ -182,6 +184,8 @@ public static class CompilerSpecializationDiagnostics
+     private static readonly long[] numericTreeOrderBlockers = new long[5];
+     private static long speculativeNumericCandidates;
+     private static long speculativeNumericLocalsEmitted;
++    private static long importedOuterNumericCandidates;
++    private static long importedOuterNumericOffers;
+ 
+     internal static void RecordScalarLocal() => Interlocked.Increment(ref scalarLocals);
+ 
+@@ -264,6 +268,34 @@ public static class CompilerSpecializationDiagnostics
+     internal static void RecordSpeculativeNumericCandidates(int count)
+         => Interlocked.Add(ref speculativeNumericCandidates, count);
+ 
++    /// <summary>
++    /// Locals item 3-9 would type by importing an enclosing function's proven-numeric conclusion
++    /// (docs/performance-roadmap.md item 3-9).
++    /// </summary>
++    /// <remarks>
++    /// <b>Bounded above by <c>SpeculativeNumericCandidates</c> by construction</b>, which is what
++    /// makes it checkable rather than merely reported: everything an enclosing scope has PROVED
++    /// numeric is also something 3-8a's pass would have ASSUMED numeric, so a reading above 26 on
++    /// the Octane corpus is a defect in this counter and not a discovery.
++    /// </remarks>
++    internal static void RecordImportedOuterNumericCandidates(int count)
++        => Interlocked.Add(ref importedOuterNumericCandidates, count);
++
++    /// <summary>
++    /// Times the enclosing scope chain answered "yes, that name is already a raw <c>double</c>"
++    /// while item 3-9's pass was resolving a function (docs/performance-roadmap.md item 3-9).
++    /// </summary>
++    /// <remarks>
++    /// <b>This is the counter that makes a zero population readable.</b> A zero candidate count on
++    /// its own is consistent with two very different worlds — nested functions never read an
++    /// enclosing numeric local at all, or they read them constantly and never in a position that
++    /// could be typed — and the follow-up work differs completely between them. Occurrence-weighted
++    /// rather than distinct, because the only question it has to answer is whether the number is
++    /// zero.
++    /// </remarks>
++    internal static void RecordImportedOuterNumericOffer()
++        => Interlocked.Increment(ref importedOuterNumericOffers);
++
+     /// <summary>Records why one hoisted name did or did not reach the numeric tier.</summary>
+     internal static void RecordNumericLocalDecision(NumericLocalRejection reason)
+     {
+@@ -289,7 +321,9 @@ public static class CompilerSpecializationDiagnostics
+             Read(numericTreeRefusals),
+             Read(numericTreeOrderBlockers),
+             Interlocked.Read(ref speculativeNumericCandidates),
+-            Interlocked.Read(ref speculativeNumericLocalsEmitted));
++            Interlocked.Read(ref speculativeNumericLocalsEmitted),
++            Interlocked.Read(ref importedOuterNumericCandidates),
++            Interlocked.Read(ref importedOuterNumericOffers));
+ 
+     private static long[] Read(long[] counters)
+     {
+@@ -337,6 +371,8 @@ public static class CompilerSpecializationDiagnostics
+         for (var i = 0; i < numericTreeOrderBlockers.Length; i++)
+             Interlocked.Exchange(ref numericTreeOrderBlockers[i], 0);
+         Interlocked.Exchange(ref speculativeNumericCandidates, 0);
++        Interlocked.Exchange(ref importedOuterNumericCandidates, 0);
++        Interlocked.Exchange(ref importedOuterNumericOffers, 0);
+         Interlocked.Exchange(ref speculativeNumericLocalsEmitted, 0);
+     }
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+index 1e34b7d5..aa8095a6 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+@@ -95,6 +95,27 @@ partial class FastCompiler
+             if (SpeculativeNumericLocals.Counting && cs.CanScalarReplaceLocals)
+                 CompilerSpecializationDiagnostics.RecordSpeculativeNumericCandidates(
+                     NumericLocalAnalysis.AnalyzeSpeculative(functionDeclaration).Count);
++
++            // Item 3-9's population. The probe answers for the ENCLOSING scope chain and asks
++            // about the binding rather than the spelling: `previousScope.GetVariable` resolves the
++            // name the way a reference to it would, and `NumericStorage != null` is the question
++            // "is this already a raw double" asked of what the compiler actually built — not of
++            // what the enclosing analysis merely proved. The two differ, and the difference is the
++            // item's own prediction: item 3-7 leaves a name captured by a hoisted function
++            // DECLARATION in a JSVariable cell however numeric its analysis found it, which is why
++            // 3-9 is not expected to reach NavierStokes.
++            if (ImportedOuterNumerics.Counting && cs.CanScalarReplaceLocals)
++                CompilerSpecializationDiagnostics.RecordImportedOuterNumericCandidates(
++                    NumericLocalAnalysis.AnalyzeImportedOuter(
++                        functionDeclaration,
++                        name =>
++                        {
++                            if (previousScope?.GetVariable(name, true)?.NumericStorage == null)
++                                return false;
++
++                            CompilerSpecializationDiagnostics.RecordImportedOuterNumericOffer();
++                            return true;
++                        }).Count);
+             // super() in a derived constructor (or an arrow nested in it) targets the
+             // superclass constructor, which differs from the home-object prototype.
+             cs.SuperConstructor = superConstructor ?? (functionDeclaration.IsArrowFunction ? previousScope.SuperConstructor : null);
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
+index 0365559e..a4d52389 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/NumericLocalAnalysis.cs
+@@ -123,6 +123,58 @@ internal sealed class NumericLocalAnalysis
+     /// separately.
+     /// </para>
+     /// </remarks>
++    /// <summary>
++    /// The names item 3-9 would type STATICALLY: the ones this function's own fixed point keeps
++    /// only when an identifier resolving to a numeric local of an ENCLOSING function is treated as
++    /// the double it already is.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// The difference from <see cref="AnalyzeSpeculative"/> is the whole item, and it is the
++    /// difference between assuming and knowing. 3-8a assumes any name from outside the function
++    /// holds a number and pays for a run-time test; this one accepts only a name the enclosing
++    /// scope has <em>already proved</em> is a raw <c>double</c>, so there is no test, no flag, no
++    /// fallback representation — the local it types is an ordinary numeric local, and every fast
++    /// path that reads <c>NumericStorage</c> works on it unchanged. **That is why 3-8a's failure
++    /// mode cannot happen here**: 3-8a lost because its reads had to box the raw half back up, and
++    /// a 3-9 name has no raw half to box.
++    /// </para>
++    /// <para>
++    /// <b>Therefore 3-9's population is a strict subset of 3-8a's</b>, which is a bound the count
++    /// can be checked against rather than a claim about it: everything the enclosing scope has
++    /// proved numeric is also something an optimistic pass would have assumed numeric. A global is
++    /// in 3-8a's set and not in this one — it has no enclosing binding to have proved anything —
++    /// and so is an outer name the enclosing analysis dropped.
++    /// </para>
++    /// <para>
++    /// <paramref name="outerNumeric"/> answers for the ENCLOSING scope chain, and it is asked about
++    /// the binding rather than the spelling: a name this function declares or takes as a parameter
++    /// shadows the outer one and is excluded before the probe is consulted, exactly as 3-8a's pass
++    /// excludes them.
++    /// </para>
++    /// </remarks>
++    public static IReadOnlySet<string> AnalyzeImportedOuter(
++        AstFunctionExpression function, System.Func<string, bool> outerNumeric)
++    {
++        if (outerNumeric == null)
++            return System.Collections.Immutable.ImmutableHashSet<string>.Empty;
++
++        var real = new NumericLocalAnalysis();
++        real.Collect(function);
++        var proven = real.Resolve(count: false);
++
++        var imported = new NumericLocalAnalysis { outerNumericNames = outerNumeric };
++        imported.Collect(function);
++        var withOuter = imported.Resolve(count: false);
++
++        if (withOuter.Count == 0)
++            return System.Collections.Immutable.ImmutableHashSet<string>.Empty;
++
++        var gained = new HashSet<string>(withOuter, System.StringComparer.Ordinal);
++        gained.ExceptWith(proven);
++        return gained;
++    }
++
+     public static IReadOnlySet<string> AnalyzeSpeculative(AstFunctionExpression function)
+     {
+         var real = new NumericLocalAnalysis();
+@@ -162,6 +214,13 @@ internal sealed class NumericLocalAnalysis
+     /// </summary>
+     private readonly HashSet<string> declaredNames = new(System.StringComparer.Ordinal);
+ 
++    /// <summary>
++    /// Item 3-9: asks the ENCLOSING scope chain whether a name is already a raw <c>double</c>
++    /// there. <c>null</c> on every pass but the imported one, so the analysis is unchanged for
++    /// every other caller.
++    /// </summary>
++    private System.Func<string, bool> outerNumericNames;
++
+     /// <summary>
+     /// Every name that was ever offered as a numeric candidate. A drop caused by reading one of
+     /// these is a CASCADE — the name is dropped because its source was — and wants no guard of
+@@ -593,7 +652,16 @@ internal sealed class NumericLocalAnalysis
+             // with a population this item does not serve.
+             || (assumeOuterNamesAreNumeric
+                 && !parameterNames.Contains(identifier.Name.Value)
+-                && !declaredNames.Contains(identifier.Name.Value)),
++                && !declaredNames.Contains(identifier.Name.Value))
++            // Item 3-9's static pass. Same exclusions for the same reason — a name this function
++            // declares or takes as a parameter is a DIFFERENT binding that merely shares a
++            // spelling, and typing it from the outer one would be a wrong answer rather than a
++            // missed opportunity — but the outer name has to have been PROVED numeric rather than
++            // assumed, so this needs no run-time test and produces an ordinary numeric local.
++            || (outerNumericNames != null
++                && !parameterNames.Contains(identifier.Name.Value)
++                && !declaredNames.Contains(identifier.Name.Value)
++                && outerNumericNames(identifier.Name.Value)),
+ 
+         // Parenthesised / sequence: the value is the last element.
+         AstSequenceExpression sequence => IsNumeric(Last(sequence)),
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/ImportedOuterNumerics.cs b/Broiler.JS/Broiler.JavaScript.Compiler/ImportedOuterNumerics.cs
+new file mode 100644
+index 00000000..569bca4b
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/ImportedOuterNumerics.cs
+@@ -0,0 +1,53 @@
++using System;
++using System.Threading;
++
++namespace Broiler.JavaScript.Compiler;
++
++/// <summary>
++/// Item 3-9's population counter: how many locals would be numeric if the analysis carried an
++/// enclosing function's proven-numeric conclusion across the closure boundary.
++/// </summary>
++/// <remarks>
++/// <para>
++/// <b>The item's own specification makes this count its precondition</b>, and the reason is a
++/// prediction it also makes: 3-9 <em>does not reach NavierStokes</em>. There the readers of
++/// <c>rowSize</c> are hoisted function <em>declarations</em>, so the outer binding is held by item
++/// 3-7's correctness conjunct and is not a raw double no matter how far the analysis reaches. So
++/// the population is names whose enclosing binding is captured only by function
++/// <em>expressions</em> — and nobody has counted how many of those the corpus has.
++/// </para>
++/// <para>
++/// <b>Counting is not building.</b> Five designs in this document have now been retired by their
++/// own precondition count, and the sixth — item 3-8a — was built instead and lost 1.2%. What is
++/// different here is that a 3-9 name needs no run-time test: the enclosing scope has already
++/// <em>proved</em> the outer name is a <c>double</c>, so the local it types is an ordinary numeric
++/// local with no flag, no fallback slot, and no read that has to box a raw half back up. 3-8a's
++/// failure mode is structurally absent. What is not yet known is whether there is anything to
++/// type, which is what this counts.
++/// </para>
++/// <para>
++/// <b>Off by default, and it must be turned on before the code being measured is compiled.</b> A
++/// compile-time counter, like <see cref="SpeculativeNumericLocals"/> and unlike the run-time
++/// censuses it is reported beside — the mistake of enabling one of these among those has now been
++/// made twice in this phase (item 3-1's <c>0083</c>, then item 3-8a's first population instrument),
++/// so it is written on the switch rather than left to the caller to remember.
++/// </para>
++/// </remarks>
++public static class ImportedOuterNumerics
++{
++    public const string EnvironmentVariable = "BROILER_JS_OUTER_NUMERIC_COUNT";
++
++    private static int counting = string.Equals(
++        Environment.GetEnvironmentVariable(EnvironmentVariable),
++        "1",
++        StringComparison.Ordinal)
++        ? 1
++        : 0;
++
++    /// <summary>Whether each compiled function also reports its imported-outer candidate count.</summary>
++    public static bool Counting
++    {
++        get => Volatile.Read(ref counting) != 0;
++        set => Volatile.Write(ref counting, value ? 1 : 0);
++    }
++}
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index f3f7ba7a..97f5d379 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -460,6 +460,8 @@ internal static class SpecializingTierMetrics
+         // beside the run-time censuses further down — which is where it went first, and why it
+         // read zero on all seven suites (item 3-1's `0083` failure mode, a second time).
+         Broiler.JavaScript.Compiler.SpeculativeNumericLocals.Counting = counters;
++        // Item 3-9's population, on the same terms and for the same reason.
++        Broiler.JavaScript.Compiler.ImportedOuterNumerics.Counting = counters;
+ 
+         string outcome;
+         var stopwatch = new Stopwatch();
+@@ -609,6 +611,14 @@ internal static class SpecializingTierMetrics
+             speculativeNumericCandidates = compiler.SpeculativeNumericCandidates,
+             speculativeNumericLocalsEmitted = compiler.SpeculativeNumericLocalsEmitted,
+ 
++            // Item 3-9: of those, the ones an ENCLOSING scope has already PROVED numeric, so no
++            // run-time test is needed and the local becomes an ordinary raw double. Bounded above
++            // by speculativeNumericCandidates by construction — a reading above it is a defect in
++            // the counter, not a discovery — and the gap between the two is what only a run-time
++            // guard could ever reach.
++            importedOuterNumericCandidates = compiler.ImportedOuterNumericCandidates,
++            importedOuterNumericOffers = compiler.ImportedOuterNumericOffers,
++
+             // The ceiling on all of phase 3: a raw double can only ever remove a box, so
+             // boxesAllocated x 24 B is every byte the whole family could take.
+             boxingRequests = boxing.Requests,
+-- 
+2.43.0
+
