@@ -1,0 +1,747 @@
+From 56b413c58c5fd6e9729d59dca1ba6f92def1da54 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 5 Aug 2026 19:38:52 +0000
+Subject: [PATCH] Compile a nested body from a kept enclosing scope, and check
+ it reproduces
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Item 1-1 names one obstacle — the capture layout — and 0104 settled it: derived
+from source alone it never misses across 5 157 sites. What is left is the part
+the item does not name. A deferred body must be compiled against the enclosing
+compiler's state, and that state is twenty-eight fields deep, on the least
+exercised path in the engine, where every one of them is a silent miscompile if
+wrong. Reproducing it is not a thing to attempt; keeping it is.
+
+FastFunctionScope makes keeping it cheap, and this is the fact the design rests
+on: it is not pooled, its Dispose only pops the stack, so a reference to it
+retains the whole Parent chain intact after the CreateFunction frame that built
+it has returned. LinkedStack.Switch already re-enters an arbitrary scope. So a
+retained context is a reference plus the five FastCompiler fields that are not
+reachable from the scope — strictness, ScriptInfo, member-initializer state,
+parameter-initializer depth — restored on entry and put back in a finally.
+
+CreateFunction is split into a wrapper that decides retention and a Core the
+wrapper and the deferred path both call. The wrapper refuses every one of the
+fourteen context-carrying parameters rather than trying to save them, and
+refuses a body inside a `with`. Refusing is the correct default here: an
+unretained function is compiled eagerly, exactly as before.
+
+**Nothing is deferred yet, deliberately.** The eager path still compiles every
+body; BROILER_JS_DEFER_TREE decides only whether a context is kept, and the
+mechanism compiles the body a SECOND time and compares. That comparison is the
+whole point of building it in this order — it is only possible while both trees
+exist, and once the eager one stops being produced there is nothing to check the
+deferred one against. Nine fixtures cover capture, three-level transitive
+capture, per-iteration `let` cells, shadowing, both self-name shapes, strictness
+under 'use strict', and that re-entry leaves the compiler state it found.
+
+On the corpus, 4 811 of 5 723 retained functions (84.1%) reproduce
+character-for-character after canonicalising four families of compiler-generated
+numbering — site indices and three gensym prefixes, which are counters over a
+compilation and so differ by construction on a second pass. Mandreel 100.0%,
+PdfJS 99.9%, Box2D 99.5%, jQuery 97.0%, Closure 96.6%, Typescript 49.6%. Each
+canonicalisation added moved the number (45.5% → 48.9% → 83.2% → 84.1%) without
+once exposing a structural difference, which is evidence about the residual but
+not proof; settling it needs a structural comparison rather than a textual one.
+---
+ .../DeferredBodyReentryTests.cs               | 209 +++++++++++
+ .../FastCompiler.CreateFunction.cs            |  58 +++
+ .../Declarations/FastCompiler.DeferredBody.cs | 341 ++++++++++++++++++
+ .../DeferPopulationMetrics.cs                 |  13 +
+ 4 files changed, 621 insertions(+)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredBodyReentryTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.DeferredBody.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredBodyReentryTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredBodyReentryTests.cs
+new file mode 100644
+index 00000000..8df1e91b
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredBodyReentryTests.cs
+@@ -0,0 +1,209 @@
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// Item 1-1's remaining half: compiling a nested function's body AFTER the enclosing compilation
++// has finished, against the enclosing scope kept alive rather than snapshotted
++// (docs/performance-roadmap.md item 1-1).
++//
++// The item names its obstacle as the capture layout, and 0104 settled that: derived from source
++// alone it never misses. What is left is the part the item does not name — a deferred body must be
++// compiled against twenty-eight pieces of enclosing compiler state, each a silent miscompile if
++// wrong, on the least-exercised path in the engine. The design is to keep the enclosing scope
++// rather than reproduce it, which FastFunctionScope makes cheap: it is not pooled, so a reference
++// retains the whole Parent chain, and LinkedStack.Switch already re-enters it.
++//
++// **These fixtures test the re-entry and nothing else.** Retention is on, the body is still
++// compiled eagerly, and the question is whether compiling it a SECOND time — later, from the
++// retained context — produces the same tree. That comparison is only possible while both exist,
++// which is exactly why it is made before anything is deferred: once the eager tree stops being
++// produced there is nothing to check the re-entered one against.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public sealed class DeferredBodyReentryTests
++{
++    private static (int Total, int Reproduced, string FirstDifference) Reenter(string source)
++    {
++        var previous = DeferredTreeCompilation.Retaining;
++        DeferredTreeCompilation.Retaining = true;
++        using var context = new JSContext();
++        DeferredTreeCompilation.Reset();
++        try
++        {
++            context.Eval(source);
++            return DeferredTreeCompilation.Recompile();
++        }
++        finally
++        {
++            DeferredTreeCompilation.Retaining = previous;
++            DeferredTreeCompilation.Reset();
++        }
++    }
++
++    private static void AssertReproduced(string source, int atLeast = 1)
++    {
++        var (total, reproduced, difference) = Reenter(source);
++        Assert.True(total >= atLeast, $"expected at least {atLeast} retained context(s), got {total}");
++        Assert.True(
++            total == reproduced,
++            $"{total - reproduced} of {total} did not reproduce.\n{difference}");
++    }
++
++    [Fact]
++    public void TheSwitchIsOffByDefault()
++        => Assert.False(DeferredTreeCompilation.Retaining);
++
++    [Fact]
++    public void ARetainedScopeIsStillValidAfterTheEnclosingCompilationFinished()
++    {
++        // The whole design in one fixture: `inner`'s body is compiled a second time, from a scope
++        // whose CreateFunction frame returned long ago. FastFunctionScope is not pooled, so the
++        // object and its Parent chain are still there — this is what says so rather than assuming.
++        AssertReproduced("""
++            function outer() {
++              var q = 1;
++              var inner = function () { return q; };
++              return inner();
++            }
++            outer();
++            """);
++    }
++
++    [Fact]
++    public void ACaptureThreeLevelsDownReproduces()
++    {
++        AssertReproduced("""
++            function outer() {
++              var q = 1;
++              return (function () {
++                return (function () {
++                  return (function () { return q; })();
++                })();
++              })();
++            }
++            outer();
++            """);
++    }
++
++    [Fact]
++    public void APerIterationLoopCellReproduces()
++    {
++        // The shape that makes the most cells, and where a re-entry that resolved names against
++        // the wrong scope instance would bind every closure to the same one.
++        AssertReproduced("""
++            var fs = [];
++            for (let i = 0; i < 3; i++) { fs.push(function () { return i; }); }
++            fs[0]() + fs[1]() + fs[2]();
++            """);
++    }
++
++    [Fact]
++    public void AShadowedNameReproduces()
++    {
++        AssertReproduced("""
++            function outer() {
++              var q = 1;
++              var inner = function (q) { return q; };
++              return inner(2);
++            }
++            outer();
++            """);
++    }
++
++    [Fact]
++    public void StrictnessIsRestoredRatherThanInherited()
++    {
++        // Strictness is one of the five FastCompiler fields the context saves, and the one whose
++        // loss is observable rather than structural: 4-2a records that a fresh compile of a
++        // function written under 'use strict' turns `undeclaredGlobal = t` from a ReferenceError
++        // into a silent global. Re-entry happens with the compiler in whatever mode the caller
++        // left it, so the saved value has to win.
++        AssertReproduced("""
++            'use strict';
++            function outer() {
++              var q = 1;
++              var inner = function () { return q; };
++              return inner();
++            }
++            outer();
++            """);
++    }
++
++    [Fact]
++    public void ARecursiveDeclarationAndANamedExpressionBothReproduce()
++    {
++        // The two self-name shapes 0104 had to fix in the layout. They resolve their own name
++        // through different bindings, so a re-entry that mixed the two up would show here.
++        AssertReproduced("""
++            function outer() {
++              function fact(n) { return n < 2 ? 1 : n * fact(n - 1); }
++              var g = function h(n) { return n < 1 ? 0 : h(n - 1); };
++              return fact(4) + g(3);
++            }
++            outer();
++            """);
++    }
++
++    [Fact]
++    public void ReEntryLeavesTheCompilerStateItFound()
++    {
++        // A deferred compile happens in the middle of somebody else's work. If the scope stack or
++        // the strictness flag were left moved, the NEXT compilation would be wrong — and it would
++        // be wrong in a way no fixture about the deferred function itself could see. Two programs
++        // in one context, with a re-entry between them, is what makes that observable.
++        var previous = DeferredTreeCompilation.Retaining;
++        DeferredTreeCompilation.Retaining = true;
++        using var context = new JSContext();
++        DeferredTreeCompilation.Reset();
++        try
++        {
++            context.Eval("function a() { var q = 1; return (function () { return q; })(); } a();");
++            var (total, reproduced, _) = DeferredTreeCompilation.Recompile();
++            Assert.True(total >= 1);
++            Assert.Equal(total, reproduced);
++
++            // The compilation that has nothing to do with the re-entry.
++            Assert.Equal("7", context.Eval("function b(x) { return x + 4; } String(b(3));").ToString());
++        }
++        finally
++        {
++            DeferredTreeCompilation.Retaining = previous;
++            DeferredTreeCompilation.Reset();
++        }
++    }
++
++    [Fact]
++    public void RetentionChangesNoAnswer()
++    {
++        // Retention is meant to be inert: the body is still compiled eagerly and the switch only
++        // decides whether a context is kept. Asserted rather than assumed, because "it only holds
++        // a reference" is the kind of claim that stops being true the first time someone makes the
++        // held thing do something.
++        const string source = """
++            function outer() {
++              var q = 1;
++              var inner = function () { return q; };
++              var tierable = function (n) { var s = 0; for (var i = 0; i < n; i++) { s = s + i; } return s; };
++              return inner() + tierable(10);
++            }
++            String(outer());
++            """;
++
++        static string Run(bool retaining)
++        {
++            var previous = DeferredTreeCompilation.Retaining;
++            DeferredTreeCompilation.Retaining = retaining;
++            try
++            {
++                using var context = new JSContext();
++                return context.Eval(source).ToString();
++            }
++            finally
++            {
++                DeferredTreeCompilation.Retaining = previous;
++                DeferredTreeCompilation.Reset();
++            }
++        }
++
++        Assert.Equal(Run(false), Run(true));
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+index ed0abae4..2bca07e0 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+@@ -17,11 +17,69 @@ partial class FastCompiler
+ {
+     private int parameterInitializerDepth;
+ 
++    /// <summary>
++    /// Item 1-1's remaining half: retains the enclosing scope for each function compiled, so its
++    /// body can be re-compiled after this compilation has finished.
++    /// </summary>
++    /// <remarks>
++    /// A wrapper rather than an edit inside <see cref="CreateFunctionCore"/>, which has several
++    /// return points — the retention has to see the value each of them produced, and threading a
++    /// capture through all of them is how one gets missed. Off by default; with the switch off
++    /// this is one boolean test per compiled function.
++    /// </remarks>
+     private BExpression CreateFunction(AstFunctionExpression functionDeclaration, BExpression super = null, bool createClass = false, string className = null,
+         IFastEnumerable<AstClassProperty> memberInits = null, bool forceStrictMode = false, bool hoistStatementDeclaration = true, string inferredFunctionName = null,
+         bool createPrototype = true, string[] directEvalPrivateNames = null, IReadOnlyDictionary<AstClassProperty, BExpression> computedMemberNames = null,
+         bool thisIsUninitialized = false, BExpression superConstructor = null, IReadOnlyList<PrivateInstanceElement> privateInstanceElements = null,
+         IReadOnlyDictionary<AstClassProperty, BExpression> autoAccessorBackingKeys = null)
++    {
++        if (!DeferredTreeCompilation.Retaining)
++        {
++            return CreateFunctionCore(functionDeclaration, super, createClass, className, memberInits, forceStrictMode,
++                hoistStatementDeclaration, inferredFunctionName, createPrototype, directEvalPrivateNames,
++                computedMemberNames, thisIsUninitialized, superConstructor, privateInstanceElements,
++                autoAccessorBackingKeys);
++        }
++
++        // Taken BEFORE the core runs, because the core pushes this function's own scope and the
++        // context has to name the scope the body was written in, not the one it creates.
++        var enclosing = scope.Top;
++        var eager = CreateFunctionCore(functionDeclaration, super, createClass, className, memberInits, forceStrictMode,
++            hoistStatementDeclaration, inferredFunctionName, createPrototype, directEvalPrivateNames,
++            computedMemberNames, thisIsUninitialized, superConstructor, privateInstanceElements,
++            autoAccessorBackingKeys);
++
++        // Only the plain shape is retained. Everything else — a class member, a derived
++        // constructor, a direct-eval compilation, a body with private names or computed member
++        // keys — carries context through CreateFunction's own parameters, which a re-entry from a
++        // scope alone cannot reproduce. Refusing them is the honest half of "keep the scope
++        // alive": the scope is what is kept, so only what the scope determines may be replayed.
++        if (super == null
++            && !createClass
++            && className == null
++            && memberInits == null
++            && !forceStrictMode
++            && hoistStatementDeclaration
++            && inferredFunctionName == null
++            && createPrototype
++            && directEvalPrivateNames == null
++            && computedMemberNames == null
++            && !thisIsUninitialized
++            && superConstructor == null
++            && privateInstanceElements == null
++            && autoAccessorBackingKeys == null)
++        {
++            RetainDeferredBody(functionDeclaration, enclosing, eager);
++        }
++
++        return eager;
++    }
++
++    private BExpression CreateFunctionCore(AstFunctionExpression functionDeclaration, BExpression super = null, bool createClass = false, string className = null,
++        IFastEnumerable<AstClassProperty> memberInits = null, bool forceStrictMode = false, bool hoistStatementDeclaration = true, string inferredFunctionName = null,
++        bool createPrototype = true, string[] directEvalPrivateNames = null, IReadOnlyDictionary<AstClassProperty, BExpression> computedMemberNames = null,
++        bool thisIsUninitialized = false, BExpression superConstructor = null, IReadOnlyList<PrivateInstanceElement> privateInstanceElements = null,
++        IReadOnlyDictionary<AstClassProperty, BExpression> autoAccessorBackingKeys = null)
+     {
+         var node = functionDeclaration;
+         var functionLength = GetExpectedArgumentCount(functionDeclaration.Params);
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.DeferredBody.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.DeferredBody.cs
+new file mode 100644
+index 00000000..0a2aac5e
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.DeferredBody.cs
+@@ -0,0 +1,341 @@
++using System;
++using System.Collections.Generic;
++using Broiler.JavaScript.Ast.Expressions;
++using Broiler.JavaScript.ExpressionCompiler.Expressions;
++
++namespace Broiler.JavaScript.Compiler;
++
++partial class FastCompiler
++{
++    /// <summary>
++    /// A nested function's body, and everything needed to compile it <em>later</em> — item 1-1's
++    /// remaining half (docs/performance-roadmap.md).
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// <b>The enclosing scope is kept alive rather than snapshotted, and that is the whole design.</b>
++    /// A deferred body must be compiled against the scope it was written in, and reproducing that
++    /// scope means reproducing <em>twenty-eight</em> separate pieces of compiler state — fourteen
++    /// <c>CreateFunction</c> parameters, nine reads of the enclosing <see cref="FastFunctionScope"/>
++    /// and five <see cref="FastCompiler"/> fields. A snapshot has to enumerate all of them and stays
++    /// correct only until someone adds a twenty-ninth; every omission is a silent miscompile on the
++    /// least-exercised path in the engine.
++    /// </para>
++    /// <para>
++    /// <b>Keeping it alive costs nothing, which is what makes the choice easy.</b>
++    /// <see cref="FastFunctionScope"/> is not pooled — <c>Dispose</c> is
++    /// <see cref="ExpressionCompiler.Core.LinkedStackItem{T}"/>'s, which only pops the stack — so a
++    /// scope object outlives its frame already and holding a reference to it retains the entire
++    /// <c>Parent</c> chain, valid and unrecycled. Re-entry is then
++    /// <see cref="ExpressionCompiler.Core.LinkedStack{T}.Switch"/>, which the stack already has.
++    /// </para>
++    /// <para>
++    /// <b>What is still saved and restored is the compiler's own instance state</b>, because that
++    /// genuinely does move on: strictness, the script-info parameter, the member-initializer flag
++    /// and the parameter-initializer depth. They are restored around the re-entry rather than
++    /// reconstructed, so the body sees what it would have seen.
++    /// </para>
++    /// <para>
++    /// A <c>with</c> boundary is refused rather than restored. <c>withBoundaries</c> is a mutable
++    /// stack whose contents at the deferred body's own position cannot be recovered from its depth,
++    /// and a body inside one resolves names dynamically anyway — the same reason
++    /// <see cref="FreeNameScan"/> reports such a body undeferrable.
++    /// </para>
++    /// </remarks>
++    internal sealed class DeferredBodyContext
++    {
++        private readonly FastCompiler compiler;
++        private readonly FastFunctionScope enclosing;
++        private readonly AstFunctionExpression function;
++
++        private readonly bool strictMode;
++        private readonly BParameterExpression savedScriptInfo;
++        private readonly bool savedInMemberInitializer;
++        private readonly int savedParameterInitializerDepth;
++
++        internal DeferredBodyContext(
++            FastCompiler compiler,
++            FastFunctionScope enclosing,
++            AstFunctionExpression function)
++        {
++            this.compiler = compiler;
++            this.enclosing = enclosing;
++            this.function = function;
++
++            strictMode = compiler.IsStrictMode;
++            savedScriptInfo = compiler.scriptInfo;
++            savedInMemberInitializer = compiler.inMemberInitializer;
++            savedParameterInitializerDepth = compiler.parameterInitializerDepth;
++        }
++
++        /// <summary>The function whose body this would build.</summary>
++        internal AstFunctionExpression Function => function;
++
++        /// <summary>
++        /// Compiles the body now, against the retained enclosing scope, exactly as the eager path
++        /// would have.
++        /// </summary>
++        /// <remarks>
++        /// Every piece of state this touches is restored afterwards, including on the throwing
++        /// path — a deferred compile happens in the middle of somebody else's work, and leaving
++        /// the scope stack moved would corrupt a compilation that has nothing to do with this one.
++        /// </remarks>
++        internal BExpression Compile()
++        {
++            var previousTop = compiler.scope.Switch(enclosing);
++            var previousStrict = compiler.IsStrictMode;
++            var previousScriptInfo = compiler.scriptInfo;
++            var previousInMemberInitializer = compiler.inMemberInitializer;
++            var previousDepth = compiler.parameterInitializerDepth;
++
++            compiler.IsStrictMode = strictMode;
++            compiler.scriptInfo = savedScriptInfo;
++            compiler.inMemberInitializer = savedInMemberInitializer;
++            compiler.parameterInitializerDepth = savedParameterInitializerDepth;
++
++            try
++            {
++                // The CORE, not the wrapper: re-entering through the wrapper would retain a
++                // fresh context for the same function on every replay, without bound.
++                return compiler.CreateFunctionCore(function);
++            }
++            finally
++            {
++                compiler.parameterInitializerDepth = previousDepth;
++                compiler.inMemberInitializer = previousInMemberInitializer;
++                compiler.scriptInfo = previousScriptInfo;
++                compiler.IsStrictMode = previousStrict;
++                compiler.scope.Switch(previousTop);
++            }
++        }
++    }
++
++    /// <summary>
++    /// Records a retained context per nested function while
++    /// <see cref="DeferredTreeCompilation.Retaining"/> is on, so re-entry can be checked against
++    /// the eager result before anything is built on it.
++    /// </summary>
++    private void RetainDeferredBody(AstFunctionExpression function, FastFunctionScope enclosing, BExpression eager)
++    {
++        // A `with` boundary is refused rather than restored — see the type's remarks.
++        if (withBoundaries.Count != 0)
++            return;
++
++        DeferredTreeCompilation.Retain(
++            new DeferredBodyContext(this, enclosing, function),
++            eager);
++    }
++}
++
++/// <summary>
++/// Item 1-1's remaining half: the switch that retains enclosing scopes so a nested body can be
++/// compiled after the enclosing compilation has finished, and the record of what was retained.
++/// </summary>
++/// <remarks>
++/// <para>
++/// <b>Off by default, and retention alone changes no output.</b> With it on, the compiler keeps a
++/// <see cref="FastCompiler.DeferredBodyContext"/> per nested function and compiles the body eagerly
++/// as before; nothing is deferred yet. That is deliberate — the re-entry is the load-bearing and
++/// riskiest half of the mechanism, and it can be proven against the eager result while both exist,
++/// which is impossible once one of them stops being produced.
++/// </para>
++/// <para>
++/// The contexts are held in a list rather than handed to a caller because the thing under test is
++/// whether re-entry reproduces the eager tree <em>for every function in a program</em>, not for one
++/// chosen by the test.
++/// </para>
++/// </remarks>
++public static class DeferredTreeCompilation
++{
++    public const string EnvironmentVariable = "BROILER_JS_DEFER_TREE";
++
++    private static int retaining = string.Equals(
++        Environment.GetEnvironmentVariable(EnvironmentVariable),
++        "1",
++        StringComparison.Ordinal)
++        ? 1
++        : 0;
++
++    /// <summary>Whether the compiler retains an enclosing scope per nested function.</summary>
++    public static bool Retaining
++    {
++        get => System.Threading.Volatile.Read(ref retaining) != 0;
++        set => System.Threading.Volatile.Write(ref retaining, value ? 1 : 0);
++    }
++
++    private static readonly List<(object Context, string Eager)> retained = [];
++
++    internal static void Retain(FastCompiler.DeferredBodyContext context, BExpression eager)
++    {
++        lock (retained)
++            retained.Add((context, Print(eager)));
++    }
++
++    /// <summary>Retained contexts since the last <see cref="Reset"/>.</summary>
++    public static int RetainedCount
++    {
++        get { lock (retained) return retained.Count; }
++    }
++
++    /// <summary>
++    /// Re-enters every retained context and reports how many reproduced the eager tree exactly.
++    /// </summary>
++    /// <remarks>
++    /// The comparison is the <em>printed</em> tree, which is the strongest equality available here:
++    /// two runs of the same compilation produce structurally distinct objects, so reference or
++    /// value equality would report a difference that is not one, while the printer is what the
++    /// expression compiler itself uses to describe a tree.
++    /// </remarks>
++    public static (int Total, int Reproduced, string FirstDifference) Recompile()
++    {
++        (object Context, string Eager)[] snapshot;
++        lock (retained)
++            snapshot = retained.ToArray();
++
++        var reproduced = 0;
++        string firstDifference = null;
++        foreach (var (context, eager) in snapshot)
++        {
++            string actual;
++            try
++            {
++                actual = Print(((FastCompiler.DeferredBodyContext)context).Compile());
++            }
++            catch (Exception e)
++            {
++                actual = e.GetType().Name + ": " + e.Message;
++            }
++
++            if (string.Equals(actual, eager, StringComparison.Ordinal))
++            {
++                reproduced++;
++                continue;
++            }
++
++            firstDifference ??= FirstDifferingLine(eager, actual);
++        }
++
++        return (snapshot.Length, reproduced, firstDifference);
++    }
++
++    public static void Reset()
++    {
++        lock (retained)
++            retained.Clear();
++    }
++
++    private static string Print(BExpression expression)
++    {
++        if (expression == null)
++            return "<null>";
++
++        using var writer = new System.IO.StringWriter();
++        using var indented = new System.CodeDom.Compiler.IndentedTextWriter(writer);
++        expression.Print(indented);
++        indented.Flush();
++        return Canonicalise(writer.ToString());
++    }
++
++    /// <summary>
++    /// Renames compiler-generated temporaries to their order of first appearance, so two
++    /// compilations of the same source compare equal.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// <b>Alpha-equivalence is the strongest equality that CAN hold here, and finding that out is
++    /// the first thing the re-entry measured.</b> A second compilation necessarily draws fresh
++    /// names from the compiler's monotonic counter, so the eager tree says <c>Context3</c>,
++    /// <c>StackItem3</c>, <c>a-3</c>, <c>LABEL_3</c> and the re-entered one says <c>…4</c>
++    /// throughout — identical trees, different gensyms. Comparing the raw text reports every
++    /// function as a difference and says nothing.
++    /// </para>
++    /// <para>
++    /// The four families share one counter, so mapping the NUMBER is enough and is deliberately
++    /// done by first appearance rather than by value: that way a re-entry which produced the same
++    /// structure with the numbers in a different ORDER would still be caught, which a
++    /// "strip all digits" normalisation would hide.
++    /// </para>
++    /// </remarks>
++    private static string Canonicalise(string printed)
++    {
++        // Item 4-2b's inline-cache site range, which a second compilation necessarily re-allocates.
++        //
++        // **Named as an exception rather than normalised away with the gensyms, because it is the
++        // one difference that would MATTER if it arose in the real mechanism.** The range comes
++        // from PropertyInlineCacheSite.NextReadSite, a process-wide monotonic counter that 4-2b
++        // uses to address item 4-1's feedback; compiling the same function twice takes two ranges
++        // — here [0,0) eagerly and [1,1) on re-entry. A genuine deferral compiles the body ONCE,
++        // so the divergence cannot occur; it is an artifact of comparing an eager tree against a
++        // re-entered one, which is a thing only this check ever does.
++        // The SAME artifact as the tiering range above, and the one the corpus is made of: every
++        // property access carries its own site index, drawn from the same process-wide counter, so
++        // a second compilation of a body with fifty property accesses differs in fifty places and
++        // in nothing else. Canonicalised by first appearance rather than erased, so a re-entry
++        // that emitted the sites in a different ORDER — which would be a real defect — still
++        // shows. The -1 sentinel maps like any other value and stays distinguishable from a site.
++        printed = System.Text.RegularExpressions.Regex.Replace(
++            printed,
++            @"(?<=PropertyInlineCacheSite\.(?:Get|Set)\()-?\d+",
++            Ordinal("#site"));
++
++        printed = System.Text.RegularExpressions.Regex.Replace(
++            printed,
++            @"EnableTiering\(([^()]*), \d+, \d+\)",
++            "EnableTiering($1, #site, #site)");
++
++        return System.Text.RegularExpressions.Regex.Replace(
++            printed,
++            @"(?<=(?:Context|StackItem|LABEL_|a-|#Temp[A-Za-z]*|#function|#tieredFunction|IElementEnumerator_))\d+",
++            Ordinal("#"));
++    }
++
++    /// <summary>
++    /// The first line on which the two trees differ, with a little context.
++    /// </summary>
++    /// <remarks>
++    /// Two truncated blobs are what this used to report, and on a 13 000-character tree the
++    /// truncation lands nowhere near the difference — so the diagnostic said only that there was
++    /// one. A line pair names the construct.
++    /// </remarks>
++    private static string FirstDifferingLine(string eager, string actual)
++    {
++        var a = eager.Split('\n');
++        var b = actual.Split('\n');
++        for (var i = 0; i < Math.Max(a.Length, b.Length); i++)
++        {
++            var left = i < a.Length ? a[i].Trim() : "<end>";
++            var right = i < b.Length ? b[i].Trim() : "<end>";
++            if (!string.Equals(left, right, StringComparison.Ordinal))
++                return $"line {i}:\n  eager: {Cap(left)}\n  re-entered: {Cap(right)}";
++        }
++
++        return $"identical line by line; lengths {eager.Length} vs {actual.Length}";
++    }
++
++    /// <summary>
++    /// A replacer that maps each distinct matched value to its order of FIRST APPEARANCE.
++    /// </summary>
++    /// <remarks>
++    /// First appearance rather than value, so a re-entry that produced the same structure with the
++    /// numbers in a different order is still reported as a difference — which erasing the digits,
++    /// or hashing them, would hide. Each call gets its own table, so the two sides are canonicalised
++    /// independently and equal output means equal structure.
++    /// </remarks>
++    private static System.Text.RegularExpressions.MatchEvaluator Ordinal(string prefix)
++    {
++        var seen = new Dictionary<string, string>(StringComparer.Ordinal);
++        return match =>
++        {
++            if (!seen.TryGetValue(match.Value, out var canonical))
++            {
++                canonical = prefix + seen.Count;
++                seen[match.Value] = canonical;
++            }
++
++            return canonical;
++        };
++    }
++
++    private static string Cap(string value)
++        => value.Length <= 220 ? value : value[..220] + " …";
++}
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
+index ac7ce283..64a79284 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
+@@ -93,6 +93,9 @@ internal static class DeferPopulationMetrics
+         // Item 1-1's remaining half: check the source-derived capture layout against the one the
+         // rewrite derives from the tree, on the same corpora and in the same run.
+         ExpressionCompiler.DeferredCaptureLayout.Checking = true;
++        // Item 1-1's remaining half, the mechanism: retain an enclosing scope per function and
++        // re-compile every body from it afterwards, checking each against the eager tree.
++        Compiler.DeferredTreeCompilation.Retaining = true;
+ 
+         foreach (var corpus in corpora)
+         {
+@@ -105,6 +108,7 @@ internal static class DeferPopulationMetrics
+             ClosureRewriteDiagnostics.Reset();
+             Compiler.CompilerSpecializationDiagnostics.Reset();
+             ExpressionCompiler.DeferredCaptureLayout.Reset();
++            Compiler.DeferredTreeCompilation.Reset();
+ 
+             string failure = null;
+             try
+@@ -128,6 +132,7 @@ internal static class DeferPopulationMetrics
+             var relaysSkipped = ClosureRewriteDiagnostics.SkippedRelays;
+             var capturesInRepeat = ClosureRewriteDiagnostics.CapturesCreatedInRepeatWalk;
+ 
++            var reentry = Compiler.DeferredTreeCompilation.Recompile();
+             var specialization = Compiler.CompilerSpecializationDiagnostics.Snapshot();
+             var captureFree = specialization.DeferralRefusals[(int)Compiler.DeferralRefusal.CaptureFree];
+             var dynamicSites = specialization.DeferralRefusals[(int)Compiler.DeferralRefusal.Dynamic];
+@@ -202,6 +207,13 @@ internal static class DeferPopulationMetrics
+                 layoutRepeatDisagreements = ExpressionCompiler.DeferredCaptureLayout.RepeatDisagreements,
+                 layoutMissedSamples = ExpressionCompiler.DeferredCaptureLayout.MissedNameSamples,
+ 
++                // Re-entry: bodies compiled a SECOND time from the retained enclosing scope,
++                // after this corpus's compilation finished, compared against the eager tree up to
++                // alpha-renaming of compiler-generated temporaries.
++                reentryTotal = reentry.Total,
++                reentryReproduced = reentry.Reproduced,
++                reentryFirstDifference = reentry.FirstDifference,
++
+                 evaluationFailure = failure,
+             });
+ 
+@@ -222,6 +234,7 @@ internal static class DeferPopulationMetrics
+ 
+         Compiler.DeferrableFunctions.Counting = false;
+         ExpressionCompiler.DeferredCaptureLayout.Checking = false;
++        Compiler.DeferredTreeCompilation.Retaining = false;
+ 
+         Console.WriteLine(JsonSerializer.Serialize(
+             new
+-- 
+2.43.0
+
