@@ -80,7 +80,10 @@ so only the parent can hold the combined view.
   counter that prices them, and the measurement that closes the item as a 1.2% regression — and
   **[`0095`](../patches/0095-js-imported-outer-numeric-population.patch)** — item 3-9's population,
   counted at **zero** by an instrument proven to discriminate first, closing that item for one
-  instrument and no mechanism. `0090` and `0091` are tests only. Usual terms: the push to the
+  instrument and no mechanism — and
+  **[`0096`](../patches/0096-js-async-job-scheduling.patch)**, which is a **correctness** fix rather
+  than a performance one: a promise job could run JavaScript beside the JavaScript that queued it,
+  and the gates for `0095` are what found it. `0090` and `0091` are tests only. Usual terms: the push to the
   submodule remote returned 403, so the pointer is deliberately unbumped and every figure in their
   sections was measured on a local build of `cca39b4d` plus those patches. They are independent of
   everything cleared above, **`0087` → `0088` → `0089` → `0090` → `0091` → `0092` → `0093` is the
@@ -1096,6 +1099,17 @@ These were paid for once each. They apply to every phase below.
   same shape as item 3-6's 290 names being *inferred* from offered-minus-dropped rather than
   counted. *A population and a traffic figure that live in the same suite still need multiplying,
   and the multiplication is an A/B, not an argument.*
+- **A test that fails only under load is a race, and the race is more likely in the engine than in
+  the test.** `SuspendingNestedFunctionsCaptureThroughTheSameBox` had passed every full-suite run in
+  this phase; a saturated container made it fail three times in four, and what it was reporting was
+  the engine running **user JavaScript on two threads in one context at once**. Both dispatch paths
+  for a promise job were wrong — the thread pool when no `SynchronizationContext` was present, and
+  `SynchronizationContext.Current` when one was, because a test host's context is not a JavaScript
+  thread — and *each covered for the other's absence*, which is why a fix for one of them measured
+  clean on a console harness and still failed the suite. **A rate measured on a loaded machine and
+  re-measured on a quiet one is not an A/B**; what settled it was a fixture built to lose the race
+  deterministically. *When a flake is timing-dependent, make the timing lopsided on purpose before
+  believing any fix for it.*
 - **A precondition count can close an item for the price of an instrument, and it is the cheapest
   outcome available.** Item 3-9's specification said to count first; the count came back **0 names
   and 0 offers on all seven suites**, so a mechanism that was sound, guard-free and genuinely
@@ -6180,7 +6194,8 @@ section — it is off by default (`BROILER_JS_OUTER_NUMERIC_COUNT=1`) and costs 
 runtime, core, parser, modules, storage and CLR. The counter is off by default and changes no
 emission on any setting, which is what makes this a measurement rather than a change.
 
-**One pre-existing flake was found on the way, and it is recorded here rather than fixed.**
+**One pre-existing flake was found on the way. It is a real engine race, and it is now fixed —
+see the section that follows.**
 `CapturedNumericLocalTests.SuspendingNestedFunctionsCaptureThroughTheSameBox` fails
 intermittently **under CPU load** — three of four runs while the test262 matrix was saturating the
 container at load average ~14 on four cores, and not at all on an idle one. The failure is always
@@ -6198,8 +6213,80 @@ returns. **`"2,12"` says the continuation resumed early**, which is a real sched
 rather than a slow test — there is no timeout or drain in the fixture to be racing. **It reproduces
 on the unmodified baseline**: the same four runs with this item's changes stashed fail three times,
 so it is neither 3-9's nor 3-8a's. It is noted here because it is load-dependent and therefore
-invisible on a quiet machine, which is how it has survived every full-suite run in this phase so
-far; it wants an item of its own against the async resumption path, not a fix folded into a counter.
+invisible on a quiet machine, which is how it survived every full-suite run in this phase until a
+saturated container made it visible.
+
+
+#### The async resumption race — found by the gates, and it was two threads running JavaScript at once: **`0096`**
+
+The flake above is not a slow test. `await 0` queues a job, so the statements after `f()` belong to
+the job already running and `v = v + 10` cannot have happened when they read `v`. **`"2,12"` says
+the continuation ran anyway** — and it ran on a different thread.
+
+**Both dispatch paths were wrong, for opposite reasons, and each covered the other's absence.**
+
+| Ambient `SynchronizationContext` | What the engine did | Why it is wrong |
+|---|---|---|
+| none — every plain `Eval` | `ThreadPool.QueueUserWorkItem` | runs the job on a pool thread |
+| present — every xUnit test | `SynchronizationContext.Current.Post` | xUnit's `AsyncTestSyncContext` dispatches through the pool too |
+
+A job resumes a generator, and resuming runs user JavaScript, so **the engine let two threads
+execute JavaScript in one context simultaneously.** ECMAScript's agent is single-threaded by
+construction and this engine is written throughout on that assumption, so a wrong arithmetic answer
+was the visible corner of an unsynchronized heap. *The reason it read as a rare flake rather than as
+corruption is that the racing job only incremented a number.*
+
+**The second row is the one that matters for how this was nearly missed.** The first fix addressed
+only the thread-pool fallback, and the console harness agreed — **18 of 3 000 wrong before, 0 of
+3 000 after.** Then the new fixtures failed anyway, because a test host is never the no-context
+case: xUnit installs `AsyncTestSyncContext` on every test thread, so the suite had always been
+taking the *other* branch. **The rate had also been measured on a loaded machine and re-measured on
+a quiet one**, which on its own would have been enough to believe a fix that fixed the wrong half.
+What settled it was a deterministic fixture, not a rate.
+
+**The rule now lives in one place** (`JSContext.PostJob`), and the order of its cases is the whole
+of it:
+
+1. **We are on the engine's own pump** (`AsyncPump`, marked `IJSJobPump`) — post there.
+2. **The pump this work belongs to**, captured when the promise or the `await` was created.
+3. **This context's queue**, while it is executing JavaScript — the new case, and the fix.
+4. **A host context**, with nothing executing.
+5. **The thread pool**, with neither.
+
+**Case 2 is not defensive and dropping it deadlocks `Execute`**, which is how the first attempt at
+this rule failed: a promise created on the pump thread can be settled from a pool thread, where
+`SynchronizationContext.Current` is null and case 1 cannot see the pump. Without case 2 the job took
+the queue, the task `AsyncPump.Run` was blocking on never completed, and the pump spun forever
+waiting for work that had gone somewhere else. `Issue814ForAwaitUsingTests.ForAwaitWithAwaitUsingHead`
+hung for twelve minutes at load average 0.10 before `--blame-hang` named it. *Only a pump is
+trusted, whether current or captured: an arbitrary captured context is no more the JavaScript thread
+than an arbitrary current one.*
+
+**The queue cannot strand a job, and that is a property of when it is taken rather than of a
+fallback.** It accepts only while a JavaScript execution is in progress — exactly when there is
+something for the job to race — so anything posted with nothing running keeps its old dispatch. That
+is what lets a host `Task`-backed promise settle long after `EvalWithTopLevelAwaitAsync` returned.
+The depth stays at one for the whole drain, so a job that queues another job takes the queue too, and
+the return to zero is made under the same lock as the final dequeue, which is the only window in
+which an enqueue could be lost. A nested `Eval` — a host callback evaluating more source while
+JavaScript is on the stack — does not drain, or a job would run in the middle of another job and
+reintroduce the interleaving on one thread.
+
+**What is fixed and what is not.** The race is gone whenever JavaScript is executing when the job is
+posted, which is every in-script `await` and every reaction queued by a running script. A job posted
+while *nothing* is executing still takes the host context or the pool, and could in principle land
+during a later execution. Closing that too means the embedding contract has to name a JavaScript
+thread the engine can serialize against, which is a change to the API rather than to a dispatch
+site, and it is not attempted here.
+
+**Gates.** The eight new fixtures are written to **lose the race deterministically** — a spin after
+the call, so a racing thread reliably wins — which is the difference between them and the test that
+found this: that one asserts the same value and caught the bug **0.6% of the time**. Measured
+against the unmodified pin they fail **5 of 8**; with the fix, 8 of 8. The whole engine suite is
+green, and the two job-ordering test262 manifests — `test262-promise-jobs` and `test262-for-await`,
+whose `ticks-with-*` cases assert exact microtask tick counts and are the sharpest check available
+on this change — pass **5/5 and 2/2**. The five pinned manifests were re-run against it as well;
+their counts are recorded in §3.4.
 
 ---
 
