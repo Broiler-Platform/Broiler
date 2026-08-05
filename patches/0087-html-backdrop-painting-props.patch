@@ -1,0 +1,67 @@
+From f88df593f6a798f731728db4d8de346dd9c6ec75 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 5 Aug 2026 09:54:22 +0000
+Subject: [PATCH] Carry author ::backdrop painting properties onto the native
+ backdrop box
+
+A native ::backdrop box was built from the bridge-resolved background plus the
+author's geometry declarations, so every other painted property in the
+::backdrop cascade was dropped. An author `opacity: 0.5` on a green scrim
+therefore filled the viewport with opaque rgb(0,128,0) instead of compositing
+to rgb(127,191,127) over the white canvas.
+
+Overlay opacity/mix-blend-mode/border-radius/box-shadow alongside the existing
+geometry overlay. Kept deliberately narrow, and in step with the bridge's
+BackdropPaintingProps, which does the same for the synthesized <div> the
+NativeBackdrop-off path builds.
+
+Fixes the WPT reftest
+html/semantics/interactive-elements/the-dialog-element/modal-dialog-backdrop-opacity
+(2.2% -> 99.5% pixel match against the Chromium reference).
+---
+ .../Parse/DomParser.cs                           | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+index 0b2b5ff..5b2866c 100644
+--- a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
++++ b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+@@ -483,6 +483,15 @@ internal sealed class DomParser
+     private static readonly string[] BackdropGeometryProps =
+         { "width", "height", "top", "left", "right", "bottom", "position" };
+ 
++    // Author ::backdrop declarations that change how the scrim composites rather than where it
++    // sits. Without these the box painted with the resolved background and nothing else, so an
++    // author `opacity: 0.5` on a green scrim filled the viewport with opaque green instead of
++    // compositing over the canvas (WPT the-dialog-element/modal-dialog-backdrop-opacity). Kept
++    // in step with the bridge's BackdropPaintingProps, which does the same for the synthesized
++    // <div> the NativeBackdrop-off path builds.
++    private static readonly string[] BackdropPaintingProps =
++        { "opacity", "mix-blend-mode", "border-radius", "box-shadow" };
++
+     /// <summary>
+     /// CSS Position 4 §top-layer / HTML §dialog: generates a native <c>::backdrop</c> box for each
+     /// element the bridge marked with a resolved backdrop background
+@@ -536,14 +545,17 @@ internal sealed class DomParser
+         CssUtils.SetPropertyValue(backdrop, "bottom", "0");
+         CssUtils.SetPropertyValue(backdrop, "background-color", bg);
+ 
+-        // Overlay author ::backdrop geometry (an explicitly sized/positioned backdrop); the
+-        // background stays the bridge-resolved value.
++        // Overlay author ::backdrop geometry (an explicitly sized/positioned backdrop) and the
++        // painting properties that composite it; the background stays the bridge-resolved value.
+         if (engine != null && dialogBox.SourceElement != null)
+         {
+             var decls = engine.GetCascadedStyle(dialogBox.SourceElement, "::backdrop");
+             foreach (var prop in BackdropGeometryProps)
+                 if (decls.TryGetValue(prop, out var val) && !string.IsNullOrWhiteSpace(val))
+                     CssUtils.SetPropertyValue(backdrop, prop, val.Trim());
++            foreach (var prop in BackdropPaintingProps)
++                if (decls.TryGetValue(prop, out var val) && !string.IsNullOrWhiteSpace(val))
++                    CssUtils.SetPropertyValue(backdrop, prop, val.Trim());
+         }
+ 
+         backdrop.TopLayerOrder = order;
+-- 
+2.43.0
+

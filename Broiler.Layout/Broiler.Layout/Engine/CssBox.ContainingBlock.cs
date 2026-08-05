@@ -61,6 +61,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     private CssBox FindPositionedContainingBlock()
     {
+        // CSS Position 4 §top-layer: a top-layer box (open modal <dialog>, open popover, or a
+        // ::backdrop) is laid out as though it were a child of the viewport, so its containing
+        // block is the initial containing block no matter what its DOM ancestors do — an
+        // ancestor's position/transform/containment never captures it. Without this an
+        // absolutely-positioned ::backdrop inside a zero-sized `overflow: clip` parent resolved
+        // `inset: 0` against that parent and landed at its origin instead of covering the
+        // viewport (WPT the-dialog-element/top-layer-parent-overflow-clip).
+        if (IsTopLayerBox)
+            return TopLayerContainingBlock();
+
         var box = ParentBox;
         while (box != null)
         {
@@ -99,6 +109,34 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     }
 
     private bool IsInitialContainingBlock(CssBox cb) => cb.ParentBox == null && LayoutEnvironment != null;
+
+    // The bridge marks a top-layer element with its top-layer order; a renderer-generated
+    // top-layer box (a native ::backdrop, which has no element to carry the attribute) carries
+    // the order in the box field instead. Mirrors FragmentTreeBuilder.GetTopLayerOrder, which
+    // reads the same two sources when projecting the order onto the fragment.
+    private const string TopLayerOrderAttr = "data-broiler-top-layer";
+
+    internal bool IsTopLayerBox =>
+        TopLayerOrder is not null || !string.IsNullOrEmpty(GetAttribute(TopLayerOrderAttr));
+
+    /// <summary>
+    /// The initial containing block a top-layer box resolves against: the nearest nested
+    /// browsing context's sub-viewport (<see cref="IsNestedViewportRoot"/>) when the box lives
+    /// inside an <c>&lt;iframe&gt;</c> — a frame has its own top layer — otherwise the root box,
+    /// which <see cref="GetAbsoluteContainingBlockPaddingBox"/> reads as the viewport rectangle.
+    /// </summary>
+    private CssBox TopLayerContainingBlock()
+    {
+        var root = this;
+        for (var box = ParentBox; box != null; box = box.ParentBox)
+        {
+            root = box;
+            if (box.IsNestedViewportRoot)
+                return box;
+        }
+
+        return root;
+    }
 
     /// <summary>
     /// Whether this box establishes a containing block for absolutely-positioned
