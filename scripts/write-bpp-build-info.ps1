@@ -167,28 +167,44 @@ if ($isAndroid) {
 }
 else {
     $exeSuffix = if ($Platform -eq 'windows') { '.exe' } else { '' }
-    $bossLauncher = if ($Platform -eq 'windows') { 'BOSS\Start-BOSS.cmd' } else { './BOSS/run-boss.sh' }
-    $bossServer = if ($Platform -eq 'windows') { 'BOSS\Broiler.Office.Server.exe' } else { './BOSS/Broiler.Office.Server' }
+    $bossLauncher = if ($Platform -eq 'windows') { 'Start-BOSS.cmd' } else { './run-boss.sh' }
+    $bossServer = if ($Platform -eq 'windows') { 'Broiler.Office.Server.exe' } else { './Broiler.Office.Server' }
 
     $lines += @(
         'Contents'
         '--------'
         ''
-        ('  {0,-24}{1}' -f "Broiler.Browser$exeSuffix", 'The Broiler web browser.')
-        ('  {0,-24}{1}' -f "Broiler.Writer$exeSuffix", 'The Broiler word processor (desktop).')
-        ('  {0,-24}{1}' -f 'BOSS/', 'Broiler Office Standalone Server — serves the Broiler Writer')
-        ('  {0,-24}{1}' -f '', 'web app (WebAssembly) over HTTP from its own Kestrel host.')
+        '  All three applications sit side by side in this folder and share the runtime files'
+        '  around them; there is nothing to install and no subfolder to descend into.'
+        ''
+        ('  {0,-30}{1}' -f "Broiler.Browser$exeSuffix", 'The Broiler web browser.')
+        ('  {0,-30}{1}' -f "Broiler.Writer$exeSuffix", 'The Broiler word processor (desktop).')
+        ('  {0,-30}{1}' -f "Broiler.Office.Server$exeSuffix", 'BOSS — the Broiler Office Standalone Server. Serves')
+        ('  {0,-30}{1}' -f '', 'the Broiler Writer web app (WebAssembly) over HTTP from')
+        ('  {0,-30}{1}' -f '', 'its own Kestrel host, out of the wwwroot/ beside it.')
+        ''
+        ('  {0,-30}{1}' -f 'wwwroot/', "The Writer's WebAssembly bundle, served by BOSS.")
+        ('  {0,-30}{1}' -f 'service/', 'Unit files and installers to run BOSS as a service.')
+        ('  {0,-30}{1}' -f 'appsettings.json', 'BOSS configuration.')
+        ('  {0,-30}{1}' -f 'README.md', 'Full BOSS documentation.')
         ''
         'Starting the Office server (BOSS)'
         '---------------------------------'
         ''
-        "  $bossLauncher                        listens on http://0.0.0.0:5555"
+        "  $bossLauncher                              listens on http://0.0.0.0:5555"
         "  $bossServer --urls http://0.0.0.0:5555"
         ''
         '  Then open http://localhost:5555/ — health probe at /healthz, server details at /api/info.'
         ''
         '  To run it as a system service (systemd, SysV init, or a Windows service), see'
-        '  BOSS/service/. Full documentation: BOSS/README.md.'
+        '  service/. Full documentation: README.md.'
+        ''
+        'Ahead-of-time compilation'
+        '-------------------------'
+        ''
+        '  The application assemblies here are ReadyToRun (R2R) — precompiled to native code for'
+        '  this architecture, so an application starts without JITting its startup path. The IL is'
+        '  still present, so the JIT can re-optimize hot code at run time as usual.'
     )
 
     if ($Variant -eq 'framework-dependent') {

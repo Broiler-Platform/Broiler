@@ -5,15 +5,16 @@ files, install scripts, launchers and the end-user documentation.
 
 Nothing here is compiled. The `Prepare Broiler Preview Package` workflow
 ([`.github/workflows/broiler-preview-package.yml`](../../.github/workflows/broiler-preview-package.yml))
-publishes `Broiler.Office.Server` into `BOSS/` inside each package and copies this tree in around it,
-so the layout below *is* the layout a user extracts.
+publishes `Broiler.Office.Server` into the **package root** — the same flat folder as
+`Broiler.Browser` and `Broiler.Writer`, whose runtime files it shares — and copies this tree in
+around it, so the layout below *is* the layout a user extracts.
 
 ```
 packaging/
-├── common/README.md                       → BOSS/README.md            (both platforms)
+├── common/README.md                       → <package>/README.md       (both platforms)
 ├── linux/
-│   ├── run-boss.sh                        → BOSS/run-boss.sh
-│   └── service/                           → BOSS/service/
+│   ├── run-boss.sh                        → <package>/run-boss.sh
+│   └── service/                           → <package>/service/
 │       ├── README.md                        Linux service guide
 │       ├── install-service.sh               systemd or SysV, auto-detected
 │       ├── uninstall-service.sh
@@ -23,8 +24,8 @@ packaging/
 │       ├── sysv/broiler-office-server.default
 │       └── reverse-proxy/{nginx,apache}-broiler-office-server.conf
 └── windows/
-    ├── Start-BOSS.cmd                     → BOSS/Start-BOSS.cmd
-    └── service/                           → BOSS/service/
+    ├── Start-BOSS.cmd                     → <package>/Start-BOSS.cmd
+    └── service/                           → <package>/service/
         ├── README.md                        Windows service guide
         ├── Install-BossService.ps1
         └── Uninstall-BossService.ps1
@@ -50,25 +51,35 @@ only — so a user never has to work out which half of a folder applies to them.
   systemd unit can be `Type=notify` and the Windows service needs no wrapper. It also anchors the
   content root at the executable's directory, so a service manager's working directory cannot hide
   `wwwroot/`.
+* **The installers copy the package root wholesale.** Since the server's assemblies are commingled
+  with the desktop applications', there is no subset to pick out: `install-service.sh` and
+  `Install-BossService.ps1` copy the whole extracted package into the install prefix, and
+  `Broiler.Browser` / `Broiler.Writer` land there inert. That is deliberate — a selective copy would
+  have to track the server's dependency closure by hand and would break the first time it changed.
 * Shell scripts are POSIX `sh` (they run on busybox and on RHEL without bash-isms); PowerShell
   scripts stay compatible with Windows PowerShell 5.1, which is what a bare Windows Server has.
 
 ## Testing a change
 
-Publish the server and assemble a package by hand:
+Publish the server and assemble a package by hand — into a bare directory here, without the desktop
+applications the real package also carries:
 
 ```bash
 dotnet publish Broiler.Office.Server/Broiler.Office.Server.csproj -c Release-Linux \
-    -r linux-x64 --self-contained true -o /tmp/BOSS
-cp -a Broiler.Office.Server/packaging/common/README.md /tmp/BOSS/
-cp -a Broiler.Office.Server/packaging/linux/run-boss.sh /tmp/BOSS/
-cp -a Broiler.Office.Server/packaging/linux/service /tmp/BOSS/
-/tmp/BOSS/run-boss.sh --urls http://127.0.0.1:5555 &
+    -r linux-x64 --self-contained true -p:PublishReadyToRun=true -o /tmp/bpp
+./scripts/package-boss.ps1 -PackageDirectory /tmp/bpp -Platform linux
+/tmp/bpp/run-boss.sh --urls http://127.0.0.1:5555 &
 curl -fsS http://127.0.0.1:5555/healthz
 ```
 
-The workflow does exactly this and then smoke-tests `/healthz`, `/api/info` and `/` on both
-platforms, so a broken package fails the run rather than reaching a release.
+`package-boss.ps1` is the same script the workflow calls, so it copies exactly what ships and fails
+on the same missing assets. The workflow then smoke-tests `/healthz`, `/api/info` and `/` on both
+platforms ([`scripts/smoke-test-boss.ps1`](../../scripts/smoke-test-boss.ps1)), so a broken package
+fails the run rather than reaching a release.
+
+`-p:PublishReadyToRun=true` matches what the workflow publishes; drop it for a quicker local
+iteration. When it *is* set, restore has to know too (the crossgen2 compiler comes in as a NuGet
+package), which the command above handles by not passing `--no-restore`.
 
 For the server itself — the vendored-publish hosting model, endpoints, how to add another Office
 app — see [`../README.md`](../README.md).

@@ -43,6 +43,10 @@ plus its configuration file, and starts the service. **Re-running it upgrades in
 payload is refreshed (`wwwroot/` replaced wholesale) and an existing configuration file is kept, with
 the new version written beside it as `*.new`.
 
+The payload is the whole extracted package directory, because the server shares its runtime files
+with `Broiler.Browser` and `Broiler.Writer` in the same folder. Those two are copied into `--prefix`
+along with it and sit there inert — the service only ever runs `Broiler.Office.Server`.
+
 Check it:
 
 ```bash

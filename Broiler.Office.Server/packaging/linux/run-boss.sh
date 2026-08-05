@@ -20,7 +20,7 @@ BOSS_URLS=${BOSS_URLS:-http://0.0.0.0:5555}
     if [ -f "$BOSS_EXEC" ]; then
         chmod +x "$BOSS_EXEC"
     else
-        echo "run-boss.sh: $BOSS_EXEC not found — run this from the extracted BOSS directory." >&2
+        echo "run-boss.sh: $BOSS_EXEC not found — run this from the extracted package directory." >&2
         exit 1
     fi
 }

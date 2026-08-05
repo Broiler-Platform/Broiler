@@ -17,7 +17,7 @@ if not defined ASPNETCORE_ENVIRONMENT set "ASPNETCORE_ENVIRONMENT=Production"
 set "DOTNET_NOLOGO=1"
 
 if not exist "%BOSS_EXEC%" (
-    echo Start-BOSS.cmd: %BOSS_EXEC% not found - run this from the extracted BOSS folder. 1>&2
+    echo Start-BOSS.cmd: %BOSS_EXEC% not found - run this from the extracted package folder. 1>&2
     exit /b 1
 )
 if not exist "%BOSS_DIR%wwwroot" (

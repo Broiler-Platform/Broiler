@@ -3,10 +3,15 @@
     Installs BOSS — the Broiler Office Standalone Server — as a Windows service.
 
 .DESCRIPTION
-    Copies the extracted BOSS folder to -InstallPath, registers a Windows service that starts it
+    Copies the extracted package folder to -InstallPath, registers a Windows service that starts it
     with the requested listening addresses, and starts the service. The server links
     Microsoft.Extensions.Hosting.WindowsServices, so it answers the service control protocol
     directly — no wrapper (NSSM, srvany) is needed.
+
+    The payload is the whole extracted package: the server shares its runtime files with
+    Broiler.Browser.exe and Broiler.Writer.exe, which sit in the same folder, so those two are
+    copied to -InstallPath as well. They are inert there — nothing starts them, and the service only
+    ever runs Broiler.Office.Server.exe.
 
     Re-running upgrades the payload in place: the service is stopped, the files are refreshed and
     the service is started again.
@@ -64,7 +69,7 @@ function Assert-Elevated {
 
 Assert-Elevated
 
-$payloadDir = Split-Path -Parent $PSScriptRoot          # …\BOSS  (this script lives in …\BOSS\service)
+$payloadDir = Split-Path -Parent $PSScriptRoot          # the package root (this script lives in …\service)
 $sourceExe = Join-Path $payloadDir 'Broiler.Office.Server.exe'
 
 if (-not (Test-Path -LiteralPath $sourceExe)) {
