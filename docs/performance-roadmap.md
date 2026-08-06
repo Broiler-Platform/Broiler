@@ -84,7 +84,17 @@ so only the parent can hold the combined view.
   why it happened**: `patches/` is one flat namespace across every submodule, so two branches
   numbering from the same high-water mark collide whenever both are open, which is the ordinary case
   rather than an unlucky one.
-  **Twelve patches are pending again, and five of them are one item.**
+  **All twelve have since landed, and the handoff has now cleared a fifth time.** `Broiler.JS`'s
+  pointer is **`8308df51`**, bumped in `Update submodules`, and the twelve patch files and
+  `patches/README.md` were deleted with it — so `patches/` no longer exists in the tree. **Verified
+  the way this campaign verifies a pointer rather than inferred from it**: each patch's `Subject`
+  resolves to a commit in `14fa4f10..8308df51` (twelve, in order), the old pin is an ancestor of the
+  new one, and the landed tree was diffed against the chain re-applied to a clean checkout of the
+  pin — **identical across the whole submodule** once carriage returns are set aside, with the
+  landed files retaining their CRLF. *So every figure below now describes the pinned pointer
+  directly, rather than a local build plus a patch series applied in order.* The links in this
+  paragraph are kept for the record and no longer resolve.
+  **What the twelve were, and five of them are one item.**
   **[`patches/0102`](../patches/0102-js-deferral-population.patch)** — item 1-1's remaining half,
   its population counted at **728 capture-free sites of 5 762, 12.6%**, and the shortcut that looked
   available refused by the counter built to test it.
@@ -285,14 +295,41 @@ six further bumps, most recently to **`cca39b4d`**; the patch files are cleared 
 [`patches/README.md`](../patches/README.md)'s index is **empty for the first time since it was
 written**. What phase 2 measured and what CI now clones are the same tree — which is the condition
 both remaining gates were waiting on, and it is why the conformance one could be run at all. **The
-handoff has now cleared four times running**, so a 403 has come to mean *deferred* rather than
+handoff has now cleared FIVE times running** — the fifth took `0102`–`0113` to **`8308df51`**, and
+with it `patches/README.md` itself, whose durable content is preserved in §0 above because it
+existed to carry the method across handoffs rather than to describe any one of them —, so a 403 has come to mean *deferred* rather than
 *stranded*; what makes that safe is that the pointer is never bumped locally, so nothing here can
 name a commit CI cannot clone. The fourth clearing took **all three open stacks at once** — the
 thirteen `Broiler.JS` patches plus the `Broiler.HTML` and `Broiler.CSS` pair — and left `patches/`
-empty for the second time since it was written. **Twelve patches are open again** (`0102`–`0113`: item 1-1's remaining
-half in four of them — its capture-free population, its capture layout, a body compiled from a kept
-enclosing scope, and that check's residual settled — plus the widened census corpus, item 4-2's
-arithmetic half priced and refused, item 4-5 unblocked, attributed, counted and its named fix refused, and two instrument defects closed), on the usual 403 terms.
+empty for the second time since it was written. **`patches/README.md` was deleted with the patch files, and it carried three things that are not
+about any one patch.** They are recorded here because the next 403 will need them and the file that
+held them is gone:
+
+- **`--keep-cr` is not optional.** Several `Broiler.JS` sources are mixed CRLF and LF *within one
+  file*. `git am` runs a patch through `mailinfo`, which normalises the diff body's line endings
+  unless told not to — so the context lines stop matching and the apply fails with *"patch does not
+  apply"* on a patch that is perfectly good. `git apply` does not have the problem, which is exactly
+  why it is not the check: the instructions use `am`, so `am` is what a patch has to survive. *This
+  verification hit it from the other side*: recovering the patch files through `git show` filtered
+  their CRs out, so the re-applied chain came back pure-LF against a landed tree that had correctly
+  kept CRLF — the diff was 1 328 insertions against 1 328 deletions and vanished under
+  `--ignore-cr-at-eol`.
+- **`patches/` is one flat namespace across every submodule**, so two branches numbering from the
+  same high-water mark collide whenever both are open — the ordinary case, not an unlucky one.
+  Number from `git ls-files patches/` at the moment of writing, and re-verify the chain after any
+  rename. The `0087`–`0099` series was written and shifted `+2` for exactly this.
+- **A pointer is verified patch by patch against the submodule's log, never inferred from the
+  prose.** Each patch's `Subject` must resolve to a commit, that commit's tree must reconcile with
+  the patch file, and the pointer each was pending against must be an ancestor of the new pin. Doing
+  that is what makes *"a 403 means deferred rather than stranded"* a fact rather than a hope, and it
+  has now held five times.
+
+**And it has now cleared a fifth time.** The twelve (`0102`–`0113`: item 1-1's remaining half in
+five of them — its capture-free population, its capture layout, a body compiled from a kept
+enclosing scope, that check's residual, and the layout question re-asked as an index — plus the
+widened census corpus, item 4-2's arithmetic half refused, item 4-5 unblocked, attributed, counted
+and its named fix refused, two instrument defects closed, and item 3-1's read/write ratio) are
+applied and the pointer is **`8308df51`**.
 
 **Two pre-existing defects found in passing**, both reproducing on a pristine build at the
 pinned pointer, neither owned by this campaign: a refused write to a function's `prototype`
