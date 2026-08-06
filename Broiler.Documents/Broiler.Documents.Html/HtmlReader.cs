@@ -285,6 +285,25 @@ internal static class HtmlReader
                 if (HtmlCss.TryParseColor(value.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(), out BColor background))
                     return style with { Background = background };
                 break;
+            case "text-transform":
+                if (value.Equals("uppercase", StringComparison.OrdinalIgnoreCase))
+                    return style with { Capitalization = TextCapitalization.AllCaps };
+                if (value.Equals("none", StringComparison.OrdinalIgnoreCase) &&
+                    style.Capitalization == TextCapitalization.AllCaps)
+                {
+                    return style with { Capitalization = TextCapitalization.None };
+                }
+                break;
+            case "font-variant":
+            case "font-variant-caps":
+                if (value.Equals("small-caps", StringComparison.OrdinalIgnoreCase))
+                    return style with { Capitalization = TextCapitalization.SmallCaps };
+                if (value.Equals("normal", StringComparison.OrdinalIgnoreCase) &&
+                    style.Capitalization == TextCapitalization.SmallCaps)
+                {
+                    return style with { Capitalization = TextCapitalization.None };
+                }
+                break;
             case "font-family":
                 return style with { FontFamily = HtmlCss.ParseFontFamily(value) };
             case "font-size":

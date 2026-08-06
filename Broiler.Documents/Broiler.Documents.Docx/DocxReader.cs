@@ -522,6 +522,12 @@ internal static class DocxReader
         style = ApplyOnOff(rPr, "strike", style, static (s, v) => s with { Strikethrough = v });
         style = ApplyOnOff(rPr, "dstrike", style, static (s, v) => s with { Strikethrough = v });
 
+        // w:smallCaps first: when a run turns both on, Word draws all caps. An
+        // explicit "off" clears only the kind it names, so a run can drop the
+        // small caps its style applied without disturbing anything else.
+        style = ApplyCapitalization(rPr, "smallCaps", TextCapitalization.SmallCaps, style);
+        style = ApplyCapitalization(rPr, "caps", TextCapitalization.AllCaps, style);
+
         XElement? underline = rPr.Element(DocxNamespaces.Wordprocessing + "u");
         if (underline is not null)
         {
@@ -605,6 +611,25 @@ internal static class DocxReader
         return uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
             uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
             uri.Scheme.Equals(Uri.UriSchemeMailto, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static InlineStyle ApplyCapitalization(
+        XElement rPr,
+        string localName,
+        TextCapitalization kind,
+        InlineStyle style)
+    {
+        XElement? element = rPr.Element(DocxNamespaces.Wordprocessing + localName);
+        if (element is null)
+            return style;
+
+        if (ReadOnOff(element))
+            return style with { Capitalization = kind };
+
+        // Turning one kind off leaves the other alone.
+        return style.Capitalization == kind
+            ? style with { Capitalization = TextCapitalization.None }
+            : style;
     }
 
     private static InlineStyle ApplyOnOff(

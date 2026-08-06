@@ -18,6 +18,11 @@ Open XML WordprocessingML package parts.
   letterhead templates hold their entire text.
 - Direct inline formatting: bold, italic, underline, strikethrough, font
   family, font size, foreground color, and background shading.
+- Capitalization: `w:caps` and `w:smallCaps`, read and written as a style
+  attribute. The text keeps the casing the author typed and the capitals are
+  applied when drawing, so an open-and-save does not rewrite it. An explicit
+  `w:val="0"` clears only the kind it names; a run declaring both draws all caps,
+  as Word does.
 - Named styles from `word/styles.xml`, resolved per ECMA-376 §17.7.2: document
   defaults (`w:docDefaults`), then the `w:basedOn` chain from its root down to
   the style named by `w:pStyle` (paragraphs) or `w:rStyle` (runs), then direct
@@ -38,10 +43,10 @@ Open XML WordprocessingML package parts.
   footers, footnotes, table geometry, and section layout are skipped or
   approximated with diagnostics where applicable.
 - Style resolution covers the attributes `RichTextDocument` models. Style
-  features outside it — `w:caps`, character spacing/scaling, table styles,
-  numbering-level overrides, conditional table formatting — are ignored, as are
-  theme colors (`w:themeColor`); Word writes the computed RGB into `w:val`
-  alongside them, which is what the reader uses.
+  features outside it — character spacing/scaling, table styles, numbering-level
+  overrides, conditional table formatting — are ignored, as are theme colors
+  (`w:themeColor`); Word writes the computed RGB into `w:val` alongside them,
+  which is what the reader uses.
 - Table structure (grid, spans, borders, cell shading) is not represented; only
   the cell text survives flattening.
 - Block nesting deeper than `DocumentLimits.MaxGroupDepth` is abandoned with a

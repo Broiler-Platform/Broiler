@@ -22,6 +22,15 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- `Broiler.Documents.Model` — `InlineStyle.Capitalization` (`none`/`all caps`/
+  `small caps`), extending the ADR 0014 inline style set. Capitalization is a
+  display property: the text keeps the casing the author typed, so an
+  open-and-save no longer rewrites it. Round-trips as DOCX `w:caps`/
+  `w:smallCaps`, RTF `\caps`/`\scaps`, and CSS `text-transform`/`font-variant`.
+- `Broiler.UI.RichEdit` — draws capitalization, synthesizing small caps by
+  drawing letters typed in lower case as capitals at a reduced size, plus
+  `RichEditCommand.AllCaps`/`SmallCaps` and formatting-code tokens
+  `[All Caps ON]`, `[Small Caps ON]`, and `[Caps OFF]`.
 - `Broiler.Documents` — DOCX read diagnostics: `docx.read.summary`,
   `docx.document.empty`, `docx.table.flattened`, `docx.block.unsupported`,
   `docx.limit.depth`, `docx.part.headerfooter`, `docx.styles.missing`,

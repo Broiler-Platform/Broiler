@@ -28,6 +28,8 @@ public enum RichEditCommand
     Italic,
     Underline,
     Strikethrough,
+    AllCaps,
+    SmallCaps,
     SetForeground,
     SetBackground,
     SetFontFamily,

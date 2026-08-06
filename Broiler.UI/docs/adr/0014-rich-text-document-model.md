@@ -10,6 +10,15 @@
 > assembly (depends only on `Broiler.Graphics`). Opaque positions, copy-on-write
 > snapshots, transaction undo, and the style subset are all preserved.
 
+> **Update (2026-08-06).** The inline style table below gains one attribute:
+> **capitalization** (none / all caps / small caps). It is added because every
+> word-processing format the DOCX/RTF/HTML codecs read carries it as a *display*
+> property — `w:caps`, `\caps`, `text-transform` — over text stored in the
+> author's own casing. Without a model attribute the only way to honor it is to
+> rewrite the text at read time, which loses the author's casing on the next
+> save. The attribute is presentation-only and changes no other guarantee: it
+> does not affect positions, text indexing, or run normalization.
+
 ## Context
 
 RichEdit needs an editor state model independent of rendering (roadmap Phase 1)
@@ -51,6 +60,7 @@ explicit.
   | Italic | yes |
   | Underline | yes |
   | Strikethrough | yes |
+  | Capitalization (none/all caps/small caps) | yes (added 2026-08-06) |
   | Foreground color | yes |
   | Background color | yes |
   | Link metadata (href + display text) | yes |

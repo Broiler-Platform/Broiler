@@ -341,10 +341,20 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
             return;
 
         double x = CaretX(Selection.Focus);
-        BFontStyle font = RunFont(CaretInlineStyle);
-        double advance = BTextMeasurer.MeasureAdvance(_compositionText, font);
+        InlineStyle style = CaretInlineStyle;
+        BFontStyle font = RunFont(style);
+        double advance = MeasurePieces(_compositionText, style, font);
         BColor color = IsEnabled ? Foreground : PlaceholderForeground;
-        renderList.DrawText(new BTextRun(_compositionText, font, color), new BPoint(x, y));
+
+        // Preedit text is drawn with the capitalization it will take once
+        // committed, so the text does not jump when the IME finishes.
+        double pieceX = x;
+        foreach (ShapedPiece piece in ShapePieces(_compositionText, style, font))
+        {
+            renderList.DrawText(new BTextRun(piece.Text, piece.Font, color), new BPoint(pieceX, y));
+            pieceX += BTextMeasurer.MeasureAdvance(piece.Text, piece.Font);
+        }
+
         renderList.FillRect(new BRect(x, y + line.Height - 2, advance, 1), color); // composition underline
     }
 
@@ -369,11 +379,82 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
                 continue;
 
             string text = paragraph.Text.Substring(segStart, segEnd - segStart);
-            BFontStyle font = RunFont(run.Style);
-            double advance = BTextMeasurer.MeasureAdvance(text, font);
-            yield return new LineSegment(text, run.Style, font, x, advance);
-            x += advance;
+            foreach (ShapedPiece piece in ShapePieces(text, run.Style, RunFont(run.Style)))
+            {
+                double advance = BTextMeasurer.MeasureAdvance(piece.Text, piece.Font);
+                yield return new LineSegment(piece.Text, run.Style, piece.Font, x, advance);
+                x += advance;
+            }
         }
+    }
+
+    /// <summary>How much smaller a small-caps letter is drawn than a full capital.</summary>
+    private const double SmallCapsScale = 0.8;
+
+    /// <summary>A stretch of a run as it is drawn: the glyphs, and the font to draw them with.</summary>
+    private readonly record struct ShapedPiece(string Text, BFontStyle Font);
+
+    /// <summary>
+    /// The pieces a stored substring is drawn as. Capitalization is a display
+    /// property — the document keeps the casing the author typed, and this is the
+    /// only place it becomes capitals, so turning it off restores the original
+    /// text exactly. Small caps additionally splits the substring wherever the
+    /// stored case changes, so letters typed in lower case can be drawn smaller
+    /// than the ones typed as capitals.
+    /// </summary>
+    private static IEnumerable<ShapedPiece> ShapePieces(string text, InlineStyle style, BFontStyle font)
+    {
+        if (text.Length == 0)
+            yield break;
+
+        if (style.Capitalization == TextCapitalization.AllCaps)
+        {
+            yield return new ShapedPiece(text.ToUpperInvariant(), font);
+            yield break;
+        }
+
+        if (style.Capitalization != TextCapitalization.SmallCaps)
+        {
+            yield return new ShapedPiece(text, font);
+            yield break;
+        }
+
+        BFontStyle reduced = font with { SizeInPixels = Math.Max(1, font.SizeInPixels * SmallCapsScale) };
+        int start = 0;
+        bool small = char.IsLower(text[0]);
+        for (int i = 1; i <= text.Length; i++)
+        {
+            if (i < text.Length && char.IsLower(text[i]) == small)
+                continue;
+
+            string piece = text[start..i];
+            yield return small
+                ? new ShapedPiece(piece.ToUpperInvariant(), reduced)
+                : new ShapedPiece(piece, font);
+
+            if (i < text.Length)
+            {
+                start = i;
+                small = char.IsLower(text[i]);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The advance of a stored substring as drawn. Every measurement goes through
+    /// here so caret placement, selection rectangles, and wrapping agree with what
+    /// <see cref="DrawText"/> puts on screen.
+    /// </summary>
+    private static double MeasurePieces(string text, InlineStyle style, BFontStyle font)
+    {
+        if (style.Capitalization == TextCapitalization.None)
+            return BTextMeasurer.MeasureAdvance(text, font);
+
+        double advance = 0;
+        foreach (ShapedPiece piece in ShapePieces(text, style, font))
+            advance += BTextMeasurer.MeasureAdvance(piece.Text, piece.Font);
+
+        return advance;
     }
 
     private BFontStyle RunFont(InlineStyle style)
@@ -1065,7 +1146,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
                 continue;
 
             string text = paragraph.Text.Substring(segmentStart, segmentEnd - segmentStart);
-            advance += BTextMeasurer.MeasureAdvance(text, RunFont(run.Style));
+            advance += MeasurePieces(text, run.Style, RunFont(run.Style));
         }
 
         return advance;
@@ -1205,11 +1286,11 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
         if (index + 1 < text.Length && char.IsHighSurrogate(text[index]) && char.IsLowSurrogate(text[index + 1]))
         {
             step = 2;
-            return BTextMeasurer.MeasureAdvance(text.Substring(index, 2), font);
+            return MeasurePieces(text.Substring(index, 2), style, font);
         }
 
         step = 1;
-        return BTextMeasurer.MeasureAdvance(text[index].ToString(), font);
+        return MeasurePieces(text[index].ToString(), style, font);
     }
 
     private bool IsDoubleClick(BPoint point)
