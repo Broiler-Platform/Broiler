@@ -193,6 +193,15 @@ internal sealed class BrowserApp : IDisposable
         _session.Dispose();
     }
 
+    /// <summary>
+    /// Prepares fetched or script-produced HTML for the rendering surface: the shared
+    /// replaced-element passes, plus synthetic ids on checkbox and radio controls so
+    /// Broiler.UI controls can be hosted over them (their geometry is only reachable
+    /// by id). Applies to the renderer's copy only — scripts run on the original.
+    /// </summary>
+    private static string PrepareForBrowsing(string html) =>
+        HtmlPostProcessor.StampToggleControlIds(HtmlPostProcessor.ProcessForBrowsing(html));
+
     private static StandardButton CreateChromeButton(string text, string semanticName) =>
         new()
         {
@@ -359,7 +368,7 @@ internal sealed class BrowserApp : IDisposable
         var (normalisedUrl, content) = await pipeline.LoadPageAsync(url, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
-        string html = HtmlPostProcessor.ProcessForBrowsing(content.Html);
+        string html = PrepareForBrowsing(content.Html);
         InteractiveSession? session = null;
         try
         {
@@ -370,7 +379,7 @@ internal sealed class BrowserApp : IDisposable
             {
                 string initial = session.CurrentHtml();
                 if (!string.IsNullOrWhiteSpace(initial))
-                    html = HtmlPostProcessor.ProcessForBrowsing(initial);
+                    html = PrepareForBrowsing(initial);
 
                 if (!session.HasPendingWork)
                 {
@@ -867,6 +876,9 @@ internal sealed class BrowserApp : IDisposable
 
         private readonly Func<IBroilerRenderer?> _getRenderer;
         private readonly HtmlFormEditor _formEditor;
+        private readonly HtmlFormState _formState = new();
+        private readonly HtmlToggleControlHost _toggleHost;
+        private bool _togglesDirty = true;
         private HtmlContainer _container = CreateContentContainer(WelcomePage, string.Empty);
         private HtmlGraphicsRenderList? _renderList;
         private InteractiveSession? _interactiveSession;
@@ -891,6 +903,9 @@ internal sealed class BrowserApp : IDisposable
             _container.LinkClicked += OnLinkClicked;
             _formEditor = new HtmlFormEditor(this);
             _formEditor.Committed += (_, _) => MarkLayoutDirty();
+            _formEditor.SubmitRequested += (_, e) => SubmitHostedField(e.FieldId, e.FieldName);
+            _toggleHost = new HtmlToggleControlHost(this, _formState);
+            _toggleHost.Toggled += (_, _) => Invalidate(UiInvalidationKind.Render);
         }
 
         public event EventHandler<BrowserLinkEventArgs>? LinkActivated;
@@ -904,6 +919,9 @@ internal sealed class BrowserApp : IDisposable
             ArgumentNullException.ThrowIfNull(container);
             StopSession();
             _formEditor.Cancel();
+            _formState.Reset();
+            _toggleHost.Clear();
+            _togglesDirty = true;
             DisposeRenderList();
             _container.LinkClicked -= OnLinkClicked;
             _container.Dispose();
@@ -928,7 +946,7 @@ internal sealed class BrowserApp : IDisposable
                 _suppressNavigation = true;
                 try
                 {
-                    _container.SetHtmlWithStyleSet(HtmlPostProcessor.ProcessForBrowsing(html), baseUrl: BaseUrl);
+                    _container.SetHtmlWithStyleSet(PrepareForBrowsing(html), baseUrl: BaseUrl);
                 }
                 finally
                 {
@@ -1002,6 +1020,7 @@ internal sealed class BrowserApp : IDisposable
 
             // Hosted form controls paint over the page, in viewport coordinates,
             // so they are placed and drawn outside the document transform.
+            RebuildHostedTogglesIfNeeded();
             PlaceHostedControls(Bounds);
             base.RenderCore(context);
             context.RenderList.PopClip();
@@ -1014,8 +1033,25 @@ internal sealed class BrowserApp : IDisposable
         /// </summary>
         protected override void ArrangeCore(BRect finalRect) => PlaceHostedControls(finalRect);
 
-        private void PlaceHostedControls(BRect viewportBounds) =>
+        private void PlaceHostedControls(BRect viewportBounds)
+        {
             _formEditor.UpdateViewport(viewportBounds, _viewportZoom, _scrollY);
+            _toggleHost.UpdateViewport(_container, viewportBounds, _viewportZoom, _scrollY);
+        }
+
+        /// <summary>
+        /// Discovers the page's checkbox and radio controls once per page. The parse is
+        /// the expensive half, so it is deferred to the first render after the page
+        /// changed rather than repeated per layout.
+        /// </summary>
+        private void RebuildHostedTogglesIfNeeded()
+        {
+            if (!_togglesDirty)
+                return;
+
+            _togglesDirty = false;
+            _toggleHost.Rebuild(GetPageHtml());
+        }
 
         protected override bool OnInput(UiInputEvent input)
         {
@@ -1310,7 +1346,41 @@ internal sealed class BrowserApp : IDisposable
             if (_suppressNavigation)
                 return;
 
-            LinkActivated?.Invoke(this, new BrowserLinkEventArgs(e.Link, e.Attributes));
+            // The renderer resolves a submit control to its form's action and nothing
+            // more; serialize the form's fields so a GET form actually carries them.
+            string target = _formState.TryBuildSubmitTarget(GetPageHtml(), e.Attributes, e.Link) ?? e.Link;
+            LinkActivated?.Invoke(this, new BrowserLinkEventArgs(target, e.Attributes));
+        }
+
+        /// <summary>
+        /// The live document as the renderer serializes it — values the user has
+        /// committed are already in it. Empty when the page cannot be serialized,
+        /// which only costs the caller its fallback.
+        /// </summary>
+        private string GetPageHtml()
+        {
+            try
+            {
+                return _container.GetHtml();
+            }
+            catch (Exception)
+            {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Submits the form containing a hosted field, which is what pressing Enter in
+        /// a text control does.
+        /// </summary>
+        private void SubmitHostedField(string fieldId, string fieldName)
+        {
+            if (_suppressNavigation)
+                return;
+
+            string? target = _formState.TryBuildFieldSubmitTarget(GetPageHtml(), fieldId, fieldName, BaseUrl);
+            if (!string.IsNullOrEmpty(target))
+                LinkActivated?.Invoke(this, new BrowserLinkEventArgs(target, new Dictionary<string, string>()));
         }
 
         private void DisposeRenderList()

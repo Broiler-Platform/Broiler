@@ -292,16 +292,9 @@ public class HtmlFormEditorTests
     public void TypingThroughTheSessionEditsThePageField()
     {
         using HtmlContainer container = LayOut(SearchPage);
-        TestUiHost host = new();
-        UiSession session = new StandardUiSessionBuilder()
-            .WithDispatcher(new ImmediateUiDispatcher())
-            .Build(host);
-
-        StandardPanel root = new();
-        session.AddRoot(root);
-        root.Arrange(new BRect(0, 0, 600, 200));
-
-        HtmlFormEditor editor = new(root);
+        using TestUiSession ui = new();
+        UiSession session = ui.Session;
+        HtmlFormEditor editor = new(ui.Root);
         Assert.True(editor.TryBegin(container, PointInFirstInput(container)));
         editor.UpdateViewport(new BRect(0, 0, 600, 200), zoom: 1, scrollY: 0);
         session.SetFocus(editor.Editor);
@@ -314,24 +307,5 @@ public class HtmlFormEditorTests
 
         editor.Commit();
         Assert.Contains("value=\"broiler\"", container.GetHtml());
-
-        session.Dispose();
-    }
-
-    private sealed class TestUiHost : IUiHost
-    {
-        public BSize ViewportSize => new(600, 200);
-
-        public double Scale => 1;
-
-        public BRenderList CreateRenderList(int capacity = 0) => new(capacity);
-
-        public void Invalidate(UiInvalidation invalidation)
-        {
-        }
-
-        public void Present(BRenderList renderList)
-        {
-        }
     }
 }

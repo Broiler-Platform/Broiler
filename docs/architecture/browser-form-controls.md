@@ -61,27 +61,83 @@ control edited after load had *no* words, and both paint and HTML serialization
 rendered blank. `SetGeneratedTextContent` now re-splits. Covered by
 `Broiler.Layout.Tests/GeneratedTextContentTests.cs`.
 
+## Toggles: checkbox and radio
+
+The renderer sizes a checkbox and radio to 13×13 and draws a border. Nothing paints
+a check or a dot, nothing reflects `checked`, and nothing toggles — the control is an
+empty square whatever the page says.
+
+`HtmlToggleControlHost` hosts a `StandardCheckBox` / `StandardRadioButton` over each
+one. Unlike the text editor, which hosts a single control on demand at the point the
+user clicked, a toggle has to *show* its state whether or not it is being interacted
+with, so every one on the page is hosted up front.
+
+That needs per-control geometry, and the renderer's only public geometry query for an
+arbitrary element is `GetElementRectangle(id)`. So the browsing path stamps a
+synthetic `id` on any checkbox or radio that lacks one
+(`HtmlPostProcessor.StampToggleControlIds`), on the renderer's copy of the page only —
+scripts execute against the untouched document, an existing `id` is never replaced,
+and the WPT/Acid profile (`Process`) deliberately does not run the pass, since those
+harnesses compare rendered output and must see the page as authored.
+
+Toggling records into `HtmlFormState` rather than the document: the renderer has no
+API to write a `checked` attribute back. Radio exclusivity is enforced twice over —
+Broiler.UI's `UiRadioGroupScope` drives the visible state, and the host records the
+*whole* group on a change so an untouched sibling's markup `checked` cannot leak into
+a submission.
+
+Hosting is capped at 64 controls per page: each costs an id lookup (a box-tree walk)
+per layout, so a pathological page is bounded rather than made quadratic.
+
+## Form submission
+
+Clicking a submit control used to navigate to the enclosing `<form>`'s `action`
+verbatim (`HtmlContainerInt.HandleLinkClicked` → `FindFormAction`) — no field values,
+so a GET search form went to `/search` rather than `/search?q=…`.
+
+`HtmlFormSerializer` builds the HTML form data set from the page's DOM and encodes it
+as `application/x-www-form-urlencoded`; `HtmlFormState` drives it:
+
+- The document comes from `HtmlContainer.GetHtml()` — the *live* tree, so text the
+  user typed is already in it, and hidden inputs, `select` options and their
+  `selected` flags all survive serialization.
+- Checked state is layered over the markup from `HtmlFormState`, since nothing writes
+  it back into the document.
+- Successful controls follow the spec's rules: disabled and unnamed controls are
+  skipped, an unchecked checkbox or radio contributes nothing, `reset` and `file`
+  never submit, and only the *submitter* contributes its own name and value.
+- A `select` submits its selected option (all of them when `multiple`), falling back
+  to the first option for a single-select with nothing marked.
+- Pressing Enter in a hosted text field submits its form with no submitter.
+
+An ordinary `<a href>` inside a form is never treated as a submission — the renderer
+raises the same event for both.
+
+**`method="post"` is not carried.** The browser navigates by fetching a URL
+(`PageLoader.FetchAsync` is a GET), so there is nowhere to put a request body; a POST
+form falls back to navigating its action unchanged, exactly as before. Carrying it
+needs a request-bearing navigation path, which is a change to the loader rather than
+to form handling.
+
 ## What is wired, and what is not
 
-| Control | Renders | Typing / toggling |
+| Control | Renders | Interaction |
 | --- | --- | --- |
-| `input` text, search, email, url, tel, number, password | yes | **yes** — hosted `StandardEdit` |
-| `textarea` | yes | **yes**, once `patches/0113-html-textarea-editable-control.patch` lands (see below) |
-| `input` submit/button/reset, `button` | yes | click already activates them |
-| `input` checkbox, radio | box painted, **checked state is not** | no |
-| `select` | box painted, no popup | no |
+| `input` text, search, email, url, tel, number, password | yes | **typing** — hosted `StandardEdit` |
+| `textarea` | yes | **typing**, once `patches/0113-html-textarea-editable-control.patch` lands (see below) |
+| `input` checkbox, radio | box only | **toggling** — hosted `StandardCheckBox` / `StandardRadioButton` |
+| `input` submit/image, `button` | yes | click activates, and **submits the form's fields** |
+| `select` | box painted, no popup | not interactive; its markup selection *is* submitted |
 
-Two gaps worth naming, because they are the next things a user hits:
+Remaining gaps, in the order they will be felt:
 
-- **Form submission does not serialize field values.** Clicking a submit control
-  walks up to the enclosing `<form>` and navigates to its `action` verbatim
-  (`HtmlContainerInt.HandleLinkClicked` → `FindFormAction`). No query string is
-  built from the form's fields, so a GET search form navigates to `/search`
-  rather than `/search?q=…`. Typing works; submitting the typed text does not.
-- **Checkbox and radio have no checked state.** `CssDefaults` sizes them to
-  13×13 and draws a border; nothing paints a check or a dot, and nothing toggles.
-  These are the natural next controls to host — Broiler.UI already has
-  `StandardCheckBox` and `StandardRadioButton`.
+- **`select` has no popup.** The control paints as a box, and submission uses whatever
+  the markup marked `selected`. Hosting Broiler.UI's `StandardComboBox` is the same
+  shape of change as the toggles — it needs the option list from the parsed document
+  and the same id-based geometry.
+- **POST forms**, as above.
+- **`input type="file"`** is never a successful control here; it needs multipart
+  encoding and a request body.
 
 ## Why textarea ships as a patch
 

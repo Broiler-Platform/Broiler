@@ -70,12 +70,22 @@ internal sealed class HtmlFormEditor
             PaddingY = UaInputPaddingY,
             CornerRadius = 0,
         };
-        _edit.Submitted += (_, _) => Commit();
+        _edit.Submitted += (_, _) => Submit();
         _owner.AddChild(_edit);
     }
 
     /// <summary>Raised after <see cref="Commit"/> wrote a value back into the document.</summary>
     public event EventHandler? Committed;
+
+    /// <summary>
+    /// Raised when the user pressed Enter in the hosted control, after its value has
+    /// been committed. Carries the field's <c>id</c> and <c>name</c> so the host can
+    /// find and submit the enclosing form.
+    /// </summary>
+    public event EventHandler<HtmlFormFieldSubmitEventArgs>? SubmitRequested;
+
+    /// <summary>The <c>id</c> of the field being edited, empty when idle or unidentified.</summary>
+    public string FieldId { get; private set; } = string.Empty;
 
     /// <summary>The hosted Broiler.UI control; the session focuses this while a field is being edited.</summary>
     public StandardEdit Editor => _edit;
@@ -122,6 +132,7 @@ internal sealed class HtmlFormEditor
         // centre: it stays inside the control even after the value changes width.
         _anchor = new PointF(rect.X + (rect.Width / 2f), rect.Y + (rect.Height / 2f));
 
+        FieldId = field.Id;
         FieldName = field.Name;
         FieldType = field.Type;
         _edit.IsPassword = string.Equals(field.Type, "password", StringComparison.OrdinalIgnoreCase);
@@ -151,6 +162,22 @@ internal sealed class HtmlFormEditor
             Committed?.Invoke(this, EventArgs.Empty);
 
         return written;
+    }
+
+    /// <summary>
+    /// Commits the typed text and asks the host to submit the enclosing form —
+    /// what pressing Enter in a text control does.
+    /// </summary>
+    public void Submit()
+    {
+        if (!IsActive)
+            return;
+
+        // Commit resets the field identity, so capture it first.
+        string id = FieldId;
+        string name = FieldName;
+        Commit();
+        SubmitRequested?.Invoke(this, new HtmlFormFieldSubmitEventArgs(id, name));
     }
 
     /// <summary>Stops editing and discards the typed text.</summary>
@@ -199,10 +226,22 @@ internal sealed class HtmlFormEditor
         _container = null;
         _documentRect = RectangleF.Empty;
         _anchor = PointF.Empty;
+        FieldId = string.Empty;
         FieldName = string.Empty;
         FieldType = string.Empty;
         _edit.Text = string.Empty;
         _edit.IsPassword = false;
         _edit.Visibility = UiVisibility.Collapsed;
     }
+}
+
+/// <summary>
+/// Identifies the field a submission was requested from, so the host can locate the
+/// enclosing form in the page's document.
+/// </summary>
+internal sealed class HtmlFormFieldSubmitEventArgs(string fieldId, string fieldName) : EventArgs
+{
+    public string FieldId { get; } = fieldId ?? string.Empty;
+
+    public string FieldName { get; } = fieldName ?? string.Empty;
 }

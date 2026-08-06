@@ -133,6 +133,63 @@ internal static class HtmlPostProcessor
     internal static string ProcessForBrowsing(string html) => ApplyReplacedElementPasses(html);
 
     /// <summary>
+    /// Prefix of the synthetic ids <see cref="StampToggleControlIds"/> assigns. Lower
+    /// case because the renderer's id lookup folds case.
+    /// </summary>
+    internal const string SyntheticIdPrefix = "broiler-fc-";
+
+    /// <summary>
+    /// Matches a checkbox or radio <c>&lt;input&gt;</c>, in either attribute order.
+    /// </summary>
+    private static readonly Regex ToggleInputPattern = new(
+        @"<input\b(?<attrs>[^>]*\btype\s*=\s*[""']?(?:checkbox|radio)\b[^>]*)>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex IdAttributePattern = new(
+        @"\bid\s*=\s*[""']?[^\s""'>]+",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Gives every checkbox and radio without one a synthetic <c>id</c>.
+    /// </summary>
+    /// <remarks>
+    /// The renderer's only public geometry query for an arbitrary element is
+    /// <c>GetElementRectangle(id)</c>, so a control with no id cannot be located and
+    /// therefore cannot have a Broiler.UI control hosted over it. Stamping ids on the
+    /// renderer's copy of the page buys that geometry without a renderer change.
+    /// <para>
+    /// This runs on the copy handed to the rendering surface only — scripts execute
+    /// against the untouched document — and it never replaces an id the page already
+    /// has, so <c>#id</c> rules and <c>getElementById</c> are unaffected. It is
+    /// deliberately *not* part of <see cref="Process"/>: the WPT and Acid harnesses
+    /// compare rendered output and must see the page exactly as authored.
+    /// </para>
+    /// </remarks>
+    internal static string StampToggleControlIds(string html)
+    {
+        if (string.IsNullOrEmpty(html))
+            return html ?? string.Empty;
+
+        int next = 0;
+        return ToggleInputPattern.Replace(html, match =>
+        {
+            string attrs = match.Groups["attrs"].Value;
+            if (IdAttributePattern.IsMatch(attrs))
+                return match.Value;
+
+            string id = SyntheticIdPrefix + next++.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            // Keep any self-closing slash at the end of the tag.
+            string trimmed = attrs.TrimEnd();
+            bool selfClosing = trimmed.EndsWith('/');
+            if (selfClosing)
+                trimmed = trimmed[..^1].TrimEnd();
+
+            return $"<input {trimmed} id=\"{id}\"{(selfClosing ? " /" : string.Empty)}>";
+        });
+    }
+
+    /// <summary>
     /// Test-harness profile: the shared render preparation plus the Acid/WPT-specific artifact cleanup
     /// (<see cref="StripHiddenTestArtifacts"/>), preserving the historical ordering (artifact cleanup
     /// runs after the replaced-element passes and before the <c>:root</c> rewrite). Used by the WPT

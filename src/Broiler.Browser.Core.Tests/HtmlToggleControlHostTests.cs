@@ -1,0 +1,223 @@
+using System.Drawing;
+using Broiler.Browser;
+using Broiler.Graphics;
+using Broiler.HtmlBridge;
+using Broiler.UI;
+using Broiler.UI.CheckBox.Standard;
+using Broiler.UI.Panel.Standard;
+using Broiler.UI.RadioButton.Standard;
+using HtmlContainer = Broiler.HTML.Image.HtmlContainer;
+
+namespace Broiler.Browser.Core.Tests;
+
+/// <summary>
+/// Covers the Broiler.UI controls hosted over the page's checkboxes and radios.
+/// The renderer draws them as empty 13×13 bordered boxes — no check, no dot, no way
+/// to toggle — so the hosted controls are what gives them state at all.
+/// </summary>
+public class HtmlToggleControlHostTests
+{
+    private const string TogglePage =
+        "<html><body style='margin:0'><form action='/s'>" +
+        "<input type='checkbox' name='a' value='1'>" +
+        "<input type='checkbox' name='b' value='2' checked>" +
+        "<input type='radio' name='c' value='x'>" +
+        "<input type='radio' name='c' value='y' checked>" +
+        "</form></body></html>";
+
+    private static HtmlContainer LayOut(string html, int width = 600, int height = 200)
+    {
+        HtmlContainer container = new()
+        {
+            AvoidAsyncImagesLoading = true,
+            AvoidImagesLateLoading = true,
+            Location = PointF.Empty,
+            MaxSize = new SizeF(width, height),
+        };
+
+        // The browsing path stamps ids so the controls can be located by geometry.
+        container.SetHtmlWithStyleSet(HtmlPostProcessor.StampToggleControlIds(html));
+        container.PerformLayout(new RectangleF(0, 0, width, height));
+        return container;
+    }
+
+    /// <summary>
+    /// Hosts inside a real session: radio-group exclusivity resolves peers by walking
+    /// the session's roots, so a detached owner would leave both radios checked.
+    /// </summary>
+    private static (HtmlToggleControlHost Host, HtmlFormState State, StandardPanel Owner) Create(TestUiSession session)
+    {
+        HtmlFormState state = new();
+        return (new HtmlToggleControlHost(session.Root, state), state, session.Root);
+    }
+
+    [Fact]
+    public void EveryCheckboxAndRadioGetsAHostedControl()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(TogglePage);
+        (HtmlToggleControlHost host, _, _) = Create(session);
+
+        host.Rebuild(container.GetHtml());
+
+        Assert.Equal(4, host.Count);
+        Assert.Equal(2, host.Controls.Count(c => c is StandardCheckBox));
+        Assert.Equal(2, host.Controls.Count(c => c is StandardRadioButton));
+    }
+
+    [Fact]
+    public void HostedControlsStartFromTheMarkupsCheckedState()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(TogglePage);
+        (HtmlToggleControlHost host, _, _) = Create(session);
+
+        host.Rebuild(container.GetHtml());
+
+        List<StandardCheckBox> boxes = host.Controls.OfType<StandardCheckBox>().ToList();
+        Assert.False(boxes[0].IsChecked);
+        Assert.True(boxes[1].IsChecked);
+
+        List<StandardRadioButton> radios = host.Controls.OfType<StandardRadioButton>().ToList();
+        Assert.False(radios[0].IsChecked);
+        Assert.True(radios[1].IsChecked);
+    }
+
+    [Fact]
+    public void HostedControlsArePlacedOverTheBoxesTheRendererLaidOut()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(TogglePage);
+        (HtmlToggleControlHost host, _, _) = Create(session);
+        host.Rebuild(container.GetHtml());
+
+        BRect viewport = new(10, 20, 600, 200);
+        host.UpdateViewport(container, viewport, zoom: 1, scrollY: 0);
+
+        foreach (UiElement control in host.Controls)
+        {
+            Assert.Equal(UiVisibility.Visible, control.Visibility);
+            Assert.True(control.Bounds.Width > 0 && control.Bounds.Height > 0);
+            // Inside the viewport, and offset by its origin.
+            Assert.True(control.Bounds.Left >= viewport.Left);
+            Assert.True(control.Bounds.Top >= viewport.Top);
+        }
+
+        // The four controls sit on one line, so no two share a left edge.
+        List<double> lefts = host.Controls.Select(c => c.Bounds.Left).ToList();
+        Assert.Equal(lefts.Count, lefts.Distinct().Count());
+    }
+
+    [Fact]
+    public void HostedControlsFollowScrollingAndHideWhenOutOfView()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(TogglePage);
+        (HtmlToggleControlHost host, _, _) = Create(session);
+        host.Rebuild(container.GetHtml());
+
+        BRect viewport = new(0, 0, 600, 200);
+        host.UpdateViewport(container, viewport, zoom: 1, scrollY: 0);
+        double top = host.Controls[0].Bounds.Top;
+
+        host.UpdateViewport(container, viewport, zoom: 1, scrollY: 10);
+        Assert.Equal(top - 10, host.Controls[0].Bounds.Top, 3);
+
+        host.UpdateViewport(container, viewport, zoom: 1, scrollY: 5000);
+        Assert.All(host.Controls, c => Assert.Equal(UiVisibility.Collapsed, c.Visibility));
+    }
+
+    [Fact]
+    public void TogglingACheckboxRecordsItForSubmission()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(TogglePage);
+        (HtmlToggleControlHost host, HtmlFormState state, _) = Create(session);
+        host.Rebuild(container.GetHtml());
+
+        StandardCheckBox first = host.Controls.OfType<StandardCheckBox>().First();
+        int toggled = 0;
+        host.Toggled += (_, _) => toggled++;
+
+        Assert.True(first.Toggle());
+
+        Assert.Equal(1, toggled);
+        Assert.True(state.GetChecked($"{HtmlPostProcessor.SyntheticIdPrefix}0", "a", "1"));
+    }
+
+    [Fact]
+    public void SelectingARadioClearsTheOtherInItsGroup()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(TogglePage);
+        (HtmlToggleControlHost host, HtmlFormState state, _) = Create(session);
+        host.Rebuild(container.GetHtml());
+
+        List<StandardRadioButton> radios = host.Controls.OfType<StandardRadioButton>().ToList();
+        Assert.True(radios[0].Select());
+
+        // The group scope drives the UI, and the recorded state follows it.
+        Assert.True(radios[0].IsChecked);
+        Assert.False(radios[1].IsChecked);
+        Assert.True(state.GetChecked($"{HtmlPostProcessor.SyntheticIdPrefix}2", "c", "x"));
+        Assert.False(state.GetChecked($"{HtmlPostProcessor.SyntheticIdPrefix}3", "c", "y"));
+    }
+
+    [Fact]
+    public void ClearRemovesEveryHostedControlFromTheOwner()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(TogglePage);
+        (HtmlToggleControlHost host, _, StandardPanel owner) = Create(session);
+        host.Rebuild(container.GetHtml());
+        Assert.Equal(4, owner.Children.Count);
+
+        host.Clear();
+
+        Assert.Equal(0, host.Count);
+        Assert.Empty(owner.Children);
+    }
+
+    [Fact]
+    public void RebuildingReplacesThePreviousPagesControls()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer first = LayOut(TogglePage);
+        using HtmlContainer second = LayOut(
+            "<html><body><input type='checkbox' name='only'></body></html>");
+        (HtmlToggleControlHost host, _, StandardPanel owner) = Create(session);
+
+        host.Rebuild(first.GetHtml());
+        host.Rebuild(second.GetHtml());
+
+        Assert.Equal(1, host.Count);
+        Assert.Single(owner.Children);
+    }
+
+    [Fact]
+    public void PagesWithoutTogglesHostNothing()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(
+            "<html><body><form><input type='text' name='q'>" +
+            "<input type='submit' value='Go'></form></body></html>");
+        (HtmlToggleControlHost host, _, _) = Create(session);
+
+        host.Rebuild(container.GetHtml());
+
+        Assert.Equal(0, host.Count);
+    }
+
+    [Fact]
+    public void UnparseableOrEmptyPagesHostNothingInsteadOfThrowing()
+    {
+        using TestUiSession session = new();
+        (HtmlToggleControlHost host, _, _) = Create(session);
+
+        host.Rebuild(string.Empty);
+        Assert.Equal(0, host.Count);
+
+        host.UpdateViewport(null, new BRect(0, 0, 100, 100), zoom: 1, scrollY: 0);
+        Assert.Equal(0, host.Count);
+    }
+}
