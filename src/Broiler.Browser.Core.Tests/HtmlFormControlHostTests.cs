@@ -3,6 +3,7 @@ using Broiler.Browser;
 using Broiler.Graphics;
 using Broiler.HtmlBridge;
 using Broiler.UI;
+using Broiler.UI.Button.Standard;
 using Broiler.UI.CheckBox.Standard;
 using Broiler.UI.ComboBox.Standard;
 using Broiler.UI.Panel.Standard;
@@ -329,5 +330,41 @@ public class HtmlFormControlHostTests
         Assert.Equal(UiVisibility.Visible, combo.Visibility);
         Assert.True(combo.Bounds.Width > 0 && combo.Bounds.Height > 0);
         Assert.True(combo.Bounds.Left >= viewport.Left);
+    }
+
+    [Fact]
+    public void FileControlsGetAHostedButtonThatAsksTheShellToPick()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(
+            "<html><body><form><input type='file' name='doc'></form></body></html>");
+        (HtmlFormControlHost host, _, _) = Create(session);
+        host.Rebuild(container.GetHtml());
+
+        StandardButton button = Assert.IsType<StandardButton>(Assert.Single(host.Controls));
+        Assert.Equal("Choose File", button.Text);
+
+        HtmlFilePickEventArgs? asked = null;
+        host.FilePickRequested += (_, e) => asked = e;
+        button.Click();
+
+        Assert.NotNull(asked);
+        Assert.Equal($"{HtmlPostProcessor.SyntheticIdPrefix}0", asked.ControlId);
+        Assert.Equal("doc", asked.ControlName);
+    }
+
+    [Fact]
+    public void AChosenFilesNameShowsOnTheHostedButton()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(
+            "<html><body><form><input type='file' name='doc'></form></body></html>");
+        (HtmlFormControlHost host, HtmlFormState state, _) = Create(session);
+        host.Rebuild(container.GetHtml());
+
+        state.SetSelectedFile($"{HtmlPostProcessor.SyntheticIdPrefix}0", "doc", "/tmp/report.pdf");
+        host.RefreshFileLabels();
+
+        Assert.Equal("report.pdf", ((StandardButton)host.Controls[0]).Text);
     }
 }

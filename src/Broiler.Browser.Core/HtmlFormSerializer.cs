@@ -104,6 +104,9 @@ internal static class HtmlFormSerializer
         Func<DomElement, string?>? valueOverride = null) =>
         EncodeUrlEncoded(BuildEntryList(form, submitter, valueOverride));
 
+    /// <summary>Supplies the file chosen for an <c>&lt;input type="file"&gt;</c>, if any.</summary>
+    public delegate SelectedFile? FileProvider(DomElement control);
+
     /// <summary>
     /// The form data set: every successful control's name and value, in tree order.
     /// Every encoding is built from this, so they cannot disagree about which
@@ -112,23 +115,33 @@ internal static class HtmlFormSerializer
     public static IReadOnlyList<FormEntry> BuildEntryList(
         DomElement form,
         DomElement? submitter = null,
-        Func<DomElement, string?>? valueOverride = null)
+        Func<DomElement, string?>? valueOverride = null,
+        FileProvider? fileProvider = null)
     {
         ArgumentNullException.ThrowIfNull(form);
 
         List<FormEntry> entries = [];
         foreach (DomElement control in Descendants(form))
-            AppendControl(entries, control, submitter, valueOverride);
+            AppendControl(entries, control, submitter, valueOverride, fileProvider);
 
         return entries;
     }
 
     /// <summary>A single name/value pair of a form data set.</summary>
     /// <param name="FileName">
-    /// Set for a file control, naming the selected file. Only multipart can carry it;
-    /// the other encodings submit the name alone, as the spec requires.
+    /// Set for a file control, naming the selected file (empty when none is). Only
+    /// multipart carries the bytes; the other encodings submit the filename alone,
+    /// which is what the HTML spec's plain and URL encodings do.
     /// </param>
-    public sealed record FormEntry(string Name, string Value, string? FileName = null);
+    /// <param name="FileContent">
+    /// The selected file's bytes, for a multipart part. Null for a text entry and for
+    /// a file control with nothing selected.
+    /// </param>
+    public sealed record FormEntry(
+        string Name,
+        string Value,
+        string? FileName = null,
+        byte[]? FileContent = null);
 
     /// <summary>
     /// The encoding the form asks for. An unrecognised <c>enctype</c> falls back to
@@ -182,27 +195,47 @@ internal static class HtmlFormSerializer
     /// A file entry carries its filename and an <c>application/octet-stream</c>
     /// content type, so a server sees a file part rather than a text field.
     /// </summary>
-    public static string EncodeMultipart(IReadOnlyList<FormEntry> entries, string boundary)
+    /// <remarks>
+    /// Returns bytes rather than a string because a file part is arbitrary binary:
+    /// round-tripping it through a UTF-8 string would corrupt anything that is not
+    /// valid UTF-8. Headers are ASCII, the body is copied verbatim.
+    /// </remarks>
+    public static byte[] EncodeMultipart(IReadOnlyList<FormEntry> entries, string boundary)
     {
         ArgumentException.ThrowIfNullOrEmpty(boundary);
 
-        StringBuilder body = new();
+        using MemoryStream body = new();
         foreach (FormEntry entry in entries)
         {
-            body.Append("--").Append(boundary).Append("\r\n");
-            body.Append("Content-Disposition: form-data; name=\"").Append(EscapeQuotes(entry.Name)).Append('"');
+            StringBuilder header = new();
+            header.Append("--").Append(boundary).Append("\r\n");
+            header.Append("Content-Disposition: form-data; name=\"").Append(EscapeQuotes(entry.Name)).Append('"');
 
             if (entry.FileName is not null)
             {
-                body.Append("; filename=\"").Append(EscapeQuotes(entry.FileName)).Append('"');
-                body.Append("\r\nContent-Type: application/octet-stream");
+                header.Append("; filename=\"").Append(EscapeQuotes(entry.FileName)).Append('"');
+                header.Append("\r\nContent-Type: application/octet-stream");
             }
 
-            body.Append("\r\n\r\n").Append(entry.Value).Append("\r\n");
+            header.Append("\r\n\r\n");
+            Write(body, header.ToString());
+
+            if (entry.FileContent is { } content)
+                body.Write(content, 0, content.Length);
+            else
+                Write(body, entry.Value);
+
+            Write(body, "\r\n");
         }
 
-        body.Append("--").Append(boundary).Append("--\r\n");
-        return body.ToString();
+        Write(body, "--" + boundary + "--\r\n");
+        return body.ToArray();
+
+        static void Write(Stream target, string text)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(text);
+            target.Write(bytes, 0, bytes.Length);
+        }
     }
 
     /// <summary>A boundary that cannot occur in the parts it separates.</summary>
@@ -247,7 +280,8 @@ internal static class HtmlFormSerializer
         List<FormEntry> body,
         DomElement control,
         DomElement? submitter,
-        Func<DomElement, string?>? valueOverride)
+        Func<DomElement, string?>? valueOverride,
+        FileProvider? fileProvider)
     {
         // A disabled control is never successful.
         if (control.HasAttribute("disabled"))
@@ -313,7 +347,19 @@ internal static class HtmlFormSerializer
             return;
         }
 
-        // reset and button never submit; file needs a body this path cannot carry.
+        if (string.Equals(type, "file", StringComparison.OrdinalIgnoreCase))
+        {
+            if (name.Length == 0)
+                return;
+
+            // HTML Forms: a file control with nothing selected still submits an entry,
+            // with an empty filename and an empty body.
+            SelectedFile? file = fileProvider?.Invoke(control);
+            AppendFile(body, name, file?.FileName ?? string.Empty, file?.Content);
+            return;
+        }
+
+        // reset and button never submit.
         if (!PlainValueInputTypes.Contains(type))
             return;
 
@@ -359,8 +405,11 @@ internal static class HtmlFormSerializer
     private static void Append(List<FormEntry> body, string name, string value) =>
         body.Add(new FormEntry(name, value));
 
-    private static void AppendFile(List<FormEntry> body, string name, string fileName, string content) =>
-        body.Add(new FormEntry(name, content, fileName));
+    private static void AppendFile(List<FormEntry> body, string name, string fileName, byte[]? content) =>
+        body.Add(new FormEntry(name, string.Empty, fileName, content));
+
+    /// <summary>A file chosen for an <c>&lt;input type="file"&gt;</c>.</summary>
+    public sealed record SelectedFile(string FileName, byte[] Content);
 
     /// <summary>
     /// Percent-encodes for <c>application/x-www-form-urlencoded</c>, where a space is

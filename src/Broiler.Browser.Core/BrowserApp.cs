@@ -10,7 +10,10 @@ using Broiler.Input.Mouse;
 using Broiler.Input.Touch;
 using Broiler.UI;
 using Broiler.UI.Button.Standard;
+using Broiler.UI.Dialog;
 using Broiler.UI.Edit.Standard;
+using Broiler.UI.FileDialog;
+using Broiler.UI.FileDialog.Standard;
 using Broiler.UI.Label;
 using Broiler.UI.Label.Standard;
 using Broiler.UI.Standard;
@@ -39,6 +42,7 @@ internal sealed class BrowserApp : IDisposable
     private readonly StandardLabel _status;
     private readonly BrowserViewport _viewport;
     private readonly BrowserContent _content;
+    private readonly StandardWindow _rootWindow;
     private int _historyIndex = -1;
     private bool _isPageBusy;
     private bool _isShuttingDown;
@@ -94,7 +98,7 @@ internal sealed class BrowserApp : IDisposable
             _viewport,
             _status);
 
-        var root = new StandardWindow
+        _rootWindow = new StandardWindow
         {
             Title = "Broiler Browser",
             Background = BrowserPalette.Canvas,
@@ -102,8 +106,8 @@ internal sealed class BrowserApp : IDisposable
             ActiveBorderColor = BrowserPalette.Accent,
             BorderThickness = 1,
         };
-        root.AddChild(_content);
-        _session.AddRoot(root);
+        _rootWindow.AddChild(_content);
+        _session.AddRoot(_rootWindow);
 
         _backButton.Clicked += (_, _) => GoHistory(-1);
         _forwardButton.Clicked += (_, _) => GoHistory(1);
@@ -113,6 +117,7 @@ internal sealed class BrowserApp : IDisposable
         _starButton.Clicked += (_, _) => ToggleFavorite();
         _address.Submitted += (_, _) => NavigateTo(_address.Text);
         _viewport.LinkActivated += OnViewportLinkActivated;
+        _viewport.FilePickRequested += OnViewportFilePickRequested;
 
         _favorites.Load();
         RefreshFavoritesBar();
@@ -190,6 +195,7 @@ internal sealed class BrowserApp : IDisposable
     {
         BeginShutdown();
         _viewport.LinkActivated -= OnViewportLinkActivated;
+        _viewport.FilePickRequested -= OnViewportFilePickRequested;
         _session.Dispose();
     }
 
@@ -485,6 +491,52 @@ internal sealed class BrowserApp : IDisposable
             null,
             string.Empty);
         _host.RequestInvalidate();
+    }
+
+    /// <summary>
+    /// Opens a file dialog for a page's <c>&lt;input type="file"&gt;</c>. The viewport
+    /// hosts the control but has no window to parent a modal to, so the shell does
+    /// this half and hands the chosen path back.
+    /// </summary>
+    private void OnViewportFilePickRequested(object? sender, HtmlFilePickEventArgs e)
+    {
+        if (_isShuttingDown)
+            return;
+
+        StandardFileDialog dialog = new()
+        {
+            Mode = UiFileDialogMode.Open,
+            CurrentDirectory = Environment.CurrentDirectory,
+            PreferredSize = FileDialogPreferredSize,
+        };
+
+        dialog.ResultCompleted += (_, result) =>
+        {
+            if (result.Result.Kind == UiDialogResultKind.Accepted &&
+                !string.IsNullOrWhiteSpace(result.Result.Value))
+            {
+                _viewport.RecordPickedFile(e.ControlId, e.ControlName, result.Result.Value);
+            }
+
+            _host.RequestInvalidate();
+        };
+
+        dialog.ShowOpenModal(_rootWindow, GetFileDialogPlacement());
+        _host.RequestInvalidate();
+    }
+
+    private static readonly BSize FileDialogPreferredSize = new(560, 380);
+
+    private BRect GetFileDialogPlacement()
+    {
+        BSize viewport = _host.ViewportSize;
+        double width = Math.Min(FileDialogPreferredSize.Width, Math.Max(280, viewport.Width - 24));
+        double height = Math.Min(FileDialogPreferredSize.Height, Math.Max(180, viewport.Height - 64));
+        return new BRect(
+            Math.Max(12, (viewport.Width - width) / 2),
+            Math.Max(42, (viewport.Height - height) / 2),
+            width,
+            height);
     }
 
     private void OnViewportLinkActivated(object? sender, BrowserLinkEventArgs e)
@@ -915,9 +967,20 @@ internal sealed class BrowserApp : IDisposable
             _formEditor.SubmitRequested += (_, e) => SubmitHostedField(e.FieldId, e.FieldName);
             _controlHost = new HtmlFormControlHost(this, _formState);
             _controlHost.Changed += (_, _) => Invalidate(UiInvalidationKind.Render);
+            _controlHost.FilePickRequested += (_, e) => FilePickRequested?.Invoke(this, e);
         }
 
         public event EventHandler<BrowserLinkEventArgs>? LinkActivated;
+
+        /// <summary>Raised when a hosted file control was activated; the shell shows the dialog.</summary>
+        public event EventHandler<HtmlFilePickEventArgs>? FilePickRequested;
+
+        /// <summary>Records the file the shell's dialog returned and refreshes the control.</summary>
+        public void RecordPickedFile(string controlId, string controlName, string path)
+        {
+            _formState.SetSelectedFile(controlId, controlName, path);
+            _controlHost.RefreshFileLabels();
+        }
 
         public string BaseUrl { get; private set; } = string.Empty;
 

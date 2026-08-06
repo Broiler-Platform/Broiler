@@ -20,6 +20,20 @@ public sealed record PageRequest(
     string? ContentType = null,
     string? Body = null)
 {
+    /// <summary>
+    /// Body bytes, for an encoding that is not text — a <c>multipart/form-data</c>
+    /// submission carrying a file. Takes precedence over <see cref="Body"/>.
+    /// </summary>
+    /// <remarks>
+    /// A file part is arbitrary binary, and round-tripping it through a UTF-8 string
+    /// would corrupt anything that is not valid UTF-8, so multipart is built as bytes
+    /// and travels as bytes.
+    /// </remarks>
+    public byte[]? BinaryBody { get; init; }
+
+    /// <summary>Whether this request has anything to send.</summary>
+    public bool HasBody => BinaryBody is not null || Body is not null;
+
     public const string Get = "GET";
 
     public const string Post = "POST";

@@ -61,30 +61,39 @@ control edited after load had *no* words, and both paint and HTML serialization
 rendered blank. `SetGeneratedTextContent` now re-splits. Covered by
 `Broiler.Layout.Tests/GeneratedTextContentTests.cs`.
 
-## Toggles: checkbox and radio
+## Hosted controls: checkbox, radio, select and file
 
-The renderer sizes a checkbox and radio to 13×13 and draws a border. Nothing paints
-a check or a dot, nothing reflects `checked`, and nothing toggles — the control is an
-empty square whatever the page says.
+The renderer draws a checkbox and radio as an empty 13×13 bordered square, a
+`<select>` as a bordered box with no visible selection and no popup, and a file input
+as a box with no way to pick anything. None of them reflect state and none of them
+respond.
 
-`HtmlToggleControlHost` hosts a `StandardCheckBox` / `StandardRadioButton` over each
-one. Unlike the text editor, which hosts a single control on demand at the point the
-user clicked, a toggle has to *show* its state whether or not it is being interacted
-with, so every one on the page is hosted up front.
+`HtmlFormControlHost` hosts a real Broiler.UI control over each: a `StandardCheckBox`,
+`StandardRadioButton`, `StandardComboBox`, or — for a file input — a `StandardButton`
+showing the chosen filename. Unlike the text editor, which hosts a single control on
+demand at the point the user clicked, these have to *show* their state whether or not
+they are being interacted with, so every one on the page is hosted up front.
 
 That needs per-control geometry, and the renderer's only public geometry query for an
 arbitrary element is `GetElementRectangle(id)`. So the browsing path stamps a
 synthetic `id` on any checkbox or radio that lacks one
-(`HtmlPostProcessor.StampToggleControlIds`), on the renderer's copy of the page only —
+(`HtmlPostProcessor.StampFormControlIds`), on the renderer's copy of the page only —
 scripts execute against the untouched document, an existing `id` is never replaced,
 and the WPT/Acid profile (`Process`) deliberately does not run the pass, since those
 harnesses compare rendered output and must see the page as authored.
 
-Toggling records into `HtmlFormState` rather than the document: the renderer has no
-API to write a `checked` attribute back. Radio exclusivity is enforced twice over —
-Broiler.UI's `UiRadioGroupScope` drives the visible state, and the host records the
-*whole* group on a change so an untouched sibling's markup `checked` cannot leak into
-a submission.
+Changes record into `HtmlFormState` rather than the document: the renderer has no API
+to write a `checked` attribute or a selected option back. Radio exclusivity is
+enforced twice over — Broiler.UI's `UiRadioGroupScope` drives the visible state, and
+the host records the *whole* group on a change so an untouched sibling's markup
+`checked` cannot leak into a submission.
+
+Two controls are deliberately partial. A `<select multiple>` is **not** hosted: a
+combo box cannot represent one, so it stays painted and submits its markup selection
+rather than being misrepresented as single-choice. And a file input's *picker* lives
+in the shell rather than the host — the host owns no window to parent a modal to, so
+it raises `FilePickRequested` and `BrowserApp` shows the `StandardFileDialog` and
+hands the path back.
 
 Hosting is capped at 64 controls per page: each costs an id lookup (a box-tree walk)
 per layout, so a pathological page is bounded rather than made quadratic.
@@ -113,11 +122,47 @@ as `application/x-www-form-urlencoded`; `HtmlFormState` drives it:
 An ordinary `<a href>` inside a form is never treated as a submission — the renderer
 raises the same event for both.
 
-**`method="post"` is not carried.** The browser navigates by fetching a URL
-(`PageLoader.FetchAsync` is a GET), so there is nowhere to put a request body; a POST
-form falls back to navigating its action unchanged, exactly as before. Carrying it
-needs a request-bearing navigation path, which is a change to the loader rather than
-to form handling.
+### Methods and encodings
+
+Navigation is a `PageRequest` — url, method, content type, body — end to end through
+`PageLoader`, `RenderingPipeline` and `BrowserApp`, rather than the bare URL string it
+used to be. A GET form puts its fields in the query; a POST carries them in the body
+in whichever encoding `enctype` asks for:
+
+| enctype | body |
+| --- | --- |
+| `application/x-www-form-urlencoded` (default) | `a=1&b=two+words` |
+| `text/plain` | `a=1\r\nb=two words\r\n` |
+| `multipart/form-data` | one part per entry, files carried as bytes |
+
+A GET ignores `enctype` entirely — it has no body to encode.
+
+One definition of "successful control" feeds all three: `BuildEntryList` is the single
+walk of the form, and the encoders are pure functions over its output, so they cannot
+disagree about which controls submit.
+
+`multipart/form-data` is built as **bytes**, not a string. A file part is arbitrary
+binary and a UTF-8 round trip would corrupt anything that is not valid UTF-8, so
+`PageRequest.BinaryBody` carries it and the loader sends it as `ByteArrayContent`.
+
+### Files
+
+`<input type="file">` is a successful control. The hosted button opens the shell's
+file dialog, the chosen path is recorded in `HtmlFormState`, and at submit time the
+file is read and carried as a multipart part with its filename and an
+`application/octet-stream` content type. Per the spec, a file control with *nothing*
+chosen still submits an entry with an empty filename, and the URL-encoded and
+plain-text encodings submit the filename alone since only multipart can carry bytes.
+A path that has since been deleted or cannot be read submits as "nothing chosen"
+rather than failing the whole submission.
+
+### History and re-submission
+
+History stores URLs only, so back, forward and reload re-issue a plain GET and a POST
+is never silently repeated. Real browsers prompt to re-submit; without that UI, a GET
+of the same URL is the safer degradation. `PageRequest.IsRepeatable` names the
+distinction. A POST usually redirects, so the loader reports the URL it landed on
+rather than the one it posted to, and relative URLs on the result resolve correctly.
 
 ## What is wired, and what is not
 
@@ -126,18 +171,20 @@ to form handling.
 | `input` text, search, email, url, tel, number, password | yes | **typing** — hosted `StandardEdit` |
 | `textarea` | yes | **typing**, once `patches/0113-html-textarea-editable-control.patch` lands (see below) |
 | `input` checkbox, radio | box only | **toggling** — hosted `StandardCheckBox` / `StandardRadioButton` |
-| `input` submit/image, `button` | yes | click activates, and **submits the form's fields** |
-| `select` | box painted, no popup | not interactive; its markup selection *is* submitted |
+| `select` | box only | **selection** — hosted `StandardComboBox` |
+| `select multiple` | native list box | not interactive; markup selection is submitted |
+| `input` file | box only | **picking** — hosted button plus the shell's file dialog |
+| `input` submit/image, `button` | yes | click activates, and **submits the form** |
 
-Remaining gaps, in the order they will be felt:
+Submission carries the form data set for GET and POST, in all three HTML encodings.
 
-- **`select` has no popup.** The control paints as a box, and submission uses whatever
-  the markup marked `selected`. Hosting Broiler.UI's `StandardComboBox` is the same
-  shape of change as the toggles — it needs the option list from the parsed document
-  and the same id-based geometry.
-- **POST forms**, as above.
-- **`input type="file"`** is never a successful control here; it needs multipart
-  encoding and a request body.
+Known limits, none of them silent:
+
+- **A `<select multiple>` is not hosted**, as above — it submits what the markup marks.
+- **Re-submitting a POST is a GET**, as above, for want of a confirmation prompt.
+- **One file per file input.** `multiple` is not honoured; the picker records a single
+  path.
+- **`<textarea>` typing depends on a pending submodule patch**, below.
 
 ## Why textarea ships as a patch
 

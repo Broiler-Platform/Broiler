@@ -299,4 +299,68 @@ public class HtmlFormStateTests
         Assert.Contains($"id=\"{HtmlPostProcessor.SyntheticIdPrefix}0\"", stamped);
         Assert.EndsWith("/>", stamped);
     }
+
+    [Fact]
+    public void AChosenFileIsPostedAsAMultipartPart()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"broiler-form-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(path, "file body");
+        try
+        {
+            using HtmlContainer container = LayOut(
+                "<html><body><form action='/upload' method='post' enctype='multipart/form-data'>" +
+                "<input id='f' type='file' name='doc'>" +
+                "<input id='go' type='submit' name='s' value='Go'>" +
+                "</form></body></html>");
+            HtmlFormState state = new();
+            state.SetSelectedFile("f", "doc", path);
+
+            PageRequest? request = state.TryBuildSubmitRequest(
+                container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/upload");
+
+            Assert.NotNull(request);
+            Assert.Equal(PageRequest.Post, request.Method);
+            Assert.StartsWith(HtmlFormSerializer.MultipartFormData + "; boundary=", request.ContentType);
+            Assert.NotNull(request.BinaryBody);
+
+            string body = System.Text.Encoding.UTF8.GetString(request.BinaryBody);
+            Assert.Contains($"filename=\"{Path.GetFileName(path)}\"", body);
+            Assert.Contains("file body", body);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void AFileThatHasGoneAwaySubmitsAsNothingChosen()
+    {
+        using HtmlContainer container = LayOut(
+            "<html><body><form action='/upload' method='post' enctype='multipart/form-data'>" +
+            "<input id='f' type='file' name='doc'>" +
+            "<input id='go' type='submit' name='s' value='Go'>" +
+            "</form></body></html>");
+        HtmlFormState state = new();
+        state.SetSelectedFile("f", "doc", "/no/such/file/anywhere.bin");
+
+        PageRequest? request = state.TryBuildSubmitRequest(
+            container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/upload");
+
+        // An unreadable path must not fail the whole submission.
+        Assert.NotNull(request);
+        string body = System.Text.Encoding.UTF8.GetString(request.BinaryBody!);
+        Assert.Contains("filename=\"\"", body);
+    }
+
+    [Fact]
+    public void ResetForgetsAChosenFile()
+    {
+        HtmlFormState state = new();
+        state.SetSelectedFile("f", "doc", "/tmp/x");
+
+        state.Reset();
+
+        Assert.Null(state.GetSelectedFile("f", "doc"));
+    }
 }

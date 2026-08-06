@@ -4,6 +4,7 @@ using Broiler.Dom.Html;
 using Broiler.Graphics;
 using Broiler.HtmlBridge;
 using Broiler.UI;
+using Broiler.UI.Button.Standard;
 using Broiler.UI.CheckBox;
 using Broiler.UI.CheckBox.Standard;
 using Broiler.UI.ComboBox;
@@ -53,11 +54,15 @@ internal sealed class HtmlFormControlHost
     private const string UaControlFontFamily = "Arial";
     private const double UaControlFontSize = 13.3333;
 
+    /// <summary>What a file control reads before anything is chosen.</summary>
+    private const string NoFileChosen = "Choose File";
+
     private readonly UiElement _owner;
     private readonly HtmlFormState _formState;
     private readonly List<HostedToggle> _hosted = [];
     private readonly Dictionary<string, UiRadioGroupScope> _radioGroups = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<ToggleIdentity>> _radioMembers = new(StringComparer.Ordinal);
+    private readonly List<FilePicker> _filePickers = [];
 
     public HtmlFormControlHost(UiElement owner, HtmlFormState formState)
     {
@@ -67,6 +72,14 @@ internal sealed class HtmlFormControlHost
 
     /// <summary>Raised when the user changed a control, so the host can repaint.</summary>
     public event EventHandler? Changed;
+
+    /// <summary>
+    /// Raised when the user activated a file control. The host does not own a window,
+    /// so choosing the file is the browser's job; it records the result through
+    /// <see cref="HtmlFormState.SetSelectedFile"/> and calls
+    /// <see cref="RefreshFileLabels"/>.
+    /// </summary>
+    public event EventHandler<HtmlFilePickEventArgs>? FilePickRequested;
 
     /// <summary>The controls hosted for the current page.</summary>
     public IReadOnlyList<UiElement> Controls => _hosted.ConvertAll(h => h.Control);
@@ -104,14 +117,15 @@ internal sealed class HtmlFormControlHost
             string type = element.GetAttribute("type") ?? string.Empty;
             bool isRadio = isInput && string.Equals(type, "radio", StringComparison.OrdinalIgnoreCase);
             bool isCheckBox = isInput && string.Equals(type, "checkbox", StringComparison.OrdinalIgnoreCase);
-            if (!isSelect && !isRadio && !isCheckBox)
+            bool isFile = isInput && string.Equals(type, "file", StringComparison.OrdinalIgnoreCase);
+            if (!isSelect && !isRadio && !isCheckBox && !isFile)
                 continue;
 
             string id = element.GetAttribute("id") ?? string.Empty;
             if (id.Length == 0)
                 continue;
 
-            Add(element, id, isSelect, isRadio);
+            Add(element, id, isSelect, isRadio, isFile);
         }
     }
 
@@ -127,6 +141,7 @@ internal sealed class HtmlFormControlHost
         _hosted.Clear();
         _radioGroups.Clear();
         _radioMembers.Clear();
+        _filePickers.Clear();
     }
 
     /// <summary>
@@ -169,13 +184,17 @@ internal sealed class HtmlFormControlHost
         }
     }
 
-    private void Add(DomElement element, string id, bool isSelect, bool isRadio)
+    private void Add(DomElement element, string id, bool isSelect, bool isRadio, bool isFile)
     {
         string name = element.GetAttribute("name") ?? string.Empty;
         string value = element.GetAttribute("value") ?? string.Empty;
 
         UiElement control;
-        if (isSelect)
+        if (isFile)
+        {
+            control = CreateFilePicker(id, name);
+        }
+        else if (isSelect)
         {
             control = CreateComboBox(element, id, name);
         }
@@ -318,6 +337,44 @@ internal sealed class HtmlFormControlHost
     }
 
     /// <summary>
+    /// Builds the button that stands in for an <c>&lt;input type="file"&gt;</c>. It
+    /// shows the chosen file's name, or the usual prompt when nothing is chosen.
+    /// </summary>
+    private UiElement CreateFilePicker(string id, string name)
+    {
+        StandardButton button = new()
+        {
+            Font = new BFontStyle(UaControlFontFamily, UaControlFontSize),
+            CornerRadius = 0,
+            PaddingX = 4,
+            PaddingY = 0,
+            Text = DescribeFile(id, name),
+        };
+
+        button.Clicked += (_, _) => FilePickRequested?.Invoke(this, new HtmlFilePickEventArgs(id, name));
+        _filePickers.Add(new FilePicker(id, name, button));
+        return button;
+    }
+
+    /// <summary>
+    /// Re-reads the chosen files into the hosted buttons' labels. Called once the
+    /// browser has recorded a pick, since the host cannot show a file dialog itself.
+    /// </summary>
+    public void RefreshFileLabels()
+    {
+        foreach (FilePicker picker in _filePickers)
+            picker.Button.Text = DescribeFile(picker.Id, picker.Name);
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private string DescribeFile(string id, string name)
+    {
+        string? path = _formState.GetSelectedFile(id, name);
+        return string.IsNullOrEmpty(path) ? NoFileChosen : Path.GetFileName(path);
+    }
+
+    /// <summary>
     /// Sizes the control's mark to the box the page laid out, so a hosted control
     /// occupies exactly the 13×13 (or author-styled) area the renderer reserved.
     /// </summary>
@@ -387,4 +444,15 @@ internal sealed class HtmlFormControlHost
 
     /// <summary>Identifies a toggle for <see cref="HtmlFormState"/>.</summary>
     private sealed record ToggleIdentity(string Id, string Name, string Value);
+
+    /// <summary>A hosted file control and the button standing in for it.</summary>
+    private sealed record FilePicker(string Id, string Name, StandardButton Button);
+}
+
+/// <summary>Identifies the file control the user activated.</summary>
+internal sealed class HtmlFilePickEventArgs(string controlId, string controlName) : EventArgs
+{
+    public string ControlId { get; } = controlId;
+
+    public string ControlName { get; } = controlName;
 }

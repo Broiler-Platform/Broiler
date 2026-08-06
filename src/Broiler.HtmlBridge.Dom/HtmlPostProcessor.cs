@@ -139,10 +139,11 @@ internal static class HtmlPostProcessor
     internal const string SyntheticIdPrefix = "broiler-fc-";
 
     /// <summary>
-    /// Matches a checkbox or radio <c>&lt;input&gt;</c>, in either attribute order.
+    /// Matches an <c>&lt;input&gt;</c> the browser hosts a Broiler.UI control over —
+    /// checkbox, radio or file — in either attribute order.
     /// </summary>
-    private static readonly Regex ToggleInputPattern = new(
-        @"<input\b(?<attrs>[^>]*\btype\s*=\s*[""']?(?:checkbox|radio)\b[^>]*)>",
+    private static readonly Regex HostedInputPattern = new(
+        @"<input\b(?<attrs>[^>]*\btype\s*=\s*[""']?(?:checkbox|radio|file)\b[^>]*)>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
@@ -158,8 +159,8 @@ internal static class HtmlPostProcessor
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
-    /// Gives every checkbox, radio and <c>&lt;select&gt;</c> without one a synthetic
-    /// <c>id</c>.
+    /// Gives every checkbox, radio, file input and <c>&lt;select&gt;</c> without one a
+    /// synthetic <c>id</c>.
     /// </summary>
     /// <remarks>
     /// The renderer's only public geometry query for an arbitrary element is
@@ -180,7 +181,7 @@ internal static class HtmlPostProcessor
             return html ?? string.Empty;
 
         int next = 0;
-        html = ToggleInputPattern.Replace(html, match => Stamp(match, "input"));
+        html = HostedInputPattern.Replace(html, match => Stamp(match, "input"));
         return SelectPattern.Replace(html, match => Stamp(match, "select"));
 
         // A local function so both passes share one counter, keeping the ids unique

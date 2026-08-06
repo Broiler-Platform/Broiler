@@ -1,5 +1,6 @@
 using Broiler.Browser;
 using Broiler.Dom;
+using System.Text;
 using Broiler.Dom.Html;
 
 namespace Broiler.Browser.Core.Tests;
@@ -114,13 +115,85 @@ public class HtmlFormSerializerTests
     }
 
     [Fact]
-    public void ResetAndFileControlsAreNeverSubmitted()
+    public void ResetControlsAreNeverSubmitted()
     {
         DomElement form = Form(
-            "<form><input type='reset' name='r' value='Reset'>" +
-            "<input type='file' name='f'><input name='q' value='x'></form>");
+            "<form><input type='reset' name='r' value='Reset'><input name='q' value='x'></form>");
 
         Assert.Equal("q=x", HtmlFormSerializer.BuildFormData(form));
+    }
+
+    [Fact]
+    public void AFileControlWithNothingChosenStillSubmitsAnEmptyEntry()
+    {
+        DomElement form = Form("<form><input type='file' name='f'><input name='q' value='x'></form>");
+
+        IReadOnlyList<HtmlFormSerializer.FormEntry> entries = HtmlFormSerializer.BuildEntryList(form);
+
+        // HTML Forms: an unset file control is still successful, with an empty filename.
+        HtmlFormSerializer.FormEntry file = entries[0];
+        Assert.Equal("f", file.Name);
+        Assert.Equal(string.Empty, file.FileName);
+        Assert.Null(file.FileContent);
+        Assert.Equal("f=&q=x", HtmlFormSerializer.EncodeUrlEncoded(entries));
+    }
+
+    [Fact]
+    public void UrlEncodedAndTextPlainSubmitAFilesNameNotItsBytes()
+    {
+        DomElement form = Form("<form><input type='file' name='f'></form>");
+        IReadOnlyList<HtmlFormSerializer.FormEntry> entries = HtmlFormSerializer.BuildEntryList(
+            form, submitter: null, valueOverride: null,
+            fileProvider: _ => new HtmlFormSerializer.SelectedFile("notes.txt", "ignored"u8.ToArray()));
+
+        Assert.Equal("f=notes.txt", HtmlFormSerializer.EncodeUrlEncoded(entries));
+        Assert.Equal("f=notes.txt\r\n", HtmlFormSerializer.EncodeTextPlain(entries));
+    }
+
+    [Fact]
+    public void MultipartCarriesTheFilesNameAndBytes()
+    {
+        DomElement form = Form("<form><input type='file' name='f'></form>");
+        IReadOnlyList<HtmlFormSerializer.FormEntry> entries = HtmlFormSerializer.BuildEntryList(
+            form, submitter: null, valueOverride: null,
+            fileProvider: _ => new HtmlFormSerializer.SelectedFile("notes.txt", "hello"u8.ToArray()));
+
+        string body = Encoding.UTF8.GetString(HtmlFormSerializer.EncodeMultipart(entries, "B"));
+
+        Assert.Equal(
+            "--B\r\nContent-Disposition: form-data; name=\"f\"; filename=\"notes.txt\"\r\n" +
+            "Content-Type: application/octet-stream\r\n\r\nhello\r\n--B--\r\n",
+            body);
+    }
+
+    [Fact]
+    public void MultipartCopiesFileBytesVerbatimRatherThanReEncodingThem()
+    {
+        DomElement form = Form("<form><input type='file' name='f'></form>");
+        // Bytes that are not valid UTF-8 — a string round-trip would corrupt them.
+        byte[] binary = [0x00, 0xFF, 0xFE, 0x80, 0x41];
+        IReadOnlyList<HtmlFormSerializer.FormEntry> entries = HtmlFormSerializer.BuildEntryList(
+            form, submitter: null, valueOverride: null,
+            fileProvider: _ => new HtmlFormSerializer.SelectedFile("blob.bin", binary));
+
+        byte[] body = HtmlFormSerializer.EncodeMultipart(entries, "B");
+
+        Assert.True(IndexOfSequence(body, binary) >= 0, "The file's bytes must appear in the body unchanged.");
+    }
+
+    private static int IndexOfSequence(byte[] haystack, byte[] needle)
+    {
+        for (int i = 0; i + needle.Length <= haystack.Length; i++)
+        {
+            bool match = true;
+            for (int j = 0; j < needle.Length && match; j++)
+                match = haystack[i + j] == needle[j];
+
+            if (match)
+                return i;
+        }
+
+        return -1;
     }
 
     [Fact]
@@ -289,7 +362,7 @@ public class HtmlFormSerializerTests
         DomElement form = Form("<form><input name='a' value='1'></form>");
         IReadOnlyList<HtmlFormSerializer.FormEntry> entries = HtmlFormSerializer.BuildEntryList(form);
 
-        string body = HtmlFormSerializer.EncodeMultipart(entries, "BOUNDARY");
+        string body = Encoding.UTF8.GetString(HtmlFormSerializer.EncodeMultipart(entries, "BOUNDARY"));
 
         Assert.Equal(
             "--BOUNDARY\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\n1\r\n--BOUNDARY--\r\n",

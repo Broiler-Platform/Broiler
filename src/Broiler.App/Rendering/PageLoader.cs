@@ -27,8 +27,8 @@ public sealed class PageLoader(HttpClient httpClient) : IPageLoader
             var localPath = uri.LocalPath;
             if (!File.Exists(localPath))
                 throw new FileNotFoundException($"Local file not found: {localPath}", localPath);
-            var html = await File.ReadAllTextAsync(localPath, cancellationToken);
-            return (url, html);
+            var fileText = await File.ReadAllTextAsync(localPath, cancellationToken);
+            return (url, fileText);
         }
 
         if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
@@ -37,18 +37,16 @@ public sealed class PageLoader(HttpClient httpClient) : IPageLoader
             url = "https://" + url;
         }
 
-        if (request.Body is null)
+        if (!request.HasBody)
         {
-            var content = await httpClient.GetStringAsync(new Uri(url), cancellationToken);
-            return (url, content);
+            var fetched = await httpClient.GetStringAsync(new Uri(url), cancellationToken);
+            return (url, fetched);
         }
 
+        using HttpContent content = CreateContent(request);
         using HttpRequestMessage message = new(new HttpMethod(request.Method), new Uri(url))
         {
-            Content = new StringContent(
-                request.Body,
-                Encoding.UTF8,
-                request.ContentType ?? PageRequest.FormUrlEncoded),
+            Content = content,
         };
 
         using HttpResponseMessage response = await httpClient
@@ -56,12 +54,31 @@ public sealed class PageLoader(HttpClient httpClient) : IPageLoader
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        string body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        string html = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
         // A submission usually redirects; report where it landed so relative URLs on
         // the resulting page resolve against the right base.
         string finalUrl = response.RequestMessage?.RequestUri?.ToString() ?? url;
-        return (finalUrl, body);
+        return (finalUrl, html);
+    }
+
+    private static HttpContent CreateContent(PageRequest request)
+    {
+        string mediaType = request.ContentType ?? PageRequest.FormUrlEncoded;
+
+        // A multipart body carries file bytes verbatim, so it must not be re-encoded
+        // as text. Its media type already includes the boundary parameter, which
+        // StringContent's constructor would reject, so it is set on the header.
+        if (request.BinaryBody is { } bytes)
+        {
+            ByteArrayContent content = new(bytes);
+            content.Headers.TryAddWithoutValidation("Content-Type", mediaType);
+            return content;
+        }
+
+        StringContent text = new(request.Body ?? string.Empty, Encoding.UTF8);
+        text.Headers.TryAddWithoutValidation("Content-Type", mediaType);
+        return text;
     }
 
     /// <inheritdoc />

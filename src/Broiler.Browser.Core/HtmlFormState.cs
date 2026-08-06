@@ -24,11 +24,15 @@ internal sealed class HtmlFormState
     /// <summary>Selected option value by control key, for selects the user has changed.</summary>
     private readonly Dictionary<string, string> _selectedValues = new(StringComparer.Ordinal);
 
+    /// <summary>Chosen file path by control key, for file inputs the user has picked for.</summary>
+    private readonly Dictionary<string, string> _selectedFiles = new(StringComparer.Ordinal);
+
     /// <summary>Forgets per-page state. Called when the page is replaced.</summary>
     public void Reset()
     {
         _checkedState.Clear();
         _selectedValues.Clear();
+        _selectedFiles.Clear();
     }
 
     /// <summary>Records the state of a checkbox or radio the user toggled.</summary>
@@ -46,6 +50,14 @@ internal sealed class HtmlFormState
     /// <summary>The recorded selection of a <c>&lt;select&gt;</c>, or <c>null</c> if untouched.</summary>
     public string? GetSelectedValue(string id, string name) =>
         _selectedValues.TryGetValue(ControlKey(id, name, string.Empty), out string? value) ? value : null;
+
+    /// <summary>Records the file chosen for an <c>&lt;input type="file"&gt;</c>.</summary>
+    public void SetSelectedFile(string id, string name, string path) =>
+        _selectedFiles[ControlKey(id, name, string.Empty)] = path;
+
+    /// <summary>The path chosen for a file input, or <c>null</c> if none has been.</summary>
+    public string? GetSelectedFile(string id, string name) =>
+        _selectedFiles.TryGetValue(ControlKey(id, name, string.Empty), out string? path) ? path : null;
 
     /// <summary>
     /// Builds the request a submission should make, or <c>null</c> when the click is
@@ -117,7 +129,7 @@ internal sealed class HtmlFormState
     private PageRequest BuildRequest(DomElement form, DomElement? submitter, string action)
     {
         IReadOnlyList<HtmlFormSerializer.FormEntry> entries =
-            HtmlFormSerializer.BuildEntryList(form, submitter, ResolveOverride);
+            HtmlFormSerializer.BuildEntryList(form, submitter, ResolveOverride, ResolveFile);
 
         // A GET form always puts its data in the query, whatever enctype says — the
         // enctype only applies to a body, and a GET has none.
@@ -131,8 +143,10 @@ internal sealed class HtmlFormState
             return new PageRequest(
                 action,
                 PageRequest.Post,
-                $"{HtmlFormSerializer.MultipartFormData}; boundary={boundary}",
-                HtmlFormSerializer.EncodeMultipart(entries, boundary));
+                $"{HtmlFormSerializer.MultipartFormData}; boundary={boundary}")
+            {
+                BinaryBody = HtmlFormSerializer.EncodeMultipart(entries, boundary),
+            };
         }
 
         string body = encoding == HtmlFormSerializer.TextPlain
@@ -158,6 +172,30 @@ internal sealed class HtmlFormState
         }
 
         return Uri.TryCreate(action, UriKind.Absolute, out Uri? absolute) ? absolute.ToString() : action;
+    }
+
+    /// <summary>
+    /// Reads the file the user chose for a control, if any. A path that has gone away
+    /// or cannot be read submits as "nothing selected" rather than failing the whole
+    /// submission.
+    /// </summary>
+    private HtmlFormSerializer.SelectedFile? ResolveFile(DomElement control)
+    {
+        string? path = GetSelectedFile(
+            control.GetAttribute("id") ?? string.Empty,
+            control.GetAttribute("name") ?? string.Empty);
+
+        if (string.IsNullOrEmpty(path))
+            return null;
+
+        try
+        {
+            return new HtmlFormSerializer.SelectedFile(Path.GetFileName(path), File.ReadAllBytes(path));
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private string? ResolveOverride(DomElement control)
