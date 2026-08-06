@@ -46,6 +46,7 @@ class MergeWptShardsTests(unittest.TestCase):
         exit_code: int,
         failure_reason: str | None = None,
         failure_detail: str | None = None,
+        attempt_suffix: str = "",
     ) -> None:
         status = {"shardIndex": shard_index, "exitCode": exit_code}
         # The workflow's "Collect shard result" step folds these in from the marker
@@ -54,7 +55,7 @@ class MergeWptShardsTests(unittest.TestCase):
             status["failureReason"] = failure_reason
         if failure_detail is not None:
             status["failureDetail"] = failure_detail
-        (root / f"wpt-shard-{shard_index}-status.json").write_text(
+        (root / f"wpt-shard-{shard_index}{attempt_suffix}-status.json").write_text(
             json.dumps(status),
             encoding="utf-8",
         )
@@ -961,6 +962,262 @@ class MergeWptShardsTests(unittest.TestCase):
 
         self.assertNotEqual(0, result.returncode)
         self.assertIn("--problem-limit must be a positive integer", result.stderr)
+
+    # ── The end-of-workflow retry pass ───────────────────────────────────────
+    #
+    # A shard that aborts abnormally is rerun once at the end of the workflow and
+    # uploads its files with a `-retry` suffix, next to whatever the aborted
+    # attempt managed to leave behind. These cover the reconciliation: the retry
+    # replaces the attempt it repeats, and never adds to it.
+
+    def test_retry_report_supersedes_the_aborted_attempt(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            # Shard 0 died partway through: one failure recorded, then the crash.
+            self._write_report(
+                shard_dir,
+                "wpt-shard-0.json",
+                0,
+                [self._failure("css/a/one.html", "RenderingError")],
+            )
+            self._write_status(shard_dir, shard_index=0, exit_code=134)
+            # The rerun measured the whole slice.
+            self._write_report(
+                shard_dir,
+                "wpt-shard-0-retry.json",
+                0,
+                [
+                    self._failure("css/a/one.html", "RenderingError"),
+                    self._failure("css/a/two.html", "Timeout"),
+                ],
+            )
+            self._write_status(shard_dir, shard_index=0, exit_code=1, attempt_suffix="-retry")
+            self._write_report(
+                shard_dir,
+                "wpt-shard-1.json",
+                1,
+                [self._failure("html/a/three.html", "Timeout")],
+            )
+            self._write_status(shard_dir, shard_index=1, exit_code=1)
+
+            merged = MODULE.merge(shard_dir, expected_shard_indexes={0, 1})
+
+            # Two shards' worth of totals, not three: the aborted attempt's
+            # summary is dropped, not summed with its rerun's.
+            self.assertEqual(2, merged["shardCount"])
+            self.assertEqual(3, merged["summary"]["failed"])
+            self.assertEqual(2, merged["summary"]["passed"])
+            self.assertEqual(5, merged["summary"]["total"])
+            # The rerun produced a report, so the slice is measured after all.
+            self.assertEqual([], merged["incompleteShards"])
+            self.assertEqual([0], merged["retriedShards"])
+
+            markdown = MODULE.render_issue_markdown(merged, "https://example.test/run/1")
+            self.assertIn("Shards rerun after an abnormal abort: 0", markdown)
+            self.assertIn("Incomplete shards: 0", markdown)
+
+    def test_shard_that_aborts_again_is_reported_as_retried(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_report(
+                shard_dir,
+                "wpt-shard-1.json",
+                1,
+                [self._failure("html/a/three.html", "Timeout")],
+            )
+            self._write_status(shard_dir, shard_index=1, exit_code=1)
+            # Shard 0 aborted, was rerun, and aborted again — no report either time.
+            self._write_status(
+                shard_dir,
+                shard_index=0,
+                exit_code=1,
+                failure_reason="BrowserDownloadBlocked",
+                failure_detail="Chromium download returned HTTP 403.",
+            )
+            self._write_status(
+                shard_dir,
+                shard_index=0,
+                exit_code=1,
+                failure_reason="BrowserDownloadBlocked",
+                failure_detail="Chromium download returned HTTP 403.",
+                attempt_suffix="-retry",
+            )
+
+            merged = MODULE.merge(shard_dir, expected_shard_indexes={0, 1})
+
+            self.assertEqual(
+                [
+                    {
+                        "shardIndex": 0,
+                        "exitCode": 1,
+                        "retried": True,
+                        "failureReason": "BrowserDownloadBlocked",
+                        "failureDetail": "Chromium download returned HTTP 403.",
+                    }
+                ],
+                merged["incompleteShards"],
+            )
+            self.assertEqual([0], merged["retriedShards"])
+
+            biggest = MODULE.render_biggest_problems_markdown(merged, None)
+            self.assertIn("shard 0 (Chromium download refused after rerun)", biggest)
+            self.assertIn("already rerun automatically at the end of this run", biggest)
+
+    def test_incomplete_shards_drive_the_retry_matrix(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            github_output = shard_dir / "github-output.txt"
+            # Shard 0 reported; shard 2 crashed after running; shard 1 uploaded
+            # nothing at all (its runner was lost mid-run).
+            self._write_report(
+                shard_dir,
+                "wpt-shard-0.json",
+                0,
+                [self._failure("css/a/one.html", "Timeout")],
+            )
+            self._write_status(shard_dir, shard_index=0, exit_code=1)
+            self._write_status(shard_dir, shard_index=2, exit_code=134)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_PATH),
+                    "--shard-dir",
+                    temp,
+                    "--expected-shards",
+                    "0,1,2",
+                    "--github-output",
+                    str(github_output),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            outputs = github_output.read_text(encoding="utf-8")
+            self.assertIn("has_incomplete_shards=true\n", outputs)
+            self.assertIn("incomplete_shard_indexes=1,2\n", outputs)
+            self.assertIn(
+                'incomplete_shard_matrix=[{"shard-index": 1}, {"shard-index": 2}]\n',
+                outputs,
+            )
+            self.assertIn("retried_shard_count=0\n", outputs)
+
+    def test_failing_but_complete_shard_is_not_retried(self) -> None:
+        # The retry pass exists for shards that went unmeasured, not for shards
+        # that measured their slice and found failures — rerunning those would
+        # burn a full run to produce the same answer.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            github_output = shard_dir / "github-output.txt"
+            self._write_report(
+                shard_dir,
+                "wpt-shard-0.json",
+                0,
+                [self._failure("css/a/one.html", "PixelMismatch", "LayoutShift")],
+            )
+            self._write_status(shard_dir, shard_index=0, exit_code=1)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_PATH),
+                    "--shard-dir",
+                    temp,
+                    "--expected-shards",
+                    "0",
+                    "--github-output",
+                    str(github_output),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            outputs = github_output.read_text(encoding="utf-8")
+            self.assertIn("has_incomplete_shards=false\n", outputs)
+            self.assertIn("incomplete_shard_indexes=\n", outputs)
+            self.assertIn("incomplete_shard_matrix=[]\n", outputs)
+            # The failure itself is still reported, just not rerun.
+            self.assertIn("failed_count=1\n", outputs)
+
+    def test_retry_supersedes_the_aborted_attempt_in_the_manifest(self) -> None:
+        # --merge-into scopes persistence to the tests a run exercised. A rerun
+        # shard's *rerun* results are that scope; the aborted attempt's partial
+        # verdicts must not resurrect entries the rerun has since passed.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp) / "shards"
+            shard_dir.mkdir()
+            manifest = Path(temp) / "failed-tests.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 0, "failed": 1, "skipped": 0, "total": 1},
+                        "results": [
+                            {
+                                "relativeTestPath": "css/a/one.html",
+                                "passed": False,
+                                "skipped": False,
+                                "category": "RenderingError",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            # The aborted attempt saw css/a/one.html fail; the rerun saw it pass
+            # (it is absent from the rerun's failures) and css/a/two.html fail.
+            self._write_report(
+                shard_dir,
+                "wpt-shard-0.json",
+                0,
+                [self._failure("css/a/one.html", "RenderingError")],
+            )
+            self._write_status(shard_dir, shard_index=0, exit_code=134)
+            (shard_dir / "wpt-shard-0-retry.json").write_text(
+                json.dumps(
+                    {
+                        "summary": {"passed": 1, "failed": 1, "skipped": 0, "total": 2},
+                        "shard": {"index": 0, "count": 8},
+                        "results": [
+                            {
+                                "relativeTestPath": "css/a/one.html",
+                                "passed": True,
+                                "skipped": False,
+                                "category": "Pass",
+                            },
+                            self._failure("css/a/two.html", "Timeout"),
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self._write_status(shard_dir, shard_index=0, exit_code=1, attempt_suffix="-retry")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_PATH),
+                    "--shard-dir",
+                    str(shard_dir),
+                    "--merge-into",
+                    str(manifest),
+                    "--merged-json",
+                    str(manifest),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            written = json.loads(manifest.read_text(encoding="utf-8"))
+            self.assertEqual(
+                ["css/a/two.html"],
+                [entry["relativeTestPath"] for entry in written["results"]],
+            )
 
     @staticmethod
     def _failure(path: str, category: str, sub_category: str | None = None) -> dict:

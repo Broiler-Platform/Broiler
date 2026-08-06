@@ -1,0 +1,240 @@
+name: Run WPT shard
+description: >
+  Provision a runner, run one shard of the WPT suite, and upload its results as
+  an artifact. Factored out of .github/workflows/wpt-tests.yml because two jobs
+  need exactly these steps: the initial sharded pass and the end-of-workflow
+  retry pass that re-runs any shard which aborted abnormally. Keeping them in
+  one place is what guarantees a retried shard is measured identically to the
+  attempt it replaces — a retry run with a different reference cache or a
+  different patch set would not be comparable at the 99% pixel threshold.
+
+inputs:
+  shard-index:
+    description: Zero-based index of the shard to run.
+    required: true
+  shard-count:
+    description: Total number of shards the suite is split into.
+    required: true
+  attempt-suffix:
+    description: >
+      Suffix appended to this attempt's artifact and result-file names — empty
+      for the first attempt, "-retry" for the end-of-workflow rerun. The names
+      have to differ because every shard artifact is downloaded into one merged
+      directory; scripts/merge-wpt-shards.py reads the suffix back off the file
+      name so a retry supersedes the attempt it replaces instead of being summed
+      alongside it.
+    required: false
+    default: ''
+  subset:
+    description: Semicolon-separated WPT subset patterns, or empty for the full suite.
+    required: false
+    default: ''
+  rerun-failed:
+    description: >
+      "true" to rerun only the previously-failed tests listed in
+      failed-tests-file, reusing cached references.
+    required: false
+    default: 'false'
+  failed-tests-file:
+    description: Path to the committed failing-test manifest used by rerun-failed.
+    required: true
+  cache-epoch:
+    description: Cache epoch; bumping it refreshes the WPT checkout and references.
+    required: true
+  wpt-checkout-dir:
+    description: Directory holding the (cached) WPT checkout.
+    required: true
+  reference-dir:
+    description: Directory holding this shard's (cached) Chromium reference slice.
+    required: true
+  results-dir:
+    description: Directory the runner writes its results into.
+    required: true
+  test-timeout-seconds:
+    description: Per-test timeout in seconds.
+    required: true
+  memory-limit-mb:
+    description: Per-test RAM cap in MiB (0 disables).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: |
+          8.0.x
+          10.0.x
+
+    - uses: actions/setup-node@v5
+      with:
+        node-version: '20'
+
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+
+    - name: Restore WPT checkout
+      uses: actions/cache@v5
+      with:
+        path: ${{ inputs.wpt-checkout-dir }}
+        key: wpt-checkout-${{ inputs.cache-epoch }}
+
+    - name: Cache shard references
+      uses: actions/cache@v5
+      with:
+        path: ${{ inputs.reference-dir }}
+        key: wpt-refs-${{ inputs.cache-epoch }}-shard-${{ inputs.shard-index }}
+
+    # Keep the Chromium build itself between runs, so a run only depends on the
+    # download being reachable when Playwright is actually bumped. There is no
+    # mirror to fall back to: for linux64 Playwright serves Chromium as a Chrome
+    # for Testing build, and every URL for it — cdn.playwright.dev included — is
+    # a redirect to the one Google bucket that geo-blocked shard 0 in issue
+    # #1534. Its ESRP mirror carries no x64 Linux Chromium at all. Caching is the
+    # only fallback that keeps the *same* binary, and the binary has to stay the
+    # same: references are compared at a 99% pixel threshold, so regenerating a
+    # slice with a different Chrome build would read as an engine regression.
+    #
+    # Keyed on the lockfile rather than the cache epoch: bumping the epoch
+    # refreshes WPT master and the reference slices, which is exactly when you
+    # still want the browser. The restore-key prefix means an unrelated lockfile
+    # edit reuses the existing browser instead of re-downloading it, while a
+    # genuine Playwright bump misses and fetches the new revision.
+    - name: Cache Playwright browsers
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/ms-playwright
+        key: wpt-playwright-${{ runner.os }}-${{ hashFiles('tests/wpt/package-lock.json') }}
+        restore-keys: wpt-playwright-${{ runner.os }}-
+
+    # Apply any submodule fix that could not be pushed to its remote (push 403
+    # → captured under patches/) and is NOT yet in the pinned pointer, so the
+    # runner exercises it. Live again as of issue #1497: PENDING_PATCHES carries
+    # 0043 (Broiler.CSS — the @container recursion that crashed the worker and
+    # gated 68 tests), 0044 and 0045 (Broiler.HTML — percentage scale factors,
+    # and a table painting its own background). Without this step those three
+    # fixes are absent from the run no matter how many times the suite is
+    # re-run, because their remotes are outside the session's GitHub scope.
+    # Entries are added only after checking they do not reverse-apply to the
+    # pinned pointer and do apply cleanly; the mechanism is idempotent, so an
+    # entry stops applying by itself once a maintainer lands the fix upstream
+    # and bumps the pointer. A patch that has gone stale against a drifted
+    # pointer fails this step loudly rather than being skipped — that is
+    # deliberate, since silently dropping a fix is what the step exists to
+    # prevent. The build compiles submodule source in place, so patching the
+    # checked-out working tree is sufficient — no pointer bump. Only Broiler's
+    # render is affected; Chromium reference generation is untouched.
+    - name: Apply pending submodule patches
+      shell: bash
+      run: bash scripts/apply-pending-wpt-patches.sh
+
+    - name: Run WPT shard ${{ inputs.shard-index }}${{ inputs.attempt-suffix }}
+      id: wpt
+      shell: bash
+      env:
+        SHARD_INDEX: ${{ inputs.shard-index }}
+        SHARD_COUNT: ${{ inputs.shard-count }}
+        SUBSET: ${{ inputs.subset }}
+        RERUN_FAILED: ${{ inputs.rerun-failed }}
+        FAILED_TESTS_FILE: ${{ inputs.failed-tests-file }}
+        BROILER_WPT_TIMEOUT_SECONDS: ${{ inputs.test-timeout-seconds }}
+        BROILER_WPT_MEMORY_LIMIT_MB: ${{ inputs.memory-limit-mb }}
+        # Match Chromium's reference generator, which screenshots at `load` before
+        # any promise_test body runs: skip executing stub promise_test bodies in
+        # Broiler's runner so post-load layout mutations (scrollTo, display toggling)
+        # in the css-anchor-position scroll cluster do not advance the captured DOM
+        # past the reference point. Affects only the C# runner, not the (Chromium)
+        # reference generation. Revert by removing this line if it regresses tests.
+        BROILER_WPT_DEFER_PROMISE_TESTS: '1'
+      run: |
+        # The regular WPT suite executes JavaScript in both Chromium and
+        # Broiler. --non-js remains available only for explicit local runs.
+        ARGS=(--shard-index "$SHARD_INDEX" --shard-count "$SHARD_COUNT")
+        if [ -n "$SUBSET" ]; then
+          ARGS+=(--subset "$SUBSET")
+        fi
+        if [ "$RERUN_FAILED" = "true" ]; then
+          # Incremental: rerun only the previously-failed tests. Reference
+          # generation is NOT skipped — run-wpt-tests.sh restricts it to just the
+          # rerun set (fast, and it guarantees those tests have references).
+          # Skipping generation here relied on a cached reference set that is not
+          # reliably present, which skipped every reran test as "missing
+          # reference image" and made the run meaningless.
+          ARGS+=(--rerun-json "$FAILED_TESTS_FILE")
+        fi
+        EXIT=0
+        bash scripts/run-wpt-tests.sh "${ARGS[@]}" || EXIT=$?
+        echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
+        echo "Shard $SHARD_INDEX finished (exit $EXIT)."
+        exit "$EXIT"
+
+    - name: Collect shard result
+      if: always()
+      shell: bash
+      env:
+        RESULTS_DIR: ${{ inputs.results-dir }}
+        SHARD_INDEX: ${{ inputs.shard-index }}
+        ATTEMPT_SUFFIX: ${{ inputs.attempt-suffix }}
+        WPT_EXIT_CODE: ${{ steps.wpt.outputs.exit_code }}
+      run: |
+        mkdir -p shard-out
+        STEM="wpt-shard-${SHARD_INDEX}${ATTEMPT_SUFFIX}"
+        cp "$RESULTS_DIR/wpt-results.json" "shard-out/${STEM}.json" 2>/dev/null || true
+        cp "$RESULTS_DIR/wpt-results.log"  "shard-out/${STEM}.log"  2>/dev/null || true
+        EXIT="$WPT_EXIT_CODE"
+        if ! [[ "$EXIT" =~ ^[0-9]+$ ]]; then
+          EXIT=1
+        fi
+        # run-wpt-tests.sh leaves a marker when the shard could not run a single
+        # test — e.g. the Playwright CDN refused its Chromium download. Folding
+        # that into the status file is what lets the merge step name the real
+        # cause instead of guessing at one (issue #1534).
+        python3 - "$SHARD_INDEX" "$EXIT" \
+          "$RESULTS_DIR/wpt-shard-failure.json" \
+          "shard-out/${STEM}-status.json" <<'PY'
+        import json, sys
+
+        shard_index, exit_code, marker_path, out_path = sys.argv[1:5]
+        status = {"shardIndex": int(shard_index), "exitCode": int(exit_code)}
+        try:
+            with open(marker_path, encoding="utf-8") as handle:
+                marker = json.load(handle)
+        except (OSError, ValueError):
+            marker = None
+        if isinstance(marker, dict):
+            if marker.get("reason"):
+                status["failureReason"] = str(marker["reason"])
+            if marker.get("detail"):
+                status["failureDetail"] = str(marker["detail"])
+        with open(out_path, "w", encoding="utf-8") as handle:
+            json.dump(status, handle)
+            handle.write("\n")
+        PY
+
+    - name: Shard step summary
+      if: always()
+      shell: bash
+      env:
+        RESULTS_DIR: ${{ inputs.results-dir }}
+        SHARD_INDEX: ${{ inputs.shard-index }}
+        SHARD_COUNT: ${{ inputs.shard-count }}
+        ATTEMPT_SUFFIX: ${{ inputs.attempt-suffix }}
+      run: |
+        SUMMARY="$RESULTS_DIR/wpt-summary.txt"
+        if [ -f "$SUMMARY" ]; then
+          LABEL="WPT shard ${SHARD_INDEX}/${SHARD_COUNT}"
+          if [ -n "$ATTEMPT_SUFFIX" ]; then
+            LABEL="$LABEL (retry)"
+          fi
+          echo "### $LABEL" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - uses: actions/upload-artifact@v6
+      if: always()
+      with:
+        name: wpt-shard-${{ inputs.shard-index }}${{ inputs.attempt-suffix }}
+        path: shard-out

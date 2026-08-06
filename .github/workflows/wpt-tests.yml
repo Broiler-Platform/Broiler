@@ -24,6 +24,14 @@ name: WPT Tests
 # browserless slice that would report every test as a missing reference, and
 # records why it stopped so the merged report names that cause rather than
 # guessing at a runner eviction. See scripts/lib/wpt-browser-install.sh.
+#
+# Any shard that aborts abnormally — evicted runner, unobtainable browser, hard
+# crash, i.e. no conclusive report — is rerun once at the end of the workflow by
+# the `retry` job, before the results are merged. A rerun shard's artifacts carry
+# a `-retry` suffix, and merge-wpt-shards.py keeps only the latest attempt per
+# shard, so the rerun's results are merged with the other shards' in place of the
+# aborted attempt rather than added on top of it. Shards that merely *fail* tests
+# are not rerun — they already measured their slice.
 
 on:
   workflow_dispatch:
@@ -161,174 +169,133 @@ jobs:
       fail-fast: false
       matrix:
         include: ${{ fromJson(needs.plan.outputs.shard-matrix) }}
-    env:
-      BROILER_WPT_TIMEOUT_SECONDS: ${{ github.event.inputs.test_timeout_seconds || '30' }}
-      BROILER_WPT_MEMORY_LIMIT_MB: ${{ github.event.inputs.memory_limit_mb || '1024' }}
     steps:
       - uses: actions/checkout@v5
         with:
           submodules: recursive
 
-      - uses: actions/setup-dotnet@v5
+      # Every provisioning/run/collect/upload step lives in the composite action,
+      # so the retry pass below runs a shard exactly the way this pass did.
+      - uses: ./.github/actions/run-wpt-shard
         with:
-          dotnet-version: |
-            8.0.x
-            10.0.x
+          shard-index: ${{ matrix.shard-index }}
+          shard-count: ${{ env.SHARD_COUNT }}
+          subset: ${{ github.event.inputs.subset || '' }}
+          rerun-failed: ${{ needs.plan.outputs.rerun-failed }}
+          failed-tests-file: ${{ env.FAILED_TESTS_FILE }}
+          cache-epoch: ${{ env.CACHE_EPOCH }}
+          wpt-checkout-dir: ${{ env.WPT_CHECKOUT_DIR }}
+          reference-dir: ${{ env.REFERENCE_DIR }}
+          results-dir: ${{ env.RESULTS_DIR }}
+          test-timeout-seconds: ${{ github.event.inputs.test_timeout_seconds || '30' }}
+          memory-limit-mb: ${{ github.event.inputs.memory_limit_mb || '1024' }}
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '20'
+  # ── Decide which shards aborted abnormally and deserve one rerun ─────────
+  #
+  # "Abnormally" is not "some tests failed": a shard that finishes and reports
+  # failures exits 1 with a full report, and rerunning it would only burn an hour
+  # to produce the same answer. What is retried is a shard that produced *no
+  # conclusive report* — its runner was evicted mid-run (the "shutdown signal"
+  # case, where the always() upload never happened), it died before running a
+  # test (e.g. the Playwright CDN geo-blocked its Chromium download, issue
+  # #1534), or it crashed hard enough to lose its report. Those are the runs
+  # whose whole slice went unmeasured, and they are exactly the shards
+  # merge-wpt-shards.py already flags as incomplete — so the same code decides
+  # here rather than a second, drifting definition of "incomplete".
+  retry-plan:
+    needs: [plan, run]
+    # !cancelled() rather than always(): if a human cancels the workflow, every
+    # shard looks incomplete and retrying them all is the opposite of what was
+    # asked. A single evicted shard does not cancel the run, so it still retries.
+    if: ${{ !cancelled() && needs.run.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    outputs:
+      retry-matrix: ${{ steps.detect.outputs.incomplete_shard_matrix }}
+      retry-shards: ${{ steps.detect.outputs.incomplete_shard_indexes }}
+      has-retries: ${{ steps.detect.outputs.has_incomplete_shards }}
+    steps:
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - name: Restore WPT checkout
-        uses: actions/cache@v5
+      # Tolerated failure: when *every* shard died before its upload step there
+      # is no artifact to match, and download-artifact treats that as an error.
+      # That case is precisely the one worth retrying, so it must not stop the
+      # job — the detect step below then sees an empty directory and flags every
+      # dispatched shard.
+      - name: Download shard results
+        continue-on-error: true
+        uses: actions/download-artifact@v7
         with:
-          path: ${{ env.WPT_CHECKOUT_DIR }}
-          key: wpt-checkout-${{ env.CACHE_EPOCH }}
+          pattern: wpt-shard-*
+          path: shard-results
+          merge-multiple: true
 
-      - name: Cache shard references
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.REFERENCE_DIR }}
-          key: wpt-refs-${{ env.CACHE_EPOCH }}-shard-${{ matrix.shard-index }}
-
-      # Keep the Chromium build itself between runs, so a run only depends on the
-      # download being reachable when Playwright is actually bumped. There is no
-      # mirror to fall back to: for linux64 Playwright serves Chromium as a Chrome
-      # for Testing build, and every URL for it — cdn.playwright.dev included — is
-      # a redirect to the one Google bucket that geo-blocked shard 0 in issue
-      # #1534. Its ESRP mirror carries no x64 Linux Chromium at all. Caching is the
-      # only fallback that keeps the *same* binary, and the binary has to stay the
-      # same: references are compared at a 99% pixel threshold, so regenerating a
-      # slice with a different Chrome build would read as an engine regression.
-      #
-      # Keyed on the lockfile rather than CACHE_EPOCH: bumping the epoch refreshes
-      # WPT master and the reference slices, which is exactly when you still want
-      # the browser. The restore-key prefix means an unrelated lockfile edit reuses
-      # the existing browser instead of re-downloading it, while a genuine
-      # Playwright bump misses and fetches the new revision.
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: wpt-playwright-${{ runner.os }}-${{ hashFiles('tests/wpt/package-lock.json') }}
-          restore-keys: wpt-playwright-${{ runner.os }}-
-
-      # Apply any submodule fix that could not be pushed to its remote (push 403
-      # → captured under patches/) and is NOT yet in the pinned pointer, so the
-      # runner exercises it. Live again as of issue #1497: PENDING_PATCHES carries
-      # 0043 (Broiler.CSS — the @container recursion that crashed the worker and
-      # gated 68 tests), 0044 and 0045 (Broiler.HTML — percentage scale factors,
-      # and a table painting its own background). Without this step those three
-      # fixes are absent from the run no matter how many times the suite is
-      # re-run, because their remotes are outside the session's GitHub scope.
-      # Entries are added only after checking they do not reverse-apply to the
-      # pinned pointer and do apply cleanly; the mechanism is idempotent, so an
-      # entry stops applying by itself once a maintainer lands the fix upstream
-      # and bumps the pointer. A patch that has gone stale against a drifted
-      # pointer fails this step loudly rather than being skipped — that is
-      # deliberate, since silently dropping a fix is what the step exists to
-      # prevent. The build compiles submodule source in place, so patching the
-      # checked-out working tree is sufficient — no pointer bump. Only Broiler's
-      # render is affected; Chromium reference generation is untouched.
-      - name: Apply pending submodule patches
+      - name: Detect shards that aborted abnormally
+        id: detect
         shell: bash
-        run: bash scripts/apply-pending-wpt-patches.sh
+        run: |
+          mkdir -p shard-results
+          python scripts/merge-wpt-shards.py \
+            --shard-dir shard-results \
+            --expected-shards "${{ needs.plan.outputs.expected-shards }}" \
+            --github-output "$GITHUB_OUTPUT"
 
-      - name: Run WPT shard ${{ matrix.shard-index }}
-        id: wpt
+      - name: Report the retry plan
         shell: bash
         env:
-          SUBSET: ${{ github.event.inputs.subset || '' }}
-          RERUN_FAILED: ${{ needs.plan.outputs.rerun-failed }}
-          # Match Chromium's reference generator, which screenshots at `load` before
-          # any promise_test body runs: skip executing stub promise_test bodies in
-          # Broiler's runner so post-load layout mutations (scrollTo, display toggling)
-          # in the css-anchor-position scroll cluster do not advance the captured DOM
-          # past the reference point. Affects only the C# runner, not the (Chromium)
-          # reference generation. Revert by removing this line if it regresses tests.
-          BROILER_WPT_DEFER_PROMISE_TESTS: '1'
+          RETRY_SHARDS: ${{ steps.detect.outputs.incomplete_shard_indexes }}
         run: |
-          # The regular WPT suite executes JavaScript in both Chromium and
-          # Broiler. --non-js remains available only for explicit local runs.
-          ARGS=(--shard-index "${{ matrix.shard-index }}" --shard-count "$SHARD_COUNT")
-          if [ -n "$SUBSET" ]; then
-            ARGS+=(--subset "$SUBSET")
-          fi
-          if [ "$RERUN_FAILED" = "true" ]; then
-            # Incremental: rerun only the previously-failed tests. Reference
-            # generation is NOT skipped — run-wpt-tests.sh restricts it to just the
-            # rerun set (fast, and it guarantees those tests have references).
-            # Skipping generation here relied on a cached reference set that is not
-            # reliably present, which skipped every reran test as "missing
-            # reference image" and made the run meaningless.
-            ARGS+=(--rerun-json "$FAILED_TESTS_FILE")
-          fi
-          EXIT=0
-          bash scripts/run-wpt-tests.sh "${ARGS[@]}" || EXIT=$?
-          echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
-          echo "Shard ${{ matrix.shard-index }} finished (exit $EXIT)."
-          exit "$EXIT"
-
-      - name: Collect shard result
-        if: always()
-        run: |
-          mkdir -p shard-out
-          cp "$RESULTS_DIR/wpt-results.json" "shard-out/wpt-shard-${{ matrix.shard-index }}.json" 2>/dev/null || true
-          cp "$RESULTS_DIR/wpt-results.log"  "shard-out/wpt-shard-${{ matrix.shard-index }}.log"  2>/dev/null || true
-          EXIT="${{ steps.wpt.outputs.exit_code }}"
-          if ! [[ "$EXIT" =~ ^[0-9]+$ ]]; then
-            EXIT=1
-          fi
-          # run-wpt-tests.sh leaves a marker when the shard could not run a single
-          # test — e.g. the Playwright CDN refused its Chromium download. Folding
-          # that into the status file is what lets the merge step name the real
-          # cause instead of guessing at one (issue #1534).
-          python3 - "${{ matrix.shard-index }}" "$EXIT" \
-            "$RESULTS_DIR/wpt-shard-failure.json" \
-            "shard-out/wpt-shard-${{ matrix.shard-index }}-status.json" <<'PY'
-          import json, sys
-
-          shard_index, exit_code, marker_path, out_path = sys.argv[1:5]
-          status = {"shardIndex": int(shard_index), "exitCode": int(exit_code)}
-          try:
-              with open(marker_path, encoding="utf-8") as handle:
-                  marker = json.load(handle)
-          except (OSError, ValueError):
-              marker = None
-          if isinstance(marker, dict):
-              if marker.get("reason"):
-                  status["failureReason"] = str(marker["reason"])
-              if marker.get("detail"):
-                  status["failureDetail"] = str(marker["detail"])
-          with open(out_path, "w", encoding="utf-8") as handle:
-              json.dump(status, handle)
-              handle.write("\n")
-          PY
-
-      - name: Shard step summary
-        if: always()
-        run: |
-          SUMMARY="$RESULTS_DIR/wpt-summary.txt"
-          if [ -f "$SUMMARY" ]; then
-            echo "### WPT shard ${{ matrix.shard-index }}/${SHARD_COUNT}" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$RETRY_SHARDS" ]; then
+            echo "### WPT retry pass" >> "$GITHUB_STEP_SUMMARY"
+            echo "Rerunning shard(s) that aborted abnormally: \`$RETRY_SHARDS\`." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - uses: actions/upload-artifact@v6
-        if: always()
+  # ── Rerun the aborted shards, once, at the end of the workflow ───────────
+  #
+  # One retry pass only: a shard that aborts twice is reported as incomplete just
+  # as before, rather than looping the workflow for hours. Each retry uploads to
+  # `wpt-shard-<i>-retry`, whose files carry the same `-retry` suffix, so the
+  # merge step can tell the two attempts apart in the flattened download
+  # directory and let the retry supersede — not add to — the attempt it replaces.
+  retry:
+    needs: [plan, prepare, retry-plan]
+    if: ${{ !cancelled() && needs.retry-plan.outputs.has-retries == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.retry-plan.outputs.retry-matrix) }}
+    steps:
+      - uses: actions/checkout@v5
         with:
-          name: wpt-shard-${{ matrix.shard-index }}
-          path: shard-out
+          submodules: recursive
+
+      - uses: ./.github/actions/run-wpt-shard
+        with:
+          shard-index: ${{ matrix.shard-index }}
+          shard-count: ${{ env.SHARD_COUNT }}
+          attempt-suffix: '-retry'
+          subset: ${{ github.event.inputs.subset || '' }}
+          rerun-failed: ${{ needs.plan.outputs.rerun-failed }}
+          failed-tests-file: ${{ env.FAILED_TESTS_FILE }}
+          cache-epoch: ${{ env.CACHE_EPOCH }}
+          wpt-checkout-dir: ${{ env.WPT_CHECKOUT_DIR }}
+          reference-dir: ${{ env.REFERENCE_DIR }}
+          results-dir: ${{ env.RESULTS_DIR }}
+          test-timeout-seconds: ${{ github.event.inputs.test_timeout_seconds || '30' }}
+          memory-limit-mb: ${{ github.event.inputs.memory_limit_mb || '1024' }}
 
   # ── Merge shard results; file an issue when there are failures ───────────
+  #
+  # Depends on `retry` as well as `run` so the merge sees the reruns' artifacts;
+  # `always()` keeps it running when the retry job was skipped (nothing aborted)
+  # or itself failed.
   report:
-    needs: [plan, run]
+    needs: [plan, run, retry]
     if: always() && needs.run.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
@@ -424,7 +391,7 @@ jobs:
 
   # ── Persist the failing-test manifest for incremental reruns ─────────────
   persist-failed:
-    needs: run
+    needs: [run, retry]
     # Refresh the failed-tests manifest (tests/wpt-baseline/failed-tests.json),
     # which drives incremental --rerun-failed-only runs, after any run that
     # actually executed shards — success OR failure. The run job reports
@@ -439,6 +406,10 @@ jobs:
     # subset/single-shard/rerun run updates just its own slice without shrinking
     # the manifest — no full-suite gate needed, and a crashed shard simply leaves
     # its tests' existing entries untouched rather than dropping them.
+    #
+    # `retry` is in `needs` only so the reruns' artifacts are on hand before the
+    # merge; it is not part of the gate, since it is skipped on the normal path
+    # where nothing aborted.
     if: >-
       always()
       && (needs.run.result == 'success' || needs.run.result == 'failure')
