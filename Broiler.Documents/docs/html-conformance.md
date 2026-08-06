@@ -47,12 +47,16 @@ spaces; `<pre>` preserves whitespace.
 | Soft breaks | `<br>` |
 | Inline style fields | CSS on `<span>` or `<a>` |
 | `LinkHref` | `<a href="...">` |
+| `InlineStyle.Image` | `<img src="data:...;base64,...">` with `alt` and a CSS size |
 | Paragraph alignment, line spacing, indent, spacing | CSS on `<p>` |
 
 `ListKind` is not written in the first subset; the writer preserves indentation
-and emits an `html.list` diagnostic. Non-model constructs such as tables,
-images, embedded objects, scripts, stylesheets, forms, and metadata are not
-serialized from the model.
+and emits an `html.list` diagnostic. An embedded image is written inline as a
+base64 data URI (`html.image.datauri`), which keeps an exported page a single
+file; the reader does not turn `<img>` back into a model image, so an image does
+not survive an HTML round-trip. Non-model constructs such as tables, embedded
+objects, scripts, stylesheets, forms, and metadata are not serialized from the
+model.
 
 ## Security And Limits
 

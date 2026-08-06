@@ -13,6 +13,12 @@ internal static class Program
     {
         _ = SetProcessDpiAwarenessContext(new IntPtr(-4)); // PER_MONITOR_AWARE_V2, best effort.
 
+        // Composition root: without a codec catalog the renderer cannot decode
+        // the images a document embeds, and the editor would draw every picture
+        // as an empty outline.
+        Broiler.Graphics.BImageCodecs.Use(
+            new Broiler.Media.MediaCodecCatalog(Broiler.Media.Image.Managed.ManagedImageCodecs.CreateCodecs()));
+
         try
         {
             using var window = new WriterWindow();

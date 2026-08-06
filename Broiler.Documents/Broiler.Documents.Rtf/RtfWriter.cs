@@ -29,6 +29,8 @@ public static class RtfWriter
 
         var fonts = new ResourceTable<string>(StringComparer.Ordinal);
         var colors = new ResourceTable<BColor>(EqualityComparer<BColor>.Default);
+        var diagnostics = new List<DocumentDiagnostic>();
+        var reported = new HashSet<string>(StringComparer.Ordinal);
         CollectResources(document, fonts, colors);
 
         var sb = new StringBuilder();
@@ -41,7 +43,7 @@ public static class RtfWriter
             sb.Append("\\pard\\plain");
             WriteParagraphProperties(sb, paragraph.Style);
             sb.Append(' ');
-            WriteRuns(sb, paragraph, fonts, colors);
+            WriteRuns(sb, paragraph, fonts, colors, diagnostics, reported);
             sb.Append("\\par\n");
         }
 
@@ -49,7 +51,7 @@ public static class RtfWriter
 
         byte[] bytes = Encoding.ASCII.GetBytes(sb.ToString());
         destination.Write(bytes, 0, bytes.Length);
-        return new DocumentWriteResult(bytes.Length);
+        return new DocumentWriteResult(bytes.Length, diagnostics);
     }
 
     /// <summary>Serialize to a byte array (convenience over the stream overload).</summary>
@@ -129,14 +131,16 @@ public static class RtfWriter
         StringBuilder sb,
         RichTextParagraph paragraph,
         ResourceTable<string> fonts,
-        ResourceTable<BColor> colors)
+        ResourceTable<BColor> colors,
+        List<DocumentDiagnostic> diagnostics,
+        HashSet<string> reported)
     {
         int offset = 0;
         foreach (StyleRun run in paragraph.Runs)
         {
             string text = paragraph.Text.Substring(offset, run.Length);
             offset += run.Length;
-            WriteRun(sb, text, run.Style, fonts, colors);
+            WriteRun(sb, text, run.Style, fonts, colors, diagnostics, reported);
         }
     }
 
@@ -145,8 +149,16 @@ public static class RtfWriter
         string text,
         InlineStyle style,
         ResourceTable<string> fonts,
-        ResourceTable<BColor> colors)
+        ResourceTable<BColor> colors,
+        List<DocumentDiagnostic> diagnostics,
+        HashSet<string> reported)
     {
+        if (style.Image is InlineImage image)
+        {
+            WriteImageRun(sb, text, image, style, fonts, colors, diagnostics, reported);
+            return;
+        }
+
         if (!string.IsNullOrEmpty(style.LinkHref))
         {
             sb.Append("{\\field{\\*\\fldinst{HYPERLINK \"");
@@ -159,6 +171,88 @@ public static class RtfWriter
 
         WriteStyledText(sb, text, style, fonts, colors);
     }
+
+    /// <summary>
+    /// Writes an image run as an RTF <c>\pict</c> destination. RTF names only a
+    /// few picture encodings; bytes in any other format are dropped with a
+    /// diagnostic rather than written under a label that would misdescribe them.
+    /// </summary>
+    private static void WriteImageRun(
+        StringBuilder sb,
+        string text,
+        InlineImage image,
+        InlineStyle style,
+        ResourceTable<string> fonts,
+        ResourceTable<BColor> colors,
+        List<DocumentDiagnostic> diagnostics,
+        HashSet<string> reported)
+    {
+        string? blip = PictureControlWord(image.ContentType);
+        int start = 0;
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (text[i] != InlineImage.Placeholder)
+                continue;
+
+            if (i > start)
+                WriteStyledText(sb, text[start..i], style, fonts, colors);
+
+            if (blip is null)
+            {
+                AddOnce(
+                    diagnostics,
+                    reported,
+                    "rtf.image.format",
+                    "RTF carries only PNG and JPEG pictures; an image in another format was dropped.");
+            }
+            else
+            {
+                WritePicture(sb, image, blip);
+            }
+
+            start = i + 1;
+        }
+
+        if (start < text.Length)
+            WriteStyledText(sb, text[start..], style, fonts, colors);
+    }
+
+    private static void WritePicture(StringBuilder sb, InlineImage image, string blip)
+    {
+        sb.Append("{\\pict").Append(blip);
+        if (image.HasExplicitSize)
+        {
+            sb.Append("\\picwgoal").Append(Twips((float)image.Width));
+            sb.Append("\\pichgoal").Append(Twips((float)image.Height));
+        }
+
+        sb.Append(' ');
+        ReadOnlySpan<byte> data = image.Data.Span;
+        foreach (byte value in data)
+            sb.Append(HexDigits[value >> 4]).Append(HexDigits[value & 0x0F]);
+
+        sb.Append('}');
+    }
+
+    private static string? PictureControlWord(string contentType) =>
+        contentType.ToLowerInvariant() switch
+        {
+            "image/png" => "\\pngblip",
+            "image/jpeg" or "image/jpg" => "\\jpegblip",
+            _ => null,
+        };
+
+    private static void AddOnce(
+        List<DocumentDiagnostic> diagnostics,
+        HashSet<string> reported,
+        string code,
+        string message)
+    {
+        if (reported.Add(code))
+            diagnostics.Add(DocumentDiagnostic.Warning(code, message));
+    }
+
+    private const string HexDigits = "0123456789abcdef";
 
     private static void WriteStyledText(
         StringBuilder sb,

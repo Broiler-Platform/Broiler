@@ -34,7 +34,8 @@ internal sealed class WriterWindow : Direct2DWindow
             () => ClientSize,
             () => DpiScale,
             Invalidate,
-            static _ => { });
+            static _ => { },
+            getRenderer: () => Renderer);
         _app = new WriterApp(_host, CloseNativeWindow);
     }
 

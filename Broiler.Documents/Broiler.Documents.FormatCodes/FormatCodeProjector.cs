@@ -317,6 +317,13 @@ public sealed class FormatCodeProjector
                         affected, FormatCodeMappingMode.Expanded,
                         StructureDescriptor(FormatCodeProperty.LineBreak, affected));
                     break;
+                case InlineImage.Placeholder:
+                    // The character an image occupies. Removing the token
+                    // removes that character, which is what deletes the picture.
+                    builder.AddToken(FormatCodeTokenKind.StructureCode, "[Image]", sourceBefore, sourceAfter,
+                        affected, FormatCodeMappingMode.Expanded,
+                        StructureDescriptor(FormatCodeProperty.Image, affected));
+                    break;
                 case '\\':
                     builder.AddToken(FormatCodeTokenKind.Escape, "\\\\", sourceBefore, sourceAfter, affected, FormatCodeMappingMode.Expanded);
                     break;
@@ -346,7 +353,7 @@ public sealed class FormatCodeProjector
     private static bool RequiresSpecialToken(string text, int index)
     {
         char character = text[index];
-        if (character is '\t' or '\u2028' or '\\' or '[' or ']')
+        if (character is '\t' or '\u2028' or InlineImage.Placeholder or '\\' or '[' or ']')
             return true;
         if (char.IsHighSurrogate(character))
             return index + 1 >= text.Length || !char.IsLowSurrogate(text[index + 1]);

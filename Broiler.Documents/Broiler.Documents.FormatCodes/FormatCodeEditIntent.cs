@@ -52,6 +52,10 @@ public enum FormatCodeProperty
     Tab,
     LineBreak,
     ParagraphBreak,
+
+    // The single character an embedded image occupies. Like the other structure
+    // properties it is removed by deleting that character.
+    Image,
 }
 
 /// <summary>

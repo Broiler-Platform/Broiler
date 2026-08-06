@@ -38,9 +38,20 @@ public readonly record struct InlineStyle
     /// <summary>Link target, or <see langword="null"/> when the run is not a link.</summary>
     public string? LinkHref { get; init; }
 
+    /// <summary>
+    /// The image drawn in place of the run's text, or <see langword="null"/> for
+    /// an ordinary text run. An image run holds exactly one
+    /// <see cref="InlineImage.Placeholder"/> character per image, so the image
+    /// takes one character position in the document.
+    /// </summary>
+    public InlineImage? Image { get; init; }
+
     /// <summary>The unformatted default style (<c>default(InlineStyle)</c>).</summary>
     public static InlineStyle Default => default;
 
     /// <summary>True when the run carries link metadata.</summary>
     public bool IsLink => !string.IsNullOrEmpty(LinkHref);
+
+    /// <summary>True when the run draws an image rather than text.</summary>
+    public bool IsImage => Image is not null;
 }

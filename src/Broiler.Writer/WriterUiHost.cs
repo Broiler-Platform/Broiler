@@ -4,7 +4,7 @@ using Broiler.UI;
 
 namespace Broiler.Writer;
 
-internal sealed class WriterUiHost : IUiHost, IUiClipboardHost, IUiTextInputHost, IDisposable
+internal sealed class WriterUiHost : IUiHost, IUiClipboardHost, IUiTextInputHost, IUiImageHost, IDisposable
 {
     private readonly Func<BSize> _getViewportSize;
     private readonly Func<double> _getScale;
@@ -13,6 +13,7 @@ internal sealed class WriterUiHost : IUiHost, IUiClipboardHost, IUiTextInputHost
     private readonly Func<string?>? _getClipboardText;
     private readonly Action<string>? _setClipboardText;
     private readonly Action<UiTextCaretInfo?>? _caretChanged;
+    private readonly Func<IBroilerRenderer?>? _getRenderer;
     private string _clipboardText = string.Empty;
 
     public WriterUiHost(
@@ -22,7 +23,8 @@ internal sealed class WriterUiHost : IUiHost, IUiClipboardHost, IUiTextInputHost
         Action<BRenderList> present,
         Func<string?>? getClipboardText = null,
         Action<string>? setClipboardText = null,
-        Action<UiTextCaretInfo?>? caretChanged = null)
+        Action<UiTextCaretInfo?>? caretChanged = null,
+        Func<IBroilerRenderer?>? getRenderer = null)
     {
         _getViewportSize = getViewportSize ?? throw new ArgumentNullException(nameof(getViewportSize));
         _getScale = getScale ?? throw new ArgumentNullException(nameof(getScale));
@@ -31,6 +33,7 @@ internal sealed class WriterUiHost : IUiHost, IUiClipboardHost, IUiTextInputHost
         _getClipboardText = getClipboardText;
         _setClipboardText = setClipboardText;
         _caretChanged = caretChanged;
+        _getRenderer = getRenderer;
     }
 
     public BSize ViewportSize => _getViewportSize();
@@ -83,6 +86,38 @@ internal sealed class WriterUiHost : IUiHost, IUiClipboardHost, IUiTextInputHost
     {
         LastCaret = caret;
         _caretChanged?.Invoke(caret);
+    }
+
+    /// <summary>
+    /// Uploads a document image to the renderer backing this host. A host built
+    /// without a renderer — the headless test host, and any surface that only
+    /// captures render lists — reports failure, and the editor then draws the
+    /// picture's outline instead.
+    /// </summary>
+    public BImageHandle CreateImage(ReadOnlySpan<byte> encodedImage)
+    {
+        IBroilerRenderer? renderer = _getRenderer?.Invoke();
+        if (renderer is null || encodedImage.IsEmpty)
+            return BImageHandle.Invalid;
+
+        try
+        {
+            return renderer.CreateImage(encodedImage);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // A document can carry any bytes at all; a decoder that rejects them
+            // must not take down the frame.
+            return BImageHandle.Invalid;
+        }
+    }
+
+    public void ReleaseImage(BImageHandle image)
+    {
+        if (!image.IsValid)
+            return;
+
+        _getRenderer?.Invoke()?.ReleaseImage(image);
     }
 
     public void ClearCaret(UiElement owner)

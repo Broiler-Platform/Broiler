@@ -124,6 +124,26 @@ public sealed class FormatCodeProjectorGoldenTests
     }
 
     [Fact]
+    public void An_Embedded_Image_Projects_As_An_Image_Structure_Code()
+    {
+        var image = new InlineImage(new byte[] { 1, 2, 3 }, "image/png", 40, 20, "a logo");
+        RichTextDocument document = RichTextDocument.FromParagraphs(
+        [
+            RichTextParagraph.Create("a", InlineStyle.Default)
+                .InsertText(1, InlineImage.PlaceholderText, InlineStyle.Default with { Image = image })
+                .InsertText(2, "b", InlineStyle.Default),
+        ]);
+
+        FormatCodeProjection projection = _projector.Project(document);
+
+        Assert.Equal("a[Image]b", projection.Text);
+        FormatCodeToken token = Assert.Single(
+            projection.Tokens.Where(t => t.DisplayText == "[Image]"));
+        Assert.Equal(FormatCodeTokenKind.StructureCode, token.Kind);
+        Assert.Equal(FormatCodeProperty.Image, token.EditDescriptor?.Property);
+    }
+
+    [Fact]
     public void Paragraphs_Reset_Inline_State_And_Use_One_Canonical_Boundary()
     {
         InlineStyle bold = new() { Bold = true };

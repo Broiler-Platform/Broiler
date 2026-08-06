@@ -76,8 +76,13 @@ Group nesting is iterative (no recursion), so depth cannot overflow the stack.
 The writer emits the honoured subset above as pure ASCII: a `{\rtf1\ansi\ansicpg1252\deff0\uc1`
 header, `\fonttbl`/`\colortbl` built from the styles used, one group-wrapped run
 per style, and a `\par` after every paragraph. Non-ASCII characters are escaped
-as `\uN?`. Round-trip (model → RTF → model) is lossless for any document the
-reader can produce, with two documented exceptions: line spacing and list kind
+as `\uN?`. An embedded image is written as a `\pict` destination — `\pngblip`
+or `\jpegblip`, sized with `\picwgoal`/`\pichgoal` — so a picture survives into
+Word and WordPad; any other image format is dropped with `rtf.image.format`.
+Because `\pict` is a skipped destination on the read side, an image does **not**
+survive a model → RTF → model round-trip; DOCX is the format that round-trips
+pictures. Round-trip is otherwise lossless for any document the reader can
+produce, with two further documented exceptions: line spacing and list kind
 are not written (they are not read either, so they stay at their defaults); and a
 **non-ASCII font-family name** is escaped as `\uN` on write, which the font-table
 reader does not decode (font names are read as their literal bytes) — so such a

@@ -17,7 +17,10 @@ internal static class DocxTestPackage
         "xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"";
 
     /// <summary>Wraps <paramref name="bodyXml"/> in a document part and zips a package around it.</summary>
-    public static byte[] FromBody(string bodyXml, IReadOnlyDictionary<string, string>? extraParts = null)
+    public static byte[] FromBody(
+        string bodyXml,
+        IReadOnlyDictionary<string, string>? extraParts = null,
+        IReadOnlyDictionary<string, byte[]>? binaryParts = null)
     {
         string documentXml =
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
@@ -48,8 +51,94 @@ internal static class DocxTestPackage
                 parts[part.Key] = part.Value;
         }
 
-        return Zip(parts);
+        var binary = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, string> part in parts)
+            binary[part.Key] = Encoding.UTF8.GetBytes(part.Value);
+
+        if (binaryParts is not null)
+        {
+            foreach (KeyValuePair<string, byte[]> part in binaryParts)
+                binary[part.Key] = part.Value;
+        }
+
+        return Zip(binary);
     }
+
+    /// <summary>
+    /// Reads a package whose document part declares relationships and carries
+    /// media parts — the shape a package with pictures has.
+    /// </summary>
+    public static DocumentReadResult ReadWithMedia(
+        string bodyXml,
+        string relationshipsInnerXml,
+        IReadOnlyDictionary<string, byte[]> mediaParts,
+        DocumentReadOptions? options = null)
+    {
+        var parts = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["word/_rels/document.xml.rels"] =
+                "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+                relationshipsInnerXml +
+                "</Relationships>",
+        };
+
+        using var stream = new MemoryStream(FromBody(bodyXml, parts, mediaParts), writable: false);
+        return new DocxDocumentCodec().Read(stream, options);
+    }
+
+    /// <summary>An image relationship pointing at a part under <c>word/media</c>.</summary>
+    public static string ImageRelationship(string id, string target) =>
+        "<Relationship Id=\"" + id + "\" " +
+        "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" " +
+        "Target=\"" + target + "\"/>";
+
+    /// <summary>
+    /// A run holding one DrawingML picture sized in EMUs, as Word writes it.
+    /// </summary>
+    public static string DrawingRun(
+        string relationshipId,
+        long widthEmus,
+        long heightEmus,
+        string? altText = null) =>
+        "<w:r><w:drawing>" +
+        "<wp:inline xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\" " +
+        "distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">" +
+        "<wp:extent cx=\"" + widthEmus + "\" cy=\"" + heightEmus + "\"/>" +
+        "<wp:docPr id=\"1\" name=\"Picture 1\"" +
+        (altText is null ? string.Empty : " descr=\"" + Escape(altText) + "\"") + "/>" +
+        "<a:graphic xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">" +
+        "<a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">" +
+        "<pic:pic xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">" +
+        "<pic:nvPicPr><pic:cNvPr id=\"1\" name=\"Picture 1\"/><pic:cNvPicPr/></pic:nvPicPr>" +
+        "<pic:blipFill><a:blip r:embed=\"" + relationshipId + "\"/>" +
+        "<a:stretch><a:fillRect/></a:stretch></pic:blipFill>" +
+        "<pic:spPr><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr>" +
+        "</pic:pic></a:graphicData></a:graphic>" +
+        "</wp:inline></w:drawing></w:r>";
+
+    /// <summary>A run holding the legacy VML picture shape, sized by CSS.</summary>
+    public static string VmlPictureRun(string relationshipId, string style) =>
+        "<w:r><w:pict>" +
+        "<v:shape xmlns:v=\"urn:schemas-microsoft-com:vml\" id=\"logo\" style=\"" + style + "\">" +
+        "<v:imagedata r:id=\"" + relationshipId + "\"/>" +
+        "</v:shape></w:pict></w:r>";
+
+    /// <summary>
+    /// The smallest valid PNG this codec will accept: a one-pixel image, used
+    /// wherever a test needs real image bytes rather than their content.
+    /// </summary>
+    public static byte[] OnePixelPng { get; } =
+    [
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+        0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+        0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
+        0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+        0x42, 0x60, 0x82,
+    ];
 
     /// <summary>Reads a package built by <see cref="FromBody"/> through the public codec.</summary>
     public static DocumentReadResult ReadBody(string bodyXml, DocumentReadOptions? options = null)
@@ -135,17 +224,16 @@ internal static class DocxTestPackage
             .Replace("<", "&lt;", StringComparison.Ordinal)
             .Replace(">", "&gt;", StringComparison.Ordinal);
 
-    private static byte[] Zip(IReadOnlyDictionary<string, string> parts)
+    private static byte[] Zip(IReadOnlyDictionary<string, byte[]> parts)
     {
         using var buffer = new MemoryStream();
         using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
         {
-            foreach (KeyValuePair<string, string> part in parts)
+            foreach (KeyValuePair<string, byte[]> part in parts)
             {
                 ZipArchiveEntry entry = archive.CreateEntry(part.Key, CompressionLevel.NoCompression);
                 using Stream stream = entry.Open();
-                byte[] bytes = Encoding.UTF8.GetBytes(part.Value);
-                stream.Write(bytes, 0, bytes.Length);
+                stream.Write(part.Value, 0, part.Value.Length);
             }
         }
 

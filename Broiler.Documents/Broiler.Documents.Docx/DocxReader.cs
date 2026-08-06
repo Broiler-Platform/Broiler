@@ -57,11 +57,13 @@ internal static class DocxReader
                 options.Limits,
                 diagnostics);
 
+            var images = new DocxImageLoader(archive, options.Limits);
             RichTextDocument document = ReadDocumentXml(
                 documentXml,
                 documentRelationships,
                 numbering,
                 styles,
+                images,
                 options.Limits,
                 diagnostics);
             ReportUnreadParts(documentRelationships, diagnostics);
@@ -88,6 +90,7 @@ internal static class DocxReader
         DocxRelationships relationships,
         DocxNumbering numbering,
         DocxStyles styles,
+        DocxImageLoader images,
         DocumentLimits limits,
         List<DocumentDiagnostic> diagnostics)
     {
@@ -101,9 +104,9 @@ internal static class DocxReader
         }
 
         var builder = new DocxDocumentBuilder(limits, diagnostics);
-        var context = new DocxReadContext(relationships, numbering, styles, builder);
+        var context = new DocxReadContext(relationships, numbering, styles, images, builder);
         ReadBlockContent(body.Elements(), context, depth: 0);
-        builder.ReportReadSummary(body.Elements().Any(IsContentBlock), styles.Count);
+        builder.ReportReadSummary(body.Elements().Any(IsContentBlock), styles.Count, images.ImageCount);
         return builder.Build();
     }
 
@@ -112,6 +115,7 @@ internal static class DocxReader
         DocxRelationships Relationships,
         DocxNumbering Numbering,
         DocxStyles Styles,
+        DocxImageLoader Images,
         DocxDocumentBuilder Builder);
 
     /// <summary>
@@ -374,7 +378,20 @@ internal static class DocxReader
             style = ApplyRunProperties(styleRunProperties, style, context.Styles.Theme);
 
         style = ApplyRunProperties(rPr, style, context.Styles.Theme);
-        foreach (XElement child in run.Elements())
+        ReadRunContent(run.Elements(), context, style);
+    }
+
+    /// <summary>
+    /// Reads the content children of a run, with the run's resolved character
+    /// style already in hand.
+    /// </summary>
+    private static void ReadRunContent(
+        IEnumerable<XElement> elements,
+        DocxReadContext context,
+        InlineStyle style)
+    {
+        DocxDocumentBuilder builder = context.Builder;
+        foreach (XElement child in elements)
         {
             if (child.Name == DocxNamespaces.Wordprocessing + "rPr")
                 continue;
@@ -417,12 +434,42 @@ internal static class DocxReader
             }
 
             if (child.Name == DocxNamespaces.Wordprocessing + "drawing" ||
-                child.Name == DocxNamespaces.Wordprocessing + "object" ||
                 child.Name == DocxNamespaces.Wordprocessing + "pict")
             {
-                builder.AddDiagnosticOnce("docx.skip.embedded", "Embedded DOCX drawing or object content was skipped.");
+                ReadPicture(child, context, style);
+                continue;
             }
+
+            // Word wraps a picture that needs a legacy fallback in
+            // mc:AlternateContent. Exactly one branch may contribute, or the same
+            // picture is read twice.
+            if (child.Name == DocxNamespaces.MarkupCompatibility + "AlternateContent")
+            {
+                XElement? branch =
+                    child.Element(DocxNamespaces.MarkupCompatibility + "Choice") ??
+                    child.Element(DocxNamespaces.MarkupCompatibility + "Fallback");
+                if (branch is not null)
+                    ReadRunContent(branch.Elements(), context, style);
+                continue;
+            }
+
+            if (child.Name == DocxNamespaces.Wordprocessing + "object")
+                builder.AddDiagnosticOnce("docx.skip.embedded", "Embedded DOCX object content was skipped.");
         }
+    }
+
+    /// <summary>
+    /// Appends a picture as one <see cref="InlineImage.Placeholder"/> character
+    /// carrying the image on its style. The run's own character formatting is
+    /// kept on it, so a picture inside a hyperlink stays inside that link.
+    /// </summary>
+    private static void ReadPicture(XElement picture, DocxReadContext context, InlineStyle style)
+    {
+        InlineImage? image = context.Images.Read(picture, context.Relationships, context.Builder);
+        if (image is null)
+            return;
+
+        context.Builder.AppendText(InlineImage.PlaceholderText, style with { Image = image });
     }
 
     /// <summary>
@@ -730,7 +777,7 @@ internal static class DocxReader
         return !color.IsEmpty;
     }
 
-    private sealed class DocxDocumentBuilder
+    private sealed class DocxDocumentBuilder : IDocxImageDiagnostics
     {
         private readonly DocumentLimits _limits;
         private readonly List<DocumentDiagnostic> _diagnostics;
@@ -776,7 +823,7 @@ internal static class DocxReader
         /// a body with block content that yields no paragraphs is a reader bug,
         /// not an empty file, and it should say so rather than open blank.
         /// </summary>
-        public void ReportReadSummary(bool bodyHadContentBlocks, int styleCount)
+        public void ReportReadSummary(bool bodyHadContentBlocks, int styleCount, int imageCount)
         {
             if (_paragraphs.Count == 0 && bodyHadContentBlocks)
             {
@@ -790,7 +837,8 @@ internal static class DocxReader
                 "DOCX read produced " + _paragraphs.Count.ToString(CultureInfo.InvariantCulture) +
                 " paragraph(s), flattened " + _tableCount.ToString(CultureInfo.InvariantCulture) +
                 " table(s), loaded " + styleCount.ToString(CultureInfo.InvariantCulture) +
-                " style(s), and skipped " + _unsupportedBlockCount.ToString(CultureInfo.InvariantCulture) +
+                " style(s), embedded " + imageCount.ToString(CultureInfo.InvariantCulture) +
+                " image(s), and skipped " + _unsupportedBlockCount.ToString(CultureInfo.InvariantCulture) +
                 " unsupported block(s)."));
         }
 

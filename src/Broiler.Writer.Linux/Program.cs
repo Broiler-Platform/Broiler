@@ -9,6 +9,12 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
+        // Composition root: without a codec catalog the renderer cannot decode
+        // the images a document embeds, and the editor would draw every picture
+        // as an empty outline.
+        Broiler.Graphics.BImageCodecs.Use(
+            new Broiler.Media.MediaCodecCatalog(Broiler.Media.Image.Managed.ManagedImageCodecs.CreateCodecs()));
+
         LinuxWriterOptions options = LinuxWriterOptions.Parse(args);
         if (options.ShowHelp)
         {

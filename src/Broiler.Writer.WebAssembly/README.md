@@ -21,6 +21,13 @@ sandbox has no ambient file system, so:
   `Broiler.Documents` writer and **download** the result. Save As prompts for a file name whose
   extension selects the format.
 
+- **Embedded images** in an opened document are read and written back by the codecs exactly as on
+  the desktop, but they are **not drawn**: this host does not implement `IUiImageHost`, so the
+  editor draws each picture as an outlined box of the right size. Nothing is lost — a document
+  opened and saved here keeps its pictures — they are simply not rendered. Implementing it means
+  registering an image codec catalog (`BImageCodecs.Use`) and bridging
+  `BrowserCanvasRenderer.CreateImage`, which adds the managed decoders to the download payload.
+
 Everything else — the window, menu, toolbar, RichEdit editing and formatting, the font dialog, the
 status bar, and scrolling — is the same code as the desktop Writer.
 

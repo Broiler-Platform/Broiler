@@ -7,9 +7,18 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.RichEdit.Standard.Tests;
 
-internal sealed class TestHost : IUiHost, IUiClipboardHost, IUiTextInputHost
+internal sealed class TestHost : IUiHost, IUiClipboardHost, IUiTextInputHost, IUiImageHost
 {
+    private ulong _nextImageId;
+
     public TestHost(BSize viewportSize) => ViewportSize = viewportSize;
+
+    /// <summary>The pixel size handed back for a created image, or null to fail every decode.</summary>
+    public BSize? ImagePixelSize { get; set; } = new BSize(20, 10);
+
+    public int CreatedImages { get; private set; }
+
+    public int ReleasedImages { get; private set; }
 
     public BSize ViewportSize { get; }
 
@@ -46,6 +55,17 @@ internal sealed class TestHost : IUiHost, IUiClipboardHost, IUiTextInputHost
         LastCaret = null;
         ClearCaretCount++;
     }
+
+    public BImageHandle CreateImage(ReadOnlySpan<byte> encodedImage)
+    {
+        CreatedImages++;
+        if (ImagePixelSize is not BSize size)
+            return BImageHandle.Invalid;
+
+        return BImageHandle.FromId(++_nextImageId, size);
+    }
+
+    public void ReleaseImage(BImageHandle image) => ReleasedImages++;
 }
 
 internal sealed class ManualClock : IUiClock

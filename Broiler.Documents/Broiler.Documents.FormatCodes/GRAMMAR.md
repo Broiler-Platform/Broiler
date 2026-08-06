@@ -73,6 +73,7 @@ Out-of-domain metrics are preserved rather than silently corrected.
 |---|---|
 | Tab (`U+0009`) | `[Tab]` |
 | Soft line break (`U+2028`) | `[Line Break]` |
+| Embedded image (`U+FFFC`) | `[Image]` |
 | Boundary between paragraphs | `[Paragraph Break]` followed by LF |
 | Paragraph with no characters | `[Empty Paragraph]` |
 | Literal backslash | `\\` |

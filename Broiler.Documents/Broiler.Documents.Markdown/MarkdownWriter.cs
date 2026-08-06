@@ -79,6 +79,9 @@ public static class MarkdownWriter
         InlineStyle style,
         List<DocumentDiagnostic> diagnostics)
     {
+        if (style.Image is InlineImage image)
+            return FormatImageRun(text, image, style, diagnostics);
+
         string formatted = EscapeText(text);
 
         if (style.FontFamily is not null && style.FontFamily.Equals("monospace", StringComparison.OrdinalIgnoreCase))
@@ -106,6 +109,41 @@ public static class MarkdownWriter
         }
 
         return formatted;
+    }
+
+    /// <summary>
+    /// Writes an image run as CommonMark image syntax with a data URI. Markdown
+    /// has no container of its own, so the bytes travel in the link destination
+    /// or they do not travel at all.
+    /// </summary>
+    private static string FormatImageRun(
+        string text,
+        InlineImage image,
+        InlineStyle style,
+        List<DocumentDiagnostic> diagnostics)
+    {
+        string destination = "data:" + image.ContentType + ";base64," + Convert.ToBase64String(image.Data.Span);
+        string alt = image.AltText.Replace("]", "\\]", StringComparison.Ordinal);
+        var builder = new StringBuilder();
+        foreach (char character in text)
+        {
+            if (character == InlineImage.Placeholder)
+                builder.Append("![").Append(alt).Append("](").Append(destination).Append(')');
+            else
+                builder.Append(EscapeText(character.ToString()));
+        }
+
+        diagnostics.Add(DocumentDiagnostic.Info(
+            "markdown.image.datauri",
+            "An embedded image was written as a base64 data URI."));
+        if (style.Bold || style.Italic || style.Strikethrough || style.Underline)
+        {
+            diagnostics.Add(DocumentDiagnostic.Warning(
+                "markdown.inline-style",
+                "Markdown writer dropped character formatting carried by an image run."));
+        }
+
+        return builder.ToString();
     }
 
     private static string EscapeText(string text)

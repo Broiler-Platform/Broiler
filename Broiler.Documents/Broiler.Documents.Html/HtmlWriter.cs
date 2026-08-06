@@ -61,13 +61,17 @@ public static class HtmlWriter
                 p.SetAttribute("style", paragraphStyle);
 
             body.AppendChild(p);
-            AppendRuns(document, p, paragraph);
+            AppendRuns(document, p, paragraph, diagnostics);
         }
 
         return document;
     }
 
-    private static void AppendRuns(DomDocument document, DomNode parent, RichTextParagraph paragraph)
+    private static void AppendRuns(
+        DomDocument document,
+        DomNode parent,
+        RichTextParagraph paragraph,
+        List<DocumentDiagnostic> diagnostics)
     {
         int offset = 0;
         foreach (StyleRun run in paragraph.Runs)
@@ -78,15 +82,75 @@ public static class HtmlWriter
             DomNode target = CreateRunContainer(document, run.Style);
             if (target is DomElement element)
             {
-                AppendTextWithBreaks(document, element, text);
+                AppendRunContent(document, element, text, run.Style, diagnostics);
                 parent.AppendChild(element);
             }
             else
             {
-                AppendTextWithBreaks(document, parent, text);
+                AppendRunContent(document, parent, text, run.Style, diagnostics);
             }
         }
     }
+
+    /// <summary>
+    /// Appends a run's characters, turning each image placeholder into an
+    /// <c>img</c> whose source is a data URI. HTML has nowhere else to keep the
+    /// bytes, and an external file beside the document would make a single-file
+    /// export no longer single-file.
+    /// </summary>
+    private static void AppendRunContent(
+        DomDocument document,
+        DomNode parent,
+        string text,
+        InlineStyle style,
+        List<DocumentDiagnostic> diagnostics)
+    {
+        if (style.Image is not InlineImage image)
+        {
+            AppendTextWithBreaks(document, parent, text);
+            return;
+        }
+
+        int start = 0;
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (text[i] != InlineImage.Placeholder)
+                continue;
+
+            if (i > start)
+                AppendTextWithBreaks(document, parent, text[start..i]);
+
+            parent.AppendChild(CreateImageElement(document, image, diagnostics));
+            start = i + 1;
+        }
+
+        if (start < text.Length)
+            AppendTextWithBreaks(document, parent, text[start..]);
+    }
+
+    private static DomElement CreateImageElement(
+        DomDocument document,
+        InlineImage image,
+        List<DocumentDiagnostic> diagnostics)
+    {
+        DomElement img = document.CreateElement("img");
+        img.SetAttribute("src", "data:" + image.ContentType + ";base64," + Convert.ToBase64String(image.Data.Span));
+        img.SetAttribute("alt", image.AltText);
+        if (image.HasExplicitSize)
+        {
+            img.SetAttribute(
+                "style",
+                "width: " + FormatLength(image.Width) + "; height: " + FormatLength(image.Height));
+        }
+
+        diagnostics.Add(DocumentDiagnostic.Info(
+            "html.image.datauri",
+            "An embedded image was written as a base64 data URI."));
+        return img;
+    }
+
+    private static string FormatLength(double value) =>
+        value.ToString("0.###", CultureInfo.InvariantCulture) + "pt";
 
     private static DomNode CreateRunContainer(DomDocument document, InlineStyle style)
     {
