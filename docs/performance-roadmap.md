@@ -84,7 +84,7 @@ so only the parent can hold the combined view.
   why it happened**: `patches/` is one flat namespace across every submodule, so two branches
   numbering from the same high-water mark collide whenever both are open, which is the ordinary case
   rather than an unlucky one.
-  **Eleven patches are pending again, and five of them are one item.**
+  **Twelve patches are pending again, and five of them are one item.**
   **[`patches/0102`](../patches/0102-js-deferral-population.patch)** — item 1-1's remaining half,
   its population counted at **728 capture-free sites of 5 762, 12.6%**, and the shortcut that looked
   available refused by the counter built to test it.
@@ -127,11 +127,15 @@ so only the parent can hold the combined view.
   before being built and refused at 0.730×**: relocating the frame to a thread-local stack saves
   **6.19 ns, 0.20% of the corpus for an M–L**, because the cost is the 56-byte `Arguments` copying
   and moving where it lands does not remove it.
-  And **[`0112`](../patches/0112-js-capture-layout-order.patch)** — item 1-1's layout question
+  **[`0112`](../patches/0112-js-capture-layout-order.patch)** — item 1-1's layout question
   asked as the item states it, **as an index**: `0104` validated membership and this document
   recorded it as the layout, which it is not. **14 605 sites ordered, 0 mismatched** where the sets
   agree — and the over-approximation turns out to shift slots, so the prediction must **drive** the
   layout rather than match it.
+  And **[`0113`](../patches/0113-js-dense-element-ratio.patch)** — item 3-1's read/write ratio
+  counted for the first time: **3.34 numeric reads per numeric write** over the corpus, 5.26 on
+  NavierStokes and 4.80 on Crypto, and **1.03 on Gameboy — the suite §4.2a re-opened the item on**,
+  so a typed store is an allocation wash there and a loss everywhere else.
   Usual terms: the push to the submodule remote returned 403, so the pointer is
   deliberately unbumped and every set of figures was measured on a local build of `14fa4f10` plus
   the patches in question. `0102` and `0103` are **independent of each other**, but `0104` builds on
@@ -285,7 +289,7 @@ handoff has now cleared four times running**, so a 403 has come to mean *deferre
 *stranded*; what makes that safe is that the pointer is never bumped locally, so nothing here can
 name a commit CI cannot clone. The fourth clearing took **all three open stacks at once** — the
 thirteen `Broiler.JS` patches plus the `Broiler.HTML` and `Broiler.CSS` pair — and left `patches/`
-empty for the second time since it was written. **Eleven patches are open again** (`0102`–`0112`: item 1-1's remaining
+empty for the second time since it was written. **Twelve patches are open again** (`0102`–`0113`: item 1-1's remaining
 half in four of them — its capture-free population, its capture layout, a body compiled from a kept
 enclosing scope, and that check's residual settled — plus the widened census corpus, item 4-2's
 arithmetic half priced and refused, item 4-5 unblocked, attributed, counted and its named fix refused, and two instrument defects closed), on the usual 403 terms.
@@ -4825,6 +4829,49 @@ Owner assemblies: `Broiler.JavaScript.Storage`, `.Runtime`, `.Compiler`.
 > withdrawn is the *refutation* of the storage half. See §4.2a. **This is not a claim the store is
 > worth building** — that needs a wall-clock A/B nobody has run, and by `0086`'s rate lesson
 > Gameboy's 1.96 GB over 23.8 s is a lower rate than NavierStokes' 0.49 GB over 2.0 s.
+>
+> **Since resolved on the axis that decides it** (`0113`): the read/write ratio the verdict rests on
+> is now counted, and **Gameboy's is 1.03** — an allocation wash. *The suite that re-opened the item
+> does not carry it.* The corpus is **3.34 reads per write**, NavierStokes 5.26 and Crypto 4.80, so
+> a typed store is a net allocation loss of ~2.3 boxes per write. **The live-memory case stands and
+> is now the whole of the item.**
+
+#### The ratio the whole verdict rests on, counted — and it settles what §4.2a re-opened — `0113`
+
+The item trades a write allocation for a read allocation, so its verdict is a ratio: *"a wash at a
+1:1 read/write ratio, a win only when writes dominate, and a loss on read-heavy code"*. It then
+asserts that its named targets *"read each element many times per write, which is the unfavourable
+direction"*. **That is a claim about the corpus, and nothing counted it.**
+
+Counted on the **dense path** — the population a typed store would serve, since a dictionary-kind
+array is outside the item entirely — and split by whether the value is a **number**, because an
+array of strings would make a corpus ratio describe arrays the item cannot help:
+
+| Suite | numeric dense writes | numeric dense reads | **reads per write** |
+|---|--:|--:|--:|
+| NavierStokes — *the item's grid target* | 10 370 089 | 54 560 144 | **5.26** |
+| Typescript | 338 606 | 1 723 870 | 5.09 |
+| Crypto — *the item's digit-array target* | 8 670 639 | 41 589 626 | **4.80** |
+| PdfJS | 16 442 985 | 39 097 665 | 2.38 |
+| Box2D | 414 130 | 987 088 | 2.38 |
+| **Gameboy** | 1 726 800 | 1 777 310 | **1.03** |
+| **Splay** | 2 824 002 | 15 998 | **0.01** |
+| **corpus** | **42 351 440** | **141 424 351** | **3.34** |
+
+**The assertion was right and now has a number.** At 32 B boxed per read against 32 B saved per
+write, a typed store is a **net allocation loss of about 2.3 boxes per write** over the corpus — and
+worse on both suites the item names.
+
+**And it settles what §4.2a re-opened.** That section withdrew the item's refutation because the
+evidence retiring the typed store came from a corpus that never contained **Gameboy**, where the
+raw-double-to-`JSValue` conversion is 51.0% of a 52.8 M-request workload. *Counted, Gameboy's dense
+read/write ratio is 1.03* — **an allocation wash, not a win**. The suite that re-opened the item
+does not carry it, and what survives is the **live-memory** argument the item already made and never
+needed this measurement for.
+
+**Splay is named rather than averaged away.** It is the one suite running the item's favourable
+direction, and it runs it by two orders of magnitude: **2 824 002 writes against 15 998 reads**. A
+corpus ratio hides that, which is why the table is per suite.
 
 **Where.** `Broiler.JavaScript.Storage/ElementArray.cs` — `private IPropertyValue[] dense`.
 
