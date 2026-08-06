@@ -149,6 +149,14 @@ public sealed class DrawTiledImageItem : DisplayItem
 public sealed class ClipItem : DisplayItem
 {
     public RectangleF ClipRect { get; init; }
+
+    /// <summary>
+    /// Vertices of an arbitrary closed clip polygon (CSS <c>clip-path: polygon()</c>) in the same
+    /// absolute coordinate space as <see cref="ClipRect"/>, or <c>null</c> for a rectangular or
+    /// rounded clip. When set, <see cref="ClipRect"/> holds the polygon's bounding box so backends
+    /// that cannot clip to an arbitrary shape still narrow the clip instead of ignoring it.
+    /// </summary>
+    public PointF[]? Polygon { get; init; }
     /// <summary>Corner radii for rounded clips (0 = sharp corners).</summary>
     public double CornerNw { get; init; }
     public double CornerNwY { get; init; }
