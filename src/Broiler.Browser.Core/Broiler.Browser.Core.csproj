@@ -39,6 +39,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Broiler.Browser.Windows" />
     <InternalsVisibleTo Include="Broiler.Browser.Linux" />
+    <InternalsVisibleTo Include="Broiler.Browser.Core.Tests" />
   </ItemGroup>
 
   <ItemGroup>

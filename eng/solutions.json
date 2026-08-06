@@ -143,6 +143,7 @@
       "description": "Cross-component integration tests; component unit tests stay in component-owned solutions.",
       "roots": [
         "src/Broiler.App.Tests/Broiler.App.Tests.csproj",
+        "src/Broiler.Browser.Core.Tests/Broiler.Browser.Core.Tests.csproj",
         "src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj",
         "src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj",
         "src/Broiler.Playback.Tests/Broiler.Playback.Tests.csproj",

@@ -866,6 +866,7 @@ internal sealed class BrowserApp : IDisposable
         private const double KeyScrollStep = 48;
 
         private readonly Func<IBroilerRenderer?> _getRenderer;
+        private readonly HtmlFormEditor _formEditor;
         private HtmlContainer _container = CreateContentContainer(WelcomePage, string.Empty);
         private HtmlGraphicsRenderList? _renderList;
         private InteractiveSession? _interactiveSession;
@@ -888,6 +889,8 @@ internal sealed class BrowserApp : IDisposable
         {
             _getRenderer = getRenderer ?? throw new ArgumentNullException(nameof(getRenderer));
             _container.LinkClicked += OnLinkClicked;
+            _formEditor = new HtmlFormEditor(this);
+            _formEditor.Committed += (_, _) => MarkLayoutDirty();
         }
 
         public event EventHandler<BrowserLinkEventArgs>? LinkActivated;
@@ -900,6 +903,7 @@ internal sealed class BrowserApp : IDisposable
         {
             ArgumentNullException.ThrowIfNull(container);
             StopSession();
+            _formEditor.Cancel();
             DisposeRenderList();
             _container.LinkClicked -= OnLinkClicked;
             _container.Dispose();
@@ -995,8 +999,23 @@ internal sealed class BrowserApp : IDisposable
                 BMatrix3x2.Translation(Bounds.Left, Bounds.Top));
             ReplayCommands(context.RenderList, htmlList.Commands);
             context.RenderList.PopTransform();
+
+            // Hosted form controls paint over the page, in viewport coordinates,
+            // so they are placed and drawn outside the document transform.
+            PlaceHostedControls(Bounds);
+            base.RenderCore(context);
             context.RenderList.PopClip();
         }
+
+        /// <summary>
+        /// Positions the Broiler.UI controls hosted over the page's form fields.
+        /// The viewport arranges them itself — the default child arrangement would
+        /// stretch each one across the whole viewport and swallow every click.
+        /// </summary>
+        protected override void ArrangeCore(BRect finalRect) => PlaceHostedControls(finalRect);
+
+        private void PlaceHostedControls(BRect viewportBounds) =>
+            _formEditor.UpdateViewport(viewportBounds, _viewportZoom, _scrollY);
 
         protected override bool OnInput(UiInputEvent input)
         {
@@ -1072,6 +1091,11 @@ internal sealed class BrowserApp : IDisposable
 
             if (input.MouseButtonTransition == MouseButtonTransition.Down)
             {
+                // A click on a text field starts editing instead of a text selection.
+                if (left && BeginFormEdit(point))
+                    return true;
+
+                _formEditor.Commit();
                 Session?.SetFocus(this);
                 _container.HandleMouseDown(point, left, right);
                 InvalidateRenderedContent();
@@ -1086,6 +1110,17 @@ internal sealed class BrowserApp : IDisposable
             }
 
             return false;
+        }
+
+        private bool BeginFormEdit(PointF viewportPoint)
+        {
+            if (!_formEditor.TryBegin(_container, viewportPoint))
+                return false;
+
+            Session?.SetFocus(_formEditor.Editor);
+            PlaceHostedControls(Bounds);
+            Invalidate(UiInvalidationKind.Arrange | UiInvalidationKind.Render);
+            return true;
         }
 
         private bool HandlePointerMove(UiInputEvent input)

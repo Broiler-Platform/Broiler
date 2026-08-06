@@ -28,6 +28,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
 
         textBox.Text = (text ?? string.Empty).AsMemory();
+
+        // Assigning Text clears the box's words, and words are otherwise only
+        // built once, by the parser. Without re-splitting here the generated
+        // content would never paint or serialize — a form control edited after
+        // load would blank out instead of showing its new value.
+        textBox.ParseToWords();
     }
 
     // CSS Text 3 §White Space Processing: only these five characters are
