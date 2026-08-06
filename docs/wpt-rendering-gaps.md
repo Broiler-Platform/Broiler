@@ -960,6 +960,18 @@ count late: it appeared not to reproduce until its reference was regenerated.)
   other is preserved exactly, and the sheet as a whole outranks page rules
   reaching into the tree — the correct direction, since per spec those should not
   match at all.
+- **A serialization pass is not free, and the suite says so.** Both this pass and
+  the `animate({pseudoElement})` one added later walk the whole document, and
+  running them unconditionally pushed
+  `RunTestWithTimeout_GridTemplateColumnsCrash_Completes_Without_Timing_Out` — a
+  **6-second** budget on a `grid-template-columns` with five million tracks — over
+  its limit. It only failed in a full-suite run, never in isolation, which is
+  exactly the shape that reads as flakiness; the control that settled it was
+  running the *same full suite* against unmodified `origin/main` sources, where the
+  test passes. Both passes now early-out on a flag (`_hasShadowRoots`,
+  `_hasAnimatedPseudoStyles`), so a document with no shadow DOM and no pseudo
+  animation pays nothing. Suite back to its 56 pre-existing failures, and
+  `css/css-shadow` 157/207 and `css/css-pseudo` 237/358 are unchanged by the guard.
 - **Compounds left alone, each for a reason:** `:host`/`:host-context` (the host
   is not in the tree), and `::slotted`/`::part` (their subject is a light-DOM
   node). `@keyframes`, `@font-face` and friends are copied verbatim — their blocks

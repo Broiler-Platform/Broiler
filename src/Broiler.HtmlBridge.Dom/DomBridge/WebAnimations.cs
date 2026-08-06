@@ -104,8 +104,16 @@ public sealed partial class DomBridge
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<
         DomElement, Dictionary<string, Dictionary<string, string>>> _animatedPseudoStyles = new();
 
+    /// <summary>
+    /// Whether any <c>animate()</c> call has targeted a pseudo-element in this document. The
+    /// serialization pass that emits them walks the whole tree, so it is gated on this rather than
+    /// run unconditionally — the overwhelming majority of documents never use the feature.
+    /// </summary>
+    private bool _hasAnimatedPseudoStyles;
+
     private Dictionary<string, string> AnimatedPseudoStyleFor(DomElement element, string pseudoElement)
     {
+        _hasAnimatedPseudoStyles = true;
         var byPseudo = _animatedPseudoStyles.GetValue(
             element, static _ => new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal));
         if (!byPseudo.TryGetValue(pseudoElement, out var properties))

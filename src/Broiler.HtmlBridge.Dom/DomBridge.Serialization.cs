@@ -406,6 +406,13 @@ public sealed partial class DomBridge
     /// </summary>
     private void ApplyAnimatedPseudoSerializationOverrides(DomElement root)
     {
+        // Nothing to emit unless animate() has actually targeted a pseudo-element, and the walk below
+        // is over the whole document — so gate it on the flag rather than paying for a tree walk on
+        // every serialization of every page. `RunTestWithTimeout_GridTemplateColumnsCrash…` is a
+        // 6-second budget on a pathological document and caught the unguarded version.
+        if (!_hasAnimatedPseudoStyles)
+            return;
+
         var rules = new List<string>();
         int pseudoIndex = 0;
         CollectAnimatedPseudoSerializationOverrides(root, rules, ref pseudoIndex);

@@ -81,8 +81,20 @@ public sealed partial class DomBridge
     /// Restricts every shadow root's own style rules to that root's tree. A no-op for a document
     /// with no shadow roots, and for a shadow tree that carries no <c>&lt;style&gt;</c>.
     /// </summary>
+    /// <summary>
+    /// Whether a shadow root has ever been attached in this document. Both this pass and its
+    /// <c>:host</c> sibling look for <c>#shadow-root</c> by walking every descendant, so a document
+    /// that has no shadow DOM at all should not pay for the walk on every serialization —
+    /// <c>RunTestWithTimeout_GridTemplateColumnsCrash…</c>, a 6-second budget on a pathological
+    /// document, is what caught the unguarded version.
+    /// </summary>
+    private bool _hasShadowRoots;
+
     private void ScopeShadowTreeSelectors(DomElement root)
     {
+        if (!_hasShadowRoots)
+            return;
+
         var index = 0;
 
         foreach (var element in root.Descendants().OfType<DomElement>())
