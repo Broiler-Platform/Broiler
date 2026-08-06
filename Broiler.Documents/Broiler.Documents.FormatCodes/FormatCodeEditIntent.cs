@@ -38,6 +38,11 @@ public enum FormatCodeProperty
     Foreground,
     Background,
     Link,
+
+    // Inline properties are projected by their offset from Bold, so a new one
+    // belongs at the end of that contiguous run — before the paragraph
+    // properties, which start at Alignment.
+    Capitalization,
     Alignment,
     ListKind,
     IndentLevel,
@@ -70,6 +75,8 @@ public enum FormatCodePaletteEntry
     Foreground,
     Background,
     Link,
+    AllCaps,
+    SmallCaps,
     AlignLeft,
     AlignCenter,
     AlignRight,
@@ -307,6 +314,10 @@ public static class FormatCodeInsertPalette
             new ApplyFormatCodeInlineIntent(range, InlineStyleDelta.WithBackground(background)),
         FormatCodePaletteEntry.Link when value is string href =>
             new ApplyFormatCodeInlineIntent(range, InlineStyleDelta.WithLink(href.Trim())),
+        FormatCodePaletteEntry.AllCaps =>
+            new ApplyFormatCodeInlineIntent(range, InlineStyleDelta.WithCapitalization(TextCapitalization.AllCaps)),
+        FormatCodePaletteEntry.SmallCaps =>
+            new ApplyFormatCodeInlineIntent(range, InlineStyleDelta.WithCapitalization(TextCapitalization.SmallCaps)),
         FormatCodePaletteEntry.AlignLeft =>
             new ApplyFormatCodeParagraphIntent(range, ParagraphStyleDelta.WithAlignment(TextAlignment.Left)),
         FormatCodePaletteEntry.AlignCenter =>

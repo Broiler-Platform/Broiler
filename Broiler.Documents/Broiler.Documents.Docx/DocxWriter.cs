@@ -197,6 +197,10 @@ public static class DocxWriter
             properties.Add(new XElement(DocxNamespaces.Wordprocessing + "u", WordAttribute("val", "single")));
         if (style.Strikethrough)
             properties.Add(new XElement(DocxNamespaces.Wordprocessing + "strike"));
+        if (style.Capitalization == TextCapitalization.AllCaps)
+            properties.Add(new XElement(DocxNamespaces.Wordprocessing + "caps"));
+        else if (style.Capitalization == TextCapitalization.SmallCaps)
+            properties.Add(new XElement(DocxNamespaces.Wordprocessing + "smallCaps"));
 
         if (!string.IsNullOrWhiteSpace(style.FontFamily))
         {

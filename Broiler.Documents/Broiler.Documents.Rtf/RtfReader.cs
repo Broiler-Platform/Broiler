@@ -220,6 +220,8 @@ public static class RtfReader
                 case "strike": _state.Char = _state.Char with { Strikethrough = !(has && p == 0) }; break;
                 case "ul": _state.Char = _state.Char with { Underline = !(has && p == 0) }; break;
                 case "ulnone": _state.Char = _state.Char with { Underline = false }; break;
+                case "caps": _state.Char = ApplyCapitalization(_state.Char, TextCapitalization.AllCaps, !(has && p == 0)); break;
+                case "scaps": _state.Char = ApplyCapitalization(_state.Char, TextCapitalization.SmallCaps, !(has && p == 0)); break;
                 case "plain": _state.Char = InlineStyle.Default; break;
                 case "fs": _state.Char = _state.Char with { FontSize = has ? p / 2f : null }; break;
                 case "f":
@@ -262,6 +264,21 @@ public static class RtfReader
                 case "emspace": AppendChar(0x2003); break;
                 default: break; // Unknown formatting control word: ignore (predictable degradation).
             }
+        }
+
+        /// <summary>
+        /// Turns one capitalization kind on or off. <c>\caps0</c> and
+        /// <c>\scaps0</c> each clear only the kind they name, so a run can drop
+        /// small caps without disturbing an all-caps state and vice versa.
+        /// </summary>
+        private static InlineStyle ApplyCapitalization(InlineStyle style, TextCapitalization kind, bool on)
+        {
+            if (on)
+                return style with { Capitalization = kind };
+
+            return style.Capitalization == kind
+                ? style with { Capitalization = TextCapitalization.None }
+                : style;
         }
 
         private void HandleControlSymbol(char symbol)

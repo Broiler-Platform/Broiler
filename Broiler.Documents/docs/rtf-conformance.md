@@ -11,7 +11,7 @@ below are exercised by `RtfConformanceTests`, `RtfLimitTests`, and
 
 | Group | Control words |
 |---|---|
-| Inline character | `\b` `\b0` `\i` `\i0` `\ul` `\ul0` `\ulnone` `\strike` `\strike0` `\plain` `\fsN` `\fN` `\cfN` `\cbN` `\highlightN` |
+| Inline character | `\b` `\b0` `\i` `\i0` `\ul` `\ul0` `\ulnone` `\strike` `\strike0` `\caps` `\caps0` `\scaps` `\scaps0` `\plain` `\fsN` `\fN` `\cfN` `\cbN` `\highlightN` |
 | Paragraph | `\pard` `\ql` `\qc` `\qr` `\liN` `\sbN` `\saN` |
 | Breaks & entities | `\par` `\line` `\tab` `\cell` (→ tab) `\row` (→ paragraph) `\lquote` `\rquote` `\ldblquote` `\rdblquote` `\bullet` `\endash` `\emdash` `\enspace` `\emspace` |
 | Control symbols | `\\` `\{` `\}` `\~` (nbsp) `\_` (nb-hyphen) `\-` (optional hyphen, dropped) `\`+CR/LF (→ paragraph) `\*` (destination marker) |

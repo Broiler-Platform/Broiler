@@ -24,7 +24,7 @@ internal static class DocxReader
             using var stream = new MemoryStream(bytes, writable: false);
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
             string documentPart = FindMainDocumentPart(archive, options.Limits, diagnostics) ?? "word/document.xml";
-            ZipArchiveEntry? documentEntry = FindEntry(archive, documentPart);
+            ZipArchiveEntry? documentEntry = DocxPackage.FindEntry(archive, documentPart);
             if (documentEntry is null)
             {
                 diagnostics.Add(DocumentDiagnostic.Error(
@@ -33,20 +33,27 @@ internal static class DocxReader
                 return new DocumentReadResult(RichTextDocument.Empty, diagnostics);
             }
 
-            XDocument? documentXml = LoadEntryXml(documentEntry, options.Limits, diagnostics, "docx.document.xml");
+            XDocument? documentXml = DocxPackage.LoadEntryXml(documentEntry, options.Limits, diagnostics, "docx.document.xml");
             if (documentXml is null)
                 return new DocumentReadResult(RichTextDocument.Empty, diagnostics);
 
-            DocxRelationships documentRelationships = ReadRelationships(
+            string baseDirectory = DocxPackage.BasePartDirectory(documentPart);
+            DocxRelationships documentRelationships = DocxPackage.ReadRelationships(
                 archive,
-                RelationshipsPartPath(documentPart),
-                BasePartDirectory(documentPart),
+                DocxPackage.RelationshipsPartPath(documentPart),
+                baseDirectory,
                 options.Limits,
                 diagnostics);
             DocxNumbering numbering = DocxNumbering.Load(
                 archive,
                 documentRelationships,
-                BasePartDirectory(documentPart),
+                baseDirectory,
+                options.Limits,
+                diagnostics);
+            DocxStyles styles = DocxStyles.Load(
+                archive,
+                documentRelationships,
+                baseDirectory,
                 options.Limits,
                 diagnostics);
 
@@ -54,8 +61,10 @@ internal static class DocxReader
                 documentXml,
                 documentRelationships,
                 numbering,
+                styles,
                 options.Limits,
                 diagnostics);
+            ReportUnreadParts(documentRelationships, diagnostics);
             return new DocumentReadResult(document, diagnostics);
         }
         catch (InvalidDataException ex)
@@ -78,6 +87,7 @@ internal static class DocxReader
         XDocument documentXml,
         DocxRelationships relationships,
         DocxNumbering numbering,
+        DocxStyles styles,
         DocumentLimits limits,
         List<DocumentDiagnostic> diagnostics)
     {
@@ -91,28 +101,227 @@ internal static class DocxReader
         }
 
         var builder = new DocxDocumentBuilder(limits, diagnostics);
-        foreach (XElement paragraph in body.Elements(DocxNamespaces.Wordprocessing + "p"))
-            ReadParagraph(paragraph, relationships, numbering, builder);
-
+        var context = new DocxReadContext(relationships, numbering, styles, builder);
+        ReadBlockContent(body.Elements(), context, depth: 0);
+        builder.ReportReadSummary(body.Elements().Any(IsContentBlock), styles.Count);
         return builder.Build();
     }
 
-    private static void ReadParagraph(
-        XElement paragraph,
-        DocxRelationships relationships,
-        DocxNumbering numbering,
-        DocxDocumentBuilder builder)
+    /// <summary>Everything a read needs to turn one element into document content.</summary>
+    private sealed record DocxReadContext(
+        DocxRelationships Relationships,
+        DocxNumbering Numbering,
+        DocxStyles Styles,
+        DocxDocumentBuilder Builder);
+
+    /// <summary>
+    /// Walks WordprocessingML block-level content — the <c>EG_BlockLevelElts</c>
+    /// group. Paragraphs are the only shape <see cref="RichTextDocument"/> can
+    /// represent, so tables and other block containers are flattened into their
+    /// paragraphs in document order rather than dropped. Anything genuinely not
+    /// understood raises a diagnostic instead of vanishing.
+    /// </summary>
+    private static void ReadBlockContent(
+        IEnumerable<XElement> elements,
+        DocxReadContext context,
+        int depth)
     {
-        ParagraphStyle paragraphStyle = ReadParagraphStyle(paragraph.Element(DocxNamespaces.Wordprocessing + "pPr"), numbering);
-        builder.StartParagraph(paragraphStyle);
-        ReadParagraphChildren(paragraph.Elements(), relationships, builder, InlineStyle.Default);
-        builder.FinishParagraph();
+        DocxDocumentBuilder builder = context.Builder;
+        if (depth > builder.Limits.MaxGroupDepth)
+        {
+            builder.AddDiagnosticOnce(
+                "docx.limit.depth",
+                "DOCX block nesting exceeded MaxGroupDepth; the deepest content was skipped.");
+            return;
+        }
+
+        foreach (XElement element in elements)
+        {
+            XName name = element.Name;
+
+            if (name == DocxNamespaces.Wordprocessing + "p")
+            {
+                ReadParagraph(element, context);
+                continue;
+            }
+
+            if (name == DocxNamespaces.Wordprocessing + "tbl")
+            {
+                ReadTable(element, context, depth + 1);
+                continue;
+            }
+
+            // A block-level structured document tag (content control) wraps real
+            // block content in w:sdtContent; the surrounding w:sdtPr is metadata.
+            if (name == DocxNamespaces.Wordprocessing + "sdt")
+            {
+                XElement? content = element.Element(DocxNamespaces.Wordprocessing + "sdtContent");
+                if (content is not null)
+                    ReadBlockContent(content.Elements(), context, depth + 1);
+                continue;
+            }
+
+            // Accepted revisions and move destinations are live content; the
+            // deleted/moved-from side is not.
+            if (name == DocxNamespaces.Wordprocessing + "ins" ||
+                name == DocxNamespaces.Wordprocessing + "moveTo" ||
+                name == DocxNamespaces.Wordprocessing + "customXml" ||
+                name == DocxNamespaces.Wordprocessing + "smartTag")
+            {
+                ReadBlockContent(element.Elements(), context, depth + 1);
+                continue;
+            }
+
+            if (name == DocxNamespaces.Wordprocessing + "del" ||
+                name == DocxNamespaces.Wordprocessing + "moveFrom")
+            {
+                builder.AddDiagnosticOnce("docx.revision.delete", "Deleted revision content was skipped.");
+                continue;
+            }
+
+            if (name == DocxNamespaces.MarkupCompatibility + "AlternateContent")
+            {
+                ReadAlternateContent(element, context, depth + 1);
+                continue;
+            }
+
+            if (IsIgnorableBlock(name))
+                continue;
+
+            builder.AddUnsupportedBlock(name);
+        }
+    }
+
+    /// <summary>
+    /// Flattens a table into the paragraphs of its cells, read left-to-right and
+    /// top-to-bottom. <see cref="RichTextDocument"/> has no table shape, so the
+    /// alternative would be losing every word the table holds — which is exactly
+    /// what a CV or letterhead template puts there.
+    /// </summary>
+    private static void ReadTable(XElement table, DocxReadContext context, int depth)
+    {
+        context.Builder.NoteTable();
+        foreach (XElement row in EnumerateTableChildren(table, "tr"))
+        {
+            foreach (XElement cell in EnumerateTableChildren(row, "tc"))
+                ReadBlockContent(cell.Elements(), context, depth + 1);
+        }
+    }
+
+    /// <summary>
+    /// Yields the <paramref name="localName"/> children of a table or row,
+    /// looking through the content controls and revision markers Word may wrap
+    /// rows and cells in.
+    /// </summary>
+    private static IEnumerable<XElement> EnumerateTableChildren(XElement parent, string localName)
+    {
+        foreach (XElement child in parent.Elements())
+        {
+            if (child.Name == DocxNamespaces.Wordprocessing + localName)
+            {
+                yield return child;
+                continue;
+            }
+
+            if (child.Name == DocxNamespaces.Wordprocessing + "sdt")
+            {
+                XElement? content = child.Element(DocxNamespaces.Wordprocessing + "sdtContent");
+                if (content is null)
+                    continue;
+
+                foreach (XElement nested in EnumerateTableChildren(content, localName))
+                    yield return nested;
+                continue;
+            }
+
+            if (child.Name == DocxNamespaces.Wordprocessing + "ins" ||
+                child.Name == DocxNamespaces.Wordprocessing + "customXml")
+            {
+                foreach (XElement nested in EnumerateTableChildren(child, localName))
+                    yield return nested;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads an <c>mc:AlternateContent</c> block: the first <c>mc:Choice</c>,
+    /// falling back to <c>mc:Fallback</c>. Only one branch may contribute, or the
+    /// same content would be read twice.
+    /// </summary>
+    private static void ReadAlternateContent(XElement alternate, DocxReadContext context, int depth)
+    {
+        XElement? branch =
+            alternate.Element(DocxNamespaces.MarkupCompatibility + "Choice") ??
+            alternate.Element(DocxNamespaces.MarkupCompatibility + "Fallback");
+        if (branch is not null)
+            ReadBlockContent(branch.Elements(), context, depth + 1);
+    }
+
+    /// <summary>Block-level elements that carry no text and are skipped silently.</summary>
+    private static bool IsIgnorableBlock(XName name)
+    {
+        if (name.Namespace != DocxNamespaces.Wordprocessing)
+            return false;
+
+        return name.LocalName is
+            "sectPr" or
+            "tblPr" or "tblGrid" or "trPr" or "tcPr" or "sdtPr" or "sdtEndPr" or
+            "bookmarkStart" or "bookmarkEnd" or
+            "commentRangeStart" or "commentRangeEnd" or
+            "proofErr" or "permStart" or "permEnd";
+    }
+
+    /// <summary>True when a body child could contribute text, used to tell an empty document from a dropped one.</summary>
+    private static bool IsContentBlock(XElement element) =>
+        element.Name != DocxNamespaces.Wordprocessing + "sectPr";
+
+    private static void ReportUnreadParts(
+        DocxRelationships relationships,
+        List<DocumentDiagnostic> diagnostics)
+    {
+        bool hasHeader = false;
+        bool hasFooter = false;
+        foreach (DocxRelationship relationship in relationships.All)
+        {
+            hasHeader |= relationship.Type.Equals(DocxNamespaces.HeaderRelationship, StringComparison.Ordinal);
+            hasFooter |= relationship.Type.Equals(DocxNamespaces.FooterRelationship, StringComparison.Ordinal);
+        }
+
+        if (hasHeader || hasFooter)
+        {
+            diagnostics.Add(DocumentDiagnostic.Info(
+                "docx.part.headerfooter",
+                "DOCX headers and footers are not part of the document body and were not imported."));
+        }
+    }
+
+    private static void ReadParagraph(XElement paragraph, DocxReadContext context)
+    {
+        XElement? pPr = paragraph.Element(DocxNamespaces.Wordprocessing + "pPr");
+        string? paragraphStyleId = WordValue(pPr?.Element(DocxNamespaces.Wordprocessing + "pStyle"));
+
+        ParagraphStyle paragraphStyle = ReadParagraphStyle(pPr, paragraphStyleId, context);
+        context.Builder.StartParagraph(paragraphStyle);
+        ReadParagraphChildren(paragraph.Elements(), context, ReadInheritedRunStyle(paragraphStyleId, context));
+        context.Builder.FinishParagraph();
+    }
+
+    /// <summary>
+    /// The character formatting a run inherits before its own <c>w:rPr</c>:
+    /// document defaults followed by the paragraph style chain's run properties.
+    /// </summary>
+    private static InlineStyle ReadInheritedRunStyle(string? paragraphStyleId, DocxReadContext context)
+    {
+        InlineStyle style = InlineStyle.Default;
+        foreach (XElement rPr in context.Styles.RunPropertiesForParagraph(paragraphStyleId))
+            style = ApplyRunProperties(rPr, style, context.Styles.Theme);
+
+        return style;
     }
 
     private static void ReadParagraphChildren(
         IEnumerable<XElement> elements,
-        DocxRelationships relationships,
-        DocxDocumentBuilder builder,
+        DocxReadContext context,
         InlineStyle style)
     {
         foreach (XElement element in elements)
@@ -122,20 +331,20 @@ internal static class DocxReader
 
             if (element.Name == DocxNamespaces.Wordprocessing + "r")
             {
-                ReadRun(element, relationships, builder, style);
+                ReadRun(element, context, style);
                 continue;
             }
 
             if (element.Name == DocxNamespaces.Wordprocessing + "hyperlink")
             {
-                InlineStyle hyperlinkStyle = ApplyHyperlinkStyle(element, relationships, style, builder);
-                ReadParagraphChildren(element.Elements(), relationships, builder, hyperlinkStyle);
+                InlineStyle hyperlinkStyle = ApplyHyperlinkStyle(element, context.Relationships, style, context.Builder);
+                ReadParagraphChildren(element.Elements(), context, hyperlinkStyle);
                 continue;
             }
 
             if (element.Name == DocxNamespaces.Wordprocessing + "del")
             {
-                builder.AddDiagnosticOnce("docx.revision.delete", "Deleted revision content was skipped.");
+                context.Builder.AddDiagnosticOnce("docx.revision.delete", "Deleted revision content was skipped.");
                 continue;
             }
 
@@ -143,22 +352,28 @@ internal static class DocxReader
             {
                 XElement? content = element.Element(DocxNamespaces.Wordprocessing + "sdtContent");
                 if (content is not null)
-                    ReadParagraphChildren(content.Elements(), relationships, builder, style);
+                    ReadParagraphChildren(content.Elements(), context, style);
                 continue;
             }
 
             if (element.HasElements)
-                ReadParagraphChildren(element.Elements(), relationships, builder, style);
+                ReadParagraphChildren(element.Elements(), context, style);
         }
     }
 
-    private static void ReadRun(
-        XElement run,
-        DocxRelationships relationships,
-        DocxDocumentBuilder builder,
-        InlineStyle inherited)
+    private static void ReadRun(XElement run, DocxReadContext context, InlineStyle inherited)
     {
-        InlineStyle style = ReadRunStyle(run.Element(DocxNamespaces.Wordprocessing + "rPr"), inherited);
+        DocxDocumentBuilder builder = context.Builder;
+        XElement? rPr = run.Element(DocxNamespaces.Wordprocessing + "rPr");
+
+        // ECMA-376 §17.7.2: the character style named by w:rStyle applies over
+        // the paragraph's inherited formatting, and the run's own w:rPr over that.
+        InlineStyle style = inherited;
+        string? characterStyleId = WordValue(rPr?.Element(DocxNamespaces.Wordprocessing + "rStyle"));
+        foreach (XElement styleRunProperties in context.Styles.RunPropertiesForCharacterStyle(characterStyleId))
+            style = ApplyRunProperties(styleRunProperties, style, context.Styles.Theme);
+
+        style = ApplyRunProperties(rPr, style, context.Styles.Theme);
         foreach (XElement child in run.Elements())
         {
             if (child.Name == DocxNamespaces.Wordprocessing + "rPr")
@@ -210,9 +425,29 @@ internal static class DocxReader
         }
     }
 
-    private static ParagraphStyle ReadParagraphStyle(XElement? pPr, DocxNumbering numbering)
+    /// <summary>
+    /// Resolves a paragraph's style: document defaults, then the
+    /// <c>w:pStyle</c> chain from its root down, then the paragraph's own
+    /// <c>w:pPr</c>. A template paragraph often carries no direct formatting at
+    /// all, so skipping the chain leaves every heading looking like body text.
+    /// </summary>
+    private static ParagraphStyle ReadParagraphStyle(
+        XElement? pPr,
+        string? paragraphStyleId,
+        DocxReadContext context)
     {
         ParagraphStyle style = ParagraphStyle.Default;
+        foreach (XElement styleParagraphProperties in context.Styles.ParagraphProperties(paragraphStyleId))
+            style = ApplyParagraphProperties(styleParagraphProperties, context.Numbering, style);
+
+        return ApplyParagraphProperties(pPr, context.Numbering, style);
+    }
+
+    private static ParagraphStyle ApplyParagraphProperties(
+        XElement? pPr,
+        DocxNumbering numbering,
+        ParagraphStyle style)
+    {
         if (pPr is null)
             return style;
 
@@ -249,21 +484,35 @@ internal static class DocxReader
         XElement? numPr = pPr.Element(DocxNamespaces.Wordprocessing + "numPr");
         if (numPr is not null)
         {
-            int indent = style.IndentLevel;
-            if (TryReadInt(numPr.Element(DocxNamespaces.Wordprocessing + "ilvl")?.Attribute(DocxNamespaces.Wordprocessing + "val"), out int ilvl))
-                indent = Math.Max(indent, ilvl + 1);
+            bool hasNumId = TryReadInt(
+                numPr.Element(DocxNamespaces.Wordprocessing + "numId")?.Attribute(DocxNamespaces.Wordprocessing + "val"),
+                out int numId);
 
-            ListKind kind = ListKind.Bullet;
-            if (TryReadInt(numPr.Element(DocxNamespaces.Wordprocessing + "numId")?.Attribute(DocxNamespaces.Wordprocessing + "val"), out int numId))
-                kind = numbering.KindFor(numId);
+            // numId 0 is how a paragraph opts out of a list its style applied.
+            if (hasNumId && numId == 0)
+            {
+                style = style with { ListKind = ListKind.None };
+            }
+            else
+            {
+                int indent = style.IndentLevel;
+                if (TryReadInt(numPr.Element(DocxNamespaces.Wordprocessing + "ilvl")?.Attribute(DocxNamespaces.Wordprocessing + "val"), out int ilvl))
+                    indent = Math.Max(indent, ilvl + 1);
 
-            style = style with { ListKind = kind, IndentLevel = Math.Max(1, indent) };
+                ListKind kind = hasNumId ? numbering.KindFor(numId) : ListKind.Bullet;
+                style = style with { ListKind = kind, IndentLevel = Math.Max(1, indent) };
+            }
         }
 
         return style;
     }
 
-    private static InlineStyle ReadRunStyle(XElement? rPr, InlineStyle style)
+    /// <summary>
+    /// Applies one <c>w:rPr</c> over an inherited style. Called once per link in
+    /// the style chain and finally for the run's own properties, so only the
+    /// elements actually present override what came before.
+    /// </summary>
+    private static InlineStyle ApplyRunProperties(XElement? rPr, InlineStyle style, DocxTheme theme)
     {
         if (rPr is null)
             return style;
@@ -272,6 +521,12 @@ internal static class DocxReader
         style = ApplyOnOff(rPr, "i", style, static (s, v) => s with { Italic = v });
         style = ApplyOnOff(rPr, "strike", style, static (s, v) => s with { Strikethrough = v });
         style = ApplyOnOff(rPr, "dstrike", style, static (s, v) => s with { Strikethrough = v });
+
+        // w:smallCaps first: when a run turns both on, Word draws all caps. An
+        // explicit "off" clears only the kind it names, so a run can drop the
+        // small caps its style applied without disturbing anything else.
+        style = ApplyCapitalization(rPr, "smallCaps", TextCapitalization.SmallCaps, style);
+        style = ApplyCapitalization(rPr, "caps", TextCapitalization.AllCaps, style);
 
         XElement? underline = rPr.Element(DocxNamespaces.Wordprocessing + "u");
         if (underline is not null)
@@ -285,7 +540,11 @@ internal static class DocxReader
             (string?)fonts?.Attribute(DocxNamespaces.Wordprocessing + "ascii") ??
             (string?)fonts?.Attribute(DocxNamespaces.Wordprocessing + "hAnsi") ??
             (string?)fonts?.Attribute(DocxNamespaces.Wordprocessing + "cs") ??
-            (string?)fonts?.Attribute(DocxNamespaces.Wordprocessing + "eastAsia");
+            (string?)fonts?.Attribute(DocxNamespaces.Wordprocessing + "eastAsia") ??
+            // Styles usually name fonts through the theme rather than directly.
+            theme.Resolve((string?)fonts?.Attribute(DocxNamespaces.Wordprocessing + "asciiTheme")) ??
+            theme.Resolve((string?)fonts?.Attribute(DocxNamespaces.Wordprocessing + "hAnsiTheme")) ??
+            theme.Resolve((string?)fonts?.Attribute(DocxNamespaces.Wordprocessing + "cstheme"));
         if (!string.IsNullOrWhiteSpace(fontFamily))
             style = style with { FontFamily = fontFamily };
 
@@ -354,6 +613,25 @@ internal static class DocxReader
             uri.Scheme.Equals(Uri.UriSchemeMailto, StringComparison.OrdinalIgnoreCase);
     }
 
+    private static InlineStyle ApplyCapitalization(
+        XElement rPr,
+        string localName,
+        TextCapitalization kind,
+        InlineStyle style)
+    {
+        XElement? element = rPr.Element(DocxNamespaces.Wordprocessing + localName);
+        if (element is null)
+            return style;
+
+        if (ReadOnOff(element))
+            return style with { Capitalization = kind };
+
+        // Turning one kind off leaves the other alone.
+        return style.Capitalization == kind
+            ? style with { Capitalization = TextCapitalization.None }
+            : style;
+    }
+
     private static InlineStyle ApplyOnOff(
         XElement parent,
         string localName,
@@ -378,7 +656,7 @@ internal static class DocxReader
         DocumentLimits limits,
         List<DocumentDiagnostic> diagnostics)
     {
-        DocxRelationships packageRelationships = ReadRelationships(
+        DocxRelationships packageRelationships = DocxPackage.ReadRelationships(
             archive,
             "_rels/.rels",
             string.Empty,
@@ -391,121 +669,6 @@ internal static class DocxReader
         }
 
         return null;
-    }
-
-    private static DocxRelationships ReadRelationships(
-        ZipArchive archive,
-        string path,
-        string baseDirectory,
-        DocumentLimits limits,
-        List<DocumentDiagnostic> diagnostics)
-    {
-        ZipArchiveEntry? entry = FindEntry(archive, path);
-        if (entry is null)
-            return DocxRelationships.Empty;
-
-        XDocument? rels = LoadEntryXml(entry, limits, diagnostics, "docx.relationships");
-        if (rels?.Root is null)
-            return DocxRelationships.Empty;
-
-        var relationships = new List<DocxRelationship>();
-        foreach (XElement element in rels.Root.Elements(DocxNamespaces.PackageRelationships + "Relationship"))
-        {
-            string? id = (string?)element.Attribute("Id");
-            string? type = (string?)element.Attribute("Type");
-            string? target = (string?)element.Attribute("Target");
-            if (string.IsNullOrWhiteSpace(id) ||
-                string.IsNullOrWhiteSpace(type) ||
-                string.IsNullOrWhiteSpace(target))
-            {
-                continue;
-            }
-
-            bool external = string.Equals((string?)element.Attribute("TargetMode"), "External", StringComparison.OrdinalIgnoreCase);
-            string resolved = external ? target : NormalizePackagePath(baseDirectory, target);
-            relationships.Add(new DocxRelationship(id, type, resolved, external));
-        }
-
-        return new DocxRelationships(relationships);
-    }
-
-    private static XDocument? LoadEntryXml(
-        ZipArchiveEntry entry,
-        DocumentLimits limits,
-        List<DocumentDiagnostic> diagnostics,
-        string diagnosticCode)
-    {
-        if (entry.Length > limits.MaxBinBytes)
-        {
-            diagnostics.Add(DocumentDiagnostic.Error(
-                diagnosticCode + ".limit",
-                "A DOCX XML part exceeded MaxBinBytes and was skipped."));
-            return null;
-        }
-
-        try
-        {
-            using Stream stream = entry.Open();
-            return XDocument.Load(stream, LoadOptions.None);
-        }
-        catch (Exception ex) when (ex is XmlException or InvalidDataException)
-        {
-            diagnostics.Add(DocumentDiagnostic.Error(
-                diagnosticCode,
-                "A DOCX XML part could not be parsed: " + ex.GetType().Name + "."));
-            return null;
-        }
-    }
-
-    private static ZipArchiveEntry? FindEntry(ZipArchive archive, string path)
-    {
-        string normalized = path.TrimStart('/').Replace('\\', '/');
-        return archive.Entries.FirstOrDefault(entry =>
-            entry.FullName.Replace('\\', '/').Equals(normalized, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static string RelationshipsPartPath(string partPath)
-    {
-        string normalized = partPath.TrimStart('/').Replace('\\', '/');
-        int slash = normalized.LastIndexOf('/');
-        if (slash < 0)
-            return "_rels/" + normalized + ".rels";
-
-        return normalized[..slash] + "/_rels/" + normalized[(slash + 1)..] + ".rels";
-    }
-
-    private static string BasePartDirectory(string partPath)
-    {
-        string normalized = partPath.TrimStart('/').Replace('\\', '/');
-        int slash = normalized.LastIndexOf('/');
-        return slash < 0 ? string.Empty : normalized[..slash];
-    }
-
-    private static string NormalizePackagePath(string baseDirectory, string target)
-    {
-        target = target.Replace('\\', '/');
-        if (target.StartsWith("/", StringComparison.Ordinal))
-            return target.TrimStart('/');
-
-        var parts = new List<string>();
-        if (!string.IsNullOrEmpty(baseDirectory))
-            parts.AddRange(baseDirectory.Split('/', StringSplitOptions.RemoveEmptyEntries));
-
-        foreach (string part in target.Split('/', StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (part == ".")
-                continue;
-            if (part == "..")
-            {
-                if (parts.Count > 0)
-                    parts.RemoveAt(parts.Count - 1);
-                continue;
-            }
-
-            parts.Add(part);
-        }
-
-        return string.Join("/", parts);
     }
 
     private static string? WordValue(XElement? element) =>
@@ -575,11 +738,60 @@ internal static class DocxReader
         private readonly List<Segment> _segments = [];
         private readonly HashSet<string> _diagnosticOnce = new(StringComparer.Ordinal);
         private ParagraphStyle _paragraphStyle = ParagraphStyle.Default;
+        private int _tableCount;
+        private int _unsupportedBlockCount;
 
         public DocxDocumentBuilder(DocumentLimits limits, List<DocumentDiagnostic> diagnostics)
         {
             _limits = limits;
             _diagnostics = diagnostics;
+        }
+
+        public DocumentLimits Limits => _limits;
+
+        public void NoteTable()
+        {
+            _tableCount++;
+            AddDiagnosticOnce(
+                "docx.table.flattened",
+                "DOCX tables were flattened into their cell paragraphs, in row order.");
+        }
+
+        /// <summary>
+        /// Records a block-level element the reader does not understand. Keyed by
+        /// element name so each distinct construct is reported once — the name is
+        /// markup structure, never document text (ADR 0004 privacy rule).
+        /// </summary>
+        public void AddUnsupportedBlock(XName name)
+        {
+            _unsupportedBlockCount++;
+            AddDiagnosticOnce(
+                "docx.block.unsupported:" + name.LocalName,
+                "docx.block.unsupported",
+                "An unsupported DOCX block-level element was skipped: " + name.LocalName + ".");
+        }
+
+        /// <summary>
+        /// Emits the read summary. The counts make a silent content loss visible:
+        /// a body with block content that yields no paragraphs is a reader bug,
+        /// not an empty file, and it should say so rather than open blank.
+        /// </summary>
+        public void ReportReadSummary(bool bodyHadContentBlocks, int styleCount)
+        {
+            if (_paragraphs.Count == 0 && bodyHadContentBlocks)
+            {
+                _diagnostics.Add(DocumentDiagnostic.Warning(
+                    "docx.document.empty",
+                    "DOCX body contained block-level content but produced no paragraphs."));
+            }
+
+            _diagnostics.Add(DocumentDiagnostic.Info(
+                "docx.read.summary",
+                "DOCX read produced " + _paragraphs.Count.ToString(CultureInfo.InvariantCulture) +
+                " paragraph(s), flattened " + _tableCount.ToString(CultureInfo.InvariantCulture) +
+                " table(s), loaded " + styleCount.ToString(CultureInfo.InvariantCulture) +
+                " style(s), and skipped " + _unsupportedBlockCount.ToString(CultureInfo.InvariantCulture) +
+                " unsupported block(s)."));
         }
 
         public void StartParagraph(ParagraphStyle style)
@@ -636,38 +848,17 @@ internal static class DocxReader
                 ? RichTextDocument.Empty
                 : RichTextDocument.FromParagraphs(_paragraphs);
 
-        public void AddDiagnosticOnce(string code, string message)
+        public void AddDiagnosticOnce(string code, string message) =>
+            AddDiagnosticOnce(code, code, message);
+
+        public void AddDiagnosticOnce(string key, string code, string message)
         {
-            if (_diagnosticOnce.Add(code))
+            if (_diagnosticOnce.Add(key))
                 _diagnostics.Add(DocumentDiagnostic.Warning(code, message));
         }
 
         private readonly record struct Segment(string Text, InlineStyle Style);
     }
-
-    private sealed class DocxRelationships
-    {
-        private readonly Dictionary<string, DocxRelationship> _byId;
-
-        public DocxRelationships(IEnumerable<DocxRelationship> relationships)
-        {
-            All = relationships.ToArray();
-            _byId = All.ToDictionary(relationship => relationship.Id, StringComparer.Ordinal);
-        }
-
-        public static DocxRelationships Empty { get; } = new(Array.Empty<DocxRelationship>());
-
-        public IReadOnlyList<DocxRelationship> All { get; }
-
-        public bool TryGet(string id, out DocxRelationship? relationship) =>
-            _byId.TryGetValue(id, out relationship);
-    }
-
-    private sealed record DocxRelationship(
-        string Id,
-        string Type,
-        string Target,
-        bool TargetModeExternal);
 
     private sealed class DocxNumbering
     {
@@ -684,16 +875,17 @@ internal static class DocxReader
             DocumentLimits limits,
             List<DocumentDiagnostic> diagnostics)
         {
-            string? numberingPath = documentRelationships.All
-                .FirstOrDefault(relationship => relationship.Type.Equals(DocxNamespaces.NumberingRelationship, StringComparison.Ordinal))
-                ?.Target;
-            numberingPath ??= NormalizePackagePath(documentBaseDirectory, "numbering.xml");
+            string numberingPath = DocxPackage.ResolvePartPath(
+                documentRelationships,
+                DocxNamespaces.NumberingRelationship,
+                documentBaseDirectory,
+                "numbering.xml");
 
-            ZipArchiveEntry? entry = FindEntry(archive, numberingPath);
+            ZipArchiveEntry? entry = DocxPackage.FindEntry(archive, numberingPath);
             if (entry is null)
                 return Empty;
 
-            XDocument? xml = LoadEntryXml(entry, limits, diagnostics, "docx.numbering");
+            XDocument? xml = DocxPackage.LoadEntryXml(entry, limits, diagnostics, "docx.numbering");
             if (xml?.Root is null)
                 return Empty;
 

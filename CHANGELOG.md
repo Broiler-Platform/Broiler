@@ -7,6 +7,39 @@ are versioned in lockstep during the preview.
 
 ## [Unreleased]
 
+### Fixed
+
+- `Broiler.Documents` — the DOCX reader walked only the direct `w:p` children of
+  `w:body`, so a document whose content lived inside a layout table (the shape CV
+  and letterhead templates use) opened completely empty in Broiler.Writer. Block
+  content is now walked recursively: tables, structured document tags, accepted
+  revisions, and `mc:AlternateContent`.
+- `Broiler.Documents` — the DOCX reader ignored `word/styles.xml`, so template
+  documents (whose paragraphs carry no direct formatting at all) read as
+  undifferentiated body text. Named paragraph and character styles now resolve
+  through `w:docDefaults` and the `w:basedOn` chain, and `w:rFonts` theme
+  references resolve against `word/theme/theme1.xml`.
+
+### Added
+
+- `Broiler.Documents.Model` — `InlineStyle.Capitalization` (`none`/`all caps`/
+  `small caps`), extending the ADR 0014 inline style set. Capitalization is a
+  display property: the text keeps the casing the author typed, so an
+  open-and-save no longer rewrites it. Round-trips as DOCX `w:caps`/
+  `w:smallCaps`, RTF `\caps`/`\scaps`, and CSS `text-transform`/`font-variant`.
+- `Broiler.UI.RichEdit` — draws capitalization, synthesizing small caps by
+  drawing letters typed in lower case as capitals at a reduced size, plus
+  `RichEditCommand.AllCaps`/`SmallCaps` and formatting-code tokens
+  `[All Caps ON]`, `[Small Caps ON]`, and `[Caps OFF]`.
+- `Broiler.Documents` — DOCX read diagnostics: `docx.read.summary`,
+  `docx.document.empty`, `docx.table.flattened`, `docx.block.unsupported`,
+  `docx.limit.depth`, `docx.part.headerfooter`, `docx.styles.missing`,
+  `docx.styles.unknown`, `docx.styles.cycle`, and `docx.styles.depth`.
+- `Broiler.Cli` — `--convert-doc` prints every read diagnostic and the character
+  count, not just a diagnostic count.
+- `Broiler.Writer` — the status bar calls out a document that read as no content,
+  and `BROILER_WRITER_DOCUMENT_LOG=1` writes the read diagnostics to stderr.
+
 ## [0.1.0-preview.1] — first preview
 
 First packaged preview of the Broiler component libraries. **APIs are unstable**

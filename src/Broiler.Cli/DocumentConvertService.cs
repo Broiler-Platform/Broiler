@@ -77,7 +77,25 @@ public static class DocumentConvertService
         File.WriteAllBytes(outputPath, output);
         Console.WriteLine(
             $"Converted {inputPath} -> {outputPath} " +
-            $"({match.Codec.Name}, {read.Document.ParagraphCount} paragraph(s), {read.Diagnostics.Count} diagnostic(s)).");
+            $"({match.Codec.Name}, {read.Document.ParagraphCount} paragraph(s), " +
+            $"{read.Document.PlainText.Length} character(s), {read.Diagnostics.Count} diagnostic(s)).");
+        WriteDiagnostics(read.Diagnostics);
         return 0;
+    }
+
+    /// <summary>
+    /// Prints every read diagnostic. A conversion that silently drops content is
+    /// the hardest kind to debug, so the codes go to the console rather than
+    /// being summarized away as a count.
+    /// </summary>
+    private static void WriteDiagnostics(IReadOnlyList<DocumentDiagnostic> diagnostics)
+    {
+        foreach (DocumentDiagnostic diagnostic in diagnostics)
+        {
+            TextWriter writer = diagnostic.Severity == DocumentDiagnosticSeverity.Error
+                ? Console.Error
+                : Console.Out;
+            writer.WriteLine($"  {diagnostic.Severity}: {diagnostic.Code}: {diagnostic.Message}");
+        }
     }
 }

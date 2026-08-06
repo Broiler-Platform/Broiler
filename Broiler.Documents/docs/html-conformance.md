@@ -25,6 +25,7 @@ for parsing and writes deterministic UTF-8 HTML with `HtmlSerializer`.
 | `<i>`, `<em>` | `InlineStyle.Italic` | CSS `font-style:italic/oblique` also maps. |
 | `<u>` | `InlineStyle.Underline` | CSS `text-decoration: underline` also maps. |
 | `<s>`, `<strike>`, `<del>` | `InlineStyle.Strikethrough` | CSS `line-through` also maps. |
+| CSS `text-transform: uppercase`, `font-variant: small-caps` | `InlineStyle.Capitalization` | Display only; the markup keeps the author's casing. |
 | `<a href>` | `InlineStyle.LinkHref` | `http`, `https`, and `mailto` only; other schemes are dropped with `html.link`. |
 | `<font face color>` | `FontFamily`, `Foreground` | Legacy compatibility only. |
 | CSS `color`, `background-color` | `Foreground`, `Background` | Named colors, `#rgb`, `#rrggbb`, and `rgb(...)`. |

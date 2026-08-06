@@ -205,6 +205,8 @@ public abstract class UiRichEdit : UiElement
             RichEditCommand.Italic => RichEditCommandState.For(editable, inline.Italic),
             RichEditCommand.Underline => RichEditCommandState.For(editable, inline.Underline),
             RichEditCommand.Strikethrough => RichEditCommandState.For(editable, inline.Strikethrough),
+            RichEditCommand.AllCaps => RichEditCommandState.For(editable, inline.Capitalization == TextCapitalization.AllCaps),
+            RichEditCommand.SmallCaps => RichEditCommandState.For(editable, inline.Capitalization == TextCapitalization.SmallCaps),
             RichEditCommand.SetForeground or RichEditCommand.SetBackground or
             RichEditCommand.SetFontFamily or RichEditCommand.SetFontSize or RichEditCommand.SetFont or
             RichEditCommand.ClearFormatting =>
@@ -348,6 +350,8 @@ public abstract class UiRichEdit : UiElement
         RichEditCommand.Italic => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleItalic(!CurrentInlineStyle.Italic)),
         RichEditCommand.Underline => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleUnderline(!CurrentInlineStyle.Underline)),
         RichEditCommand.Strikethrough => _editor.ApplyInlineStyle(InlineStyleDelta.ToggleStrikethrough(!CurrentInlineStyle.Strikethrough)),
+        RichEditCommand.AllCaps => _editor.ApplyInlineStyle(ToggleCapitalization(TextCapitalization.AllCaps)),
+        RichEditCommand.SmallCaps => _editor.ApplyInlineStyle(ToggleCapitalization(TextCapitalization.SmallCaps)),
         RichEditCommand.SetForeground => parameter is BColor foreground && _editor.ApplyInlineStyle(InlineStyleDelta.WithForeground(foreground)),
         RichEditCommand.SetBackground => parameter is BColor background && _editor.ApplyInlineStyle(InlineStyleDelta.WithBackground(background)),
         RichEditCommand.SetFontFamily => _editor.ApplyInlineStyle(InlineStyleDelta.WithFontFamily(NormalizeFontFamily(parameter as string))),
@@ -382,6 +386,15 @@ public abstract class UiRichEdit : UiElement
         ListKind target = CurrentParagraphStyle.ListKind == kind ? ListKind.None : kind;
         return _editor.SetListKind(target);
     }
+
+    /// <summary>
+    /// Turns <paramref name="kind"/> on, or back off when it is already the
+    /// current capitalization. The two kinds are exclusive, so switching between
+    /// them replaces rather than combines.
+    /// </summary>
+    private InlineStyleDelta ToggleCapitalization(TextCapitalization kind) =>
+        InlineStyleDelta.WithCapitalization(
+            CurrentInlineStyle.Capitalization == kind ? TextCapitalization.None : kind);
 
     private static InlineStyleDelta FontStyleDelta(BFontStyle font) => new()
     {

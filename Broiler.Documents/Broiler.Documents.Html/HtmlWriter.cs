@@ -138,6 +138,11 @@ public static class HtmlWriter
         if (decoration.Length > 0)
             declarations.Add("text-decoration: " + decoration);
 
+        if (style.Capitalization == TextCapitalization.AllCaps)
+            declarations.Add("text-transform: uppercase");
+        else if (style.Capitalization == TextCapitalization.SmallCaps)
+            declarations.Add("font-variant: small-caps");
+
         if (style.FontFamily is not null)
             declarations.Add("font-family: " + QuoteCssString(style.FontFamily));
         if (style.FontSize.HasValue)

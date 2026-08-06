@@ -11,7 +11,7 @@ namespace Broiler.Documents.FormatCodes;
 /// <summary>Projects normalized Broiler rich-text state into grammar-version 1 tokens.</summary>
 public sealed class FormatCodeProjector
 {
-    private const int InlinePropertyCount = 9;
+    private const int InlinePropertyCount = 10;
 
     public FormatCodeProjection Project(
         RichTextDocument document,
@@ -408,6 +408,7 @@ public sealed class FormatCodeProjector
         6 => left.Foreground != right.Foreground,
         7 => left.Background != right.Background,
         8 => !string.Equals(NormalizeLink(left.LinkHref), NormalizeLink(right.LinkHref), StringComparison.Ordinal),
+        9 => left.Capitalization != right.Capitalization,
         _ => throw new ArgumentOutOfRangeException(nameof(property)),
     };
 
@@ -424,6 +425,7 @@ public sealed class FormatCodeProjector
             6 => InlineStyleDelta.WithForeground(BColor.Empty),
             7 => InlineStyleDelta.WithBackground(BColor.Empty),
             8 => InlineStyleDelta.WithLink(null),
+            9 => InlineStyleDelta.WithCapitalization(TextCapitalization.None),
             _ => throw new ArgumentOutOfRangeException(nameof(property)),
         };
         return new FormatCodeTokenEditDescriptor(
@@ -453,6 +455,7 @@ public sealed class FormatCodeProjector
         6 => !style.Foreground.IsEmpty,
         7 => !style.Background.IsEmpty,
         8 => NormalizeLink(style.LinkHref) is not null,
+        9 => style.Capitalization != TextCapitalization.None,
         _ => throw new ArgumentOutOfRangeException(nameof(property)),
     };
 
@@ -467,6 +470,7 @@ public sealed class FormatCodeProjector
         6 => "[Text Color DEFAULT]",
         7 => "[Highlight NONE]",
         8 => "[Link OFF]",
+        9 => "[Caps OFF]",
         _ => throw new ArgumentOutOfRangeException(nameof(property)),
     };
 
@@ -484,6 +488,7 @@ public sealed class FormatCodeProjector
         6 => $"[Text Color {FormatColor(style.Foreground)}]",
         7 => $"[Highlight {FormatColor(style.Background)}]",
         8 => $"[Link \"{EscapeQuoted(NormalizeLink(style.LinkHref)!, options)}\"]",
+        9 => style.Capitalization == TextCapitalization.SmallCaps ? "[Small Caps ON]" : "[All Caps ON]",
         _ => throw new ArgumentOutOfRangeException(nameof(property)),
     };
 

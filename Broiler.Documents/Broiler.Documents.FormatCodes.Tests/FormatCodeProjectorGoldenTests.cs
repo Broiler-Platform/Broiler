@@ -49,6 +49,7 @@ public sealed class FormatCodeProjectorGoldenTests
             Foreground = new BColor(0x11, 0x22, 0x33, 0x44),
             Background = new BColor(0xFF, 0xF2, 0xA8, 0xFF),
             LinkHref = "https://example.test/[x]",
+            Capitalization = TextCapitalization.SmallCaps,
         };
 
         FormatCodeProjection projection = _projector.Project(
@@ -58,9 +59,24 @@ public sealed class FormatCodeProjectorGoldenTests
             "[Bold ON][Italic ON][Underline ON][Strike ON]" +
             "[Font \"A\\\"\\[B\\]\\\\C\"][Size 17]" +
             "[Text Color #11223344][Highlight #FFF2A8FF]" +
-            "[Link \"https://example.test/\\[x\\]\"]x" +
-            "[Link OFF][Highlight NONE][Text Color DEFAULT][Size DEFAULT]" +
+            "[Link \"https://example.test/\\[x\\]\"][Small Caps ON]x" +
+            "[Caps OFF][Link OFF][Highlight NONE][Text Color DEFAULT][Size DEFAULT]" +
             "[Font DEFAULT][Strike OFF][Underline OFF][Italic OFF][Bold OFF]",
+            projection.Text);
+    }
+
+    [Fact]
+    public void Capitalization_Projects_Its_Kind_And_Closes_As_One_Property()
+    {
+        RichTextParagraph paragraph = RichTextParagraph
+            .Create("a", new InlineStyle { Capitalization = TextCapitalization.AllCaps })
+            .Append(RichTextParagraph.Create("b", new InlineStyle { Capitalization = TextCapitalization.SmallCaps }));
+
+        FormatCodeProjection projection = _projector.Project(
+            RichTextDocument.FromParagraphs([paragraph]));
+
+        Assert.Equal(
+            "[All Caps ON]a[Caps OFF][Small Caps ON]b[Caps OFF]",
             projection.Text);
     }
 

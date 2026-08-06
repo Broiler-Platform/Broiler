@@ -189,6 +189,8 @@ public static class RtfWriter
         if (style.Italic) b.Append("\\i");
         if (style.Underline) b.Append("\\ul");
         if (style.Strikethrough) b.Append("\\strike");
+        if (style.Capitalization == TextCapitalization.AllCaps) b.Append("\\caps");
+        else if (style.Capitalization == TextCapitalization.SmallCaps) b.Append("\\scaps");
         if (style.FontFamily is not null)
             b.Append("\\f").Append(fonts.IndexOf(style.FontFamily));
         if (style.FontSize.HasValue)

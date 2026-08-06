@@ -10,6 +10,12 @@ internal static class DocxNamespaces
     public static readonly XNamespace Wordprocessing = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
     public static readonly XNamespace Xml = "http://www.w3.org/XML/1998/namespace";
 
+    /// <summary>Markup compatibility, used by <c>mc:AlternateContent</c> blocks.</summary>
+    public static readonly XNamespace MarkupCompatibility = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+    /// <summary>DrawingML, used by the theme part's font scheme.</summary>
+    public static readonly XNamespace Drawing = "http://schemas.openxmlformats.org/drawingml/2006/main";
+
     public const string OfficeDocumentRelationship =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
 
@@ -18,6 +24,18 @@ internal static class DocxNamespaces
 
     public const string NumberingRelationship =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering";
+
+    public const string StylesRelationship =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+
+    public const string ThemeRelationship =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme";
+
+    public const string HeaderRelationship =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header";
+
+    public const string FooterRelationship =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer";
 
     public const string DocumentContentType =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";

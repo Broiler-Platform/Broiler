@@ -23,6 +23,12 @@ public readonly record struct InlineStyle
 
     public bool Strikethrough { get; init; }
 
+    /// <summary>
+    /// How the run's letters are cased when drawn. Presentation only — the text
+    /// itself is stored as the author typed it.
+    /// </summary>
+    public TextCapitalization Capitalization { get; init; }
+
     /// <summary>Foreground color, or <see cref="BColor.Empty"/> for the default color.</summary>
     public BColor Foreground { get; init; }
 

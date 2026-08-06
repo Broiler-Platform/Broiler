@@ -18,6 +18,8 @@ public readonly record struct InlineStyleDelta
 
     public bool? Strikethrough { get; init; }
 
+    public TextCapitalization? Capitalization { get; init; }
+
     public BColor? Foreground { get; init; }
 
     public BColor? Background { get; init; }
@@ -41,6 +43,7 @@ public readonly record struct InlineStyleDelta
         Italic = Italic ?? style.Italic,
         Underline = Underline ?? style.Underline,
         Strikethrough = Strikethrough ?? style.Strikethrough,
+        Capitalization = Capitalization ?? style.Capitalization,
         Foreground = Foreground ?? style.Foreground,
         Background = Background ?? style.Background,
         FontFamily = SetFontFamily ? FontFamily : style.FontFamily,
@@ -55,6 +58,9 @@ public readonly record struct InlineStyleDelta
     public static InlineStyleDelta ToggleUnderline(bool on) => new() { Underline = on };
 
     public static InlineStyleDelta ToggleStrikethrough(bool on) => new() { Strikethrough = on };
+
+    public static InlineStyleDelta WithCapitalization(TextCapitalization capitalization) =>
+        new() { Capitalization = capitalization };
 
     public static InlineStyleDelta WithForeground(BColor color) => new() { Foreground = color };
 
@@ -73,6 +79,7 @@ public readonly record struct InlineStyleDelta
         Italic = false,
         Underline = false,
         Strikethrough = false,
+        Capitalization = TextCapitalization.None,
         Foreground = BColor.Empty,
         Background = BColor.Empty,
         SetFontFamily = true,

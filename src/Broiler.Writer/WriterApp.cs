@@ -69,6 +69,7 @@ internal sealed class WriterApp : IDisposable
     private string? _currentDocumentPath;
     private string _lastDirectory = Environment.CurrentDirectory;
     private string _lastAction = "Ready";
+    private IReadOnlyList<DocumentDiagnostic> _lastReadDiagnostics = Array.Empty<DocumentDiagnostic>();
 
     private const string DefaultDocumentExtension = ".rtf";
     private static readonly BSize FileDialogPreferredSize = new(740, 430);
@@ -210,6 +211,15 @@ internal sealed class WriterApp : IDisposable
 
     public UiSession Session => _session;
 
+    /// <summary>The document currently in the editor.</summary>
+    internal RichTextDocument Document => _editor.Document;
+
+    /// <summary>
+    /// The diagnostics of the most recent read, kept so a document that opens
+    /// unexpectedly blank can be explained rather than guessed at.
+    /// </summary>
+    internal IReadOnlyList<DocumentDiagnostic> LastReadDiagnostics => _lastReadDiagnostics;
+
     public BRenderList RenderFrame() => _session.RenderFrame();
 
     public void Dispatch(UiInputEvent input)
@@ -238,9 +248,7 @@ internal sealed class WriterApp : IDisposable
             DocumentReadResult result = ReadDocument(displayName, copy.ToArray());
             _currentDocumentPath = displayName;
             _title.Text = Path.GetFileName(displayName);
-            _lastAction = result.Diagnostics.Count == 0
-                ? "Opened " + Path.GetFileName(displayName)
-                : "Opened " + Path.GetFileName(displayName) + " with " + result.Diagnostics.Count.ToString(CultureInfo.InvariantCulture) + " note(s)";
+            _lastAction = DescribeOpen(Path.GetFileName(displayName), result);
             _editor.Document = result.Document;
             _editor.Selection = RichTextRange.Caret(_editor.Document.Start);
             _session.SetFocus(_editor);
@@ -695,9 +703,7 @@ internal sealed class WriterApp : IDisposable
             _currentDocumentPath = fullPath;
             _lastDirectory = Path.GetDirectoryName(fullPath) ?? _lastDirectory;
             _title.Text = Path.GetFileName(fullPath);
-            _lastAction = result.Diagnostics.Count == 0
-                ? "Opened " + Path.GetFileName(fullPath)
-                : "Opened " + Path.GetFileName(fullPath) + " with " + result.Diagnostics.Count.ToString(CultureInfo.InvariantCulture) + " note(s)";
+            _lastAction = DescribeOpen(Path.GetFileName(fullPath), result);
             _editor.Document = result.Document;
             _editor.Selection = RichTextRange.Caret(_editor.Document.Start);
             _session.SetFocus(_editor);
@@ -894,7 +900,56 @@ internal sealed class WriterApp : IDisposable
             throw new NotSupportedException("No readable document codec recognized '" + Path.GetExtension(fullPath) + "'.");
 
         using var readStream = new MemoryStream(bytes, writable: false);
-        return match.Codec.Read(readStream);
+        DocumentReadResult result = match.Codec.Read(readStream);
+        _lastReadDiagnostics = result.Diagnostics;
+        LogReadDiagnostics(match.Codec.Name, fullPath, result);
+        return result;
+    }
+
+    /// <summary>
+    /// Writes the read diagnostics to stderr when
+    /// <c>BROILER_WRITER_DOCUMENT_LOG</c> is set. Off by default: the status bar
+    /// carries the summary, and this is the switch for chasing one bad file.
+    /// </summary>
+    private static void LogReadDiagnostics(string codecName, string fullPath, DocumentReadResult result)
+    {
+        if (!IsDocumentLoggingEnabled)
+            return;
+
+        Console.Error.WriteLine(
+            "[writer] read " + Path.GetFileName(fullPath) + " via " + codecName + ": " +
+            result.Document.ParagraphCount.ToString(CultureInfo.InvariantCulture) + " paragraph(s), " +
+            result.Document.PlainText.Length.ToString(CultureInfo.InvariantCulture) + " character(s), " +
+            result.Diagnostics.Count.ToString(CultureInfo.InvariantCulture) + " diagnostic(s)");
+        foreach (DocumentDiagnostic diagnostic in result.Diagnostics)
+            Console.Error.WriteLine("[writer]   " + diagnostic);
+    }
+
+    private static bool IsDocumentLoggingEnabled =>
+        Environment.GetEnvironmentVariable("BROILER_WRITER_DOCUMENT_LOG") is "1" or "true" or "TRUE" or "on";
+
+    /// <summary>
+    /// Builds the status-bar text for a completed open. Info-level notes are
+    /// routine and stay out of the count; a read that produced no text at all is
+    /// called out, because "nothing happened" is the one outcome the user cannot
+    /// otherwise tell apart from an empty file.
+    /// </summary>
+    internal static string DescribeOpen(string fileName, DocumentReadResult result)
+    {
+        string text = "Opened " + fileName;
+        if (result.Document.PlainText.Length == 0)
+            text += " (no readable content)";
+
+        int notes = 0;
+        foreach (DocumentDiagnostic diagnostic in result.Diagnostics)
+        {
+            if (diagnostic.Severity != DocumentDiagnosticSeverity.Info)
+                notes++;
+        }
+
+        return notes == 0
+            ? text
+            : text + " with " + notes.ToString(CultureInfo.InvariantCulture) + " note(s)";
     }
 
     private static DocumentWriteResult WriteDocument(
