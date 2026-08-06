@@ -10,6 +10,9 @@ internal static class DocxNamespaces
     public static readonly XNamespace Wordprocessing = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
     public static readonly XNamespace Xml = "http://www.w3.org/XML/1998/namespace";
 
+    /// <summary>Markup compatibility, used by <c>mc:AlternateContent</c> blocks.</summary>
+    public static readonly XNamespace MarkupCompatibility = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
     public const string OfficeDocumentRelationship =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
 
@@ -18,6 +21,12 @@ internal static class DocxNamespaces
 
     public const string NumberingRelationship =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering";
+
+    public const string HeaderRelationship =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header";
+
+    public const string FooterRelationship =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer";
 
     public const string DocumentContentType =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";

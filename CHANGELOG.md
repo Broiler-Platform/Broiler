@@ -7,6 +7,24 @@ are versioned in lockstep during the preview.
 
 ## [Unreleased]
 
+### Fixed
+
+- `Broiler.Documents` — the DOCX reader walked only the direct `w:p` children of
+  `w:body`, so a document whose content lived inside a layout table (the shape CV
+  and letterhead templates use) opened completely empty in Broiler.Writer. Block
+  content is now walked recursively: tables, structured document tags, accepted
+  revisions, and `mc:AlternateContent`.
+
+### Added
+
+- `Broiler.Documents` — DOCX read diagnostics: `docx.read.summary`,
+  `docx.document.empty`, `docx.table.flattened`, `docx.block.unsupported`,
+  `docx.limit.depth`, and `docx.part.headerfooter`.
+- `Broiler.Cli` — `--convert-doc` prints every read diagnostic and the character
+  count, not just a diagnostic count.
+- `Broiler.Writer` — the status bar calls out a document that read as no content,
+  and `BROILER_WRITER_DOCUMENT_LOG=1` writes the read diagnostics to stderr.
+
 ## [0.1.0-preview.1] — first preview
 
 First packaged preview of the Broiler component libraries. **APIs are unstable**

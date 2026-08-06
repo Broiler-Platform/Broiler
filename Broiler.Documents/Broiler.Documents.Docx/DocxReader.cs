@@ -56,6 +56,7 @@ internal static class DocxReader
                 numbering,
                 options.Limits,
                 diagnostics);
+            ReportUnreadParts(documentRelationships, diagnostics);
             return new DocumentReadResult(document, diagnostics);
         }
         catch (InvalidDataException ex)
@@ -91,10 +92,201 @@ internal static class DocxReader
         }
 
         var builder = new DocxDocumentBuilder(limits, diagnostics);
-        foreach (XElement paragraph in body.Elements(DocxNamespaces.Wordprocessing + "p"))
-            ReadParagraph(paragraph, relationships, numbering, builder);
-
+        ReadBlockContent(body.Elements(), relationships, numbering, builder, depth: 0);
+        builder.ReportReadSummary(body.Elements().Any(IsContentBlock));
         return builder.Build();
+    }
+
+    /// <summary>
+    /// Walks WordprocessingML block-level content — the <c>EG_BlockLevelElts</c>
+    /// group. Paragraphs are the only shape <see cref="RichTextDocument"/> can
+    /// represent, so tables and other block containers are flattened into their
+    /// paragraphs in document order rather than dropped. Anything genuinely not
+    /// understood raises a diagnostic instead of vanishing.
+    /// </summary>
+    private static void ReadBlockContent(
+        IEnumerable<XElement> elements,
+        DocxRelationships relationships,
+        DocxNumbering numbering,
+        DocxDocumentBuilder builder,
+        int depth)
+    {
+        if (depth > builder.Limits.MaxGroupDepth)
+        {
+            builder.AddDiagnosticOnce(
+                "docx.limit.depth",
+                "DOCX block nesting exceeded MaxGroupDepth; the deepest content was skipped.");
+            return;
+        }
+
+        foreach (XElement element in elements)
+        {
+            XName name = element.Name;
+
+            if (name == DocxNamespaces.Wordprocessing + "p")
+            {
+                ReadParagraph(element, relationships, numbering, builder);
+                continue;
+            }
+
+            if (name == DocxNamespaces.Wordprocessing + "tbl")
+            {
+                ReadTable(element, relationships, numbering, builder, depth + 1);
+                continue;
+            }
+
+            // A block-level structured document tag (content control) wraps real
+            // block content in w:sdtContent; the surrounding w:sdtPr is metadata.
+            if (name == DocxNamespaces.Wordprocessing + "sdt")
+            {
+                XElement? content = element.Element(DocxNamespaces.Wordprocessing + "sdtContent");
+                if (content is not null)
+                    ReadBlockContent(content.Elements(), relationships, numbering, builder, depth + 1);
+                continue;
+            }
+
+            // Accepted revisions and move destinations are live content; the
+            // deleted/moved-from side is not.
+            if (name == DocxNamespaces.Wordprocessing + "ins" ||
+                name == DocxNamespaces.Wordprocessing + "moveTo" ||
+                name == DocxNamespaces.Wordprocessing + "customXml" ||
+                name == DocxNamespaces.Wordprocessing + "smartTag")
+            {
+                ReadBlockContent(element.Elements(), relationships, numbering, builder, depth + 1);
+                continue;
+            }
+
+            if (name == DocxNamespaces.Wordprocessing + "del" ||
+                name == DocxNamespaces.Wordprocessing + "moveFrom")
+            {
+                builder.AddDiagnosticOnce("docx.revision.delete", "Deleted revision content was skipped.");
+                continue;
+            }
+
+            if (name == DocxNamespaces.MarkupCompatibility + "AlternateContent")
+            {
+                ReadAlternateContent(element, relationships, numbering, builder, depth + 1);
+                continue;
+            }
+
+            if (IsIgnorableBlock(name))
+                continue;
+
+            builder.AddUnsupportedBlock(name);
+        }
+    }
+
+    /// <summary>
+    /// Flattens a table into the paragraphs of its cells, read left-to-right and
+    /// top-to-bottom. <see cref="RichTextDocument"/> has no table shape, so the
+    /// alternative would be losing every word the table holds — which is exactly
+    /// what a CV or letterhead template puts there.
+    /// </summary>
+    private static void ReadTable(
+        XElement table,
+        DocxRelationships relationships,
+        DocxNumbering numbering,
+        DocxDocumentBuilder builder,
+        int depth)
+    {
+        builder.NoteTable();
+        foreach (XElement row in EnumerateTableChildren(table, "tr"))
+        {
+            foreach (XElement cell in EnumerateTableChildren(row, "tc"))
+                ReadBlockContent(cell.Elements(), relationships, numbering, builder, depth + 1);
+        }
+    }
+
+    /// <summary>
+    /// Yields the <paramref name="localName"/> children of a table or row,
+    /// looking through the content controls and revision markers Word may wrap
+    /// rows and cells in.
+    /// </summary>
+    private static IEnumerable<XElement> EnumerateTableChildren(XElement parent, string localName)
+    {
+        foreach (XElement child in parent.Elements())
+        {
+            if (child.Name == DocxNamespaces.Wordprocessing + localName)
+            {
+                yield return child;
+                continue;
+            }
+
+            if (child.Name == DocxNamespaces.Wordprocessing + "sdt")
+            {
+                XElement? content = child.Element(DocxNamespaces.Wordprocessing + "sdtContent");
+                if (content is null)
+                    continue;
+
+                foreach (XElement nested in EnumerateTableChildren(content, localName))
+                    yield return nested;
+                continue;
+            }
+
+            if (child.Name == DocxNamespaces.Wordprocessing + "ins" ||
+                child.Name == DocxNamespaces.Wordprocessing + "customXml")
+            {
+                foreach (XElement nested in EnumerateTableChildren(child, localName))
+                    yield return nested;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads an <c>mc:AlternateContent</c> block: the first <c>mc:Choice</c>,
+    /// falling back to <c>mc:Fallback</c>. Only one branch may contribute, or the
+    /// same content would be read twice.
+    /// </summary>
+    private static void ReadAlternateContent(
+        XElement alternate,
+        DocxRelationships relationships,
+        DocxNumbering numbering,
+        DocxDocumentBuilder builder,
+        int depth)
+    {
+        XElement? branch =
+            alternate.Element(DocxNamespaces.MarkupCompatibility + "Choice") ??
+            alternate.Element(DocxNamespaces.MarkupCompatibility + "Fallback");
+        if (branch is not null)
+            ReadBlockContent(branch.Elements(), relationships, numbering, builder, depth + 1);
+    }
+
+    /// <summary>Block-level elements that carry no text and are skipped silently.</summary>
+    private static bool IsIgnorableBlock(XName name)
+    {
+        if (name.Namespace != DocxNamespaces.Wordprocessing)
+            return false;
+
+        return name.LocalName is
+            "sectPr" or
+            "tblPr" or "tblGrid" or "trPr" or "tcPr" or "sdtPr" or "sdtEndPr" or
+            "bookmarkStart" or "bookmarkEnd" or
+            "commentRangeStart" or "commentRangeEnd" or
+            "proofErr" or "permStart" or "permEnd";
+    }
+
+    /// <summary>True when a body child could contribute text, used to tell an empty document from a dropped one.</summary>
+    private static bool IsContentBlock(XElement element) =>
+        element.Name != DocxNamespaces.Wordprocessing + "sectPr";
+
+    private static void ReportUnreadParts(
+        DocxRelationships relationships,
+        List<DocumentDiagnostic> diagnostics)
+    {
+        bool hasHeader = false;
+        bool hasFooter = false;
+        foreach (DocxRelationship relationship in relationships.All)
+        {
+            hasHeader |= relationship.Type.Equals(DocxNamespaces.HeaderRelationship, StringComparison.Ordinal);
+            hasFooter |= relationship.Type.Equals(DocxNamespaces.FooterRelationship, StringComparison.Ordinal);
+        }
+
+        if (hasHeader || hasFooter)
+        {
+            diagnostics.Add(DocumentDiagnostic.Info(
+                "docx.part.headerfooter",
+                "DOCX headers and footers are not part of the document body and were not imported."));
+        }
     }
 
     private static void ReadParagraph(
@@ -575,11 +767,59 @@ internal static class DocxReader
         private readonly List<Segment> _segments = [];
         private readonly HashSet<string> _diagnosticOnce = new(StringComparer.Ordinal);
         private ParagraphStyle _paragraphStyle = ParagraphStyle.Default;
+        private int _tableCount;
+        private int _unsupportedBlockCount;
 
         public DocxDocumentBuilder(DocumentLimits limits, List<DocumentDiagnostic> diagnostics)
         {
             _limits = limits;
             _diagnostics = diagnostics;
+        }
+
+        public DocumentLimits Limits => _limits;
+
+        public void NoteTable()
+        {
+            _tableCount++;
+            AddDiagnosticOnce(
+                "docx.table.flattened",
+                "DOCX tables were flattened into their cell paragraphs, in row order.");
+        }
+
+        /// <summary>
+        /// Records a block-level element the reader does not understand. Keyed by
+        /// element name so each distinct construct is reported once — the name is
+        /// markup structure, never document text (ADR 0004 privacy rule).
+        /// </summary>
+        public void AddUnsupportedBlock(XName name)
+        {
+            _unsupportedBlockCount++;
+            AddDiagnosticOnce(
+                "docx.block.unsupported:" + name.LocalName,
+                "docx.block.unsupported",
+                "An unsupported DOCX block-level element was skipped: " + name.LocalName + ".");
+        }
+
+        /// <summary>
+        /// Emits the read summary. The counts make a silent content loss visible:
+        /// a body with block content that yields no paragraphs is a reader bug,
+        /// not an empty file, and it should say so rather than open blank.
+        /// </summary>
+        public void ReportReadSummary(bool bodyHadContentBlocks)
+        {
+            if (_paragraphs.Count == 0 && bodyHadContentBlocks)
+            {
+                _diagnostics.Add(DocumentDiagnostic.Warning(
+                    "docx.document.empty",
+                    "DOCX body contained block-level content but produced no paragraphs."));
+            }
+
+            _diagnostics.Add(DocumentDiagnostic.Info(
+                "docx.read.summary",
+                "DOCX read produced " + _paragraphs.Count.ToString(CultureInfo.InvariantCulture) +
+                " paragraph(s), flattened " + _tableCount.ToString(CultureInfo.InvariantCulture) +
+                " table(s), and skipped " + _unsupportedBlockCount.ToString(CultureInfo.InvariantCulture) +
+                " unsupported block(s)."));
         }
 
         public void StartParagraph(ParagraphStyle style)
@@ -636,9 +876,12 @@ internal static class DocxReader
                 ? RichTextDocument.Empty
                 : RichTextDocument.FromParagraphs(_paragraphs);
 
-        public void AddDiagnosticOnce(string code, string message)
+        public void AddDiagnosticOnce(string code, string message) =>
+            AddDiagnosticOnce(code, code, message);
+
+        public void AddDiagnosticOnce(string key, string code, string message)
         {
-            if (_diagnosticOnce.Add(code))
+            if (_diagnosticOnce.Add(key))
                 _diagnostics.Add(DocumentDiagnostic.Warning(code, message));
         }
 
