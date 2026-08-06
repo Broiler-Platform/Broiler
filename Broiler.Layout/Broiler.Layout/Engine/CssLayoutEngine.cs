@@ -1324,6 +1324,18 @@ internal static class CssLayoutEngine
                     + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
                     + b.ActualPaddingTop + b.ActualPaddingBottom;
         }
+        // CSS Sizing 4 §4: an auto block axis takes its used size from the used
+        // inline size through the box's preferred aspect ratio. An atomic
+        // inline-level box computes its height here rather than in
+        // CssBox.ResolveUsedBlockHeight, so the transfer has to be repeated on this
+        // path — without it an outer <svg>, whose SVG children are not CSS boxes,
+        // measured its content height as zero and vanished. b.Size.Width is the
+        // used border-box width settled above (min-/max-width already applied), so
+        // the transfer reads the same width the box is painted at.
+        else if (b.TryGetAspectRatioBlockHeight(out double ratioHeight))
+        {
+            ibHeight = ratioHeight;
+        }
         else
         {
             ibHeight = Math.Max(0, b.ActualBottom - b.Location.Y);

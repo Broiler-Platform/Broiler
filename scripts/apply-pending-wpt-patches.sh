@@ -52,6 +52,15 @@ PENDING_PATCHES=(
   # css/css-shadow/shadow-directionality-001 and -002) and it applies cleanly to
   # the pinned Broiler.CSS pointer.
   "Broiler.CSS|patches/0102-css-dir-pseudo-class.patch"
+  # An outer <svg> was sized to the 300×150 default object size instead of
+  # taking its width from the containing block and its height from the viewBox
+  # ratio. WPT-relevant (issue #1552 problems 25–28, inert/inert-svg-hittest,
+  # the-dialog-element/inert-svg-hittest, accessibility/svg-mouse-listener and
+  # svg/animations/svgrect-animation-invalid-value-1) and it applies cleanly to
+  # the pinned Broiler.HTML pointer. Needs the main-repo half (the aspect-ratio
+  # transfer widened past block-level boxes) to have any effect; that half is
+  # already in-tree.
+  "Broiler.HTML|patches/0116-html-svg-viewbox-intrinsic-sizing.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

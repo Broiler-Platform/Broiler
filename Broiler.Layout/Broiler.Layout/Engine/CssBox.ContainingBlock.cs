@@ -503,15 +503,23 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// <summary>CSS Sizing 4 §4: <c>true</c> when this box's block (height) axis is
     /// <c>auto</c> but resolvable from its used width and preferred
     /// <c>aspect-ratio</c>, so its used height is definite for percentage-height
-    /// descendants. Scoped to in-flow block-level boxes, matching
-    /// <see cref="TryResolveAspectRatioBlockHeight"/>'s applicability.</summary>
+    /// descendants. Scoped by <see cref="CanTransferAspectRatioToBlockHeight"/>,
+    /// matching <see cref="TryResolveAspectRatioBlockHeight"/>'s applicability.</summary>
     internal bool HasDefiniteAspectRatioBlockHeight() =>
-        (Height == CssConstants.Auto || string.IsNullOrEmpty(Height))
-        && Display == CssConstants.Block
-        && Float == CssConstants.None
-        && Position != CssConstants.Absolute && Position != CssConstants.Fixed
-        && !IsImage
-        && TryResolveAspectRatioBlockHeight(out _);
+        TryGetAspectRatioBlockHeight(out _);
+
+    /// <summary>CSS Sizing 4 §4: the used border-box height this box's auto block
+    /// axis takes from its used width and preferred aspect ratio, for the layout
+    /// paths that live outside <see cref="CssBox"/> — an atomic inline-level box
+    /// computes its own height in
+    /// <see cref="CssLayoutEngine"/>'s inline flow rather than in
+    /// <see cref="ResolveUsedBlockHeight"/>.</summary>
+    internal bool TryGetAspectRatioBlockHeight(out double borderBoxHeight)
+    {
+        borderBoxHeight = 0;
+        return CanTransferAspectRatioToBlockHeight
+            && TryResolveAspectRatioBlockHeight(out borderBoxHeight);
+    }
 
     /// <summary>
     /// CSS2.1 §10.5: the containing-block height a percentage <c>height</c>

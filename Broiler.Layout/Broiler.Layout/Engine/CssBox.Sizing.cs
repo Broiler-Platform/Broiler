@@ -274,6 +274,39 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// square). Returns <c>false</c> when there is no preferred aspect ratio,
     /// leaving every aspect-ratio-less box (the overwhelming majority) untouched.</para>
     /// </summary>
+    /// <summary>
+    /// CSS Sizing 4 §4: whether this box's <c>auto</c> block (height) axis may be
+    /// derived from its used inline (width) size and its preferred aspect ratio.
+    /// <para>The transfer is only unambiguous when the used width does not itself
+    /// depend on the height being transferred. That holds for an in-flow
+    /// block-level box (whose auto width fills the containing block) and for
+    /// <em>any</em> box carrying a specified, non-<c>auto</c> width — including a
+    /// float or an inline-block, which would otherwise shrink-to-fit. The latter is
+    /// what sizes an outer <c>&lt;svg&gt;</c>: SVG 2 §8.2 resolves its auto width to
+    /// <c>100%</c>, and its viewBox ratio then gives the height (see
+    /// <c>DomParser.ApplySvgReplacedSizing</c>).</para>
+    /// <para>Absolutely positioned boxes stay out: their block size comes from the
+    /// §10.6.4 inset constraint above, and their percentage heights always resolve
+    /// against a definite containing block.</para>
+    /// </summary>
+    private bool CanTransferAspectRatioToBlockHeight
+    {
+        get
+        {
+            if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+                return false;
+            if (Position == CssConstants.Absolute || Position == CssConstants.Fixed)
+                return false;
+            if (IsImage)
+                return false;
+
+            if (!string.IsNullOrEmpty(Width) && Width != CssConstants.Auto)
+                return true;
+
+            return Display == CssConstants.Block && Float == CssConstants.None;
+        }
+    }
+
     private bool TryResolveAspectRatioBlockHeight(out double borderBoxHeight)
     {
         borderBoxHeight = 0;
