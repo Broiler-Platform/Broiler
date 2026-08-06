@@ -1193,18 +1193,35 @@ Each of these reproduces locally, so the diagnosis is from a real render rather
 than from reading code.
 
 - **Problems 22, 23, 25 and 26 — the `massive-element-*-of-viewport-partially-onscreen`
-  quartet (1.8% and 2.6%) — are view-transition snapshot geometry, not scrolling.**
-  That distinction was worth an experiment: the tests put a 40 000px element in a
-  `writing-mode: vertical-lr` document, call `scrollIntoView()` on its far end, and
-  screenshot the transition. Rendering the tests' **own `-ref.html`**, which
-  performs the identical scroll without a transition, gives white 87.1% / green
-  10.6% / blue 1.3% against Chromium's white 87.2% / green 11.5% / blue 0.7% — so
-  scrolling a vertical writing mode is right. Rendering the **test** gives green
-  84.8% / lightblue 12.5%: `::view-transition-old(target)`'s image is the element
-  painted from its origin. The gap is what a snapshot of an element larger than
-  the snapshot containing block contains. The family is 20 tests locally (2
-  passing), scoring from 1.8% to 98.8%, so it is one root cause worth more than
-  the four tests the list names.
+  quartet (1.8% and 2.6%) — are two separate bugs in the capture, not scrolling.**
+  The tests put a 40 000px element in a `writing-mode: vertical-lr` document, call
+  `scrollIntoView()` on its far end, and screenshot the transition. Rendering the
+  tests' **own `-ref.html`**, which performs the identical scroll without a
+  transition, gives white 87.1% / green 10.6% / blue 1.3% against Chromium's white
+  87.2% / green 11.5% / blue 0.7% — so scrolling a vertical writing mode is right,
+  and the gap is in the transition. Instrumenting the capture says what it is:
+
+      capture target: old=(8,8,40000x100)  new=(-38986,8,40000x100)
+
+  1. **The old capture is taken against pre-scroll layout.** The test scrolls
+     *before* calling `startViewTransition`, so both rectangles should carry the
+     same −38 986 offset; the old one is still at the unscrolled `x: 8`. That alone
+     explains the `-old` variants, which paint `::view-transition-old(target)` and
+     so show the element's *left* edge (its lightblue `.top`) where the reference
+     shows its right. It is a layout-flush ordering bug in
+     `CaptureOldViewTransitionState`, not a coordinate-space one — the *new* capture
+     computed the same way is correct.
+  2. **The snapshot clone lays its children out horizontally.** Ours is green 84.8%
+     / lightblue 12.5% — a green band ~651px tall, where the element is 100px tall
+     — so `.middle`'s `block-size: 39800px` is resolving as a height. It is **not**
+     a lost `writing-mode` bake: instrumenting `BuildViewTransitionSnapshotContent`
+     shows `writing-mode=vertical-lr` correctly carried onto the content box, so the
+     miss is further in, in how the clone's box is sized. That needs its own
+     investigation.
+
+  The family is 20 tests locally (2 passing), scoring from 1.8% to 98.8%, so it is
+  worth more than the four tests the list names — but it is two fixes, each needing
+  its own before/after, not the one this entry used to describe.
 - **Problems 14, 15 and 27 (`clip-path`, ~1.0% and 2.9%) need a real path clip.**
   `TryCreateInsetClipPathItem` in `Broiler.HTML`'s `PaintWalker.Geometry` models
   `clip-path` as a **rectangle** — it parses `inset()` and nothing else. Problems
