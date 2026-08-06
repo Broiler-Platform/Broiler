@@ -31,10 +31,22 @@ lets a partial subset/shard/rerun run update its own slice of the manifest
 without shrinking it, so persistence is safe on every run, not just a full-suite
 one.
 
+A shard that aborts abnormally (runner eviction, a browser it could not
+download, a hard crash) is rerun once at the end of the workflow, and uploads
+its results with a ``-retry`` suffix alongside the aborted attempt's. Both land
+in the same directory, so the two are reconciled here: for each shard only the
+latest attempt is merged, meaning a retry *replaces* the attempt it repeats
+rather than being summed with it. ``retriedShards`` records which shards that
+happened to.
+
 When ``--github-output`` is given (the ``$GITHUB_OUTPUT`` file), the script also
 writes ``failed_count``, ``total_count``, ``incomplete_shard_count``,
-``create_issue``, ``biggest_problem_count`` and ``create_biggest_issue`` step
-outputs. The last two drive the second (biggest-problems) issue.
+``create_issue``, ``biggest_problem_count``, ``create_biggest_issue``,
+``incomplete_shard_indexes``, ``incomplete_shard_matrix``,
+``has_incomplete_shards`` and ``retried_shard_count`` step outputs.
+``create_(biggest_)issue`` drive the two issues; the ``incomplete_shard_*``
+trio drives the retry pass, which re-dispatches exactly the shards flagged
+incomplete.
 """
 
 from __future__ import annotations
@@ -94,6 +106,74 @@ def _family_key(relative_path: str) -> str:
     return f"{directory}/{collapsed}" if directory else collapsed
 
 
+# The WPT workflow's retry pass re-runs, at the end of the run, any shard that
+# aborted abnormally, and uploads that attempt's files with this suffix
+# (``wpt-shard-3-retry.json`` beside the original ``wpt-shard-3.json``). Both
+# attempts therefore land in the same flattened download directory, and the
+# suffix is the only thing distinguishing them — the runner's own report has no
+# notion of attempts. Reading it back here is what lets a retry *supersede* the
+# attempt it replaces instead of being summed alongside it, which would
+# double-count a shard that uploaded a partial report before dying.
+RETRY_SUFFIX = "-retry"
+STATUS_SUFFIX = "-status"
+
+
+def _attempt_number(path: Path) -> int:
+    """Which pass a shard artifact came from: 1 for the end-of-workflow retry, 0
+    for the original attempt."""
+    stem = path.stem
+    if stem.endswith(STATUS_SUFFIX):
+        stem = stem[: -len(STATUS_SUFFIX)]
+    return 1 if stem.endswith(RETRY_SUFFIX) else 0
+
+
+def _report_shard_index(report: dict) -> int | None:
+    shard = report.get("shard")
+    if not isinstance(shard, dict):
+        return None
+    try:
+        return int(shard.get("index"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _status_shard_index(status: dict) -> int | None:
+    try:
+        return int(status["shardIndex"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _select_latest_attempts(entries, index_of):
+    """Collapse per-shard artifacts down to the latest attempt of each shard.
+
+    ``entries`` is an iterable of ``(path, payload)``. When the retry pass reran
+    a shard, both attempts are present; only the retry describes what that slice
+    actually did, so the earlier attempt is dropped rather than merged next to
+    it. Payloads whose shard index cannot be read are all kept — there is nothing
+    to supersede them with, and dropping them would lose results.
+
+    Returns ``(entries, retried_shard_indexes)``, the second being the shards a
+    retry attempt actually superseded.
+    """
+    latest: dict[int, tuple[int, Path, dict]] = {}
+    kept: list[tuple[Path, dict]] = []
+    retried: set[int] = set()
+    for path, payload in entries:
+        shard_index = index_of(payload)
+        if shard_index is None:
+            kept.append((path, payload))
+            continue
+        attempt = _attempt_number(path)
+        if attempt > 0:
+            retried.add(shard_index)
+        current = latest.get(shard_index)
+        if current is None or attempt >= current[0]:
+            latest[shard_index] = (attempt, path, payload)
+    kept.extend((path, payload) for _attempt, path, payload in latest.values())
+    return kept, retried
+
+
 def _iter_shard_reports(shard_dir: Path):
     # Recurse so it does not matter whether artifacts were downloaded flat or
     # into per-shard subdirectories.
@@ -105,6 +185,12 @@ def _iter_shard_reports(shard_dir: Path):
         # Only consider documents that look like a Broiler.Wpt report.
         if isinstance(data, dict) and "summary" in data and "results" in data:
             yield path, data
+
+
+def _shard_reports(shard_dir: Path):
+    """Shard reports with each retried shard represented by its retry only."""
+    entries, _retried = _select_latest_attempts(_iter_shard_reports(shard_dir), _report_shard_index)
+    return entries
 
 
 def _iter_shard_statuses(shard_dir: Path):
@@ -138,14 +224,19 @@ def _format_incomplete_shard(status: dict) -> str:
     has received a shutdown signal"), so the whole slice went unmeasured rather
     than crashing on a specific test."""
     reason = status.get("failureReason")
+    # A shard the workflow's retry pass already reran is labelled as such: it is
+    # the *rerun* that came back inconclusive, so "re-run the workflow" is no
+    # longer the obvious next step.
+    retried = " after rerun" if status.get("retried") else ""
     if reason:
         # An unrecognised reason is still more informative than the exit code, so
         # it is shown as-is rather than dropped.
-        return f"shard {status['shardIndex']} ({FAILURE_REASON_LABELS.get(reason, reason)})"
+        label = FAILURE_REASON_LABELS.get(reason, reason)
+        return f"shard {status['shardIndex']} ({label}{retried})"
     exit_code = status["exitCode"]
     if exit_code == "missing":
-        return f"shard {status['shardIndex']} (no report uploaded)"
-    return f"shard {status['shardIndex']} (exit {exit_code})"
+        return f"shard {status['shardIndex']} (no report uploaded{retried})"
+    return f"shard {status['shardIndex']} (exit {exit_code}{retried})"
 
 
 def _incomplete_shard_cause_sentences(shards: list[dict]) -> list[str]:
@@ -173,6 +264,17 @@ def _incomplete_shard_cause_sentences(shards: list[dict]) -> list[str]:
             "A shard that recorded no reason is usually a transient CI-runner "
             "eviction (the runner received a shutdown signal before its upload step "
             "ran), which is likewise not a test regression."
+        )
+
+    retried = [str(status["shardIndex"]) for status in shards if status.get("retried")]
+    if retried:
+        # Worth saying plainly: the workflow's own retry pass already spent a
+        # second full run on these and they still came back inconclusive, so this
+        # is not the usual one-off eviction that clears by itself.
+        subject = f"Shard {retried[0]} was" if len(retried) == 1 else f"Shards {', '.join(retried)} were"
+        sentences.append(
+            f"{subject} already rerun automatically at the end of this run and still "
+            "did not complete, so this is unlikely to be a one-off runner eviction."
         )
 
     return sentences
@@ -402,15 +504,18 @@ def merge(
     family_groups: dict[str, dict] = {}
     reported_shard_indexes: set[int] = set()
 
-    for _path, report in _iter_shard_reports(shard_dir):
+    # Reports first: a shard the retry pass reran contributes its retry only, so
+    # the totals below count each shard's slice exactly once.
+    report_entries, retried_by_report = _select_latest_attempts(
+        _iter_shard_reports(shard_dir), _report_shard_index
+    )
+
+    for _path, report in report_entries:
         shard_count += 1
         summary = report.get("summary", {})
-        shard = report.get("shard")
-        if isinstance(shard, dict):
-            try:
-                reported_shard_indexes.add(int(shard.get("index")))
-            except (TypeError, ValueError):
-                pass
+        shard_index = _report_shard_index(report)
+        if shard_index is not None:
+            reported_shard_indexes.add(shard_index)
         passed += int(summary.get("passed", 0) or 0)
         failed += int(summary.get("failed", 0) or 0)
         skipped += int(summary.get("skipped", 0) or 0)
@@ -537,7 +642,14 @@ def merge(
     # download, say — so the report can name the cause instead of inferring one
     # from a bare non-zero exit.
     shard_failure_reasons: dict[int, dict[str, str]] = {}
-    for _path, status in _iter_shard_statuses(shard_dir):
+    status_entries, retried_by_status = _select_latest_attempts(
+        _iter_shard_statuses(shard_dir), _status_shard_index
+    )
+    # Shards the end-of-workflow retry pass reran. A shard is "retried" if either
+    # kind of artifact carries the retry suffix: a rerun that died before writing
+    # a report still leaves a status file, and a rerun that succeeded leaves both.
+    retried_shard_indexes = sorted(retried_by_report | retried_by_status)
+    for _path, status in status_entries:
         try:
             shard_index = int(status["shardIndex"])
             exit_code = int(status["exitCode"])
@@ -586,6 +698,10 @@ def merge(
             {
                 "shardIndex": shard_index,
                 "exitCode": exit_code if exit_code is not None else "missing",
+                # Still unmeasured *after* the workflow already reran it, which
+                # rules out a one-off runner eviction and is worth saying out
+                # loud — the report otherwise reads as if a rerun might fix it.
+                **({"retried": True} if shard_index in retried_by_report | retried_by_status else {}),
                 **shard_failure_reasons.get(shard_index, {}),
             }
         )
@@ -646,6 +762,7 @@ def merge(
         "shardCount": shard_count,
         "problemLimit": problem_limit,
         "incompleteShards": incomplete_shards,
+        "retriedShards": retried_shard_indexes,
         "topProblems": top_problems,
         "topFailingDirectories": directory_counter.most_common(problem_limit),
         "failuresByCategory": category_counter.most_common(),
@@ -665,7 +782,7 @@ def _collect_executed_paths(shard_dir: Path) -> set[str]:
     deliberately excluded, so a test that merely skipped this run does not evict
     its existing manifest entry. Used to scope ``merge_into_manifest``."""
     executed: set[str] = set()
-    for _path, report in _iter_shard_reports(shard_dir):
+    for _path, report in _shard_reports(shard_dir):
         for result in report.get("results", []):
             if not isinstance(result, dict) or result.get("skipped"):
                 continue
@@ -729,6 +846,17 @@ def render_issue_markdown(merged: dict, run_url: str | None) -> str:
         f"- Failed: {summary['failed']}",
         f"- Skipped: {summary['skipped']}",
         f"- Incomplete shards: {len(merged['incompleteShards'])}",
+    ]
+    # Shards the workflow reran at the end because their first attempt aborted
+    # abnormally. Their retry's results are what the totals above count — the
+    # aborted attempt is superseded, not added to it.
+    retried = merged.get("retriedShards") or []
+    if retried:
+        lines.append(
+            "- Shards rerun after an abnormal abort: "
+            + ", ".join(str(index) for index in retried)
+        )
+    lines += [
         "",
         f"### Top {merged['problemLimit']} problems",
         "",
@@ -976,6 +1104,14 @@ def main() -> int:
           f"{failed} failed, {merged['summary']['skipped']} skipped, {total} total.")
 
     if args.github_output:
+        # The indexes of the shards that went unmeasured, in the two shapes the
+        # workflow's retry pass needs: a comma-separated list for the log/summary
+        # and a ready-to-use `strategy.matrix.include` array. `retry` only
+        # re-dispatches shards that produced no conclusive report — a shard that
+        # ran to completion and merely reported failing tests is not incomplete
+        # and is never rerun.
+        incomplete_indexes = [status["shardIndex"] for status in merged["incompleteShards"]]
+        matrix = json.dumps([{"shard-index": index} for index in incomplete_indexes])
         with args.github_output.open("a", encoding="utf-8") as handle:
             handle.write(f"failed_count={failed}\n")
             handle.write(f"total_count={total}\n")
@@ -983,6 +1119,14 @@ def main() -> int:
             handle.write(f"create_issue={'true' if failed > 0 or incomplete_shard_count > 0 else 'false'}\n")
             handle.write(f"biggest_problem_count={biggest_problem_count}\n")
             handle.write(f"create_biggest_issue={'true' if biggest_problem_count > 0 else 'false'}\n")
+            handle.write(
+                "incomplete_shard_indexes="
+                + ",".join(str(index) for index in incomplete_indexes)
+                + "\n"
+            )
+            handle.write(f"incomplete_shard_matrix={matrix}\n")
+            handle.write(f"has_incomplete_shards={'true' if incomplete_indexes else 'false'}\n")
+            handle.write(f"retried_shard_count={len(merged['retriedShards'])}\n")
 
     return 0
 
