@@ -1,0 +1,558 @@
+From e02e807d89d5dcbe2cce127e89b7ed32ec574ada Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 5 Aug 2026 19:59:44 +0000
+Subject: [PATCH] Settle item 1-1's re-entry residual, and fix the comparison
+ that caused most of it
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+0105 reported 84.1% of re-entered bodies reproducing the eager tree and said
+plainly what that number was worth: a printed diff answers only "equal up to a
+renaming somebody thought of in advance", and the residual 15.9% looked like
+ordinal divergence on every instance examined without that being proof. This
+answers it, and the first thing it found was a defect in the comparison.
+
+The gensym families were canonicalised in one pass whose ordinal table was keyed
+on the bare number, so Context3 and #TempJSValue3 shared an entry — and any
+function where two families drew the same number on one side and not the other
+desynchronised every ordinal after it. One table per family takes five of six
+corpora from 96.6-99.9% to 100.0%.
+
+Then the residual is partitioned rather than described. Beside the equality up
+to an order-preserving renaming, the same three families are ERASED instead of
+mapped, which asks whether the trees agree in every token a counter did not
+produce. That is 5 723 of 5 723 on every corpus, with 0 throwing — so no
+re-entered body differs from its eager tree in a node, an operator, a constant
+or a shape. Erasure is the weaker question and is reported beside the stronger
+rather than instead of it.
+
+What is left is 471 functions whose counter ordinals differ, and they classify
+exactly two ways with nothing in "other". 460 are the site table's -1: the check
+compiles every body a second time and a retained context recompiles its whole
+subtree, so Typescript drives the process-wide counter from 24 759 to exactly
+its 65 536 cap. 11 are the eager side reusing a site the re-entry allocated
+fresh, which is 4-2b's tier-2 rule working as designed — a recompile for tiering
+re-uses the tier-1 site so the feedback it consumes stays addressable, and a
+re-entry has no tier-1 tree to re-use from. Both are properties of compiling the
+same body twice in one process, which a deferral by construction does not do.
+
+Per-process, so the corpora do not share the counter: closure 100.0%, mandreel
+100.0%, jquery 99.8%, pdfjs 99.7%, box2d 99.7%, typescript 73.7% — 91.8% over
+5 723, with every one of the remaining 471 accounted for.
+
+Both equalities are pinned directly rather than trusted for never having failed:
+one fixture drives a counter renaming (both accept), a token no counter produced
+(both reject), and a site reused on one side only — which the strong equality
+reports and the weak one cannot, which is exactly why the residual is classified
+from the raw sequences instead of left inside the weaker number.
+---
+ .../DeferredBodyReentryTests.cs               |  70 ++++-
+ .../Declarations/FastCompiler.DeferredBody.cs | 295 +++++++++++++++++-
+ .../DeferPopulationMetrics.cs                 |  17 +-
+ 3 files changed, 359 insertions(+), 23 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredBodyReentryTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredBodyReentryTests.cs
+index 8df1e91b..d25da639 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredBodyReentryTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/DeferredBodyReentryTests.cs
+@@ -21,7 +21,7 @@ namespace Broiler.JavaScript.Compiler.Tests;
+ [Collection(Phase3DiagnosticsCollection.Name)]
+ public sealed class DeferredBodyReentryTests
+ {
+-    private static (int Total, int Reproduced, string FirstDifference) Reenter(string source)
++    private static DeferredTreeCompilation.Comparison Reenter(string source)
+     {
+         var previous = DeferredTreeCompilation.Retaining;
+         DeferredTreeCompilation.Retaining = true;
+@@ -41,11 +41,16 @@ public sealed class DeferredBodyReentryTests
+ 
+     private static void AssertReproduced(string source, int atLeast = 1)
+     {
+-        var (total, reproduced, difference) = Reenter(source);
+-        Assert.True(total >= atLeast, $"expected at least {atLeast} retained context(s), got {total}");
++        var c = Reenter(source);
++        Assert.True(c.Total >= atLeast, $"expected at least {atLeast} retained context(s), got {c.Total}");
++        Assert.Equal(0, c.Threw);
+         Assert.True(
+-            total == reproduced,
+-            $"{total - reproduced} of {total} did not reproduce.\n{difference}");
++            c.Total == c.Reproduced,
++            $"{c.Total - c.Reproduced} of {c.Total} did not reproduce.\n{c.FirstDifference}");
++
++        // Structural equality is the weaker of the two and must hold wherever the stronger does,
++        // or the partition the corpus is read through is not a partition.
++        Assert.Equal(c.Total, c.Structural);
+     }
+ 
+     [Fact]
+@@ -157,9 +162,9 @@ public sealed class DeferredBodyReentryTests
+         try
+         {
+             context.Eval("function a() { var q = 1; return (function () { return q; })(); } a();");
+-            var (total, reproduced, _) = DeferredTreeCompilation.Recompile();
+-            Assert.True(total >= 1);
+-            Assert.Equal(total, reproduced);
++            var c = DeferredTreeCompilation.Recompile();
++            Assert.True(c.Total >= 1);
++            Assert.Equal(c.Total, c.Reproduced);
+ 
+             // The compilation that has nothing to do with the re-entry.
+             Assert.Equal("7", context.Eval("function b(x) { return x + 4; } String(b(3));").ToString());
+@@ -171,6 +176,55 @@ public sealed class DeferredBodyReentryTests
+         }
+     }
+ 
++    [Fact]
++    public void BothEqualitiesAreShownToReportADifferenceBeforeTheirZerosAreTrusted()
++    {
++        // **The fixture that makes `structural = 100%` mean something**, and §3.5's rule from 0096
++        // applied to the second checker this item has needed: a comparison that has never reported
++        // a failure is a claim about the comparison. Neither equality can be made to fail from
++        // JavaScript — if it could, that would be the defect they exist to find — so both are
++        // driven directly.
++        const string eager = "x = PropertyInlineCacheSite.Get(7, Context3, k); LABEL_4: y = #TempJSValue9;";
++
++        // A counter renaming, which is what a second compilation necessarily produces. Both
++        // equalities must accept it or the corpus figures are measuring the counters.
++        const string renamed = "x = PropertyInlineCacheSite.Get(90, Context11, k); LABEL_12: y = #TempJSValue40;";
++        Assert.True(DeferredTreeCompilation.SameUpToCounters(eager, renamed));
++        Assert.True(DeferredTreeCompilation.SameStructurally(eager, renamed));
++
++        // A token no counter produced — a different property being read. Both must reject it,
++        // including the weaker one, or `structural` is not a statement about the tree at all.
++        const string different = "x = PropertyInlineCacheSite.Get(7, Context3, OTHER); LABEL_4: y = #TempJSValue9;";
++        Assert.False(DeferredTreeCompilation.SameUpToCounters(eager, different));
++        Assert.False(DeferredTreeCompilation.SameStructurally(eager, different));
++
++        // **And the exact gap between the two, asserted rather than described.** Here one side
++        // reads the SAME site twice where the other reads two distinct ones. The strong equality
++        // reports it, because ordinals are assigned by first appearance; the weak one cannot,
++        // because it erases the numbers. That is the whole of what `structural` buys over
++        // `reproduced` being unreliable — and it is why the corpus's 471 non-reproducing functions
++        // are classified by the raw sequences rather than left inside the weaker number.
++        const string reused = "x = PropertyInlineCacheSite.Get(7, Context3, k); LABEL_4: y = #TempJSValue9; z = PropertyInlineCacheSite.Get(7, Context3, k);";
++        const string fresh = "x = PropertyInlineCacheSite.Get(7, Context3, k); LABEL_4: y = #TempJSValue9; z = PropertyInlineCacheSite.Get(8, Context3, k);";
++        Assert.False(DeferredTreeCompilation.SameUpToCounters(reused, fresh));
++        Assert.True(DeferredTreeCompilation.SameStructurally(reused, fresh));
++    }
++
++    [Fact]
++    public void EachGensymFamilyIsCanonicalisedAgainstItsOwnTable()
++    {
++        // **The defect the corpus run found in this comparison itself.** The families were
++        // canonicalised in one pass whose ordinal table was keyed on the bare NUMBER, so
++        // `Context3` and `#TempJSValue3` shared an entry. Two families drawing the same number on
++        // one side and not the other then desynchronised every ordinal after it, reporting a
++        // difference that was an artifact of the comparison — worth 5 of 6 corpora going from
++        // 96.6-99.9% to 100.0% once the tables were separated. The families do not share a
++        // counter; the table must not either.
++        const string eager = "Context3 -> #TempJSValue3 -> Context4";
++        const string reentered = "Context7 -> #TempJSValue9 -> Context8";
++        Assert.True(DeferredTreeCompilation.SameUpToCounters(eager, reentered));
++    }
++
+     [Fact]
+     public void RetentionChangesNoAnswer()
+     {
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.DeferredBody.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.DeferredBody.cs
+index 0a2aac5e..76e18643 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.DeferredBody.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.DeferredBody.cs
+@@ -167,6 +167,9 @@ public static class DeferredTreeCompilation
+ 
+     internal static void Retain(FastCompiler.DeferredBodyContext context, BExpression eager)
+     {
++        // The RAW print is kept, not the canonicalised one: the two canonicalisations below are
++        // different questions asked of the same text, and collapsing it on the way in would leave
++        // only one of them askable.
+         lock (retained)
+             retained.Add((context, Print(eager)));
+     }
+@@ -186,14 +189,30 @@ public static class DeferredTreeCompilation
+     /// value equality would report a difference that is not one, while the printer is what the
+     /// expression compiler itself uses to describe a tree.
+     /// </remarks>
+-    public static (int Total, int Reproduced, string FirstDifference) Recompile()
++    public static Comparison Recompile()
+     {
+         (object Context, string Eager)[] snapshot;
+         lock (retained)
+             snapshot = retained.ToArray();
+ 
++        // Item 4-2b's process-wide site counter, read either side of the whole re-entry. It is
++        // the one resource the check CONSUMES rather than observes: compiling every body a second
++        // time draws a second set of sites, and a retained context recompiles its whole subtree,
++        // so a deeply nested corpus draws far more than twice. The table refuses with -1 past
++        // 65 536, and a refusal is a real difference in the printed tree that a genuine deferral
++        // — which compiles each body ONCE — cannot produce. Reported so the reader can tell the
++        // two apart instead of taking the claim on trust.
++        var sitesBefore = Runtime.PropertyInlineCacheSite.NextReadSite;
++
+         var reproduced = 0;
++        var structural = 0;
++        var threw = 0;
++        var exhausted = 0;
++        var eagerReused = 0;
++        var otherDivergence = 0;
+         string firstDifference = null;
++        string firstStructuralDifference = null;
++        string firstOrdinalDivergence = null;
+         foreach (var (context, eager) in snapshot)
+         {
+             string actual;
+@@ -203,27 +222,118 @@ public static class DeferredTreeCompilation
+             }
+             catch (Exception e)
+             {
+-                actual = e.GetType().Name + ": " + e.Message;
++                threw++;
++                firstStructuralDifference ??= "threw: " + e.GetType().Name + ": " + e.Message;
++                continue;
+             }
+ 
+-            if (string.Equals(actual, eager, StringComparison.Ordinal))
++            if (string.Equals(Canonicalise(actual), Canonicalise(eager), StringComparison.Ordinal))
+             {
+                 reproduced++;
++                structural++;
++                continue;
++            }
++
++            firstDifference ??= FirstDifferingLine(Canonicalise(eager), Canonicalise(actual));
++
++            switch (ClassifySiteDivergence(eager, actual, out var divergence))
++            {
++                case SiteDivergence.Exhausted: exhausted++; break;
++                case SiteDivergence.EagerReusedASite: eagerReused++; break;
++                case SiteDivergence.Other: otherDivergence++; break;
++            }
++
++            firstOrdinalDivergence ??= divergence;
++
++            if (string.Equals(Erase(actual), Erase(eager), StringComparison.Ordinal))
++            {
++                structural++;
+                 continue;
+             }
+ 
+-            firstDifference ??= FirstDifferingLine(eager, actual);
++            firstStructuralDifference ??= FirstDifferingLine(Erase(eager), Erase(actual));
+         }
+ 
+-        return (snapshot.Length, reproduced, firstDifference);
++        return new Comparison(
++            sitesBefore,
++            Runtime.PropertyInlineCacheSite.NextReadSite,
++            snapshot.Length,
++            reproduced,
++            structural,
++            threw,
++            exhausted,
++            eagerReused,
++            otherDivergence,
++            firstDifference,
++            firstStructuralDifference,
++            firstOrdinalDivergence);
+     }
+ 
++    /// <summary>
++    /// What re-entering every retained context produced, partitioned by <em>how</em> it differed.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// <b>The two counts answer two different questions and only the second is about the
++    /// mechanism.</b> <see cref="Reproduced"/> is equality up to an order-preserving renaming of
++    /// the compiler's monotonic counters — the strongest equality a printed diff can assert, and
++    /// the one that fails whenever the two sides encounter a different NUMBER of distinct counter
++    /// values before a given point, which is a fact about the counters rather than about the tree.
++    /// <see cref="Structural"/> erases those numbers instead of mapping them, so it asks whether
++    /// the two trees agree in every token that is not a counter draw.
++    /// </para>
++    /// <para>
++    /// Erasure is deliberately the WEAKER of the two and is reported beside the stronger rather
++    /// than instead of it, because what it hides is a permutation of counter values — and for the
++    /// one family where a permutation would matter (item 4-2b's inline-cache sites, which address
++    /// feedback) it cannot arise: sites are allocated in emission order from a monotonic counter,
++    /// so two compilations that emit the same tree draw ascending runs differing only in base.
++    /// The gensym families are fresh names, where a permutation is not a difference at all.
++    /// </para>
++    /// <para>
++    /// <see cref="Threw"/> is counted separately and is the only category that is unambiguously a
++    /// defect: a re-entry that cannot produce a tree at all has not been compared to anything.
++    /// </para>
++    /// </remarks>
++    public readonly record struct Comparison(
++        int SitesBefore,
++        int SitesAfter,
++        int Total,
++        int Reproduced,
++        int Structural,
++        int Threw,
++        int Exhausted,
++        int EagerReusedASite,
++        int OtherDivergence,
++        string FirstDifference,
++        string FirstStructuralDifference,
++        string FirstOrdinalDivergence);
++
+     public static void Reset()
+     {
+         lock (retained)
+             retained.Clear();
+     }
+ 
++    /// <summary>
++    /// Whether two printed trees are equal up to an order-preserving renaming of the compiler's
++    /// counters — the equality <see cref="Comparison.Reproduced"/> counts.
++    /// </summary>
++    /// <remarks>
++    /// Exposed so the comparison can be pinned directly. A checker whose only evidence is that it
++    /// has never reported a failure is a claim about the checker, which is §3.5's rule from 0096
++    /// and the rule 0104's layout checker was built under.
++    /// </remarks>
++    public static bool SameUpToCounters(string eager, string reentered)
++        => string.Equals(Canonicalise(eager), Canonicalise(reentered), StringComparison.Ordinal);
++
++    /// <summary>
++    /// Whether two printed trees agree in every token a counter did not produce — the equality
++    /// <see cref="Comparison.Structural"/> counts.
++    /// </summary>
++    public static bool SameStructurally(string eager, string reentered)
++        => string.Equals(Erase(eager), Erase(reentered), StringComparison.Ordinal);
++
+     private static string Print(BExpression expression)
+     {
+         if (expression == null)
+@@ -233,9 +343,20 @@ public static class DeferredTreeCompilation
+         using var indented = new System.CodeDom.Compiler.IndentedTextWriter(writer);
+         expression.Print(indented);
+         indented.Flush();
+-        return Canonicalise(writer.ToString());
++        return writer.ToString();
+     }
+ 
++    /// <summary>
++    /// The counter-derived numbers replaced by a fixed token rather than mapped, so two trees
++    /// compare equal exactly when they agree in every token a counter did not produce.
++    /// </summary>
++    /// <remarks>
++    /// The same three families <see cref="Canonicalise"/> maps, matched by the same patterns — one
++    /// evaluator away from it, so the two questions cannot drift apart as families are added.
++    /// </remarks>
++    private static string Erase(string printed)
++        => Renumber(printed, prefix => new System.Text.RegularExpressions.MatchEvaluator(_ => prefix));
++
+     /// <summary>
+     /// Renames compiler-generated temporaries to their order of first appearance, so two
+     /// compilations of the same source compare equal.
+@@ -273,20 +394,168 @@ public static class DeferredTreeCompilation
+         // in nothing else. Canonicalised by first appearance rather than erased, so a re-entry
+         // that emitted the sites in a different ORDER — which would be a real defect — still
+         // shows. The -1 sentinel maps like any other value and stays distinguishable from a site.
++        return Renumber(printed, Ordinal);
++    }
++
++    /// <summary>
++    /// Rewrites the three families of compiler-generated number, with the replacement strategy
++    /// left to the caller.
++    /// </summary>
++    /// <remarks>
++    /// The patterns live here once so <see cref="Canonicalise"/> and <see cref="Erase"/> ask their
++    /// two questions of exactly the same set of tokens. A family added to one is added to both,
++    /// which is the property that makes the difference between the two counts mean what it says.
++    /// </remarks>
++    private static string Renumber(
++        string printed,
++        Func<string, System.Text.RegularExpressions.MatchEvaluator> strategy)
++    {
+         printed = System.Text.RegularExpressions.Regex.Replace(
+             printed,
+             @"(?<=PropertyInlineCacheSite\.(?:Get|Set)\()-?\d+",
+-            Ordinal("#site"));
++            strategy("#site"));
+ 
+         printed = System.Text.RegularExpressions.Regex.Replace(
+             printed,
+-            @"EnableTiering\(([^()]*), \d+, \d+\)",
+-            "EnableTiering($1, #site, #site)");
++            @"(?<=EnableTiering\([^()]{0,4096}, )\d+, \d+(?=\))",
++            strategy("#tier"));
++
++        // **One table PER FAMILY, which is not a detail.** These were canonicalised by a single
++        // pass whose ordinal table was keyed on the bare number, so `Context3` and `#Temp3` shared
++        // an entry — and any function where two families happened to draw the same number on one
++        // side and not the other desynchronised every ordinal after it, reporting a difference
++        // that was an artifact of the comparison. The families do not share a counter; the table
++        // must not either.
++        foreach (var family in GensymFamilies)
++        {
++            printed = System.Text.RegularExpressions.Regex.Replace(
++                printed,
++                @"(?<=" + family + @")\d+",
++                strategy("#" + family));
++        }
+ 
+-        return System.Text.RegularExpressions.Regex.Replace(
+-            printed,
+-            @"(?<=(?:Context|StackItem|LABEL_|a-|#Temp[A-Za-z]*|#function|#tieredFunction|IElementEnumerator_))\d+",
+-            Ordinal("#"));
++        return printed;
++    }
++
++    /// <summary>
++    /// The compiler-generated name prefixes whose trailing number is drawn from a counter, each
++    /// canonicalised against its own table.
++    /// </summary>
++    private static readonly string[] GensymFamilies =
++    [
++        "Context",
++        "StackItem",
++        "LABEL_",
++        "a-",
++        "#Temp[A-Za-z]*",
++        "#tieredFunction",
++        "#function",
++        "IElementEnumerator_",
++    ];
++
++    /// <summary>
++    /// Why the two sides' inline-cache-site ordinals stopped agreeing, in terms of the RAW values.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// <b>The canonicalisation reports the divergence where it SHOWS, which is downstream of where
++    /// it happens.</b> Ordinals are assigned by first appearance, so once the two sides have seen a
++    /// different number of distinct values every later ordinal differs and the first reported line
++    /// names an access that is perfectly fine. This walks the two raw sequences instead and finds
++    /// the first position where they disagree about whether the value is <em>new</em>.
++    /// </para>
++    /// <para>
++    /// The distinction matters because the two possible causes are not the same finding. If both
++    /// sides draw a strictly ascending run of fresh values and differ only in base, the sequences
++    /// have identical shape and this reports nothing — the divergence is arithmetic. If one side
++    /// <em>repeats</em> a value the other does not, two accesses share an inline-cache site in one
++    /// compilation and not the other, which is a real difference in what gets addressed.
++    /// </para>
++    /// </remarks>
++    /// <summary>
++    /// Why one function's site ordinals diverged, in the two ways the check itself causes and the
++    /// one it would not.
++    /// </summary>
++    /// <remarks>
++    /// Both named causes are properties of compiling the same body <em>twice in one process</em>,
++    /// which is what this check does and what a deferral by construction does not — so they are
++    /// classified rather than counted together with a difference that would matter.
++    /// </remarks>
++    private enum SiteDivergence
++    {
++        /// <summary>The sequences agree; the divergence is in another family.</summary>
++        None,
++
++        /// <summary>
++        /// One side got the <c>-1</c> the site table returns past <c>MaxSites</c>. The second
++        /// compilation draws a second full set of sites — more, since a retained context
++        /// recompiles its whole subtree — so a large corpus exhausts a table the eager pass alone
++        /// leaves half empty.
++        /// </summary>
++        Exhausted,
++
++        /// <summary>
++        /// The eager side <em>repeated</em> a site the re-entry allocated fresh, which is item
++        /// 4-2b's tier-2 rule working as designed: a recompile for tiering re-uses the tier-1
++        /// site so the feedback it consumes stays addressable. The re-entry has no tier-1 tree to
++        /// re-use from, so it allocates. A deferred body is compiled before any tier exists.
++        /// </summary>
++        EagerReusedASite,
++
++        /// <summary>Neither of the above — the category that would be a finding.</summary>
++        Other,
++    }
++
++    private static SiteDivergence ClassifySiteDivergence(string eager, string actual, out string divergence)
++    {
++        var a = SiteValues(eager);
++        var b = SiteValues(actual);
++
++        var seenA = new Dictionary<string, int>(StringComparer.Ordinal);
++        var seenB = new Dictionary<string, int>(StringComparer.Ordinal);
++        for (var i = 0; i < Math.Min(a.Count, b.Count); i++)
++        {
++            var newA = !seenA.ContainsKey(a[i]);
++            var newB = !seenB.ContainsKey(b[i]);
++            if (newA)
++                seenA[a[i]] = i;
++            if (newB)
++                seenB[b[i]] = i;
++
++            if (newA == newB && (newA || seenA[a[i]] == seenB[b[i]]))
++                continue;
++
++            divergence =
++                $"site {i} of {a.Count}/{b.Count}: eager {a[i]} ({(newA ? "new" : "repeat of " + seenA[a[i]])}), "
++                + $"re-entered {b[i]} ({(newB ? "new" : "repeat of " + seenB[b[i]])})";
++
++            if (a[i] == "-1" || b[i] == "-1")
++                return SiteDivergence.Exhausted;
++
++            return !newA && newB ? SiteDivergence.EagerReusedASite : SiteDivergence.Other;
++        }
++
++        if (a.Count != b.Count)
++        {
++            divergence = $"different site COUNT: {a.Count} vs {b.Count}";
++            return SiteDivergence.Other;
++        }
++
++        divergence = null;
++        return SiteDivergence.None;
++    }
++
++    private static List<string> SiteValues(string printed)
++    {
++        var values = new List<string>();
++        foreach (System.Text.RegularExpressions.Match match in
++            System.Text.RegularExpressions.Regex.Matches(
++                printed, @"(?<=PropertyInlineCacheSite\.(?:Get|Set)\()-?\d+"))
++        {
++            values.Add(match.Value);
++        }
++
++        return values;
+     }
+ 
+     /// <summary>
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
+index 64a79284..928f933a 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
+@@ -208,11 +208,24 @@ internal static class DeferPopulationMetrics
+                 layoutMissedSamples = ExpressionCompiler.DeferredCaptureLayout.MissedNameSamples,
+ 
+                 // Re-entry: bodies compiled a SECOND time from the retained enclosing scope,
+-                // after this corpus's compilation finished, compared against the eager tree up to
+-                // alpha-renaming of compiler-generated temporaries.
++                // after this corpus's compilation finished, compared against the eager tree TWO
++                // ways. `reproduced` is equality up to an order-preserving renaming of the
++                // compiler's monotonic counters; `structural` erases those numbers instead of
++                // mapping them, so it asks whether the trees agree in every token a counter did
++                // not produce. The gap between them is numbering, and only what is outside
++                // `structural` is a candidate difference in the tree itself.
+                 reentryTotal = reentry.Total,
+                 reentryReproduced = reentry.Reproduced,
++                reentryStructural = reentry.Structural,
++                reentryThrew = reentry.Threw,
+                 reentryFirstDifference = reentry.FirstDifference,
++                reentryFirstStructuralDifference = reentry.FirstStructuralDifference,
++                reentryFirstOrdinalDivergence = reentry.FirstOrdinalDivergence,
++                reentryExhausted = reentry.Exhausted,
++                reentryEagerReusedASite = reentry.EagerReusedASite,
++                reentryOtherDivergence = reentry.OtherDivergence,
++                reentrySitesBefore = reentry.SitesBefore,
++                reentrySitesAfter = reentry.SitesAfter,
+ 
+                 evaluationFailure = failure,
+             });
+-- 
+2.43.0
+

@@ -1,0 +1,359 @@
+From 747b21483399d74ecec17118ab6b712caf213224 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 6 Aug 2026 06:07:33 +0000
+Subject: [PATCH] Ask item 1-1's layout question the way the item states it: as
+ an index
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+0104 predicted a SET of captured bindings and checked membership: zero missed on
+5 157 sites. This document then recorded that as having settled the capture
+layout, and later patches repeated it. It had not.
+
+Item 1-1 states its obstacle as "a captured name's INDEX in the enclosing
+lambda's Box[]", and that index is Inputs.Count at the moment
+ClosureRepository.Setup first sees the binding — the order the closure rewrite's
+descending walk meets it in the body. The prediction was a HashSet built from
+FreeNameScan.Free, itself a HashSet. It has no order, so it could not have
+answered the question even in principle. Zero missed names means a deferred body
+would be handed the right bindings; it says nothing about whether it would find
+each one in the slot the creation site put it.
+
+So FreeNameScan now records first-mention order beside the set, PredictCaptures
+returns an ordered list, and the checker compares that order against
+repository.Inputs — the array the creation site emits, in index order, rather
+than against the Closures dictionary whose enumeration order is a hash-table
+detail. Synthetic bindings are skipped on both sides on the same rule the
+membership check uses.
+
+Asked, over six corpora: 14 605 sites ordered, 4 461 exact, ZERO mismatched, and
+10 144 where the sets differ so the order question does not arise. Where the
+predicted set equals the handed-in set, the predicted order equals the slot order
+without exception.
+
+The 10 144 are the over-approximation 0104 already counted at 2 712 sites, and
+they carry a consequence its framing did not. For membership, over-approximating
+is a cost — one box per creation site. For a LAYOUT it is not merely a cost: an
+extra predicted binding shifts every later slot, so the predicted numbering and
+the tree-derived numbering are different numberings rather than the same one with
+spare entries. That is only safe if the deferral DRIVES the layout from the
+prediction rather than matching it, which is a design constraint the item did not
+previously carry.
+
+Two defects found in the writing of this, both mine. Bracketing the new insertion
+without braces made the following `else` bind to it — the dangling else — so
+SelfNameReferenced stopped being set and the named-function-expression fixture
+failed immediately, which is what that fixture is a paired assertion for. And the
+parent's free order was composed by iterating the child's SET, which would have
+scrambled the property being measured; fixed, and re-measured identical, so the
+hazard was latent rather than active.
+
+Compiler suite green: 1 267 tests.
+---
+ .../FastCompiler.CreateFunction.cs            |  18 ++-
+ .../Declarations/FreeNameScan.cs              |  45 +++++-
+ .../DeferredCaptureLayout.cs                  | 128 +++++++++++++++++-
+ .../DeferPopulationMetrics.cs                 |   9 ++
+ 4 files changed, 189 insertions(+), 11 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+index 2bca07e0..8d1e2744 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+@@ -719,12 +719,18 @@ partial class FastCompiler
+     /// can reach a binding the text never names, so there is no set to be right about.
+     /// </para>
+     /// </remarks>
+-    private static HashSet<BParameterExpression> PredictCaptures(
++    private static List<BParameterExpression> PredictCaptures(
+         AstFunctionExpression function,
+         FastFunctionScope enclosing,
+         FastFunctionScope own)
+     {
+-        var captures = new HashSet<BParameterExpression>(ExpressionCompiler.Core.ReferenceEqualityComparer.Instance);
++        // **Ordered, because the thing being predicted is an index.** `0104` predicted a set and
++        // checked membership; a captured name's Box[] slot is the order the closure rewrite's walk
++        // first encounters it, so a set cannot answer the item's actual obstacle. First-mention
++        // order is the only order source alone offers, and whether it is the walk's order is what
++        // the checker now asks rather than what this assumes.
++        var captures = new List<BParameterExpression>();
++        var seen = new HashSet<BParameterExpression>(ExpressionCompiler.Core.ReferenceEqualityComparer.Instance);
+         if (enclosing == null)
+             return captures;
+ 
+@@ -732,7 +738,7 @@ partial class FastCompiler
+         if (scan.Dynamic)
+             return captures;
+ 
+-        foreach (var name in scan.Free)
++        foreach (var name in scan.FreeInOrder)
+         {
+             if (!enclosing.TryResolveBinding(name, out var binding))
+             {
+@@ -751,7 +757,8 @@ partial class FastCompiler
+                 continue;
+             }
+ 
+-            captures.Add(cell);
++            if (seen.Add(cell))
++                captures.Add(cell);
+         }
+ 
+         // **A named function EXPRESSION's own name, which is not free and is still handed in.**
+@@ -775,7 +782,8 @@ partial class FastCompiler
+             && own.TryGetOwnVariable(function.Id.Name.Value, out var self)
+             && (self.Variable ?? self.EvalCaptureExpression as BParameterExpression) is { } selfCell)
+         {
+-            captures.Add(selfCell);
++            if (seen.Add(selfCell))
++                captures.Add(selfCell);
+         }
+ 
+         return captures;
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs
+index f5697056..8186a452 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FreeNameScan.cs
+@@ -50,6 +50,28 @@ public sealed class FreeNameScan
+     /// <summary>Names referenced and not bound anywhere inside the function.</summary>
+     public readonly HashSet<string> Free = new(System.StringComparer.Ordinal);
+ 
++    /// <summary>
++    /// The same names as <see cref="Free"/>, in the order they were first encountered.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// <b>Item 1-1's obstacle is stated as an INDEX and the prediction that was validated against
++    /// it was a set.</b> A captured name's slot in the enclosing lambda's <c>Box[]</c> is
++    /// <c>Inputs.Count</c> at the moment <c>ClosureRepository.Setup</c> first sees it — that is,
++    /// the order the closure rewrite's descending walk encounters the name in the body. `0104`
++    /// compared the predicted names against the actual ones and found zero missed, which settles
++    /// <em>which</em> bindings are handed in and says nothing about <em>which slot each lands in</em>
++    /// — and the creation site the enclosing lambda emits fixes that order for the deferred body
++    /// to agree with.
++    /// </para>
++    /// <para>
++    /// So the order is recorded here beside the set rather than derived from it later, because it
++    /// cannot be: a <c>HashSet</c> has none. Whether this order is the one the walk produces is a
++    /// question for the checker, not an assumption of this class.
++    /// </para>
++    /// </remarks>
++    public readonly List<string> FreeInOrder = [];
++
+     /// <summary>
+     /// The body can reach a binding it never names — a direct <c>eval</c>, a <c>with</c>, or
+     /// <c>debugger</c>. No free-name set describes it, so the function cannot be deferred.
+@@ -210,10 +232,15 @@ public sealed class FreeNameScan
+             // them itself, in which case they stop here, or pass them further up. Routing them
+             // through the ordinary reference path is what makes capture transitive for free.
+             var parent = functionScans.Count == 0 ? scan : functionScans[^1];
+-            foreach (var name in own.Free)
++            // Iterated in ORDER, not over the set. A parent's free order is the order it first
++            // meets each name, and a child's names are met where the child appears — so passing
++            // them up in the child's own first-mention order is what makes the composed order a
++            // source order rather than a hash order. Iterating `own.Free` here would scramble
++            // exactly the property the order check exists to measure.
++            foreach (var name in own.FreeInOrder)
+             {
+-                if (!IsBound(name))
+-                    parent.Free.Add(name);
++                if (!IsBound(name) && parent.Free.Add(name))
++                    parent.FreeInOrder.Add(name);
+             }
+ 
+             if (own.Dynamic)
+@@ -314,9 +341,19 @@ public sealed class FreeNameScan
+         {
+             var name = identifier.Name.Value;
+             if (!TryFindBinder(name, out var binder))
+-                Current.Free.Add(name);
++            {
++                // Braced deliberately. Without them the `else` below binds to this inner `if`
++                // instead of the outer one — the dangling-else — and SelfNameReferenced stops
++                // being set at all. The named-function-expression fixture caught it immediately,
++                // which is the whole reason that fixture is a paired assertion rather than a
++                // one-sided "did not miss".
++                if (Current.Free.Add(name))
++                    Current.FreeInOrder.Add(name);
++            }
+             else if (selfScopes.Count != 0 && binder == selfScopes[^1])
++            {
+                 Current.SelfNameReferenced = true;
++            }
+ 
+             return identifier;
+         }
+diff --git a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs
+index aac9a3cb..5520964f 100644
+--- a/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs
++++ b/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/DeferredCaptureLayout.cs
+@@ -193,9 +193,10 @@ public static class DeferredCaptureLayout
+     public static long SyntheticNames => Interlocked.Read(ref syntheticNames);
+ 
+     /// <summary>Records what the front end predicts this lambda captures, from source alone.</summary>
+-    public static void Predict(BLambdaExpression lambda, HashSet<BParameterExpression> captures)
++    public static void Predict(BLambdaExpression lambda, List<BParameterExpression> captures)
+     {
+-        predicted.AddOrUpdate(lambda, captures);
++        predictedOrder.AddOrUpdate(lambda, captures);
++        predicted.AddOrUpdate(lambda, new HashSet<BParameterExpression>(captures, Core.ReferenceEqualityComparer.Instance));
+         var spellings = new HashSet<string>(System.StringComparer.Ordinal);
+         foreach (var c in captures)
+             if (!string.IsNullOrEmpty(c.Name))
+@@ -231,9 +232,132 @@ public static class DeferredCaptureLayout
+             if (entry.Value.index >= 0)
+                 actual.Add(entry.Key);
+ 
++        CheckOrder(lambda, repository);
+         Check(lambda, actual);
+     }
+ 
++    /// <summary>
++    /// Compares the predicted <em>order</em> against the slot order the rewrite assigned — the
++    /// question item 1-1 actually asks.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// <b>`0104` validated membership and this document recorded it as having settled the layout.
++    /// It had not.</b> The item states its obstacle as *"a captured name's INDEX in the enclosing
++    /// lambda's <c>Box[]</c>"*, and that index is <c>Inputs.Count</c> at the moment
++    /// <c>ClosureRepository.Setup</c> first sees the binding — the order the descending walk meets
++    /// it in the body. The prediction was a <c>HashSet</c> built from <c>FreeNameScan.Free</c>,
++    /// itself a <c>HashSet</c>: it has no order, so it could not have answered the question even
++    /// in principle. Zero missed names means the deferred body would be handed the right bindings;
++    /// it says nothing about whether it would find each one in the slot the creation site put it.
++    /// </para>
++    /// <para>
++    /// <b>Compared against <c>Inputs</c> rather than against <c>Closures</c>.</b> <c>Inputs</c> is
++    /// the array the creation site emits, in index order, which is the thing a deferred body has
++    /// to agree with. <c>Closures</c> is a dictionary and its enumeration order is an
++    /// implementation detail of the hash table.
++    /// </para>
++    /// <para>
++    /// Synthetic bindings are skipped on both sides, on the same rule the membership check uses:
++    /// a compiler-introduced capture is not an identifier a free-name walk can see, so charging
++    /// the prediction for its position would report a defect in the exclusion rather than in the
++    /// order.
++    /// </para>
++    /// </remarks>
++    private static void CheckOrder(BLambdaExpression lambda, ClosureRepository repository)
++    {
++        if (undeferrable.TryGetValue(lambda, out _))
++            return;
++
++        if (!predictedOrder.TryGetValue(lambda, out var expected))
++            return;
++
++        if (orderVerdicts.TryGetValue(lambda, out _))
++            return;
++
++        orderVerdicts.AddOrUpdate(lambda, true);
++
++        var actual = new List<BParameterExpression>();
++        foreach (var entry in repository.Inputs)
++            if (entry != null && !IsSynthetic(entry))
++                actual.Add(entry);
++
++        var predictedReal = new List<BParameterExpression>();
++        foreach (var capture in expected)
++            if (!IsSynthetic(capture))
++                predictedReal.Add(capture);
++
++        Interlocked.Increment(ref orderedSites);
++        if (predictedReal.Count == 0 && actual.Count == 0)
++        {
++            Interlocked.Increment(ref orderExact);
++            return;
++        }
++
++        // A prediction that names a different SET cannot have a meaningful order, and the
++        // membership check already counts it. Separated so the order figure is about order.
++        var sameSet = predictedReal.Count == actual.Count;
++        if (sameSet)
++        {
++            var seen = new HashSet<BParameterExpression>(actual, Core.ReferenceEqualityComparer.Instance);
++            foreach (var p in predictedReal)
++                if (!seen.Contains(p))
++                {
++                    sameSet = false;
++                    break;
++                }
++        }
++
++        if (!sameSet)
++        {
++            Interlocked.Increment(ref orderSetDiffers);
++            return;
++        }
++
++        for (var i = 0; i < predictedReal.Count; i++)
++        {
++            if (!ReferenceEquals(predictedReal[i], actual[i]))
++            {
++                Interlocked.Increment(ref orderMismatched);
++                if (orderSamples.Count < 20)
++                {
++                    lock (orderSamples)
++                        if (orderSamples.Count < 20)
++                            orderSamples.Add(
++                                $"slot {i}: predicted {predictedReal[i].Name}, actual {actual[i].Name} "
++                                + $"(of {predictedReal.Count})");
++                }
++
++                return;
++            }
++        }
++
++        Interlocked.Increment(ref orderExact);
++    }
++
++    /// <summary>Sites whose predicted ORDER was compared against the assigned slot order.</summary>
++    public static long OrderedSites => Interlocked.Read(ref orderedSites);
++
++    /// <summary>Those whose predicted order matched the slot order exactly.</summary>
++    public static long OrderExact => Interlocked.Read(ref orderExact);
++
++    /// <summary>Those that named the same bindings in a DIFFERENT order — a wrong Box[] index.</summary>
++    public static long OrderMismatched => Interlocked.Read(ref orderMismatched);
++
++    /// <summary>Those whose sets differ, so the order question does not arise. Counted apart.</summary>
++    public static long OrderSetDiffers => Interlocked.Read(ref orderSetDiffers);
++
++    /// <summary>Up to twenty examples of a slot the prediction would have put a different binding in.</summary>
++    public static IReadOnlyList<string> OrderSamples => orderSamples;
++
++    private static readonly ConditionalWeakTable<BLambdaExpression, List<BParameterExpression>> predictedOrder = [];
++    private static readonly ConditionalWeakTable<BLambdaExpression, object> orderVerdicts = [];
++    private static readonly List<string> orderSamples = [];
++    private static long orderedSites;
++    private static long orderExact;
++    private static long orderMismatched;
++    private static long orderSetDiffers;
++
+     public static void Check(BLambdaExpression lambda, ICollection<BParameterExpression> actual)
+     {
+         if (undeferrable.TryGetValue(lambda, out _))
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
+index 928f933a..5dd95e98 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/DeferPopulationMetrics.cs
+@@ -207,6 +207,15 @@ internal static class DeferPopulationMetrics
+                 layoutRepeatDisagreements = ExpressionCompiler.DeferredCaptureLayout.RepeatDisagreements,
+                 layoutMissedSamples = ExpressionCompiler.DeferredCaptureLayout.MissedNameSamples,
+ 
++                // Item 1-1's obstacle is an INDEX, and the check above compares a SET. These
++                // compare the predicted order against the slot order the rewrite assigned, which
++                // is the question the item actually asks.
++                layoutOrderedSites = ExpressionCompiler.DeferredCaptureLayout.OrderedSites,
++                layoutOrderExact = ExpressionCompiler.DeferredCaptureLayout.OrderExact,
++                layoutOrderMismatched = ExpressionCompiler.DeferredCaptureLayout.OrderMismatched,
++                layoutOrderSetDiffers = ExpressionCompiler.DeferredCaptureLayout.OrderSetDiffers,
++                layoutOrderSamples = ExpressionCompiler.DeferredCaptureLayout.OrderSamples,
++
+                 // Re-entry: bodies compiled a SECOND time from the retained enclosing scope,
+                 // after this corpus's compilation finished, compared against the eager tree TWO
+                 // ways. `reproduced` is equality up to an order-preserving renaming of the
+-- 
+2.43.0
+

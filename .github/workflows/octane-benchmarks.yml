@@ -32,9 +32,11 @@ on:
         description: >-
           Run each suite this many times and report the median score plus the
           observed spread. 1 is a single measurement — enough to see whether a
-          suite completes, not enough to call a score change real.
+          suite completes, not enough to call a score change real, and a result
+          committed at 1 says so in its own header. Pass 1 deliberately for a
+          quick coverage check.
         required: false
-        default: '1'
+        default: '3'
       octane_ref:
         description: Git ref of chromium/octane to benchmark.
         required: false
@@ -70,7 +72,16 @@ jobs:
     runs-on: ubuntu-latest
     # Jint adds about ten minutes to the previous 90: it completes every suite,
     # and its slowest (Mandreel) measured 104s against Broiler's 313s.
-    timeout-minutes: 105
+    #
+    # Sized for the default THREE repetitions (roadmap item 0-6's noise band),
+    # not one. Broiler's own 15 suites measured 654 s in the committed run, of
+    # which Mandreel and zlib are 499 s between them; with Chromium and Jint
+    # beside it a single repetition is roughly 26 minutes of benchmarking on top
+    # of a recursive-submodule checkout and a Release build. Tripling the
+    # benchmark half lands near 95 minutes, which the previous 105 would have cut
+    # off often enough to make the band unobtainable — the failure mode being a
+    # run that costs the full 105 minutes and commits nothing.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v5
         with:
@@ -97,7 +108,7 @@ jobs:
           args=(
             --engines "${{ github.event.inputs.engines || 'chromium,broiler,jint' }}"
             --timeout "${{ github.event.inputs.timeout_seconds || '180' }}"
-            --repetitions "${{ github.event.inputs.repetitions || '1' }}"
+            --repetitions "${{ github.event.inputs.repetitions || '3' }}"
             --octane-ref "${{ github.event.inputs.octane_ref || 'master' }}"
           )
           [ -n "$ONLY" ] && args+=(--only "$ONLY")

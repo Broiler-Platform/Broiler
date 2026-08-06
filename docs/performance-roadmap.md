@@ -21,14 +21,16 @@ so only the parent can hold the combined view.
 - **Acceptance protocol:** unchanged and unchallenged —
   [`Broiler.JS/docs/performance.md`](../Broiler.JS/docs/performance.md) governs what
   may be *claimed*. **Nothing in this document closes on the numbers it quotes.**
-- **Provenance:** the pinned submodule pointer is **`cca39b4d`**, checked 2026-08-05 against
+- **Provenance:** the pinned submodule pointer is **`14fa4f10`**, checked 2026-08-05 against
   the gitlink rather than against the prose — **and checking it is what caught that this line
-  said `07adeb44`**, which the pointer had moved five commits past. That is the *fifth*
-  consecutive time this line was stale when read (`2ebc0c3c`, `71dda1b7`, `9bf9639b` and
-  `61c8cc65` before that), which is no longer a coincidence: **a pointer written into prose goes
-  stale silently**, and the only reliable reading of it is `git submodule status`. Five readings,
-  five staleness findings, is a rate rather than an anecdote — the line is wrong *by default*, so
-  the sentence to write next to any pointer is the command that reads it.
+  said `cca39b4d`**, which the pointer had moved thirteen commits past. That is the *sixth*
+  consecutive time this line was stale when read (`07adeb44`, `2ebc0c3c`, `71dda1b7`, `9bf9639b`
+  and `61c8cc65` before that), which is no longer a coincidence: **a pointer written into prose goes
+  stale silently**, and the only reliable reading of it is `git submodule status`. Six readings,
+  six staleness findings, is a rate rather than an anecdote — the line is wrong *by default*, so
+  the sentence to write next to any pointer is the command that reads it. **The two other
+  submodules now carry the same note**: `Broiler.HTML` is `2f94c0d5` and `Broiler.CSS` `076ed5d5`,
+  both of which had also moved since anything here described them.
   It is why §4.1's and §3.4's figures below carry the
   commit they were taken at rather than "the pin". `2ebc0c3c`, `a6f101cc`, `71dda1b7`,
   `685026c0`, `cdb2fd41`, `7ef80c03` and `8228b0da` are all **ancestors** of the current pin
@@ -62,52 +64,87 @@ so only the parent can hold the combined view.
   boxing-source census and `ToNumeric` reuse now describes the pinned pointer directly**, rather
   than a local build of `07adeb44` plus a patch series applied in order, which is what their
   sections used to have to say.
-  **Thirteen patches are pending again:
-  [`patches/0089`](../patches/0089-js-numeric-tree-order.patch)** — item 3-1's order-preserving
-  guard placement, the refusal waterfall that specified it and the 54.0% of the corpus's allocation
-  it removes — **[`0090`](../patches/0090-js-gc-pause-accounting.patch)** — the GC-pause
-  denominator that prices it, and phase 3, for the first time — and
-  **[`0091`](../patches/0091-js-update-target-census.patch)** — where the `++`/`--` step's operands
-  live, which re-opens item 3-8 — and
-  **[`0092`](../patches/0092-js-numeric-local-defeat-tests.patch)** — the eight shapes that scope it
-  to 3-8a — and **[`0093`](../patches/0093-js-3-8a-defeat-ab.patch)** — the A/B that survived an
-  attempt to build 3-8a, which is not built — and
-  **[`0094`](../patches/0094-js-speculative-numeric-population.patch)** — 3-8a's population, counted
-  at 26 names by an instrument made to discriminate first — and
-  **[`0095`](../patches/0095-js-speculative-numeric-storage.patch)** — 3-8a's dual-representation
-  local, built and off by default — and
-  **[`0096`](../patches/0096-js-speculative-numeric-read-paths.patch)** — its three consumers, the
-  counter that prices them, and the measurement that closes the item as a 1.2% regression — and
-  **[`0097`](../patches/0097-js-imported-outer-numeric-population.patch)** — item 3-9's population,
-  counted at **zero** by an instrument proven to discriminate first, closing that item for one
-  instrument and no mechanism — and
-  **[`0098`](../patches/0098-js-async-job-scheduling.patch)**, which is a **correctness** fix rather
-  than a performance one: a promise job could run JavaScript beside the JavaScript that queued it,
-  and the gates for `0097` are what found it — and
-  **[`0099`](../patches/0099-js-execution-exclusion.patch)**, which closes the residual `0098` wrote
-  down (measured at 172 overlaps in 200 rounds) and states the embedding contract that the engine
-  cannot enforce alone — and
-  **[`0100`](../patches/0100-js-blocking-host-wait.patch)**, which fixes the two deadlocks those two
-  introduced between them, one each, and gives a host a supported way to wait on a `Task` from
-  inside JavaScript. *Each of the three was found by measuring what the one before it claimed.*
-  And **[`0101`](../patches/0101-js-free-name-scan.patch)** — item 1-1's named precondition, built
-  and priced: a resolved free-name scan per function, at **6.6–12.2%** of body-tree construction as
-  one bottom-up pass against up to **47.7%** written the obvious way, which is what the item's
-  recorded 5.4–9.9% *lower bound* was silent about.
-  `0092` and `0093` are tests only. Usual terms: the push to the
-  submodule remote returned 403, so the pointer is deliberately unbumped and every figure in their
-  sections was measured on a local build of `cca39b4d` plus those patches. They are independent of
-  everything cleared above, **`0089` → `0090` → `0091` → `0092` → `0093` → `0094` → `0095` →
-  `0096` → `0097` → `0098` → `0099` → `0100` → `0101` is the
-  required order**, and all thirteen were verified by applying them in sequence to a clean checkout with
-  **`git am --keep-cr`** and building the result. **The series was written as `0087`–`0099` and
-  renumbered `+2`** once `main` landed `0087-html-backdrop-painting-props` and
-  `0088-css-nth-child-of-selector` on the same two numbers: `patches/` is one flat namespace across
-  every submodule, so two branches numbering from the same high-water mark collide whenever both are
-  open. The shift is textual — the thirteen bodies are unchanged and the chain was re-verified after
-  the rename. None needs a main-repo fallback: `BROILER_JS_NUMERIC_TREE_ORDER=0` restores the
-  previous emission exactly and is the bisection, `0089`'s refusal counters are touched once per
-  compiled site rather than per call, and `0090` is four `GC` reads per suite in a benchmark host.
+  **The handoff has completed a fourth time, and this time it took all three submodules at once.**
+  The thirteen `Broiler.JS` files pending at the last reading (`0089`–`0101`) **and the HTML and CSS
+  pair beside them** (`0087`, `0088`) have all been applied, pushed and their pointers bumped, so
+  `patches/` was empty for the second time since it was written. All fifteen were checked **patch by
+  patch against each submodule's log rather than inferred from this prose** — each `Subject` resolved
+  to a commit, that commit's `format-patch` output diffed against the patch file (identical once the
+  `From <sha>` line, the blob `index` lines and the trailing git version are set aside, which is the
+  whole of the difference on all fifteen), and each pending-against pointer confirmed an ancestor of
+  the new pin. In patch order the `Broiler.JS` thirteen are **`12760bb9`, `48ad65e7`, `01c79c46`,
+  `2bab9775`, `16389682`, `e0bb9b40`, `cfed00ef`, `c2667c29`, `6ff52f3b`, `ba31a4a9`, `b80327ac`,
+  `3fa35e14`, `14fa4f10`**; `0087` is `Broiler.HTML` `2f94c0d5` and `0088` is `Broiler.CSS`
+  `076ed5d5`. **So every figure recorded for item 3-1's order-preserving guard placement, the GC-pause
+  denominator, the update-target census, items 3-8a and 3-9, the three async-correctness fixes and
+  item 1-1's free-name scan now describes the pinned pointers directly**, rather than a local build
+  plus a patch series applied in order, which is what those sections had to say while they were
+  pending. The renumbering note that series carried — written `0087`–`0099`, shifted `+2` when `main`
+  landed the HTML and CSS pair on the same two numbers — retires with it; **what does not retire is
+  why it happened**: `patches/` is one flat namespace across every submodule, so two branches
+  numbering from the same high-water mark collide whenever both are open, which is the ordinary case
+  rather than an unlucky one.
+  **Twelve patches are pending again, and five of them are one item.**
+  **[`patches/0102`](../patches/0102-js-deferral-population.patch)** — item 1-1's remaining half,
+  its population counted at **728 capture-free sites of 5 762, 12.6%**, and the shortcut that looked
+  available refused by the counter built to test it.
+  **[`0103`](../patches/0103-js-widen-census-corpus.patch)** — the census corpus, widened past the
+  **7 of 15** suites it could reach, which moves item 4-1's headline from **93.54% to 80.11%** and
+  fixes what had been keeping Mandreel out of every census: an **uncatchable stack overflow in the
+  benchmark host**, because item 0-2's stack reserve is a property of the *shell* and no benchmark
+  host had it (§4.2a).
+  **[`0104`](../patches/0104-js-capture-layout-checker.patch)** — item 1-1's *named* obstacle
+  settled: the capture layout derived from source alone **misses nothing on 5 157 sites**, at the
+  price of over-approximating on 2 712 of them, and **two soundness defects in `0101`'s own code**
+  fixed on the way, both about a function's own name.
+  **[`0105`](../patches/0105-js-deferred-body-reentry.patch)** — the obstacle the item does
+  *not* name: a nested body **compiled a second time from the enclosing scope kept alive**, after
+  the enclosing compilation has finished.
+  **[`0106`](../patches/0106-js-reentry-structural-partition.patch)** — that check's residual
+  settled: **5 723 of 5 723 re-entered bodies agree with their eager tree in every token a compiler
+  counter did not produce**, and the 471 whose counter ordinals differ are **all** either the site
+  table's `-1` (the check's own second compilation exhausts it) or 4-2b's tier-2 site re-use, with
+  nothing unexplained.
+  **[`0107`](../patches/0107-js-generic-operator-ceiling.patch)** — item 4-2's arithmetic half
+  priced and **refused by its own arithmetic** at **0.119%** of the corpus, the relational lead it
+  points at closed with it at **0.022%**, and **the whole generic binary-operator surface bounded
+  at 0.475%**.
+  **[`0108`](../patches/0108-js-call-entry-cost.patch)** — item 4-5 **unblocked**: pricing the
+  engine's two call entries against each other, which 4-4 named as the first thing 4-5 should do and
+  nobody had done, says **44% of a call entry (50.18 ns of 114.60) is bookkeeping the short path
+  already skips** — **2.85% of the corpus**, so the missing "~85% unattributable from outside the
+  engine" was the *replicas* being the wrong instrument rather than a missing profiler.
+  **[`0109`](../patches/0109-js-call-bookkeeping-attribution.patch)** — that bookkeeping
+  **attributed**, with the sum closing to within 0.5 ns: **92% of it is Annex B `caller`/`arguments`**
+  at 44.40 ns per call to every ordinary non-strict function, while the
+  strict-mode `AsyncLocal` write costs **102.87 ns per crossing** on **4.74%** of calls — nine of
+  twelve suites never cross, PdfJS crosses on 52.65% of its.
+  **[`0110`](../patches/0110-js-legacy-frame-census.patch)** — that frame **counted** rather
+  than bounded: **60.16% of all calls push one, 1.46% of the corpus**, with Richards at 100% and
+  the two strict suites at ~0% — plus the two instrument defects `0103` surfaced and left (the
+  stale `round-up-16` "current" label, and a histogram bucket that could go negative) **closed**.
+  **[`0111`](../patches/0111-js-legacy-frame-shape.patch)** — that item's named fix **priced
+  before being built and refused at 0.730×**: relocating the frame to a thread-local stack saves
+  **6.19 ns, 0.20% of the corpus for an M–L**, because the cost is the 56-byte `Arguments` copying
+  and moving where it lands does not remove it.
+  **[`0112`](../patches/0112-js-capture-layout-order.patch)** — item 1-1's layout question
+  asked as the item states it, **as an index**: `0104` validated membership and this document
+  recorded it as the layout, which it is not. **14 605 sites ordered, 0 mismatched** where the sets
+  agree — and the over-approximation turns out to shift slots, so the prediction must **drive** the
+  layout rather than match it.
+  And **[`0113`](../patches/0113-js-dense-element-ratio.patch)** — item 3-1's read/write ratio
+  counted for the first time: **3.34 numeric reads per numeric write** over the corpus, 5.26 on
+  NavierStokes and 4.80 on Crypto, and **1.03 on Gameboy — the suite §4.2a re-opened the item on**,
+  so a typed store is an allocation wash there and a loss everywhere else.
+  Usual terms: the push to the submodule remote returned 403, so the pointer is
+  deliberately unbumped and every set of figures was measured on a local build of `14fa4f10` plus
+  the patches in question. `0102` and `0103` are **independent of each other**, but `0104` builds on
+  `0102` and `0105` on both, so **`0102` → `0103` → `0104` → `0105` is the order** — verified by
+  applying all four in sequence to a clean checkout of the pin with `git am --keep-cr` and diffing
+  the result against the tree they were generated from. None needs
+  a main-repo fallback: `0102`'s and `0104`'s counters and `0105`'s retention are off by default
+  (`BROILER_JS_DEFER_TREE_COUNT=1`, `BROILER_JS_CAPTURE_LAYOUT_CHECK=1`, `BROILER_JS_DEFER_TREE=1`)
+  and change no emission on any setting, and `0103` touches only the benchmark host.
   **Measurements and the test262 run in §4.1 and §3.4 were taken at `cdb2fd41` and have not
   been repeated** — `685026c0` also carries a string-allocation fix (#936). Octane code
   sites verified at `45f4f679`. **Phase 2's own measurements — §0, and each 2-x section —
@@ -128,16 +165,16 @@ so only the parent can hold the combined view.
 
 ## 0. Status
 
-**Last updated 2026-08-04.** Snapshot of where the campaign stands; every claim is detailed in
+**Last updated 2026-08-05.** Snapshot of where the campaign stands; every claim is detailed in
 the item's own section below, and nothing here is *closed* — see the acceptance protocol in §3.
 
 | Phase | State |
 |---|---|
-| **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6's workflow run has happened and its results are committed** — 2026-08-03 at the pinned pointer, **15 of 15 suites `ok` and 17 of 17 scores** for Broiler, Jint and a same-machine Chromium alike, nothing errored or timed out. Geomean **351** against Chromium's 57 080 (**163×**) and Jint's 616 (**0.569×**), spread **139.8×**. That answers the coverage question and phase 2's exit criterion (below); **what 0-6 still owes is the noise band** — the run is one repetition per suite and says so, so magnitudes and pass/fail may be read from it and deltas may not — plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce |
-| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting. **New: 1-4 ✅.** Measuring 1-1's premise found the phase's actual dominant cost, and it was not lazy compilation: the closure rewrite held a lambda's in-scope bindings in a `List` and asked it `Contains` per parameter reference, so **emission was quadratic in a scope's binding count** — 2 000 top-level declarations emitted in 13 865 ms against 2.5 ms of parse. A reference-keyed multiset (list-backed below 32 bindings) makes it linear: **28.5× on that shape, and 3.04× on Mandreel end-to-end**, ABBA-interleaved, six pairs. **1-1 is still open and its premise now has a number** — 92–96% of compile time is function bodies on the large real programs — but the measurement also **splits phase 1 in two and re-targets 1-1**: Mandreel was *wide*, not deep, and never was a 1-1 case, while jQuery at 96.5% deferrable is the whole of it. **1-1's emission half then landed without needing the capture mechanism at all**: every risk the item names is settled by the front end, so deferring *IL generation* to first invocation is the same prize with none of them — **jQuery 0.661×, Box2D 0.636×, PdfJS 0.689× on compile, allocation ~0.52× across the board, and 1.0009× steady state**. **Octane CodeLoad, the benchmark the item names, was run and passes: 94.6 → 104.0, 1.099×, 24 samples an arm, 93% pairwise dominance** — and it took 24 because the first three-sample pair and its reverse disagreed. That ratio also re-frames the item: compilation is only ~27% of what CodeLoad measures, not the whole of it. Two mistakes were caught by measuring: a stack handoff per deferred function took the suite from 3.5 to 20 minutes, and a thunk that *called* its resolve cost 1.0247% on call-heavy code until the warm path was written in IL. Typescript is 1.034× slower and unexplained. **The Mandreel suite was then run too, and it overturns the phase's headline target**: a 3.04× faster compile of `mandreel.js` moves Mandreel 0.993× and MandreelLatency 0.992× — Octane compiles that file at script load and times only the run function, so MandreelLatency measures execution pauses and belongs to phase 3. The saving is real and outside every score: suite wall clock **358.2 → 350.0 s**, non-overlapping. **What remains of 1-1 has now been measured before being built, and both halves of its premise hold.** The three-way split was only ever taken on synthetic declaration walls; taken on the real corpora it reads **parse 9.4–13.5%, expression-tree construction 33.6–63.9%, emission 25–57%** — tree construction is the single largest phase on five of six, parse and tree together are **43–75%** of compile, and the parse, the part an early-error rule forbids deferring, is a tenth of it. The population was never counted at all, and it is **84–99.7% of a script's functions never invoked once it has been evaluated** (jQuery 347 of 415, Mandreel 2 689 of 2 697). So the remaining half is over half the compile across a population that is almost entirely never needed. **It also corrects this item's own ceiling table**: `--compile-profile` stubs *outermost* bodies and jQuery has exactly one — the IIFE the library is written inside, 99.91% of its bytes — so the "96.5% of its compile in bodies that are never called" is everything except the parse, and that body is called first. **And measuring the phases found a repeat inside the half that already landed**: `LambdaRewriter.Rewrite` descends through nested lambdas, and `Relay` called it *again* per relayed site, so a lambda at depth *d* was walked *d+1* times and jQuery's whole tree was walked twice by a compile that emits almost nothing. Counted, the second walk finds nothing on any site — **0 of 415, 0 of 978, 0 of 1 574** — and a second counter says the repeat, left to run, creates **0 captures** the first walk had not. It is now skipped for any lambda a descending walk has already entered, with `RewriteRootOnly`'s pass deliberately marking nothing so async and generator bodies are unaffected. **All five pinned test262 manifests were run against it and every count is identical to §3.4's row, manifest by manifest** — 8 710 / 8 617 / 84 / 251 / 9, same files not just same totals. Whole compile **0.782× on jQuery and 0.867× on Typescript, six of six pairs each**; **Box2D does not separate** and its control arm's own spread is 55.6%, so the phase was measured directly instead — **its emission phase 0.549× and its whole compile 0.775×**, in the round where `--compile-phases`' parse control held. **1-1's remaining half now has a price rather than a lower bound** (`0101`): the free-name walk the item names as its own precondition is built and measured at **6.6–12.2%** of body-tree construction as one bottom-up pass — but at **up to 47.7%** written the obvious way, per-function and superlinear in nesting depth, which is what the recorded 5.4–9.9% *lower bound* was silent about. Mandreel, wide and not deep, is the control that goes the other way (7.8% → 8.8%). **The deferral mechanism is still not built and the item is still size L** — it is simply no longer blocked on an unpriced precondition |
-| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. Then **2-12** found why the misses that remained could never heal: the cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — **77.7% of DeltaBlue's misses**. Refreshing in place takes **DeltaBlue's read hit rate to 93.16%** (65.96% before both fixes) and Box2D's to 98.83%. **DeltaBlue still fails the gate at 447×**, but the cache is no longer the reason, and what remains is not property-cache-shaped. **0-6's CI run has since confirmed the split independently — Richards 144.9×, DeltaBlue 460×** — so the phase's exit criterion is answered by two measurements on different machines that agree on which side of 200× each benchmark falls, rather than by one. Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
-| **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. **Its `let`/`const` half is now landed**, on the second attempt: the first was withdrawn on a miscompile, and re-built scoped to the *numeric* tier alone it reproduces the predicted number and not the defect — **`let` and `const` both 31.98 → 0.00 B/iter and 1 → 3 numeric locals, identical to the eligible `var` floor, with all twelve other `--local-alloc` rows byte-identical**, both arms from one tree. The recorded reproduction was re-run against it and is green, including under the switches that restore the pre-1-4 and pre-1-1 front end — so the withdrawn attempt's defect is **not explained**, only not reproduced; what the second attempt does differently is leave the JSValue tier closed to lexical names, since a TDZ and const-ness live in the cell that tier removes while the numeric gate proves both unobservable. **The block-scoped `var` then landed too, and 3-3 is complete**: the "definite-assignment analysis" it asked for is the function body's own dominance argument applied one level down — an unconditional block is *transparent* (entered whenever reached, exits only via `return`/`throw`), and any other block *confines* its declaration, which then needs every reference inside it. **`block-var` 31.98 → 0.00 B/iter and 1 → 3, one row moved and twelve byte-identical.** Two defects were caught on the way, neither shipped: a non-dominating declaration could mark a name readable and mask a read that would see `undefined`, and the fix for that over-corrected into rejecting a benign numeric re-declaration — caught by a pre-existing test written as "the guard against over-fixing". All four of the item's categories are now at the eligible floor except `parameter`, which cannot reach the numeric tier at all. 3-4 is a cost, not a task. **New: 3-5 ✅, and it measured the ceiling on this whole phase.** 4-5's probe found that the control loop every measurement here treats as a *floor* was itself paying a box per iteration — and the cause is not the parameter: `i` is a raw double, `n` is a `JSValue`, and `<` had a native form only when **both** sides were doubles, so the raw side was boxed to meet the generic operator. Unboxing the *other* side instead needs no entry guard and covers more (`i < a.length` is a property read, boxed for the same reason), and is sound because ToPrimitive of a Number is that Number. **33.77 → 10.03 ns and 32 → 0 B an iteration, 3.4× on its shape**; 33 semantics tests, every one of which also passes on the unmodified compiler. **On the Octane corpus it is invisible — 0.997× bytes, 0.995× time — and the reason is the number this phase never had: only 5.0% of scalar locals (203 of 4 029) reach the numeric tier at all.** The emission is not the problem (390 comparisons take the new form, 59% of those that could); what is on the other side is. That is the ceiling on 3-0, 3-3 and 3-5 alike, it is the same `CanScalarReplaceLocals` gate that bounds phase 4's tiering candidates, and widening it became **new item 3-6**. It also answers what 3-4 was told to wait for: the gap largely survives unboxed locals, because the unboxing reaches 5% of them. **3-6 has since done its count, and it retired its own design — and 3-5's explanation with it.** Of 2 695 hoisted names, `CanScalarReplaceLocals` — the gate 3-5 blamed — rejects **2, 0.1%**; the causes are *not proven numeric* (2 012, 74.7%) and *captured by a nested function* (478, 17.7%). Counted again inside the analysis, the first is not "most locals are not numbers" either: only **~170 names are never offered**, while the optimistic fixed point **offers 2 335 and drops 1 842 (78.9%)**, because something assigned to them comes from a parameter, a property read, an element or a call — none knowable statically. The two counts reconcile exactly, and the residue is **290 names the analysis proved numeric that the hoist site refused for being captured**. So the work splits: **3-7** gives a captured numeric local a raw-`double` cell (290 names, **203 → ~493, 2.4×**, entirely static), and **3-8** guards a local's numeric-ness at run time — which is **4-3b's in-method branch pointed at a representation**, and means *the largest single obstacle in phase 3 is shaped like phase 4*. Nothing was built for 3-6: its own text said to count first, and the count retired the design, for the fourth item running. **New: 3-7 ✅, and its premise was wrong in both directions.** The cell it asked for already existed — the expression compiler rewrites any CLR local a nested lambda references into a `Box<T>`, and **`Box<double>` *is* the shared cell**, so a captured numeric local costs *one* allocation where the `JSVariable` form costs two. The population, though, is **36× smaller than 3-6 said**: of its 478 captured names, **247 (51.7%) are named by a hoisted function declaration** and can never be widened, 223 more are not proven numeric, and the widening is worth **eight names, 224 → 232, 1.036×**. 3-6's 290 was **inferred rather than counted**, from *offered minus dropped* — and `Resolve` removes a third population between those two counters that had no counter at all, so the real reconciliation is **offered 2 295 = rejected 133 + dropped 1 916 + surviving 246**, and only **22** provably-numeric names are refused at the hoist site for any reason. Lifting the conjunct exposed **two wrong answers and one compile failure that had been hiding behind it**: a hoisted `function g(){ return s; }` can read `s` before `var s = 0` runs while sitting textually after it (`"0"` for `"undefined"`); a nested function's own parameter could mark the outer name initialized and mask a read that really sees `undefined` (`"0,5"` for `"undefined,5"`); and a function declaration stores a function object into the binding being typed, which no assignment-expression walk sees (`let f = 5; { function f(){} }` died on *"Assignment target Call is not supported"*). The first is fixed by a conjunct that is **not** behind the switch, because it is correctness. On its shape the result is exact — **63.97 → 0.01 B/iter, −112 B an activation, and shape ÷ control 7.19× → 1.0000×**, i.e. a captured numeric local now runs at the speed of the same loop with no closure at all — against an equally exact **losing side of +32 B and 1.111× when the value is read *through* the closure**. On the corpus it is **1.0001×**, invisible for the third item running, and the count says why: 2 439 names are not proven numeric and 247 are held by a hoisting rule. **Nothing left in phase 3 is a matter of loosening a conjunction** — and **3-8 then said the conjunctions were never where the prize was**. Two numbers, neither previously taken: **number boxing is 41.89% of everything the corpus allocates** (2.05 GB of 4.88 GB; 66.96% on NavierStokes, 55.16% on Crypto, 35.98% on Box2D, against 0.31% on DeltaBlue — a spread that buries the prize in any corpus average), and the **entire** numeric-local tier, measured for the first time against a build with it switched off, removes **311 187 boxes of 85.6 M — 0.36%, and 0.41% of total allocation**. So four "invisible on the corpus" readings were never evidence that the mechanism does not matter; they were evidence that eight more names do not. A box is minted by the **operator**, whose operands arrive boxed from array elements and object fields, so the local is one link carrying 0.36% of the traffic. Counting what defeats each proof says the same: of 1 916 drops, **894 (46.7%) are a property read and 570 (29.7%) a call's return — 76.4% values produced elsewhere** — against **47 (2.5%) parameters**, the category 3-3 deferred to phase 4 as the one that mattered. **3-8 as written should not be started; 3-1 and 3-2 move to the front of the phase.** Writing the classifier's tests also found the analysis offering a nested function's block-scoped `var`s to its *enclosing* function too, so each was dropped and counted once per level — no answer changes and every downstream figure is identical, but 3-7's `offered`/`rejected` pair is corrected from 2 521/359 to **2 295/133**. **New: 3-1 is started, and its first count re-specifies it off storage.** Nobody had measured what the generic arithmetic operators are *handed* — only what the compiler could prove about them. Counted: **73 817 515 of 73 818 646 invocations across the corpus arrive with both operands already Numbers, every one but 1 131**, and that population is **86.6% of all 85.2 M boxes**, while the compiler's `both are native` gate reaches **556 053, 0.75%** — and even that counts `+` alone, the only operator with a raw-double overload. *Compile-time provability reaches 0.75% of the arithmetic and run-time truth reaches 100.00% of it*, which is the sharpest statement this phase has of why six correct items are invisible. The consequence: the operator already gets two Numbers whatever they are stored in, so a typed backing store is not the precondition — what it cannot do is **hand one back**, because the consumer is a `JSValue`. The shared half is a **run-time-guarded specialization of an arithmetic tree**, boxing only the root, and the per-shape rows already say what it is worth (96 B and three boxes for `s = s + a[0] * 1.5`, of which two are intermediates). It also partly reverses 3-8's "do not start as written": 3-8 priced that guard at the **local** and was right that it is worth 0.36%; at the **operator** the same speculation reaches 86.6%. **And the shared half is now built and measured**: a guarded arithmetic tree — leaves evaluated once into temporaries, tested for Number, computed on raw doubles, boxed only at the root — removes **10 401 782 boxes of 85 249 783, 12.2% of everything the corpus allocates, from 862 compiled sites**, where 3-0, 3-3, 3-5, 3-7 and 3-1's bitwise half moved **0.36% between them**. Crypto 0.786× boxes and 0.583× generic invocations; Box2D 0.933×; Richards 0.787×. **Eligibility is bounded by evaluation order, not by the census**: a coercion runs between two leaf evaluations in a nested tree and is observable, so a leaf evaluated after the first internal node must be a literal or a proven-numeric local — which is why `s + a[0] * 1.5` qualifies and `(a[0] * 2) + p.v` is refused. **The gap to the 86.6% ceiling is itself the next finding**: NavierStokes loses 10.1% of its generic invocations and **1.8%** of its boxes, EarleyBoyer **99.7%** and **none**, so most of those two suites' boxes are minted somewhere that is not a binary arithmetic operator. **And the wall clock is measured too**, ABBA-interleaved, six pairs, with the corpus's own control: DeltaBlue and EarleyBoyer remove zero boxes between the arms and sit at **1.005× and 1.006×**, while the driver total is **0.981× on six of six pairs** and Crypto **0.912× on six of six**. No suite is slower. *12.2% of the corpus's allocation buys 1.9% of its execution time* — which bounds the rest of phase 3 the way 4-2b's 0.83% bounded phase 4. **And the gap to the ceiling has now been chased to its source, which is not where this item has been looking.** Giving the compiler's boxing conversion its own factory entry refutes the obvious reading — only **5.0%** of NavierStokes' requests are a raw double crossing into a `JSValue`, so a typed backing store cannot be why its boxes survive, while the conversion-heavy suite is **Crypto at 31.0%**, the one the guarded tree already served best. That first pass left **40.5% of the corpus's requests attributed to nothing**, and two counters took it to **1.0%**: `BitwiseXor` was the one generic binary operator the census never hooked, and the rest is **the unary operators, which no census had looked at**. **`++` and `--` are 30.9% of all boxing on the corpus, 51.6% on NavierStokes and 80.4% on EarleyBoyer** — more than the compiler conversion and the numeric literal together — and **exactly half of it is a `ToNumeric` copying a `JSNumber` into an equal `JSNumber`**, because it mints unconditionally to hand back the old value and a Number has no observable identity. **17 281 232 requests, 15.4% of the corpus's boxing, for a value the engine is already holding**. **That is now built, and it is nine lines.** Reuse is sound because a Number has no observable identity — the argument the small-integer cache has rested on since P2-2 — and the guard is `IsNumber`, not `!IsBigInt`, because a String or `null` still has to be coerced. Measured: **17 285 913 requests removed against a prediction of 17 281 232, the thing built matching the thing measured to 0.03%**, and **7 050 834 real allocations, 9.4%** — the gap between the two being the small-integer cache, which had already been answering Crypto's loop counters for free while NavierStokes' indices run past its bound. **NavierStokes loses 23.0% of its boxes and 0.906× of its time on six of six ABBA pairs**; with `0084` the corpus goes **85 255 034 → 67 798 222 boxes, 0.795×**. **And the run's sharpest reading is what did not move**: EarleyBoyer cut **50.0%** of its boxes — the largest proportional cut — for **1.002×**, because that is 82 000 boxes a second against NavierStokes' 4 240 000. *A share of a suite's own allocation forecasts nothing; the absolute rate forecasts everything*, which retires a habit this document has had since phase 3 opened. **And then the largest single result phase 3 has produced, from removing one eligibility rule rather than building a mechanism.** `0084` reached 12.2% against a census ceiling of 86.6% and never said which of its six conditions was refusing the rest; counted, **862 of 5 396 candidate arithmetic nodes specialize — 16.0%** — and the two rules that turn down the rest are one finding, not two: `+` is left-associative, so `a[0]+a[1]+a[2]+a[3]` refuses at the root as **order-unsafe** (1 762), refuses again at each left child, and its bottom node is then a single operator with **no saving to make** (2 718). *A chain of k operators produces k−1 order-unsafe rows and one no-saving row and specializes nothing.* **The sub-census then said the rule is not refusing what this phase assumed**: the blocking leaf is a property read **1 028** times and a computed element read **34** — 1.9% — so after six items written around array-resident data, the leaf that blocks the order rule is an object field, and Box2D alone contributes 984. **The fix is that nothing required the leaves to move.** Emitting each leaf at its own postorder position and putting the type test *where the coercion it stands in for would have run* preserves the reference order exactly, and the purity rule then has nothing left to protect — the same soundness argument `0084` makes, read from the other end. Each node carries a `bool`, a raw `double` and a `JSValue`, so a failure part-way up boxes the accumulated double once and lets the rest run generically, which the hoisting form cannot do. **Measured, one build, the switch the only difference: 53 353 957 → 6 626 052 generic invocations (0.124×) and 67 795 858 → 31 162 330 boxes — 36 633 528 removed, 54.0% of everything the corpus allocates**, against 12.2% for `0084`, 9.4% for `0086` and 0.36% for the five locals items combined; from the pre-`0084` baseline the corpus is **85 255 034 → 31 162 330, 0.366×**. OrderUnsafe goes **1 762 → 0** and NoSavingToMake **2 718 → 1 181** without that rule being touched, which is the chain-residue prediction coming out. The leaf cap had to be re-measured too — it was 8 and had *never fired*, because the order rule refused those trees first; at 16 it turns down 8 instead of 85 and the corpus loses a further **664 338 boxes, 2.1%**. **Wall clock, six ABBA pairs, counters off: driver 0.969× on six of six, NavierStokes 0.834× and Crypto 0.893× both on six of six**, against the two zero-box controls at **1.002× and 0.999×**. **And `0086`'s lesson predicts the row that looks wrong**: Box2D removes 51% of its own boxes and reads 1.003×, because that is 861 000 a second against NavierStokes' 6 500 000 — the two suites that move are exactly the two above ~6 M/s. *54.0% of the allocation buys 3.1% of the time*, which with `0084`'s 12.2% → 1.9% is the third reading of the same constant and the number to size the rest of the phase from **And the phase finally has a denominator.** Eight items priced in boxes, three of them measuring an allocation cut against wall clock and getting a sixth of the share back with no explanation — four lines of `GC.GetTotalPauseDuration()` say why. **Collection is 1.8–2.0% of the driver**, and of the 768 ms this item removed **54 ms was collection and 714 ms was the mutator** (pointer bump, zeroing, write barriers, cache traffic). *A box costs about fourteen times more to create than to collect here*, which turns §Non-goals' "the collector is not the problem" from an assertion into a measurement. Allocated bytes fall **4.00 → 2.92 GB**, corroborating the box counters from outside them. At **711 ms per GB** the **0.70 GB of number boxes still standing is worth ~495 ms, 2.6% of the driver** — so everything left in phase 3 is an XL bidding for under 2%, and the `++`/`--` step (33.2% of what remains, concentrated on the corpus's highest-rate boxer) should be counted before the typed store is built. **A sampling profiler was tried and does not help**: `dotnet-trace` inflates the driver ~29% and puts 28% of self time in `PollGCWorker`, its own rendezvous point, while compiled JavaScript lives in `DynamicMethod`s that do not symbolicate — 47.8% of the run lands on `InvokeFunction` and 2.4% on a named body. *The biggest frame in the profile is the profiler*, and 4-5's "blocked on a profiler" needs a different tool, not an afternoon **And the `++`/`--` count that re-specification asked for is taken, with a clean answer.** Of 17 282 144 steps: **Element 0, Property 0.3%, LocalCell 0.0%, LocalSlot 98.1%, Other 0** — *not one of the corpus's increments is on an array element*, so the step shares no mechanism with a typed store, and 98.1% are on a local or parameter the numeric analysis did not prove numeric. Weighted by each suite's request-to-allocation ratio that is **≈7.05 M real boxes, 22.6% of the 31.16 M the corpus still allocates**, and **6.76 M of it is NavierStokes' alone** — the corpus's highest-rate boxer, which is where §3.5's rate lesson says an allocation item pays. Reading the source names the cascade exactly: `++currentRow` in `lin_solve`, where `currentRow = j * rowSize` and `rowSize` is a `FluidField`-scope var written from a sibling closure, so the analysis cannot type it and 3-6's waterfall shows NavierStokes at **24 numeric locals of 141 hoisted names**. ***One closure variable the analysis will not type costs 6.76 M boxes.*** **This re-opens 3-8 on the terms `0083` already used once**: 3-8 priced a run-time guard at the *local* and measured the static tier at 0.36%, which was a measurement of what the mechanism catches; this measures what it **lets through**, and the two differ sixty-fold **Then scoped, by asking which RULE defeats the shape the traffic is in rather than which names were dropped.** Eight shapes, one per conjunct, with the update-target census as the oracle (a numeric local contributes no row, a slot contributes `LocalSlot`, a captured one `LocalCell`). Three suspects are innocent: a nested function **declaration** does not defeat the enclosing local, 3-7's hoisting rule produces a `LocalCell` — and NavierStokes has **9 461 760 `LocalSlot` steps against six `LocalCell`** — and passing the value in as an argument only trades `OtherName` for `Parameter`. **What is left is one conjunct: the analysis is per-function and will not type a name from outside it**, and the sharp fixture is that this holds *even when the enclosing name is already proven numeric* — a conclusion is not carried across a closure boundary. That splits the work: **3-9** (new, S–M, static) imports the enclosing scope's proven-numeric set, which is pure analysis reach with no soundness argument — but **does not reach NavierStokes**, whose root is held by 3-7's correctness rule, so its population must be counted before it is built; and **3-8a**, the run-time half, which is the only thing that reaches the cascade: where a local's *only* defeat is `OtherName`, one `IsNumber` test where the value enters decides the name for the whole function — 4-3b's in-method branch pointed at a representation, no longer general, and so no longer an XL. **Sized: 6.76 M of the 7.05 M real update boxes (96%), ≈0.16 GB, ≈115 ms — 0.6% of the driver.** *The best-founded item left in the phase, and still half a percent; phase 3 is not short of ideas, it is bounded by the exchange rate `0090` measured* **3-8a was then taken to the build and stopped, on its own instrument.** Two findings. **The mechanism is an XL after all**: narrowing *which names* it speculates on does not narrow *what has to change to hold one* — a speculative raw double is a double only while a flag holds, and every fast path (3-0's index, 3-5's comparison, the raw store, the native step, `ToNativeExpression`) keys off the single `NumericStorage` field, so each must become guard-aware or read a dead value, and a missed site is a **wrong answer**. *Size an item by the surface that changes, not by the population that uses it.* **And the population could not be measured**: the optimistic-minus-real instrument read **0 on all seven suites and on the shape it was built for**, so by §3.5 it is unusable — a counter never shown to read non-zero is a claim about the counter. One real defect fell out of it, and it is `0083`'s a second time: **the enable for a compile-time counter was placed among the run-time censuses, which switch on after the corpus has compiled.** Fixing that changed nothing, so the instrument was **reverted rather than shipped**. **What is kept is the A/B the item rests on**, reduced to one identifier: `var c = 2 * rowSize; c++` is a `LocalSlot` that boxes every step, `var c = 2 * 10; c++` is numeric and costs nothing — same nesting, same body, one name different, so the enclosing-scope read *is* the defeat **The count 3-8a was missing has now been taken, on the second attempt, and the discipline is the finding as much as the number**: the instrument was made to *discriminate on constructed shapes* before being pointed at the corpus — seven fixtures, of which the two that matter are negatives (a `Parameter`-defeated local and a never-offered `var a = []` must both stay out, or the count is a tally of every drop). **26 names across the corpus, 232 → 258 numeric locals, 1.11×** — and the distribution is the result: six suites gain one to three each while **NavierStokes gains fifteen and goes 24 → 39, 1.62×**, the largest single-suite widening this phase has produced, landing on exactly the suite that carries **9.46 M of the 16.95 M `LocalSlot` steps and 6.76 M of the 7.05 M real update boxes**. *The population and the traffic are concentrated in the same place, which is the condition every earlier phase-3 widening failed* — 3-7 moved 8 names at 1.036× and was worth 1.0001× because its eight were scattered where nothing hot lived. The prize is still `0090`'s ≈115 ms, **0.6% of the driver**: what changed is confidence, not size. **The count does not license the build** — the mechanism is still the XL above, since every fast path keys off `NumericStorage` and a speculative local is a double only while a flag holds; what it settles is that the work would have something to reach **The XL's storage half is then built, off by default, and it is a measured regression.** A speculative local is held as a raw `double`, a `bool` saying the double is live, and the ordinary `JSValue` slot, with `Expression` a conditional over the two — so **every existing read site is correct untouched** and a write through it is rejected loudly, the numeric tier's own safety argument reused. It deliberately does **not** get `NumericStorage`, the field five fast paths read as "this binding IS a double". Writes derive the flag from the slot branch-free; the `++`/`--` step branches on it and, while it holds, is a native double add that writes nothing back. **All three consumers that can take a raw double are now built too** — the guarded tree's leaf (`OrderedNode` already *is* a raw double, a flag and a fallback), the element read and the element write, over 3-0's `GetElementByNumber`/`SetElementByNumber`. **Each moved the number and none moved it enough: 1.021× storage alone, 1.017× with the tree leaf and the element read, 1.012× with the element write.** Only then was a counter added at the *read* — `JSNumber.CreateSpeculativeRead`, a fourth factory entry — and it closed the item in one line: **NavierStokes mints 393 705 boxes reading a speculative local and the whole item removes ≈5 300.** The 835 584 steps it genuinely takes off `Increment` mostly save no allocation at all, because they are `x[++i]` and the result is boxed to be an index either way. ***Closed as measured, not deferred***: the mechanism is correct and left in the tree behind a switch that defaults off, because what makes it lose is the read/write ratio of the code it targets — `currentRow` is read four ways and incremented once — which is a property of the workload, not of how many consumers the compiler grows. **Every premise the item was scoped on survived and the item still lost.** Building it also found a real defect the fixtures initially failed to catch — a tree leaf that offered a slot the raw half had left three increments stale, answering `"0!"` for `"3!"` — and the repair to the *test* discipline is §3.5's new rule: after writing a fixture for a new fast path, break the emitter deliberately and confirm it fails. **And the arm corrects the count's own reading**: the 15 names carry **835 584 of NavierStokes' 9.46 M steps, 8.8%**, not the whole of it — *the suite holding the names being the suite holding the traffic is not the claim that the names hold the traffic*. 1 191 + 4 571 + 2 103 tests green **on both settings**, with the four shape fixtures now Theories over the switch **3-9, the static half of the same split, is then closed by its own precondition count — and it cost one instrument and no mechanism.** Its population is **0 on all seven suites**, against 3-8a's 26 reported from the same call site in the same run, so the zero is the corpus rather than the harness. A second counter says *why*, because a single zero cannot separate "nested functions never read an enclosing numeric local" from "they read them constantly and never anywhere typable": the enclosing scope chain answers *"that name is already a raw double"* **0 times on the whole corpus**. The reads do not exist. That reconciles with item 3-7 exactly — 3-9 can only import from a name that is both proven numeric AND still a raw double despite being captured, which is 3-7's population of **eight names**, and not one of the eight is read from an assignment inside the function that captures it. **The instrument was made to discriminate first** — nine constructed fixtures, three reading non-zero, each re-checked by disabling the probe and confirming it fails, which is `0096`'s own new §3.5 rule applied to the thing that decides this item. It also settles a design question by flipping two fixtures: the probe must ask what the compiler **built** (`NumericStorage`) and not what the analysis **proved**, or a name 3-7 leaves in a cell for correctness reads as a win. *A good mechanism with nothing to point it at* — no guard, no fallback, 3-8a's failure mode structurally absent — declined because building it would buy an analysis pass and a scope-chain probe per compiled function for zero names |
-| **4** — tiering | Started. **4-3a is landed and it found a real hazard**: restart is only sound if the body is not suspendable, and nothing said so — the property held by two unrelated accidents (the `EnableTiering` call sitting inside the ordinary-function `else` branch, and the tiering gate borrowing `CanScalarReplaceLocals`, which refuses generators for its own reasons). Defeating both, a legal `async function` whose body matches the planner's shape returns **`number` instead of a Promise** from its second call on — measured, not argued. One condition at the decision point fixes it, and 16 tests pin all three conditions. **4-3b is landed too**: `SpeculationBuilder.Guarded` compiles the specialized and generic forms into one method so a failed guard is a *branch*, with the subject evaluated exactly once (the hand-rolled spelling fails 12 of its 15 tests) and per-site poisoning after four misses. **It emits no JavaScript-level speculation, and that is structural rather than scope-trimming** — a guard needs a shape or a callee to speculate on and a tier-1 method knows neither, so the branch only has meaning inside a tier-2 recompile, which is 4-2. The mechanism lands before its consumer because it has to. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 has landed and it settles the phase's premise.** Per-site feedback now *retains* what the inline caches only observe — receiver shapes at reads, callee identities at calls — and over seven Octane suites, weighted by executed operations, **93.54% of 37.9 M property reads and 96.70% of 4.24 M calls happen at a site that only ever saw one shape or one callee**. 4-2 and 4-4 are an XL each and both are worth their cost only in proportion to that number; nothing in the engine could report it until now, and it comes out high. **Megamorphism is essentially absent** — 18 sites in total, five of seven suites have none — corroborating 2-10's independent finding of zero megamorphic read sites; the fallback path 4-3b must still be correct, it just will not be hot. **DeltaBlue is the worst read case at 77.10%**, with 43 polymorphic read sites against Richards's 1, which is a lead on the suite still outside phase 2's gate. Collection is off by default, costs nothing on the call path *by construction*, and the item's third signal — numeric-vs-generic per site — is deliberately left uncollected rather than half-built. **4-2 has now landed too, and it splits the same way 4-3 did.** Measuring the branch it was told to replace found that it does **not** "recompile the same code the same way": a fresh top-level compilation builds a *second* function object and loses inherited strictness, so **DeltaBlue died on the shipping tier-2 hook** — `TypeError: Cannot get property call of undefined`, 0 of 1 benchmarks against 1 of 1 untiered, because its constructors read `X.superConstructor` off their own name and got the copy. Four of thirteen probes disagreed between tiered and untiered. **4-2a** states the recompile contract, refuses the identity cases and repairs strictness, at a cost of ~5% of promotions. **4-2b** then makes tier-2 re-emit tier-1's *own* site indices — which carries the warm caches across promotion and makes 4-1's feedback addressable — and emits a monomorphic read as a shape guard plus a direct slot load through 4-3b's in-method branch, whose **first JavaScript-level consumer** this is. **44.74% of the corpus's 37.9 M executed reads leave the inline-cache path** (counted exactly: cache misses are identical, so they were removed, not converted), carried by **1 130 sites**, with 156 guard misses and 30 poisoned — the monomorphism holds past the promotion point. **Each such read is 0.818× (46.83 → 37.12 ns, six pairs, 0.778–0.879), and the suite wall clock does not move: 0.9947 against a feedback-on control.** That is arithmetic, not failure — 16.9 M × 9.7 ns is 164 ms of a 19.7 s run, **0.83%**, under a ±2% floor. It also bounds the phase: the whole read path is ≤ ~9% of Octane's execution time here and the whole call path ≤ ~5.5%, so **the two paths phase 4 is built around are together at most ~15%**, which 4-4 should know before it starts. The item's arithmetic half is still not built, for 4-1's reason. **4-4's premise has now been measured too, and it re-specifies the item before any of it was built.** Counting at the call rather than through 4-1's compile-time gate, the corpus makes **6 194 758** invocations, and **37% of them are to native builtins** — an emitted call site with no body to inline, which any ceiling counting them inflates by more than a third. That correction came out of writing the counter's tests, which also found that a builtin runs a JavaScript callback on a *different and much shorter* entry (`InvokeCallback`, one `using` scope against five); callback invocations turn out to be **zero** on all seven suites, so an earlier guess that they explained the gap to 4-1's figure was wrong and is recorded rather than quietly deleted. Of the 3 902 620 calls with a JavaScript callee, **64.0% are made from a promoted function** — inlining's whole surface, and an upper bound. Against a hand-inlined control in one run set, **inlining saves 149 ns a call (0.37×)** — so the ceiling is **372 ms of a 19 694 ms driver, 1.89%**. Inlining is **expressible** here, unlike 4-3's deopt: labels and goto exist, a real function scope handles the callee's names, and 4-1 retains the callee — so the blocker is value, plus one semantics decision nothing can undo (an inlined callee has no frame, so it leaves `Error().stack`, and this engine has nothing to reconstruct one from). **New item 4-5 beats it**: a call costs **142 ns before it carries any argument**, plus 17.1 ns each, so ~90% of the overhead is fixed — and reducing that reaches all 6.19 M calls with no speculation, no guard and no fallback. The same probe also bounds the phase: reads are **9.16%** of execution time and the fixed call prologue **4.47%** (paid by every invocation, native callee included), so **the two paths phases 2 and 4 are built around are together under 14%** — while the arithmetic-only control loop is 16.98 ns an iteration, which points at **3-4**, not at phase 4. **4-5's ablation has since run, and it falsifies most of its own premise**: five nested `using` scopes cost **0.011 ns**, EH 0.73 ns and dispatch 0.68 ns, so the prologue is not where a call's cost is. The one real cost is an **`AsyncLocal<bool>` read at 7.0 ns against a `[ThreadStatic]` at 0.31 ns** — read on every call, and documented in `JSEngine` as *"reads are cheap"*, **wrong by 24×**. Mirrored into a ThreadStatic with the AsyncLocal kept as the carrier (0.22% of the corpus; 9 tests, which also pass on the unmodified engine). **~85% of a call's fixed cost is still unattributable from outside the engine**, so the rest of 4-5 is blocked on a profiler rather than a design. **And the control every probe here has used turned out not to be a floor**: the same counted loop with a *literal* bound instead of a parameter one runs at **8.36 ns and 0 B an iteration** against **33.77 ns and 32 B** — same answer, **4.0× and a box per iteration**, because a parameter cannot reach the numeric tier (3-3's one acknowledged gap) so `i < n` boxes. `for (var i = 0; i < n; i++)` is the corpus's commonest shape; that is **new item 3-5**, and on this evidence it is worth more than anything left in phase 4 |
+| **0** — evidence | 0-1…0-5 ✅, 0-9…0-11 ✅. **0-6's workflow run has happened and its results are committed** — refreshed **2026-08-05**, superseding the 2026-08-03 run this row used to quote, with **15 of 15 suites `ok` and 17 of 17 scores** for Broiler, Jint and a same-machine Chromium alike, nothing errored or timed out. Geomean **498** against Chromium's 74 297 (**149×**) and Jint's 820 (**0.606×**), spread **155.4×**. Both runs are single-repetition, **so the move from 351 to 498 is not a delta anyone may claim** — the machine differs as much as the engine does, which is the entire reason the band is the thing still owed. What is legitimate to read across the two is which side of a threshold each benchmark falls, and that is unchanged: Richards passes at **141.3×** (was 144.9×), DeltaBlue fails at **399.5×** (was 460×). **What 0-6 still owes is the noise band** — plus 0-7's BenchmarkDotNet and 0-8's RID matrix, which a container cannot produce. **The band is now unblocked rather than merely owed**: the workflow defaults to `--repetitions 3` and is sized for it (`timeout-minutes` 105 → 180), so the next committed result carries one instead of disclaiming its absence; and a 3-repetition Broiler-only run over twelve suites has put a first band on record locally — **five of thirteen scores exceed the 7.5% band the harness declares** (Splay 15.9%, Crypto 12.5%, **Richards 10.6%**, SplayLatency 10.4%, **DeltaBlue 9.1%**), median 5.5%, best 0.4%, so the band is per suite and ranges forty-fold. The two bolded are the pair phase 2's exit criterion rests on: the 200× verdict is untouched at 141× and 400×, but a Richards change under ~10% is not measurable at three repetitions (below) |
+| **1** — compile-time | 1-2's mitigation ✅ (`43bc4230`); **1-2's real fix is now on all three recursing passes** — the validator and emitter (`StackGuard` had three defects and could not fire), and now `FastParser`, whose descent aborted the process at 25 000 nesting levels **in the default configuration** and now survives 90 000 at no measurable cost. 1-2's stated acceptance criterion **already passed before any work** — it measured size where the cause was nesting. **New: 1-4 ✅.** Measuring 1-1's premise found the phase's actual dominant cost, and it was not lazy compilation: the closure rewrite held a lambda's in-scope bindings in a `List` and asked it `Contains` per parameter reference, so **emission was quadratic in a scope's binding count** — 2 000 top-level declarations emitted in 13 865 ms against 2.5 ms of parse. A reference-keyed multiset (list-backed below 32 bindings) makes it linear: **28.5× on that shape, and 3.04× on Mandreel end-to-end**, ABBA-interleaved, six pairs. **1-1 is still open and its premise now has a number** — 92–96% of compile time is function bodies on the large real programs — but the measurement also **splits phase 1 in two and re-targets 1-1**: Mandreel was *wide*, not deep, and never was a 1-1 case, while jQuery at 96.5% deferrable is the whole of it. **1-1's emission half then landed without needing the capture mechanism at all**: every risk the item names is settled by the front end, so deferring *IL generation* to first invocation is the same prize with none of them — **jQuery 0.661×, Box2D 0.636×, PdfJS 0.689× on compile, allocation ~0.52× across the board, and 1.0009× steady state**. **Octane CodeLoad, the benchmark the item names, was run and passes: 94.6 → 104.0, 1.099×, 24 samples an arm, 93% pairwise dominance** — and it took 24 because the first three-sample pair and its reverse disagreed. That ratio also re-frames the item: compilation is only ~27% of what CodeLoad measures, not the whole of it. Two mistakes were caught by measuring: a stack handoff per deferred function took the suite from 3.5 to 20 minutes, and a thunk that *called* its resolve cost 1.0247% on call-heavy code until the warm path was written in IL. Typescript is 1.034× slower and unexplained. **The Mandreel suite was then run too, and it overturns the phase's headline target**: a 3.04× faster compile of `mandreel.js` moves Mandreel 0.993× and MandreelLatency 0.992× — Octane compiles that file at script load and times only the run function, so MandreelLatency measures execution pauses and belongs to phase 3. The saving is real and outside every score: suite wall clock **358.2 → 350.0 s**, non-overlapping. **What remains of 1-1 has now been measured before being built, and both halves of its premise hold.** The three-way split was only ever taken on synthetic declaration walls; taken on the real corpora it reads **parse 9.4–13.5%, expression-tree construction 33.6–63.9%, emission 25–57%** — tree construction is the single largest phase on five of six, parse and tree together are **43–75%** of compile, and the parse, the part an early-error rule forbids deferring, is a tenth of it. The population was never counted at all, and it is **84–99.7% of a script's functions never invoked once it has been evaluated** (jQuery 347 of 415, Mandreel 2 689 of 2 697). So the remaining half is over half the compile across a population that is almost entirely never needed. **It also corrects this item's own ceiling table**: `--compile-profile` stubs *outermost* bodies and jQuery has exactly one — the IIFE the library is written inside, 99.91% of its bytes — so the "96.5% of its compile in bodies that are never called" is everything except the parse, and that body is called first. **And measuring the phases found a repeat inside the half that already landed**: `LambdaRewriter.Rewrite` descends through nested lambdas, and `Relay` called it *again* per relayed site, so a lambda at depth *d* was walked *d+1* times and jQuery's whole tree was walked twice by a compile that emits almost nothing. Counted, the second walk finds nothing on any site — **0 of 415, 0 of 978, 0 of 1 574** — and a second counter says the repeat, left to run, creates **0 captures** the first walk had not. It is now skipped for any lambda a descending walk has already entered, with `RewriteRootOnly`'s pass deliberately marking nothing so async and generator bodies are unaffected. **All five pinned test262 manifests were run against it and every count is identical to §3.4's row, manifest by manifest** — 8 710 / 8 617 / 84 / 251 / 9, same files not just same totals. Whole compile **0.782× on jQuery and 0.867× on Typescript, six of six pairs each**; **Box2D does not separate** and its control arm's own spread is 55.6%, so the phase was measured directly instead — **its emission phase 0.549× and its whole compile 0.775×**, in the round where `--compile-phases`' parse control held. **1-1's remaining half now has a price rather than a lower bound** (`0101`): the free-name walk the item names as its own precondition is built and measured at **6.6–12.2%** of body-tree construction as one bottom-up pass — but at **up to 47.7%** written the obvious way, per-function and superlinear in nesting depth, which is what the recorded 5.4–9.9% *lower bound* was silent about. Mandreel, wide and not deep, is the control that goes the other way (7.8% → 8.8%). **And the population that could skip the mechanism entirely is now counted, which closes off the cheap way in** (`0102`): a site whose free names resolve to no enclosing binding needs no `Box[]` and is deferrable with what already exists, and that is **728 of 5 762 sites, 12.6%** — 39.7% on the flattest corpus and **7.4% on Mandreel**, worst exactly where the prize is largest. `Dynamic`, the direct-`eval` risk the item's text leads with, refuses **7 sites of 5 762, 0.1%**, the second time this item's stated risks have come back in an order the measurement reverses. **The reading that looked like an opening is refused by the counter built to test it**: Mandreel's 7 605 bound free names are only **165 function-owned**, because it is 1 364 top-level declarations and a top-level `var` is a global-object property per spec — but **`cellBacked` equals `bound` exactly on all six corpora, 15 118 of 15 118**, since this engine gives a program-level binding a CLR local in the program lambda like any other. *A spec-level fact about where a binding lives is not a fact about where the compiler puts it.* Writing the probe also found a hazard worth more than the count: the natural API for the question, `GetVariable`, **sets `RootScope.HasOuterFunctionCaptures` as a side effect**, a conjunct of item 4-2a's tiering gate — a probe built on it would have turned tiering *off* for every function it merely asked about. **The mechanism was then attempted and re-specified**: the item's stated raw material — *"`JSFunction` already carries `source` and already recompiles from it for tiering"* — **does not serve it**, because `RecompileForTiering` compiles `({source})` as a *fresh top-level script* with no enclosing scope, and the tiering gate admits a function only when there is no enclosing context to reproduce (`!HasOuterFunctionCaptures`, `!HasNestedFunctions`, no `with`, not an arrow, not a class). *That is the complement of the population a deferral serves.* The real obstacle, itemised: **14 `CreateFunction` parameters, 9 enclosing-scope reads and 5 pieces of `FastCompiler` instance state** must be reproduced at first call, each a silent miscompile if wrong. The recommendation is to **keep the enclosing scope alive rather than snapshot it**. **Not built**, because its gate is test262 over five manifests plus the item's four spec risks, and a half-verified version is a wrong answer in compiled code rather than a wrong number in an instrument. **The deferral mechanism is still not built and the item is still size L** — it is simply no longer blocked on an unpriced precondition, and no longer has a twelfth of itself available cheaply. **The layout itself was then attempted** (`0104`), and the checker built to validate it found **two obstacles the item's statement does not name**: `ClosureRepository` holds *two* populations — bindings **handed in** from an enclosing scope and the lambda's **own locals something nested captures** — so the deferral needs two derivations rather than one, and `outer` reads as "missing its own local" until they are told apart; and **every function is handed a `ScriptInfo_*` binding no source identifier names**, so the layout needs a reserved region for compiler-introduced captures. **The go/no-go is now answered: zero missed sites on 5 157 checked**, once three corrections were made — repeats recognised (Mandreel relays 1 336 of its 1 358 sites twice, with **0 disagreements**, so the repeat is pure duplication), undeferrable bodies excluded (7 sites, a defect in the checker: an empty prediction against a real capture set reports every capture as a miss), and **one real soundness defect in `0101`'s own code** — `FreeNameScan` bound a function DECLARATION's own name inside the function as well as in the enclosing scope, so **138 self-referential declarations across five corpora reported as capturing nothing**, and a deferred body built on that would have resolved its own name to a box that was not there. The derivation **over-approximates on 2 712 of 5 157 sites** — safe, and the cost side the mechanism must be measured against. **And the one shape the corpus does not contain is closed too**: a named function *expression*'s self-name, which the spec binds inside and this engine hands in as a cell anyway. The first attempt tested `Variable != null` — the field that binding leaves null on purpose, exposing itself through `EvalCaptureExpression` alone — which is `0097`'s rule a third time and the first time it has decided a **mechanism** rather than a measurement. Adding it unconditionally cost **126 sites** of precision, so `FreeNameScan` now gives the self-name **a scope of its own** and reports a reference to it exactly; **the gap closes at no precision cost, 2 445 exact either way**. *Two soundness defects fixed in total, both about a function's own name, both of which would have miscompiled a deferred body built on the layout as it stood*. **And `0104` settled MEMBERSHIP, not the layout — a distinction this document then lost for several sections, including in the patches that followed it** (`0112`). The item's obstacle is *an index*, that index is `Inputs.Count` at first encounter in the rewrite's descending walk, and the prediction was a `HashSet` derived from a `HashSet`: it has **no order**, so it could not answer the question even in principle. Asked properly — first-mention order recorded and compared against `repository.Inputs` — **14 605 sites, 4 461 exact, ZERO mismatched**, so *where the predicted set equals the handed-in set the order matches without exception*; the other **10 144 differ in SET**, which is the same over-approximation, and it carries a consequence the earlier framing did not: **an extra predicted binding shifts every later slot**, so the two numberings are different numberings rather than one with spare entries — safe only if the deferral **drives** the layout from the prediction instead of matching it. **The mechanism was then built for the half that had no evidence** (`0105`): a nested body **compiled a second time, after the enclosing compilation has finished, from the enclosing scope kept alive rather than snapshotted**. That is cheap because `FastFunctionScope` **is not pooled** — its `Dispose` only pops the stack, so a reference retains the whole `Parent` chain intact after the frame that built it returned — and `LinkedStack.Switch` already re-enters it; only the **five** `FastCompiler` fields not reachable from the scope are saved and restored, on the throwing path too. `CreateFunction` splits into a wrapper that decides retention and a `Core` both paths call, and the wrapper **refuses all fourteen context-carrying parameters** rather than trying to save them. **4 811 of 5 723 retained functions reproduce character-for-character, 84.1%** — Mandreel 100.0%, PdfJS 99.9%, Box2D 99.5%, jQuery 97.0%, Closure 96.6%, Typescript 49.6% — after canonicalising four families of compiler-generated numbering that are **counters over a compilation** and so differ by construction on a second pass (one of them item 4-2b's process-wide site counter, which *a genuine deferral cannot hit* because it compiles the body once). Each canonicalisation moved the total (45.5% → 48.9% → 83.2% → 84.1%) and **never once exposed a structural difference**, which is evidence about the residual **15.9% and not proof** — a printed-text diff answers only *“equal up to a renaming somebody thought of in advance”*, and settling it needs a structural walk that is not built. **Nothing is deferred yet, deliberately**: the eager path still compiles every body and the switch decides only whether a context is kept, because **the comparison is only possible while both trees exist** — once the eager one stops being produced there is nothing to check the deferred one against. **And the residual is now settled rather than described** (`0106`): erasing the counter-derived numbers instead of mapping them, **5 723 of 5 723 re-entered bodies agree with their eager tree in every token a counter did not produce, on every corpus, with none throwing** — no difference in a node, an operator, a constant or a shape. The 471 whose ordinals still differ classify **exactly two ways with nothing in “other”**: **460** are the site table's `-1`, because the check's second compilation drives item 4-2b's process-wide counter from 24 759 to **exactly its 65 536 cap** on Typescript, and **11** are the *eager* side re-using a site the re-entry allocated fresh — 4-2b's tier-2 rule working as designed. ***Both are properties of compiling the same body twice in one process, which a deferral by construction does not do.*** **The first finding was in the checker, not the mechanism**: the gensym families shared one ordinal table keyed on the bare number, so `Context3` and `#TempJSValue3` collided and desynchronised every ordinal after them — one table per family takes five of six corpora to 100.0% and the total from 84.1% to **91.8%**. Both equalities are pinned by a fixture that shows each reporting a difference, including **a site re-used on one side only**, which the strong one catches and the weak one cannot. **Still L**; what remains is suppressing the eager build and threading the deferred site through `Relay`, which `BLambdaExpression`'s **readonly `Body`** makes a change to the expression node rather than to the compiler |
+| **2** — property access | **Every item landed or closed.** 2-0 ✅ 2-1 ✅ 2-2 ✅ 2-4 ✅ 2-7 ✅ 2-8 ✅ **2-9 ✅**; **2-3 and 2-5 closed on measurements**; 2-6 folded into 4-1. The phase's conformance gate is **satisfied**, and **its Octane exit criterion is now answered and splits: Richards is inside 200× at 183× (band 163–191) and DeltaBlue is not, at 576× (band 538–711)** — five repetitions per engine, same machine. **DeltaBlue is what phase 2 has left** (item **2-10**), and it is the suite 2-8 was written for. Its first pass found and fixed a real defect — `push` cost every array its shape permanently, **2 503 dictionary fallbacks → 0** — but that did **not** move DeltaBlue's read hit rate, which stays at **65.96% against Richards's 86.61%** and is the live lead. Decomposing those misses ruled out megamorphism (**0** megamorphic read sites) and, in passing, **found a live `class`-shaped instance of 2-0's defect**: `class C{}; new C()` published a global prototype invalidation **once per allocation** (2 002 for 2 000). **Fixed as 2-11** — the setter no longer invalidates when the chain did not actually change — and the effect on the real suites is far larger than the class case suggested, because the retirement was process-wide: **Richards's read hit rate 86.61% → 99.97%**, DeltaBlue's 65.96% → 69.45%, Box2D's 96.39% → 97.72%, with invalidations 37 → 10, 2 519 → 16 and 1 944 → 107. Then **2-12** found why the misses that remained could never heal: the cache's add path deduplicated on two keys while a hit checked six, so a stale entry was declined rather than refreshed and its site missed for the rest of the process — **77.7% of DeltaBlue's misses**. Refreshing in place takes **DeltaBlue's read hit rate to 93.16%** (65.96% before both fixes) and Box2D's to 98.83%. **DeltaBlue still fails the gate at 447× (399.5× on the committed run)**, but the cache is no longer the reason, and what remains is not property-cache-shaped. **2-13 then found where it is, using the column every committed run already carried and nobody had divided.** Asking Jint — a managed interpreter with no JIT, on the same runtime, in the same run — the same question separates *"DeltaBlue is hard for this engine"* from *"DeltaBlue is a suite V8 does unusually well on"*: DeltaBlue is **2.83× harder than Richards for Broiler and 2.56× harder for Jint**, so **only 1.10× of the gap is Broiler's own** — reproduced independently at 1.118× on the previous committed run. Closing the entire Broiler-specific residue takes DeltaBlue to **362×**, against a **200×** gate, so **the criterion is not reachable by removing a Broiler-specific deficiency at all**. Broiler is in fact *ahead* of Jint on DeltaBlue (0.77×) by nearly the margin it is ahead on Richards (0.69×), while the three suites where it is genuinely differentially behind are **MandreelLatency 54.3×, CodeLoad 37.8× and zlib 12.0×** — the front end and latency, which is where §1.1 always said the structural gap was. The obvious remaining explanation is falsified by a second control in the same table: **Crypto is 73.82% monomorphic against DeltaBlue's 77.10% and is Broiler's *best* suite against Jint at 0.46×**, so read polymorphism predicts the gap in neither direction. **2-10 closes as measured**, having produced three real defects and no explanation, and hands forward a question about the gate rather than a lead inside the suite. **And 2-7 and 2-9 have been re-taken over all fifteen suites** (§4.2a), which their own instrument could not previously complete — it aborted at the ninth on Mandreel and emitted nothing. **2-9 is corroborated**: 2 202 782 maps on the full corpus, the right side of its recorded 16.2 M → 2.5 M. **2-7 splits**: live memory still favours the shipped policy but by less than recorded (**0.644×** against **0.56×**), while its **allocated-bytes win changes sign** — geometric growth pays **33×** the node copying on suites it never saw, turning **0.82× into 1.044×**. The decision stands, since it was taken on live memory and live memory is still a third off; the allocated column should stop being quoted. **0-6's CI run has since confirmed the split independently — Richards 144.9×, DeltaBlue 460×** — so the phase's exit criterion is answered by two measurements on different machines that agree on which side of 200× each benchmark falls, rather than by one. Also outstanding: **2-9's ~20% compile-and-first-run cost still wants a follow-up — but not the one that was written.** Its losing-side hypothesis was measured against the control it never had (a *strict* function, which carries no Annex B deferred cells) and is **wrong**: every function materializes its trie **exactly once** whether strict or not, because the `prototype` install is withheld from shape-only storage by 2-8's DeltaBlue fix. "Stop materializing for a deferred cell" would have removed a materialization that already happened. The replacement candidate — split cache-visibility from shape-only storage — is specified and **not attempted**, since it is the code whose last regression broke DeltaBlue and it needs 0-6 |
+| **3** — arithmetic | Started. **3-0 landed, both halves** — an indexed access boxed its index; a read now allocates **nothing at all** and a write loses ~32 B, on reference arrays as much as numeric ones. **3-1 measured before starting and re-specified**: it trades write allocation for read allocation 1:1, so its clean half is live memory. **3-3's parameter half landed** — and the measurement re-specified it: the gap was a per-call `JSVariable` **cell**, not a box, so a three-parameter call went **230.2 → 62.2 B**. **Probing that analysis before extending it found a wrong-answer bug shipped since P2-2** — two writes it could not see, one returning NaN and one aborting the process on valid JavaScript; fixed, at no measurable cost. **Its `let`/`const` half is now landed**, on the second attempt: the first was withdrawn on a miscompile, and re-built scoped to the *numeric* tier alone it reproduces the predicted number and not the defect — **`let` and `const` both 31.98 → 0.00 B/iter and 1 → 3 numeric locals, identical to the eligible `var` floor, with all twelve other `--local-alloc` rows byte-identical**, both arms from one tree. The recorded reproduction was re-run against it and is green, including under the switches that restore the pre-1-4 and pre-1-1 front end — so the withdrawn attempt's defect is **not explained**, only not reproduced; what the second attempt does differently is leave the JSValue tier closed to lexical names, since a TDZ and const-ness live in the cell that tier removes while the numeric gate proves both unobservable. **The block-scoped `var` then landed too, and 3-3 is complete**: the "definite-assignment analysis" it asked for is the function body's own dominance argument applied one level down — an unconditional block is *transparent* (entered whenever reached, exits only via `return`/`throw`), and any other block *confines* its declaration, which then needs every reference inside it. **`block-var` 31.98 → 0.00 B/iter and 1 → 3, one row moved and twelve byte-identical.** Two defects were caught on the way, neither shipped: a non-dominating declaration could mark a name readable and mask a read that would see `undefined`, and the fix for that over-corrected into rejecting a benign numeric re-declaration — caught by a pre-existing test written as "the guard against over-fixing". All four of the item's categories are now at the eligible floor except `parameter`, which cannot reach the numeric tier at all. 3-4 is a cost, not a task. **New: 3-5 ✅, and it measured the ceiling on this whole phase.** 4-5's probe found that the control loop every measurement here treats as a *floor* was itself paying a box per iteration — and the cause is not the parameter: `i` is a raw double, `n` is a `JSValue`, and `<` had a native form only when **both** sides were doubles, so the raw side was boxed to meet the generic operator. Unboxing the *other* side instead needs no entry guard and covers more (`i < a.length` is a property read, boxed for the same reason), and is sound because ToPrimitive of a Number is that Number. **33.77 → 10.03 ns and 32 → 0 B an iteration, 3.4× on its shape**; 33 semantics tests, every one of which also passes on the unmodified compiler. **On the Octane corpus it is invisible — 0.997× bytes, 0.995× time — and the reason is the number this phase never had: only 5.0% of scalar locals (203 of 4 029) reach the numeric tier at all.** The emission is not the problem (390 comparisons take the new form, 59% of those that could); what is on the other side is. That is the ceiling on 3-0, 3-3 and 3-5 alike, it is the same `CanScalarReplaceLocals` gate that bounds phase 4's tiering candidates, and widening it became **new item 3-6**. It also answers what 3-4 was told to wait for: the gap largely survives unboxed locals, because the unboxing reaches 5% of them. **3-6 has since done its count, and it retired its own design — and 3-5's explanation with it.** Of 2 695 hoisted names, `CanScalarReplaceLocals` — the gate 3-5 blamed — rejects **2, 0.1%**; the causes are *not proven numeric* (2 012, 74.7%) and *captured by a nested function* (478, 17.7%). Counted again inside the analysis, the first is not "most locals are not numbers" either: only **~170 names are never offered**, while the optimistic fixed point **offers 2 335 and drops 1 842 (78.9%)**, because something assigned to them comes from a parameter, a property read, an element or a call — none knowable statically. The two counts reconcile exactly, and the residue is **290 names the analysis proved numeric that the hoist site refused for being captured**. So the work splits: **3-7** gives a captured numeric local a raw-`double` cell (290 names, **203 → ~493, 2.4×**, entirely static), and **3-8** guards a local's numeric-ness at run time — which is **4-3b's in-method branch pointed at a representation**, and means *the largest single obstacle in phase 3 is shaped like phase 4*. Nothing was built for 3-6: its own text said to count first, and the count retired the design, for the fourth item running. **New: 3-7 ✅, and its premise was wrong in both directions.** The cell it asked for already existed — the expression compiler rewrites any CLR local a nested lambda references into a `Box<T>`, and **`Box<double>` *is* the shared cell**, so a captured numeric local costs *one* allocation where the `JSVariable` form costs two. The population, though, is **36× smaller than 3-6 said**: of its 478 captured names, **247 (51.7%) are named by a hoisted function declaration** and can never be widened, 223 more are not proven numeric, and the widening is worth **eight names, 224 → 232, 1.036×**. 3-6's 290 was **inferred rather than counted**, from *offered minus dropped* — and `Resolve` removes a third population between those two counters that had no counter at all, so the real reconciliation is **offered 2 295 = rejected 133 + dropped 1 916 + surviving 246**, and only **22** provably-numeric names are refused at the hoist site for any reason. Lifting the conjunct exposed **two wrong answers and one compile failure that had been hiding behind it**: a hoisted `function g(){ return s; }` can read `s` before `var s = 0` runs while sitting textually after it (`"0"` for `"undefined"`); a nested function's own parameter could mark the outer name initialized and mask a read that really sees `undefined` (`"0,5"` for `"undefined,5"`); and a function declaration stores a function object into the binding being typed, which no assignment-expression walk sees (`let f = 5; { function f(){} }` died on *"Assignment target Call is not supported"*). The first is fixed by a conjunct that is **not** behind the switch, because it is correctness. On its shape the result is exact — **63.97 → 0.01 B/iter, −112 B an activation, and shape ÷ control 7.19× → 1.0000×**, i.e. a captured numeric local now runs at the speed of the same loop with no closure at all — against an equally exact **losing side of +32 B and 1.111× when the value is read *through* the closure**. On the corpus it is **1.0001×**, invisible for the third item running, and the count says why: 2 439 names are not proven numeric and 247 are held by a hoisting rule. **Nothing left in phase 3 is a matter of loosening a conjunction** — and **3-8 then said the conjunctions were never where the prize was**. Two numbers, neither previously taken: **number boxing is 41.89% of everything the corpus allocates** (2.05 GB of 4.88 GB; 66.96% on NavierStokes, 55.16% on Crypto, 35.98% on Box2D, against 0.31% on DeltaBlue — a spread that buries the prize in any corpus average), and the **entire** numeric-local tier, measured for the first time against a build with it switched off, removes **311 187 boxes of 85.6 M — 0.36%, and 0.41% of total allocation**. So four "invisible on the corpus" readings were never evidence that the mechanism does not matter; they were evidence that eight more names do not. A box is minted by the **operator**, whose operands arrive boxed from array elements and object fields, so the local is one link carrying 0.36% of the traffic. Counting what defeats each proof says the same: of 1 916 drops, **894 (46.7%) are a property read and 570 (29.7%) a call's return — 76.4% values produced elsewhere** — against **47 (2.5%) parameters**, the category 3-3 deferred to phase 4 as the one that mattered. **3-8 as written should not be started; 3-1 and 3-2 move to the front of the phase.** Writing the classifier's tests also found the analysis offering a nested function's block-scoped `var`s to its *enclosing* function too, so each was dropped and counted once per level — no answer changes and every downstream figure is identical, but 3-7's `offered`/`rejected` pair is corrected from 2 521/359 to **2 295/133**. **New: 3-1 is started, and its first count re-specifies it off storage.** Nobody had measured what the generic arithmetic operators are *handed* — only what the compiler could prove about them. Counted: **73 817 515 of 73 818 646 invocations across the corpus arrive with both operands already Numbers, every one but 1 131**, and that population is **86.6% of all 85.2 M boxes**, while the compiler's `both are native` gate reaches **556 053, 0.75%** — and even that counts `+` alone, the only operator with a raw-double overload. *Compile-time provability reaches 0.75% of the arithmetic and run-time truth reaches 100.00% of it*, which is the sharpest statement this phase has of why six correct items are invisible. The consequence: the operator already gets two Numbers whatever they are stored in, so a typed backing store is not the precondition — what it cannot do is **hand one back**, because the consumer is a `JSValue`. The shared half is a **run-time-guarded specialization of an arithmetic tree**, boxing only the root, and the per-shape rows already say what it is worth (96 B and three boxes for `s = s + a[0] * 1.5`, of which two are intermediates). It also partly reverses 3-8's "do not start as written": 3-8 priced that guard at the **local** and was right that it is worth 0.36%; at the **operator** the same speculation reaches 86.6%. **And the shared half is now built and measured**: a guarded arithmetic tree — leaves evaluated once into temporaries, tested for Number, computed on raw doubles, boxed only at the root — removes **10 401 782 boxes of 85 249 783, 12.2% of everything the corpus allocates, from 862 compiled sites**, where 3-0, 3-3, 3-5, 3-7 and 3-1's bitwise half moved **0.36% between them**. Crypto 0.786× boxes and 0.583× generic invocations; Box2D 0.933×; Richards 0.787×. **Eligibility is bounded by evaluation order, not by the census**: a coercion runs between two leaf evaluations in a nested tree and is observable, so a leaf evaluated after the first internal node must be a literal or a proven-numeric local — which is why `s + a[0] * 1.5` qualifies and `(a[0] * 2) + p.v` is refused. **The gap to the 86.6% ceiling is itself the next finding**: NavierStokes loses 10.1% of its generic invocations and **1.8%** of its boxes, EarleyBoyer **99.7%** and **none**, so most of those two suites' boxes are minted somewhere that is not a binary arithmetic operator. **And the wall clock is measured too**, ABBA-interleaved, six pairs, with the corpus's own control: DeltaBlue and EarleyBoyer remove zero boxes between the arms and sit at **1.005× and 1.006×**, while the driver total is **0.981× on six of six pairs** and Crypto **0.912× on six of six**. No suite is slower. *12.2% of the corpus's allocation buys 1.9% of its execution time* — which bounds the rest of phase 3 the way 4-2b's 0.83% bounded phase 4. **And the gap to the ceiling has now been chased to its source, which is not where this item has been looking.** Giving the compiler's boxing conversion its own factory entry refutes the obvious reading — only **5.0%** of NavierStokes' requests are a raw double crossing into a `JSValue`, so a typed backing store cannot be why its boxes survive, while the conversion-heavy suite is **Crypto at 31.0%**, the one the guarded tree already served best. That first pass left **40.5% of the corpus's requests attributed to nothing**, and two counters took it to **1.0%**: `BitwiseXor` was the one generic binary operator the census never hooked, and the rest is **the unary operators, which no census had looked at**. **`++` and `--` are 30.9% of all boxing on the corpus, 51.6% on NavierStokes and 80.4% on EarleyBoyer** — more than the compiler conversion and the numeric literal together — and **exactly half of it is a `ToNumeric` copying a `JSNumber` into an equal `JSNumber`**, because it mints unconditionally to hand back the old value and a Number has no observable identity. **17 281 232 requests, 15.4% of the corpus's boxing, for a value the engine is already holding**. **That is now built, and it is nine lines.** Reuse is sound because a Number has no observable identity — the argument the small-integer cache has rested on since P2-2 — and the guard is `IsNumber`, not `!IsBigInt`, because a String or `null` still has to be coerced. Measured: **17 285 913 requests removed against a prediction of 17 281 232, the thing built matching the thing measured to 0.03%**, and **7 050 834 real allocations, 9.4%** — the gap between the two being the small-integer cache, which had already been answering Crypto's loop counters for free while NavierStokes' indices run past its bound. **NavierStokes loses 23.0% of its boxes and 0.906× of its time on six of six ABBA pairs**; with `0084` the corpus goes **85 255 034 → 67 798 222 boxes, 0.795×**. **And the run's sharpest reading is what did not move**: EarleyBoyer cut **50.0%** of its boxes — the largest proportional cut — for **1.002×**, because that is 82 000 boxes a second against NavierStokes' 4 240 000. *A share of a suite's own allocation forecasts nothing; the absolute rate forecasts everything*, which retires a habit this document has had since phase 3 opened. **And then the largest single result phase 3 has produced, from removing one eligibility rule rather than building a mechanism.** `0084` reached 12.2% against a census ceiling of 86.6% and never said which of its six conditions was refusing the rest; counted, **862 of 5 396 candidate arithmetic nodes specialize — 16.0%** — and the two rules that turn down the rest are one finding, not two: `+` is left-associative, so `a[0]+a[1]+a[2]+a[3]` refuses at the root as **order-unsafe** (1 762), refuses again at each left child, and its bottom node is then a single operator with **no saving to make** (2 718). *A chain of k operators produces k−1 order-unsafe rows and one no-saving row and specializes nothing.* **The sub-census then said the rule is not refusing what this phase assumed**: the blocking leaf is a property read **1 028** times and a computed element read **34** — 1.9% — so after six items written around array-resident data, the leaf that blocks the order rule is an object field, and Box2D alone contributes 984. **The fix is that nothing required the leaves to move.** Emitting each leaf at its own postorder position and putting the type test *where the coercion it stands in for would have run* preserves the reference order exactly, and the purity rule then has nothing left to protect — the same soundness argument `0084` makes, read from the other end. Each node carries a `bool`, a raw `double` and a `JSValue`, so a failure part-way up boxes the accumulated double once and lets the rest run generically, which the hoisting form cannot do. **Measured, one build, the switch the only difference: 53 353 957 → 6 626 052 generic invocations (0.124×) and 67 795 858 → 31 162 330 boxes — 36 633 528 removed, 54.0% of everything the corpus allocates**, against 12.2% for `0084`, 9.4% for `0086` and 0.36% for the five locals items combined; from the pre-`0084` baseline the corpus is **85 255 034 → 31 162 330, 0.366×**. OrderUnsafe goes **1 762 → 0** and NoSavingToMake **2 718 → 1 181** without that rule being touched, which is the chain-residue prediction coming out. The leaf cap had to be re-measured too — it was 8 and had *never fired*, because the order rule refused those trees first; at 16 it turns down 8 instead of 85 and the corpus loses a further **664 338 boxes, 2.1%**. **Wall clock, six ABBA pairs, counters off: driver 0.969× on six of six, NavierStokes 0.834× and Crypto 0.893× both on six of six**, against the two zero-box controls at **1.002× and 0.999×**. **And `0086`'s lesson predicts the row that looks wrong**: Box2D removes 51% of its own boxes and reads 1.003×, because that is 861 000 a second against NavierStokes' 6 500 000 — the two suites that move are exactly the two above ~6 M/s. *54.0% of the allocation buys 3.1% of the time*, which with `0084`'s 12.2% → 1.9% is the third reading of the same constant and the number to size the rest of the phase from **And the phase finally has a denominator.** Eight items priced in boxes, three of them measuring an allocation cut against wall clock and getting a sixth of the share back with no explanation — four lines of `GC.GetTotalPauseDuration()` say why. **Collection is 1.8–2.0% of the driver**, and of the 768 ms this item removed **54 ms was collection and 714 ms was the mutator** (pointer bump, zeroing, write barriers, cache traffic). *A box costs about fourteen times more to create than to collect here*, which turns §Non-goals' "the collector is not the problem" from an assertion into a measurement. Allocated bytes fall **4.00 → 2.92 GB**, corroborating the box counters from outside them. At **711 ms per GB** the **0.70 GB of number boxes still standing is worth ~495 ms, 2.6% of the driver** — so everything left in phase 3 is an XL bidding for under 2%, and the `++`/`--` step (33.2% of what remains, concentrated on the corpus's highest-rate boxer) should be counted before the typed store is built. **A sampling profiler was tried and does not help**: `dotnet-trace` inflates the driver ~29% and puts 28% of self time in `PollGCWorker`, its own rendezvous point, while compiled JavaScript lives in `DynamicMethod`s that do not symbolicate — 47.8% of the run lands on `InvokeFunction` and 2.4% on a named body. *The biggest frame in the profile is the profiler*, and 4-5's "blocked on a profiler" needs a different tool, not an afternoon **And the `++`/`--` count that re-specification asked for is taken, with a clean answer.** Of 17 282 144 steps: **Element 0, Property 0.3%, LocalCell 0.0%, LocalSlot 98.1%, Other 0** — *not one of the corpus's increments is on an array element*, so the step shares no mechanism with a typed store, and 98.1% are on a local or parameter the numeric analysis did not prove numeric. Weighted by each suite's request-to-allocation ratio that is **≈7.05 M real boxes, 22.6% of the 31.16 M the corpus still allocates**, and **6.76 M of it is NavierStokes' alone** — the corpus's highest-rate boxer, which is where §3.5's rate lesson says an allocation item pays. Reading the source names the cascade exactly: `++currentRow` in `lin_solve`, where `currentRow = j * rowSize` and `rowSize` is a `FluidField`-scope var written from a sibling closure, so the analysis cannot type it and 3-6's waterfall shows NavierStokes at **24 numeric locals of 141 hoisted names**. ***One closure variable the analysis will not type costs 6.76 M boxes.*** **This re-opens 3-8 on the terms `0083` already used once**: 3-8 priced a run-time guard at the *local* and measured the static tier at 0.36%, which was a measurement of what the mechanism catches; this measures what it **lets through**, and the two differ sixty-fold **Then scoped, by asking which RULE defeats the shape the traffic is in rather than which names were dropped.** Eight shapes, one per conjunct, with the update-target census as the oracle (a numeric local contributes no row, a slot contributes `LocalSlot`, a captured one `LocalCell`). Three suspects are innocent: a nested function **declaration** does not defeat the enclosing local, 3-7's hoisting rule produces a `LocalCell` — and NavierStokes has **9 461 760 `LocalSlot` steps against six `LocalCell`** — and passing the value in as an argument only trades `OtherName` for `Parameter`. **What is left is one conjunct: the analysis is per-function and will not type a name from outside it**, and the sharp fixture is that this holds *even when the enclosing name is already proven numeric* — a conclusion is not carried across a closure boundary. That splits the work: **3-9** (new, S–M, static) imports the enclosing scope's proven-numeric set, which is pure analysis reach with no soundness argument — but **does not reach NavierStokes**, whose root is held by 3-7's correctness rule, so its population must be counted before it is built; and **3-8a**, the run-time half, which is the only thing that reaches the cascade: where a local's *only* defeat is `OtherName`, one `IsNumber` test where the value enters decides the name for the whole function — 4-3b's in-method branch pointed at a representation, no longer general, and so no longer an XL. **Sized: 6.76 M of the 7.05 M real update boxes (96%), ≈0.16 GB, ≈115 ms — 0.6% of the driver.** *The best-founded item left in the phase, and still half a percent; phase 3 is not short of ideas, it is bounded by the exchange rate `0090` measured* **3-8a was then taken to the build and stopped, on its own instrument.** Two findings. **The mechanism is an XL after all**: narrowing *which names* it speculates on does not narrow *what has to change to hold one* — a speculative raw double is a double only while a flag holds, and every fast path (3-0's index, 3-5's comparison, the raw store, the native step, `ToNativeExpression`) keys off the single `NumericStorage` field, so each must become guard-aware or read a dead value, and a missed site is a **wrong answer**. *Size an item by the surface that changes, not by the population that uses it.* **And the population could not be measured**: the optimistic-minus-real instrument read **0 on all seven suites and on the shape it was built for**, so by §3.5 it is unusable — a counter never shown to read non-zero is a claim about the counter. One real defect fell out of it, and it is `0083`'s a second time: **the enable for a compile-time counter was placed among the run-time censuses, which switch on after the corpus has compiled.** Fixing that changed nothing, so the instrument was **reverted rather than shipped**. **What is kept is the A/B the item rests on**, reduced to one identifier: `var c = 2 * rowSize; c++` is a `LocalSlot` that boxes every step, `var c = 2 * 10; c++` is numeric and costs nothing — same nesting, same body, one name different, so the enclosing-scope read *is* the defeat **The count 3-8a was missing has now been taken, on the second attempt, and the discipline is the finding as much as the number**: the instrument was made to *discriminate on constructed shapes* before being pointed at the corpus — seven fixtures, of which the two that matter are negatives (a `Parameter`-defeated local and a never-offered `var a = []` must both stay out, or the count is a tally of every drop). **26 names across the corpus, 232 → 258 numeric locals, 1.11×** — and the distribution is the result: six suites gain one to three each while **NavierStokes gains fifteen and goes 24 → 39, 1.62×**, the largest single-suite widening this phase has produced, landing on exactly the suite that carries **9.46 M of the 16.95 M `LocalSlot` steps and 6.76 M of the 7.05 M real update boxes**. *The population and the traffic are concentrated in the same place, which is the condition every earlier phase-3 widening failed* — 3-7 moved 8 names at 1.036× and was worth 1.0001× because its eight were scattered where nothing hot lived. The prize is still `0090`'s ≈115 ms, **0.6% of the driver**: what changed is confidence, not size. **The count does not license the build** — the mechanism is still the XL above, since every fast path keys off `NumericStorage` and a speculative local is a double only while a flag holds; what it settles is that the work would have something to reach **The XL's storage half is then built, off by default, and it is a measured regression.** A speculative local is held as a raw `double`, a `bool` saying the double is live, and the ordinary `JSValue` slot, with `Expression` a conditional over the two — so **every existing read site is correct untouched** and a write through it is rejected loudly, the numeric tier's own safety argument reused. It deliberately does **not** get `NumericStorage`, the field five fast paths read as "this binding IS a double". Writes derive the flag from the slot branch-free; the `++`/`--` step branches on it and, while it holds, is a native double add that writes nothing back. **All three consumers that can take a raw double are now built too** — the guarded tree's leaf (`OrderedNode` already *is* a raw double, a flag and a fallback), the element read and the element write, over 3-0's `GetElementByNumber`/`SetElementByNumber`. **Each moved the number and none moved it enough: 1.021× storage alone, 1.017× with the tree leaf and the element read, 1.012× with the element write.** Only then was a counter added at the *read* — `JSNumber.CreateSpeculativeRead`, a fourth factory entry — and it closed the item in one line: **NavierStokes mints 393 705 boxes reading a speculative local and the whole item removes ≈5 300.** The 835 584 steps it genuinely takes off `Increment` mostly save no allocation at all, because they are `x[++i]` and the result is boxed to be an index either way. ***Closed as measured, not deferred***: the mechanism is correct and left in the tree behind a switch that defaults off, because what makes it lose is the read/write ratio of the code it targets — `currentRow` is read four ways and incremented once — which is a property of the workload, not of how many consumers the compiler grows. **Every premise the item was scoped on survived and the item still lost.** Building it also found a real defect the fixtures initially failed to catch — a tree leaf that offered a slot the raw half had left three increments stale, answering `"0!"` for `"3!"` — and the repair to the *test* discipline is §3.5's new rule: after writing a fixture for a new fast path, break the emitter deliberately and confirm it fails. **And the arm corrects the count's own reading**: the 15 names carry **835 584 of NavierStokes' 9.46 M steps, 8.8%**, not the whole of it — *the suite holding the names being the suite holding the traffic is not the claim that the names hold the traffic*. 1 191 + 4 571 + 2 103 tests green **on both settings**, with the four shape fixtures now Theories over the switch **3-9, the static half of the same split, is then closed by its own precondition count — and it cost one instrument and no mechanism.** Its population is **0 on all seven suites**, against 3-8a's 26 reported from the same call site in the same run, so the zero is the corpus rather than the harness. A second counter says *why*, because a single zero cannot separate "nested functions never read an enclosing numeric local" from "they read them constantly and never anywhere typable": the enclosing scope chain answers *"that name is already a raw double"* **0 times on the whole corpus**. The reads do not exist. That reconciles with item 3-7 exactly — 3-9 can only import from a name that is both proven numeric AND still a raw double despite being captured, which is 3-7's population of **eight names**, and not one of the eight is read from an assignment inside the function that captures it. **The instrument was made to discriminate first** — nine constructed fixtures, three reading non-zero, each re-checked by disabling the probe and confirming it fails, which is `0096`'s own new §3.5 rule applied to the thing that decides this item. It also settles a design question by flipping two fixtures: the probe must ask what the compiler **built** (`NumericStorage`) and not what the analysis **proved**, or a name 3-7 leaves in a cell for correctness reads as a win. *A good mechanism with nothing to point it at* — no guard, no fallback, 3-8a's failure mode structurally absent — declined because building it would buy an analysis pass and a scope-chain probe per compiled function for zero names. **And every number in this row has a denominator it never stated** (§4.2a): `SpecializingTierMetrics`, which produces all of them, ran **7 of Octane's 15 suites**. Widened, the corpus is **164.1 M boxing requests and 90.6 M boxes against 52.0 M and 31.4 M, 12.93 GB against 3.13 GB** — **65.4% of the boxes, 75.8% of the bytes and 80.3% of the execution are outside the suites this phase has been counting** — and **Gameboy alone allocates 41.3 M boxes, 1.32× the whole measured corpus**, having never been in a census. The seven reproduce their recorded 31.16 M, so it is the same instrument over more suites. **What survives is `0090`'s denominator, with one qualification** — collection is 1.80% of the widened corpus against 2.29% of the seven, so the GC non-goal stands; but measured counters-off the spread across suites is **0.7% to 10.3%**, and the top of it is **Splay**, the suite Octane includes to stress the collector and the one no census had run. The conclusion holds everywhere measured; the single exchange rate should stop being quoted. **What does not survive is the ranking**: "everything left in phase 3 is an XL bidding for under 2%" sized the remainder against a driver a fifth the size of the real one. **And attributing the widened corpus partly reverses 3-1's move off storage.** The census's own partition is stable in share — conversion 47.4% → **42.2%** — while the count goes **24.6 M → 69.3 M**, which is `0086`'s rate lesson arriving from the other direction: *a share that holds while its population triples is not a robust share, it is an unread one*. **64.4% of the corpus's conversions are outside the seven, and Gameboy alone mints 26.9 M — more than all seven together — at 51.0% of its own requests.** A conversion is the compiler boxing a raw `double` to cross into a `JSValue`, the one source a typed backing store removes without further operator work, and Gameboy is a `Uint8Array` memory image with register arrays: exactly the shape 3-1 was written for. **3-1's storage half should be re-opened as unmeasured rather than left recorded as refuted** — the evidence that retired it ("5.0% of NavierStokes' requests") came from a corpus that excluded the item's best case. It is not a claim the store is worth building: that needs a wall-clock A/B nobody has run, and Gameboy's 1.96 GB over 23.8 s is a lower *rate* than NavierStokes' 0.49 GB over 2.0 s |
+| **4** — tiering | Started. **4-3a is landed and it found a real hazard**: restart is only sound if the body is not suspendable, and nothing said so — the property held by two unrelated accidents (the `EnableTiering` call sitting inside the ordinary-function `else` branch, and the tiering gate borrowing `CanScalarReplaceLocals`, which refuses generators for its own reasons). Defeating both, a legal `async function` whose body matches the planner's shape returns **`number` instead of a Promise** from its second call on — measured, not argued. One condition at the decision point fixes it, and 16 tests pin all three conditions. **4-3b is landed too**: `SpeculationBuilder.Guarded` compiles the specialized and generic forms into one method so a failed guard is a *branch*, with the subject evaluated exactly once (the hand-rolled spelling fails 12 of its 15 tests) and per-site poisoning after four misses. **It emits no JavaScript-level speculation, and that is structural rather than scope-trimming** — a guard needs a shape or a callee to speculate on and a tier-1 method knows neither, so the branch only has meaning inside a tier-2 recompile, which is 4-2. The mechanism lands before its consumer because it has to. **4-3's design is written** — and it re-specifies the item: this engine has no interpreter frame to reconstruct, so V8-style deopt has no counterpart here. Splits into 4-3a (state and enforce the restart contract the pilot already runs, S) and 4-3b (a generic fallback branch inside the specialized method, M–L), which gates 4-4 rather than all of phase 4. **4-1 has landed and it settles the phase's premise — over seven suites, and §4.2a has since re-taken it over twelve.** Per-site feedback now *retains* what the inline caches only observe — receiver shapes at reads, callee identities at calls — and over **seven** Octane suites, weighted by executed operations, **93.54% of 37.9 M property reads and 96.70% of 4.24 M calls happen at a site that only ever saw one shape or one callee**. **Widened to every suite that runs, the same instrument reads 80.11% of 307.9 M reads and 86.35% of 52.9 M calls** — 87.7% of the corpus's reads were outside the seven, and the two suites that move the number (Gameboy at **34.60%** monomorphic with 1 282 polymorphic sites, Splay at **10.15%**) had never been counted. 80% is still most of the work, so 4-2b is not retired; what is retired is the idea that 93.5% described the engine rather than seven suites chosen for being call-heavy. 4-2 and 4-4 are an XL each and both are worth their cost only in proportion to that number; nothing in the engine could report it until now, and it comes out high. **Megamorphism is essentially absent** — 18 sites in total, five of seven suites have none — corroborating 2-10's independent finding of zero megamorphic read sites; the fallback path 4-3b must still be correct, it just will not be hot. **DeltaBlue is the worst read case at 77.10%**, with 43 polymorphic read sites against Richards's 1, which is a lead on the suite still outside phase 2's gate. Collection is off by default, costs nothing on the call path *by construction*, and the item's third signal — numeric-vs-generic per site — is deliberately left uncollected rather than half-built. **4-2 has now landed too, and it splits the same way 4-3 did.** Measuring the branch it was told to replace found that it does **not** "recompile the same code the same way": a fresh top-level compilation builds a *second* function object and loses inherited strictness, so **DeltaBlue died on the shipping tier-2 hook** — `TypeError: Cannot get property call of undefined`, 0 of 1 benchmarks against 1 of 1 untiered, because its constructors read `X.superConstructor` off their own name and got the copy. Four of thirteen probes disagreed between tiered and untiered. **4-2a** states the recompile contract, refuses the identity cases and repairs strictness, at a cost of ~5% of promotions. **4-2b** then makes tier-2 re-emit tier-1's *own* site indices — which carries the warm caches across promotion and makes 4-1's feedback addressable — and emits a monomorphic read as a shape guard plus a direct slot load through 4-3b's in-method branch, whose **first JavaScript-level consumer** this is. **44.74% of the corpus's 37.9 M executed reads leave the inline-cache path** (counted exactly: cache misses are identical, so they were removed, not converted), carried by **1 130 sites**, with 156 guard misses and 30 poisoned — the monomorphism holds past the promotion point. **Each such read is 0.818× (46.83 → 37.12 ns, six pairs, 0.778–0.879), and the suite wall clock does not move: 0.9947 against a feedback-on control.** That is arithmetic, not failure — 16.9 M × 9.7 ns is 164 ms of a 19.7 s run, **0.83%**, under a ±2% floor. It also bounds the phase: the whole read path is ≤ ~9% of Octane's execution time here and the whole call path ≤ ~5.5%, so **the two paths phase 4 is built around are together at most ~15%**, which 4-4 should know before it starts. **The item's arithmetic half has now been priced, and it is refused by its own arithmetic** (`0107`, §4-2c): defined against what 3-1 already proves, the population is that item's `NoSavingToMake` refusal — **26.22% of candidate nodes**, refused by a condition that reasons about *allocation* and says nothing about time — and the census the item rests on turns out to be another seven-suite figure, **100.00% → 92.10% over twelve**, with the **spread the finding rather than the total** (Splay **0.46%**, Box2D 100.00%), which is the first evidence the item has ever had for its own per-site thesis. Priced three-armed and round-robin — after a first harness run in blocks reported spreads of **161–470%** and a `multiply-generic` **2.5× too slow**, an instrument producing the effect rather than finding it — it is **0.704× on multiply (11/12 rounds, 6.39 ns saved)**, 0.906× on add whose **miss is 18.567×** because the failure is a string concatenation rather than a coercion, and **best case 124 ms of a 104 620 ms driver: 0.119%**, net negative at the add rate. **7× smaller than 4-2b, which this document already called below the noise floor.** The relational lead it points at is **closed rather than left as a guess**, which needed a counter nobody had built — 3-1's speculation excludes the relational operators and 3-5 needs one side already unboxed, so a comparison over two boxed operands is reached by no fast path at all: **23 986 595 comparisons, 99.85% both-Numbers, worth 0.022%**. **So the whole generic binary-operator surface — 50.1 M invocations — is 497 ms, 0.475% of the corpus if removed entirely**, which beside 4-2b's read path ≤ ~9% and call path ≤ ~5.5% is the third side of the same box: *the operators are not where this engine's time goes.* **4-4's premise has now been measured too, and it re-specifies the item before any of it was built.** Counting at the call rather than through 4-1's compile-time gate, the corpus makes **6 194 758** invocations, and **37% of them are to native builtins** — an emitted call site with no body to inline, which any ceiling counting them inflates by more than a third. That correction came out of writing the counter's tests, which also found that a builtin runs a JavaScript callback on a *different and much shorter* entry (`InvokeCallback`, one `using` scope against five); callback invocations turn out to be **zero** on all seven suites, so an earlier guess that they explained the gap to 4-1's figure was wrong and is recorded rather than quietly deleted. Of the 3 902 620 calls with a JavaScript callee, **64.0% are made from a promoted function** — inlining's whole surface, and an upper bound. Against a hand-inlined control in one run set, **inlining saves 149 ns a call (0.37×)** — so the ceiling is **372 ms of a 19 694 ms driver, 1.89%**. **That ceiling was a seven-suite number too, and widened it is LARGER**: the same instrument reaches all fifteen since `0103`, the seven **reproduce to within 0.0002%** (6 194 744 invocations, 2 496 730 inlinable, 1.89%), and over **the twelve suites that run** it is **59 372 476 invocations, 40 523 273 with a JavaScript callee, and 4-4's ceiling is 2.43%** — with the fixed call prologue, 4-5's surface, at **8.06%** rather than 4.48%. **The two halves move in opposite directions and that is the finding**: the *population* share falls (*"from a promoted caller"* **64.0% → 42.1%**, because the suites nobody had counted hardly promote — **PdfJS 1.1% of 949 790 calls**, Splay 15.5%, five suites at 0%, **Typescript at 38.8% while being 77% of the corpus's JavaScript calls**) while the *time* share rises, since the seven are **10.4% of the corpus's calls against 18.8% of its time** — call-poor, the opposite of how they were chosen. Since a guard needs an observation and a tier-1 method has none, 4-2a's promotion gate is the ceiling on 4-4's ceiling. **The re-specification survives for a different reason than it was written for**: 4-5 beats 4-4 by **3.3×** (8.06% against 2.43%) rather than 2.4×, so the ranking is firmer — but **4-4's ceiling did not shrink into irrelevance, it grew to about three times 4-2b's landed 0.83%**, and the honest statement is *4-4 is not too small to matter, it is too small to beat 4-5*. **A first reading of this divided by all fifteen suites and reported 0.65%** — Mandreel spends 286 728 ms hitting the stack guard while making 1 488 of 59.7 M calls, so it is 72% of a fifteen-suite wall clock and nothing of what is counted; §4.2a's own convention already said the widened headlines are over twelve. Cross-checked against a **counters-off** driver at 110 620 ms against 104 620 ms (0.946×, per-suite 0.75×–1.11×), so the counters are inside run-to-run variance. Inlining is **expressible** here, unlike 4-3's deopt: labels and goto exist, a real function scope handles the callee's names, and 4-1 retains the callee — so the blocker is value, plus one semantics decision nothing can undo (an inlined callee has no frame, so it leaves `Error().stack`, and this engine has nothing to reconstruct one from). **New item 4-5 beats it**: a call costs **142 ns before it carries any argument**, plus 17.1 ns each, so ~90% of the overhead is fixed — and reducing that reaches all 6.19 M calls with no speculation, no guard and no fallback. The same probe also bounds the phase: reads are **9.16%** of execution time and the fixed call prologue **4.47%** (paid by every invocation, native callee included), so **the two paths phases 2 and 4 are built around are together under 14%** — **and re-taken over the twelve suites that run both halves RISE, to 14.01% and 8.06%, so the pair is 22.07%**, still a minority and a materially larger one — while the arithmetic-only control loop is 16.98 ns an iteration, which points at **3-4**, not at phase 4. **4-5's ablation has since run, and it falsifies most of its own premise**: five nested `using` scopes cost **0.011 ns**, EH 0.73 ns and dispatch 0.68 ns, so the prologue is not where a call's cost is. The one real cost is an **`AsyncLocal<bool>` read at 7.0 ns against a `[ThreadStatic]` at 0.31 ns** — read on every call, and documented in `JSEngine` as *"reads are cheap"*, **wrong by 24×**. Mirrored into a ThreadStatic with the AsyncLocal kept as the carrier (0.22% of the corpus; 9 tests, which also pass on the unmodified engine). **~85% of a call's fixed cost looked unattributable from outside the engine** — and it was the *replicas* that could not see it, not the engine (`0108`). 4-4 had already named the measurement that answers it and nobody had taken it: **`JSFunction.InvokeCallback` is the engine's own short path**, same `EnterRealm`, same delegate selection, same `this` coercion, one `using` scope instead of five and none of the executing-function or legacy-caller bookkeeping — a natural ablation that has been shipping the whole time. On the same callee with the same prebuilt arguments, **`InvokeFunction` is 114.60 ns and `InvokeCallback` 64.43 ns: a 50.18 ns difference, 0.562×, so 44% of a call entry is bookkeeping rather than ~10 ns of it**, and the gap is a lower bound (the short arm also pays a reflection delegate dispatch and a tail-call test). **That is 2 979 ms of a 104 620 ms driver — 2.85% of the corpus, against 4-4's whole ceiling of 2.43%** — with no speculation, no guard, no tier and no fallback path. **It is a budget rather than a saving**: the bookkeeping serves `f.caller`, strict mode across a call, realms and `with`, and some of it is required — but it localises the missing 85% to **eight named operations** between the two entries, with `EnterRealm` excluded because it is in *both*, which the replica pass could not have shown. **The ablation of those eight then closed the sum to within 0.5 ns** (`0109`), and it needed no engine change either: an **arrow** through the long entry costs **71.79 ns against an ordinary sloppy function's 116.19**, only **3.81 ns** more than the short entry, because `AddLegacyCallerAndArguments` is emitted for ordinary function declarations and expressions and not for arrows or methods. So **44.40 ns of the 48.21 — 92% — is the Annex B `caller`/`arguments` frame**, `PushLegacyFrame` copying the `Arguments` struct twice and popping it back **on every call to every ordinary non-strict function**; the executing-function save/set/restore is 2.14 ns, the `Current` cast and `Options.ScriptHostMode` read 2.14 ns, and the two `with`-scope pushes — the most suspicious-looking lines in the method — are **free**. **2-9 recorded that these cells cost something at function *creation*; they also cost 44 ns per *call*, and nothing had measured it.** Bounded to calls that can pay it, that is **≤1.65% of the corpus**, and *the largest single attributable cost in this engine's call path is a legacy web-reality feature no benchmark uses.* **And the strict control the ablation started from found something else, larger per call and rarer**: a strict callee entered from sloppy code costs **102.87 ns and 224 B more**, because `StrictModeScope` writes the strict-mode `AsyncLocal` on entry and again on exit — 4-5 fixed the *read* side and left the write side resting on *"the write only on a transition, so the common case is…"*, an argument about frequency nothing could check. **Counted, 2 813 191 of 59 372 513 calls cross — 4.74%, worth 0.266%** — and **nine of twelve suites never cross at all while PdfJS crosses on 52.65% of its calls**, so the claim is right about the corpus and false about one suite in it. **And that frame is now counted rather than bounded** (`0110`): **35 715 923 of 59 372 494 calls push one — 60.16% of all calls, 88.14% of the JavaScript-callee ones, 1.46% of the corpus** — with **Richards at 100.00%**, Typescript 75.44%, Box2D 69.87%, and **PdfJS 0.59% and Gameboy 0.02%** because *the two suites that escape it are the two that are strict*. **A program written in strict mode does not pay this at all.** **4-5 is no longer "make the prologue cheaper"; it is "make the legacy frame lazy" — and that fix has since been priced and refused** (`0111`): moving the frame to a thread-local stack is **0.730×, saving 6.19 ns — 0.20% of the corpus for an M–L**, because one 56-byte `Arguments` copy alone is 8.19 ns and *the cost is the copying, not where it lands*. **Removing the frame outright is 1.46%, seven times that**, and it is the one whose gate cannot be made sound — `caller` and `arguments` are reachable through a computed member access. **And this item's own control has since been fixed by the item it proposed**: 3-5 landed, so `for (var i = 0; i < n; i++)` reads **7.67 ns and 0 B** against the 33.77 ns and 32 B recorded here — **the box per iteration is gone** — which retires this item's closing inference that the control points at 3-4 rather than at phase 4: a call is now **~19× a loop iteration** where it was ~4×. **And the control every probe here has used turned out not to be a floor**: the same counted loop with a *literal* bound instead of a parameter one ran at **8.36 ns and 0 B an iteration** against **33.77 ns and 32 B** — same answer, **4.0× and a box per iteration**, because a parameter cannot reach the numeric tier (3-3's one acknowledged gap) so `i < n` boxes. `for (var i = 0; i < n; i++)` is the corpus's commonest shape; that became **item 3-5**, which **landed and worked — the probe now reads 7.67 ns and 0 B, and every figure quoted against that control needs to say which side of 3-5 it was taken on** |
 | **5** — regex | **Gate satisfied, and it overturns the phase.** `Matcher.cs` is not the default engine — `JSRegExp` routes only semantic-gap patterns to it, and Octane's corpus has no look-behind and no `u` flag, so it barely runs. The engine that does serve them is `System.Text.RegularExpressions` built **interpreted**; `RegexOptions.Compiled` is worth ~2× on six of seven real Octane patterns and a stable **4.3× against** on the seventh — a *trim* — so a use-count policy is ruled out. Largest regex cost measured was neither: `replace` with a global flag allocated **42 859 B per match**, because an Annex B legacy static copied the subject on every successful match — **fixed, 0.048x the bytes and 0.30x the time**. Decomposing what was left **per call** then found a single-match `replace` paying two full UTF-16 copies of the subject through a `StringBuilder`; concatenating three spans instead is **4.020 → 2.020 B per subject character, exactly the predicted halving**, and **the identical defect in `String.prototype.replace`'s string-`searchValue` builtin was found by reading the neighbouring code and fixed with it**. The global case's retained result list then landed too — **2 032.8 → 478.3 B per match**, dead linear on both sides, by streaming when the receiver's `exec` is the pristine intrinsic and the replacement is a `$`-free string. **Every follow-up this phase named is now closed**; what is left is item 2's `Compiled` policy, deliberately unshipped |
 
 **What phase 2 changed, measured.** Hit rates and byte counts are deterministic and exact; every
@@ -153,25 +190,77 @@ wall-clock figure is a median of interleaved process-granularity pairs against a
 | 2-8 | Statics on a constructor function were a 100% miss — DeltaBlue's hot path — **0 → 199 999**, ~10% on a DeltaBlue-shaped loop. **This item also shipped a regression that broke DeltaBlue outright; the fix is folded into the same patch** |
 | 2-9 | A shape-tracked property cost ~150 B of radix trie to store an 8-byte reference. The trie is no longer written at all while an object is shape-tracked — **a three-field object is 0.36x and an eight-field one 0.15x**, against **+8 B on every object** for the attribute array. Over an Octane run **six in seven property maps are never built**: 16.2 M → 2.5 M, live map bytes 0.15x. All 22 cache rows byte-identical. **Losing side, measured against a built control: ~20% on compile-and-first-run**, corroborated by Octane CodeLoad at 0.844 |
 
-**Owed.** **0-6's CI Octane run has happened**, at the pinned pointer on 2026-08-03, and it is
-the first committed result that describes the engine as it now is. What it settles and what it
+**Owed.** **0-6's CI Octane run has happened and has since been refreshed** — most recently
+**2026-08-05**, which is what `tests/octane/results/` now holds. What it settles and what it
 does not:
 
 - **Coverage: 17 of 17 scores, all 15 suites `ok`, for all three engines** — Broiler, Jint and
   a same-machine Chromium. Nothing errored, crashed or timed out (`diagnostics.md`: *"All 15
   suites completed. Nothing to diagnose."*). This is the headline half of the gate and it is
-  met.
+  met, on both runs.
 - **Phase 2's real exit criterion — *DeltaBlue and Richards inside 200×* — is answered, and it
-  splits exactly as the local run predicted: Richards PASSES at 144.9×, DeltaBlue FAILS at
-  460×.** The local five-repetition run had them at 150× and 447×; CI's single-repetition run
-  says 144.9× and 460×. Two independent measurements agreeing on which side of 200× each
-  benchmark falls is what makes the split a finding rather than a reading.
-- **The noise band is still not on record**, and that is the half still owed: the run is
-  `"Repetitions per suite: 1"`, and `comparison.md` says so itself — *"a single run; deltas
-  against it cannot be distinguished from noise"*. So the per-suite numbers below may be
-  quoted for **magnitude and for pass/fail**, and **no delta against them may be claimed**.
-  0-7's BenchmarkDotNet comparison and 0-8's RID matrix remain owed too, and a container
+  splits the same way on three independent measurements: Richards PASSES, DeltaBlue FAILS.**
+  The local five-repetition run had them at 150× and 447×; CI on 2026-08-03 said 144.9× and
+  460×; CI on 2026-08-05 says **141.3× and 399.5×**. Three measurements on two machines agreeing
+  on which side of 200× each benchmark falls is what makes the split a finding rather than a
+  reading — and note that agreement is the *only* thing being claimed across them.
+- **The two committed runs must not be differenced, and the temptation to is the reason this
+  bullet is here.** Between 2026-08-03 and 2026-08-05 the geomean reads 351 → 498 and the ratio
+  163× → 149×, which looks like a 1.42× engine improvement and is nothing of the kind:
+  **Chromium's own column moved 57 080 → 74 297 on the same runner**, so most of what moved is
+  the machine. Both runs are `"Repetitions per suite: 1"` and `comparison.md` says so on its own
+  face — *"a single run; deltas against it cannot be distinguished from noise"*. Magnitude and
+  pass/fail may be quoted; **no delta may be**, including this one.
+- **The band is no longer merely owed — it is unblocked.** 0-4 built `--repetitions` and the
+  harness has always emitted a per-benchmark spread, a `⚠` above the 7.5% band and a
+  per-engine repetition count; nothing in CI had ever passed the flag, so every committed
+  result disclaimed its own deltas. The workflow now defaults to **3** (both the input default
+  and the shell fallback that actually applies off a dispatch) and its `timeout-minutes` is
+  raised 105 → 180 to fit three repetitions of a ~26-minute benchmark half. **A first band is
+  also on record locally** — see below — though a container is not the machine the gate closes
+  on. 0-7's BenchmarkDotNet comparison and 0-8's RID matrix remain owed, and a container
   cannot produce either.
+
+#### The first band on record — and the declared 7.5% does not hold
+
+Broiler-only, **3 repetitions**, twelve suites (the three slowest — Mandreel, zlib, Typescript —
+left out for time), one process per repetition, in this container. Not the machine 0-8 closes on
+and not a CI runner; what it is, is the first time anything in this campaign has reported a
+spread instead of promising one.
+
+| Score | Median | Samples | Spread |
+|---|--:|---|--:|
+| Splay | 529 | 545, 461, 529 | **15.9%** |
+| Crypto | 265 | 263, 265, 296 | **12.5%** |
+| Richards | 246 | 249, 246, 223 | **10.6%** |
+| SplayLatency | 1 199 | 1 163, 1 199, 1 288 | **10.4%** |
+| DeltaBlue | 209 | 197, 209, 216 | **9.1%** |
+| EarleyBoyer | 435 | 435, 445, 416 | 6.7% |
+| Box2D | 657 | 657, 659, 623 | 5.5% |
+| RegExp | 121 | 117, 123, 121 | 5.0% |
+| Gameboy | 1 075 | 1 075, 1 043, 1 096 | 4.9% |
+| NavierStokes | 517 | 535, 517, 516 | 3.7% |
+| CodeLoad | 110 | 110, 112, 108 | 3.6% |
+| RayTrace | 469 | 469, 460, 476 | 3.4% |
+| PdfJS | 452 | 454, 452, 452 | 0.4% |
+
+**Five of thirteen scores exceed the 7.5% band the harness declares**, and the median is 5.5%
+against a best of 0.4% — so the band is not one number, it is per suite and it ranges forty-fold.
+*The figure `phase0.json` has carried since 0-4 was an assumption, and this is the first
+measurement of it.*
+
+**Two of the five are Richards and DeltaBlue**, which is the pair phase 2's exit criterion rests
+on. That does not disturb the verdict — 141× and 400× are nowhere near the 200× line, and three
+measurements on two machines agree on which side each falls — but it prices every *future* claim
+about them: **a Richards change under ~10% is not measurable at three repetitions**, and phase 4's
+own headline result was 0.83% of suite time. This is §3.5's "three samples an arm is a coin toss
+dressed as a measurement" arriving as a number rather than as an anecdote, and it is why 1-1's
+CodeLoad result took 24 samples an arm to call.
+
+**What must not be read out of this table.** Its geomean (383) is over **13 scores, not 17**, and
+it is Broiler alone in a container with no same-machine Chromium beside it — so it is not
+comparable to the committed run's 498 and must never be quoted as if it were. Only the spread
+column is the finding.
 
 **The conformance gate is satisfied, and was re-run five times for items 3-3, 4-1, 4-3a and 4-3b.** All
 four pinned manifests were run **2026-08-03 on linux-x64 at the pinned `9bf9639b`** — plus
@@ -196,13 +285,14 @@ six further bumps, most recently to **`cca39b4d`**; the patch files are cleared 
 [`patches/README.md`](../patches/README.md)'s index is **empty for the first time since it was
 written**. What phase 2 measured and what CI now clones are the same tree — which is the condition
 both remaining gates were waiting on, and it is why the conformance one could be run at all. **The
-handoff has now cleared three times running**, so a 403 has come to mean *deferred* rather than
+handoff has now cleared four times running**, so a 403 has come to mean *deferred* rather than
 *stranded*; what makes that safe is that the pointer is never bumped locally, so nothing here can
-name a commit CI cannot clone. **Seven patches are open again** (`0089`, item 3-1's order-preserving
-guard placement; `0090`, the GC-pause denominator that prices it; `0091`, the update-target
-census that re-opens item 3-8; `0092`, the eight shapes that scope it to 3-8a; `0093`, the A/B
-that survived the attempt to build it; `0094`, its population counted at 26 names; and `0095`, its
-dual-representation local built and measured), on the usual 403 terms.
+name a commit CI cannot clone. The fourth clearing took **all three open stacks at once** — the
+thirteen `Broiler.JS` patches plus the `Broiler.HTML` and `Broiler.CSS` pair — and left `patches/`
+empty for the second time since it was written. **Twelve patches are open again** (`0102`–`0113`: item 1-1's remaining
+half in four of them — its capture-free population, its capture layout, a body compiled from a kept
+enclosing scope, and that check's residual settled — plus the widened census corpus, item 4-2's
+arithmetic half priced and refused, item 4-5 unblocked, attributed, counted and its named fix refused, and two instrument defects closed), on the usual 403 terms.
 
 **Two pre-existing defects found in passing**, both reproducing on a pristine build at the
 pinned pointer, neither owned by this campaign: a refused write to a function's `prototype`
@@ -1202,6 +1292,164 @@ These were paid for once each. They apply to every phase below.
   as the invariant on both settings of the new switch** — the answer is unchanged, only which form
   computes it moves. *Assert the count as well as the answer, because an answer-only fixture passes
   silently when the mechanism underneath it is replaced.*
+- **A read-only question asked through a mutating API is not a read-only question.** Item 1-1's
+  population probe needed one thing from the compiler: where does this name resolve? The API for
+  that is `FastFunctionScope.GetVariable`, and it **sets `RootScope.HasOuterFunctionCaptures` as a
+  side effect of answering** — which is a conjunct of item 4-2a's tiering gate. A probe built the
+  obvious way would have turned tiering *off* for every function it merely asked about, silently,
+  and only on the arm where the counter was enabled: the measured arm would have differed from the
+  shipping one in a way no assertion in the instrument could catch, because the instrument was the
+  cause. It cost one grep for what reads the flag. *Before reading engine state through an existing
+  accessor, read the accessor — an instrument that mutates is measuring a build nobody ships, and
+  the arm it corrupts is the one you are reporting.*
+- **A declared noise band is a configured number until someone measures it, and this one was
+  wrong in the direction that matters.** `phase0.json` has carried 7.5% since 0-4 built
+  `--repetitions`, every acceptance rule in this campaign is written against it, and nothing had
+  ever run the flag that would check it. Run: **5 of 13 scores exceed it**, the spread ranges
+  0.4% to 15.9% — forty-fold — and **Richards and DeltaBlue are two of the five that fail it**,
+  which is the pair phase 2's exit criterion rests on. The band is not one number, it is per
+  suite, and a threshold set once and applied uniformly is generous to the quiet suites and
+  wrong about the loud ones. *A tolerance nobody has measured is a preference; measure it before
+  writing acceptance rules against it, and expect it to be per-workload rather than global.*
+- **"The corpus" is a denominator, and an instrument that does not emit it will be quoted without
+  one.** Every phase-3 and phase-4 headline in this document says *"the corpus"* — 41.89% of its
+  allocation, 54.0% of it removed, 93.54% of its reads monomorphic — and the censuses producing
+  those numbers ran **7 of Octane's 15 suites**. The totals were added up outside the instrument,
+  which is the step where the suite list stopped travelling with the number. Widened, the
+  monomorphic read share is **80.11%, not 93.54%**, and **87.7% of the corpus's reads were outside
+  the seven**. *Emit the aggregate from the instrument, with the population size beside it, so a
+  partial corpus is forced to say so at the point of use.*
+- **A missing suite is a defect report nobody filed.** The seven were not chosen — Mandreel
+  **aborted the census host** with an uncatchable .NET stack overflow, because item 0-2's 16 MiB
+  thread and stack reserve are a property of the *shell*, and no benchmark host had them. The
+  census then serialized its output only at the end, so that abort discarded the eight suites that
+  had already run. Between them those two make a suite permanently unmeasurable and make finding
+  out expensive. *When a corpus has a hole in it, the hole is the first thing to measure — and
+  make every instrument checkpoint per item, because the run you cannot finish is the one whose
+  partial results you most need.*
+- **A ratio to another engine is a statement about both engines, and the third column tells you
+  which one moved.** Phase 2's exit criterion is *"DeltaBlue and Richards inside 200× of
+  Chromium"*, and for three sessions the 400×/141× split was read as a fact about this engine —
+  four explanations eliminated, two real defects fixed, no dent in the ratio. Asking the *same*
+  question of Jint, a managed interpreter with no JIT that has been in every committed run since
+  the harness gained it, splits it in one division: DeltaBlue is **2.83× harder than Richards for
+  Broiler and 2.56× harder for Jint**, so only **1.10×** of the gap is ours, and closing all of it
+  reaches 362× against a 200× gate. *The criterion was unreachable by construction and nothing in
+  the item said so.* The cost of finding out was a division on data already committed. **Whenever
+  an acceptance test is expressed as a ratio to a system you do not control, compute it for a third
+  system before spending a session inside the numerator** — and prefer a reference that fails the
+  way you do (a managed interpreter) over one that does not (a production JIT), because only the
+  first can tell a shared difficulty from a private defect.
+- **A shared control moving with the subject is the cheapest check a benchmark delta can get, and
+  this harness has always emitted one.** Between the two committed Octane runs Broiler's geomean
+  reads **351 → 498**, which is a 1.42× improvement if any of it belongs to the engine. Chromium's
+  own geomean moved **57 080 → 74 297** on the same runner over the same two days and Jint's
+  **616 → 820** — three engines moving 1.30–1.42× together, which is a statement about the runner
+  rather than about any of them. Both runs are single-repetition and both say so on their own face,
+  so the disclaimer was already there and the tempting number was still sitting next to it. *When a
+  result ships beside an unchanged reference, difference the reference first; a delta that the
+  control also shows is the machine, and the ratio column exists precisely to divide it out.*
+- **A number computed over a subset stays wrong in the same direction every time you re-use it, and
+  the subset does not announce itself.** §4.2a found three censuses stuck on 7 of Octane's 15 suites
+  and fixed the hosts; what it could not fix is every *figure already derived* from them, because a
+  derived figure carries no record of its denominator. Two have since been re-taken and **both
+  moved by more than the effects they were used to justify**: item 4-2's `arithmeticBothNumbers`
+  from 100.00% to 92.10% with a 0.46%–100% per-suite spread, and item 4-4's inlining ceiling from
+  **1.89% to 2.43%** — the latter *upward*, because although *"from a promoted caller"* falls from
+  64.0% to 42.1%, the suites nobody had counted make far more calls per millisecond than the seven
+  do. Neither re-take needed new code; the widened hosts had been shipping for one patch, and
+  the numbers were simply never read again. **The seven suites are 10.4% of the corpus's calls
+  against 18.8% of its time** — call-poor, the opposite of how they were chosen. *When an
+  instrument's reach changes, re-derive everything that was ever computed from it, and re-derive it
+  by reproducing the old reading first* — both re-takes matched the old figure over the old subset,
+  4-4's to within 0.0002% on a count of millions, which is what makes the new reading the same
+  measurement rather than a different one.
+- **A widened denominator has to exclude what does not run, and the suite that breaks it is the one
+  that dominates it.** Both re-takes above were first computed against all fifteen Octane suites,
+  which reported 4-2's arithmetic half at 0.038% and **4-4's ceiling at 0.65% — a third of the
+  seven-suite figure it was correcting, and the wrong direction entirely.** Three suites fail
+  (zlib's `read` is a shell builtin, RegExp has a pre-existing checksum, **Mandreel hits the stack
+  guard**) and §4.2a had already written the rule: the widened headlines are over the twelve *"and
+  the JSON says so"*. **Mandreel spends 286 728 ms failing** — 72% of a fifteen-suite wall clock —
+  while making **1 488 of 59.7 M calls**, so it is almost the entire denominator and none of the
+  numerator. Over the twelve the same data reads **2.43% and 8.06%**, both *larger* than the
+  seven-suite figures, and 4-4's conclusion changes from *"too small to matter"* to *"too small to
+  beat 4-5"*. **A fourth has since followed**: item 3-2's numeric-read table, whose 50.1% becomes
+  **55.2% of 186 831 813** and whose *"3-2 is a Box2D item, 98% of the corpus's numeric reads are
+  Box2D's"* becomes **9.6%** — the item was re-specified around a suite that turns out to be a
+  fifteenth of its own population, while Typescript and Gameboy, 89% of it, had never been counted. **The catch came from a cross-check run for an unrelated reason** — a counters-off
+  driver, to price the instrument's own overhead, which turned out to be nil (0.946×) and instead
+  put the per-suite times side by side, where one row was 72% of the column. *A widening that fixes
+  the numerator's coverage silently changes what belongs in the denominator; print the per-suite
+  denominator before quoting any total built from it, and re-read the convention you already
+  wrote down.*
+- **A validated claim is validated of the property it tested, and the sentence that records it will
+  drift to the property the item cares about.** `0104` predicted which bindings a deferred body
+  captures and checked **membership**: zero missed on 5 157 sites, an honest and load-bearing
+  result. Item 1-1's obstacle, in the item's own words, is *"a captured name's **index**"*. Between
+  the check and the write-up the sentence became *"the capture layout `0104` settled"*, and four
+  later patches — and several paragraphs written by the same person who ran the check — repeated it.
+  **The prediction was a `HashSet` derived from a `HashSet`: it had no order, so it could not have
+  answered the index question even in principle.** Nobody had to be careless for this; the drift is
+  from a true sentence to a shorter one, and the shorter one is the one that gets quoted.
+  *Restate the item's obstacle in the item's own words next to the result, and check that the result
+  is about the same noun.* Asked properly, the answer was reassuring — 0 mismatches on 4 461
+  comparable sites — **and it changed a design constraint**: over-approximation, recorded as a cost,
+  shifts every later slot, so the prediction has to **drive** the layout rather than match it.
+- **Price a fix before you build it, on the same terms you priced the problem.** Item 4-5's cost
+  was measured (~44 ns on 60.16% of calls, 1.46% of the corpus) and its fix was then *named* — move
+  the per-invocation frame off the function object onto a thread-local stack — with a size attached
+  by inference rather than by measurement, which is the step that usually goes unexamined because
+  the problem's number feels like it transfers to the solution. It does not. Priced, the relocation
+  is **0.730×: 6.19 ns of the 22.96 the current shape costs, 0.20% of the corpus, for an M–L with a
+  generator-suspension hazard in it.** *A third arm said why in one line* — a single 56-byte
+  `Arguments` copy is 8.19 ns, so the cost is the **copying**, and the fix moved where the copying
+  lands without removing any of it. **The arm that decides a fix is not the arm that measured the
+  problem**, and the cheapest version of it is usually one line of the proposed design run in
+  isolation. Doing it cost one probe and saved an M–L that would have bought 0.2%.
+- **When a component pass cannot account for the whole, suspect the components before the tool.**
+  Item 4-5 priced every mechanism in a call's prologue by *replicating* it — five nested `using`s at
+  0.011 ns, EH at 0.73, dispatch at 0.68 — got about **10 ns of a ~147 ns call**, and concluded that
+  **~85% was "unattributable from outside the engine"**, blocking itself on a sampling profiler the
+  container does not have. The replicas were right about what they measured and wrong about what
+  was asked: *a replica prices the mechanism, and says nothing about what the engine's own scopes do
+  inside themselves.* The engine already shipped the control — `InvokeCallback`, the same call with
+  one scope instead of five — and 4-4 had even written down that pricing the two against each other
+  was **"the first thing 4-5 should do"**. Taken, it says **50.18 ns of 114.60, 44%**, and the item
+  was never blocked. **Two habits, and the second is the cheaper one**: when the parts do not sum to
+  the whole, the missing mass is more often in *how* the parts were priced than in a part nobody
+  named; and **before declaring an item blocked on a tool, re-read the item that produced it for the
+  measurement it already specified.**
+- **A residue you can only describe is a residue you have not measured — classify it, and be ready
+  for the classification to indict the instrument.** `0105` reported 84.1% of re-entered function
+  bodies reproducing the eager tree and characterised the other 15.9% as *"ordinal divergence on
+  every instance examined"* — an honest sentence, and an anecdote: it names what the failures looked
+  like to somebody reading them, over a sample nobody counted. Classifying them cost one enum and
+  two counters, and **three of the four causes turned out not to be about the mechanism at all**.
+  The largest was the comparison's own ordinal table, shared across gensym families and keyed on the
+  bare number, so `Context3` and `#TempJSValue3` collided and desynchronised every ordinal after
+  them. The next two were the check's *second compilation*: it exhausts item 4-2b's process-wide
+  site table (24 759 → exactly its 65 536 cap on one corpus), and it races the tier-2 rule that
+  re-uses a tier-1 site. **Nothing was left over.** *The value of a classification is not the
+  categories you expect to fill — it is the empty "other" bucket at the end, which is the only
+  thing that turns "every instance I looked at" into "every instance".* And a checker's residue is
+  the first place to look for the checker's own defects, because that is where they are indistin­
+  guishable from the subject's.
+- **A two-arm microbenchmark run in blocks is measuring the process's history, not the arms.** The
+  probe that priced item 4-2's arithmetic half ran each arm's six samples consecutively and came
+  back with generic-arm spreads of **161%, 76% and 470%** against effects near 3× — the exact
+  condition §3.5 already forbids reading, produced by the instrument rather than found by it. It
+  reported `multiply-generic` at **39.00 ns** and `less-generic` at **20.67 ns**; the same code,
+  run round-robin with the arms reversed on alternate rounds and a blocking collection between
+  samples, reports **15.42** and **3.93**. *A 2.5× and a 5.4× error, both in the direction that
+  would have founded the item.* Consecutive samples hand each arm a private slice of the process —
+  its own gen-0 debt, its own place in the tiered-JIT ramp, whatever the previous arm left on the
+  heap — and in a fixed order the same arm pays the same debt every round, so the error is
+  systematic rather than noisy and averaging more samples does not remove it. **Interleave the
+  arms, reverse on alternate rounds, and ratio *within* a round**: a ratio of medians inherits
+  whatever differed between the blocks, while a median of within-round ratios divides it out. On
+  these arms the per-arm spreads stayed above 60% and the pair ratios were still clean at 11/12 and
+  12/12 — which is the whole argument for the pairing in one line.
 
 ---
 
@@ -1247,63 +1495,400 @@ repository root is the solution to run.
 
 ### 4.2 The current Octane profile
 
-**Regenerated by the workflow on 2026-08-03 at the pinned pointer** — `tests/octane/results/`,
+**Regenerated by the workflow on 2026-08-05 at the pinned pointer** — `tests/octane/results/`,
 Octane version 9, Chromium 149.0.7827.55 and Jint 4.15.3 on the same machine. This replaces the
-2026-07-31 table, which quoted an engine five suites of which did not score and which is now
-twenty-odd commits behind. Ordered by ratio, best first.
+2026-08-03 table, which replaced the 2026-07-31 one. Ordered by ratio, best first.
 
-> **One repetition per suite.** `comparison.md` says so on its own face — *"a single run;
-> deltas against it cannot be distinguished from noise"*. Read this table for **magnitude and
-> for which side of a threshold a benchmark falls**, which is what phase 2's exit gate asks;
-> do **not** read a delta out of it against any earlier table, including the one it replaces.
-> A band needs `--repetitions` and is still owed (0-6).
+> **One repetition per suite, and this table is the second in a row that cannot be differenced
+> against its predecessor.** `comparison.md` says so on its own face — *"a single run; deltas
+> against it cannot be distinguished from noise"*. Read it for **magnitude and for which side of
+> a threshold a benchmark falls**, which is what phase 2's exit gate asks; do **not** read a
+> delta out of it against any earlier table, **including the one it replaces** — see the
+> Chromium column below for why that is not pedantry. A band needs `--repetitions`, which CI now
+> defaults to 3 (0-6).
 
 | Benchmark | Chromium | Broiler | × slower | Jint | Dominant blocker |
 |---|--:|--:|--:|--:|---|
-| SplayLatency | 72 859 | 2 220 | **33** | 3 164 | — (best axis; GC pauses are fine) |
-| Typescript | 90 558 | 2 492 | 36 | 2 556 | mixed; overhead amortized by real work |
-| Splay | 44 461 | 626 | 71 | 839 | B1 allocation rate |
-| Gameboy | 91 279 | 1 096 | 83 | 936 | B1 typed arrays, B3 exotic exclusion |
-| RegExp | 10 263 | 122 | 84 | 210 | B5 — **and B5 names the wrong component**; see phase 5 |
-| NavierStokes | 35 474 | 384 | 92 | 255 | B1 boxed array elements |
-| PdfJS | 56 417 | 508 | 111 | 890 | B1, B5, B4 |
-| Richards | 38 257 | 264 | **145** | 188 | B2 call cost, B3 shape transitions — **now inside 200×** |
-| Box2D | 101 050 | 675 | 150 | 622 | B1 + B2 (no escape analysis, no inlining) |
-| Crypto | 38 431 | 225 | 171 | 148 | B1 integer boxing |
-| zlib | 80 429 | 390 | 206 | 5 339 | B1 integer boxing |
-| CodeLoad | 31 180 | 137 | 228 | 3 659 | B4 eager compilation — **~27% of what it measures**, see 1-1 |
-| EarleyBoyer | 93 399 | 404 | 231 | 416 | B1 allocation rate |
-| RayTrace | 118 472 | 463 | 256 | 448 | B1 + B2 escape analysis |
-| Mandreel | 48 186 | 166 | 290 | 92.8 | B1 heap traffic — **not B4 compile**, see 1-4 |
-| DeltaBlue | 99 812 | 217 | **460** | 188 | **B2 polymorphic call cost — the one suite still outside 200×** |
-| MandreelLatency | 66 469 | 14.5 | **4 584** | 789 | ~~B4 compile latency~~ — **measured: not compilation.** Pauses between render frames over already-compiled code; a 3.04× faster compile of `mandreel.js` moves it 0.992×. Points at B1 allocation rate / B7 |
-| **Overall (geomean)** | **57 080** | **351** | **163** | **616** | spread (worst ÷ best suite) **139.8×** |
+| SplayLatency | 89 673 | 2 614 | **34** | 3 850 | — (best axis; GC pauses are fine) |
+| Typescript | 118 170 | 3 338 | 35 | 3 393 | mixed; overhead amortized by real work |
+| Splay | 56 416 | 779 | 72 | 1 064 | B1 allocation rate |
+| NavierStokes | 45 217 | 621 | 73 | 346 | B1 boxed array elements |
+| Gameboy | 120 086 | 1 626 | 74 | 1 228 | B1 typed arrays, B3 exotic exclusion |
+| RegExp | 12 988 | 166 | 78 | 265 | B5 — **and B5 names the wrong component**; see phase 5 |
+| PdfJS | 79 352 | 712 | 111 | 1 142 | B1, B5, B4 |
+| Crypto | 49 408 | 425 | 116 | 195 | B1 integer boxing |
+| Richards | 49 320 | 349 | **141** | 242 | B2 call cost, B3 shape transitions — **inside 200×** |
+| Box2D | 136 091 | 937 | 145 | 837 | B1 + B2 (no escape analysis, no inlining) |
+| EarleyBoyer | 110 540 | 615 | 180 | 540 | B1 allocation rate |
+| zlib | 103 463 | 566 | 183 | 6 792 | B1 integer boxing |
+| CodeLoad | 40 803 | 193 | 211 | 7 289 | B4 eager compilation — **~27% of what it measures**, see 1-1 |
+| RayTrace | 152 290 | 677 | 225 | 578 | B1 + B2 escape analysis |
+| Mandreel | 64 547 | 238 | 271 | 128 | B1 heap traffic — **not B4 compile**, see 1-4 |
+| DeltaBlue | 126 232 | 316 | **400** | 242 | **B2 polymorphic call cost — the one suite still outside 200×** |
+| MandreelLatency | 99 704 | 18.7 | **5 332** | 1 016 | ~~B4 compile latency~~ — **measured: not compilation.** Pauses between render frames over already-compiled code; a 3.04× faster compile of `mandreel.js` moves it 0.992×. Points at B1 allocation rate / B7 |
+| **Overall (geomean)** | **74 297** | **498** | **149** | **820** | spread (worst ÷ best suite) **155.4×** |
 
-The shape of that list *is* the finding, and it has not changed: the extremes are front-end and
-call-path, not arithmetic. The losses are concentrated in two subsystems rather than spread
-evenly — which is what makes them addressable in a defined order.
+The shape of that list *is* the finding, and it has not changed across three regenerations: the
+extremes are front-end and call-path, not arithmetic. The losses are concentrated in two
+subsystems rather than spread evenly — which is what makes them addressable in a defined order.
 
-**Three things this run says that the stale one could not.**
+**What this run says, and one thing it conspicuously does not.**
 
-- **Richards is inside 200× and DeltaBlue is not** — 145× against 460×, the same split the
-  local run found at 150× and 447×. Phase 2 moved Richards across the line and did not move
-  DeltaBlue across it. That is the phase's exit criterion, answered.
+- **The Chromium column is the reason the no-deltas rule is not pedantry.** Between the two
+  committed runs Broiler's geomean reads 351 → 498, which would be a 1.42× engine improvement
+  if anything about it were attributable to the engine. **Chromium's own geomean moved 57 080 →
+  74 297 on the same runner over the same two days, and Jint's 616 → 820** — three engines
+  moving 1.30–1.42× together is a statement about GitHub's hardware allocation, not about any
+  of them. The ratio column, which divides that out, moves 163× → 149×; even *that* is a single
+  sample against a single sample. *A shared control moving with the subject is the cheapest
+  possible check on a benchmark delta, and it is available in every committed run of this
+  harness.*
+- **Richards is inside 200× and DeltaBlue is not** — 141× against 400×, the same split the
+  local five-repetition run found at 150× and 447× and the 2026-08-03 CI run at 144.9× and
+  460×. Three measurements on two machines agree on the side of the line. Phase 2 moved
+  Richards across it and did not move DeltaBlue across it. That is the phase's exit criterion,
+  answered — and the agreement is what is being claimed, not the numbers.
 - **Jint is the more informative column.** Against a managed interpreter on the same runtime
-  Broiler is **0.569× overall** — behind, on a geometric mean of the 17 per-benchmark ratios.
-  It is *ahead* on the call- and object-heavy suites this campaign has been working (Mandreel
-  1.79×, Crypto 1.52×, NavierStokes 1.51×, Richards 1.40×, Gameboy 1.17×, DeltaBlue 1.15×,
-  Box2D 1.09×) and far behind on three: **CodeLoad 0.037×, zlib 0.073×, MandreelLatency
-  0.018×**. Two of those three are the front end and the third is latency, so the column
-  agrees with §1.1 about where this engine's remaining structural gap is — and it does it
-  against a reference that is not a JIT, which Chromium's column cannot.
-- **The worst score is no longer a compilation problem.** MandreelLatency at 4 584× is still
-  the tail, and 1-4 and 1-1 between them made compiling `mandreel.js` 3.04× faster and moved
-  it 0.992×. It belongs to phase 3.
+  Broiler is **0.606× overall** — behind, on a geometric mean of the 17 per-benchmark ratios.
+  It is *ahead* on the call- and object-heavy suites this campaign has been working (Crypto
+  2.18×, Mandreel 1.86×, NavierStokes 1.80×, Richards 1.44×, Gameboy 1.32×, DeltaBlue 1.31×,
+  RayTrace 1.17×, EarleyBoyer 1.14×, Box2D 1.12×) and far behind on three: **CodeLoad 0.026×,
+  zlib 0.083×, MandreelLatency 0.018×**. Those three are where the structural gap is, and it
+  is a gap a reference that is not a JIT can show and Chromium's column cannot. **One of the
+  three was mis-attributed here for three revisions and is corrected below**: this bullet used
+  to read *"two of those three are the front end and the third is latency"*, which is true of
+  CodeLoad and false of zlib — measured, zlib's `eval`-compile is **2.09 s against 35.06 s for
+  one iteration of its own benchmark**, so the front end is under 6% of a single iteration and
+  under 2% of the measured region. **zlib is an execution gap, not a compile gap** (§4.2a).
+- **The worst score is still not a compilation problem.** MandreelLatency at 5 332× is the
+  tail, and 1-4 and 1-1 between them made compiling `mandreel.js` 3.04× faster and moved it
+  0.992×. It belongs to phase 3.
+
+### 4.2a The corpus every phase-3 and phase-4 headline is computed over is **7 of 15 suites**
+
+**Found by asking a different question and tripping over the answer.** §2-13 established that
+Broiler's largest *private* deficiency is zlib — 12.0× behind Jint relative to Chromium, against
+0.77× on DeltaBlue — so the obvious next step was to look at what the censuses say about zlib.
+They say nothing. **zlib is in none of them**, and neither are Mandreel, Gameboy, PdfJS,
+Typescript, CodeLoad, Splay or RegExp.
+
+**`TypeFeedbackMetrics` and `SpecializingTierMetrics` both ran the same seven**: Richards,
+DeltaBlue, RayTrace, Box2D, EarleyBoyer, Crypto, NavierStokes. That was a defensible corpus for the
+question 4-1 asked. It stopped being one the moment its output was quoted as ***"the corpus"*** —
+the phrase every phase-3 and phase-4 headline in this document uses — over a denominator that was
+never stated.
+
+**The third census in the same directory *lists* all fifteen and reaches nine**, which is worse
+than either — see below. So the shortcut is not shared and not deliberate: two censuses were
+written against seven suites, and the one written against fifteen could never finish them. *Nothing
+here was a considered corpus decision; three instruments arrived at three different partial answers
+and one phrase — "the corpus" — was used for all of them.*
+
+#### Why it was seven, which nobody had written down: **Mandreel aborts the census host**
+
+Not a choice about cost. Widening the suite list and running it produces, at the ninth suite:
+
+```text
+Stack overflow.
+   at DynamicClass.global_init-mandreel.js:123784,0(...)
+   at DynamicClass.mandreelAppInit-mandreel.js:1456,0(...)
+```
+
+**An uncatchable .NET stack overflow, and item 0-2 is exactly the thing that should have prevented
+it.** 0-2 records that the shell *"runs script-host JS on a 16 MiB thread it sizes itself"* with a
+4 MiB reserve, so deep recursion raises a catchable *"Maximum call stack size exceeded"*. That is a
+property of `Broiler.JavaScript/Program.cs` — **the shell** — and `BenchmarkContext.Create` built a
+plain `JSContext` on whatever stack the runtime handed `Main`. *Every benchmark host in this
+campaign has been running without the reserve the shell has had since phase 0*, and the one suite
+that needs it was therefore permanently unmeasurable.
+
+**And the instrument made that as expensive as possible**: it serialized its JSON once, at the end,
+so an abort in the ninth suite discarded the eight that had already run. A partial corpus that
+cannot even produce a partial result is a corpus nobody widens twice.
+
+**Both are fixed** — the census runs on the shell's thread with the shell's budget, and writes its
+report after *every* suite — and Mandreel now fails the way the shell makes it fail, catchably,
+instead of taking the process down.
+
+#### What the widened count says, and it moves phase 4's premise
+
+| Corpus | suites | property reads | monomorphic | calls | monomorphic |
+|---|--:|--:|--:|--:|--:|
+| as quoted throughout this document | 7 | 37 871 921 | **93.54%** | 4 239 252 | **96.70%** |
+| every suite that runs | 12 | **307 869 165** | **80.11%** | **52 931 427** | **86.35%** |
+
+**The old seven reproduce to the digit** — 93.54% of 37.9 M reads and 96.70% of 4.24 M calls, which
+is §0's phase-4 row verbatim — so this is the same instrument over a bigger corpus and not a
+different measurement. **87.7% of the corpus's property reads were outside the suites being
+counted.**
+
+**4-1's headline is the premise items 4-2 and 4-4 rest on, and it falls 93.54% → 80.11%.** The two
+suites that move it were never in a census:
+
+| Suite | reads | monomorphic | polymorphic sites |
+|---|--:|--:|--:|
+| **Typescript** | 207 393 777 | 89.52% | 748 |
+| **Gameboy** | 54 539 137 | **34.60%** | **1 282** |
+| **Splay** | 1 445 504 | **10.15%** | 43 |
+| Box2D (in the seven) | 25 963 010 | 94.12% | 247 |
+
+Typescript alone is **67% of the corpus's reads**. Gameboy at 34.60% monomorphic and Splay at
+10.15% are not tails — they are the two most polymorphic suites in Octane, and the phase that
+speculates on monomorphism had counted neither. *This does not retire 4-2b — 80% is still most of
+the work — but "93.5% of reads are monomorphic" was a fact about seven suites chosen for being
+call-heavy, and it has been carried as a fact about the engine.*
+
+#### And the two suites Broiler is furthest behind on do almost no property reads or calls at all
+
+| Suite | reads | calls | Jint ÷ Broiler (§2-13) |
+|---|--:|--:|--:|
+| zlib | **29** | **9** | **12.0** |
+| Mandreel | **79** | **815** | 0.54 |
+| MandreelLatency | — (same suite) | — | **54.3** |
+
+Both are asm.js: a typed-array heap addressed by shifted integer indices, with arithmetic and
+element access and essentially no named property access and no polymorphic dispatch. **So the two
+paths phases 2 and 4 are entirely built around are structurally absent from the suite this engine
+is worst at**, which is a sharper statement of §Non-goals' asm.js bullet than that bullet makes:
+the reason not to special-case asm.js is well taken, and it is *not* a reason to believe the
+general mechanisms reach it.
+
+**zlib's own gap is execution, not the front end.** Measured directly — zlib evaluates a 185 KB
+asm.js blob through `eval` inside its own timed function — the **eval-compile is 2 086 ms against
+35 062 ms for one iteration** of the benchmark, so compilation is **5.9% of an iteration and under
+2% of the measured region** (10 deterministic iterations). §4.2's Jint bullet used to file zlib
+under "the front end" alongside CodeLoad; that is corrected above. What zlib is behind on is
+running the code.
+
+#### The same hole in phase 3's corpus, and it is bigger
+
+`SpecializingTierMetrics` is where phase 3's headline numbers come from — the box counters, the
+allocated bytes, the GC-pause denominator `0090` added — and **it ran the same seven suites**.
+Widened the same way (shell stack, shell budget, checkpointed per suite), with the counters on so
+every column below is a deterministic count:
+
+| Corpus | suites | boxing requests | boxes allocated | allocated bytes |
+|---|--:|--:|--:|--:|
+| as quoted throughout phase 3 | 7 | 52 039 070 | 31 401 346 | 3.13 GB |
+| every suite that runs | 12 | **164 127 581** | **90 641 738** | **12.93 GB** |
+
+**65.4% of the corpus's boxes, 75.8% of its allocated bytes and 80.3% of its execution are outside
+the suites phase 3 has been counting.** The seven's 31.4 M reproduces the 31.16 M this document
+records after `0089`, so this is the same instrument over a bigger corpus.
+
+**And one suite that was never in it out-allocates the entire measured corpus:**
+
+| Suite | boxes allocated | allocated bytes | in the seven |
+|---|--:|--:|---|
+| **Gameboy** | **41 308 969** | 1.96 GB | **no** |
+| Crypto | 13 416 207 | 0.92 GB | yes |
+| NavierStokes | 11 747 641 | 0.49 GB | yes |
+| PdfJS | 9 001 157 | **2.35 GB** | **no** |
+| Typescript | 8 883 786 | **4.96 GB** | **no** |
+| Box2D | 5 420 051 | 0.56 GB | yes |
+| *(whole old seven)* | *31 401 346* | *3.13 GB* | — |
+
+**Gameboy alone allocates 1.32× the boxes of the seven-suite corpus phase 3 ranked itself
+against**, and Typescript allocates more bytes than all seven together. Every "N% of everything the
+corpus allocates" in this phase — 41.89%, 12.2%, 54.0%, 9.4%, 0.36% — has that denominator.
+
+**What survives the widening is worth as much as what does not.** `0090`'s denominator holds:
+collection is **1.80% of elapsed on the widened corpus** against 2.29% on the seven, so *"a box
+costs about fourteen times more to create than to collect"* was not an artifact of the corpus, and
+§Non-goals' GC bullet stands. What does not survive is the **ranking** built on top of it: phase 3
+sized its remaining work as *"an XL bidding for under 2%"* of a driver that turns out to be a fifth
+of the real one, and the suites carrying the other four fifths were never asked what they allocate.
+
+#### And it partly reverses item 3-1's move off storage
+
+The same run carries item 3-1's boxing-source census, so the widened corpus can be attributed
+without measuring anything else. The census's own partition is
+`requests − literal − conversion = what the operators and builtins mint`:
+
+| Corpus | requests | literal | **conversion** | operators + builtins |
+|---|--:|--:|--:|--:|
+| old seven | 52 039 070 | 3.2% | **47.4%** | 49.4% |
+| every suite that runs | **164 127 581** | 5.1% | **42.2%** | 52.7% |
+
+***The share barely moves and the population triples**, which is the trap `0086` already named
+from the other direction*: a share looks robust — 47.4% against 42.2% — and would be read as
+*"the corpus does not matter"*, while the absolute count goes **24.6 M → 69.3 M** and its dominant
+producer changes identity completely.
+
+| Suite | conversions | share of its requests | in the seven |
+|---|--:|--:|---|
+| **Gameboy** | **26 938 581** | **51.0%** | **no** |
+| Crypto | 17 062 140 | 67.9% | yes |
+| **Typescript** | 11 493 206 | 28.8% | **no** |
+| **PdfJS** | 5 677 720 | 34.1% | **no** |
+| NavierStokes | 4 039 054 | 25.6% | yes |
+| Box2D | 3 206 383 | 34.9% | yes |
+| *(whole old seven)* | *24 649 985* | — | — |
+
+**64.4% of the corpus's conversions are outside the seven, and Gameboy alone mints more of them
+than all seven together.** A conversion is the compiler boxing a raw `double` to cross into a
+`JSValue` — the one boxing source a typed backing store removes without further operator work.
+
+**That is item 3-1's re-specification meeting its own counter-example.** 3-1 was moved off storage
+on the strength of this census: *"only 5.0% of NavierStokes' requests are a raw double crossing
+into a JSValue, so a typed backing store cannot be why its boxes survive, while the
+conversion-heavy suite is Crypto at 31.0% — the one the guarded tree already served best."* That
+reasoning is sound about the seven and was never tested against **Gameboy**, where the conversion
+is **51.0% of a 52.8 M-request workload**, and which is a Game Boy emulator: a `Uint8Array` memory
+image and register arrays, which is *precisely* the shape 3-1 was originally written for.
+
+**The claim this does and does not support.** It does not say the typed store is worth building —
+that needs a wall-clock A/B nobody has run, and `0086`'s rate lesson says Gameboy's 1.96 GB over
+23.8 s is a lower rate than NavierStokes' 0.49 GB over 2.0 s. It says the *evidence* that retired
+the item was drawn from a corpus that excluded the item's best case, and **3-1's storage half should
+be re-opened as unmeasured rather than left recorded as refuted**.
+
+> **Shares here are not comparable to the ones this document records from the pre-`0084` census.**
+> This run is post-`0084`, `0086` and `0089`, which between them removed most of the
+> operator-minted boxes, so every remaining source's *share* is mechanically larger — NavierStokes
+> reads 25.6% here against the 5.0% recorded then. What is comparable is the absolute counts and
+> the ranking across suites within this one run, and those are what is quoted.
+
+> **The elapsed column is not a timing measurement and is not used as one.** This run has the
+> counters on, which the census's own documentation says distorts wall clock; elapsed is quoted
+> only to say which suites carry the work, at order of magnitude. The box and byte counts are
+> deterministic.
+
+#### The third census listed fifteen suites and reached nine
+
+**The correction above needs a second correction, and it goes the other way.**
+`PropertyMapDistributionMetrics` — item 2-7's instrument, the one that has had all fifteen suites
+since phase 2 — **aborts at the ninth on the same Mandreel stack overflow**, and because it too
+serialized once at the end, an aborted run produces *nothing at all*. So it was not the well-behaved
+control; it was the worst of the three. **Items 2-7 and 2-9's map figures are not reproducible from
+a clean tree**: the only way to get output was `BROILER_MAP_DISTRIBUTION_SKIP`, and the recorded
+numbers do not say what was skipped. *Listing a suite is not measuring it, and the difference is
+invisible in the output.*
+
+Fixed the same way. Run over all fifteen, it completes, and it re-takes two landed items:
+
+- **2-9 is corroborated on the full corpus.** It recorded *"six in seven property maps are never
+  built: 16.2 M → 2.5 M"*; the widened run counts **2 202 782 maps**, which is the right side of
+  that ratio measured over twice the suites.
+- **2-7's shipped policy is confirmed on live memory and its allocation win is not.** Simulating
+  the candidates against the widened distribution:
+
+| Policy | live bytes | vs round-up-16 | allocated | vs round-up-16 | nodes copied |
+|---|--:|--:|--:|--:|--:|
+| `round-up-16` (the pre-2-7 rule) | 2.044 GB | 1.000 | 2.075 GB | 1.000 | 424 472 |
+| `round-up-8` | 2.043 GB | 0.9999 | 3.114 GB | 1.501 | 9 233 940 |
+| `round-up-4` | 1.680 GB | 0.822 | 3.153 GB | 1.520 | 13 858 188 |
+| **`min-4-then-double`** (what ships) | **1.316 GB** | **0.644** | 2.166 GB | **1.044** | 13 858 188 |
+
+  2-7 recorded **0.56× live and 0.82× allocated**. **Both figures shrink on the wider corpus, and
+  one of them changes sign.** Live memory still favours the shipped policy but by less — **0.644×
+  against 0.56×** — while the allocated-bytes win becomes a small loss: geometric growth pays
+  **33× the node copying** (13 858 188 against 424 472), and on suites 2-7 never saw that turns
+  0.82× into **1.044×**. The item's decision stands, because it was taken on live memory and live
+  memory is still a third off; what should stop being quoted is the allocated column, which is now
+  a wash at best.
+
+- **And `shareAtOneGroup` reads 0.02% against the 43.9% 2-7 was justified by** — not a
+  contradiction, but §3.5's *"an item can be overtaken by the items around it"* a third time: 2-9
+  subsequently stopped writing the trie at all for shape-tracked objects, and the maps that survive
+  are the ones that needed a real descriptor, which are not the one-group population 2-7 was
+  about. *A share recorded before the item after it landed is not a share.*
+
+**Two defects in the instrument itself, reported rather than smoothed.** Its policy table labels
+`round-up-16` *"current: VirtualMemory.Allocate as written"*, which has been false since 2-7
+shipped — the code is geometric-from-`NodeBlock` and says so in its own remarks, so the simulation
+now describes a baseline nobody runs. And one histogram bucket reads **−15**, with
+`negativeBucketCounts: 15`: a count that can go negative is a defect in the counter, and it is
+surfaced in the output instead of being clamped away.
+
+**Both closed** (`0110`). The labels are corrected against the code: `round-up-16` is named as *the
+pre-2-7 rule, kept as the baseline every other row is ratioed against*, and `min-4-then-double` —
+which is what `VirtualMemory.Allocate` does today, geometric from `SAUint32Map.NodeBlock` — is
+marked **CURRENT**, so the table no longer leaves the shipping policy unlabelled while calling a
+retired one current. **And the negative bucket had a structural cause worth naming**: the histogram
+counts each map once, in the bucket its life ended at, by *moving it out of the previous bucket* as
+it grows — which assumes its arrival there was counted. A map already at that size when `Reset`
+zeroed the table has a decrement with nothing to cancel. *A negative count is not a distribution,
+and every share in the table is divided by a total that contains it.* The decrement now clamps at
+zero and the clamps are counted separately (`resetStraddlingMaps`), which is the bargain the
+negative was making, made correctly. **Re-run: 17 clamps, 0 negatives** — so the defect reproduces
+and the fix is demonstrated rather than assumed.
+
+#### Counters off: two things the widened corpus says that the seven could not
+
+Re-run with the counters off and tiering disabled (`--specializing-tier <dir> none timing`), so
+the wall clock is a legitimate one.
+
+**First, and it is a ratio rather than a share, so the caveat below does not touch it: Splay
+spends 10.3% of its time in collection, against 1.07% across the corpus** — and Splay was never
+in a census.
+
+| Suite | elapsed | GC pause | **GC share** | in the seven |
+|---|--:|--:|--:|---|
+| **Splay** | 2 011 ms | 206.5 ms | **10.3%** | **no** |
+| Crypto | 2 700 ms | 118.4 ms | 4.4% | yes |
+| DeltaBlue | 732 ms | 26.1 ms | 3.6% | yes |
+| EarleyBoyer | 3 273 ms | 88.8 ms | 2.7% | yes |
+| Typescript | 40 389 ms | 960.2 ms | 2.4% | **no** |
+| Box2D | 6 440 ms | 124.7 ms | 1.9% | yes |
+| Richards | 544 ms | 4.5 ms | 0.8% | yes |
+| Mandreel | 288 674 ms | 2 035.7 ms | 0.7% | **no** |
+
+`0090` measured collection at **1.8–2.0% of the driver** and concluded *"a box costs about fourteen
+times more to create than to collect"*, which §Non-goals promotes from assertion to measurement.
+**That average was taken without the one suite Octane includes to stress the collector.** Splay
+builds and discards a large splay tree; `SplayLatency` exists to time the pauses. At 10.3% the
+exchange rate there is nearer 9:1 than 14:1 — *still the right conclusion, and a fifth of the
+margin*. The claim that survives is the one `0090` actually needs: allocation dominates collection
+on every suite measured. What does not survive is quoting **one** number for it, when the spread
+across suites is **0.7% to 10.3%**.
+
+**Second: Mandreel completes with tiering off and fails the stack guard with tiering on.** Same
+16 MiB stack, same 12 MiB budget, same source — `arm=None` runs it in 288.7 s, `arm=Feedback`
+raises *"Maximum call stack size exceeded"* in `global_init`. So the tiering path costs enough
+stack to matter on the deepest recursion in the corpus, which is a constraint on item 4-2 nobody
+had measured because Mandreel had never reached a census. It is recorded rather than chased.
+
+> **The elapsed *shares* in that table must not be read as "share of the engine's Octane work".**
+> This census runs a fixed three iterations of each benchmark; Octane's scoring loop gives each
+> benchmark roughly equal wall clock and normalises against a per-benchmark reference. So Mandreel
+> at 78.8% of census elapsed means *one iteration of Mandreel is enormous*, not that Mandreel is
+> four fifths of an Octane run. The **GC column above is a ratio internal to each suite** and is
+> unaffected; the box and byte counts reported earlier share this three-iteration basis
+> consistently, which is what makes *those* comparisons sound.
+
+#### Honest limits of the widened run
+
+Three suites load and report setup-only counts because their benchmark bodies fail in this host,
+each for a reason already on record elsewhere in this document and none of them new:
+
+- **zlib** — `ReferenceError: read is not defined`. The `read` shell builtin is defined in
+  `Program.cs`, and the census host is not the shell. Same class of defect as the stack reserve.
+- **Mandreel** — `RangeError: Maximum call stack size exceeded`. This is the fix *working*: what
+  used to abort the process now throws. Getting Mandreel to complete in the census host is
+  further work.
+- **RegExp** — `Error: Wrong checksum`, the pre-existing defect §0 already records.
+
+Together they contribute **267 472 of 308 136 637 reads, 0.09%**, so the headline is unaffected —
+but the widened corpus is **12 suites, not 15**, and the table above says 12.
 
 ### 4.3 The blockers, ranked
 
 The bridge between §4.1 (what the engine does) and the phases (what to do). Ordered by how
 much of the gap each accounts for.
+
+> **This ranking predates the corpus correction in §4.2a and has not been re-taken.** Every
+> quantity it orders by was measured over the seven suites the censuses could reach, and §4.2a
+> found that 87.7% of the corpus's property reads, 65.4% of its boxes and 75.8% of its allocated
+> bytes lie outside them. Three specific entries below are now known to rest on a partial corpus:
+> **B1**'s ranking as "the single largest multiplier" (the boxing census tripled and its dominant
+> source changed identity), **B2**'s "Richards and DeltaBlue have the worst throughput ratios"
+> (§2-13 attributes most of DeltaBlue's ratio to V8 rather than to this engine), and **B7**'s
+> reading of the collector (Splay spends 10.3% of its time collecting and was in no census). *A
+> re-ranking needs a per-suite time basis this document does not yet have* — the census's own
+> elapsed column is on a fixed-iteration basis that Octane's scoring loop does not share — so the
+> entries are left standing with their provenance marked rather than reordered on the wrong
+> number.
 
 **B1 · Every JavaScript value is a heap-allocated object.** `JSValue` is
 `public abstract partial class JSValue` — a CLR reference type. No Smi tagging, no
@@ -2025,6 +2610,349 @@ building that oracle found two more bugs — *in the oracle* — which is the cr
 costs **7–12% of the work it removes**, over a population that is **84–99.7% never invoked**, and
 that the shape of the scan is worth a five-fold difference in that figure. **Size of what remains:
 L**, unchanged — but no longer blocked on an unpriced precondition.
+
+#### And how many sites need that obstacle solved at all: **`0102`**
+
+**The obvious next move was to skip the mechanism for the sites that do not need it, and it does
+not pay.** A function whose free names resolve to nothing an enclosing scope holds captures
+nothing, is handed no `Box[]`, and could have its tree deferred with the machinery that already
+exists — no capture mechanism, no name → index map, none of the L. Nobody had counted that
+population, and the two scanners next to it cannot: `NestedFunctionScanner` collects identifiers a
+nested function *mentions*, which cannot tell `function (q) { return q; }` from
+`function () { return q; }`, and neither knows where a name *resolves*. Counted, one row per
+function site the corpus compiles:
+
+| Corpus | sites | capture-free | share | capturing | dynamic |
+|---|--:|--:|--:|--:|--:|
+| codeload-closure | 58 | 23 | **39.7%** | 35 | 0 |
+| codeload-jquery | 534 | 82 | 15.4% | 452 | 0 |
+| pdfjs | 949 | 145 | 15.3% | 803 | 1 |
+| typescript | 1 763 | 240 | 13.6% | 1 518 | 5 |
+| box2d | 982 | 129 | 13.1% | 853 | 0 |
+| mandreel | 1 476 | 109 | **7.4%** | 1 366 | 1 |
+| **total** | **5 762** | **728** | **12.6%** | **5 027** | **7** |
+
+**So there is no cheap subset to take first.** 87.3% of sites need the capture mechanism, which
+is to say the mechanism *is* the item — and the share is worst exactly where the prize is largest,
+7.4% on Mandreel, whose compile is the biggest in the corpus and 99.7% of whose functions are
+never invoked. The one refusal that no mechanism can lift, `Dynamic`, is **7 sites of 5 762,
+0.1%** — the second time this item's stated risks have come back in an order the measurement
+reverses, after the early-error pre-parse turned out to be a tenth of the compile it was said to
+dominate.
+
+**And the reading that looked like an opening is refused by the counter built to test it.**
+Mandreel is 1 364 *top-level* function declarations, and its 7 605 bound free names are only
+**165 function-owned** — the other 97.8% resolve to a program-level binding. A script's top-level
+`var` and function declarations are properties of the global object per spec, so those names
+looked like they should cost a deferral nothing, which would have made the largest compile in the
+corpus deferrable for free. They do not: **`cellBacked` equals `bound` exactly on all six corpora,
+15 118 of 15 118**, because this engine gives a program-level binding a CLR local in the program
+lambda like every other binding, and a nested body referencing one needs a `Box[]` entry on
+exactly the same terms. ***A spec-level fact about where a binding lives is not a fact about where
+the compiler puts it*** — and the reason that is a finding rather than a guess is that the two
+counts were kept apart on purpose instead of being assumed equal.
+
+**The instrument was made to discriminate before it was pointed anywhere**, which is what makes an
+exact equality mean something rather than being a claim about the counter — §3.5's rule, paid for
+by items 3-8a and 3-9. Eighteen fixtures, the negatives load-bearing: the **same body text in two
+enclosing scopes gives two different verdicts**, which nothing that scans the function alone can
+do; a parameter or an inner `var` sharing the outer spelling captures nothing; and `cellBacked` is
+shown to separate from `bound` *before* the equality is reported, through a named function
+expression's own name — which binds with no CLR local and reads **1 bound / 0 cellBacked** against
+an ordinary local's 1 / 1. Deliberately breaking the resolver fails **exactly the four
+capture-detecting fixtures** and leaves the other eleven green. The denominator is cross-checked
+rather than asserted: classified sites match `--compile-profile`'s own function count **exactly on
+four corpora**, and by **+2 and +1** on the two that evaluate a CodeLoad epilogue — which contains
+exactly 2 and 1 inline functions.
+
+**One hazard was found by writing it and is worth more than the count.** The obvious way to ask
+where a name resolves is `FastFunctionScope.GetVariable`, and it **sets
+`RootScope.HasOuterFunctionCaptures` as a side effect of answering** — a conjunct of item 4-2a's
+tiering gate. A probe built on it would have turned tiering *off* for every function it merely
+asked about, which is an instrument changing the thing it measures, silently and only on the arm
+where it is enabled. The probe uses a side-effect-free `TryResolveBinding` instead, and a fixture
+runs the same program on both settings of the switch. *A read-only question asked through a
+mutating API is not a read-only question.*
+
+**What this does not change: the item's size or its ranking.** It is still **L**, still the front
+of phase 1, and still worth 33.6–63.9% of compile over a population 84–99.7% never invoked. What
+it removes is the option of doing a twelfth of it cheaply and calling the item started.
+
+#### The capture layout, attempted — and two obstacles the item's statement does not name
+
+**The item says its remaining half is blocked on one thing**: a captured name's index in the
+enclosing lambda's `Box[]` is decided by `LambdaRewriter` *from the tree*, and a deferred body has
+no tree, so the layout must be derivable from source alone. `0101` built the free-name walk that
+would derive it. This builds the **checker** that says whether such a derivation is correct —
+because the only property that matters about it is asymmetric: over-approximating costs a box per
+creation site, and **under-approximating is a miscompile**, so a single missed capture disqualifies
+the whole approach.
+
+`DeferredCaptureLayout` records what the front end predicts from `FreeNameScan` plus scope
+resolution, and compares it at relay against what the rewrite actually decided. Nine fixtures,
+including one that **deliberately records an empty prediction against a non-empty truth and asserts
+the miss is reported** — without it every green below is vacuous, which is `0096`'s rule applied to
+a comparison rather than an emitter.
+
+**Obstacle 1, found on the simplest fixture there is, and it is a distinction this document has been
+conflating.** `ClosureRepository` holds **two** populations, and the item's phrase *"which variables
+this lambda captures"* means one of them:
+
+- bindings **handed in** from an enclosing scope (`Setup`, appended to `Inputs`, `index >= 0`) —
+  what a deferred body needs a `Box[]` index for, and what a free-name walk answers;
+- the lambda's **own locals that something nested captures** (`Convert`, `index == -1`) — which
+  must live in a cell, and which a free-name walk of that lambda correctly does *not* name,
+  because they are not free in it.
+
+Compared against the whole repository, `function outer(){ var q = 1; var inner = function(){ return q; }; }`
+reports **`outer` missing `q`** — a function "missing" its own local. The prediction was right and
+the comparison was wrong. *So the deferral needs two derivations, not one*: the enclosing function
+must learn which of its own locals to box from **its children's** free-name sets, and the deferred
+body must learn its own free names' indices. `FreeNameScan.ForProgram` already computes bottom-up
+and can serve both; nothing in the item's text says two are needed.
+
+**Obstacle 2: every function captures a binding no source identifier names.** `ScriptInfo_1` —
+script metadata the compiler threads into each function — is handed in to every one of them. A
+free-name walk cannot predict it and must not be charged for it, so the layout has to carry a
+reserved region for compiler-introduced captures alongside the source-derived one. Also in that
+class: `this`, `arguments`, `new.target`.
+
+**The instrument disagreed with itself, and fixing that is what produced the answer.** The first
+corpus run reported 170 missed sites and, in the same run, Mandreel at **2 622 exact against 1 476
+predicted sites** — more checks than predictions, which can only mean a site is relayed more than
+once. Three corrections, in the order they had to be made:
+
+1. **Repeats are recognised rather than counted.** A layout is a property of a *site*, so counting
+   it once per relay makes every total a function of how many times the enclosing lambda happened
+   to be emitted. **Mandreel relays 1 336 of its 1 358 sites twice**; jQuery and Typescript relay
+   none twice. And the interesting half is counted rather than assumed — **repeat disagreements
+   are 0 on every corpus**, so the repeat is pure duplication and the rewrite decides the same
+   capture set on every relay.
+2. **Undeferrable bodies are excluded, which was a defect in this checker.** A
+   `FreeNameScan.Dynamic` body can reach bindings its text never names, so there is no set to be
+   right about — but recording it as an *empty prediction* reports every one of its captures as a
+   miss, which is the strongest signal the instrument has. That was the whole of the
+   `predicted{}` population on Mandreel, PdfJS and Typescript. **7 sites across the corpus.**
+3. **And then one real defect, in `0101`'s own code.** With the noise gone, every remaining miss
+   was the same shape — `F/F`, `G/G`, `Dict/Dict`, `mandreelNextDecompress/…` — **a function
+   referencing its own name**. `FreeNameScan.EnterFunction` bound the function's own name inside
+   the function unconditionally, with a comment describing the *named function expression* case.
+   A function **declaration**'s name is bound in the **enclosing** scope, so a self-reference is a
+   free reference and a deferred body must be handed a box for it. **138 sites across five
+   corpora reported as capturing nothing.** The fix is one condition, and it is a soundness fix
+   rather than a precision one: built on as it stood, a deferred self-referential declaration
+   would have resolved its own name to a box that was not there.
+
+**With those three, the corpus reports zero.**
+
+| Corpus | checked | excluded | repeats | disagreements | exact | over | **missed** |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| codeload-closure | 49 | 0 | 0 | 0 | 48 | 1 | **0** |
+| codeload-jquery | 413 | 0 | 0 | 0 | 272 | 141 | **0** |
+| mandreel | 1 358 | 1 | 1 336 | 0 | 1 346 | 12 | **0** |
+| pdfjs | 795 | 1 | 7 | 0 | 220 | 575 | **0** |
+| typescript | 1 569 | 5 | 0 | 0 | 357 | 1 212 | **0** |
+| box2d | 973 | 0 | 4 | 0 | 202 | 771 | **0** |
+| **total** | **5 157** | **7** | **1 347** | **0** | **2 445** | **2 712** | **0** |
+
+**So the precondition holds on the corpus: a layout derived from source alone never misses a
+capture the rewrite makes.** It over-approximates on **2 712 of 5 157 sites** — safe, and the
+price is one box per over-predicted name at each creation site plus that name's numeric tier,
+which is the cost side the mechanism will have to be measured against.
+
+**The one shape the corpus does not contain is now closed too, and it took two attempts.** A named
+function *expression*'s own name is bound inside itself by the specification — `FreeNameScan` is
+right that it is not free — and **this engine materialises that binding as a `JSVariable` parameter
+in the enclosing scope which the body captures**, so the layout must carry it anyway.
+`var f = function g(n) { … g … }` read `g/g predicted{}`.
+
+**The first attempt looked the name up in the function's own scope and tested `Variable != null`,
+which is exactly the field this binding leaves null on purpose** — its own comment says it *"is not
+a local Variable of this scope (it is captured read-only), so it is exposed via
+`EvalCaptureExpression` only"*. Reading `Variable ?? EvalCaptureExpression`, the same disjunction
+`VariableScope.CaptureExpression` already makes, closes it. That is item `0097`'s rule for the third
+time — ***ask what the compiler built, not what the analysis proved*** — and the first time it has
+decided a **mechanism** rather than a measurement.
+
+**Adding the self-name unconditionally cost 126 sites of precision**, because a named function
+expression that never mentions its own name is handed no cell for it. So `FreeNameScan` now gives
+the self-name **a scope of its own**, below the function scope, which is where the specification
+puts it too: a parameter or body binding of the same spelling shadows it correctly, and a reference
+that reaches it can be told apart from one that reaches a parameter. `SelfNameReferenced` is then
+exact rather than "the function has a name".
+
+| | missed | exact | over |
+|---|--:|--:|--:|
+| before the self-name was predicted | 0 *(shape absent from corpus)* | 2 445 | 2 712 |
+| self-name added unconditionally | 0 | 2 319 | 2 838 |
+| **self-name gated on a reference** | **0** | **2 445** | **2 712** |
+
+**The gap closes at no precision cost** — the same 2 445 exact as before it was predicted at all.
+
+#### The layout question, asked as the item states it — as an INDEX — `0112`
+
+**`0104` predicted a set and checked membership; this document then recorded it as having settled
+the layout, and later sections repeated that. It had not.** The item states its obstacle as *"a
+captured name's **index** in the enclosing lambda's `Box[]`"*, and that index is `Inputs.Count` at
+the moment `ClosureRepository.Setup` first sees the binding — **the order the closure rewrite's
+descending walk meets it in the body**. The prediction was a `HashSet` built from
+`FreeNameScan.Free`, itself a `HashSet`. *It has no order, so it could not have answered the
+question even in principle.* Zero missed names means a deferred body would be handed the right
+bindings; it says nothing about whether it would find each one **in the slot the creation site put
+it**.
+
+So the order is now recorded and compared — against `repository.Inputs`, the array the creation site
+emits in index order, rather than against the `Closures` dictionary whose enumeration order is a
+hash-table detail.
+
+| Corpus | ordered | **exact** | **mismatched** | sets differ |
+|---|--:|--:|--:|--:|
+| codeload-closure | 72 | 34 | **0** | 38 |
+| codeload-jquery | 497 | 143 | **0** | 354 |
+| mandreel | 1 867 | 253 | **0** | 1 614 |
+| pdfjs | 2 674 | 639 | **0** | 2 035 |
+| typescript | 4 255 | 1 430 | **0** | 2 825 |
+| box2d | 5 240 | 1 962 | **0** | 3 278 |
+| **total** | **14 605** | **4 461** | **0** | **10 144** |
+
+***Where the predicted set equals the handed-in set, the predicted order equals the slot order —
+4 461 of 4 461, without exception.*** That is the reassuring half, and it is new.
+
+**The other 10 144 carry a consequence `0104`'s framing did not.** They are the over-approximation
+it counted at 2 712 sites, which it recorded as *"safe, and the cost side the mechanism must be
+measured against"* — one box per creation site. **For membership that is right. For a layout it is
+not merely a cost**: an extra predicted binding shifts every later slot, so the predicted numbering
+and the tree-derived numbering are *different numberings*, not the same one with spare entries. That
+is only safe if **the deferral drives the layout from the prediction rather than matching it** — the
+enclosing function boxes exactly what was predicted, in predicted order — which is a design
+constraint the item did not previously carry and which makes over-approximation cost boxes rather
+than correctness.
+
+**Two defects found writing it, both in this patch's own change.** Adding the order insertion
+without braces made the following `else` bind to it — the dangling else — so `SelfNameReferenced`
+stopped being set, and the named-function-expression fixture failed on the first run; *that fixture
+is a paired assertion precisely so a one-sided regression cannot pass it*. And the parent's free
+order was composed by iterating the child's **set**, which would have scrambled the property being
+measured — fixed, and re-measured **identical**, so the hazard was latent rather than active.
+
+**State: the layout is validated, the deferral is not built, and the item is still L.** What is now
+known that was not: the derivation **never under-approximates**, on the corpus *or* on the one
+shape the corpus lacks; it over-approximates on **53%** of sites, which is the cost the mechanism
+must be measured against; `ClosureRepository`'s two populations must be told apart; and the
+compiler-introduced captures (`ScriptInfo_*`, `this`, `arguments`, `new.target`) need a reserved
+region beside the source-derived one. **Two soundness defects were fixed getting here**, both about
+a function's own name, and both would have miscompiled a deferred body built on the layout as it
+stood.
+
+#### The mechanism: **the enclosing scope is kept alive, and re-entry is built** — `0105`
+
+**The item's stated raw material does not serve it, and that is provable rather than arguable.** The
+item says `JSFunction` *"already carries `source` and already recompiles from it for tiering — the
+raw material for deferring is present"*. Read, `RecompileForTiering` wraps the text as `({source})`
+and hands it to `CoreScript.Compile` **as a fresh top-level script** — no enclosing scope, by
+construction, which is why 4-2a had to refuse the identity cases and repair strictness. The tiering
+gate enforces the same thing from the other side: it admits a function only when
+`!HasOuterFunctionCaptures && !HasNestedFunctions && withBoundaries.Count == 0`, not an arrow, not a
+class, not direct-eval compilation. ***So the recompile path is sound precisely for the functions
+with no enclosing context to reproduce, which is the complement of the population a deferral
+serves*** — `0102` counted 87.3% of sites capturing something. The two mechanisms share a source
+string and nothing else.
+
+**What the deferral actually needs, itemised**: a body compiled at first call must be handed **14**
+`CreateFunction` parameters, **9** reads of the enclosing `FastFunctionScope` and **5**
+`FastCompiler` fields. The capture layout `0104` settled is the *solved* part; twenty-eight other
+pieces of state are not.
+
+**So the scope is kept rather than reproduced, and that turned out to be nearly free.**
+`FastFunctionScope` **is not pooled** — its `Dispose` is `LinkedStackItem`'s, which only pops the
+stack — so a scope object already outlives its frame, and holding a reference retains the whole
+`Parent` chain, valid and unrecycled. Re-entry is `LinkedStack.Switch`, which the stack already has.
+Only the compiler's own five fields are saved and restored, on the throwing path too, because a
+deferred compile happens in the middle of somebody else's work and a moved scope stack would
+corrupt a compilation that has nothing to do with it.
+
+**Retention is inert and the check is the point.** With the switch on, the body is still compiled
+eagerly *and* a context is retained; the question is whether compiling it a **second** time, after
+the enclosing compilation has finished, reproduces the first tree. **That comparison is only
+possible while both exist**, which is why it is made before anything is deferred — once the eager
+tree stops being produced there is nothing to check the re-entered one against.
+
+As first read, that was **4 811 of 5 723, 84.1%** — the number `0106` below re-takes and then
+explains away, because two of the three things holding it down were the comparison and the check's
+own second compilation rather than the re-entry.
+
+Nine constructed shapes reproduce exactly — a three-level capture, a per-iteration `let` cell, a
+shadowed name, a recursive declaration beside a named function expression, `'use strict'`
+inheritance, and a fixture asserting the compiler state is left as it was found.
+
+**Equality here is alpha-equivalence, and finding that out was the first result.** A second
+compilation necessarily draws fresh names from the compiler's monotonic counters, so the raw text
+differs everywhere: `Context3` against `Context4`, `#TempJSValue20` against `#TempJSValue31`,
+`EnableTiering(…, 0, 0)` against `(…, 1, 1)`, and — the whole of the corpus's first pass —
+`PropertyInlineCacheSite.Get(7, …)` against `Get(236, …)` at **every property access**. Those are
+item 4-2b's process-wide site counter; **a genuine deferral compiles the body once, so they cannot
+arise**. Canonicalising each family by *first appearance* rather than erasing it keeps a re-entry
+that emitted them in a different **order** visible.
+
+#### The residual, settled — and most of it was the comparison — `0106`
+
+The paragraph this replaces said the residual **15.9%** looked like ordinal divergence on every
+instance examined, that a printed diff *"can only ever answer 'equal up to a renaming somebody
+thought of in advance'"*, and that settling it needed something else. It is settled, and **the
+first thing the settling found was a defect in the checker rather than in the mechanism.**
+
+**The gensym families shared one ordinal table, keyed on the bare number.** So `Context3` and
+`#TempJSValue3` shared an entry, and any function where two families drew the same number on one
+side and not the other **desynchronised every ordinal after it** — reporting a difference that was
+an artifact of the comparison. The families do not share a counter; the table must not either.
+**One table per family takes five of six corpora to 100.0%.**
+
+**Then the residual is partitioned rather than described.** Beside the equality up to an
+order-preserving renaming, the same three families are **erased** instead of mapped — which asks
+whether the two trees agree in every token a counter did *not* produce.
+
+| Corpus | re-entered | reproduced | **structural** | threw |
+|---|--:|--:|--:|--:|
+| codeload-closure | 58 | **100.0%** | **100.0%** | 0 |
+| mandreel | 1 476 | **100.0%** | **100.0%** | 0 |
+| codeload-jquery | 534 | 99.8% | **100.0%** | 0 |
+| pdfjs | 910 | 99.7% | **100.0%** | 0 |
+| box2d | 982 | 99.7% | **100.0%** | 0 |
+| typescript | 1 763 | 73.7% | **100.0%** | 0 |
+| **total** | **5 723** | **91.8%** | **100.0%** | **0** |
+
+***No re-entered body differs from its eager tree in a node, an operator, a constant or a shape*** —
+5 723 of 5 723, on every corpus, with none throwing. Erasure is deliberately the **weaker** of the
+two questions and is reported *beside* the stronger rather than instead of it, because what it
+hides is a permutation of counter values.
+
+**And the 471 functions whose ordinals still differ classify exactly two ways, with nothing in
+"other".** **460** are the site table's `-1` sentinel: the check compiles every body a *second*
+time and a retained context recompiles its **whole subtree**, so Typescript drives item 4-2b's
+process-wide counter from **24 759 to exactly its `MaxSites` of 65 536** and every allocation after
+that is refused. **11** are the **eager** side re-using a site the re-entry allocated fresh — 4-2b's
+tier-2 rule working as designed, since a recompile for tiering re-uses the tier-1 site so the
+feedback it consumes stays addressable, and a re-entry has no tier-1 tree to re-use from.
+***Both are properties of compiling the same body twice in one process, which a deferral by
+construction does not do.*** The counts are per-process, because sharing the counter across six
+corpora is what made the first reading 84.1% instead of 91.8%.
+
+**Both equalities are pinned directly rather than trusted for never having failed** — §3.5's rule
+from `0096`, and the rule `0104`'s layout checker was built under. One fixture drives a counter
+renaming (both accept), a token no counter produced (both reject), and **a site re-used on one side
+only**, which the strong equality reports and the weak one cannot: that is the exact gap between
+the two numbers, asserted rather than described, and it is why the 471 are classified from the raw
+sequences instead of left inside the weaker one.
+
+
+**And nothing is deferred yet.** The eager path still compiles every body; the switch
+(`BROILER_JS_DEFER_TREE`, default off) decides only whether a context is retained, and a fixture
+asserts the same program returns the same answer on both settings. What is built is the half that
+had no evidence — that a body *can* be compiled later from a kept scope — and it is built where it
+can still be checked against the answer it has to match. **Size: still L**; what remains is
+suppressing the eager build and threading the deferred site through `Relay`, which
+`BLambdaExpression`'s readonly `Body` makes a change to the expression node rather than to the
+compiler.
 
 #### What landed for it: the closure rewrite is no longer walked once per level
 
@@ -3788,6 +4716,92 @@ across all four pinned manifests — 8 313 / 8 220 / 84 / 44 / 9, identical mani
 The change cannot return a wrong value: a refreshed entry is still checked by every guard on the
 next read, and the entry it replaces was one the guards had just rejected.
 
+#### 2-13 · Where the rest of DeltaBlue's gap is — **measured against the third engine, and it is mostly not Broiler's**
+
+2-12 left the item in a stated but unexplored state: *"whatever is left is not property-cache-shaped,
+and the remaining gap now has to be looked for somewhere other than phase 2's subject."* Four
+explanations had been eliminated and the suite still failed the gate at 447×, now **399.5×** on the
+committed run. This is the look, and it needed **no new instrument** — the answer was in the column
+every committed run has carried since Jint was added and nobody had divided.
+
+**The question was asked the wrong way round.** *"Why is Broiler 400× slower than Chromium on
+DeltaBlue when it is 141× on Richards?"* presumes the 2.83× between them is Broiler's. Jint is a
+managed interpreter with no JIT at all, on the same runtime, in the same run — so asking it the same
+question separates *"DeltaBlue is hard for this engine"* from *"DeltaBlue is a suite V8 does
+unusually well on"*:
+
+| | Chromium ÷ Broiler | Chromium ÷ Jint |
+|---|--:|--:|
+| Richards | 141.3× | 203.8× |
+| DeltaBlue | **399.5×** | **521.6×** |
+| **DeltaBlue ÷ Richards** | **2.83×** | **2.56×** |
+
+**Only 1.10× of the 2.83× is Broiler's own** — and it reproduces on the previous committed run,
+independently, at **1.118×** (Broiler 3.04×, Jint 2.72×). *Both managed engines fall behind V8 on
+DeltaBlue by nearly the same multiple that they fall behind it on Richards, plus a tenth.*
+
+**The consequence is a bound on the item rather than a lead inside it.** Closing the whole
+Broiler-specific residue takes DeltaBlue from **399.5× to 362×** (395× on the older run's numbers).
+The gate is **200×**. So **phase 2's exit criterion on DeltaBlue is not reachable by removing a
+Broiler-specific deficiency at all** — meeting it requires beating Jint on that suite by a further
+~1.8×, which is not a claim any phase 2 item was written to make, and not one the phase's machinery
+is shaped to deliver. *An exit criterion expressed as a ratio to another engine inherits that
+engine's behaviour, and this one has been read for three sessions as though it were a statement
+about ours.*
+
+**The method is checked before it is trusted**, because a ratio of ratios will produce a number for
+any pair of suites whether or not it means anything. Across the committed run it separates by two
+orders of magnitude and reads in both directions:
+
+| Suite | Chromium ÷ Broiler | Chromium ÷ Jint | Jint ÷ Broiler | Reading |
+|---|--:|--:|--:|---|
+| MandreelLatency | 5 331.8× | 98.1× | **54.3** | Broiler-specific, and the largest in the suite |
+| CodeLoad | 211.4× | 5.6× | **37.8** | Broiler-specific — the front end |
+| zlib | 182.8× | 15.2× | **12.0** | Broiler-specific |
+| PdfJS | 111.4× | 69.5× | 1.60 | mildly Broiler-specific |
+| RegExp | 78.2× | 49.0× | 1.60 | mildly Broiler-specific |
+| **DeltaBlue** | **399.5×** | **521.6×** | **0.77** | **Broiler ahead of Jint** |
+| Richards | 141.3× | 203.8× | 0.69 | Broiler ahead of Jint |
+| Mandreel | 271.2× | 504.3× | 0.54 | Broiler well ahead |
+| Crypto | 116.3× | 253.4× | 0.46 | Broiler well ahead |
+
+**Broiler is *ahead* of Jint on DeltaBlue** (0.77), by almost the same margin it is ahead on
+Richards (0.69). The three suites where it is genuinely, differentially behind are the front end and
+latency — exactly where §1.1 says the structural gap is, and none of them is DeltaBlue.
+
+**And the obvious remaining explanation is falsified by a second control in the same table.** Item
+4-1 records DeltaBlue as the worst read case at 77.10% monomorphic with 43 polymorphic read sites
+against Richards's 1, which reads like the answer. It is not: **Crypto is 73.82% monomorphic — worse
+than DeltaBlue — with 25 polymorphic sites carrying 26.2% of its reads, and Crypto is Broiler's
+*best* suite against Jint at 0.46×.** Read polymorphism does not predict the gap in either
+direction.
+
+| Suite | read observations | monomorphic | polymorphic sites | polymorphic share |
+|---|--:|--:|--:|--:|
+| EarleyBoyer | 5 490 829 | 100.0% | 0 | 0.0% |
+| Richards | 605 672 | 96.74% | 1 | 3.3% |
+| Box2D | 25 963 010 | 94.12% | 247 | 5.9% |
+| RayTrace | 2 919 249 | 94.06% | 37 | 5.9% |
+| **DeltaBlue** | 1 001 675 | **77.10%** | **43** | **22.9%** |
+| **Crypto** | 1 891 092 | **73.82%** | 25 | **26.2%** |
+
+**What is left that phase 2 or phase 4 could still reach, priced.** 4-2b's tier-2 specialization
+emits a *monomorphic* read — a shape guard plus a direct slot load — so by construction it reaches
+at most **77.1%** of DeltaBlue's reads, and a polymorphic form would add the remaining **22.9%**.
+Against 4-5's corpus-wide finding that reads are **9.16%** of execution time, that is **≈2.1% of
+DeltaBlue's time**. Worth knowing before anyone builds a polymorphic tier-2 read on DeltaBlue's
+account; not worth building on it. (The 9.16% is a corpus figure, not DeltaBlue's own, and is used
+here only as an order of magnitude.)
+
+**So 2-10 closes as measured.** The suite kept its own item through four eliminations and two real
+defects — `push` costing every array its shape, the redundant prototype write, the un-replaceable
+cache entry — every one of which was worth fixing on its own terms, and none of which was the 400×.
+The 400× is largely V8's win rather than Broiler's loss, the residue is a tenth, and **what the item
+should hand forward is a question about the gate rather than a lead inside the suite**: whether
+*"inside 200× of Chromium"* is the right acceptance test for a benchmark on which Chromium is
+2.56× further ahead of a plain interpreter than it is on the suite beside it. Recorded as a reading
+for the plan to decide, not changed here.
+
 ---
 
 
@@ -3807,7 +4821,60 @@ Owner assemblies: `Broiler.JavaScript.Storage`, `.Runtime`, `.Compiler`.
 > indexed access boxes its index**, ~32 B on every array read and write in the engine, with no
 > read-side cost to removing it. That became **3-0**, and it goes first.
 
-### 3-1 · Unboxed backing stores for dense arrays — **re-measured; it is the precondition for the six items already built**
+### 3-1 · Unboxed backing stores for dense arrays — **re-measured; the storage half is re-opened as unmeasured, not refuted (§4.2a)**
+
+> **The evidence that moved this item off storage came from a 7-of-15-suite corpus.** "Only 5.0% of
+> NavierStokes' requests are a raw double crossing into a `JSValue`" is what retired the typed
+> backing store, and it was never tested against **Gameboy** — a `Uint8Array` memory image with
+> register arrays, never in any census, where the conversion is **51.0% of a 52.8 M-request
+> workload** and which alone mints **more conversions (26.9 M) than the entire old corpus
+> (24.6 M)**. The operator work this item did instead is real and measured and stands; what is
+> withdrawn is the *refutation* of the storage half. See §4.2a. **This is not a claim the store is
+> worth building** — that needs a wall-clock A/B nobody has run, and by `0086`'s rate lesson
+> Gameboy's 1.96 GB over 23.8 s is a lower rate than NavierStokes' 0.49 GB over 2.0 s.
+>
+> **Since resolved on the axis that decides it** (`0113`): the read/write ratio the verdict rests on
+> is now counted, and **Gameboy's is 1.03** — an allocation wash. *The suite that re-opened the item
+> does not carry it.* The corpus is **3.34 reads per write**, NavierStokes 5.26 and Crypto 4.80, so
+> a typed store is a net allocation loss of ~2.3 boxes per write. **The live-memory case stands and
+> is now the whole of the item.**
+
+#### The ratio the whole verdict rests on, counted — and it settles what §4.2a re-opened — `0113`
+
+The item trades a write allocation for a read allocation, so its verdict is a ratio: *"a wash at a
+1:1 read/write ratio, a win only when writes dominate, and a loss on read-heavy code"*. It then
+asserts that its named targets *"read each element many times per write, which is the unfavourable
+direction"*. **That is a claim about the corpus, and nothing counted it.**
+
+Counted on the **dense path** — the population a typed store would serve, since a dictionary-kind
+array is outside the item entirely — and split by whether the value is a **number**, because an
+array of strings would make a corpus ratio describe arrays the item cannot help:
+
+| Suite | numeric dense writes | numeric dense reads | **reads per write** |
+|---|--:|--:|--:|
+| NavierStokes — *the item's grid target* | 10 370 089 | 54 560 144 | **5.26** |
+| Typescript | 338 606 | 1 723 870 | 5.09 |
+| Crypto — *the item's digit-array target* | 8 670 639 | 41 589 626 | **4.80** |
+| PdfJS | 16 442 985 | 39 097 665 | 2.38 |
+| Box2D | 414 130 | 987 088 | 2.38 |
+| **Gameboy** | 1 726 800 | 1 777 310 | **1.03** |
+| **Splay** | 2 824 002 | 15 998 | **0.01** |
+| **corpus** | **42 351 440** | **141 424 351** | **3.34** |
+
+**The assertion was right and now has a number.** At 32 B boxed per read against 32 B saved per
+write, a typed store is a **net allocation loss of about 2.3 boxes per write** over the corpus — and
+worse on both suites the item names.
+
+**And it settles what §4.2a re-opened.** That section withdrew the item's refutation because the
+evidence retiring the typed store came from a corpus that never contained **Gameboy**, where the
+raw-double-to-`JSValue` conversion is 51.0% of a 52.8 M-request workload. *Counted, Gameboy's dense
+read/write ratio is 1.03* — **an allocation wash, not a win**. The suite that re-opened the item
+does not carry it, and what survives is the **live-memory** argument the item already made and never
+needed this measurement for.
+
+**Splay is named rather than averaged away.** It is the one suite running the item's favourable
+direction, and it runs it by two orders of magnitude: **2 824 002 writes against 15 998 reads**. A
+corpus ratio hides that, which is why the table is per suite.
 
 **Where.** `Broiler.JavaScript.Storage/ElementArray.cs` — `private IPropertyValue[] dense`.
 
@@ -4794,7 +5861,7 @@ pre-existing win-x64 host-environment ones. **test262 over all four pinned manif
 
 **Size: M**, and it landed at that size.
 
-### 3-2 · Unboxed doubles in shape slots — **measured; its premise sentence is wrong and its population is one suite**
+### 3-2 · Unboxed doubles in shape slots — **measured; its premise sentence is wrong, and the "one suite" was an artifact of the seven-suite corpus**
 
 The object-field twin of 3-1: `shapeSlots` holds `JSValue` references, so
 `vector.x = 1.5` allocates. This is what RayTrace and Box2D need, and it **composes
@@ -4858,7 +5925,51 @@ missing — and the per-suite column is the one that decides the plan:
   Together they are **85% of the corpus's boxes and essentially no property traffic**: their
   numbers live in `new Array` read by index. *No amount of work on shape slots reaches them.*
 
+#### The table above is the seven suites, and widened it overturns the re-specification below
+
+**The signal 3-2 was missing was collected on exactly the corpus §4.2a found the censuses were stuck
+on**, and the total gives it away: 20 065 493 cache-answered reads, against **186 831 813** over the
+twelve suites that run. *The seven are 10.7% of the corpus's cache-answered reads and 9.7% of its
+numeric ones.* `SpecializingTierMetrics` has reached all fifteen since `0103`, so this is a re-read
+rather than a new instrument — the fourth figure in this document to need one.
+
+| Suite | cache-answered reads | of them numeric | | boxes allocated | in the seven |
+|---|--:|--:|--:|--:|---|
+| **Typescript** | **115 082 436** | **64 199 239** | **55.8%** | 8 797 514 | — |
+| **Gameboy** | **47 152 809** | **27 437 672** | **58.2%** | **29 322 416** | — |
+| Box2D | 18 242 021 | 9 853 002 | 54.0% | 5 225 033 | yes |
+| PdfJS | 3 190 918 | 1 054 355 | 33.0% | 6 394 984 | — |
+| Splay | 1 338 329 | 415 070 | 31.0% | 29 337 | — |
+| Crypto | 651 171 | 74 382 | 11.4% | 13 409 653 | yes |
+| NavierStokes | 388 | **0** | 0.0% | 11 747 635 | yes |
+| **all twelve** | **186 831 813** | **103 158 443** | **55.2%** | **75 704 490** | |
+
+**The premise strengthens and the plan inverts.** *"Half of every property read the cache answers
+hands back a number"* goes from 50.1% to **55.2%**, so the item's founding observation is if
+anything better than recorded. But **"3-2 is a Box2D item" is wrong**: Box2D is **9.6%** of the
+corpus's numeric reads, not 98%. ***3-2 is a Typescript-and-Gameboy item*** — those two are
+**64.2 M and 27.4 M numeric reads, 89% of the corpus's between them**, and neither had ever been
+counted.
+
+**The box split inverts with it.** *"3-1 carries 85% of the corpus's boxes (NavierStokes' 30.0 M plus
+Crypto's 42.4 M)"* — over twelve suites those two are **25.2 M of 75.7 M, 33.2%**. **Gameboy alone is
+29.3 M, 38.7%**, the largest single source in the corpus, and it is *not* one of 3-1's suites.
+
+***And `0113` says which item Gameboy belongs to.*** Its dense element read/write ratio is **1.03**,
+so a typed backing store there is an allocation wash — while **58.2% of its cache-answered property
+reads hand back a number**. **For the corpus's biggest box source, 3-2 is the item and 3-1 is not.**
+That is the opposite of the ordering below, and the two measurements were taken independently.
+
+**What survives unchanged.** *"3-2 cannot touch 3-1's suites"* holds exactly as written and is
+sharper for the widening: NavierStokes performs **388** property reads, **zero** numeric, against
+11.7 M boxes; Crypto reads 651 171 against 13.4 M. Their numbers still live in `new Array` read by
+index, and no work on shape slots reaches them. The two items are still one mechanism with two
+backends — the identical per-iteration figures above are untouched by any of this.
+
 #### Re-specification
+
+> **Superseded in its ordering by the widened table above**, which was taken after it. The
+> *mechanism* argument — one compiler half, two backends — stands; the *ranking* does not.
 
 **3-1 first, then 3-2, and the split is now quantitative rather than a guess.**
 
@@ -6535,7 +7646,7 @@ and tested; what is missing is the part that makes entering tier-2 worth anythin
 |---|---|---|---|---|
 | **4-3** | **Deoptimization** — **designed; 4-3a and 4-3b both landed** | `Runtime/FunctionTiering.cs`, `Engine/CallFrames.cs`, and for 4-3b `.Compiler` / `.ExpressionCompiler` | The safety net that makes everything else legal. "Bail out mid-function by reconstructing an interpreter frame" is **not expressible here** — there is no interpreter frame. Splits into **4-3a** (S, the restart contract the pilot already implements) and **4-3b** (M–L, a generic fallback branch inside the specialized method), and only 4-3b gates 4-4 | ~~XL~~ **S + M–L** |
 | **4-1** | **Type feedback collection** — **shapes and callees landed; numeric-vs-generic outstanding** | `Runtime/TypeFeedback.cs`, `Runtime/ObjectShape.cs`, `LinqExpressions/JSFunctionBuilder.cs` | The inline caches already observe shapes at property sites but do not *retain* them. Now recorded per site and kept: receiver shapes at reads, callee identities at calls. **And it answers the question the rest of the phase rests on — see below.** Callee identity was phase 2's 2-6 until that item was measured: there is no repeated callee resolution to remove, so recording it is feedback and nothing else, and it pays only once 4-2 and 4-4 consume it | L |
-| **4-2** | **A specializing tier-2 compile** — **split by measurement; 4-2a and 4-2b both landed, arithmetic half outstanding** | `BuiltIns/Function/JSFunction.cs` — replace the `numericPlan == null` branch, plus `Runtime/TypeFeedback.cs` and `.LinqExpressions` for 4-2b | Consume 4-1's feedback: monomorphic property access → shape check plus direct slot read; arithmetic → raw `double`/`int` where feedback says so. **Measuring the branch first found it unsound** — it does not recompile the same code the same way, and DeltaBlue died on it — so the item splits into **4-2a** (S, the recompile contract) and **4-2b** (L, the specializing emission). 4-2b specializes **44.7% of the corpus's executed reads at 0.818× each**, which is **0.83% of suite time**: real, and below the noise floor | ~~XL~~ **S + L** |
+| **4-2** | **A specializing tier-2 compile** — **split by measurement; 4-2a and 4-2b both landed, arithmetic half outstanding** | `BuiltIns/Function/JSFunction.cs` — replace the `numericPlan == null` branch, plus `Runtime/TypeFeedback.cs` and `.LinqExpressions` for 4-2b | Consume 4-1's feedback: monomorphic property access → shape check plus direct slot read; arithmetic → raw `double`/`int` where feedback says so. **Measuring the branch first found it unsound** — it does not recompile the same code the same way, and DeltaBlue died on it — so the item splits into **4-2a** (S, the recompile contract) and **4-2b** (L, the specializing emission). 4-2b specializes **44.7% of the corpus's executed reads at 0.818× each**, which is **0.83% of suite time**: real, and below the noise floor. **The arithmetic half is now measured and refused** (4-2c): its population is 3-1's `NoSavingToMake` refusal, its census was another seven-suite 100.00% that reads **92.10%** over twelve with a **0.46%–100%** spread, and specializing all of it is **0.119% of the corpus** — net negative at the `+` rate, whose failing guard is **18.567×**. The relational lead is closed with it at **0.022%**, so the **whole generic binary-operator surface is 0.475%** | ~~XL~~ **S + L + refuted** |
 | **4-4** | **Inlining of small JS callees** at monomorphic sites — **premise measured; re-specified, do not start as written** | `.Compiler` | What Richards and DeltaBlue actually need, and the measurement says why: **a call costs ~250 ns, about thirteen times the loop body it replaces** (2-6). Strictly downstream of 4-3, 4-1 and 4-2 — the callee-identity feedback it needs is 4-1's, not a separate phase-2 item. **Measured before starting, and the ceiling is 1.89%**: 6 194 758 invocations of which **37% are to native builtins with no body to inline**, 3 902 620 with a JavaScript callee, 64.0% of those from a promoted function, and a hand-inlined control says inlining saves 149 ns each. Inlining is *expressible* here — unlike 4-3's deopt, the mechanism exists — so the blocker is value, and it splits into **4-4a** (the stack-trace question) and **4-4b** (AST-level inlining). **New 4-5** — make the fixed 142 ns call prologue cheaper — addresses more calls for less risk | ~~XL~~ **deferred; 4-5 first** |
 | **4-5** | **The fixed cost of a call** — **ablation done; premise mostly falsified, one cost fixed** | `Engine/Core/JSEngine.cs` | A call costs **142 ns before any argument** plus 17.1 ns each. The ablation prices every piece: **five nested `using` scopes cost 0.011 ns**, EH 0.73 ns, dispatch 0.68 ns, ThreadStatic reads free — so the prologue is *not* where the cost is, and 2-6 is confirmed directly. The one real cost is an **`AsyncLocal<bool>` read at 7.0 ns against a `[ThreadStatic]` at 0.31 ns**, read on every call, and documented in `JSEngine` as *"reads are cheap"* — **wrong by 24x**. Mirrored into a ThreadStatic, keeping the AsyncLocal as the carrier: **0.22% of the corpus**, pinned by 9 tests that also pass on the unmodified engine. **~85% of a call's fixed cost remains unattributable from outside the engine** — the rest of the item is blocked on a profiler, not on a design | ~~M–L~~ **S landed; rest blocked** |
 | **3-5** | **A numeric local compared against a `JSValue`** — **landed** | `.Compiler` — `FastCompiler.VisitBinaryExpression` | The control loop every probe here used as a floor was paying a box per iteration: `i` is a raw double, `n` is a `JSValue`, and `<` had a native form only when **both** sides were doubles, so the raw side was boxed to meet the generic operator. The cause is not the parameter — unboxing the *other* side needs no entry guard and covers more (`i < a.length` is a property read). Sound because ToPrimitive of a Number is that Number; `<`/`>` only, as NaN makes `<=`/`>=` unsafe. **33.77 → 10.03 ns and 32 → 0 B per iteration, 3.4× on its shape**, 33 semantics tests that all pass on the unmodified compiler too. **On the corpus it is invisible — 0.997× bytes — and why is the finding: only 5.0% of scalar locals (203 of 4 029) reach the numeric tier at all** | M |
@@ -7061,11 +8172,8 @@ are independently controllable — which is what made the three-arm measurement 
 
 **What is not done.**
 
-- **The item's arithmetic half.** *"Arithmetic → raw `double`/`int` where feedback says so"* is not
-  built, and the blocker is 4-1's, restated: the numeric-vs-generic signal was deliberately left
-  uncollected, because the compiler already proves numeric-ness statically for locals (3-3), so a
-  runtime counter has to be defined against *that* to say anything new. Left open rather than
-  half-built, for the second time and for the same reason.
+- **The item's arithmetic half — measured, and refused by its own arithmetic** (`0107`). See
+  §4-2c below; it is 0.119% of the corpus, and at the `+` rate it is net negative.
 - **A poisoned site still pays its guard**, which 4-3b predicted and recorded as owed to this item.
   The right answer is to re-emit the method without the guard once a site poisons; 30 sites of 1 130
   is small enough that it was not worth building before this item had a throughput number, and now
@@ -7076,7 +8184,124 @@ are independently controllable — which is what made the three-arm measurement 
   That is a strictly larger guard and it is the same set 4-4's inlining needs, so it belongs with
   4-4 rather than here.
 
-### 4-4 · Inlining of small JS callees — **premise measured; the item is re-specified and should not be started as written**
+#### 4-2c · The arithmetic half — **priced, and refuted along with the lead it points at** — `0107`
+
+The item's third clause is *"arithmetic → raw `double`/`int` where feedback says so"*, and it stayed
+open on one stated blocker: **the numeric-vs-generic signal was left uncollected because the
+compiler already proves numeric-ness statically, so a runtime counter has to be defined against
+*that* to say anything new.** Defined that way, the population is not "arithmetic" at all.
+
+**Item 3-1's speculation is on by default and already takes 71.76% of candidate nodes.** It
+speculates on `+ - * / % **` and the bitwise operators over operands the compiler cannot prove
+numeric — statically, with a guard, needing no feedback. So what is left for a feedback-driven tier
+is 3-1's **refusals**, and over the widened corpus they are one thing:
+
+| 3-1's decision | nodes | share |
+|---|--:|--:|
+| Specialized | 57 996 | **71.76%** |
+| **NoSavingToMake** | **21 188** | **26.22%** |
+| StringLeaf | 1 111 | 1.37% |
+| AlreadyNative | 474 | 0.59% |
+| TooManyLeaves | 39 | 0.05% |
+| WithOrEvalShadow | 8 | 0.01% |
+| OrderUnsafe | 0 | 0.00% |
+
+**`NoSavingToMake` is the whole of the residue, and the condition that produces it reasons about
+allocation.** A single-node tree over two unprovable leaves — `a.x * b.y` — removes no intermediate
+and no already-native leaf, so the guarded form mints the same box the generic operator does. That
+is correct about boxes and *says nothing about time*, and time is what a tier-2 specialization sells.
+
+#### The census the item would rest on was a seven-suite figure, and it does not survive widening
+
+§4.1 quotes *"100.00% of the invocations is what says the guard predicts"*. Re-taken over the twelve
+suites that run, `arithmeticBothNumbers` is **92.10% of 26 198 356** — and the total is the least
+interesting part of it:
+
+| Suite | generic arithmetic | both Numbers |
+|---|--:|--:|
+| Box2D | 4 152 413 | **100.00%** |
+| NavierStokes | 1 738 413 | **100.00%** |
+| Gameboy | 13 240 220 | 99.50% |
+| Typescript | 2 850 444 | 98.71% |
+| **PdfJS** | **3 121 352** | **46.56%** |
+| **Splay** | **264 890** | **0.46%** |
+| **all twelve** | **26 198 356** | **92.10%** |
+
+**Third instrument to fall to what §4.2a found, and the first where the *spread* is the finding
+rather than the total.** A signal that reads 100% everywhere says a static widening would do; a
+signal that reads 0.46% on one suite and 100% on another says the opposite — which is the argument
+*for* per-site feedback, and it is the first evidence this item has ever had for its own thesis.
+
+#### What the operation costs, three arms, and the instrument had to be fixed first
+
+**The first harness ran each arm's samples consecutively and its generic arms came back with
+spreads of 161%, 76% and 470% against effects near 3×** — §3.5's rule about a control varying by
+more than the effect, produced by the instrument rather than found by it. Consecutive samples give
+an arm a private slice of the process's history: its own gen-0 debt, its own place in the tiered-JIT
+ramp, whatever the previous arm left on the heap. It reported `multiply-generic` at **39.00 ns** and
+`less-generic` at **20.67 ns**; round-robin with a blocking collection between samples reports
+**15.42** and **3.93**. *A 2.5× and a 5.4× error, in the direction that would have founded the item.*
+
+Fixed — every arm once per round, reversed on alternate rounds, ratioed **within** each round so the
+round's noise divides out:
+
+| | median pair ratio | rounds favouring | ns saved |
+|---|--:|--:|--:|
+| multiply | **0.704×** | 11/12 | **6.39** |
+| multiply, guard wrong | 1.760× | 0/12 | −14.53 |
+| add | 0.906× | 9/12 | 1.78 |
+| **add, guard wrong** | **18.567×** | 0/12 | **−281.21** |
+| relational | **0.753×** | **12/12** | 0.97 |
+| relational, guard wrong | 0.917× | 10/12 | +0.33 |
+
+**`+`'s miss is 18.6× because its failure is a real answer** — a string concatenation, 352 B against
+32 — rather than a coercion. A `+` site that is one part in a hundred strings loses overall. And
+**relational is the one guard here with no losing side**: even when it fails it is cheaper than the
+generic path, because the generic `Less` re-dispatches where the guard's type test does not.
+
+#### Multiplied out, the item is refused
+
+Best case over the corpus — every hit specialized at the multiply rate, every miss paying for it —
+is **124 ms of a 104 620 ms driver: 0.119%**. At the `add` rate it is **net negative**. For scale,
+**4-2b landed at 0.83%** and this document already called that *"real, and below the noise floor"*.
+This is 7× smaller than the thing that was already too small to see.
+
+*(The driver is the **twelve suites that run**, per §4.2a's convention. A first reading of this
+divided by all fifteen and got 0.038% — Mandreel spends 286 728 ms hitting the stack guard while
+making 1 488 calls, so it is 72% of a fifteen-suite wall clock and near zero of everything being
+counted. The direction is unchanged and the magnitude is 3× larger; item 4-4 below records the same
+mistake, where it changed a conclusion rather than only a figure.)*
+
+#### The lead it points at is closed the same way rather than left as a guess
+
+Relational is 0.753× with no losing side, and **no fast path in this engine reaches it**: 3-1's
+speculation is gated on `IsNativeNumericOperator`, which excludes the relational operators, and 3-5
+helps only when one side is *already* an unboxed double — its own counter records how many sites it
+could not reach and stops there. That looked like the better item. It is not, and saying so needed
+the counter nobody had built: **23 986 595 comparisons, 99.85% both-Numbers** — far more uniform
+than arithmetic, PdfJS 98.58% and Box2D 99.64% being the only suites off 100% — and worth
+**23 ms, 0.022%**.
+
+**So the whole generic binary-operator surface is bounded, which is worth more than either item
+was.** 26.1 M arithmetic invocations at 15.42 ns and 24.0 M comparisons at 3.93 ns is **497 ms of
+104 620 ms — 0.475% of the corpus's execution time if it were removed *entirely***. That sits beside
+4-2b's own closing bound (the read path ≤ ~9%, the call path ≤ ~5.5%) and is the third side of the
+same box: **the operators are not where this engine's time goes.**
+
+**The counter is counted once per source-level comparison by a re-entrancy guard rather than by a
+case analysis over which paths delegate** — `JSObject` coerces and calls the primitive's, `JSNumber`
+unwraps and calls the base's, the base hands a BigInt comparison to the other operand's mirror — and
+that analysis is exactly what left `BitwiseXor` unhooked and silent about it. Four fixtures assert
+**exact** counts: N comparisons in the source are N in the counter, through the re-dispatching
+object path where a naive hook double counts, with a string comparison separating from a numeric
+one, and across all four operators so a missing hook shows as three rather than as a smaller number
+nobody questions.
+
+**Status: 4-2's arithmetic half is closed as refuted by measurement, and no relational item is
+opened.** The hooks are behind the existing off-by-default flag on the same methods whose arithmetic
+siblings already carry one, and nothing that ships changes.
+
+### 4-4 · Inlining of small JS callees — **premise measured, ceiling re-taken over the corpus at 2.43%; still do not start it, because 4-5 is 8.06%**
 
 Written the way 4-3 was: the premise first, from the code and a probe, before an XL is started
 against it. §4's own ordering makes this the last item, and 4-2b's closing arithmetic already
@@ -7166,6 +8391,79 @@ large to inline, a guard that has to be paid on every execution, and the generic
 to be kept forever. **An XL whose perfect execution is 1.89%** — against 4-2b's 0.83%, so about
 twice it, and against the campaign's 163× gap, not the item that closes it.
 
+#### The ceiling was a seven-suite number too, and widened it is LARGER
+
+**Everything above is computed over the same seven suites §4.2a found the other censuses were stuck
+on**, and the table that produced it says so on its own face — *"All seven"*. `SpecializingTierMetrics`
+reaches all fifteen since `0103`, so the same instrument was simply re-read, and **the seven
+reproduce**: 6 194 744 invocations against the recorded 6 194 758 and 2 496 730 inlinable against
+2 496 760 — **14 and 30 apart in millions, 0.0002%**, which is the engine's own start-up calls
+varying between runs — a 19 650 ms driver against 19 694 ms, and the same **1.89%** and **4.48%**.
+So what follows is more suites, not a different measurement.
+
+**The denominator has to be the twelve suites that RUN, and getting that wrong the first time is
+worth recording.** Three suites report a failure — zlib (`read` is a shell builtin), RegExp (a
+pre-existing checksum) and **Mandreel, which spends 286 728 ms hitting the stack guard** — and
+§4.2a's own convention already says the widened headlines are over twelve *"and the JSON says so"*.
+Summed over all fifteen, Mandreel alone is **72% of the corpus's wall clock** while contributing
+**1 488 of 59.7 M calls**, so a per-call ratio computed against it reads 0.65% and means nothing.
+*The document's own rule, ignored by the person who wrote the paragraph that states it.*
+
+| | the seven | **the twelve that run** |
+|---|--:|--:|
+| All invocations | 6 194 744 | **59 372 476** |
+| Native callee | 37.0% | **32.1%** |
+| Calls with a JavaScript callee | 3 902 604 | **40 523 273** |
+| …from a promoted caller | 2 496 730 — **64.0%** | 17 074 137 — **42.1%** |
+| Driver | 19 650 ms | 104 620 ms |
+| **4-4's ceiling** | **1.89%** | **2.43%** |
+| Inlining every JS-callee call | 2.95% | **5.77%** |
+| **The fixed call prologue (4-5's surface)** | **4.48%** | **8.06%** |
+
+**The two halves move in opposite directions, and that is the finding.** The *population* share
+falls — 64.0% of JavaScript calls come from a promoted caller on the seven, 42.1% on the twelve —
+while the *time* share rises, because the suites nobody had counted make far more calls per
+millisecond of run time than the seven do. **4-4's ceiling goes up to 2.43% and 4-5's surface to
+8.06%**, and the seven suites turn out to be **10.4% of the corpus's calls against 18.8% of its
+time**: call-poor, not call-rich, which is the opposite of how they were chosen.
+
+**Cross-checked against a counters-off driver**, because a ratio whose denominator carries the
+instrument's own cost is not a measurement: 110 620 ms against 104 620 ms over the same twelve, a
+**0.946×** ratio with per-suite ratios spanning 0.75×–1.11× — so the counters are inside run-to-run
+variance and the figures read **2.30%** and **7.62%** there. Both are quoted counters-on, as the
+1.89% was.
+
+**And the drop is not about inlining — it is about the promotion gate's reach.** The native share
+barely moves (37.0% → 32.1%); what collapses is *"from a promoted caller"*, 64.0% → 42.1%, because
+the suites nobody had counted hardly promote at all:
+
+| Suite | JS-callee calls | from a promoted caller |
+|---|--:|--:|
+| EarleyBoyer | 1 537 068 | 93.9% |
+| Crypto | 240 363 | 90.3% |
+| DeltaBlue | 335 626 | 86.4% |
+| **Typescript** | **31 170 780** | **38.8%** |
+| Box2D | 1 222 502 | 19.6% |
+| Splay | 616 811 | 15.5% |
+| **PdfJS** | **949 790** | **1.1%** |
+| RegExp, NavierStokes, Mandreel, CodeLoad, zlib | 19 190 | **0.0%** |
+
+Typescript alone is **77% of the corpus's JavaScript calls** and promotes 38.8% of them; PdfJS makes
+nearly a million and promotes one in ninety. 4-3b established that a guard needs an observation and
+a tier-1 method has none, so **inlining only has meaning inside a tier-2 recompile** — which makes
+4-2a's promotion gate the ceiling on 4-4's ceiling. *That gate reaches 42% of the real corpus's
+JavaScript calls, not 64%, and widening it is a different item from the one 4-4 describes.*
+
+**So 4-4's re-specification survives, but for a different reason than it was written for.** The
+section below recommends 4-5 over 4-4 on the strength of 4.47% against 1.89% — a 2.4× argument.
+Widened it is **8.06% against 2.43%**, which is **3.3×**: the ranking is unchanged and firmer, but
+**4-4's ceiling did not shrink into irrelevance — it grew to about three times 4-2b's landed
+0.83%**. That is a real number for an XL, and the honest statement is narrower than the one this
+section previously carried: *4-4 is not too small to matter, it is too small to beat 4-5*, and
+4-5 needs no speculation, no guard, no tier and no fallback path, and cannot change a stack trace.
+**The recommendation is the same; the argument for it is now about the alternative rather than
+about 4-4 being negligible.**
+
 **And the same probe says where the time actually is.** Reads are 37 871 908 × 47.6 ns = **1 804 ms
 (9.16%)**. The call *prologue* is paid by all 6 194 758 invocations — a native callee takes the same
 entry as a JavaScript one — so at 142 ns fixed that is **880 ms (4.47%)**. The two paths phases 2
@@ -7173,6 +8471,20 @@ and 4 are built around are together **under 14% of Octane's execution time in th
 measured directly rather than as the pair of upper bounds 4-2b could give. §4's header says phase 4
 is "the difference between ~100× and ~10×"; **that is not what these numbers say**, and the sentence
 should not survive them unqualified.
+
+**Widened, the pair is 22%, and the way it is computed needs saying.** The call half comes from
+this host and is re-taken cleanly above: **8.06%**. The read half does *not* — 37 871 908 is 4-1's
+count of executed property reads from `TypeFeedbackMetrics`, divided by a driver from
+`SpecializingTierMetrics`, so **the 9.16% was already a figure mixed across two hosts**. That is
+inherited rather than introduced here, and it is named rather than quietly repeated. Computed the
+same way over the same twelve suites — §4.2a's **307.9 M** reads against this host's 104 620 ms —
+the read half is **14.01%**, and the pair is **22.07%, not under 14%**. ***Both halves rose, and the
+sentence they were drawn for is wrong in the direction that matters***: the two paths phases 2 and 4
+are built around are about a fifth of this engine's execution time rather than a seventh — still a
+minority, still not *"the difference between ~100× and ~10×"*, but a materially larger minority than
+the seven suites showed. (This host's own read columns count the inline cache's hits and misses,
+which is a different population from 4-1's, and is why the mixed figure is kept rather than silently
+replaced with a single-host one that would not be comparable to the 9.16% it corrects.)
 
 The other ~86% has a visible candidate in the same table and it is the *control*: `s = s + (i + 1)`
 costs **16.98 ns an iteration** for three JSValue operations and a compare. A loop that touches no
@@ -7222,7 +8534,10 @@ is available — but because its ceiling is 1.89% and two cheaper things address
   **This applies to all 6 194 758 invocations rather than the 2 496 760 inlinable ones — 2.5× the
   calls — needs no speculation, no guard, no tier and no fallback path, and cannot change a stack
   trace.** Halving the fixed cost would be ~2.2%, more than 4-4's *ceiling*, at a fraction of the
-  risk.
+  risk. **Over the twelve suites that run the same comparison is 59 372 476 against 17 074 137 — 3.5× the
+  calls — and 8.06% against 2.43%**, so widening moved both items *up* and moved 4-5 further ahead
+  of 4-4. **Halving the fixed cost is ~4.0% there**, the largest single measured target anywhere in
+  phase 4, and still more than 4-4's perfect execution.
   **And there is already a shipping proof that most of the prologue is optional.**
   `JSFunction.InvokeCallback` — the entry every native callback site uses — takes one `using` scope
   against five and does none of the executing-function or legacy-caller bookkeeping. Two call paths
@@ -7240,9 +8555,11 @@ above. Neither is XL on its own. The order matters: 4-4a is a semantics decision
 
 **Nothing is landed for this item.** The probe (`--inlining-call-probe`) and the call counting
 (`CallPathDiagnostics`, off by default) are, because the successor needs them and because a
-measurement nobody can re-run is not evidence.
+measurement nobody can re-run is not evidence — **and that is exactly what let the ceiling be
+re-taken over the whole corpus without writing a line of engine code**: `0103` widened the host, and
+the widened reading was one command away for a patch before anybody ran it.
 
-### 4-5 · The fixed cost of a call — **one real cost found and fixed; the item's own premise is mostly wrong**
+### 4-5 · The fixed cost of a call — **attributed: 92% of the bookkeeping is Annex B `caller`/`arguments`**
 
 4-4's measurement produced this item and told it what to do first: *"it wants an ablation pass of
 its own before it is built"*. That pass has now happened, and it falsifies most of what the item
@@ -7303,7 +8620,7 @@ driver, 0.22%** — a fifth of 4-2b's, and below anything this container can res
 component measurement is where the evidence is (spread 7.35–7.66 against 0.305–0.337, which is
 about as tight as this machine gets); the suite-level arithmetic follows from it.
 
-#### So where is a call's 142 ns? Not anywhere this can see
+#### So where is a call's 142 ns? Not anywhere the REPLICAS can see
 
 Everything priced above sums to about **10 ns of the ~142 ns** a zero-argument call costs. The
 allocation half is deterministic and says a little more — `GC.GetAllocatedBytesForCurrentThread`
@@ -7324,6 +8641,220 @@ account for the rest.** After the scopes, the EH, the dispatch, the ThreadStatic
 and the boxing, **~85% of a call's fixed cost is unexplained by any component that can be priced
 from outside the engine.** That is the honest state of this item, and the successor's first move is
 a sampling profiler rather than another reading of the code — which this container does not have.
+
+#### The 85% was not unattributable — the replicas were the wrong instrument — `0108`
+
+**4-4 named the measurement that answers this and it had never been taken:** *"Two call paths exist
+in this engine and one is much shorter; **pricing the difference between them is the first thing 4-5
+should do**."* The table above prices each mechanism by **replicating it locally**, which is right
+for the claim it was testing — *is a `using` scope expensive?* — and is silent on what the engine's
+own scopes do inside themselves. `JSFunction.InvokeCallback` is the engine's own short path: the
+same `EnterRealm`, the same `SelectInvocationDelegate`, the same `this` coercion, **one `using`
+scope instead of five, and none of the executing-function or legacy-caller bookkeeping**. It is a
+natural ablation that has been shipping the whole time.
+
+| Entry | ns per call | spread |
+|---|--:|--:|
+| **`InvokeFunction`** — every emitted JavaScript call site | **114.60** | 12.5% |
+| **`InvokeCallback`** — every native builtin's JavaScript callback | **64.43** | 5.4% |
+| **difference** | **50.18 — 0.562×** | |
+
+> ***44% of a call entry is bookkeeping, not 10 ns of it.*** **The item is not blocked on a tool.**
+
+Both arms run the same callee with the same prebuilt `Arguments`, and **both are asserted to return
+the same answer before anything is timed** — a short path that quietly returned early would look
+exactly like the finding this exists to produce. Neither allocates, so the 32 B per argument an
+emitted call site pays is outside this measurement by construction, and the callee's own body is in
+both arms and cancels.
+
+**The gap is a lower bound in both directions that matter.** The short arm is reached by a delegate
+bound once through reflection, so it pays a delegate dispatch the long arm does not (0.68 ns,
+already priced above), and it resolves a tail-call sentinel the long path handles in its own loop.
+Both make the measured difference *smaller* than the bookkeeping actually is.
+
+**What it is worth.** 50.18 ns on **59 372 476** invocations is **2 979 ms of a 104 620 ms driver —
+2.85%**, against 4-4's entire ceiling of 2.43% and 4-2b's landed 0.83%. **It needs no speculation,
+no guard, no tier and no fallback path, and it cannot change a stack trace.**
+
+**What it is not.** *The 50 ns is not 50 ns of waste.* The bookkeeping serves `f.caller`, strict
+mode across a call boundary, realms and `with` scopes; some of it is required and some of it is
+required only for functions that can observe it — `HasLegacyCallerArguments` is already a
+per-function test. So the finding is a **budget**, not a saving: it localises the item's missing
+85% to eight named operations between the two entries — the executing-function save/set/restore,
+the legacy-caller check and frame, `EnterStrictMode`, the `JSEngine.Current` cast and its
+`Options.ScriptHostMode` read, the two `with`-scope pushes (both of which return `null` early here,
+so the cost is the calls and the property reads rather than the scopes), the second `try`/`catch`,
+and the tail-call test. **`EnterRealm` is in both arms and is therefore excluded**, which the
+replica pass could not have told anyone.
+
+#### The ablation, and the sum closes — `0109`
+
+**The isolating control needs no engine change either.** `AddLegacyCallerAndArguments` is emitted
+for ordinary non-strict function *declarations and expressions*, so an **arrow** and a **shorthand
+method** are sloppy callees with no legacy frame. Through the *same long entry*:
+
+| Arm | ns per call | bytes |
+|---|--:|--:|
+| `InvokeFunction` — ordinary sloppy function | 116.19 | 0 |
+| **`InvokeFunction` — arrow** | **71.79** | 0 |
+| `InvokeFunction` — object method | 76.53 | 0 |
+| `InvokeCallback` — the short entry | 67.98 | 0 |
+
+***An arrow through the long entry costs 3.81 ns more than the short entry that skips all the
+bookkeeping.*** So the bookkeeping is almost entirely one thing, and the components — measured
+against **the engine's own accessors** this time, not replicas — say which:
+
+| Piece | ns |
+|---|--:|
+| **the legacy caller/arguments frame** (long − arrow) | **44.40** |
+| the executing-function save/set/restore | 2.14 |
+| the `JSEngine.Current` cast and its `Options.ScriptHostMode` read | 2.14 |
+| the two `with`-scope pushes | 0.01 |
+| **sum** | **48.69** |
+| *target (long − short)* | *48.21* |
+
+**The sum closes to within 0.5 ns, and 92% of it is a web-compatibility feature.** `PushLegacyFrame`
+copies the `Arguments` struct into a `LegacyFrame` and again into the function, then pops it back —
+on **every call to every ordinary non-strict function**. As an upper bound that is **2.52% of the
+corpus**. Item 2-9 already recorded that these cells cost something at function *creation*; **they
+also cost 44 ns per call**, which nothing had measured. The `with`-scope pushes, which read as the
+most suspicious line in the method, are **free**.
+
+#### And the control that was supposed to isolate it found something larger
+
+The measurement started from the strict callee, on item 2-9's reasoning that a strict function has
+no legacy cells. It does not — and it costs **more**, not less:
+
+| Arm | ns per call | bytes |
+|---|--:|--:|
+| `InvokeFunction` — sloppy callee | 116.19 | 0 |
+| **`InvokeFunction` — strict callee, entered from sloppy code** | **219.06** | **224** |
+| `InvokeCallback` — strict callee | 64.12 | 0 |
+
+**102.87 ns and 224 bytes more, per call**, and the short entry shows it is not the callee: it is
+`StrictModeScope`. That scope writes the strict-mode `AsyncLocal` when the callee's strictness
+differs from the currently executing code's — **on entry and again on exit**. Its own comment says
+the write happens *"only on a transition, so the common case is now a ThreadStatic read and a
+compare, with no AsyncLocal touched at all"*, which is **true of a uniformly strict or uniformly
+sloppy call graph and false at every boundary between them**. *4-5 fixed the read side and left the
+write side resting on an argument about frequency that nothing in the engine could check.*
+
+**So it is counted** (`CallPathDiagnostics.RecordStrictTransition`, inside the `changed` branch
+where the claim lives, behind the same off-by-default flag the call counting already uses). Whether
+102.87 ns matters is a question about the corpus rather than about the mechanism, and until this
+counter there was no way to ask it.
+
+**Counted, the comment is right about the corpus and wrong about one suite in it.** Over the twelve
+suites that run, **2 813 191 of 59 372 513 calls cross a strictness boundary — 4.74%** — and the
+distribution is the finding rather than the total:
+
+| Suite | calls | strict transitions | share |
+|---|--:|--:|--:|
+| **PdfJS** | 3 995 534 | **2 103 558** | **52.65%** |
+| Gameboy | 7 216 202 | 709 632 | 9.83% |
+| Typescript | 41 321 153 | 1 | 0.00% |
+| *the other nine* | 7 million-odd | **0** | **0.00%** |
+
+**Nine of twelve suites never cross at all**, so *"the common case is a ThreadStatic read and a
+compare"* is a fair description of this corpus — and **PdfJS crosses on more than half its calls**,
+where the claim is simply false. **2 813 191 × 102.87 ns is 289 ms of a 108 767 ms driver: 0.266%.**
+Real, concentrated, and small; the write side does not need fixing for Octane, and the sentence
+asserting it should say *"on a uniformly-strict or uniformly-sloppy call graph"* rather than
+*"the common case"*.
+
+#### What 4-5 is now, ranked
+
+| | of the corpus |
+|---|--:|
+| the whole `InvokeFunction` entry | **6.50%** |
+| **the legacy caller/arguments frame** — counted, 60.16% of calls | **1.46%** |
+| the strict-mode `AsyncLocal` write | 0.266% |
+| the executing-function save/set/restore | ~0.08% |
+| the `Current` cast and `Options.ScriptHostMode` read | ~0.08% |
+| the `with`-scope pushes | **0.00%** |
+
+#### The split, counted, and the ceiling was tight — `0110`
+
+`0109` bounded the legacy frame at **≤1.65%** by charging it to every call with a JavaScript callee,
+because nothing said how many of those callees actually carry the pair. **Counted at the entry, it
+is 35 715 923 of 59 372 494 calls — 60.16% of all calls and 88.14% of the ones with a JavaScript
+callee — worth 1 586 ms of a 108 879 ms driver: 1.46%.** The ceiling was tight, and the item is
+real.
+
+| Suite | JS-callee calls | pushes a legacy frame |
+|---|--:|--:|
+| Richards | 121 402 | **100.00%** |
+| NavierStokes | 622 | 98.73% |
+| DeltaBlue | 335 626 | 96.23% |
+| Splay | 616 815 | 96.12% |
+| Crypto | 240 388 | 94.09% |
+| Typescript | 31 170 780 | 75.44% |
+| Box2D | 1 222 502 | 69.87% |
+| RayTrace | 445 021 | 65.76% |
+| EarleyBoyer | 1 537 068 | 50.53% |
+| **PdfJS** | 949 784 | **0.59%** |
+| **Gameboy** | 3 882 298 | **0.02%** |
+
+**The two suites that escape it are the two that were strict**, which is the same split the
+strict-transition census found from the other side — PdfJS crosses a strictness boundary on 52.65%
+of its calls *because* most of its code is strict, and strict functions carry no legacy pair. *A
+program written in strict mode does not pay this at all.*
+
+**And `this`-coercion turns out to be the same population, exactly.** `thisCoercions` equals
+`legacyFrames` on every suite, to the call: on this corpus the callees that carry Annex B cells are
+precisely the ones that coerce a sloppy `this`. So the two conditions the entry tests separately
+are, in practice, one condition — which matters for a fix, because it means a single "ordinary
+sloppy function" predicate gates both.
+
+**What a fix looks like, since the item can now be pointed at one.** The cells are already deferred
+at creation (2-9); what is not deferred is the per-invocation frame, and `PushLegacyFrame` copies
+the `Arguments` struct into a `LegacyFrame` and again into the function, then copies it back on the
+way out. Nothing reads either cell in any benchmark, and nothing can read them *except* during the
+call — so the state exists to answer a question that is almost never asked. The engine already
+maintains `JSEngine.ExecutingFunction`; a `caller`/`arguments` cell that walked a thread-local
+invocation stack on demand would need no per-call state at all. **That is an M–L with real
+correctness surface** — recursion, re-entrancy, generators suspending mid-call.
+
+#### And the fix was priced before it was built, and refused — `0111`
+
+**0.730×.** Over a control that does the guard and nothing else:
+
+| Arm | ns | over control |
+|---|--:|--:|
+| control | 0.36 | — |
+| **save/restore on the function object** — what the engine does today | **23.32** | **22.96** |
+| **push/pop a thread-local stack** — the proposed fix | **17.13** | **16.77** |
+| one 56-byte `Arguments` copy, alone | 8.19 | 7.83 |
+
+**The saving is 6.19 ns**, which over 35.7 M calls is **221 ms of a 108 879 ms driver: 0.20% of the
+corpus, for an M–L with a generator-suspension hazard in it.** *And the third arm says why:* one
+`Arguments` copy alone is **8.19 ns**, so ***the cost is the copying, and relocating where the
+copying lands does not remove it.***
+
+**So the lever is eliminating copies, not moving them** — removing the frame outright is **1.46%,
+seven times the relocation**, and that is where any effort belongs. It is also the hard one: a
+static gate on "does this program ever touch `caller`/`arguments`" is unsound, because both are
+reachable through a computed member access no analysis of the source can exclude, and a gate flipped
+at *first* materialisation gets the very read that flips it wrong.
+
+**The replica is legitimate here and it is worth saying why, given `0108`.** That patch's finding
+was that replicating a *mechanism* — a `using` scope, an EH region — misprices it, because the
+engine's own scopes have insides. A **struct copy has no inside**: the JIT emits the same moves for
+the same layout wherever it appears. The *absolute* is still an under-estimate — these arms write
+static fields where the engine writes instance fields of a heap object, so the engine pays write
+barriers these do not, which is most likely the gap between 22.96 ns here and ~44 ns in situ. **The
+ratio is what the arm is for**, and the ratio is the answer.
+
+**Status: 4-5's largest cost is measured at 1.46%, its named fix is refused at 0.20%, and no
+successor is specified.** That is a better place than the item has been in — *it is no longer
+blocked on a tool, or on a design nobody had priced; it is blocked on the fact that the only fix
+worth building is the one whose gate cannot be made sound.*
+
+*The shape of the answer is worth stating plainly: **the largest single attributable cost in this
+engine's call path is Annex B `caller`/`arguments`**, a feature no benchmark uses and the
+specification marks as legacy web reality. Whether it can be made lazy — the cells are already
+deferred at creation (2-9); it is the per-call frame that is not — is a design question this item
+can now be pointed at instead of a profiler.*
 
 #### The larger thing the control turned out to be hiding
 
@@ -7351,16 +8882,49 @@ be. The boxing is real and priced; the 4.0× is an upper bound on the parameter'
 paying a box per iteration. That is a phase 3 item — 3-3's one acknowledged gap, which has never
 had a number — and on this evidence it is worth more than anything left in phase 4.
 
+#### That item landed, and this section's own control is now four times faster — `0108`
+
+**Item 3-5 shipped on the strength of the paragraph above, and re-running the probe shows it
+worked.** The same two shapes, same host, same run set:
+
+| | when this section was written | now |
+|---|--:|--:|
+| bound is a **parameter** (`i < n`) | 33.77 ns, **32 B** | **7.67 ns, 0 B** |
+| bound is a **literal** | 8.36 ns, 0 B | 4.45 ns, 0 B |
+
+**The box per iteration is gone — 32 B → 0 B, which is the exact half of the claim** — and the
+parameter shape is now within 1.7× of the literal rather than 4.0×. The timing rows carry ~38%
+spread on this machine and the allocation rows carry none, so *the boxing is what is established
+and the 4.4× is the noisy corollary*, exactly as the original reading was careful to say in the
+other direction.
+
+**Two consequences, and the second is the one that matters here.** First, **every probe in this
+document that used the control as a floor was using a floor that has since dropped**, and figures
+quoted against it should say which side of 3-5 they were taken on. Second, this section closes by
+inferring that *"the arithmetic-only control loop is 16.98 ns an iteration, which points at 3-4,
+not at phase 4"* — **that inference no longer holds**. A control-loop iteration is now **7.67 ns**
+and a call is still **~147 ns fixed**, so a call is about **19× a loop iteration** where it was
+about 4×. *The thing the control was hiding has been fixed, and what it was hiding it from is the
+call path.*
+
 #### Re-specification
 
-- **The prologue work 4-5 was created to do is mostly not there.** What remains of the item is the
-  ~85% that nothing here can attribute, and it should not be attempted without a profiler. The
-  AsyncLocal fix ships; the rest of the item is **blocked on a tool, not on a design**.
-- **New 3-5 (M): give a parameter a numeric local.** 3-3 excluded parameters and said so; the price
-  is now measured at a box per iteration on the corpus's commonest loop. It needs the same
-  dominance argument 3-3 already built for `var`, `let`/`const` and block-scoped `var`, plus a
-  guard for the arguments object's mapping. **This is where the call-path budget should go next**,
-  ahead of 4-4 and ahead of what is left of 4-5.
+- ~~**The prologue work 4-5 was created to do is mostly not there.**~~ **Superseded by `0108`.**
+  The replicated mechanisms could not see it; the engine's own short path can. **44% of a call
+  entry — 50.18 ns of 114.60 — is bookkeeping `InvokeCallback` already skips**, which is
+  **2.85% of the corpus**, and the next move is an ablation of the eight named operations between
+  the two entries rather than a profiler. *The item is unblocked and it is now the largest measured
+  target in phase 4.*
+- ~~**New 3-5 (M): give a parameter a numeric local.**~~ **Landed, and re-measured here**: the box
+  per iteration is gone (32 B → 0 B) and the control loop is **7.67 ns** against 33.77. This
+  section's closing inference — that the control points at 3-4 rather than at phase 4 — **falls with
+  it**: a call is now ~19× a loop iteration where it was ~4×.
+- **What is left of the item, ranked and now attributed** (`0109`). The whole `InvokeFunction`
+  entry is **6.50%** of the corpus and the bookkeeping half **2.85%**; 4-4's ceiling is **2.43%**;
+  4-2's arithmetic half was refused at **0.119%**. **4-5 is where the phase-4 budget should go**,
+  and within it **92% of the bookkeeping is the Annex B `caller`/`arguments` frame at ≤1.65%** —
+  everything else named in `0108`'s list is together under 0.5%, and the `with`-scope pushes are
+  free. **The item is no longer "make the prologue cheaper"; it is "make the legacy frame lazy."**
 
 ---
 
@@ -7753,11 +9317,11 @@ predicate at all.
 
 | Phase | Order within it | Size | Unblocks / expected effect | Exit gate |
 |---|---|---|---|---|
-| **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → 0-6 workflow run ✅ (17/17 committed at the pin) → **0-6's noise band (`--repetitions` in CI), then 0-7, 0-8** | — | Everything. 12 → **17 scores** ✅, known noise band, and the first evidence any phase A–F can close on | 17/17 ✅, no timeout at the 180 s floor ✅, `comparison.md` reporting the triad ✅, **band on record** and **the BenchmarkDotNet + RID-matrix rows collected** — the three still open |
-| **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-4 ✅** → **1-1 emission half ✅** → **1-1's remaining half measured, and the repeated closure rewrite it found is fixed ✅**; the capture mechanism itself is still open → 1-3 measure | 1-4 S, 1-1 remainder L | The two worst scores in the suite; page-load time generally. **1-4 took the Mandreel half (3.04×); 1-1's deferred emission takes 0.64–0.69× off jQuery, PdfJS and Box2D at 1.0009× steady state, and CodeLoad 94.6 → 104.0 (1.099×)**. **The remaining half is now sized rather than inferred**: parse 9.4–13.5% / tree construction 33.6–63.9% / emission 25–57% on the real corpora, over a population that is **84–99.7% never invoked**. What blocks it is not a pre-parser and not `EmitConstant` — the `Box[]` a creation site passes *is* the capture mechanism — but that its indices are decided by `LambdaRewriter` from a tree the deferred body does not have. **That obstacle is now built and priced rather than bounded** (`0101`): the free-name map that makes the layout addressable costs **6.6–12.2%** of body-tree construction as one bottom-up pass, and **up to 47.7%** written per-function, where the walk is superlinear in nesting depth — so the previously recorded 5.4–9.9% *lower bound* was a fair estimate of the right implementation and five-fold low for the obvious one. Mandreel, wide and not deep, is the control that goes the other way (7.8% → 8.8%). The mechanism itself is still unbuilt and still **L**. **The repeated closure rewrite the measurement found is fixed and is worth 0.782× on jQuery's whole compile and 0.867× on Typescript's, six of six pairs each** | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
-| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured twice, agreeing: Richards PASSES (183× → 150× after 2-11/2-12 locally; 144.9× in CI), DeltaBlue FAILS (576× → 447× locally; 460× in CI)**, five repetitions per engine on one machine and the committed CI run on another |
-| **3** | 3-0 ✅ → **3-3 ✅** → 3-5 ✅ → 3-6 ✅ → 3-7 ✅ → 3-8 ✅ (counted, do not start as written) → **3-1 (85% of the corpus's boxes) → 3-2 (Box2D's 11.6 M), sharing one compiler half, and nothing else until they land** → then *cost* 3-4 | L–XL, 3-8 XL | Uniform lift across arithmetic and allocation-heavy suites. **3-7 closes the static half of the coverage question and 3-8 is what is left**: the widening reached 8 names of 2 920 (224 → 232), because 247 of 3-6's 478 captured names are held by a *hoisting* rule that is correctness rather than policy, and 2 439 are not proven numeric. **3-8 then measured the two numbers this phase never had, and they re-order it.** Number boxing is **41.89% of the corpus's allocation** (2.05 GB of 4.88, and 66.96% of NavierStokes) — so the prize was always large — while the **whole** raw-double local tier, every item from P2-2 onward, removes **0.36% of those boxes**. A box is minted by the operator, not by the local, and 76.4% of the names 3-8 would guard take their value from a property read or a call. **3-1 and 3-2 move to the front**: they unbox the sites that mint the boxes, and they have been ranked behind the locals work since the phase opened on no measurement at all. **Started, and the first count moves the item off storage.** What the generic arithmetic operators are handed at run time had never been measured: **73 817 515 of 73 818 646 invocations arrive with both operands already Numbers — every one but 1 131 — and that population is 86.6% of every box the corpus allocates**, while the compiler's own `both are native` proof reaches **0.75%** of the same invocations. *Compile-time provability reaches 0.75% of the arithmetic; run-time truth reaches 100.00%.* So the shared half is a **run-time-guarded specialization of an arithmetic expression tree** — box only the root — and not the typed backing store the item is written around; a typed store returns to being the live-memory item it always measured as. It also partly reverses 3-8's "do not start as written" without contradicting it: 3-8 priced the guard at the **local** (0.36%), this counts it at the **operator** (86.6%). **The shared half is then built** — evaluate each leaf once, test for Number, compute on raw doubles, box only the root — and removes **10 401 782 boxes of 85 249 783, 12.2% of the corpus's allocation, from 862 sites**, against **0.36% for every previous phase-3 item combined**. Short of the 86.6% ceiling for a reason the per-suite column gives rather than hides: NavierStokes loses 10.1% of its generic invocations and 1.8% of its boxes, EarleyBoyer 99.7% and none, so **most of those two suites' boxes are minted somewhere that is not a binary arithmetic operator** — the next count. Wall clock then measured: **driver 0.981× on six of six ABBA pairs, Crypto 0.912× on six of six**, against controls at 1.005× and 1.006× — so **12.2% of the allocation buys 1.9% of the time**, and no suite is slower. **3-1's own re-measurement then made that stronger.** The element chain decomposes exactly — 0.00 for a raw double, 31.98 for `s = s + a[0]`, 95.99 with a multiply, 159.67 for a read-modify-write — and the element STORE is in none of it: the boxes are minted by the operators, and the read is free today only because what it hands back is already a box. Two things fell out. A numeric literal is **re-boxed on every evaluation** (`a[0] * 1.5` costs two boxes where `a[0] * 2` costs one), measured at **1.2% of requests** and recorded rather than built. And the **bitwise and shift operators had no native form** although the analysis has always typed them — `s = i + 1023` costs 0.00 B/iter and `s = i & 1023` cost 31.84. That half **is built** (`JSNumericOperators`, all six through `ToUint32`, 15 tests on both arms) and takes its shape to **0.00** — **and removes no boxes at all on the corpus**: six suites identical to the digit, and Crypto (42.4 M boxes) differing by less than its own run-to-run variation, measured by running one arm twice. The native form needs both operands native and Crypto's digits live in `this.array[i]`. *Six items have now built machinery array-resident data cannot reach; every one is correct, every one is invisible, and every one is waiting on 3-1*. **3-2 was then measured too, and its one-sentence premise is wrong**: `o.x = 2` allocates **nothing** — a slot store is a reference copy — so `vector.x = 1.5` pays for the **literal**, not the slot, and the slot's own cost shows up only in `o.x = v * 1.5` where the value is a raw double (32 B, the same 32 B for the eleventh time). The field rows match the element rows **to the hundredth** — 31.98 and 96.00 both — so 3-1 and 3-2 are one mechanism with two backends. And 4-1's uncollected "numeric-vs-generic" signal, built at last, splits them exactly: **50.1% of all cache-answered reads hand back a number**, but **98% of those are Box2D's**, while **NavierStokes performs 388 property reads, zero numeric, and mints 29 977 471 boxes**. So **3-1 carries 85% of the corpus's boxes and 3-2 carries Box2D's**, and no work on shape slots reaches the other two suites. **The next count then named every box the corpus mints, and moved the item again.** The compiler's boxing conversion — the only thing a typed store could remove without further operator work — is **5.0% of NavierStokes' requests against 31.0% of Crypto's**, i.e. the two suites are the opposite way round from this item's premise. Chasing the **40.5%** that first pass left unattributed down to **1.0%** found the answer in the operators no census had counted: **`++` and `--` are 30.9% of the corpus's boxing, 51.6% of NavierStokes' and 80.4% of EarleyBoyer's**, and **half of that is `ToNumeric` re-boxing a value that is already a Number** — 17 281 232 requests, 15.4% of all boxing, removable by a guard. **Built, in nine lines**: 17 285 913 requests removed against that prediction (0.03%), **7 050 834 real allocations, 9.4%**, NavierStokes **23.0% of its boxes and 0.906× of its time on six of six pairs**, and the corpus **0.795×** with `0084`. **What did not move is the finding**: EarleyBoyer halved its boxes for 1.002×, because 82 000 a second is not 4 240 000 a second — *a share of a suite's own allocation forecasts nothing, the absolute rate forecasts everything*. **Then the refusal waterfall, which is the count `0084` never took and the largest result the phase has had.** Of 5 396 candidate arithmetic nodes only **862 specialize**; `OrderUnsafe` refuses 1 762 and `NoSavingToMake` 2 718, and those are **one** finding — a left-leaning `a[0]+a[1]+a[2]+a[3]` refuses at the root for order, again at each left child, and its bottom node is then a lone operator with nothing to save. The sub-census names the blocking leaf: **1 028 property reads against 34 element reads**, so the rule this phase assumed was an array problem is an **object-field** one, 984 of them Box2D's. **The fix is that nothing required the leaves to move**: emit each at its own postorder position and put the test where the coercion would have run, and the purity rule has nothing left to protect. **53 353 957 → 6 626 052 generic invocations and 67 795 858 → 31 162 330 boxes — 36 633 528 removed, 54.0% of everything the corpus allocates**, `OrderUnsafe` 1 762 → 0 and `NoSavingToMake` 2 718 → 1 181 untouched. From the pre-`0084` baseline the corpus is **0.366×**. **Driver 0.969× on six of six ABBA pairs, NavierStokes 0.834× and Crypto 0.893× both six of six**, two zero-box controls at 1.002× and 0.999×; Box2D cuts 51% of its own boxes for 1.003× because 861 000/s is not 6 500 000/s, which is `0086`'s lesson holding a second time. *54.0% of the allocation buys 3.1% of the time* — with `0084`'s 12.2% → 1.9%, the third reading of the constant that should size the rest of the phase  **And then the denominator the phase never had**: collection is **1.8–2.0% of the driver**, and of the 768 ms the order-preserving emission removed only **54 ms was collection** — the other 714 ms is the mutator's own allocation work. *A box costs ~14× more to create than to collect*, which makes §Non-goals' "the collector is not the problem" a measurement. At **711 ms per GB** the **0.70 GB of number boxes left is worth ~2.6% of the driver**, so everything remaining here is an XL bidding for under 2% — count the `++`/`--` step's operands before building the typed store, and bid with a rate rather than a share. A sampling profiler was tried and does not decompose this engine: it inflates the driver ~29%, its biggest frame is its own rendezvous point, and compiled JavaScript does not symbolicate  **And the `++`/`--` count is taken**: of 17 282 144 steps, **Element 0, Property 0.3%, LocalSlot 98.1%, Other 0** — the step shares no mechanism with a typed store and belongs to the numeric local. ≈**7.05 M real boxes, 22.6% of what the corpus still allocates**, 6.76 M of it NavierStokes', where one untypable closure variable (`rowSize`) cascades into every `++currentRow`. **Re-opens 3-8**, which priced the guard at the local and measured the tier's *yield* (0.36%); this measures what it *lets through*  **Then scoped**: eight shapes, one per conjunct, rule three suspects out — a nested function declaration is innocent, 3-7's hoisting rule produces a `LocalCell` (NavierStokes: 9 461 760 slots against six cells), and passing the value in only trades `OtherName` for `Parameter`. **One conjunct is left — the analysis will not type a name from outside the function, even one already proven numeric.** Splits into **3-9** (static, import the enclosing scope's conclusion; does *not* reach NavierStokes, whose root is held by 3-7's correctness rule; count its population first) and **3-8a** (run-time, one `IsNumber` test where the value enters) — scoped at **≈115 ms, 0.6% of the driver, an M rather than an XL**. **3-8a was then built complete and closed as a measured regression.** Its population is 26 names, 15 in NavierStokes; the dual representation and all three consumers that can take a raw double are built (the guarded tree's leaf, the element read, the element write), and each moved the number without moving it enough — 1.021×, 1.017×, 1.012×. A counter added **at the read** then settled it: **NavierStokes mints 393 705 boxes reading a speculative local against ≈5 300 removed**, because the 835 584 steps it takes off `Increment` are mostly `x[++i]`, whose result is boxed to be an index either way. *Every premise the item was scoped on survived and the item still lost* — what makes it lose is the read/write ratio of the code it targets, a property of the workload rather than of how many consumers the compiler grows. **Off by default and staying off; §3.5 gains the rule that a representation change is priced by that ratio, counted before the representation is built.** **3-9, the static half of the same split, is closed at a population of ZERO** — 0 names and 0 outer-numeric offers on all seven suites, against 3-8a's 26 from the same call site in the same run — because 3-9 can only import from a name that is both proven numeric and still a raw double despite being captured, which is item 3-7's eight, and none of the eight is read from an assignment inside the function that captures it. *Counted with an instrument proven to discriminate on nine constructed shapes first, and closed for one instrument and no mechanism* | `test262-arrays`, `test262-binary-data`, and — added by 3-3's `let`/`const` half — `test262-lexical-declarations`; allocation reported per item alongside time |
-| **4** | 4-3 design ✅ → **4-1 ✅** (shapes and callees; numeric-vs-generic still open per site — item 3-2 collected the aggregate read share, 50.1%, for a phase 3 ranking) → **4-3a ✅** → **4-3b ✅** → **4-2a ✅** → **4-2b ✅** (arithmetic half left open) → 4-4 | XL | The remaining order of magnitude. **4-1 measured the premise: 93.5% of reads and 96.7% of calls are monomorphic by execution weight, so 4-2 and 4-4 are well-founded.** 4-3a stated and enforced the restart contract — and found its no-suspendable-bodies condition was held only by two unrelated accidents, two ordinary refactors away from an async function returning a number instead of a Promise. **4-2 then split the same way**: measuring the branch it was told to replace found it produced *wrong answers* — DeltaBlue died on the shipping tier-2 hook — which 4-2a fixes, and 4-2b's specialization takes **44.7% of the corpus's executed reads off the cache path at 0.818× each**, which is **0.83% of suite time**. That number is the phase's own warning: the whole read path is ≤ ~9% of Octane's execution time here and the whole call path ≤ ~5.5%, so **4-4's ceiling is smaller than the phase assumed** | Deopt correctness proven **before** any speculation ships; full test262 matrix |
+| **0** | 0-1…0-5 ✅, 0-9…0-11 ✅ → 0-6 workflow run ✅ (17/17 committed, refreshed 2026-08-05) → **0-6's noise band — CI now defaults to `--repetitions 3` ✅ and a first band is on record ✅; a banded CI result is what is awaited** → 0-7, 0-8 | — | Everything. 12 → **17 scores** ✅, known noise band, and the first evidence any phase A–F can close on | 17/17 ✅, no timeout at the 180 s floor ✅, `comparison.md` reporting the triad ✅, **band on record** — the workflow now defaults to 3 repetitions and is sized for them (105 → 180 min), and a local 12-suite run has measured it for the first time: **5 of 13 scores exceed the declared 7.5%**, median 5.5%, worst 15.9%, so the band is per suite rather than one number. **The declared figure was an assumption `phase0.json` has carried since 0-4** — and **the BenchmarkDotNet + RID-matrix rows collected** are still open, which a container cannot produce |
+| **1** | 1-2 mitigation ✅ → 1-2 real fix ✅ (all three passes) → **1-4 ✅** → **1-1 emission half ✅** → **1-1's remaining half measured, and the repeated closure rewrite it found is fixed ✅**; the capture mechanism itself is still open → 1-3 measure | 1-4 S, 1-1 remainder L | The two worst scores in the suite; page-load time generally. **1-4 took the Mandreel half (3.04×); 1-1's deferred emission takes 0.64–0.69× off jQuery, PdfJS and Box2D at 1.0009× steady state, and CodeLoad 94.6 → 104.0 (1.099×)**. **The remaining half is now sized rather than inferred**: parse 9.4–13.5% / tree construction 33.6–63.9% / emission 25–57% on the real corpora, over a population that is **84–99.7% never invoked**. What blocks it is not a pre-parser and not `EmitConstant` — the `Box[]` a creation site passes *is* the capture mechanism — but that its indices are decided by `LambdaRewriter` from a tree the deferred body does not have. **That obstacle is now built and priced rather than bounded** (`0101`): the free-name map that makes the layout addressable costs **6.6–12.2%** of body-tree construction as one bottom-up pass, and **up to 47.7%** written per-function, where the walk is superlinear in nesting depth — so the previously recorded 5.4–9.9% *lower bound* was a fair estimate of the right implementation and five-fold low for the obvious one. Mandreel, wide and not deep, is the control that goes the other way (7.8% → 8.8%). The mechanism itself is still unbuilt and still **L**. **And the population that could skip it entirely is now counted, which closes off the cheap way in** (`0102`): a site whose free names resolve to no enclosing binding needs no `Box[]` and could be deferred today, and that is **728 of 5 762 sites, 12.6%** — 39.7% on the flattest corpus and **7.4% on Mandreel**, i.e. worst exactly where the prize is largest. `Dynamic`, the direct-`eval` risk the item leads with, refuses **7 sites of 5 762**. The reading that looked like an opening — Mandreel's 7 605 bound free names being only **165 function-owned**, because a top-level `var` is a global-object property per spec — is refused by the counter built to test it: **`cellBacked` equals `bound` exactly on all six corpora, 15 118 of 15 118**, since this engine gives a program-level binding a CLR local like any other. *A spec-level fact about where a binding lives is not a fact about where the compiler puts it.* **The repeated closure rewrite the measurement found is fixed and is worth 0.782× on jQuery's whole compile and 0.867× on Typescript's, six of six pairs each** | test262 over the four pinned manifests, no new failure **and no new timeout**; MandreelLatency and CodeLoad out of the tail |
+| **2** | 2-0 ✅ → 2-1 ✅ → 2-2 ✅ → 2-4 ✅ → 2-7 ✅ → 2-8 ✅ → **2-9 ✅** (2-3's successor, L); 2-5 and **2-3 closed on measurements**, 2-6 folded into 4-1. **Every item is landed or closed** | M each, 2-9 L | The Richards/DeltaBlue/Box2D cluster | An ownership entry and owned tests **per item**; test262 properties/strict-mode **satisfied** — unchanged at `a6f101cc` plus 2-9; **DeltaBlue and Richards inside 200×** — **measured twice, agreeing: Richards PASSES (183× → 150× after 2-11/2-12 locally; 144.9× in CI), DeltaBlue FAILS (576× → 447× locally; 460× in CI)**, five repetitions per engine on one machine and the committed CI run on another. **2-13 then decomposed the failing half against the third engine and bounded it**: DeltaBlue is 2.83× harder than Richards for Broiler and **2.56× for Jint**, so **1.10× of the gap is Broiler's** (1.118× on the previous run, independently) and closing all of it reaches **362×** against a 200× gate. The criterion is **not reachable by removing a Broiler-specific deficiency**; Broiler is ahead of Jint on DeltaBlue (0.77×) as it is on Richards (0.69×), and the genuinely Broiler-specific suites are MandreelLatency (54.3×), CodeLoad (37.8×) and zlib (12.0×). Read polymorphism is falsified as the cause by Crypto, 73.82% monomorphic and Broiler's best suite against Jint. **2-10 closes as measured**, handing forward a question about the gate |
+| **3** | 3-0 ✅ → **3-3 ✅** → 3-5 ✅ → 3-6 ✅ → 3-7 ✅ → 3-8 ✅ (counted, do not start as written) → **3-1 (85% of the corpus's boxes) → 3-2 (Box2D's 11.6 M), sharing one compiler half, and nothing else until they land** → then *cost* 3-4 | L–XL, 3-8 XL | Uniform lift across arithmetic and allocation-heavy suites. **3-7 closes the static half of the coverage question and 3-8 is what is left**: the widening reached 8 names of 2 920 (224 → 232), because 247 of 3-6's 478 captured names are held by a *hoisting* rule that is correctness rather than policy, and 2 439 are not proven numeric. **3-8 then measured the two numbers this phase never had, and they re-order it.** Number boxing is **41.89% of the corpus's allocation** (2.05 GB of 4.88, and 66.96% of NavierStokes) — so the prize was always large — while the **whole** raw-double local tier, every item from P2-2 onward, removes **0.36% of those boxes**. A box is minted by the operator, not by the local, and 76.4% of the names 3-8 would guard take their value from a property read or a call. **3-1 and 3-2 move to the front**: they unbox the sites that mint the boxes, and they have been ranked behind the locals work since the phase opened on no measurement at all. **Started, and the first count moves the item off storage.** What the generic arithmetic operators are handed at run time had never been measured: **73 817 515 of 73 818 646 invocations arrive with both operands already Numbers — every one but 1 131 — and that population is 86.6% of every box the corpus allocates**, while the compiler's own `both are native` proof reaches **0.75%** of the same invocations. *Compile-time provability reaches 0.75% of the arithmetic; run-time truth reaches 100.00%.* So the shared half is a **run-time-guarded specialization of an arithmetic expression tree** — box only the root — and not the typed backing store the item is written around; a typed store returns to being the live-memory item it always measured as. It also partly reverses 3-8's "do not start as written" without contradicting it: 3-8 priced the guard at the **local** (0.36%), this counts it at the **operator** (86.6%). **The shared half is then built** — evaluate each leaf once, test for Number, compute on raw doubles, box only the root — and removes **10 401 782 boxes of 85 249 783, 12.2% of the corpus's allocation, from 862 sites**, against **0.36% for every previous phase-3 item combined**. Short of the 86.6% ceiling for a reason the per-suite column gives rather than hides: NavierStokes loses 10.1% of its generic invocations and 1.8% of its boxes, EarleyBoyer 99.7% and none, so **most of those two suites' boxes are minted somewhere that is not a binary arithmetic operator** — the next count. Wall clock then measured: **driver 0.981× on six of six ABBA pairs, Crypto 0.912× on six of six**, against controls at 1.005× and 1.006× — so **12.2% of the allocation buys 1.9% of the time**, and no suite is slower. **3-1's own re-measurement then made that stronger.** The element chain decomposes exactly — 0.00 for a raw double, 31.98 for `s = s + a[0]`, 95.99 with a multiply, 159.67 for a read-modify-write — and the element STORE is in none of it: the boxes are minted by the operators, and the read is free today only because what it hands back is already a box. Two things fell out. A numeric literal is **re-boxed on every evaluation** (`a[0] * 1.5` costs two boxes where `a[0] * 2` costs one), measured at **1.2% of requests** and recorded rather than built. And the **bitwise and shift operators had no native form** although the analysis has always typed them — `s = i + 1023` costs 0.00 B/iter and `s = i & 1023` cost 31.84. That half **is built** (`JSNumericOperators`, all six through `ToUint32`, 15 tests on both arms) and takes its shape to **0.00** — **and removes no boxes at all on the corpus**: six suites identical to the digit, and Crypto (42.4 M boxes) differing by less than its own run-to-run variation, measured by running one arm twice. The native form needs both operands native and Crypto's digits live in `this.array[i]`. *Six items have now built machinery array-resident data cannot reach; every one is correct, every one is invisible, and every one is waiting on 3-1*. **3-2 was then measured too, and its one-sentence premise is wrong**: `o.x = 2` allocates **nothing** — a slot store is a reference copy — so `vector.x = 1.5` pays for the **literal**, not the slot, and the slot's own cost shows up only in `o.x = v * 1.5` where the value is a raw double (32 B, the same 32 B for the eleventh time). The field rows match the element rows **to the hundredth** — 31.98 and 96.00 both — so 3-1 and 3-2 are one mechanism with two backends. And 4-1's uncollected "numeric-vs-generic" signal, built at last, splits them exactly: **50.1% of all cache-answered reads hand back a number**, but **98% of those are Box2D's**, while **NavierStokes performs 388 property reads, zero numeric, and mints 29 977 471 boxes**. So **3-1 carries 85% of the corpus's boxes and 3-2 carries Box2D's**, and no work on shape slots reaches the other two suites. **The next count then named every box the corpus mints, and moved the item again.** The compiler's boxing conversion — the only thing a typed store could remove without further operator work — is **5.0% of NavierStokes' requests against 31.0% of Crypto's**, i.e. the two suites are the opposite way round from this item's premise. Chasing the **40.5%** that first pass left unattributed down to **1.0%** found the answer in the operators no census had counted: **`++` and `--` are 30.9% of the corpus's boxing, 51.6% of NavierStokes' and 80.4% of EarleyBoyer's**, and **half of that is `ToNumeric` re-boxing a value that is already a Number** — 17 281 232 requests, 15.4% of all boxing, removable by a guard. **Built, in nine lines**: 17 285 913 requests removed against that prediction (0.03%), **7 050 834 real allocations, 9.4%**, NavierStokes **23.0% of its boxes and 0.906× of its time on six of six pairs**, and the corpus **0.795×** with `0084`. **What did not move is the finding**: EarleyBoyer halved its boxes for 1.002×, because 82 000 a second is not 4 240 000 a second — *a share of a suite's own allocation forecasts nothing, the absolute rate forecasts everything*. **Then the refusal waterfall, which is the count `0084` never took and the largest result the phase has had.** Of 5 396 candidate arithmetic nodes only **862 specialize**; `OrderUnsafe` refuses 1 762 and `NoSavingToMake` 2 718, and those are **one** finding — a left-leaning `a[0]+a[1]+a[2]+a[3]` refuses at the root for order, again at each left child, and its bottom node is then a lone operator with nothing to save. The sub-census names the blocking leaf: **1 028 property reads against 34 element reads**, so the rule this phase assumed was an array problem is an **object-field** one, 984 of them Box2D's. **The fix is that nothing required the leaves to move**: emit each at its own postorder position and put the test where the coercion would have run, and the purity rule has nothing left to protect. **53 353 957 → 6 626 052 generic invocations and 67 795 858 → 31 162 330 boxes — 36 633 528 removed, 54.0% of everything the corpus allocates**, `OrderUnsafe` 1 762 → 0 and `NoSavingToMake` 2 718 → 1 181 untouched. From the pre-`0084` baseline the corpus is **0.366×**. **Driver 0.969× on six of six ABBA pairs, NavierStokes 0.834× and Crypto 0.893× both six of six**, two zero-box controls at 1.002× and 0.999×; Box2D cuts 51% of its own boxes for 1.003× because 861 000/s is not 6 500 000/s, which is `0086`'s lesson holding a second time. *54.0% of the allocation buys 3.1% of the time* — with `0084`'s 12.2% → 1.9%, the third reading of the constant that should size the rest of the phase  **And then the denominator the phase never had**: collection is **1.8–2.0% of the driver**, and of the 768 ms the order-preserving emission removed only **54 ms was collection** — the other 714 ms is the mutator's own allocation work. *A box costs ~14× more to create than to collect*, which makes §Non-goals' "the collector is not the problem" a measurement. At **711 ms per GB** the **0.70 GB of number boxes left is worth ~2.6% of the driver**, so everything remaining here is an XL bidding for under 2% — count the `++`/`--` step's operands before building the typed store, and bid with a rate rather than a share. A sampling profiler was tried and does not decompose this engine: it inflates the driver ~29%, its biggest frame is its own rendezvous point, and compiled JavaScript does not symbolicate  **And the `++`/`--` count is taken**: of 17 282 144 steps, **Element 0, Property 0.3%, LocalSlot 98.1%, Other 0** — the step shares no mechanism with a typed store and belongs to the numeric local. ≈**7.05 M real boxes, 22.6% of what the corpus still allocates**, 6.76 M of it NavierStokes', where one untypable closure variable (`rowSize`) cascades into every `++currentRow`. **Re-opens 3-8**, which priced the guard at the local and measured the tier's *yield* (0.36%); this measures what it *lets through*  **Then scoped**: eight shapes, one per conjunct, rule three suspects out — a nested function declaration is innocent, 3-7's hoisting rule produces a `LocalCell` (NavierStokes: 9 461 760 slots against six cells), and passing the value in only trades `OtherName` for `Parameter`. **One conjunct is left — the analysis will not type a name from outside the function, even one already proven numeric.** Splits into **3-9** (static, import the enclosing scope's conclusion; does *not* reach NavierStokes, whose root is held by 3-7's correctness rule; count its population first) and **3-8a** (run-time, one `IsNumber` test where the value enters) — scoped at **≈115 ms, 0.6% of the driver, an M rather than an XL**. **3-8a was then built complete and closed as a measured regression.** Its population is 26 names, 15 in NavierStokes; the dual representation and all three consumers that can take a raw double are built (the guarded tree's leaf, the element read, the element write), and each moved the number without moving it enough — 1.021×, 1.017×, 1.012×. A counter added **at the read** then settled it: **NavierStokes mints 393 705 boxes reading a speculative local against ≈5 300 removed**, because the 835 584 steps it takes off `Increment` are mostly `x[++i]`, whose result is boxed to be an index either way. *Every premise the item was scoped on survived and the item still lost* — what makes it lose is the read/write ratio of the code it targets, a property of the workload rather than of how many consumers the compiler grows. **Off by default and staying off; §3.5 gains the rule that a representation change is priced by that ratio, counted before the representation is built.** **3-9, the static half of the same split, is closed at a population of ZERO** — 0 names and 0 outer-numeric offers on all seven suites, against 3-8a's 26 from the same call site in the same run — because 3-9 can only import from a name that is both proven numeric and still a raw double despite being captured, which is item 3-7's eight, and none of the eight is read from an assignment inside the function that captures it. *Counted with an instrument proven to discriminate on nine constructed shapes first, and closed for one instrument and no mechanism*. **Then the denominator itself was checked** (§4.2a): the census producing every figure in this row ran **7 of 15 suites**, and widened it reads **90.6 M boxes and 12.93 GB against 31.4 M and 3.13 GB — 65.4% of the boxes outside the seven**, with **Gameboy alone at 41.3 M, 1.32× the whole measured corpus**. `0090`'s GC denominator survives (1.80% against 2.29%); the phase's ranking of its own remainder does not. **Attributing the widened corpus then partly reverses 3-1's move off storage**: conversions go **24.6 M → 69.3 M** with **64.4% of them outside the seven**, and **Gameboy alone mints 26.9 M at 51.0% of its own requests** — more than all seven together — on a `Uint8Array` memory image, which is the shape a typed backing store was written for. **3-1's storage half re-opens as unmeasured rather than refuted** | `test262-arrays`, `test262-binary-data`, and — added by 3-3's `let`/`const` half — `test262-lexical-declarations`; allocation reported per item alongside time |
+| **4** | 4-3 design ✅ → **4-1 ✅** (shapes and callees; numeric-vs-generic still open per site — item 3-2 collected the aggregate read share, 50.1%, for a phase 3 ranking) → **4-3a ✅** → **4-3b ✅** → **4-2a ✅** → **4-2b ✅** → **4-2c ✅ refuted** (the arithmetic half priced at 0.119% and closed, the relational lead closed with it at 0.022%, and the whole generic binary-operator surface bounded at 0.475% of the corpus) → **4-5 ✅ unblocked** (44% of a call entry is bookkeeping the engine's own short path skips — **2.85% of the corpus**, the largest measured target left in the phase, and an ablation of eight named operations rather than a profiler) → **4-4 ✅ measured, not started** (its ceiling re-taken over the twelve suites that run is **2.43%**, *larger* than the seven-suite 1.89% — the promotion gate reaches 42.1% of the corpus's JavaScript calls rather than 64.0%, but the never-counted suites are far call-denser per millisecond — while 4-5's surface is **8.06%**, so the ranking holds by 3.3×) | XL | The remaining order of magnitude. **4-1 measured the premise: 93.5% of reads and 96.7% of calls are monomorphic by execution weight, so 4-2 and 4-4 are well-founded** — over **seven** suites. **§4.2a re-took it over twelve and it is 80.11% and 86.35%**, because the census corpus every phase-3 and phase-4 headline is computed over was 7 of 15 and never said so; Mandreel had been aborting the census host with an uncatchable stack overflow, since item 0-2's stack reserve is a property of the *shell* and no benchmark host had it. Fixed, and the number is still high enough to found the phase. 4-3a stated and enforced the restart contract — and found its no-suspendable-bodies condition was held only by two unrelated accidents, two ordinary refactors away from an async function returning a number instead of a Promise. **4-2 then split the same way**: measuring the branch it was told to replace found it produced *wrong answers* — DeltaBlue died on the shipping tier-2 hook — which 4-2a fixes, and 4-2b's specialization takes **44.7% of the corpus's executed reads off the cache path at 0.818× each**, which is **0.83% of suite time**. That number is the phase's own warning: the whole read path is ≤ ~9% of Octane's execution time here and the whole call path ≤ ~5.5%, so **4-4's ceiling is smaller than the phase assumed** | Deopt correctness proven **before** any speculation ships; full test262 matrix |
 | **5** | profile ✅ → per-match subject copy on `replace`/`exec` ✅ → single-match `replace` without a builder ✅ (both builtins) → the global case's retained result list ✅ → `Compiled` per pattern **measured, no policy shipped** → *then* consider compiling `Broiler.Regex` | L | RegExp, plus PdfJS and Typescript | Octane regex corpus profiled **before** any rewrite — **satisfied**, and it re-ordered the phase |
 
 **Dependencies.**
@@ -7794,7 +9358,12 @@ Stated explicitly so effort does not drift into them.
   and the cache traffic of touching a gigabyte of fresh memory. *A box costs about fourteen times
   more to create than to collect on this corpus.* Aiming at the collector would have been aiming at
   a fourteenth of the problem, which is what this bullet always claimed and could not previously
-  show.
+  show. **Qualified since, and the qualification is that "the corpus" was seven suites** (§4.2a):
+  measured over every suite that runs, collection is **1.07%** of elapsed — but the spread is
+  **0.7% to 10.3%**, and the top of it is **Splay**, the suite Octane includes to stress the
+  collector and the one no census had ever run. The conclusion holds everywhere measured
+  (allocation dominates collection on every suite); what should stop being quoted is a single
+  exchange rate, since on Splay it is nearer 9:1 than 14:1.
 - **asm.js or WebAssembly special-casing** for Mandreel and zlib. Recognizing asm.js
   type annotations would move two scores and is exactly the optimize-for-the-benchmark
   behaviour that got Octane retired in 2017. Phases 3 and 4 reach the same code through
@@ -8049,6 +9618,10 @@ the inline cache answers, how many hand back a number. This is item 4-1's third 
 It costs one `IsNumber` test on the two hit returns and only while
 `PropertyOptimizationDiagnostics.Enabled`. **Read it per suite:** the corpus total is 50.1%, and
 that single figure conceals Box2D at 54.0% of 18.2 M reads against NavierStokes at 0% of 388.
+**And that 50.1% was another seven-suite figure**: over the twelve that run it is **55.2% of
+186 831 813** — the seven are **10.7%** of the corpus's cache-answered reads — which **inverts item
+3-2's plan**. Box2D is **9.6%** of the corpus's numeric reads rather than 98%; **Typescript
+(64.2 M) and Gameboy (27.4 M) are 89% of them** and neither had been counted.
 
 **`--specializing-tier … counters` also reports the arithmetic-operand census** (item 3-1):
 `arithmeticGeneric` is every invocation of a generic two-`JSValue` arithmetic or bitwise operator,
