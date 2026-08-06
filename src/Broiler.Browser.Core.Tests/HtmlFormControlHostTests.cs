@@ -4,6 +4,7 @@ using Broiler.Graphics;
 using Broiler.HtmlBridge;
 using Broiler.UI;
 using Broiler.UI.CheckBox.Standard;
+using Broiler.UI.ComboBox.Standard;
 using Broiler.UI.Panel.Standard;
 using Broiler.UI.RadioButton.Standard;
 using HtmlContainer = Broiler.HTML.Image.HtmlContainer;
@@ -15,7 +16,7 @@ namespace Broiler.Browser.Core.Tests;
 /// The renderer draws them as empty 13×13 bordered boxes — no check, no dot, no way
 /// to toggle — so the hosted controls are what gives them state at all.
 /// </summary>
-public class HtmlToggleControlHostTests
+public class HtmlFormControlHostTests
 {
     private const string TogglePage =
         "<html><body style='margin:0'><form action='/s'>" +
@@ -36,7 +37,7 @@ public class HtmlToggleControlHostTests
         };
 
         // The browsing path stamps ids so the controls can be located by geometry.
-        container.SetHtmlWithStyleSet(HtmlPostProcessor.StampToggleControlIds(html));
+        container.SetHtmlWithStyleSet(HtmlPostProcessor.StampFormControlIds(html));
         container.PerformLayout(new RectangleF(0, 0, width, height));
         return container;
     }
@@ -45,10 +46,10 @@ public class HtmlToggleControlHostTests
     /// Hosts inside a real session: radio-group exclusivity resolves peers by walking
     /// the session's roots, so a detached owner would leave both radios checked.
     /// </summary>
-    private static (HtmlToggleControlHost Host, HtmlFormState State, StandardPanel Owner) Create(TestUiSession session)
+    private static (HtmlFormControlHost Host, HtmlFormState State, StandardPanel Owner) Create(TestUiSession session)
     {
         HtmlFormState state = new();
-        return (new HtmlToggleControlHost(session.Root, state), state, session.Root);
+        return (new HtmlFormControlHost(session.Root, state), state, session.Root);
     }
 
     [Fact]
@@ -56,7 +57,7 @@ public class HtmlToggleControlHostTests
     {
         using TestUiSession session = new();
         using HtmlContainer container = LayOut(TogglePage);
-        (HtmlToggleControlHost host, _, _) = Create(session);
+        (HtmlFormControlHost host, _, _) = Create(session);
 
         host.Rebuild(container.GetHtml());
 
@@ -70,7 +71,7 @@ public class HtmlToggleControlHostTests
     {
         using TestUiSession session = new();
         using HtmlContainer container = LayOut(TogglePage);
-        (HtmlToggleControlHost host, _, _) = Create(session);
+        (HtmlFormControlHost host, _, _) = Create(session);
 
         host.Rebuild(container.GetHtml());
 
@@ -88,7 +89,7 @@ public class HtmlToggleControlHostTests
     {
         using TestUiSession session = new();
         using HtmlContainer container = LayOut(TogglePage);
-        (HtmlToggleControlHost host, _, _) = Create(session);
+        (HtmlFormControlHost host, _, _) = Create(session);
         host.Rebuild(container.GetHtml());
 
         BRect viewport = new(10, 20, 600, 200);
@@ -113,7 +114,7 @@ public class HtmlToggleControlHostTests
     {
         using TestUiSession session = new();
         using HtmlContainer container = LayOut(TogglePage);
-        (HtmlToggleControlHost host, _, _) = Create(session);
+        (HtmlFormControlHost host, _, _) = Create(session);
         host.Rebuild(container.GetHtml());
 
         BRect viewport = new(0, 0, 600, 200);
@@ -132,12 +133,12 @@ public class HtmlToggleControlHostTests
     {
         using TestUiSession session = new();
         using HtmlContainer container = LayOut(TogglePage);
-        (HtmlToggleControlHost host, HtmlFormState state, _) = Create(session);
+        (HtmlFormControlHost host, HtmlFormState state, _) = Create(session);
         host.Rebuild(container.GetHtml());
 
         StandardCheckBox first = host.Controls.OfType<StandardCheckBox>().First();
         int toggled = 0;
-        host.Toggled += (_, _) => toggled++;
+        host.Changed += (_, _) => toggled++;
 
         Assert.True(first.Toggle());
 
@@ -150,7 +151,7 @@ public class HtmlToggleControlHostTests
     {
         using TestUiSession session = new();
         using HtmlContainer container = LayOut(TogglePage);
-        (HtmlToggleControlHost host, HtmlFormState state, _) = Create(session);
+        (HtmlFormControlHost host, HtmlFormState state, _) = Create(session);
         host.Rebuild(container.GetHtml());
 
         List<StandardRadioButton> radios = host.Controls.OfType<StandardRadioButton>().ToList();
@@ -168,7 +169,7 @@ public class HtmlToggleControlHostTests
     {
         using TestUiSession session = new();
         using HtmlContainer container = LayOut(TogglePage);
-        (HtmlToggleControlHost host, _, StandardPanel owner) = Create(session);
+        (HtmlFormControlHost host, _, StandardPanel owner) = Create(session);
         host.Rebuild(container.GetHtml());
         Assert.Equal(4, owner.Children.Count);
 
@@ -185,7 +186,7 @@ public class HtmlToggleControlHostTests
         using HtmlContainer first = LayOut(TogglePage);
         using HtmlContainer second = LayOut(
             "<html><body><input type='checkbox' name='only'></body></html>");
-        (HtmlToggleControlHost host, _, StandardPanel owner) = Create(session);
+        (HtmlFormControlHost host, _, StandardPanel owner) = Create(session);
 
         host.Rebuild(first.GetHtml());
         host.Rebuild(second.GetHtml());
@@ -201,7 +202,7 @@ public class HtmlToggleControlHostTests
         using HtmlContainer container = LayOut(
             "<html><body><form><input type='text' name='q'>" +
             "<input type='submit' value='Go'></form></body></html>");
-        (HtmlToggleControlHost host, _, _) = Create(session);
+        (HtmlFormControlHost host, _, _) = Create(session);
 
         host.Rebuild(container.GetHtml());
 
@@ -212,12 +213,121 @@ public class HtmlToggleControlHostTests
     public void UnparseableOrEmptyPagesHostNothingInsteadOfThrowing()
     {
         using TestUiSession session = new();
-        (HtmlToggleControlHost host, _, _) = Create(session);
+        (HtmlFormControlHost host, _, _) = Create(session);
 
         host.Rebuild(string.Empty);
         Assert.Equal(0, host.Count);
 
         host.UpdateViewport(null, new BRect(0, 0, 100, 100), zoom: 1, scrollY: 0);
         Assert.Equal(0, host.Count);
+    }
+
+    private const string SelectPage =
+        "<html><body style='margin:0'><form action='/s'>" +
+        "<select name='colour'><option value='r'>Red</option>" +
+        "<option value='g' selected>Green</option><option value='b'>Blue</option></select>" +
+        "</form></body></html>";
+
+    [Fact]
+    public void SelectsGetAHostedComboBoxCarryingTheirOptions()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(SelectPage);
+        (HtmlFormControlHost host, _, _) = Create(session);
+
+        host.Rebuild(container.GetHtml());
+
+        StandardComboBox combo = Assert.IsType<StandardComboBox>(Assert.Single(host.Controls));
+        Assert.Equal(["Red", "Green", "Blue"], combo.Items.Select(i => i.Text));
+        Assert.Equal(["r", "g", "b"], combo.Items.Select(i => i.Id));
+    }
+
+    [Fact]
+    public void HostedComboBoxStartsOnTheMarkupsSelectedOption()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(SelectPage);
+        (HtmlFormControlHost host, _, _) = Create(session);
+
+        host.Rebuild(container.GetHtml());
+
+        StandardComboBox combo = host.Controls.OfType<StandardComboBox>().Single();
+        Assert.Equal(1, combo.SelectedIndex);
+        Assert.Equal("g", combo.SelectedItem?.Id);
+    }
+
+    [Fact]
+    public void ASelectWithNothingMarkedStartsOnItsFirstOption()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(
+            "<html><body><form><select name='s'><option value='a'>A</option>" +
+            "<option value='b'>B</option></select></form></body></html>");
+        (HtmlFormControlHost host, _, _) = Create(session);
+
+        host.Rebuild(container.GetHtml());
+
+        Assert.Equal(0, host.Controls.OfType<StandardComboBox>().Single().SelectedIndex);
+    }
+
+    [Fact]
+    public void OptionsWithoutAValueSubmitTheirText()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(
+            "<html><body><form><select name='s'><option>Plain</option></select></form></body></html>");
+        (HtmlFormControlHost host, _, _) = Create(session);
+
+        host.Rebuild(container.GetHtml());
+
+        Assert.Equal("Plain", host.Controls.OfType<StandardComboBox>().Single().SelectedItem?.Id);
+    }
+
+    [Fact]
+    public void ChangingTheSelectionRecordsItForSubmission()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(SelectPage);
+        (HtmlFormControlHost host, HtmlFormState state, _) = Create(session);
+        host.Rebuild(container.GetHtml());
+        int changed = 0;
+        host.Changed += (_, _) => changed++;
+
+        StandardComboBox combo = host.Controls.OfType<StandardComboBox>().Single();
+        Assert.True(combo.SelectIndex(2));
+
+        Assert.Equal(1, changed);
+        Assert.Equal("b", state.GetSelectedValue($"{HtmlPostProcessor.SyntheticIdPrefix}0", "colour"));
+    }
+
+    [Fact]
+    public void AMultiSelectIsNotHostedBecauseAComboBoxCannotRepresentIt()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(
+            "<html><body><form><select name='s' multiple><option value='a' selected>A</option>" +
+            "<option value='b' selected>B</option></select></form></body></html>");
+        (HtmlFormControlHost host, _, _) = Create(session);
+
+        host.Rebuild(container.GetHtml());
+
+        Assert.Equal(0, host.Count);
+    }
+
+    [Fact]
+    public void HostedComboBoxIsPlacedOverTheSelectTheRendererLaidOut()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(SelectPage);
+        (HtmlFormControlHost host, _, _) = Create(session);
+        host.Rebuild(container.GetHtml());
+
+        BRect viewport = new(10, 20, 600, 200);
+        host.UpdateViewport(container, viewport, zoom: 1, scrollY: 0);
+
+        UiElement combo = host.Controls.Single();
+        Assert.Equal(UiVisibility.Visible, combo.Visibility);
+        Assert.True(combo.Bounds.Width > 0 && combo.Bounds.Height > 0);
+        Assert.True(combo.Bounds.Left >= viewport.Left);
     }
 }

@@ -195,12 +195,12 @@ internal sealed class BrowserApp : IDisposable
 
     /// <summary>
     /// Prepares fetched or script-produced HTML for the rendering surface: the shared
-    /// replaced-element passes, plus synthetic ids on checkbox and radio controls so
+    /// replaced-element passes, plus synthetic ids on checkbox, radio and select controls so
     /// Broiler.UI controls can be hosted over them (their geometry is only reachable
     /// by id). Applies to the renderer's copy only — scripts run on the original.
     /// </summary>
     private static string PrepareForBrowsing(string html) =>
-        HtmlPostProcessor.StampToggleControlIds(HtmlPostProcessor.ProcessForBrowsing(html));
+        HtmlPostProcessor.StampFormControlIds(HtmlPostProcessor.ProcessForBrowsing(html));
 
     private static StandardButton CreateChromeButton(string text, string semanticName) =>
         new()
@@ -250,18 +250,23 @@ internal sealed class BrowserApp : IDisposable
         return false;
     }
 
-    private void NavigateTo(string url)
+    private void NavigateTo(string url) => NavigateTo(PageRequest.ForUrl(url));
+
+    private void NavigateTo(PageRequest request)
     {
-        if (_isShuttingDown || string.IsNullOrWhiteSpace(url))
+        if (_isShuttingDown || string.IsNullOrWhiteSpace(request.Url))
             return;
 
-        url = NormalizeInput(url);
+        request = request with { Url = NormalizeInput(request.Url) };
         if (_historyIndex < _history.Count - 1)
             _history.RemoveRange(_historyIndex + 1, _history.Count - _historyIndex - 1);
 
-        _history.Add(url);
+        // History holds URLs, so back/forward and reload re-issue a plain GET. A POST
+        // is therefore never silently repeated — real browsers prompt instead, and
+        // without that UI a GET of the same URL is the safer degradation.
+        _history.Add(request.Url);
         _historyIndex = _history.Count - 1;
-        LoadUrl(url);
+        LoadUrl(request);
     }
 
     private void GoHistory(int delta)
@@ -300,11 +305,14 @@ internal sealed class BrowserApp : IDisposable
         _host.RequestInvalidate();
     }
 
-    private void LoadUrl(string url)
+    private void LoadUrl(string url) => LoadUrl(PageRequest.ForUrl(url));
+
+    private void LoadUrl(PageRequest request)
     {
         if (_isShuttingDown)
             return;
 
+        string url = request.Url;
         long navigationGeneration = BeginNavigation();
         SetUrlText(url);
         UpdateNavigationButtons();
@@ -323,7 +331,7 @@ internal sealed class BrowserApp : IDisposable
 
         var cancellation = new CancellationTokenSource();
         _navigationCancellation = cancellation;
-        _ = LoadUrlInBackgroundAsync(navigationGeneration, url, cancellation);
+        _ = LoadUrlInBackgroundAsync(navigationGeneration, request, cancellation);
     }
 
     private long BeginNavigation()
@@ -336,13 +344,13 @@ internal sealed class BrowserApp : IDisposable
 
     private async Task LoadUrlInBackgroundAsync(
         long navigationGeneration,
-        string url,
+        PageRequest request,
         CancellationTokenSource cancellation)
     {
         NavigationLoadResult? result = null;
         try
         {
-            result = await LoadUrlOnWorkerAsync(url, cancellation.Token).ConfigureAwait(false);
+            result = await LoadUrlOnWorkerAsync(request, cancellation.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -359,13 +367,13 @@ internal sealed class BrowserApp : IDisposable
         }
     }
 
-    private static async Task<NavigationLoadResult> LoadUrlOnWorkerAsync(string url, CancellationToken cancellationToken)
+    private static async Task<NavigationLoadResult> LoadUrlOnWorkerAsync(PageRequest request, CancellationToken cancellationToken)
     {
         using var pipeline = new RenderingPipeline(
             new PageLoader(new HttpClient()),
             new ScriptEngine());
 
-        var (normalisedUrl, content) = await pipeline.LoadPageAsync(url, cancellationToken).ConfigureAwait(false);
+        var (normalisedUrl, content) = await pipeline.LoadPageAsync(request, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
         string html = PrepareForBrowsing(content.Html);
@@ -484,7 +492,8 @@ internal sealed class BrowserApp : IDisposable
         if (_isShuttingDown)
             return;
 
-        NavigateTo(ResolveLinkUrl(e.Link));
+        // Only the URL is resolved against the page; a submission's body travels as-is.
+        NavigateTo(e.Request with { Url = ResolveLinkUrl(e.Link) });
     }
 
     private string ResolveLinkUrl(string link)
@@ -877,8 +886,8 @@ internal sealed class BrowserApp : IDisposable
         private readonly Func<IBroilerRenderer?> _getRenderer;
         private readonly HtmlFormEditor _formEditor;
         private readonly HtmlFormState _formState = new();
-        private readonly HtmlToggleControlHost _toggleHost;
-        private bool _togglesDirty = true;
+        private readonly HtmlFormControlHost _controlHost;
+        private bool _controlsDirty = true;
         private HtmlContainer _container = CreateContentContainer(WelcomePage, string.Empty);
         private HtmlGraphicsRenderList? _renderList;
         private InteractiveSession? _interactiveSession;
@@ -904,8 +913,8 @@ internal sealed class BrowserApp : IDisposable
             _formEditor = new HtmlFormEditor(this);
             _formEditor.Committed += (_, _) => MarkLayoutDirty();
             _formEditor.SubmitRequested += (_, e) => SubmitHostedField(e.FieldId, e.FieldName);
-            _toggleHost = new HtmlToggleControlHost(this, _formState);
-            _toggleHost.Toggled += (_, _) => Invalidate(UiInvalidationKind.Render);
+            _controlHost = new HtmlFormControlHost(this, _formState);
+            _controlHost.Changed += (_, _) => Invalidate(UiInvalidationKind.Render);
         }
 
         public event EventHandler<BrowserLinkEventArgs>? LinkActivated;
@@ -920,8 +929,8 @@ internal sealed class BrowserApp : IDisposable
             StopSession();
             _formEditor.Cancel();
             _formState.Reset();
-            _toggleHost.Clear();
-            _togglesDirty = true;
+            _controlHost.Clear();
+            _controlsDirty = true;
             DisposeRenderList();
             _container.LinkClicked -= OnLinkClicked;
             _container.Dispose();
@@ -1020,7 +1029,7 @@ internal sealed class BrowserApp : IDisposable
 
             // Hosted form controls paint over the page, in viewport coordinates,
             // so they are placed and drawn outside the document transform.
-            RebuildHostedTogglesIfNeeded();
+            RebuildHostedControlsIfNeeded();
             PlaceHostedControls(Bounds);
             base.RenderCore(context);
             context.RenderList.PopClip();
@@ -1036,21 +1045,21 @@ internal sealed class BrowserApp : IDisposable
         private void PlaceHostedControls(BRect viewportBounds)
         {
             _formEditor.UpdateViewport(viewportBounds, _viewportZoom, _scrollY);
-            _toggleHost.UpdateViewport(_container, viewportBounds, _viewportZoom, _scrollY);
+            _controlHost.UpdateViewport(_container, viewportBounds, _viewportZoom, _scrollY);
         }
 
         /// <summary>
-        /// Discovers the page's checkbox and radio controls once per page. The parse is
+        /// Discovers the page's checkbox, radio and select controls once per page. The parse is
         /// the expensive half, so it is deferred to the first render after the page
         /// changed rather than repeated per layout.
         /// </summary>
-        private void RebuildHostedTogglesIfNeeded()
+        private void RebuildHostedControlsIfNeeded()
         {
-            if (!_togglesDirty)
+            if (!_controlsDirty)
                 return;
 
-            _togglesDirty = false;
-            _toggleHost.Rebuild(GetPageHtml());
+            _controlsDirty = false;
+            _controlHost.Rebuild(GetPageHtml());
         }
 
         protected override bool OnInput(UiInputEvent input)
@@ -1347,9 +1356,10 @@ internal sealed class BrowserApp : IDisposable
                 return;
 
             // The renderer resolves a submit control to its form's action and nothing
-            // more; serialize the form's fields so a GET form actually carries them.
-            string target = _formState.TryBuildSubmitTarget(GetPageHtml(), e.Attributes, e.Link) ?? e.Link;
-            LinkActivated?.Invoke(this, new BrowserLinkEventArgs(target, e.Attributes));
+            // more; serialize the form's fields so the submission actually carries them.
+            PageRequest request = _formState.TryBuildSubmitRequest(GetPageHtml(), e.Attributes, e.Link)
+                ?? PageRequest.ForUrl(e.Link);
+            LinkActivated?.Invoke(this, new BrowserLinkEventArgs(request, e.Attributes));
         }
 
         /// <summary>
@@ -1378,9 +1388,9 @@ internal sealed class BrowserApp : IDisposable
             if (_suppressNavigation)
                 return;
 
-            string? target = _formState.TryBuildFieldSubmitTarget(GetPageHtml(), fieldId, fieldName, BaseUrl);
-            if (!string.IsNullOrEmpty(target))
-                LinkActivated?.Invoke(this, new BrowserLinkEventArgs(target, new Dictionary<string, string>()));
+            PageRequest? request = _formState.TryBuildFieldSubmitRequest(GetPageHtml(), fieldId, fieldName, BaseUrl);
+            if (request is not null)
+                LinkActivated?.Invoke(this, new BrowserLinkEventArgs(request, new Dictionary<string, string>()));
         }
 
         private void DisposeRenderList()
@@ -1438,10 +1448,19 @@ internal sealed class BrowserApp : IDisposable
     private sealed class BrowserLinkEventArgs : EventArgs
     {
         public BrowserLinkEventArgs(string link, IReadOnlyDictionary<string, string> attributes)
+            : this(PageRequest.ForUrl(link), attributes)
         {
-            Link = link;
+        }
+
+        public BrowserLinkEventArgs(PageRequest request, IReadOnlyDictionary<string, string> attributes)
+        {
+            Request = request;
+            Link = request.Url;
             Attributes = attributes;
         }
+
+        /// <summary>The navigation to perform — a plain URL, or a form submission with a body.</summary>
+        public PageRequest Request { get; }
 
         public string Link { get; }
 

@@ -1,3 +1,4 @@
+using Broiler.App.Rendering;
 using Broiler.Dom;
 using Broiler.Dom.Html;
 
@@ -20,8 +21,15 @@ internal sealed class HtmlFormState
     /// <summary>Checked state by control key, for controls the user has toggled.</summary>
     private readonly Dictionary<string, bool> _checkedState = new(StringComparer.Ordinal);
 
+    /// <summary>Selected option value by control key, for selects the user has changed.</summary>
+    private readonly Dictionary<string, string> _selectedValues = new(StringComparer.Ordinal);
+
     /// <summary>Forgets per-page state. Called when the page is replaced.</summary>
-    public void Reset() => _checkedState.Clear();
+    public void Reset()
+    {
+        _checkedState.Clear();
+        _selectedValues.Clear();
+    }
 
     /// <summary>Records the state of a checkbox or radio the user toggled.</summary>
     public void SetChecked(string id, string name, string value, bool isChecked) =>
@@ -31,16 +39,22 @@ internal sealed class HtmlFormState
     public bool? GetChecked(string id, string name, string value) =>
         _checkedState.TryGetValue(ControlKey(id, name, value), out bool state) ? state : null;
 
+    /// <summary>Records the option a hosted <c>&lt;select&gt;</c> now has selected.</summary>
+    public void SetSelectedValue(string id, string name, string value) =>
+        _selectedValues[ControlKey(id, name, string.Empty)] = value;
+
+    /// <summary>The recorded selection of a <c>&lt;select&gt;</c>, or <c>null</c> if untouched.</summary>
+    public string? GetSelectedValue(string id, string name) =>
+        _selectedValues.TryGetValue(ControlKey(id, name, string.Empty), out string? value) ? value : null;
+
     /// <summary>
-    /// Builds the URL a submission should navigate to, or <c>null</c> when the click
-    /// is not a form submission this can serialize — an ordinary link, a control
-    /// outside any form, or a <c>method="post"</c> form, which the browser's
-    /// fetch-by-URL navigation cannot carry.
+    /// Builds the request a submission should make, or <c>null</c> when the click is
+    /// not a form submission — an ordinary link, or a control outside any form.
     /// </summary>
     /// <param name="pageHtml">The live document, as serialized by the renderer.</param>
     /// <param name="attributes">Attributes of the clicked control, as reported by the renderer.</param>
     /// <param name="resolvedAction">The action URL the renderer already resolved.</param>
-    public string? TryBuildSubmitTarget(
+    public PageRequest? TryBuildSubmitRequest(
         string pageHtml,
         IReadOnlyDictionary<string, string>? attributes,
         string resolvedAction)
@@ -57,21 +71,19 @@ internal sealed class HtmlFormState
 
         DomElement? submitter = HtmlFormSerializer.FindControl(root, attributes);
         DomElement? form = HtmlFormSerializer.FindEnclosingForm(submitter);
-        if (form is null || !HtmlFormSerializer.IsGetSubmission(form))
+        if (form is null)
             return null;
 
-        return HtmlFormSerializer.ApplyQuery(
-            resolvedAction,
-            HtmlFormSerializer.BuildFormData(form, submitter, ResolveOverride));
+        return BuildRequest(form, submitter, resolvedAction);
     }
 
     /// <summary>
-    /// Builds the URL for a submission triggered from a field rather than a button —
-    /// pressing Enter in a text control submits its form. Returns <c>null</c> when the
-    /// field is not in a serializable form.
+    /// Builds the request for a submission triggered from a field rather than a
+    /// button — pressing Enter in a text control submits its form. Returns
+    /// <c>null</c> when the field is not in a form.
     /// </summary>
     /// <param name="baseUrl">Page URL, used to resolve a relative form action.</param>
-    public string? TryBuildFieldSubmitTarget(string pageHtml, string fieldId, string fieldName, string baseUrl)
+    public PageRequest? TryBuildFieldSubmitRequest(string pageHtml, string fieldId, string fieldName, string baseUrl)
     {
         if (string.IsNullOrEmpty(pageHtml))
             return null;
@@ -90,13 +102,44 @@ internal sealed class HtmlFormState
 
         DomElement? field = HtmlFormSerializer.FindControl(root, attributes);
         DomElement? form = HtmlFormSerializer.FindEnclosingForm(field);
-        if (form is null || !HtmlFormSerializer.IsGetSubmission(form))
+        if (form is null)
             return null;
 
         // No submitter: pressing Enter in a field submits the form without any
         // button contributing its own name and value.
-        string query = HtmlFormSerializer.BuildFormData(form, submitter: null, ResolveOverride);
-        return HtmlFormSerializer.ApplyQuery(ResolveAction(form.GetAttribute("action"), baseUrl), query);
+        return BuildRequest(form, submitter: null, ResolveAction(form.GetAttribute("action"), baseUrl));
+    }
+
+    /// <summary>
+    /// Turns a form and its submitter into a navigation: a GET puts the form data set
+    /// in the query, a POST carries it as the request body.
+    /// </summary>
+    private PageRequest BuildRequest(DomElement form, DomElement? submitter, string action)
+    {
+        IReadOnlyList<HtmlFormSerializer.FormEntry> entries =
+            HtmlFormSerializer.BuildEntryList(form, submitter, ResolveOverride);
+
+        // A GET form always puts its data in the query, whatever enctype says — the
+        // enctype only applies to a body, and a GET has none.
+        if (HtmlFormSerializer.IsGetSubmission(form))
+            return new PageRequest(HtmlFormSerializer.ApplyQuery(action, HtmlFormSerializer.EncodeUrlEncoded(entries)));
+
+        string encoding = HtmlFormSerializer.ResolveEncoding(form);
+        if (encoding == HtmlFormSerializer.MultipartFormData)
+        {
+            string boundary = HtmlFormSerializer.CreateMultipartBoundary();
+            return new PageRequest(
+                action,
+                PageRequest.Post,
+                $"{HtmlFormSerializer.MultipartFormData}; boundary={boundary}",
+                HtmlFormSerializer.EncodeMultipart(entries, boundary));
+        }
+
+        string body = encoding == HtmlFormSerializer.TextPlain
+            ? HtmlFormSerializer.EncodeTextPlain(entries)
+            : HtmlFormSerializer.EncodeUrlEncoded(entries);
+
+        return new PageRequest(action, PageRequest.Post, encoding, body);
     }
 
     /// <summary>Resolves a form action against the page URL, leaving it as-is if that fails.</summary>
@@ -119,6 +162,15 @@ internal sealed class HtmlFormState
 
     private string? ResolveOverride(DomElement control)
     {
+        if (string.Equals(control.TagName, "select", StringComparison.OrdinalIgnoreCase))
+        {
+            // A multi-select is never hosted, so it has no recorded selection and
+            // falls through to the markup's selected options.
+            return GetSelectedValue(
+                control.GetAttribute("id") ?? string.Empty,
+                control.GetAttribute("name") ?? string.Empty);
+        }
+
         if (!string.Equals(control.TagName, "input", StringComparison.OrdinalIgnoreCase))
             return null;
 

@@ -18,11 +18,21 @@ public sealed class RenderingPipeline(
     /// Uses <see cref="Broiler.HtmlBridge.Scripting.ScriptExtractionService.ExtractAll"/> so that deferred
     /// and external scripts are also captured, matching the CLI's behaviour.
     /// </summary>
-    public async Task<(string NormalisedUrl, PageContent Content)> LoadPageAsync(
+    public Task<(string NormalisedUrl, PageContent Content)> LoadPageAsync(
         string url,
+        CancellationToken cancellationToken = default) =>
+        LoadPageAsync(PageRequest.ForUrl(url), cancellationToken);
+
+    /// <summary>
+    /// Load a page for <paramref name="request"/> — a plain navigation, or a form
+    /// submission carrying a request body — and return a <see cref="PageContent"/>
+    /// ready for rendering.
+    /// </summary>
+    public async Task<(string NormalisedUrl, PageContent Content)> LoadPageAsync(
+        PageRequest request,
         CancellationToken cancellationToken = default)
     {
-        var (normalisedUrl, html) = await pageLoader.FetchAsync(url, cancellationToken).ConfigureAwait(false);
+        var (normalisedUrl, html) = await pageLoader.FetchAsync(request, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
         var result = ScriptExtractionService.ExtractAll(html, normalisedUrl);

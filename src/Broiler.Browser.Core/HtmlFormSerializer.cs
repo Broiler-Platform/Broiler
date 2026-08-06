@@ -101,16 +101,114 @@ internal static class HtmlFormSerializer
     public static string BuildFormData(
         DomElement form,
         DomElement? submitter = null,
+        Func<DomElement, string?>? valueOverride = null) =>
+        EncodeUrlEncoded(BuildEntryList(form, submitter, valueOverride));
+
+    /// <summary>
+    /// The form data set: every successful control's name and value, in tree order.
+    /// Every encoding is built from this, so they cannot disagree about which
+    /// controls submit.
+    /// </summary>
+    public static IReadOnlyList<FormEntry> BuildEntryList(
+        DomElement form,
+        DomElement? submitter = null,
         Func<DomElement, string?>? valueOverride = null)
     {
         ArgumentNullException.ThrowIfNull(form);
 
-        StringBuilder body = new();
+        List<FormEntry> entries = [];
         foreach (DomElement control in Descendants(form))
-            AppendControl(body, control, submitter, valueOverride);
+            AppendControl(entries, control, submitter, valueOverride);
+
+        return entries;
+    }
+
+    /// <summary>A single name/value pair of a form data set.</summary>
+    /// <param name="FileName">
+    /// Set for a file control, naming the selected file. Only multipart can carry it;
+    /// the other encodings submit the name alone, as the spec requires.
+    /// </param>
+    public sealed record FormEntry(string Name, string Value, string? FileName = null);
+
+    /// <summary>
+    /// The encoding the form asks for. An unrecognised <c>enctype</c> falls back to
+    /// URL encoding, which is what the HTML spec's missing-value default is.
+    /// </summary>
+    public static string ResolveEncoding(DomElement form)
+    {
+        string? declared = form.GetAttribute("enctype")?.Trim();
+        if (string.Equals(declared, MultipartFormData, StringComparison.OrdinalIgnoreCase))
+            return MultipartFormData;
+        if (string.Equals(declared, TextPlain, StringComparison.OrdinalIgnoreCase))
+            return TextPlain;
+
+        return UrlEncoded;
+    }
+
+    public const string UrlEncoded = "application/x-www-form-urlencoded";
+
+    public const string MultipartFormData = "multipart/form-data";
+
+    public const string TextPlain = "text/plain";
+
+    /// <summary>Encodes an entry list as <c>application/x-www-form-urlencoded</c>.</summary>
+    public static string EncodeUrlEncoded(IReadOnlyList<FormEntry> entries)
+    {
+        StringBuilder body = new();
+        foreach (FormEntry entry in entries)
+        {
+            if (body.Length > 0)
+                body.Append('&');
+
+            // A file control submits its filename, since the bytes need multipart.
+            body.Append(Encode(entry.Name)).Append('=').Append(Encode(entry.FileName ?? entry.Value));
+        }
 
         return body.ToString();
     }
+
+    /// <summary>Encodes an entry list as <c>text/plain</c> (HTML forms §plain text encoding).</summary>
+    public static string EncodeTextPlain(IReadOnlyList<FormEntry> entries)
+    {
+        StringBuilder body = new();
+        foreach (FormEntry entry in entries)
+            body.Append(entry.Name).Append('=').Append(entry.FileName ?? entry.Value).Append("\r\n");
+
+        return body.ToString();
+    }
+
+    /// <summary>
+    /// Encodes an entry list as <c>multipart/form-data</c> with the given boundary.
+    /// A file entry carries its filename and an <c>application/octet-stream</c>
+    /// content type, so a server sees a file part rather than a text field.
+    /// </summary>
+    public static string EncodeMultipart(IReadOnlyList<FormEntry> entries, string boundary)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(boundary);
+
+        StringBuilder body = new();
+        foreach (FormEntry entry in entries)
+        {
+            body.Append("--").Append(boundary).Append("\r\n");
+            body.Append("Content-Disposition: form-data; name=\"").Append(EscapeQuotes(entry.Name)).Append('"');
+
+            if (entry.FileName is not null)
+            {
+                body.Append("; filename=\"").Append(EscapeQuotes(entry.FileName)).Append('"');
+                body.Append("\r\nContent-Type: application/octet-stream");
+            }
+
+            body.Append("\r\n\r\n").Append(entry.Value).Append("\r\n");
+        }
+
+        body.Append("--").Append(boundary).Append("--\r\n");
+        return body.ToString();
+    }
+
+    /// <summary>A boundary that cannot occur in the parts it separates.</summary>
+    public static string CreateMultipartBoundary() => "----BroilerFormBoundary" + Guid.NewGuid().ToString("N");
+
+    private static string EscapeQuotes(string text) => text.Replace("\"", "%22", StringComparison.Ordinal);
 
     /// <summary>Sentinel a <paramref name="valueOverride"/> returns to mark a checkbox/radio checked.</summary>
     public const string CheckedOverride = "checked";
@@ -146,7 +244,7 @@ internal static class HtmlFormSerializer
         !string.Equals(form.GetAttribute("method"), "post", StringComparison.OrdinalIgnoreCase);
 
     private static void AppendControl(
-        StringBuilder body,
+        List<FormEntry> body,
         DomElement control,
         DomElement? submitter,
         Func<DomElement, string?>? valueOverride)
@@ -223,7 +321,7 @@ internal static class HtmlFormSerializer
             Append(body, name, live ?? control.GetAttribute("value") ?? string.Empty);
     }
 
-    private static void AppendSelect(StringBuilder body, DomElement select, string name, string? live)
+    private static void AppendSelect(List<FormEntry> body, DomElement select, string name, string? live)
     {
         if (live is not null)
         {
@@ -258,13 +356,11 @@ internal static class HtmlFormSerializer
     private static string OptionValue(DomElement option) =>
         option.GetAttribute("value") ?? (option.TextContent ?? string.Empty).Trim();
 
-    private static void Append(StringBuilder body, string name, string value)
-    {
-        if (body.Length > 0)
-            body.Append('&');
+    private static void Append(List<FormEntry> body, string name, string value) =>
+        body.Add(new FormEntry(name, value));
 
-        body.Append(Encode(name)).Append('=').Append(Encode(value));
-    }
+    private static void AppendFile(List<FormEntry> body, string name, string fileName, string content) =>
+        body.Add(new FormEntry(name, content, fileName));
 
     /// <summary>
     /// Percent-encodes for <c>application/x-www-form-urlencoded</c>, where a space is

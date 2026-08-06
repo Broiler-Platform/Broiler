@@ -252,4 +252,55 @@ public class HtmlFormSerializerTests
         Assert.NotNull(found);
         Assert.Equal("lucky", found.GetAttribute("name"));
     }
+
+    [Fact]
+    public void EncodingIsTakenFromEnctypeWithUrlEncodedAsTheDefault()
+    {
+        Assert.Equal(HtmlFormSerializer.UrlEncoded, HtmlFormSerializer.ResolveEncoding(Form("<form></form>")));
+        Assert.Equal(
+            HtmlFormSerializer.MultipartFormData,
+            HtmlFormSerializer.ResolveEncoding(Form("<form enctype='multipart/form-data'></form>")));
+        Assert.Equal(
+            HtmlFormSerializer.TextPlain,
+            HtmlFormSerializer.ResolveEncoding(Form("<form enctype='TEXT/PLAIN'></form>")));
+        // An unrecognised enctype falls back to the spec's missing-value default.
+        Assert.Equal(
+            HtmlFormSerializer.UrlEncoded,
+            HtmlFormSerializer.ResolveEncoding(Form("<form enctype='application/json'></form>")));
+    }
+
+    [Fact]
+    public void EveryEncodingIsBuiltFromTheSameEntryList()
+    {
+        DomElement form = Form(
+            "<form><input name='a' value='1'><input name='b' value='two words'>" +
+            "<input name='skip' value='x' disabled></form>");
+
+        IReadOnlyList<HtmlFormSerializer.FormEntry> entries = HtmlFormSerializer.BuildEntryList(form);
+
+        Assert.Equal(["a", "b"], entries.Select(e => e.Name));
+        Assert.Equal("a=1&b=two+words", HtmlFormSerializer.EncodeUrlEncoded(entries));
+        Assert.Equal("a=1\r\nb=two words\r\n", HtmlFormSerializer.EncodeTextPlain(entries));
+    }
+
+    [Fact]
+    public void MultipartWrapsEachEntryInItsOwnPart()
+    {
+        DomElement form = Form("<form><input name='a' value='1'></form>");
+        IReadOnlyList<HtmlFormSerializer.FormEntry> entries = HtmlFormSerializer.BuildEntryList(form);
+
+        string body = HtmlFormSerializer.EncodeMultipart(entries, "BOUNDARY");
+
+        Assert.Equal(
+            "--BOUNDARY\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\n1\r\n--BOUNDARY--\r\n",
+            body);
+    }
+
+    [Fact]
+    public void MultipartBoundariesAreUnique()
+    {
+        Assert.NotEqual(
+            HtmlFormSerializer.CreateMultipartBoundary(),
+            HtmlFormSerializer.CreateMultipartBoundary());
+    }
 }

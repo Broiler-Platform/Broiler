@@ -1,4 +1,5 @@
 using System.Drawing;
+using Broiler.App.Rendering;
 using Broiler.Browser;
 using Broiler.HtmlBridge;
 using HtmlContainer = Broiler.HTML.Image.HtmlContainer;
@@ -48,12 +49,12 @@ public class HtmlFormStateTests
         using HtmlContainer container = LayOut(SearchPage);
         HtmlFormState state = new();
 
-        string? target = state.TryBuildSubmitTarget(
+        PageRequest? target = state.TryBuildSubmitRequest(
             container.GetHtml(),
             SubmitAttributes("go", "btnG", "Search"),
             "https://example.com/search");
 
-        Assert.Equal("https://example.com/search?q=broiler&src=hp&btnG=Search", target);
+        Assert.Equal("https://example.com/search?q=broiler&src=hp&btnG=Search", target?.Url);
     }
 
     [Fact]
@@ -69,12 +70,12 @@ public class HtmlFormStateTests
         editor.Editor.Text = "typed query";
         Assert.True(editor.Commit());
 
-        string? target = state.TryBuildSubmitTarget(
+        PageRequest? target = state.TryBuildSubmitRequest(
             container.GetHtml(),
             SubmitAttributes("go", "btnG", "Search"),
             "https://example.com/search");
 
-        Assert.Equal("https://example.com/search?q=typed+query&src=hp&btnG=Search", target);
+        Assert.Equal("https://example.com/search?q=typed+query&src=hp&btnG=Search", target?.Url);
     }
 
     private static PointF FindEditablePoint(HtmlContainer container)
@@ -95,11 +96,11 @@ public class HtmlFormStateTests
         using HtmlContainer container = LayOut(SearchPage);
         HtmlFormState state = new();
 
-        string? target = state.TryBuildFieldSubmitTarget(
+        PageRequest? target = state.TryBuildFieldSubmitRequest(
             container.GetHtml(), "q", "q", "https://example.com/");
 
         // No submitter, so btnG does not contribute; the relative action resolves.
-        Assert.Equal("https://example.com/search?q=broiler&src=hp", target);
+        Assert.Equal("https://example.com/search?q=broiler&src=hp", target?.Url);
     }
 
     [Fact]
@@ -110,7 +111,7 @@ public class HtmlFormStateTests
             "<input name='q' value='x'></form></body></html>");
         HtmlFormState state = new();
 
-        string? target = state.TryBuildSubmitTarget(
+        PageRequest? target = state.TryBuildSubmitRequest(
             container.GetHtml(),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["href"] = "/about" },
             "https://example.com/about");
@@ -119,7 +120,7 @@ public class HtmlFormStateTests
     }
 
     [Fact]
-    public void PostFormsFallBackToNavigatingTheActionUnchanged()
+    public void PostFormsCarryTheirFieldsInTheRequestBody()
     {
         using HtmlContainer container = LayOut(
             "<html><body><form action='/login' method='post'>" +
@@ -127,10 +128,49 @@ public class HtmlFormStateTests
             "</form></body></html>");
         HtmlFormState state = new();
 
-        // The browser fetches by URL, so a POST body cannot be carried; the caller
-        // falls back to the action the renderer resolved.
-        Assert.Null(state.TryBuildSubmitTarget(
-            container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://example.com/login"));
+        PageRequest? request = state.TryBuildSubmitRequest(
+            container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://example.com/login");
+
+        Assert.NotNull(request);
+        Assert.Equal(PageRequest.Post, request.Method);
+        // The action keeps no query: a POST's fields go in the body.
+        Assert.Equal("https://example.com/login", request.Url);
+        Assert.Equal("u=me&s=Go", request.Body);
+        Assert.Equal(HtmlFormSerializer.UrlEncoded, request.ContentType);
+        Assert.False(request.IsRepeatable);
+    }
+
+    [Fact]
+    public void PostFormsHonourTheirDeclaredEncoding()
+    {
+        using HtmlContainer container = LayOut(
+            "<html><body><form action='/p' method='post' enctype='text/plain'>" +
+            "<input name='a' value='1'><input id='go' type='submit' name='s' value='Go'>" +
+            "</form></body></html>");
+        HtmlFormState state = new();
+
+        PageRequest? request = state.TryBuildSubmitRequest(
+            container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/p");
+
+        Assert.Equal(HtmlFormSerializer.TextPlain, request?.ContentType);
+        Assert.Equal("a=1\r\ns=Go\r\n", request?.Body);
+    }
+
+    [Fact]
+    public void AGetFormIgnoresEnctypeBecauseItHasNoBody()
+    {
+        using HtmlContainer container = LayOut(
+            "<html><body><form action='/s' enctype='text/plain'>" +
+            "<input name='a' value='1'><input id='go' type='submit' name='s' value='Go'>" +
+            "</form></body></html>");
+        HtmlFormState state = new();
+
+        PageRequest? request = state.TryBuildSubmitRequest(
+            container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s");
+
+        Assert.Equal(PageRequest.Get, request?.Method);
+        Assert.Equal("https://x/s?a=1&s=Go", request?.Url);
+        Assert.Null(request?.Body);
     }
 
     [Fact]
@@ -140,7 +180,7 @@ public class HtmlFormStateTests
             "<html><body><input id='go' type='submit' name='s' value='Go'></body></html>");
         HtmlFormState state = new();
 
-        Assert.Null(state.TryBuildSubmitTarget(
+        Assert.Null(state.TryBuildSubmitRequest(
             container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://example.com/"));
     }
 
@@ -158,25 +198,50 @@ public class HtmlFormStateTests
         // Markup state: only b is checked.
         Assert.Equal(
             "https://x/s?b=2&s=Go",
-            state.TryBuildSubmitTarget(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s"));
+            state.TryBuildSubmitRequest(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s")?.Url);
 
         state.SetChecked("a", "a", "1", isChecked: true);
         state.SetChecked("b", "b", "2", isChecked: false);
 
         Assert.Equal(
             "https://x/s?a=1&s=Go",
-            state.TryBuildSubmitTarget(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s"));
+            state.TryBuildSubmitRequest(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s")?.Url);
     }
 
     [Fact]
-    public void ResetForgetsPerPageToggleState()
+    public void AChangedSelectionIsLayeredOverTheMarkup()
+    {
+        using HtmlContainer container = LayOut(
+            "<html><body><form action='/s'>" +
+            "<select id='sel' name='colour'><option value='r'>Red</option>" +
+            "<option value='g' selected>Green</option></select>" +
+            "<input id='go' type='submit' name='s' value='Go'>" +
+            "</form></body></html>");
+        HtmlFormState state = new();
+
+        // Markup selection.
+        Assert.Equal(
+            "https://x/s?colour=g&s=Go",
+            state.TryBuildSubmitRequest(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s")?.Url);
+
+        state.SetSelectedValue("sel", "colour", "r");
+
+        Assert.Equal(
+            "https://x/s?colour=r&s=Go",
+            state.TryBuildSubmitRequest(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s")?.Url);
+    }
+
+    [Fact]
+    public void ResetForgetsPerPageControlState()
     {
         HtmlFormState state = new();
         state.SetChecked("a", "a", "1", isChecked: true);
+        state.SetSelectedValue("sel", "colour", "r");
 
         state.Reset();
 
         Assert.Null(state.GetChecked("a", "a", "1"));
+        Assert.Null(state.GetSelectedValue("sel", "colour"));
     }
 
     [Fact]
@@ -193,8 +258,8 @@ public class HtmlFormStateTests
     {
         HtmlFormState state = new();
 
-        Assert.Null(state.TryBuildSubmitTarget(string.Empty, SubmitAttributes("go", "s", "Go"), "https://x/"));
-        Assert.Null(state.TryBuildSubmitTarget("<html>", null, "https://x/"));
+        Assert.Null(state.TryBuildSubmitRequest(string.Empty, SubmitAttributes("go", "s", "Go"), "https://x/"));
+        Assert.Null(state.TryBuildSubmitRequest("<html>", null, "https://x/"));
     }
 
     /// <summary>
@@ -204,7 +269,7 @@ public class HtmlFormStateTests
     [Fact]
     public void ToggleControlsAreStampedWithIdsForGeometryLookup()
     {
-        string stamped = HtmlPostProcessor.StampToggleControlIds(
+        string stamped = HtmlPostProcessor.StampFormControlIds(
             "<form><input type='checkbox' name='a'><input type='radio' name='b' value='1'></form>");
 
         Assert.Contains($"id=\"{HtmlPostProcessor.SyntheticIdPrefix}0\"", stamped);
@@ -214,7 +279,7 @@ public class HtmlFormStateTests
     [Fact]
     public void StampingKeepsExistingIdsAndLeavesOtherControlsAlone()
     {
-        string stamped = HtmlPostProcessor.StampToggleControlIds(
+        string stamped = HtmlPostProcessor.StampFormControlIds(
             "<form><input type='checkbox' id='mine' name='a'>" +
             "<input type='text' name='q'><input type='submit' value='Go'></form>");
 
@@ -225,7 +290,7 @@ public class HtmlFormStateTests
     [Fact]
     public void StampedControlsKeepTheirAttributesAndSelfClosingForm()
     {
-        string stamped = HtmlPostProcessor.StampToggleControlIds(
+        string stamped = HtmlPostProcessor.StampFormControlIds(
             "<input type=\"checkbox\" name=\"a\" value=\"1\" checked />");
 
         Assert.Contains("name=\"a\"", stamped);

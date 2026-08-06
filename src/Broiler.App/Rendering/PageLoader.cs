@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Broiler.App.Rendering;
 
 /// <summary>
@@ -11,10 +13,14 @@ namespace Broiler.App.Rendering;
 /// </remarks>
 public sealed class PageLoader(HttpClient httpClient) : IPageLoader
 {
-
     /// <inheritdoc />
-    public async Task<(string NormalisedUrl, string Html)> FetchAsync(string url, CancellationToken cancellationToken = default)
+    public async Task<(string NormalisedUrl, string Html)> FetchAsync(
+        PageRequest request,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
+        string url = request.Url;
         if (url.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
         {
             var uri = new Uri(url);
@@ -31,9 +37,36 @@ public sealed class PageLoader(HttpClient httpClient) : IPageLoader
             url = "https://" + url;
         }
 
-        var content = await httpClient.GetStringAsync(new Uri(url), cancellationToken);
-        return (url, content);
+        if (request.Body is null)
+        {
+            var content = await httpClient.GetStringAsync(new Uri(url), cancellationToken);
+            return (url, content);
+        }
+
+        using HttpRequestMessage message = new(new HttpMethod(request.Method), new Uri(url))
+        {
+            Content = new StringContent(
+                request.Body,
+                Encoding.UTF8,
+                request.ContentType ?? PageRequest.FormUrlEncoded),
+        };
+
+        using HttpResponseMessage response = await httpClient
+            .SendAsync(message, cancellationToken)
+            .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        string body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        // A submission usually redirects; report where it landed so relative URLs on
+        // the resulting page resolve against the right base.
+        string finalUrl = response.RequestMessage?.RequestUri?.ToString() ?? url;
+        return (finalUrl, body);
     }
+
+    /// <inheritdoc />
+    public Task<(string NormalisedUrl, string Html)> FetchAsync(string url, CancellationToken cancellationToken = default) =>
+        FetchAsync(PageRequest.ForUrl(url), cancellationToken);
 
     public void Dispose() => httpClient.Dispose();
 }

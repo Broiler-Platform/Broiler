@@ -6,6 +6,8 @@ using Broiler.HtmlBridge;
 using Broiler.UI;
 using Broiler.UI.CheckBox;
 using Broiler.UI.CheckBox.Standard;
+using Broiler.UI.ComboBox;
+using Broiler.UI.ComboBox.Standard;
 using Broiler.UI.RadioButton;
 using Broiler.UI.RadioButton.Standard;
 using HtmlContainer = Broiler.HTML.Image.HtmlContainer;
@@ -13,31 +15,32 @@ using HtmlContainer = Broiler.HTML.Image.HtmlContainer;
 namespace Broiler.Browser;
 
 /// <summary>
-/// Hosts real Broiler.UI <see cref="StandardCheckBox"/> and
-/// <see cref="StandardRadioButton"/> controls over the page's checkboxes and radios,
-/// which the renderer draws as empty 13×13 bordered boxes with no checked state and
-/// no way to toggle them.
+/// Hosts real Broiler.UI controls over the page's checkboxes, radios and
+/// <c>&lt;select&gt;</c>s — a <see cref="StandardCheckBox"/>,
+/// <see cref="StandardRadioButton"/> or <see cref="StandardComboBox"/> apiece. The
+/// renderer draws all three as empty bordered boxes: no check, no dot, no selected
+/// option text, no popup, and no way to change any of them.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Unlike the text editor — which hosts one control on demand, at the point the user
-/// clicked — a toggle has to show its state whether or not it is being interacted
+/// clicked — these have to show their state whether or not they are being interacted
 /// with, so every one on the page is hosted up front.
 /// </para>
 /// <para>
 /// That needs each control's geometry, and the renderer's only public geometry query
 /// for an arbitrary element is <c>GetElementRectangle(id)</c>. Controls are therefore
-/// given synthetic ids by <see cref="HtmlPostProcessor.StampToggleControlIds"/> before
+/// given synthetic ids by <see cref="HtmlPostProcessor.StampFormControlIds"/> before
 /// the page reaches the renderer, identified from the parsed document, and located by
 /// id after each layout.
 /// </para>
 /// <para>
-/// Toggling records into <see cref="HtmlFormState"/> rather than the document: the
-/// renderer has no API to write a <c>checked</c> attribute back, and form submission
-/// layers this state over the markup anyway.
+/// Changes record into <see cref="HtmlFormState"/> rather than the document: the
+/// renderer has no API to write a <c>checked</c> attribute or a selected option back,
+/// and form submission layers this state over the markup anyway.
 /// </para>
 /// </remarks>
-internal sealed class HtmlToggleControlHost
+internal sealed class HtmlFormControlHost
 {
     /// <summary>
     /// Ceiling on hosted controls per page. Each one costs an id lookup — a box-tree
@@ -46,20 +49,24 @@ internal sealed class HtmlToggleControlHost
     /// </summary>
     private const int MaxHostedControls = 64;
 
+    /// <summary>UA default control font (see <c>CssDefaults</c>), so hosted controls match the page.</summary>
+    private const string UaControlFontFamily = "Arial";
+    private const double UaControlFontSize = 13.3333;
+
     private readonly UiElement _owner;
     private readonly HtmlFormState _formState;
     private readonly List<HostedToggle> _hosted = [];
     private readonly Dictionary<string, UiRadioGroupScope> _radioGroups = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<ToggleIdentity>> _radioMembers = new(StringComparer.Ordinal);
 
-    public HtmlToggleControlHost(UiElement owner, HtmlFormState formState)
+    public HtmlFormControlHost(UiElement owner, HtmlFormState formState)
     {
         _owner = owner ?? throw new ArgumentNullException(nameof(owner));
         _formState = formState ?? throw new ArgumentNullException(nameof(formState));
     }
 
-    /// <summary>Raised when the user toggled a control, so the host can repaint.</summary>
-    public event EventHandler? Toggled;
+    /// <summary>Raised when the user changed a control, so the host can repaint.</summary>
+    public event EventHandler? Changed;
 
     /// <summary>The controls hosted for the current page.</summary>
     public IReadOnlyList<UiElement> Controls => _hosted.ConvertAll(h => h.Control);
@@ -84,19 +91,27 @@ internal sealed class HtmlToggleControlHost
             if (_hosted.Count >= MaxHostedControls)
                 break;
 
-            if (!string.Equals(element.TagName, "input", StringComparison.OrdinalIgnoreCase))
+            bool isSelect = string.Equals(element.TagName, "select", StringComparison.OrdinalIgnoreCase);
+            bool isInput = string.Equals(element.TagName, "input", StringComparison.OrdinalIgnoreCase);
+            if (!isSelect && !isInput)
+                continue;
+
+            // A multi-select is not a combo box; leave it painted and let submission
+            // use the markup's selection rather than misrepresent it as single-choice.
+            if (isSelect && element.HasAttribute("multiple"))
                 continue;
 
             string type = element.GetAttribute("type") ?? string.Empty;
-            bool isRadio = string.Equals(type, "radio", StringComparison.OrdinalIgnoreCase);
-            if (!isRadio && !string.Equals(type, "checkbox", StringComparison.OrdinalIgnoreCase))
+            bool isRadio = isInput && string.Equals(type, "radio", StringComparison.OrdinalIgnoreCase);
+            bool isCheckBox = isInput && string.Equals(type, "checkbox", StringComparison.OrdinalIgnoreCase);
+            if (!isSelect && !isRadio && !isCheckBox)
                 continue;
 
             string id = element.GetAttribute("id") ?? string.Empty;
             if (id.Length == 0)
                 continue;
 
-            Add(element, id, isRadio);
+            Add(element, id, isSelect, isRadio);
         }
     }
 
@@ -154,16 +169,23 @@ internal sealed class HtmlToggleControlHost
         }
     }
 
-    private void Add(DomElement element, string id, bool isRadio)
+    private void Add(DomElement element, string id, bool isSelect, bool isRadio)
     {
         string name = element.GetAttribute("name") ?? string.Empty;
         string value = element.GetAttribute("value") ?? string.Empty;
-        bool markupChecked = element.HasAttribute("checked");
-        bool isChecked = _formState.GetChecked(id, name, value) ?? markupChecked;
 
-        UiElement control = isRadio
-            ? CreateRadio(id, name, value, isChecked)
-            : CreateCheckBox(id, name, value, isChecked);
+        UiElement control;
+        if (isSelect)
+        {
+            control = CreateComboBox(element, id, name);
+        }
+        else
+        {
+            bool isChecked = _formState.GetChecked(id, name, value) ?? element.HasAttribute("checked");
+            control = isRadio
+                ? CreateRadio(id, name, value, isChecked)
+                : CreateCheckBox(id, name, value, isChecked);
+        }
 
         control.Visibility = UiVisibility.Collapsed;
         _owner.AddChild(control);
@@ -184,7 +206,7 @@ internal sealed class HtmlToggleControlHost
         box.CheckStateChanged += (_, _) =>
         {
             _formState.SetChecked(id, name, value, box.CheckState == UiCheckState.Checked);
-            Toggled?.Invoke(this, EventArgs.Empty);
+            Changed?.Invoke(this, EventArgs.Empty);
         };
 
         return box;
@@ -229,10 +251,70 @@ internal sealed class HtmlToggleControlHost
                     _formState.SetChecked(member.Id, member.Name, member.Value, member == identity);
             }
 
-            Toggled?.Invoke(this, EventArgs.Empty);
+            Changed?.Invoke(this, EventArgs.Empty);
         };
 
         return radio;
+    }
+
+    /// <summary>
+    /// Builds a combo box from a <c>&lt;select&gt;</c>'s options, seeded with the
+    /// selection the page declares (or the first option, which is what a single-select
+    /// with nothing marked shows and submits).
+    /// </summary>
+    private UiElement CreateComboBox(DomElement select, string id, string name)
+    {
+        List<UiComboBoxItem> items = [];
+        List<string> values = [];
+        int selected = -1;
+
+        foreach (DomElement option in Descendants(select))
+        {
+            if (!string.Equals(option.TagName, "option", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            string text = (option.TextContent ?? string.Empty).Trim();
+            // An option with no value attribute submits its text.
+            string value = option.GetAttribute("value") ?? text;
+
+            if (option.HasAttribute("selected") && selected < 0)
+                selected = items.Count;
+
+            values.Add(value);
+            items.Add(new UiComboBoxItem(value, text));
+        }
+
+        if (selected < 0 && items.Count > 0)
+            selected = 0;
+
+        // A selection the user already made on this page outranks the markup.
+        string? recorded = _formState.GetSelectedValue(id, name);
+        if (recorded is not null)
+        {
+            int index = values.IndexOf(recorded);
+            if (index >= 0)
+                selected = index;
+        }
+
+        StandardComboBox combo = new()
+        {
+            Font = new BFontStyle(UaControlFontFamily, UaControlFontSize),
+            CornerRadius = 0,
+        };
+        combo.SetItems(items);
+        if (selected >= 0)
+            combo.SelectIndex(selected);
+
+        combo.SelectionChanged += (_, _) =>
+        {
+            int index = combo.SelectedIndex;
+            if (index >= 0 && index < values.Count)
+                _formState.SetSelectedValue(id, name, values[index]);
+
+            Changed?.Invoke(this, EventArgs.Empty);
+        };
+
+        return combo;
     }
 
     /// <summary>
@@ -251,6 +333,11 @@ internal sealed class HtmlToggleControlHost
             case StandardRadioButton radio:
                 radio.MarkSize = size;
                 radio.Spacing = 0;
+                break;
+            case StandardComboBox combo:
+                // A combo fills its box rather than sizing a mark inside it, and its
+                // row height has to match or the closed control clips its own text.
+                combo.ItemHeight = Math.Max(1, target.Height);
                 break;
         }
     }

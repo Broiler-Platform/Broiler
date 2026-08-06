@@ -133,7 +133,7 @@ internal static class HtmlPostProcessor
     internal static string ProcessForBrowsing(string html) => ApplyReplacedElementPasses(html);
 
     /// <summary>
-    /// Prefix of the synthetic ids <see cref="StampToggleControlIds"/> assigns. Lower
+    /// Prefix of the synthetic ids <see cref="StampFormControlIds"/> assigns. Lower
     /// case because the renderer's id lookup folds case.
     /// </summary>
     internal const string SyntheticIdPrefix = "broiler-fc-";
@@ -145,12 +145,21 @@ internal static class HtmlPostProcessor
         @"<input\b(?<attrs>[^>]*\btype\s*=\s*[""']?(?:checkbox|radio)\b[^>]*)>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>
+    /// Matches a <c>&lt;select&gt;</c> start tag (never the closing tag, which
+    /// <c>\b</c> after the name cannot follow a slash into).
+    /// </summary>
+    private static readonly Regex SelectPattern = new(
+        @"<select\b(?<attrs>[^>]*)>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static readonly Regex IdAttributePattern = new(
         @"\bid\s*=\s*[""']?[^\s""'>]+",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
-    /// Gives every checkbox and radio without one a synthetic <c>id</c>.
+    /// Gives every checkbox, radio and <c>&lt;select&gt;</c> without one a synthetic
+    /// <c>id</c>.
     /// </summary>
     /// <remarks>
     /// The renderer's only public geometry query for an arbitrary element is
@@ -165,13 +174,18 @@ internal static class HtmlPostProcessor
     /// compare rendered output and must see the page exactly as authored.
     /// </para>
     /// </remarks>
-    internal static string StampToggleControlIds(string html)
+    internal static string StampFormControlIds(string html)
     {
         if (string.IsNullOrEmpty(html))
             return html ?? string.Empty;
 
         int next = 0;
-        return ToggleInputPattern.Replace(html, match =>
+        html = ToggleInputPattern.Replace(html, match => Stamp(match, "input"));
+        return SelectPattern.Replace(html, match => Stamp(match, "select"));
+
+        // A local function so both passes share one counter, keeping the ids unique
+        // across the page rather than restarting per control kind.
+        string Stamp(Match match, string tagName)
         {
             string attrs = match.Groups["attrs"].Value;
             if (IdAttributePattern.IsMatch(attrs))
@@ -185,8 +199,9 @@ internal static class HtmlPostProcessor
             if (selfClosing)
                 trimmed = trimmed[..^1].TrimEnd();
 
-            return $"<input {trimmed} id=\"{id}\"{(selfClosing ? " /" : string.Empty)}>";
-        });
+            string separator = trimmed.Length > 0 ? " " : string.Empty;
+            return $"<{tagName}{separator}{trimmed} id=\"{id}\"{(selfClosing ? " /" : string.Empty)}>";
+        }
     }
 
     /// <summary>
