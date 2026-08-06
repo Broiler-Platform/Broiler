@@ -119,7 +119,14 @@ public sealed partial class DomBridge
 
         foreach (var styleEl in outerStyles)
         {
-            var partRules = ExtractPartRules(GetStyleElementCssText(styleEl));
+            // Lifting the rule into this scope is only half of it: the selector matcher does not
+            // model ::part, so a rule whose subject is still `::part(name)` matches nothing once it
+            // gets here. Re-emit it against the shadow element's own `part` attribute — inside this
+            // scope every candidate is already a member of this tree, so the attribute alone says
+            // what the pseudo said. Without this the part's declarations stayed invisible to
+            // getComputedStyle, and a `view-transition-name` set from ::part never reached the
+            // capture (WPT auto-name-from-id-shadow).
+            var partRules = ExtractPartRulesForShadowScope(GetStyleElementCssText(styleEl));
             if (partRules.Length > 0)
                 sources.Add(new CssStyleScopeBuilder.StyleSource(
                     partRules, CSS.Dom.CssOrigin.Author, GetAttr(styleEl, "media")));
