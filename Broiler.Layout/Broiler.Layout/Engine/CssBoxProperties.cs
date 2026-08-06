@@ -387,40 +387,49 @@ internal abstract partial class CssBoxProperties
         {
             string raw = value ?? string.Empty;
 
+            // `border-radius: <horizontal> / <vertical>` gives elliptical corners. The vertical half
+            // used to be cut off here and thrown away, so `75px / 50px` rounded as if it were
+            // `75px` — circular corners on a shape the author asked to be an ellipse. Each corner
+            // now carries "<h> <v>", the same two-value form the per-corner longhands accept.
             int slashIndex = raw.IndexOf('/');
+            string[] vertical = slashIndex >= 0
+                ? raw[(slashIndex + 1)..].Split((char[])null, StringSplitOptions.RemoveEmptyEntries)
+                : [];
             if (slashIndex >= 0)
                 raw = raw[..slashIndex];
 
             string[] r = raw.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
 
-            switch (r.Length)
+            // border-radius lists its corners clockwise from the top-left, and fills a short list
+            // by mirroring: 2 values are the two diagonals, 3 leave the bottom-left to match the
+            // top-right. This used to read the list as if the first value were the top-RIGHT corner,
+            // so `border-radius: 5px 60px 5px 5px` cut the top-left where CSS cuts the top-right,
+            // and a 3-value list never assigned the bottom-left at all. Invisible while every corner
+            // shares a radius, which is nearly every use of the property.
+            static string[] ExpandCorners(string[] values) => values.Length switch
             {
-                case 1:
-                    CornerNeRadius = r[0];
-                    CornerNwRadius = r[0];
-                    CornerSeRadius = r[0];
-                    CornerSwRadius = r[0];
-                    break;
+                // top-left, top-right, bottom-right, bottom-left
+                1 => [values[0], values[0], values[0], values[0]],
+                2 => [values[0], values[1], values[0], values[1]],
+                3 => [values[0], values[1], values[2], values[1]],
+                _ => [values[0], values[1], values[2], values[3]],
+            };
 
-                case 2:
-                    CornerNeRadius = r[0];
-                    CornerNwRadius = r[0];
-                    CornerSeRadius = r[1];
-                    CornerSwRadius = r[1];
-                    break;
+            if (r.Length is >= 1 and <= 4)
+            {
+                var horizontal = ExpandCorners(r);
+                // The vertical list expands over the corners by the same rule, so each corner keeps
+                // its own pair rather than borrowing a neighbour's.
+                var verticalByCorner = vertical.Length is >= 1 and <= 4 ? ExpandCorners(vertical) : null;
 
-                case 3:
-                    CornerNeRadius = r[0];
-                    CornerNwRadius = r[1];
-                    CornerSeRadius = r[2];
-                    break;
+                string Corner(int corner) => verticalByCorner is null
+                    ? horizontal[corner]
+                    : horizontal[corner] + " " + verticalByCorner[corner];
 
-                case 4:
-                    CornerNeRadius = r[0];
-                    CornerNwRadius = r[1];
-                    CornerSeRadius = r[2];
-                    CornerSwRadius = r[3];
-                    break;
+                CornerNwRadius = Corner(0);
+                CornerNeRadius = Corner(1);
+                CornerSeRadius = Corner(2);
+                CornerSwRadius = Corner(3);
             }
 
             _cornerRadius = value;
@@ -1799,8 +1808,26 @@ internal abstract partial class CssBoxProperties
         };
     }
 
+    /// <summary>The horizontal component of a corner radius: the first of its one or two
+    /// space-separated values.</summary>
+    internal static string FirstCornerRadiusComponent(string radius)
+    {
+        if (string.IsNullOrWhiteSpace(radius))
+            return radius;
+
+        var trimmed = radius.Trim();
+        var space = trimmed.IndexOf(' ');
+        return space < 0 ? trimmed : trimmed[..space];
+    }
+
     private double ParseCornerRadius(string radius)
     {
+        // A corner radius may carry two values — `border-top-left-radius: 75px 50px` is an ellipse,
+        // horizontal radius then vertical. Only the horizontal one is resolved here; the vertical is
+        // derived at paint time, where the box height is known. Handing the whole pair to the
+        // single-length parser made it fail and return 0, so a two-value corner did not round at all.
+        radius = FirstCornerRadiusComponent(radius);
+
         double basis = radius != null && radius.Contains('%', StringComparison.Ordinal)
             ? Math.Max(0, Size.Width)
             : 0;

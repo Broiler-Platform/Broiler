@@ -159,6 +159,9 @@ public sealed partial class DomBridge
         // selectors must be rewritten to target that root's own host — otherwise the
         // renderer's lenient :host matching paints every element.
         ScopeShadowHostSelectors(root);
+        // The renderer does not model ::part, so an outer rule addressing a shadow part reached
+        // nothing. Runs while shadow-root ancestry is still intact, so only real parts are stamped.
+        RewriteShadowPartSelectors(root);
         // A host's light-DOM children render only where a <slot> assigns them; with no slot in
         // the shadow tree they generate no boxes.
         HideUnslottedShadowHostChildren(root);

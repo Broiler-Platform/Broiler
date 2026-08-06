@@ -274,6 +274,68 @@ internal static partial class SvgRenderer
     }
 
     /// <summary>
+    /// Scans one <c>&lt;svg&gt;</c> string for <c>&lt;clipPath&gt;</c> definitions and records each
+    /// under its <c>id</c> in the document-wide <see cref="SvgClipPathTable"/>, so a CSS
+    /// <c>clip-path: url(#id)</c> on an HTML element resolves to a <c>&lt;clipPath&gt;</c> declared
+    /// in any <c>&lt;svg&gt;</c> subtree of the document.
+    /// <para>
+    /// Only the first shape child is taken. A <c>&lt;clipPath&gt;</c> may hold several children,
+    /// whose union is the clip; the rasterizer pushes one clip region, so a multi-shape definition
+    /// would need a union it cannot express. Taking the first is a narrowing of that union — never
+    /// larger than the real clip — where taking all of them separately would intersect instead and
+    /// erase nearly everything.
+    /// </para>
+    /// </summary>
+    internal static void CollectClipPaths(string svgXml)
+    {
+        if (string.IsNullOrEmpty(svgXml) || svgXml.IndexOf("<clippath", StringComparison.OrdinalIgnoreCase) < 0)
+            return;
+
+        foreach (Match cm in ClipPathBlockRegex().Matches(svgXml))
+        {
+            var clipAttrs = ParseAttributes(cm.Groups[1].Value);
+            if (!clipAttrs.TryGetValue("id", out var id) || string.IsNullOrEmpty(id))
+                continue;
+
+            bool objectBoundingBox = clipAttrs.TryGetValue("clipPathUnits", out var units)
+                && units.Trim().Equals("objectBoundingBox", StringComparison.OrdinalIgnoreCase);
+
+            if (TryParseFirstClipShape(cm.Groups[2].Value, objectBoundingBox, out var shape))
+                SvgClipPathTable.Add(id, shape);
+        }
+    }
+
+    /// <summary>
+    /// Finds whichever modelled shape element appears first in a <c>&lt;clipPath&gt;</c> body.
+    /// Matching each element type separately and keeping the earliest hit preserves document order
+    /// without needing a real parser, which is all the rest of this renderer has either.
+    /// </summary>
+    private static bool TryParseFirstClipShape(
+        string body, bool objectBoundingBox, out SvgClipPathTable.ClipShape shape)
+    {
+        SvgClipPathTable.ClipShape best = null;
+        int bestIndex = int.MaxValue;
+
+        Consider(ParseRectRegex().Match(body), SvgClipPathTable.ClipShapeKind.Rect);
+        Consider(ParseCircleRegex().Match(body), SvgClipPathTable.ClipShapeKind.Circle);
+        Consider(ParseEllipseRegex().Match(body), SvgClipPathTable.ClipShapeKind.Ellipse);
+        Consider(ParsePolygonRegex().Match(body), SvgClipPathTable.ClipShapeKind.Polygon);
+
+        shape = best;
+        return shape != null;
+
+        void Consider(Match match, SvgClipPathTable.ClipShapeKind kind)
+        {
+            if (!match.Success || match.Index >= bestIndex)
+                return;
+
+            bestIndex = match.Index;
+            best = new SvgClipPathTable.ClipShape(
+                kind, ParseAttributes(match.Groups[1].Value), objectBoundingBox);
+        }
+    }
+
+    /// <summary>
     /// Scans one <c>&lt;svg&gt;</c> string for <c>&lt;filter&gt;</c> definitions whose sole modelled
     /// primitive is an <c>&lt;feFlood&gt;</c>, and records each under its <c>id</c> in the document-wide
     /// <see cref="SvgFilterTable"/>. Called for every SVG-bearing fragment before painting so a
@@ -455,6 +517,9 @@ internal static partial class SvgRenderer
 
     [GeneratedRegex(@"<filter\b([^>]*)>(.*?)</filter>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex FilterBlockRegex();
+
+    [GeneratedRegex(@"<clipPath\b([^>]*)>(.*?)</clipPath>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex ClipPathBlockRegex();
 
     [GeneratedRegex(@"<feflood\b([^>]*?)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex FeFloodRegex();
