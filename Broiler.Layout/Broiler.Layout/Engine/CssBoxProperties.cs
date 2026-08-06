@@ -400,39 +400,36 @@ internal abstract partial class CssBoxProperties
 
             string[] r = raw.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
 
-            // Pairs a corner's horizontal radius with its vertical one, when the author gave one.
-            // The vertical list expands over the four corners exactly as the horizontal list does.
-            string Corner(string horizontal, int index) =>
-                vertical.Length == 0 ? horizontal : horizontal + " " + vertical[Math.Min(index, vertical.Length - 1)];
-
-            switch (r.Length)
+            // border-radius lists its corners clockwise from the top-left, and fills a short list
+            // by mirroring: 2 values are the two diagonals, 3 leave the bottom-left to match the
+            // top-right. This used to read the list as if the first value were the top-RIGHT corner,
+            // so `border-radius: 5px 60px 5px 5px` cut the top-left where CSS cuts the top-right,
+            // and a 3-value list never assigned the bottom-left at all. Invisible while every corner
+            // shares a radius, which is nearly every use of the property.
+            static string[] ExpandCorners(string[] values) => values.Length switch
             {
-                case 1:
-                    CornerNeRadius = Corner(r[0], 0);
-                    CornerNwRadius = Corner(r[0], 0);
-                    CornerSeRadius = Corner(r[0], 0);
-                    CornerSwRadius = Corner(r[0], 0);
-                    break;
+                // top-left, top-right, bottom-right, bottom-left
+                1 => [values[0], values[0], values[0], values[0]],
+                2 => [values[0], values[1], values[0], values[1]],
+                3 => [values[0], values[1], values[2], values[1]],
+                _ => [values[0], values[1], values[2], values[3]],
+            };
 
-                case 2:
-                    CornerNeRadius = Corner(r[0], 0);
-                    CornerNwRadius = Corner(r[0], 0);
-                    CornerSeRadius = Corner(r[1], 1);
-                    CornerSwRadius = Corner(r[1], 1);
-                    break;
+            if (r.Length is >= 1 and <= 4)
+            {
+                var horizontal = ExpandCorners(r);
+                // The vertical list expands over the corners by the same rule, so each corner keeps
+                // its own pair rather than borrowing a neighbour's.
+                var verticalByCorner = vertical.Length is >= 1 and <= 4 ? ExpandCorners(vertical) : null;
 
-                case 3:
-                    CornerNeRadius = Corner(r[0], 0);
-                    CornerNwRadius = Corner(r[1], 1);
-                    CornerSeRadius = Corner(r[2], 2);
-                    break;
+                string Corner(int corner) => verticalByCorner is null
+                    ? horizontal[corner]
+                    : horizontal[corner] + " " + verticalByCorner[corner];
 
-                case 4:
-                    CornerNeRadius = Corner(r[0], 0);
-                    CornerNwRadius = Corner(r[1], 1);
-                    CornerSeRadius = Corner(r[2], 2);
-                    CornerSwRadius = Corner(r[3], 3);
-                    break;
+                CornerNwRadius = Corner(0);
+                CornerNeRadius = Corner(1);
+                CornerSeRadius = Corner(2);
+                CornerSwRadius = Corner(3);
             }
 
             _cornerRadius = value;
