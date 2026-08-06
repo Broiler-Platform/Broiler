@@ -24,8 +24,8 @@ internal sealed class HtmlFormState
     /// <summary>Selected option value by control key, for selects the user has changed.</summary>
     private readonly Dictionary<string, string> _selectedValues = new(StringComparer.Ordinal);
 
-    /// <summary>Chosen file path by control key, for file inputs the user has picked for.</summary>
-    private readonly Dictionary<string, string> _selectedFiles = new(StringComparer.Ordinal);
+    /// <summary>Chosen file paths by control key, for file inputs the user has picked for.</summary>
+    private readonly Dictionary<string, List<string>> _selectedFiles = new(StringComparer.Ordinal);
 
     /// <summary>Forgets per-page state. Called when the page is replaced.</summary>
     public void Reset()
@@ -51,13 +51,40 @@ internal sealed class HtmlFormState
     public string? GetSelectedValue(string id, string name) =>
         _selectedValues.TryGetValue(ControlKey(id, name, string.Empty), out string? value) ? value : null;
 
-    /// <summary>Records the file chosen for an <c>&lt;input type="file"&gt;</c>.</summary>
+    /// <summary>Records the single file chosen for an <c>&lt;input type="file"&gt;</c>.</summary>
     public void SetSelectedFile(string id, string name, string path) =>
-        _selectedFiles[ControlKey(id, name, string.Empty)] = path;
+        _selectedFiles[ControlKey(id, name, string.Empty)] = [path];
 
-    /// <summary>The path chosen for a file input, or <c>null</c> if none has been.</summary>
+    /// <summary>
+    /// Adds a file to a <c>multiple</c> file input's selection, so picking repeatedly
+    /// accumulates rather than replacing. A path already chosen is not added twice.
+    /// </summary>
+    public void AddSelectedFile(string id, string name, string path)
+    {
+        string key = ControlKey(id, name, string.Empty);
+        if (!_selectedFiles.TryGetValue(key, out List<string>? paths))
+        {
+            paths = [];
+            _selectedFiles[key] = paths;
+        }
+
+        if (!paths.Contains(path, StringComparer.Ordinal))
+            paths.Add(path);
+    }
+
+    /// <summary>Forgets everything chosen for a file input.</summary>
+    public void ClearSelectedFiles(string id, string name) =>
+        _selectedFiles.Remove(ControlKey(id, name, string.Empty));
+
+    /// <summary>The first path chosen for a file input, or <c>null</c> if none has been.</summary>
     public string? GetSelectedFile(string id, string name) =>
-        _selectedFiles.TryGetValue(ControlKey(id, name, string.Empty), out string? path) ? path : null;
+        GetSelectedFiles(id, name) is [string first, ..] ? first : null;
+
+    /// <summary>Every path chosen for a file input, in the order they were picked.</summary>
+    public IReadOnlyList<string> GetSelectedFiles(string id, string name) =>
+        _selectedFiles.TryGetValue(ControlKey(id, name, string.Empty), out List<string>? paths)
+            ? paths
+            : [];
 
     /// <summary>
     /// Builds the request a submission should make, or <c>null</c> when the click is
@@ -129,7 +156,7 @@ internal sealed class HtmlFormState
     private PageRequest BuildRequest(DomElement form, DomElement? submitter, string action)
     {
         IReadOnlyList<HtmlFormSerializer.FormEntry> entries =
-            HtmlFormSerializer.BuildEntryList(form, submitter, ResolveOverride, ResolveFile);
+            HtmlFormSerializer.BuildEntryList(form, submitter, ResolveOverride, ResolveFiles);
 
         // A GET form always puts its data in the query, whatever enctype says — the
         // enctype only applies to a body, and a GET has none.
@@ -175,27 +202,33 @@ internal sealed class HtmlFormState
     }
 
     /// <summary>
-    /// Reads the file the user chose for a control, if any. A path that has gone away
-    /// or cannot be read submits as "nothing selected" rather than failing the whole
-    /// submission.
+    /// Reads the files the user chose for a control. A path that has gone away or
+    /// cannot be read is dropped rather than failing the whole submission; when that
+    /// leaves nothing, the control submits as "nothing selected".
     /// </summary>
-    private HtmlFormSerializer.SelectedFile? ResolveFile(DomElement control)
+    private IReadOnlyList<HtmlFormSerializer.SelectedFile> ResolveFiles(DomElement control)
     {
-        string? path = GetSelectedFile(
+        IReadOnlyList<string> paths = GetSelectedFiles(
             control.GetAttribute("id") ?? string.Empty,
             control.GetAttribute("name") ?? string.Empty);
 
-        if (string.IsNullOrEmpty(path))
-            return null;
+        if (paths.Count == 0)
+            return [];
 
-        try
+        List<HtmlFormSerializer.SelectedFile> files = [];
+        foreach (string path in paths)
         {
-            return new HtmlFormSerializer.SelectedFile(Path.GetFileName(path), File.ReadAllBytes(path));
+            try
+            {
+                files.Add(new HtmlFormSerializer.SelectedFile(Path.GetFileName(path), File.ReadAllBytes(path)));
+            }
+            catch (Exception)
+            {
+                // Deleted or unreadable since it was chosen.
+            }
         }
-        catch (Exception)
-        {
-            return null;
-        }
+
+        return files;
     }
 
     private string? ResolveOverride(DomElement control)

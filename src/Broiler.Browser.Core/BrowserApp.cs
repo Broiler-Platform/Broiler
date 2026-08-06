@@ -11,6 +11,7 @@ using Broiler.Input.Touch;
 using Broiler.UI;
 using Broiler.UI.Button.Standard;
 using Broiler.UI.Dialog;
+using Broiler.UI.Dialog.Standard;
 using Broiler.UI.Edit.Standard;
 using Broiler.UI.FileDialog;
 using Broiler.UI.FileDialog.Standard;
@@ -31,7 +32,7 @@ internal sealed class BrowserApp : IDisposable
     private readonly Action<bool> _setAnimationActive;
     private readonly UiSession _session;
     private readonly FavoritesManager _favorites = new();
-    private readonly List<string> _history = [];
+    private readonly List<PageRequest> _history = [];
     private readonly StandardButton _backButton;
     private readonly StandardButton _forwardButton;
     private readonly StandardButton _refreshButton;
@@ -267,10 +268,9 @@ internal sealed class BrowserApp : IDisposable
         if (_historyIndex < _history.Count - 1)
             _history.RemoveRange(_historyIndex + 1, _history.Count - _historyIndex - 1);
 
-        // History holds URLs, so back/forward and reload re-issue a plain GET. A POST
-        // is therefore never silently repeated — real browsers prompt instead, and
-        // without that UI a GET of the same URL is the safer degradation.
-        _history.Add(request.Url);
+        // History holds the whole request, so revisiting a POST can re-issue it —
+        // behind a confirmation, since repeating a submission is not free.
+        _history.Add(request);
         _historyIndex = _history.Count - 1;
         LoadUrl(request);
     }
@@ -284,8 +284,21 @@ internal sealed class BrowserApp : IDisposable
         if (target < 0 || target >= _history.Count)
             return;
 
+        PageRequest request = _history[target];
+        if (!request.IsRepeatable)
+        {
+            // Re-issuing a submission can charge a card twice. Ask first, and only
+            // move the history cursor if the user agrees.
+            ConfirmResubmission(() =>
+            {
+                _historyIndex = target;
+                LoadUrl(request);
+            });
+            return;
+        }
+
         _historyIndex = target;
-        LoadUrl(_history[target]);
+        LoadUrl(request);
     }
 
     private void Reload()
@@ -293,9 +306,59 @@ internal sealed class BrowserApp : IDisposable
         if (_isShuttingDown)
             return;
 
-        if (_historyIndex >= 0 && _historyIndex < _history.Count)
-            LoadUrl(_history[_historyIndex]);
+        if (_historyIndex < 0 || _historyIndex >= _history.Count)
+            return;
+
+        PageRequest request = _history[_historyIndex];
+        if (request.IsRepeatable)
+        {
+            LoadUrl(request);
+            return;
+        }
+
+        ConfirmResubmission(() => LoadUrl(request));
     }
+
+    /// <summary>
+    /// Asks before repeating a form submission, and runs <paramref name="resubmit"/>
+    /// only if the user agrees. A POST is not safe to replay on its own — reloading a
+    /// checkout would place the order twice — so revisiting one goes through here.
+    /// </summary>
+    private void ConfirmResubmission(Action resubmit)
+    {
+        StandardDialog dialog = new()
+        {
+            Title = "Confirm resubmission",
+            PreferredSize = ResubmitDialogSize,
+        };
+
+        StandardLabel message = new()
+        {
+            Text = "This page was the result of a form submission. Sending it again may repeat the action.",
+            Font = new BFontStyle("Segoe UI", 13),
+            Foreground = BrowserPalette.Text,
+            Trimming = UiTextTrimming.None,
+        };
+        StandardButton resend = CreateChromeButton("Resend", "Resend");
+        StandardButton cancel = CreateChromeButton("Cancel", "Cancel");
+
+        resend.Clicked += (_, _) => dialog.Accept();
+        cancel.Clicked += (_, _) => dialog.Cancel();
+
+        dialog.AddChild(new ResubmitPrompt(message, resend, cancel));
+        dialog.ResultCompleted += (_, e) =>
+        {
+            if (e.Result.Kind == UiDialogResultKind.Accepted)
+                resubmit();
+
+            _host.RequestInvalidate();
+        };
+
+        dialog.ShowModal(_rootWindow, GetDialogPlacement(ResubmitDialogSize));
+        _host.RequestInvalidate();
+    }
+
+    private static readonly BSize ResubmitDialogSize = new(420, 170);
 
     private void StopLoading()
     {
@@ -508,6 +571,7 @@ internal sealed class BrowserApp : IDisposable
             Mode = UiFileDialogMode.Open,
             CurrentDirectory = Environment.CurrentDirectory,
             PreferredSize = FileDialogPreferredSize,
+            Title = e.AllowsMultiple ? "Add a file" : "Choose a file",
         };
 
         dialog.ResultCompleted += (_, result) =>
@@ -515,23 +579,23 @@ internal sealed class BrowserApp : IDisposable
             if (result.Result.Kind == UiDialogResultKind.Accepted &&
                 !string.IsNullOrWhiteSpace(result.Result.Value))
             {
-                _viewport.RecordPickedFile(e.ControlId, e.ControlName, result.Result.Value);
+                _viewport.RecordPickedFile(e.ControlId, e.ControlName, result.Result.Value, e.AllowsMultiple);
             }
 
             _host.RequestInvalidate();
         };
 
-        dialog.ShowOpenModal(_rootWindow, GetFileDialogPlacement());
+        dialog.ShowOpenModal(_rootWindow, GetDialogPlacement(FileDialogPreferredSize));
         _host.RequestInvalidate();
     }
 
     private static readonly BSize FileDialogPreferredSize = new(560, 380);
 
-    private BRect GetFileDialogPlacement()
+    private BRect GetDialogPlacement(BSize preferred)
     {
         BSize viewport = _host.ViewportSize;
-        double width = Math.Min(FileDialogPreferredSize.Width, Math.Max(280, viewport.Width - 24));
-        double height = Math.Min(FileDialogPreferredSize.Height, Math.Max(180, viewport.Height - 64));
+        double width = Math.Min(preferred.Width, Math.Max(280, viewport.Width - 24));
+        double height = Math.Min(preferred.Height, Math.Max(160, viewport.Height - 64));
         return new BRect(
             Math.Max(12, (viewport.Width - width) / 2),
             Math.Max(42, (viewport.Height - height) / 2),
@@ -584,7 +648,7 @@ internal sealed class BrowserApp : IDisposable
 
     private string CurrentHistoryUrl() =>
         _historyIndex >= 0 && _historyIndex < _history.Count
-            ? _history[_historyIndex]
+            ? _history[_historyIndex].Url
             : string.Empty;
 
     private void ToggleFavorite()
@@ -975,10 +1039,18 @@ internal sealed class BrowserApp : IDisposable
         /// <summary>Raised when a hosted file control was activated; the shell shows the dialog.</summary>
         public event EventHandler<HtmlFilePickEventArgs>? FilePickRequested;
 
-        /// <summary>Records the file the shell's dialog returned and refreshes the control.</summary>
-        public void RecordPickedFile(string controlId, string controlName, string path)
+        /// <summary>
+        /// Records the file the shell's dialog returned and refreshes the control. A
+        /// <c>multiple</c> input accumulates, so picking again adds to its selection
+        /// instead of replacing it — the dialog chooses one file at a time.
+        /// </summary>
+        public void RecordPickedFile(string controlId, string controlName, string path, bool allowsMultiple)
         {
-            _formState.SetSelectedFile(controlId, controlName, path);
+            if (allowsMultiple)
+                _formState.AddSelectedFile(controlId, controlName, path);
+            else
+                _formState.SetSelectedFile(controlId, controlName, path);
+
             _controlHost.RefreshFileLabels();
         }
 
@@ -1505,6 +1577,55 @@ internal sealed class BrowserApp : IDisposable
                         break;
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Lays out the resubmission prompt: the message across the top, its two buttons
+    /// on a row at the bottom right. A dialog's default child arrangement stretches
+    /// every child over the whole surface, so this places them itself.
+    /// </summary>
+    private sealed class ResubmitPrompt : UiElement
+    {
+        private const double Margin = 16;
+        private const double ButtonHeight = 28;
+        private const double ButtonWidth = 84;
+        private const double ButtonGap = 8;
+
+        private readonly StandardLabel _message;
+        private readonly StandardButton _accept;
+        private readonly StandardButton _cancel;
+
+        public ResubmitPrompt(StandardLabel message, StandardButton accept, StandardButton cancel)
+        {
+            _message = message;
+            _accept = accept;
+            _cancel = cancel;
+            AddChild(_message);
+            AddChild(_cancel);
+            AddChild(_accept);
+        }
+
+        protected override BSize MeasureCore(BSize availableSize)
+        {
+            foreach (UiElement child in Children)
+                child.Measure(availableSize);
+
+            return availableSize;
+        }
+
+        protected override void ArrangeCore(BRect finalRect)
+        {
+            double buttonTop = Math.Max(finalRect.Top, finalRect.Bottom - Margin - ButtonHeight);
+            _message.Arrange(new BRect(
+                finalRect.Left + Margin,
+                finalRect.Top + Margin,
+                Math.Max(0, finalRect.Width - (2 * Margin)),
+                Math.Max(0, buttonTop - finalRect.Top - (2 * Margin))));
+
+            double acceptLeft = finalRect.Right - Margin - ButtonWidth;
+            _accept.Arrange(new BRect(acceptLeft, buttonTop, ButtonWidth, ButtonHeight));
+            _cancel.Arrange(new BRect(acceptLeft - ButtonGap - ButtonWidth, buttonTop, ButtonWidth, ButtonHeight));
         }
     }
 

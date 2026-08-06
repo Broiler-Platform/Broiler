@@ -363,4 +363,141 @@ public class HtmlFormStateTests
 
         Assert.Null(state.GetSelectedFile("f", "doc"));
     }
+
+    [Fact]
+    public void AMultipleFileInputSubmitsOnePartPerFile()
+    {
+        string first = WriteTempFile("one");
+        string second = WriteTempFile("two");
+        try
+        {
+            using HtmlContainer container = LayOut(
+                "<html><body><form action='/upload' method='post' enctype='multipart/form-data'>" +
+                "<input id='f' type='file' name='docs' multiple>" +
+                "<input id='go' type='submit' name='s' value='Go'>" +
+                "</form></body></html>");
+            HtmlFormState state = new();
+            state.AddSelectedFile("f", "docs", first);
+            state.AddSelectedFile("f", "docs", second);
+
+            PageRequest? request = state.TryBuildSubmitRequest(
+                container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/upload");
+
+            string body = System.Text.Encoding.UTF8.GetString(request!.BinaryBody!);
+            Assert.Contains($"filename=\"{Path.GetFileName(first)}\"", body);
+            Assert.Contains($"filename=\"{Path.GetFileName(second)}\"", body);
+            Assert.Contains("one", body);
+            Assert.Contains("two", body);
+        }
+        finally
+        {
+            File.Delete(first);
+            File.Delete(second);
+        }
+    }
+
+    [Fact]
+    public void AFileInputWithoutMultipleSubmitsOnlyItsFirstFile()
+    {
+        string first = WriteTempFile("one");
+        string second = WriteTempFile("two");
+        try
+        {
+            using HtmlContainer container = LayOut(
+                "<html><body><form action='/upload' method='post' enctype='multipart/form-data'>" +
+                "<input id='f' type='file' name='doc'>" +
+                "<input id='go' type='submit' name='s' value='Go'>" +
+                "</form></body></html>");
+            HtmlFormState state = new();
+            state.AddSelectedFile("f", "doc", first);
+            state.AddSelectedFile("f", "doc", second);
+
+            PageRequest? request = state.TryBuildSubmitRequest(
+                container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/upload");
+
+            string body = System.Text.Encoding.UTF8.GetString(request!.BinaryBody!);
+            Assert.Contains("one", body);
+            Assert.DoesNotContain("two", body);
+        }
+        finally
+        {
+            File.Delete(first);
+            File.Delete(second);
+        }
+    }
+
+    [Fact]
+    public void AddingTheSameFileTwiceDoesNotDuplicateIt()
+    {
+        HtmlFormState state = new();
+        state.AddSelectedFile("f", "docs", "/tmp/a");
+        state.AddSelectedFile("f", "docs", "/tmp/a");
+
+        Assert.Equal(["/tmp/a"], state.GetSelectedFiles("f", "docs"));
+    }
+
+    [Fact]
+    public void PickingASingleFileReplacesThePreviousChoice()
+    {
+        HtmlFormState state = new();
+        state.SetSelectedFile("f", "doc", "/tmp/a");
+        state.SetSelectedFile("f", "doc", "/tmp/b");
+
+        Assert.Equal(["/tmp/b"], state.GetSelectedFiles("f", "doc"));
+    }
+
+    [Fact]
+    public void UnreadableFilesAreDroppedWithoutLosingTheReadableOnes()
+    {
+        string good = WriteTempFile("kept");
+        try
+        {
+            using HtmlContainer container = LayOut(
+                "<html><body><form action='/upload' method='post' enctype='multipart/form-data'>" +
+                "<input id='f' type='file' name='docs' multiple>" +
+                "<input id='go' type='submit' name='s' value='Go'>" +
+                "</form></body></html>");
+            HtmlFormState state = new();
+            state.AddSelectedFile("f", "docs", "/no/such/file.bin");
+            state.AddSelectedFile("f", "docs", good);
+
+            PageRequest? request = state.TryBuildSubmitRequest(
+                container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/upload");
+
+            string body = System.Text.Encoding.UTF8.GetString(request!.BinaryBody!);
+            Assert.Contains("kept", body);
+            Assert.DoesNotContain("file.bin", body);
+        }
+        finally
+        {
+            File.Delete(good);
+        }
+    }
+
+    private static string WriteTempFile(string content)
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"broiler-form-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(path, content);
+        return path;
+    }
+
+    /// <summary>
+    /// History gates re-navigation on this: a GET can be replayed freely, a
+    /// submission goes through a confirmation first.
+    /// </summary>
+    [Fact]
+    public void OnlyGetRequestsAreRepeatable()
+    {
+        Assert.True(PageRequest.ForUrl("https://x/").IsRepeatable);
+        Assert.True(new PageRequest("https://x/", PageRequest.Get).IsRepeatable);
+        Assert.False(new PageRequest("https://x/", PageRequest.Post, Body: "a=1").IsRepeatable);
+    }
+
+    [Fact]
+    public void ARequestCarriesEitherATextOrABinaryBody()
+    {
+        Assert.False(PageRequest.ForUrl("https://x/").HasBody);
+        Assert.True(new PageRequest("https://x/", PageRequest.Post, Body: "a=1").HasBody);
+        Assert.True(new PageRequest("https://x/", PageRequest.Post) { BinaryBody = [1, 2] }.HasBody);
+    }
 }

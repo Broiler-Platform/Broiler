@@ -57,6 +57,9 @@ internal sealed class HtmlFormControlHost
     /// <summary>What a file control reads before anything is chosen.</summary>
     private const string NoFileChosen = "Choose File";
 
+    /// <summary>What a <c>multiple</c> file control reads before anything is chosen.</summary>
+    private const string NoFilesChosen = "Choose Files";
+
     private readonly UiElement _owner;
     private readonly HtmlFormState _formState;
     private readonly List<HostedToggle> _hosted = [];
@@ -192,7 +195,7 @@ internal sealed class HtmlFormControlHost
         UiElement control;
         if (isFile)
         {
-            control = CreateFilePicker(id, name);
+            control = CreateFilePicker(id, name, element.HasAttribute("multiple"));
         }
         else if (isSelect)
         {
@@ -340,7 +343,7 @@ internal sealed class HtmlFormControlHost
     /// Builds the button that stands in for an <c>&lt;input type="file"&gt;</c>. It
     /// shows the chosen file's name, or the usual prompt when nothing is chosen.
     /// </summary>
-    private UiElement CreateFilePicker(string id, string name)
+    private UiElement CreateFilePicker(string id, string name, bool allowsMultiple)
     {
         StandardButton button = new()
         {
@@ -348,11 +351,12 @@ internal sealed class HtmlFormControlHost
             CornerRadius = 0,
             PaddingX = 4,
             PaddingY = 0,
-            Text = DescribeFile(id, name),
+            Text = DescribeFile(id, name, allowsMultiple),
         };
 
-        button.Clicked += (_, _) => FilePickRequested?.Invoke(this, new HtmlFilePickEventArgs(id, name));
-        _filePickers.Add(new FilePicker(id, name, button));
+        button.Clicked += (_, _) =>
+            FilePickRequested?.Invoke(this, new HtmlFilePickEventArgs(id, name, allowsMultiple));
+        _filePickers.Add(new FilePicker(id, name, allowsMultiple, button));
         return button;
     }
 
@@ -363,15 +367,22 @@ internal sealed class HtmlFormControlHost
     public void RefreshFileLabels()
     {
         foreach (FilePicker picker in _filePickers)
-            picker.Button.Text = DescribeFile(picker.Id, picker.Name);
+            picker.Button.Text = DescribeFile(picker.Id, picker.Name, picker.AllowsMultiple);
 
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private string DescribeFile(string id, string name)
+    private string DescribeFile(string id, string name, bool allowsMultiple)
     {
-        string? path = _formState.GetSelectedFile(id, name);
-        return string.IsNullOrEmpty(path) ? NoFileChosen : Path.GetFileName(path);
+        IReadOnlyList<string> paths = _formState.GetSelectedFiles(id, name);
+        return paths.Count switch
+        {
+            0 => allowsMultiple ? NoFilesChosen : NoFileChosen,
+            1 => Path.GetFileName(paths[0]),
+            // A `multiple` control accumulates, so name the count rather than
+            // truncating a list into a button.
+            _ => $"{paths.Count} files",
+        };
     }
 
     /// <summary>
@@ -446,13 +457,16 @@ internal sealed class HtmlFormControlHost
     private sealed record ToggleIdentity(string Id, string Name, string Value);
 
     /// <summary>A hosted file control and the button standing in for it.</summary>
-    private sealed record FilePicker(string Id, string Name, StandardButton Button);
+    private sealed record FilePicker(string Id, string Name, bool AllowsMultiple, StandardButton Button);
 }
 
 /// <summary>Identifies the file control the user activated.</summary>
-internal sealed class HtmlFilePickEventArgs(string controlId, string controlName) : EventArgs
+internal sealed class HtmlFilePickEventArgs(string controlId, string controlName, bool allowsMultiple) : EventArgs
 {
     public string ControlId { get; } = controlId;
 
     public string ControlName { get; } = controlName;
+
+    /// <summary>Whether the control accepts more than one file, so picks accumulate.</summary>
+    public bool AllowsMultiple { get; } = allowsMultiple;
 }

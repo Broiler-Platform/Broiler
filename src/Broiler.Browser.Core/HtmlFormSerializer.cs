@@ -104,8 +104,11 @@ internal static class HtmlFormSerializer
         Func<DomElement, string?>? valueOverride = null) =>
         EncodeUrlEncoded(BuildEntryList(form, submitter, valueOverride));
 
-    /// <summary>Supplies the file chosen for an <c>&lt;input type="file"&gt;</c>, if any.</summary>
-    public delegate SelectedFile? FileProvider(DomElement control);
+    /// <summary>
+    /// Supplies the files chosen for an <c>&lt;input type="file"&gt;</c> — several only
+    /// when it is a <c>multiple</c> control. Empty when nothing is chosen.
+    /// </summary>
+    public delegate IReadOnlyList<SelectedFile> FileProvider(DomElement control);
 
     /// <summary>
     /// The form data set: every successful control's name and value, in tree order.
@@ -352,10 +355,22 @@ internal static class HtmlFormSerializer
             if (name.Length == 0)
                 return;
 
+            IReadOnlyList<SelectedFile> files = fileProvider?.Invoke(control) ?? [];
+
             // HTML Forms: a file control with nothing selected still submits an entry,
-            // with an empty filename and an empty body.
-            SelectedFile? file = fileProvider?.Invoke(control);
-            AppendFile(body, name, file?.FileName ?? string.Empty, file?.Content);
+            // with an empty filename and an empty body. A `multiple` control submits
+            // one entry per file, all under the same name.
+            if (files.Count == 0)
+            {
+                AppendFile(body, name, string.Empty, null);
+                return;
+            }
+
+            // Without `multiple` the control has one file however many were offered.
+            int count = control.HasAttribute("multiple") ? files.Count : 1;
+            for (int index = 0; index < count; index++)
+                AppendFile(body, name, files[index].FileName, files[index].Content);
+
             return;
         }
 

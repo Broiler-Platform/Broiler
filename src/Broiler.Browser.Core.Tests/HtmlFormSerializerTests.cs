@@ -144,7 +144,7 @@ public class HtmlFormSerializerTests
         DomElement form = Form("<form><input type='file' name='f'></form>");
         IReadOnlyList<HtmlFormSerializer.FormEntry> entries = HtmlFormSerializer.BuildEntryList(
             form, submitter: null, valueOverride: null,
-            fileProvider: _ => new HtmlFormSerializer.SelectedFile("notes.txt", "ignored"u8.ToArray()));
+            fileProvider: _ => [new HtmlFormSerializer.SelectedFile("notes.txt", "ignored"u8.ToArray())]);
 
         Assert.Equal("f=notes.txt", HtmlFormSerializer.EncodeUrlEncoded(entries));
         Assert.Equal("f=notes.txt\r\n", HtmlFormSerializer.EncodeTextPlain(entries));
@@ -156,7 +156,7 @@ public class HtmlFormSerializerTests
         DomElement form = Form("<form><input type='file' name='f'></form>");
         IReadOnlyList<HtmlFormSerializer.FormEntry> entries = HtmlFormSerializer.BuildEntryList(
             form, submitter: null, valueOverride: null,
-            fileProvider: _ => new HtmlFormSerializer.SelectedFile("notes.txt", "hello"u8.ToArray()));
+            fileProvider: _ => [new HtmlFormSerializer.SelectedFile("notes.txt", "hello"u8.ToArray())]);
 
         string body = Encoding.UTF8.GetString(HtmlFormSerializer.EncodeMultipart(entries, "B"));
 
@@ -174,7 +174,7 @@ public class HtmlFormSerializerTests
         byte[] binary = [0x00, 0xFF, 0xFE, 0x80, 0x41];
         IReadOnlyList<HtmlFormSerializer.FormEntry> entries = HtmlFormSerializer.BuildEntryList(
             form, submitter: null, valueOverride: null,
-            fileProvider: _ => new HtmlFormSerializer.SelectedFile("blob.bin", binary));
+            fileProvider: _ => [new HtmlFormSerializer.SelectedFile("blob.bin", binary)]);
 
         byte[] body = HtmlFormSerializer.EncodeMultipart(entries, "B");
 

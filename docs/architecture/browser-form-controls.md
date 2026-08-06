@@ -88,12 +88,11 @@ enforced twice over — Broiler.UI's `UiRadioGroupScope` drives the visible stat
 the host records the *whole* group on a change so an untouched sibling's markup
 `checked` cannot leak into a submission.
 
-Two controls are deliberately partial. A `<select multiple>` is **not** hosted: a
-combo box cannot represent one, so it stays painted and submits its markup selection
-rather than being misrepresented as single-choice. And a file input's *picker* lives
-in the shell rather than the host — the host owns no window to parent a modal to, so
-it raises `FilePickRequested` and `BrowserApp` shows the `StandardFileDialog` and
-hands the path back.
+A `<select multiple>` is **not** hosted — see the open decision at the end. A file
+input's *picker* lives in the shell rather than the host: the host owns no window to
+parent a modal to, so it raises `FilePickRequested` and `BrowserApp` shows the
+`StandardFileDialog` and hands the path back. A `multiple` file input accumulates,
+since the dialog chooses one file at a time; its button then reads "*n* files".
 
 Hosting is capped at 64 controls per page: each costs an id lookup (a box-tree walk)
 per layout, so a pathological page is bounded rather than made quadratic.
@@ -148,21 +147,26 @@ binary and a UTF-8 round trip would corrupt anything that is not valid UTF-8, so
 ### Files
 
 `<input type="file">` is a successful control. The hosted button opens the shell's
-file dialog, the chosen path is recorded in `HtmlFormState`, and at submit time the
+file dialog, the chosen paths are recorded in `HtmlFormState`, and at submit time each
 file is read and carried as a multipart part with its filename and an
-`application/octet-stream` content type. Per the spec, a file control with *nothing*
-chosen still submits an entry with an empty filename, and the URL-encoded and
-plain-text encodings submit the filename alone since only multipart can carry bytes.
-A path that has since been deleted or cannot be read submits as "nothing chosen"
-rather than failing the whole submission.
+`application/octet-stream` content type. A `multiple` input submits one part per file,
+all under the same name; without `multiple` it submits one however many were offered.
+
+Per the spec, a file control with *nothing* chosen still submits an entry with an
+empty filename, and the URL-encoded and plain-text encodings submit the filename alone
+since only multipart can carry bytes. A path that has since been deleted or cannot be
+read is dropped rather than failing the whole submission; when that leaves nothing,
+the control submits as "nothing chosen".
 
 ### History and re-submission
 
-History stores URLs only, so back, forward and reload re-issue a plain GET and a POST
-is never silently repeated. Real browsers prompt to re-submit; without that UI, a GET
-of the same URL is the safer degradation. `PageRequest.IsRepeatable` names the
-distinction. A POST usually redirects, so the loader reports the URL it landed on
-rather than the one it posted to, and relative URLs on the result resolve correctly.
+History stores the whole `PageRequest`, so revisiting a submission can re-issue it —
+behind a confirmation, since replaying a POST can charge a card twice. Back, forward
+and reload check `PageRequest.IsRepeatable`; a GET replays silently, a POST puts up a
+modal and only moves the history cursor if the user agrees.
+
+A POST usually redirects, so the loader reports the URL it landed on rather than the
+one it posted to, and relative URLs on the result resolve correctly.
 
 ## What is wired, and what is not
 
@@ -173,18 +177,46 @@ rather than the one it posted to, and relative URLs on the result resolve correc
 | `input` checkbox, radio | box only | **toggling** — hosted `StandardCheckBox` / `StandardRadioButton` |
 | `select` | box only | **selection** — hosted `StandardComboBox` |
 | `select multiple` | native list box | not interactive; markup selection is submitted |
-| `input` file | box only | **picking** — hosted button plus the shell's file dialog |
+| `input` file | box only | **picking** — hosted button plus the shell's file dialog, `multiple` accumulates |
 | `input` submit/image, `button` | yes | click activates, and **submits the form** |
 
 Submission carries the form data set for GET and POST, in all three HTML encodings.
 
 Known limits, none of them silent:
 
-- **A `<select multiple>` is not hosted**, as above — it submits what the markup marks.
-- **Re-submitting a POST is a GET**, as above, for want of a confirmation prompt.
-- **One file per file input.** `multiple` is not honoured; the picker records a single
-  path.
+- **A `<select multiple>` is not hosted** — see below.
 - **`<textarea>` typing depends on a pending submodule patch**, below.
+
+## Open decision: multi-selection in `UiListView`
+
+`<select multiple>` is the one form control still not interactive. The renderer paints
+it as a native list box and submission honours whatever the markup marked `selected`,
+but there is no way to change that selection.
+
+It is **not** hosted deliberately, and the reason is worth recording. The obvious
+candidates both misrepresent the control: a `StandardComboBox` is single-choice, and
+so is `UiListView` — hosting either would let the user pick exactly one option and
+would silently discard the other selections the markup declares. That is worse than
+leaving the control inert, so nothing is hosted.
+
+Making it work needs multi-selection in `UiListView`, which is a Broiler.UI component
+decision rather than a browser one — the component is ADR-governed, its
+`HUMAN_REVIEW.md` is `PENDING`, and its selection model has no recorded direction. The
+shape it would take, for whoever owns that call:
+
+- A `UiListSelectionMode { Single, Multiple }` defaulting to `Single`, so existing
+  consumers are unaffected.
+- `SelectedItemIds` alongside today's single `SelectedItemId`, which would keep
+  meaning "the primary selection" so existing `SelectionChanged` handlers still work.
+- An interaction rule for `Multiple` in `StandardListView` — plain-click-toggles is
+  the simplest, ctrl/shift-click matches platform list boxes. This is the part that
+  most wants an owner's decision rather than a default chosen here.
+
+With that in place the browser side is small: host a `StandardListView` in `Multiple`
+mode, seed it from the options marked `selected`, and record the selection through
+`HtmlFormState` exactly as the combo box already does. The serializer already emits
+one entry per selected option for a multi-select (`MultiSelectSubmitsEverySelectedOption`),
+so nothing downstream needs to change.
 
 ## Why textarea ships as a patch
 
