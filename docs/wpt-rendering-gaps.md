@@ -1152,6 +1152,19 @@ count late: it appeared not to reproduce until its reference was regenerated.)
   where cloning the DOM into the snapshot was implemented, measured at +8/−7 and
   reverted. Problem 28 belongs to that item, not to a scroll bug.
 
+### A runner note: scroll metrics ignore the configured viewport size
+
+Hit twice while writing tests for the fixes above, so it is worth recording rather
+than working around a third time. `new WptTestRunner(w, h)` renders at the given
+size, but the scroll metrics — `vh` lengths and the maximum scroll offset — resolve
+against the default 1024x768 regardless. A page built to be "taller than the
+viewport" at 200x200 therefore scrolls to somewhere that is not the bottom of the
+canvas, and a test asserting on what is on screen fails for a reason that has
+nothing to do with what it is testing. Both `ScrollClampingTests` and
+`ViewTransitionOldCaptureScrollTests` pin their renders to the default size for
+this reason. Out of scope for issue #1538, but it is a real defect in the runner,
+not just a test-authoring trap.
+
 ### Problems 12 and 13 are an unshipped draft feature, not a layout bug
 
 `css-grid/…/subgrid/grid-subgridded-to-grid-lanes/…` (0.80% and 0.89%, both
@@ -1204,36 +1217,44 @@ once it was re-triaged as an ordinary failure it turned out to be a one-line rul
 Each of these reproduces locally, so the diagnosis is from a real render rather
 than from reading code.
 
-- **Problems 22, 23, 25 and 26 — the `massive-element-*-of-viewport-partially-onscreen`
-  quartet (1.8% and 2.6%) — are two separate bugs in the capture, not scrolling.**
+- **Problems 22, 23, 25 and 26 — the `massive-element-*` family — are two separate
+  bugs in the capture, not scrolling. One is fixed.**
   The tests put a 40 000px element in a `writing-mode: vertical-lr` document, call
   `scrollIntoView()` on its far end, and screenshot the transition. Rendering the
   tests' **own `-ref.html`**, which performs the identical scroll without a
   transition, gives white 87.1% / green 10.6% / blue 1.3% against Chromium's white
   87.2% / green 11.5% / blue 0.7% — so scrolling a vertical writing mode is right,
-  and the gap is in the transition. Instrumenting the capture says what it is:
+  and the gap is in the transition. Instrumenting the capture said what it is:
 
       capture target: old=(8,8,40000x100)  new=(-38986,8,40000x100)
 
-  1. **The old capture is taken against pre-scroll layout.** The test scrolls
-     *before* calling `startViewTransition`, so both rectangles should carry the
-     same −38 986 offset; the old one is still at the unscrolled `x: 8`. That alone
-     explains the `-old` variants, which paint `::view-transition-old(target)` and
-     so show the element's *left* edge (its lightblue `.top`) where the reference
-     shows its right. It is a layout-flush ordering bug in
-     `CaptureOldViewTransitionState`, not a coordinate-space one — the *new* capture
-     computed the same way is correct.
-  2. **The snapshot clone lays its children out horizontally.** Ours is green 84.8%
-     / lightblue 12.5% — a green band ~651px tall, where the element is 100px tall
-     — so `.middle`'s `block-size: 39800px` is resolving as a height. It is **not**
-     a lost `writing-mode` bake: instrumenting `BuildViewTransitionSnapshotContent`
-     shows `writing-mode=vertical-lr` correctly carried onto the content box, so the
-     miss is further in, in how the clone's box is sized. That needs its own
-     investigation.
+  1. **The old capture was not in the snapshot containing block — fixed.** Both
+     captures call the same `GetBoundingClientRectForDomElement`, but at different
+     moments against different layouts, and only one has the scroll folded in: the
+     new capture runs on the render projection, where the scroll is already baked
+     into box positions, while the old one runs during script, where it is not. The
+     page scroll is now subtracted from the old capture, which reproduces the new
+     capture's −38 986 exactly. **A `position: fixed` element — or anything inside
+     one — is excluded**, since it does not move with the page and its document
+     coordinates are already viewport coordinates; without that exception
+     `new-content-transform-position-fixed` falls from 100% to 98.73%, which is how
+     the exception was found rather than guessed.
+     **Measured: `css-view-transitions` 346 → 349 of 490, nothing lost.** The gains
+     are `massive-element-on-top-of-viewport-partially-onscreen-old`/`-new`
+     (96.70% → 99.58% — the *vertical*-scroll members of the family) and
+     `transformed-element-scroll-transform` (98.73% → 100%).
+     `snapshot-containing-block-absolute` moves 55.85% → 54.89%, failing on both
+     sides.
+  2. **The snapshot clone still lays its children out horizontally — open.** Ours is
+     green 85.1% — a green band ~651px tall where the element is 100px tall — so
+     `.middle`'s `block-size: 39800px` is resolving as a height. It is **not** a
+     lost `writing-mode` bake: `BuildViewTransitionSnapshotContent` carries
+     `writing-mode: vertical-lr` onto the content box correctly, so the miss is
+     further in, in how the clone's box is sized. **This is what still fails the
+     four tests the list names** — they are the horizontal-scroll members, where the
+     block axis and the scrolled axis are the same one.
 
-  The family is 20 tests locally (2 passing), scoring from 1.8% to 98.8%, so it is
-  worth more than the four tests the list names — but it is two fixes, each needing
-  its own before/after, not the one this entry used to describe.
+  The family is 20 tests locally, and the fixed half moved two of them.
 - **Problems 14, 15 and 27 (`clip-path`, ~1.0% and 2.9%) need a real path clip.**
   `TryCreateInsetClipPathItem` in `Broiler.HTML`'s `PaintWalker.Geometry` models
   `clip-path` as a **rectangle** — it parses `inset()` and nothing else. Problems
@@ -1285,9 +1306,9 @@ owned by a section above). Re-reported problems point at that section.
 | 19 | `css-view-transitions/view-transition-waituntil-animation-manipulation` | 1.3% | 98.46% | does not reproduce — judge from CI |
 | 20 | `css-shadow/shadow-directionality-001.tentative` | 1.3% | **1.27% → 99.55%** | **fixed** — same change as problem 16 |
 | 21 | `css-position/overlay/overlay-transition-finished` | 1.8% | **1.81% → 100%** | **fixed** — the paint-time half of the `overlay` entry transition, main repo |
-| 22, 23 | `css-view-transitions/massive-element-left-of-viewport-partially-onscreen-{new,old}` | 1.8% | 1.81% | open — diagnosed above (snapshot geometry, not scrolling) |
+| 22, 23 | `css-view-transitions/massive-element-left-of-viewport-partially-onscreen-{new,old}` | 1.8% | 1.81% | open — **half fixed**: the old capture is now in the snapshot containing block (which closed the two `on-top-of` siblings); these still fail on the clone's box sizing. See above |
 | 24 | `css-align/animation/row-gap-interpolation` | 2.6% | 2.59% | open — a **testharness** test: its reference is Chromium's results table, so closing it means passing the `row-gap` interpolation subtests, not one fix |
-| 25, 26 | `css-view-transitions/massive-element-right-of-viewport-partially-onscreen-{new,old}` | 2.6% | 2.65% | open — same root cause as 22/23 |
+| 25, 26 | `css-view-transitions/massive-element-right-of-viewport-partially-onscreen-{new,old}` | 2.6% | 2.65% | open — same two causes as 22/23 |
 | 27 | `css-masking/clip-path/clip-path-element-userSpaceOnUse-004` | 2.9% | 2.86% | open — SVG `<clipPath>` reference needs a real path clip |
 | 28 | `css-view-transitions/reset-state-after-scrolled-view-transition` | 3.6% | 3.61% | **part-fixed** — the scroll no longer overshoots the end (CSSOM View clamp, main repo); still failing on the rasterised root snapshot, which is #1491's problems 19/21/23 |
 | 29 | `html/…/form-validation-validity-textarea-defaultValue` | 3.8% | 3.78% | open — a **testharness** test whose reference is Chromium's results table; three of its five subtests drive `test_driver.send_keys`, which the runner only stubs |

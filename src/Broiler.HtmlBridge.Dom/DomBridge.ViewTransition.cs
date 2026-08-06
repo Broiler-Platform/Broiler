@@ -315,12 +315,64 @@ public sealed partial class DomBridge
                 continue;
 
             var (l, t, w, h) = GetBoundingClientRectForDomElement(element, isRoot: false);
+            (l, t) = ToSnapshotContainingBlockCoordinates(element, l, t);
             // Snapshot the old content now, before the update callback mutates (or removes) the
             // element — the "old" image must show its pre-callback state.
             state.OldCaptures[name] = new NamedSnapshot(l, t, w, h,
                 style.GetValueOrDefault("background-color") ?? "transparent",
                 BuildViewTransitionSnapshotContent(element));
         }
+    }
+
+    /// <summary>
+    /// Converts a captured rect's origin from the live layout's document coordinates into the
+    /// snapshot containing block — i.e. subtracts the page scroll.
+    /// <para>
+    /// The old and new captures both call <see cref="GetBoundingClientRectForDomElement"/>, but at
+    /// different moments against different layouts, and only one of them has the scroll folded in.
+    /// The new capture runs on the render projection, where the scroll is already baked into box
+    /// positions; the old one runs during script, against a layout where it is not. So a page that
+    /// scrolls and *then* starts a transition captured its old geometry unscrolled while the new
+    /// geometry was correct — measured on WPT
+    /// <c>massive-element-left-of-viewport-partially-onscreen</c> (issue #1538 problems 22/23/25/26)
+    /// as <c>old=(8,8,…)</c> against <c>new=(-38986,8,…)</c>, where the page had scrolled 38 994px.
+    /// The <c>-old</c> variants paint <c>::view-transition-old</c>, so they showed the element's
+    /// leading edge where the reference shows its trailing one.
+    /// </para>
+    /// <para>
+    /// A <c>position: fixed</c> element — or anything inside one — does not move with the page, so
+    /// its document coordinates are already viewport coordinates and subtracting the scroll would
+    /// push it off by the scroll amount. Measured: without this exception
+    /// <c>new-content-transform-position-fixed</c> falls from 100% to 98.73%.
+    /// </para>
+    /// <para>
+    /// Only the page scroll is subtracted, which is what these tests exercise and what the render
+    /// bake accounts for. An element inside a scrolled sub-container is not adjusted here.
+    /// </para>
+    /// </summary>
+    private (double Left, double Top) ToSnapshotContainingBlockCoordinates(DomElement element, double left, double top)
+    {
+        if (DocumentElement is not { } documentElement || HasFixedPositionAncestorOrSelf(element))
+            return (left, top);
+
+        return (left - GetElementScrollOffset(documentElement, vertical: false),
+                top - GetElementScrollOffset(documentElement, vertical: true));
+    }
+
+    private bool HasFixedPositionAncestorOrSelf(DomElement element)
+    {
+        for (DomNode? node = element; node is not null; node = node.ParentNode)
+        {
+            if (node is not DomElement ancestor)
+                continue;
+            if (string.Equals(
+                    UsedStyleForCapture(ancestor).GetValueOrDefault("position"),
+                    "fixed",
+                    System.StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>
