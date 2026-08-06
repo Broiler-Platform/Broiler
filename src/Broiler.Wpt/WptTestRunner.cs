@@ -789,23 +789,6 @@ internal sealed partial class WptTestRunner
 })();
 ";
 
-    private static readonly string[] TestharnessGlobalNames =
-    [
-        "test",
-        "async_test",
-        "promise_test",
-        "assert_equals",
-        "assert_true",
-        "assert_false",
-        "assert_unreached",
-        "assert_approx_equals",
-        "assert_less_than",
-        "assert_greater_than",
-        "setup",
-        "done",
-        "checkLayout"
-    ];
-
     private readonly int _width;
     private readonly int _height;
     private readonly string? _failureImageDir;
@@ -2418,7 +2401,7 @@ internal sealed partial class WptTestRunner
                 try
                 {
                     context.Eval(script);
-                    PromoteWindowGlobalsToContext(context);
+                    PromoteWindowGlobalsToContext(bridge);
                     DrainAsyncWork();
                 }
                 catch (Exception ex)
@@ -2433,7 +2416,7 @@ internal sealed partial class WptTestRunner
                 try
                 {
                     context.Eval(script);
-                    PromoteWindowGlobalsToContext(context);
+                    PromoteWindowGlobalsToContext(bridge);
                     DrainAsyncWork();
                 }
                 catch (Exception ex)
@@ -2467,20 +2450,34 @@ internal sealed partial class WptTestRunner
         return (bridge.SerializeToHtml(), layoutAssertions);
     }
 
-    private static void PromoteWindowGlobalsToContext(JSContext context)
+    /// <summary>
+    /// Makes whatever the script that just ran added to <c>window</c> reachable unqualified, by
+    /// re-running the bridge's <c>window</c> → global mirror.
+    /// <para>
+    /// A browser has nothing to do here — its <c>window</c> <em>is</em> the global object — but the
+    /// bridge keeps the two apart, so <c>window.foo = …</c> in one <c>&lt;script&gt;</c> leaves an
+    /// unqualified <c>foo()</c> in the next a <c>ReferenceError</c>, which aborts that whole script
+    /// block. This used to promote a hand-written list of 13 testharness names, which covered
+    /// <c>test</c>/<c>assert_*</c> and nothing else: every other WPT support library was still
+    /// invisible unqualified. <c>/css/support/interpolation-testcommon.js</c> is the widest of them
+    /// — it exports <c>test_interpolation</c>, <c>test_composition</c>, <c>neutralKeyframe</c> and
+    /// three more, and each of the ~100 <c>*-interpolation</c> tests calls them unqualified from
+    /// its inline script, so all of them rendered blank against a reference full of test boxes
+    /// (issue #1552 problems 4, 18 and 22). Sweeping every own member of <c>window</c> instead of
+    /// listing names keeps this correct as libraries come and go.
+    /// </para>
+    /// </summary>
+    private static void PromoteWindowGlobalsToContext(DomBridge bridge)
     {
-        foreach (var name in TestharnessGlobalNames)
+        try
         {
-            try
-            {
-                var value = context.Eval($"typeof window['{name}'] !== 'undefined' ? window['{name}'] : undefined");
-                if (value != null && value != JSUndefined.Value)
-                    context[name] = value;
-            }
-            catch
-            {
-                // Best-effort only — some globals may not exist for a given page.
-            }
+            bridge.SyncWindowMembersOntoGlobal();
+        }
+        catch (Exception ex)
+        {
+            // Best-effort only — a page whose window resists enumeration must not fail the test.
+            RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.PromoteWindowGlobalsToContext",
+                $"Error promoting window members to the global scope: {ex.Message}", ex);
         }
     }
 
