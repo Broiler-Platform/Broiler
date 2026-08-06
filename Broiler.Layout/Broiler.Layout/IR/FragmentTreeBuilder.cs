@@ -18,23 +18,29 @@ internal static class FragmentTreeBuilder
     /// </summary>
     public static Fragment Build(CssBox root)
     {
-        // Reset and repopulate the document-wide SVG filter table for this render pass, so a
-        // `filter="url(#id)"` reference resolves even when the `<filter>` lives in a different
-        // `<svg>` subtree than the referencing shape.
+        // Reset and repopulate the document-wide SVG definition tables for this render pass, so a
+        // `filter="url(#id)"` or `clip-path: url(#id)` reference resolves even when the `<filter>` /
+        // `<clipPath>` lives in a different `<svg>` subtree than the referencing element.
         SvgFilterTable.Reset();
+        SvgClipPathTable.Reset();
         var tree = BuildFragment(root, parentHasTransform: false);
-        CollectSvgFilters(tree);
+        CollectSvgDefinitions(tree);
         return tree;
     }
 
     /// <summary>Walks the fragment tree and registers every modelled SVG filter (see
-    /// <see cref="SvgFilterTable"/>) from each fragment's serialized SVG content.</summary>
-    private static void CollectSvgFilters(Fragment fragment)
+    /// <see cref="SvgFilterTable"/>) and clip path (see <see cref="SvgClipPathTable"/>) from each
+    /// fragment's serialized SVG content.</summary>
+    private static void CollectSvgDefinitions(Fragment fragment)
     {
         if (!string.IsNullOrEmpty(fragment.SvgContent))
+        {
             SvgRenderer.CollectFloodFilters(fragment.SvgContent);
+            SvgRenderer.CollectClipPaths(fragment.SvgContent);
+        }
+
         foreach (var child in fragment.Children)
-            CollectSvgFilters(child);
+            CollectSvgDefinitions(child);
     }
 
     private static Fragment BuildFragment(CssBox box, bool parentHasTransform)

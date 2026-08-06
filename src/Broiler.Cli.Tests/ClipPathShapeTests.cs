@@ -381,4 +381,148 @@ div { width: 100px; height: 100px; background: green; clip-path: circle(20px at 
         Assert.Equal(Green, Rgb(bitmap, 5, 5));
         Assert.Equal(Green, Rgb(bitmap, 95, 95));
     }
+
+    // ── url(#id) → <clipPath> ───────────────────────────────────────────────────────────────
+    //
+    // WPT css-masking/clip-path/clip-path-element-* clips an HTML element with a <clipPath>
+    // declared in a *sibling* <svg>, which is why the definitions need a document-wide registry
+    // rather than the per-<svg> markup the SVG renderer sees.
+
+    /// <summary>
+    /// WPT clip-path-element-userSpaceOnUse-001: user-space coordinates are CSS pixels from the
+    /// reference box's origin, so a rect at 50,50 sized 150x100 keeps exactly the green content of
+    /// a 150x100 box inside a 50px red border. (The <c>150px</c> width also pins that a unit suffix
+    /// on an SVG geometry attribute is honoured rather than read as zero.)
+    /// </summary>
+    [Fact]
+    public void SvgReferenceClipPath_UserSpaceOnUse_UsesCssPixelsFromTheReferenceBox()
+    {
+        using var bitmap = Render("""
+<!DOCTYPE html>
+<style>body { margin: 0; }</style>
+<div style="width: 150px; height: 100px; border: solid red 50px; background: green; clip-path: url(#clip);"></div>
+<svg>
+  <clipPath id="clip"><rect x="50" y="50" width="150px" height="100" /></clipPath>
+</svg>
+""");
+
+        Assert.Equal(Green, Rgb(bitmap, 51, 51));    // just inside the clip
+        Assert.Equal(Green, Rgb(bitmap, 199, 149));  // just inside the far corner
+        Assert.Equal(White, Rgb(bitmap, 49, 49));    // the red border, clipped away
+        Assert.Equal(White, Rgb(bitmap, 201, 151));
+    }
+
+    /// <summary>
+    /// WPT clip-path-element-userSpaceOnUse-003 and -004 (issue #1544 problem 25): under the default
+    /// <c>userSpaceOnUse</c>, percentages resolve against the <em>viewport</em>, not against the
+    /// <c>&lt;svg&gt;</c> that declares the clip path nor the element that references it.
+    /// </summary>
+    [Theory]
+    // <rect y="50%" height="50%"> — the bottom half of the page.
+    [InlineData("<rect x=\"0\" y=\"50%\" width=\"100%\" height=\"50%\" />", 150, 250, 150, 50)]
+    // <rect x="50%" width="50%"> — the right half of the page.
+    [InlineData("<rect x=\"50%\" y=\"0\" width=\"50%\" height=\"100%\" />", 250, 150, 50, 150)]
+    public void SvgReferenceClipPath_UserSpaceOnUse_ResolvesPercentagesAgainstTheViewport(
+        string rect, int keptX, int keptY, int clippedX, int clippedY)
+    {
+        using var bitmap = Render($$"""
+<!DOCTYPE html>
+<style>html, body { width: 100%; height: 100%; margin: 0; }</style>
+<div style="width: 100%; height: 100%; background: green; clip-path: url(#clip); position: absolute;"></div>
+<svg><clipPath id="clip">{{rect}}</clipPath></svg>
+""");
+
+        Assert.Equal(Green, Rgb(bitmap, keptX, keptY));
+        Assert.Equal(White, Rgb(bitmap, clippedX, clippedY));
+    }
+
+    /// <summary>
+    /// Under <c>clipPathUnits="objectBoundingBox"</c> the same numbers are fractions of the
+    /// referencing element's own box instead, so 0.5 is its midpoint however large it is.
+    /// </summary>
+    [Fact]
+    public void SvgReferenceClipPath_ObjectBoundingBox_ResolvesFractionsOfTheElementBox()
+    {
+        using var bitmap = Render("""
+<!DOCTYPE html>
+<style>body { margin: 0; }</style>
+<div style="width: 200px; height: 100px; background: green; clip-path: url(#clip);"></div>
+<svg>
+  <clipPath id="clip" clipPathUnits="objectBoundingBox">
+    <rect x="0.5" y="0" width="0.5" height="1" />
+  </clipPath>
+</svg>
+""");
+
+        Assert.Equal(Green, Rgb(bitmap, 150, 50));   // the right half of the 200x100 box
+        Assert.Equal(White, Rgb(bitmap, 50, 50));
+    }
+
+    /// <summary>A <c>&lt;polygon&gt;</c> child clips to its outline, not to its bounding box.</summary>
+    [Fact]
+    public void SvgReferenceClipPath_PolygonChild_ClipsToTheOutline()
+    {
+        using var bitmap = Render("""
+<!DOCTYPE html>
+<style>body { margin: 0; }</style>
+<div style="width: 100px; height: 100px; background: green; clip-path: url(#clip);"></div>
+<svg><clipPath id="clip"><polygon points="0,0 0,100 100,100" /></clipPath></svg>
+""");
+
+        Assert.Equal(Green, Rgb(bitmap, 20, 80));
+        Assert.Equal(White, Rgb(bitmap, 80, 20));
+    }
+
+    /// <summary>A <c>&lt;circle&gt;</c> child clips to the circle.</summary>
+    [Fact]
+    public void SvgReferenceClipPath_CircleChild_ClipsToTheCircle()
+    {
+        using var bitmap = Render("""
+<!DOCTYPE html>
+<style>body { margin: 0; }</style>
+<div style="width: 200px; height: 200px; background: green; clip-path: url(#clip);"></div>
+<svg><clipPath id="clip"><circle cx="100" cy="100" r="100" /></clipPath></svg>
+""");
+
+        AssertEllipse(bitmap, 200, 200, 100, 100, 100, 100);
+    }
+
+    /// <summary>
+    /// A reference that resolves to nothing — no such id, or a definition whose only child is a
+    /// shape the rasterizer does not model — leaves the element unclipped rather than blanking it.
+    /// </summary>
+    [Theory]
+    [InlineData("<svg><clipPath id=\"other\"><rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" /></clipPath></svg>")]
+    [InlineData("<svg><clipPath id=\"clip\"><path d=\"M 0 0 L 10 0 L 10 10 Z\" /></clipPath></svg>")]
+    [InlineData("")]
+    public void SvgReferenceClipPath_ThatResolvesToNothing_LeavesTheElementUnclipped(string svg)
+    {
+        using var bitmap = Render($$"""
+<!DOCTYPE html>
+<style>body { margin: 0; }</style>
+<div style="width: 100px; height: 100px; background: green; clip-path: url(#clip);"></div>
+{{svg}}
+""");
+
+        Assert.Equal(Green, Rgb(bitmap, 5, 5));
+        Assert.Equal(Green, Rgb(bitmap, 95, 95));
+    }
+
+    /// <summary>
+    /// A <c>&lt;rect&gt;</c> with zero width or height disables rendering of the shape (SVG 1.1
+    /// §9.2), and a clip path with no shape in it clips everything away.
+    /// </summary>
+    [Fact]
+    public void SvgReferenceClipPath_WithAZeroSizedRect_ClipsEverythingAway()
+    {
+        using var bitmap = Render("""
+<!DOCTYPE html>
+<style>body { margin: 0; }</style>
+<div style="width: 100px; height: 100px; background: green; clip-path: url(#clip);"></div>
+<svg><clipPath id="clip"><rect x="0" y="0" width="0" height="100" /></clipPath></svg>
+""");
+
+        Assert.Equal(White, Rgb(bitmap, 5, 5));
+        Assert.Equal(White, Rgb(bitmap, 50, 50));
+    }
 }
