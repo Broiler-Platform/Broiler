@@ -500,4 +500,44 @@ public class HtmlFormStateTests
         Assert.True(new PageRequest("https://x/", PageRequest.Post, Body: "a=1").HasBody);
         Assert.True(new PageRequest("https://x/", PageRequest.Post) { BinaryBody = [1, 2] }.HasBody);
     }
+
+    [Fact]
+    public void AMultiSelectSubmitsEveryChosenOption()
+    {
+        using HtmlContainer container = LayOut(
+            "<html><body><form action='/s'>" +
+            "<select id='sel' name='colours' multiple><option value='r'>Red</option>" +
+            "<option value='g' selected>Green</option><option value='b'>Blue</option></select>" +
+            "<input id='go' type='submit' name='s' value='Go'>" +
+            "</form></body></html>");
+        HtmlFormState state = new();
+
+        // Markup selection.
+        Assert.Equal(
+            "https://x/s?colours=g&s=Go",
+            state.TryBuildSubmitRequest(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s")?.Url);
+
+        state.SetSelectedValues("sel", "colours", ["r", "b"]);
+
+        Assert.Equal(
+            "https://x/s?colours=r&colours=b&s=Go",
+            state.TryBuildSubmitRequest(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s")?.Url);
+    }
+
+    [Fact]
+    public void AnEmptiedMultiSelectSubmitsNothingForItself()
+    {
+        using HtmlContainer container = LayOut(
+            "<html><body><form action='/s'>" +
+            "<select id='sel' name='colours' multiple><option value='g' selected>Green</option></select>" +
+            "<input id='go' type='submit' name='s' value='Go'>" +
+            "</form></body></html>");
+        HtmlFormState state = new();
+        state.SetSelectedValues("sel", "colours", []);
+
+        // The user's empty selection wins over the markup's `selected`.
+        Assert.Equal(
+            "https://x/s?s=Go",
+            state.TryBuildSubmitRequest(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s")?.Url);
+    }
 }

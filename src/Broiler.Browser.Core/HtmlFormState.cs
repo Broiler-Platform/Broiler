@@ -21,8 +21,8 @@ internal sealed class HtmlFormState
     /// <summary>Checked state by control key, for controls the user has toggled.</summary>
     private readonly Dictionary<string, bool> _checkedState = new(StringComparer.Ordinal);
 
-    /// <summary>Selected option value by control key, for selects the user has changed.</summary>
-    private readonly Dictionary<string, string> _selectedValues = new(StringComparer.Ordinal);
+    /// <summary>Selected option values by control key, for selects the user has changed.</summary>
+    private readonly Dictionary<string, List<string>> _selectedValues = new(StringComparer.Ordinal);
 
     /// <summary>Chosen file paths by control key, for file inputs the user has picked for.</summary>
     private readonly Dictionary<string, List<string>> _selectedFiles = new(StringComparer.Ordinal);
@@ -43,13 +43,28 @@ internal sealed class HtmlFormState
     public bool? GetChecked(string id, string name, string value) =>
         _checkedState.TryGetValue(ControlKey(id, name, value), out bool state) ? state : null;
 
-    /// <summary>Records the option a hosted <c>&lt;select&gt;</c> now has selected.</summary>
+    /// <summary>Records the option a hosted single-choice <c>&lt;select&gt;</c> now has selected.</summary>
     public void SetSelectedValue(string id, string name, string value) =>
-        _selectedValues[ControlKey(id, name, string.Empty)] = value;
+        _selectedValues[ControlKey(id, name, string.Empty)] = [value];
 
-    /// <summary>The recorded selection of a <c>&lt;select&gt;</c>, or <c>null</c> if untouched.</summary>
+    /// <summary>
+    /// Records everything a hosted <c>&lt;select multiple&gt;</c> now has selected.
+    /// An empty list is a real state — the user deselected everything — and is kept
+    /// as such rather than falling back to the markup.
+    /// </summary>
+    public void SetSelectedValues(string id, string name, IEnumerable<string> values) =>
+        _selectedValues[ControlKey(id, name, string.Empty)] = [.. values];
+
+    /// <summary>The recorded primary selection of a <c>&lt;select&gt;</c>, or <c>null</c> if untouched.</summary>
     public string? GetSelectedValue(string id, string name) =>
-        _selectedValues.TryGetValue(ControlKey(id, name, string.Empty), out string? value) ? value : null;
+        GetSelectedValues(id, name) is [string first, ..] ? first : null;
+
+    /// <summary>
+    /// Everything recorded for a <c>&lt;select&gt;</c>, or <c>null</c> when the user
+    /// has not touched it and the markup still decides.
+    /// </summary>
+    public IReadOnlyList<string>? GetSelectedValues(string id, string name) =>
+        _selectedValues.TryGetValue(ControlKey(id, name, string.Empty), out List<string>? values) ? values : null;
 
     /// <summary>Records the single file chosen for an <c>&lt;input type="file"&gt;</c>.</summary>
     public void SetSelectedFile(string id, string name, string path) =>
@@ -156,7 +171,7 @@ internal sealed class HtmlFormState
     private PageRequest BuildRequest(DomElement form, DomElement? submitter, string action)
     {
         IReadOnlyList<HtmlFormSerializer.FormEntry> entries =
-            HtmlFormSerializer.BuildEntryList(form, submitter, ResolveOverride, ResolveFiles);
+            HtmlFormSerializer.BuildEntryList(form, submitter, ResolveOverride, ResolveFiles, ResolveSelection);
 
         // A GET form always puts its data in the query, whatever enctype says — the
         // enctype only applies to a body, and a GET has none.
@@ -231,17 +246,14 @@ internal sealed class HtmlFormState
         return files;
     }
 
+    /// <summary>The options a hosted select has selected, or null to use the markup's.</summary>
+    private IReadOnlyList<string>? ResolveSelection(DomElement select) =>
+        GetSelectedValues(
+            select.GetAttribute("id") ?? string.Empty,
+            select.GetAttribute("name") ?? string.Empty);
+
     private string? ResolveOverride(DomElement control)
     {
-        if (string.Equals(control.TagName, "select", StringComparison.OrdinalIgnoreCase))
-        {
-            // A multi-select is never hosted, so it has no recorded selection and
-            // falls through to the markup's selected options.
-            return GetSelectedValue(
-                control.GetAttribute("id") ?? string.Empty,
-                control.GetAttribute("name") ?? string.Empty);
-        }
-
         if (!string.Equals(control.TagName, "input", StringComparison.OrdinalIgnoreCase))
             return null;
 

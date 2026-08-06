@@ -111,6 +111,13 @@ internal static class HtmlFormSerializer
     public delegate IReadOnlyList<SelectedFile> FileProvider(DomElement control);
 
     /// <summary>
+    /// Supplies the option values a <c>&lt;select&gt;</c> now has selected, or
+    /// <c>null</c> to fall back to the ones the markup marks. Returning an empty list
+    /// means the user deselected everything, which a <c>multiple</c> select allows.
+    /// </summary>
+    public delegate IReadOnlyList<string>? SelectProvider(DomElement select);
+
+    /// <summary>
     /// The form data set: every successful control's name and value, in tree order.
     /// Every encoding is built from this, so they cannot disagree about which
     /// controls submit.
@@ -119,13 +126,14 @@ internal static class HtmlFormSerializer
         DomElement form,
         DomElement? submitter = null,
         Func<DomElement, string?>? valueOverride = null,
-        FileProvider? fileProvider = null)
+        FileProvider? fileProvider = null,
+        SelectProvider? selectProvider = null)
     {
         ArgumentNullException.ThrowIfNull(form);
 
         List<FormEntry> entries = [];
         foreach (DomElement control in Descendants(form))
-            AppendControl(entries, control, submitter, valueOverride, fileProvider);
+            AppendControl(entries, control, submitter, valueOverride, fileProvider, selectProvider);
 
         return entries;
     }
@@ -284,7 +292,8 @@ internal static class HtmlFormSerializer
         DomElement control,
         DomElement? submitter,
         Func<DomElement, string?>? valueOverride,
-        FileProvider? fileProvider)
+        FileProvider? fileProvider,
+        SelectProvider? selectProvider)
     {
         // A disabled control is never successful.
         if (control.HasAttribute("disabled"))
@@ -303,7 +312,7 @@ internal static class HtmlFormSerializer
         if (IsTag(control, "select"))
         {
             if (name.Length > 0)
-                AppendSelect(body, control, name, live);
+                AppendSelect(body, control, name, selectProvider?.Invoke(control));
             return;
         }
 
@@ -382,11 +391,19 @@ internal static class HtmlFormSerializer
             Append(body, name, live ?? control.GetAttribute("value") ?? string.Empty);
     }
 
-    private static void AppendSelect(List<FormEntry> body, DomElement select, string name, string? live)
+    private static void AppendSelect(
+        List<FormEntry> body,
+        DomElement select,
+        string name,
+        IReadOnlyList<string>? live)
     {
         if (live is not null)
         {
-            Append(body, name, live);
+            // A hosted select is authoritative, including when nothing is selected —
+            // a `multiple` list the user emptied submits no entry at all.
+            foreach (string value in live)
+                Append(body, name, value);
+
             return;
         }
 

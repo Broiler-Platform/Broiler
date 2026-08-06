@@ -69,8 +69,9 @@ as a box with no way to pick anything. None of them reflect state and none of th
 respond.
 
 `HtmlFormControlHost` hosts a real Broiler.UI control over each: a `StandardCheckBox`,
-`StandardRadioButton`, `StandardComboBox`, or — for a file input — a `StandardButton`
-showing the chosen filename. Unlike the text editor, which hosts a single control on
+`StandardRadioButton`, `StandardComboBox`, a `StandardListView` for a
+`<select multiple>`, or — for a file input — a `StandardButton` showing the chosen
+filename. Unlike the text editor, which hosts a single control on
 demand at the point the user clicked, these have to *show* their state whether or not
 they are being interacted with, so every one on the page is hosted up front.
 
@@ -88,7 +89,11 @@ enforced twice over — Broiler.UI's `UiRadioGroupScope` drives the visible stat
 the host records the *whole* group on a change so an untouched sibling's markup
 `checked` cannot leak into a submission.
 
-A `<select multiple>` is **not** hosted — see the open decision at the end. A file
+A `<select multiple>` is hosted as a multi-selection `StandardListView`, seeded from
+every option the markup marks `selected` — with no fallback to the first option, since
+a multi-select with nothing marked genuinely has nothing selected. Deselecting
+everything is recorded as an empty selection rather than as "untouched", so the user's
+choice wins over the markup. A file
 input's *picker* lives in the shell rather than the host: the host owns no window to
 parent a modal to, so it raises `FilePickRequested` and `BrowserApp` shows the
 `StandardFileDialog` and hands the path back. A `multiple` file input accumulates,
@@ -176,7 +181,7 @@ one it posted to, and relative URLs on the result resolve correctly.
 | `textarea` | yes | **typing**, once `patches/0113-html-textarea-editable-control.patch` lands (see below) |
 | `input` checkbox, radio | box only | **toggling** — hosted `StandardCheckBox` / `StandardRadioButton` |
 | `select` | box only | **selection** — hosted `StandardComboBox` |
-| `select multiple` | native list box | not interactive; markup selection is submitted |
+| `select multiple` | native list box | **selection** — hosted multi-selection `StandardListView` |
 | `input` file | box only | **picking** — hosted button plus the shell's file dialog, `multiple` accumulates |
 | `input` submit/image, `button` | yes | click activates, and **submits the form** |
 
@@ -184,39 +189,36 @@ Submission carries the form data set for GET and POST, in all three HTML encodin
 
 Known limits, none of them silent:
 
-- **A `<select multiple>` is not hosted** — see below.
+- **Multi-selection is keyboard-or-click, not Ctrl-click** — see below.
 - **`<textarea>` typing depends on a pending submodule patch**, below.
 
-## Open decision: multi-selection in `UiListView`
+## Multi-selection, and why a click toggles
 
-`<select multiple>` is the one form control still not interactive. The renderer paints
-it as a native list box and submission honours whatever the markup marked `selected`,
-but there is no way to change that selection.
+`<select multiple>` needed multi-selection in `UiListView`, which did not have it.
+That is now an additive, opt-in feature of the component:
 
-It is **not** hosted deliberately, and the reason is worth recording. The obvious
-candidates both misrepresent the control: a `StandardComboBox` is single-choice, and
-so is `UiListView` — hosting either would let the user pick exactly one option and
-would silently discard the other selections the markup declares. That is worse than
-leaving the control inert, so nothing is hosted.
+- `UiListSelectionMode { Single, Multiple }`, defaulting to `Single`, so a list that
+  never asks for multi-selection behaves exactly as it always did.
+- `SelectedItemIds` alongside the existing `SelectedItemId`, which keeps meaning "the
+  primary selection" — the anchor a range extends from.
+- `SetSelectedItems`, `ToggleItem`, `SelectRangeTo`, `IsSelected`.
+- `SelectionChanged` fires on any change to the *set* and now also carries
+  `OldItemIds`/`NewItemIds`; a handler written against the single-selection args is
+  untouched.
 
-Making it work needs multi-selection in `UiListView`, which is a Broiler.UI component
-decision rather than a browser one — the component is ADR-governed, its
-`HUMAN_REVIEW.md` is `PENDING`, and its selection model has no recorded direction. The
-shape it would take, for whoever owns that call:
+**A click toggles the row rather than replacing the selection, and that is forced
+rather than chosen.** The desktop convention — plain click replaces, Ctrl toggles,
+Shift extends — is not implementable today: `Broiler.Input`'s `MouseButtonEvent`
+carries no modifier state, and `UiInputEvent.FromMouseButton` reports
+`KeyboardModifierState.None` for every pointer press, so a Ctrl-click cannot be told
+from a plain one. Toggling is what stays usable with no modifiers, and it is what
+touch needs regardless.
 
-- A `UiListSelectionMode { Single, Multiple }` defaulting to `Single`, so existing
-  consumers are unaffected.
-- `SelectedItemIds` alongside today's single `SelectedItemId`, which would keep
-  meaning "the primary selection" so existing `SelectionChanged` handlers still work.
-- An interaction rule for `Multiple` in `StandardListView` — plain-click-toggles is
-  the simplest, ctrl/shift-click matches platform list boxes. This is the part that
-  most wants an owner's decision rather than a default chosen here.
-
-With that in place the browser side is small: host a `StandardListView` in `Multiple`
-mode, seed it from the options marked `selected`, and record the selection through
-`HtmlFormState` exactly as the combo box already does. The serializer already emits
-one entry per selected option for a multi-select (`MultiSelectSubmitsEverySelectedOption`),
-so nothing downstream needs to change.
+Ranges are therefore keyboard-only for now: Shift with an arrow extends from the
+anchor, and Space toggles in place so a discontiguous selection is reachable without a
+pointer. `SelectRangeTo` is on the abstraction and tested; a modifier-aware click
+starts working the day pointer events carry modifiers, which is a `Broiler.Input`
+contract change rather than a Broiler.UI one.
 
 ## Why textarea ships as a patch
 

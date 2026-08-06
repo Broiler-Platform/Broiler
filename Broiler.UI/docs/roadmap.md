@@ -100,3 +100,22 @@ sequencing and exit gates are in
 - Validate independent package consumption and non-Windows builds.
 - Complete dependency, license, API, and attributable human review before a
   stable release.
+
+## Pointer events carry no modifier state
+
+`Broiler.Input`'s `MouseButtonEvent` has no modifier field, and
+`UiInputEvent.FromMouseButton` reports `KeyboardModifierState.None` for every pointer
+press. Any control that wants Ctrl-click or Shift-click therefore cannot have it: the
+modified click is indistinguishable from a plain one.
+
+This surfaced building `UiListSelectionMode.Multiple` for `UiListView`, where the
+platform convention is plain-click-replaces / Ctrl-toggles / Shift-extends. The
+control ships with click-toggles instead — the behaviour that stays usable with no
+modifiers, and the one touch needs anyway — and keeps ranges on the keyboard
+(Shift+arrow extends, Space toggles in place). `UiListView.SelectRangeTo` and
+`ToggleItem` are public and tested, so a modifier-aware click is a small change to
+`StandardListView` once the input contract can express it.
+
+Closing this means adding modifier state to `MouseButtonEvent` (and the pen/touch
+equivalents) and populating it in every platform backend, which is a `Broiler.Input`
+contract change rather than a Broiler.UI one.

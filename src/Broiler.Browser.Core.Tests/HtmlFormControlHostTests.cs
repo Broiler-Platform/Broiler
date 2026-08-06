@@ -6,6 +6,8 @@ using Broiler.UI;
 using Broiler.UI.Button.Standard;
 using Broiler.UI.CheckBox.Standard;
 using Broiler.UI.ComboBox.Standard;
+using Broiler.UI.ListView;
+using Broiler.UI.ListView.Standard;
 using Broiler.UI.Panel.Standard;
 using Broiler.UI.RadioButton.Standard;
 using HtmlContainer = Broiler.HTML.Image.HtmlContainer;
@@ -301,18 +303,83 @@ public class HtmlFormControlHostTests
         Assert.Equal("b", state.GetSelectedValue($"{HtmlPostProcessor.SyntheticIdPrefix}0", "colour"));
     }
 
+    private const string MultiSelectPage =
+        "<html><body style='margin:0'><form action='/s'>" +
+        "<select name='colours' multiple><option value='r'>Red</option>" +
+        "<option value='g' selected>Green</option><option value='b' selected>Blue</option></select>" +
+        "</form></body></html>";
+
     [Fact]
-    public void AMultiSelectIsNotHostedBecauseAComboBoxCannotRepresentIt()
+    public void AMultiSelectIsHostedAsAMultiSelectionListView()
     {
         using TestUiSession session = new();
-        using HtmlContainer container = LayOut(
-            "<html><body><form><select name='s' multiple><option value='a' selected>A</option>" +
-            "<option value='b' selected>B</option></select></form></body></html>");
+        using HtmlContainer container = LayOut(MultiSelectPage);
         (HtmlFormControlHost host, _, _) = Create(session);
 
         host.Rebuild(container.GetHtml());
 
-        Assert.Equal(0, host.Count);
+        StandardListView list = Assert.IsType<StandardListView>(Assert.Single(host.Controls));
+        Assert.Equal(UiListSelectionMode.Multiple, list.SelectionMode);
+        Assert.Equal(["Red", "Green", "Blue"], list.Items.Select(i => i.Text));
+    }
+
+    [Fact]
+    public void AMultiSelectStartsOnEveryOptionTheMarkupMarks()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(MultiSelectPage);
+        (HtmlFormControlHost host, _, _) = Create(session);
+
+        host.Rebuild(container.GetHtml());
+
+        StandardListView list = host.Controls.OfType<StandardListView>().Single();
+        // Options 1 and 2 are the marked ones; ids are positional.
+        Assert.Equal(["1", "2"], list.SelectedItemIds);
+    }
+
+    [Fact]
+    public void AMultiSelectWithNothingMarkedStartsEmpty()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(
+            "<html><body><form><select name='s' multiple><option value='a'>A</option>" +
+            "<option value='b'>B</option></select></form></body></html>");
+        (HtmlFormControlHost host, _, _) = Create(session);
+
+        host.Rebuild(container.GetHtml());
+
+        // Unlike a single-choice select, there is no fallback to the first option.
+        Assert.Empty(host.Controls.OfType<StandardListView>().Single().SelectedItemIds);
+    }
+
+    [Fact]
+    public void ChangingAMultiSelectRecordsEveryChosenValue()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(MultiSelectPage);
+        (HtmlFormControlHost host, HtmlFormState state, _) = Create(session);
+        host.Rebuild(container.GetHtml());
+
+        StandardListView list = host.Controls.OfType<StandardListView>().Single();
+        list.SetSelectedItems(["0", "2"]);
+
+        Assert.Equal(
+            ["r", "b"],
+            state.GetSelectedValues($"{HtmlPostProcessor.SyntheticIdPrefix}0", "colours"));
+    }
+
+    [Fact]
+    public void DeselectingEverythingInAMultiSelectIsRecordedAsEmptyNotAsUntouched()
+    {
+        using TestUiSession session = new();
+        using HtmlContainer container = LayOut(MultiSelectPage);
+        (HtmlFormControlHost host, HtmlFormState state, _) = Create(session);
+        host.Rebuild(container.GetHtml());
+
+        host.Controls.OfType<StandardListView>().Single().SetSelectedItems([]);
+
+        // Empty is a real state; null would mean "fall back to the markup".
+        Assert.Empty(state.GetSelectedValues($"{HtmlPostProcessor.SyntheticIdPrefix}0", "colours")!);
     }
 
     [Fact]

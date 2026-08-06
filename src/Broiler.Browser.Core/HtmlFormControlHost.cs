@@ -9,6 +9,8 @@ using Broiler.UI.CheckBox;
 using Broiler.UI.CheckBox.Standard;
 using Broiler.UI.ComboBox;
 using Broiler.UI.ComboBox.Standard;
+using Broiler.UI.ListView;
+using Broiler.UI.ListView.Standard;
 using Broiler.UI.RadioButton;
 using Broiler.UI.RadioButton.Standard;
 using HtmlContainer = Broiler.HTML.Image.HtmlContainer;
@@ -112,11 +114,6 @@ internal sealed class HtmlFormControlHost
             if (!isSelect && !isInput)
                 continue;
 
-            // A multi-select is not a combo box; leave it painted and let submission
-            // use the markup's selection rather than misrepresent it as single-choice.
-            if (isSelect && element.HasAttribute("multiple"))
-                continue;
-
             string type = element.GetAttribute("type") ?? string.Empty;
             bool isRadio = isInput && string.Equals(type, "radio", StringComparison.OrdinalIgnoreCase);
             bool isCheckBox = isInput && string.Equals(type, "checkbox", StringComparison.OrdinalIgnoreCase);
@@ -199,7 +196,9 @@ internal sealed class HtmlFormControlHost
         }
         else if (isSelect)
         {
-            control = CreateComboBox(element, id, name);
+            control = element.HasAttribute("multiple")
+                ? CreateListView(element, id, name)
+                : CreateComboBox(element, id, name);
         }
         else
         {
@@ -386,6 +385,103 @@ internal sealed class HtmlFormControlHost
     }
 
     /// <summary>
+    /// Builds the multi-selection list that stands in for a
+    /// <c>&lt;select multiple&gt;</c>, seeded with every option the page marks
+    /// <c>selected</c>.
+    /// </summary>
+    /// <remarks>
+    /// Unlike a single-choice select there is no fallback to the first option: a
+    /// multi-select with nothing marked genuinely has nothing selected.
+    /// </remarks>
+    private UiElement CreateListView(DomElement select, string id, string name)
+    {
+        List<UiListItem> items = [];
+        List<string> markupSelection = [];
+
+        foreach (DomElement option in Descendants(select))
+        {
+            if (!string.Equals(option.TagName, "option", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            string text = (option.TextContent ?? string.Empty).Trim();
+            string value = option.GetAttribute("value") ?? text;
+
+            // Options can repeat a value; the list needs unique ids, so index them.
+            string itemId = items.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            items.Add(new UiListItem(itemId, text));
+            if (option.HasAttribute("selected"))
+                markupSelection.Add(itemId);
+        }
+
+        StandardListView list = new()
+        {
+            SelectionMode = UiListSelectionMode.Multiple,
+            Font = new BFontStyle(UaControlFontFamily, UaControlFontSize),
+            CornerRadius = 0,
+        };
+        list.SetItems(items);
+
+        // A selection the user already made on this page outranks the markup.
+        IReadOnlyList<string>? recorded = _formState.GetSelectedValues(id, name);
+        list.SetSelectedItems(recorded is null
+            ? markupSelection
+            : [.. recorded.Select(value => IndexOfValue(select, value)).Where(index => index >= 0)
+                .Select(index => index.ToString(System.Globalization.CultureInfo.InvariantCulture))]);
+
+        list.SelectionChanged += (_, _) =>
+        {
+            _formState.SetSelectedValues(id, name, list.SelectedItemIds.Select(itemId => ValueAt(select, itemId)));
+            Changed?.Invoke(this, EventArgs.Empty);
+        };
+
+        return list;
+    }
+
+    /// <summary>The option value at a list item's index, since ids are positional.</summary>
+    private static string ValueAt(DomElement select, string itemId)
+    {
+        if (!int.TryParse(itemId, System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out int index))
+        {
+            return string.Empty;
+        }
+
+        int seen = 0;
+        foreach (DomElement option in Descendants(select))
+        {
+            if (!string.Equals(option.TagName, "option", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (seen++ != index)
+                continue;
+
+            string text = (option.TextContent ?? string.Empty).Trim();
+            return option.GetAttribute("value") ?? text;
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>The index of the first option carrying <paramref name="value"/>, or -1.</summary>
+    private static int IndexOfValue(DomElement select, string value)
+    {
+        int index = 0;
+        foreach (DomElement option in Descendants(select))
+        {
+            if (!string.Equals(option.TagName, "option", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            string text = (option.TextContent ?? string.Empty).Trim();
+            if (string.Equals(option.GetAttribute("value") ?? text, value, StringComparison.Ordinal))
+                return index;
+
+            index++;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
     /// Sizes the control's mark to the box the page laid out, so a hosted control
     /// occupies exactly the 13×13 (or author-styled) area the renderer reserved.
     /// </summary>
@@ -401,6 +497,10 @@ internal sealed class HtmlFormControlHost
             case StandardRadioButton radio:
                 radio.MarkSize = size;
                 radio.Spacing = 0;
+                break;
+            case StandardListView list:
+                // A list fills its box and scrolls; its rows keep the UA line height.
+                list.ItemHeight = Math.Max(1, UaControlFontSize * 1.4);
                 break;
             case StandardComboBox combo:
                 // A combo fills its box rather than sizing a mark inside it, and its
