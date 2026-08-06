@@ -461,8 +461,21 @@ internal static partial class CssUtils
             case "border-block-end-width":
                 SetLogicalBorderComponent(cssBox, inlineAxis: false, startSide: false, component: "width", value);
                 break;
+            // The per-corner longhands had no arm at all, so `border-top-left-radius: 75px 50px`
+            // was dropped and the corner did not round. NW/NE/SE/SW are top-left/top-right/
+            // bottom-right/bottom-left.
+            case "border-top-left-radius":
             case "corner-nw-radius":
                 cssBox.CornerNwRadius = value;
+                break;
+            case "border-top-right-radius":
+                cssBox.CornerNeRadius = value;
+                break;
+            case "border-bottom-right-radius":
+                cssBox.CornerSeRadius = value;
+                break;
+            case "border-bottom-left-radius":
+                cssBox.CornerSwRadius = value;
                 break;
             case "corner-ne-radius":
                 cssBox.CornerNeRadius = value;
