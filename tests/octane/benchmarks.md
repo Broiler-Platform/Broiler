@@ -6,21 +6,26 @@ actually does, which engine subsystem it puts under load, and — using the
 committed results in [`results/`](results/) — where Broiler's time goes.
 
 Numbers quoted for Broiler are from
-[`results/comparison.md`](results/comparison.md) (generated 2026-07-31,
-Chromium 149.0.7827.55 vs the `BroilerJS --script-host` shell), except where a
-score is marked *(0046)*.
+[`results/comparison.md`](results/comparison.md) (generated 2026-08-05,
+Chromium 149.0.7827.55 vs the `BroilerJS --script-host` shell).
 
-> **The committed results are stale.** They were generated 2026-07-31 20:28,
-> against a `Broiler.JS` pointer that predated the engine fixes for the five
-> failing suites. Those fixes landed at `7ef80c03` and the pointer was bumped to
-> `cdb2fd41` in `2d9f39ca` on 2026-08-01 11:45 — about 15 hours later. Nobody has
-> re-run the workflow since, so `results/` still shows Crypto, PdfJS, CodeLoad,
-> zlib and Typescript failing on an engine that no longer has those defects.
+> **The results are current, and the five suites that used to fail all score.**
+> The run committed under [`results/`](results/) was generated 2026-08-05 and
+> reports **15 of 15 suites `ok` and 17 of 17 scores** for Broiler, Chromium and
+> Jint alike — nothing errored, nothing timed out. Crypto, PdfJS, CodeLoad, zlib
+> and Typescript, which an earlier revision of this page had to quote from a patch
+> index because they scored nothing, are ordinary published results now; the
+> *(0046)* marker that stood in for them is retired.
 >
-> A score marked *(0046)* is the value measured on the fixed engine at the time
-> the fix was written, recorded in the patch index that has since been cleared.
-> Treat those five as the expectation for the next run, not as a published
-> result.
+> **What must not be read out of the refresh.** Both this run and the 2026-07-31
+> one it replaces are **single-repetition, on different machines**, so the change
+> in any score between them is not a delta anyone may claim — the machine differs
+> as much as the engine does. What is legitimate to read across the two is which
+> side of a threshold each benchmark falls on. The noise band the harness declares
+> is **7.5%**, and a local three-repetition run has since shown the true band is
+> per suite and ranges forty-fold (Splay 15.9%, Richards 10.6%, DeltaBlue 9.1%,
+> median 5.5%). See
+> [`docs/performance-roadmap.md` §0](../../docs/performance-roadmap.md).
 
 ---
 
@@ -38,11 +43,11 @@ far more than one great score lifts it.
 
 Two consequences worth keeping in mind when reading the committed results:
 
-- **The headline totals are not like-for-like.** Chromium's 57245 is a geomean
-  over all 17 scores; Broiler's 245 is a geomean over the 12 it completed.
-  Restricted to the same 12, Chromium scores 58419 — so the honest headline is
-  **≈238× slower on the suites Broiler finishes**, and the ratio would be worse,
-  not better, with the missing five included at their measured values.
+- **The headline totals are now like-for-like.** Both geomeans are over all 17
+  scores — Chromium 74 297, Broiler 498 — so the headline is **149× slower across
+  the whole suite**, with no "on the suites it finishes" qualifier to carry. That
+  was not true of the previous committed run, where Broiler completed 12 of 17 and
+  the totals had to be restricted before they could be compared at all.
 - **Octane was retired by its authors in 2017**, on the grounds that engines had
   started optimizing for its specific shapes rather than for the web. That makes
   it a poor target to *tune against* and an excellent one to *shake out* a young
@@ -65,28 +70,28 @@ overhead Broiler pays that a plain tree-walker does not — rather than a genera
 deficit. Read the ratios in §4 against Chromium for the size of the gap, and
 against Jint for whether a given suite is anomalous.
 
-**What the column shows on first evidence.** A single unrepeated run in a dev
-container — so *not* publishable numbers, and no substitute for the workflow run
-§4 is waiting on — nonetheless sorts the suites into three groups. The middle
-group is within noise of parity and should be read as no more than that; the two
-ends are decided by margins no noise band reaches:
+**What the column shows.** The committed run sorts the suites into three groups.
+It is still one repetition per suite, so the middle group is within noise of
+parity and should be read as no more than that; the two ends are decided by
+margins no noise band reaches:
 
 | Group | Suites, with Broiler ÷ Jint |
 |---|---|
-| Ahead of the interpreter | Mandreel 1.7, Crypto 1.5, NavierStokes 1.5, EarleyBoyer 1.1, Gameboy 1.1, Richards 1.1, Box2D 1.1 |
-| Level with it | RayTrace 0.99, Splay 0.94, DeltaBlue 0.89 |
-| **Behind it** | Typescript 0.80, SplayLatency 0.73, PdfJS 0.57, RegExp 0.42, **zlib 0.073, CodeLoad 0.029, MandreelLatency 0.017** |
+| Ahead of the interpreter | Crypto 2.18, Mandreel 1.86, NavierStokes 1.80, Richards 1.44, Gameboy 1.32, DeltaBlue 1.31, RayTrace 1.17, EarleyBoyer 1.14, Box2D 1.12 |
+| Level with it | Typescript 0.98 |
+| **Behind it** | Splay 0.73, SplayLatency 0.68, RegExp 0.63, PdfJS 0.62, **zlib 0.083, CodeLoad 0.026, MandreelLatency 0.018** |
 
 The three at the end are the finding. **CodeLoad and MandreelLatency are the two
 compilation-cost benchmarks** — the ones §3's **B4** names — and they are where
-Broiler falls 34× and 59× behind an engine that never compiles anything. Against
+Broiler falls 38× and 56× behind an engine that never compiles anything. Against
 Chromium those two are simply the largest of a column of large numbers; against
 Jint they are categorically different from every other suite, which is the
-distinction the second reference point exists to draw. zlib at 14× behind is the
+distinction the second reference point exists to draw. zlib at 12× behind is the
 one that §4's ranking does not already predict, and is worth its own look.
 
-The published numbers come with the next workflow run; §4 below predates the
-column.
+Overall Broiler scores **0.606×** of Jint across the 17 benchmarks both engines
+completed — so the geomean is dragged below parity by that tail, not by a
+uniform deficit.
 
 ---
 
@@ -111,9 +116,9 @@ just millions of `this.x` reads and method calls through a handful of distinct
 object shapes. Engines win here through monomorphic inline caches plus
 aggressive inlining of tiny methods.
 
-**Broiler: 108 vs 46754 — 433× slower.** The second-worst ratio of any
-throughput benchmark, and it should be read as a direct measurement of per-call
-and per-property-access cost. Both are known open items: shape tracking is
+**Broiler: 349 vs 49320 — 141.3× slower.** Mid-table on ratio, and it should be
+read as a direct measurement of per-call and per-property-access cost. Both are
+known open items: shape tracking is
 gated on `GetType() == typeof(JSObject)` so nothing exotic participates, there is
 no shape-transition cache (so the constructor that builds each
 `TaskControlBlock` misses on *every* field it creates), and each call still goes
@@ -139,7 +144,7 @@ prototype-chain style, so method lookups walk prototypes rather than hitting own
 properties. It is the suite's stress test for whether an engine's inline caches
 survive polymorphism and whether prototype lookup is cached at all.
 
-**Broiler: 171 vs 102708 — 601× slower, the worst throughput ratio in the
+**Broiler: 316 vs 126232 — 399.5× slower, the worst throughput ratio in the
 suite.** This is the clearest single signal in the whole run. It says the
 prototype-method-call path is where Broiler is furthest from V8 — consistent with
 the engine's own measurements, where inherited-method call sites had a **0%**
@@ -163,12 +168,12 @@ loops are the closest JavaScript gets to C: `a[i] * b[j] + c` with `&`, `|`,
 int32, keeping the digit arrays in unboxed integer element storage, and eliding
 bounds checks.
 
-**Broiler: 127 *(0046)* vs 38183 — 301× slower.** Two separate stories here.
-First, without patch 0046 this suite does not score at all: `if (r == null)` on a
+**Broiler: 425 vs 49408 — 116.3× slower.** Two separate stories here.
+First, this suite did not score at all until `7ef80c03`: `if (r == null)` on a
 `BigInteger` ran `ToPrimitive` on the object (spec says an Object compared with
 null is `false` with no coercion), which reached `toString → toRadix → divRemTo →`
 the same test, recursing until the stack was exhausted and killing the process.
-Second, once it runs, the 301× is the boxing tax in its purest form: every digit
+Second, now that it runs, the 116× is the boxing tax in its purest form: every digit
 that leaves a local or enters an array becomes a heap-allocated `JSValue`.
 
 ### RayTrace — ray tracer
@@ -186,7 +191,7 @@ short-lived small-object allocation. It is the suite's escape-analysis benchmark
 an engine that can prove those intermediate `Vector`s never escape stack-allocates
 them and the allocation disappears; an engine that cannot pays for every one.
 
-**Broiler: 403 vs 117436 — 291× slower.** No escape analysis, and doubles are
+**Broiler: 677 vs 152290 — 224.9× slower.** No escape analysis, and doubles are
 boxed once they land in an object field, so each vector operation costs a
 `JSObject` plus three `JSValue`s. The unboxed-`double`-locals work from P2-2 does
 not reach here: its eligibility gate is a function-top-level `var` not named by any
@@ -207,8 +212,8 @@ control flow. It allocates enormously and almost all of it dies young.
 the benchmark that most directly rewards a fast bump-allocator with a cheap
 scavenger, and it punishes any per-allocation bookkeeping.
 
-**Broiler: 339 vs 91547 — 270× slower**, and at 33.5 s wall clock it is the
-slowest suite Broiler actually completes apart from Mandreel. The relevant history
+**Broiler: 615 vs 110540 — 179.7× slower**, at 17.2 s wall clock — fourth-longest
+of the fifteen files, well behind zlib and Mandreel. The relevant history
 is P0-1: every `JSValue` construction used to call
 `JSObject.NotifyPrototypeChainMutation()` unconditionally — so *allocating a
 number invalidated every inline cache in the realm*. That is fixed; what remains
@@ -230,7 +235,7 @@ using `test`, `exec`, `replace` (including function callbacks), `split` and
 compilation, the matcher itself, capture-group handling, and the string
 allocation around `replace`. V8 compiles regexes to native code with Irregexp.
 
-**Broiler: 89.9 vs 9890 — 110× slower.** Note that Chromium's *absolute* score
+**Broiler: 166 vs 12988 — 78.2× slower.** Note that Chromium's *absolute* score
 here is the lowest of any benchmark (9890), because the reference time was set
 against an already-fast Irregexp — so 110× is measured against a strong baseline.
 `Broiler.Regex` is a from-scratch ECMAScript engine whose matcher is a
@@ -254,7 +259,8 @@ survives, so it gets promoted, and then the mutation rate forces the GC to keep
 tracing and rewriting a big live set. This is the benchmark that motivated
 incremental marking in V8.
 
-**Broiler: 283 vs 43027 — 152× slower.** Better than the suite median, which is
+**Broiler: 779 vs 56416 — 72.4× slower** — the best throughput ratio bar
+Typescript, and better than the suite median, which is
 the interesting part: the .NET GC handles this workload comparatively well. The
 loss is the per-node cost of building the payload objects, not the collector.
 
@@ -268,11 +274,11 @@ throughput, Octane records the time of each individual iteration and scores the
 stops the world for one long mark-and-sweep scores badly here even if its total
 throughput is fine.
 
-**Broiler: 1539 vs 69725 — 45×, by a wide margin Broiler's best result in the
-suite.** Worth stating plainly because it is the one axis where the .NET runtime
-is doing Broiler a favour: the background/concurrent GC's pause distribution is
-genuinely competitive, and the 45× is mostly the throughput deficit showing
-through rather than a pause problem. **The GC is not currently a primary
+**Broiler: 2614 vs 89673 — 34.3×, Broiler's best result in the suite** (Typescript
+is a close second at 35.4×). Worth stating plainly because it is the one axis where
+the .NET runtime is doing Broiler a favour: the background/concurrent GC's pause
+distribution is genuinely competitive, and the 34× is mostly the throughput deficit
+showing through rather than a pause problem. **The GC is not currently a primary
 blocker.**
 
 ### NavierStokes — 2D fluid dynamics
@@ -289,7 +295,7 @@ elimination, strength reduction on the index arithmetic, keeping doubles in
 registers across the loop body. It is the suite's numeric-kernel test and the one
 closest to what a JIT's loop optimizer is for.
 
-**Broiler: 341 vs 35432 — 104× slower**, one of the better ratios. The
+**Broiler: 621 vs 45217 — 72.8× slower**, one of the better ratios. The
 `NumericLoopPlanner` and the unboxed-`double`-locals work are visible here: the
 loop *counters* and scalar accumulators can stay raw `double`s. What cannot is the
 grid itself — every `field[i]` read materializes a boxed `JSValue`, and dense
@@ -308,8 +314,8 @@ parsing over `Uint8Array`s, string building, dictionary-shaped object lookups
 with dynamic keys, regexes, and a big class hierarchy — plus the sheer volume of
 code, which tests parse and compile time as well.
 
-**Broiler: 321 *(0046)* vs 58725 — 183× slower.** Also a suite that scored
-nothing before patch 0046, for an instructive reason: `undefined + x`
+**Broiler: 712 vs 79352 — 111.4× slower.** Also a suite that scored nothing until
+`7ef80c03`, for an instructive reason: `undefined + x`
 string-concatenated instead of adding numerically, so
 `this.end = (start + length) || bytes.length` with both arguments omitted stored
 the truthy string `"undefinedundefined"`; every stream then reported a NaN length
@@ -330,9 +336,9 @@ function tables, and individual functions of preposterous size.
 to compile enormous functions at all.** V8 recognizes the asm.js-shaped
 type coercions and compiles to unboxed integer/double code.
 
-**Broiler: 160 vs 47996 — 300× slower, and 313 seconds of wall clock** — it alone
-is longer than every other suite combined and needs the workflow's 1800 s
-per-suite timeout. Also the suite that most tests the *compiler*: `global_init`
+**Broiler: 238 vs 64547 — 271.2× slower, and 228 seconds of wall clock** — the
+second-longest file after zlib, and with it about 77% of the run; it needs the
+workflow's 1800 s per-suite timeout. Also the suite that most tests the *compiler*: `global_init`
 is a single generated function spanning **152,948 lines**, and building it has
 been observed to overflow the CLR stack outright (with a JavaScript stack only
 eight frames deep — that is the compiler recursing over the AST, not the program
@@ -349,7 +355,7 @@ that code ready to run, rather than how fast it runs afterwards.
 well by compiling lazily (never compiling function bodies until first call) and
 by keeping any single compilation unit small enough not to be perceptible.
 
-**Broiler: 14.5 vs 67368 — 4646× slower, by an order of magnitude the worst
+**Broiler: 18.7 vs 99704 — 5331.8× slower, by an order of magnitude the worst
 score in the suite.** It is the single most diagnostic number in the whole run:
 Broiler compiles this eagerly, in units as large as the source makes them, through
 an expression-tree pipeline that is far more expensive per byte of source than a
@@ -370,7 +376,7 @@ branchy state-machine logic.
 through large dispatch tables** — plus property access on a few very large
 objects with hundreds of fields.
 
-**Broiler: 1041 vs 90650 — 87× slower, Broiler's second-best throughput ratio.**
+**Broiler: 1626 vs 120086 — 73.9× slower, among Broiler's best throughput ratios.**
 The reason is worth noting: the work per dispatch is large enough that the
 constant overhead per call and per property access is amortized. Benchmarks where
 Broiler does *relatively* well are the ones doing real work between engine
@@ -390,10 +396,10 @@ strategy is pre-parsing: scan function bodies just enough to find their extents,
 and compile nothing until called. jQuery defines thousands of functions; almost
 none run.
 
-**Broiler: 83.4 *(0046)* vs 30916 — 371× slower.** The lowest absolute score of
-any completing suite. Like MandreelLatency, this is entirely a front-end result
-and points at the same place: eager compilation through expression trees. The
-prior failure was also instructive — non-strict `eval` routed a `var` initializer
+**Broiler: 193 vs 40803 — 211.4× slower**, and the second-lowest absolute score of
+any throughput suite after RegExp. Like MandreelLatency, this is entirely a
+front-end result and points at the same place: eager compilation through
+expression trees. Its prior failure was also instructive — non-strict `eval` routed a `var` initializer
 inside a function the eval'd code declared to the *eval* var-environment binding
 instead of the function's own hoisted local, so the store never reached the
 binding the reads resolved to and leaked out as a global. jQuery's `windowmock`
@@ -421,7 +427,7 @@ because it loads three things at once:
 - **Megamorphic call sites** in the contact dispatch, where the callee genuinely
   varies.
 
-**Broiler: 584 vs 99321 — 170× slower.** Note that Box2D also produced a
+**Broiler: 937 vs 136091 — 145.2× slower.** Note that Box2D also produced a
 *correctness* fix on the way: the parser crashed on a bare `return` immediately
 before a closing brace (commit `7786cdd5`).
 
@@ -437,12 +443,12 @@ Emscripten's integer-coercion idioms.
 asm.js-shaped code — the same axis as Mandreel but in a much smaller, more
 regular program.
 
-**Broiler: 237 *(0046)* vs 80514 — 340× slower.** Its prior failure was the
+**Broiler: 566 vs 103463 — 182.8× slower.** Its prior failure was the
 cheapest fix in the whole set and the most complete blocker: Emscripten's shell
 preamble does `Module.read = read` unconditionally, the way `d8` and SpiderMonkey
 provide it, and the Broiler shell had `print` but not `read`. A `ReferenceError`
-before the benchmark ran a line. It also takes 647 s once it works, so it needs
-the long per-suite timeout too.
+before the benchmark ran a line. It also takes 271 s once it works — the longest
+file in the run — so it needs the long per-suite timeout too.
 
 ### Typescript — the TypeScript compiler compiling itself
 
@@ -457,8 +463,8 @@ manipulation, huge object graphs, polymorphic property access, closures, `Map`-i
 dictionary objects with dynamic keys, and sustained GC pressure — plus parse and
 compile time for a very large input.
 
-**Broiler: 1009 *(0046)* vs 86327 — 86× slower, the best throughput ratio in the
-suite** (and its highest absolute score bar the latency ones). The same pattern as
+**Broiler: 3338 vs 118170 — 35.4× slower, the best throughput ratio in the
+suite** (and its highest absolute score bar SplayLatency). The same pattern as
 Gameboy, more so: in a workload this large and this varied, no single engine
 overhead dominates, and Broiler's relative standing is at its best. Its prior
 failure was a parser bug — the last expression of a C-style `for` head's comma
@@ -531,8 +537,8 @@ benchmark above:
 
 ### B4 · Compile time and compile latency on large machine-generated code
 
-MandreelLatency (**4646×**) and CodeLoad (**371×**) measure nothing but the front
-end, and they are the two worst results in the suite. Three causes compound:
+MandreelLatency (**5331.8×**) and CodeLoad (**211.4×**) measure nothing but the
+front end; the first is the worst result in the suite by an order of magnitude. Three causes compound:
 
 - **Compilation is eager.** CodeLoad exists specifically to reward engines that
   pre-parse and defer compiling function bodies until first call. jQuery defines
@@ -551,7 +557,7 @@ page load time.
 
 `Broiler.Regex` is a new ECMAScript-semantics engine whose `Matching/Matcher.cs`
 is a backtracking interpreter with no compilation to native code. V8's Irregexp
-JIT-compiles each pattern. RegExp is 110× off *against Octane's lowest reference
+JIT-compiles each pattern. RegExp is 78× off *against Octane's lowest reference
 baseline*, and the same engine is on PdfJS's and Typescript's critical path.
 
 ### B6 · Ambient state on hot paths
@@ -566,8 +572,8 @@ property-set helpers so the hot path reads nothing — is not started.
 ### B7 · GC — *not* currently a primary blocker
 
 Worth stating explicitly to keep it off the priority list. SplayLatency is
-Broiler's best result at 45×, and Splay's throughput at 152× is better than the
-suite median. The .NET GC is handling a workload it was never tuned for
+Broiler's best result at 34.3×, and Splay's throughput at 72.4× is second-best of
+the throughput suites. The .NET GC is handling a workload it was never tuned for
 respectably. The allocation *rate* is a severe problem (B1) — but that is a
 problem with what the engine asks the collector to do, not with the collector.
 
@@ -602,46 +608,51 @@ skipped.
 
 ## 4. Reading the ratios
 
-Sorted by how far Broiler is off Chromium, using the committed scores plus the
-five *(0046)* measurements:
+Sorted by how far Broiler is off Chromium, using the committed scores — all 17 of
+them, for the first time:
 
 | Benchmark | Chromium | Broiler | × slower | Dominant blocker |
 |---|--:|--:|--:|---|
-| SplayLatency | 69 725 | 1 539 | 45 | — (best axis; GC pauses are fine) |
-| Typescript | 86 327 | 1 009 *(0046)* | 86 | mixed; overhead amortized by real work |
-| Gameboy | 90 650 | 1 041 | 87 | B1 typed arrays, B3 exotic exclusion |
-| NavierStokes | 35 432 | 341 | 104 | B1 boxed array elements |
-| RegExp | 9 890 | 89.9 | 110 | B5 regex engine |
-| Splay | 43 027 | 283 | 152 | B1 allocation rate |
-| Box2D | 99 321 | 584 | 170 | B1 + B2 (no escape analysis, no inlining) |
-| PdfJS | 58 725 | 321 *(0046)* | 183 | B1, B5, B4 |
-| EarleyBoyer | 91 547 | 339 | 270 | B1 allocation rate |
-| RayTrace | 117 436 | 403 | 291 | B1 + B2 escape analysis |
-| Mandreel | 47 996 | 160 | 300 | B4 compile, B1 heap traffic |
-| Crypto | 38 183 | 127 *(0046)* | 301 | B1 integer boxing |
-| zlib | 80 514 | 237 *(0046)* | 340 | B1 integer boxing |
-| CodeLoad | 30 916 | 83.4 *(0046)* | 371 | **B4 eager compilation** |
-| Richards | 46 754 | 108 | 433 | **B2 call cost, B3 shape transitions** |
-| DeltaBlue | 102 708 | 171 | 601 | **B2 polymorphic call cost** |
-| MandreelLatency | 67 368 | 14.5 | 4 646 | **B4 compile latency** |
+| SplayLatency | 89 673 | 2 614 | 34.3 | — (best axis; GC pauses are fine) |
+| Typescript | 118 170 | 3 338 | 35.4 | mixed; overhead amortized by real work |
+| Splay | 56 416 | 779 | 72.4 | B1 allocation rate |
+| NavierStokes | 45 217 | 621 | 72.8 | B1 boxed array elements |
+| Gameboy | 120 086 | 1 626 | 73.9 | B1 typed arrays, B3 exotic exclusion |
+| RegExp | 12 988 | 166 | 78.2 | B5 regex engine |
+| PdfJS | 79 352 | 712 | 111.4 | B1, B5, B4 |
+| Crypto | 49 408 | 425 | 116.3 | B1 integer boxing |
+| Richards | 49 320 | 349 | 141.3 | **B2 call cost, B3 shape transitions** |
+| Box2D | 136 091 | 937 | 145.2 | B1 + B2 (no escape analysis, no inlining) |
+| EarleyBoyer | 110 540 | 615 | 179.7 | B1 allocation rate |
+| zlib | 103 463 | 566 | 182.8 | B1 integer boxing |
+| CodeLoad | 40 803 | 193 | 211.4 | **B4 eager compilation** |
+| RayTrace | 152 290 | 677 | 224.9 | B1 + B2 escape analysis |
+| Mandreel | 64 547 | 238 | 271.2 | B4 compile, B1 heap traffic |
+| DeltaBlue | 126 232 | 316 | 399.5 | **B2 polymorphic call cost** |
+| MandreelLatency | 99 704 | 18.7 | 5 331.8 | **B4 compile latency** |
 
 The shape of that list is the finding:
 
-- **The extremes are both front-end and call-path, not arithmetic.** The four
-  worst are MandreelLatency, DeltaBlue, Richards and CodeLoad. Two are compilation
-  cost; two are the cost of making a call and reading a property. Boxing (B1) is
-  the biggest *uniform* multiplier, but it is not what produces the outliers.
+- **The extremes are front-end, call-path and allocation, not arithmetic.** The
+  four worst are MandreelLatency, DeltaBlue, Mandreel and RayTrace — two of them
+  compilation cost, one the cost of making a call, one the cost of allocating
+  short-lived objects with no escape analysis. CodeLoad, the other front-end
+  benchmark, sits just outside at 211×. Boxing (B1) is the biggest *uniform*
+  multiplier, but it is not what produces the outliers.
 - **Broiler does relatively best where the benchmark does the most work per
   engine operation** (Typescript, Gameboy) and relatively worst where the engine
-  operation *is* the work (DeltaBlue, Richards). That is the signature of a fixed
-  per-operation overhead rather than of a bad optimizer.
+  operation *is* the work (DeltaBlue). That is the signature of a fixed
+  per-operation overhead rather than of a bad optimizer. Richards, which used to
+  sit beside DeltaBlue at the bottom of this list, is now mid-table — a change
+  driven by the phase-2 inline-cache work, though **not one this single-repetition
+  pair of runs may be used to size**.
 - **GC is the one subsystem that is already competitive.**
 
 On that evidence the ordering with the best return is: **B4** (lazy compilation —
-it owns the two worst scores outright and is the one that matters most to page
-load), then **B2/B3** on the call and property paths (the Richards/DeltaBlue
-cluster), then **B1** representation work, which is the largest total win and by
-far the largest change.
+it owns the worst score outright, plus Mandreel and CodeLoad, and is the one that
+matters most to page load), then **B2/B3** on the call and property paths (which
+DeltaBlue still heads), then **B1** representation work, which is the largest
+total win and by far the largest change.
 
 ---
 
