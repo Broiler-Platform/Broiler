@@ -1155,16 +1155,37 @@ our render of its own reference. Worth a maintainer's call on whether these belo
 in the "reference is the unfeatured render" bucket before any engine work; chasing
 byte-compatibility on a dropped declaration is not the same as implementing subgrid.
 
-### An earlier verdict that no longer holds
+### An earlier verdict that no longer held — problem 7, re-triaged and then **fixed**
 
-**Problem 7 (`css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative`)
-is a genuine gap now, not an untrustworthy pass.** The table below records it as
-"passes only by rendering nothing — the reference is a blank white canvas". That
-is no longer true: Chromium's reference for it is now **100% green**, and Broiler
-renders **100% red** (a 0.0% match, matching CI). Whatever changed — the test or
-the engine — the "won't fix" reasoning attached to it is stale and it should be
-triaged as an ordinary nested-view-transitions failure. *Re-checking what a
-reference actually contains is cheap; carrying a stale verdict is not.*
+**It was recorded as an untrustworthy pass, and it was neither.** The #1491 table
+below has it as "passes only by rendering nothing — the reference is a blank white
+canvas". That stopped being true: Chromium's reference is now **100% green** and
+Broiler rendered **100% red**, a 0.0% match that reproduces CI exactly. Re-checking
+what a reference actually contains is cheap; carrying a stale verdict is not — and
+once it was re-triaged as an ordinary failure it turned out to be a one-line rule.
+
+- **Owner:** HtmlBridge (`DomBridge.ViewTransition.cs`). Main repo.
+- **`view-transition-group: <custom-ident>` resolves against the *ancestor* chain**,
+  not against the whole document (css-view-transitions-2) — the test's own title is
+  "Explicit view-transition-group name can only match ancestors".
+  `ResolveGroupParentName` accepted any captured element with that name, so a group
+  nested under its **sibling**. The colour follows from there:
+  `::view-transition-group(test) { background: inherit }` then inherited the
+  sibling's red instead of the green `::view-transition` root, and since every group
+  in that family is `position: absolute; inset: 0`, the last one painted takes the
+  whole canvas.
+- **The family is six tests against one reference**, which is what makes the rule
+  checkable rather than guessable: `-direct` (parent) and `-nested` (grandparent)
+  must keep nesting, while `-non-ancestor` (sibling), `-non-existent`, `-self` and
+  `-nested-vt-names` must not. All six render 100% green after the change. `root`
+  keeps qualifying explicitly, since the document element is an ancestor of every
+  other captured element.
+- **Measured: 0.0% → 100%**, and the 490-test `css-view-transitions` subset goes
+  **344 → 345 passing with nothing lost and nothing else moved**. Four tests in
+  `ViewTransitionGroupAncestorTests` read the nesting off one colour — green when
+  the group nested, blue when it stayed top-level — and cover both directions, so
+  the fix cannot degenerate into "never nest". Only the sibling case fails without
+  it, which is the shape of a narrowing.
 
 ### Diagnosed, not fixed
 
@@ -1222,7 +1243,7 @@ owned by a section above). Re-reported problems point at that section.
 | 3 | `css-page/page-margin-002-print` | 0.0% | — | re-report of #1491 problem 12 — [screen-layout gaps](#screen-layout-gaps-behind-the-three-print-html-tests) |
 | 4 | `css-transforms/animation/transform-interpolation-002` | 0.0% | — | re-report of #1491 problem 13 — both engines empty offline |
 | 5, 6 | `css-view-transitions/iframe-and-main-frame-transition-old-main-*` (2) | 0.0% | 0.00% | re-report of #1491 problems 16/17 — needs a transition in a nested browsing context |
-| 7 | `css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative` | 0.0% | 0.00% | **verdict corrected** — reference is now 100% green, ours 100% red; no longer a blank-reference pass |
+| 7 | `css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative` | 0.0% | **0.00% → 100%** | **fixed** — an explicit `view-transition-group` name now only matches an ancestor, main repo. (Also a corrected verdict: it was not the blank-reference pass the #1491 table records) |
 | 8 | `css-view-transitions/nothing-captured` | 0.0% | **99.54% (passes)** | does not reproduce — judge from CI |
 | 9 | `resource-timing/initiator-type/frameset` | 0.0% | — | re-report of #1491 problem 26 — [frameset frames render nothing](#frameset-frames-render-nothing) |
 | 10 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | — | **won't fix** — #1497 problem 25: Chromium fails this reftest against its own reference |
@@ -1265,7 +1286,7 @@ feature they test — closing those means rendering less, not more.
 | 13 | `css-transforms/animation/transform-interpolation-002` | 0.0% | 100% — both empty offline | open |
 | 14, 15 | `css-view-transitions/auto-name*` (2) | 0.0% | ours captures both items + backdrop; Chromium drops `view-transition-name: auto` | **won't fix** — reference is the unfeatured render |
 | 16, 17 | `css-view-transitions/iframe-and-main-frame-*` (2) | 0.0% | ours 99.5% white, Chromium 74.5% green + 25% blue | open — needs a transition in a nested browsing context |
-| 18 | `css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative` | 0.0% | 100% — reference is a blank white canvas | ~~**untrustworthy** — passes only by rendering nothing~~ **stale**: the reference is now 100% green and ours 100% red, so this is a genuine gap. See [#1538 problem 7](#an-earlier-verdict-that-no-longer-holds) |
+| 18 | `css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative` | 0.0% | 100% — reference is a blank white canvas | ~~**untrustworthy** — passes only by rendering nothing~~ **stale, and since fixed**: the reference is now 100% green, and an explicit `view-transition-group` name matching a non-ancestor was the cause. See [#1538 problem 7](#an-earlier-verdict-that-no-longer-held--problem-7-re-triaged-and-then-fixed) |
 | 19, 21 | `css-view-transitions/old-/new-content-captures-root` (2) | 0.0% | ours 98.7% pink (backdrop through the page) | open — needs a rasterised root snapshot |
 | 20, 22 | `css-view-transitions/*-root-scrollbar-with-fixed-background` (2) | 0.0% | 100% — reference is 99% `lightblue`, genuine | passing locally |
 | 23 | `css-view-transitions/root-captured-as-different-tag` | 0.0% | ours 100% red (the `(root)` trap rule) | part-fixed — the `(root)` rules no longer match; still needs the root snapshot |

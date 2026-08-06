@@ -435,12 +435,40 @@ public sealed partial class DomBridge
         if (value is null || value.Equals("contain", System.StringComparison.OrdinalIgnoreCase))
             return NearestCapturedAncestorName(element, name, elementByName, root, requireContain: true);
 
-        // An explicit <custom-ident>: nest under that group when it is itself captured. A group
-        // cannot reference its own name (css-view-transitions-2: a self-reference is invalid and the
-        // group falls back to the flat `normal` layout) — WPT compute-explicit-name-self.
+        // An explicit <custom-ident> nests under that group only when the element carrying that
+        // view-transition-name is an ANCESTOR — css-view-transitions-2 resolves the name against the
+        // ancestor chain, not against the whole document, so a sibling or a cousin does not qualify
+        // (WPT nested/compute-explicit-name-non-ancestor, whose title is exactly that). Matching any
+        // captured element nested a group under its sibling, and since the test's
+        // `::view-transition-group(test) { background: inherit }` then inherited the sibling's red
+        // instead of the green `::view-transition` root, the whole canvas came out red.
+        //
+        // A group cannot reference its own name either (a self-reference is invalid and the group
+        // falls back to the flat `normal` layout) — WPT compute-explicit-name-self — and a name that
+        // no element carries falls back the same way (compute-explicit-name-non-existent).
         if (string.Equals(value, name, System.StringComparison.Ordinal))
             return null;
-        return elementByName.ContainsKey(value) || value == "root" ? value : null;
+
+        // `root` is the document element's name, and the document element is an ancestor of every
+        // other captured element, so it always qualifies.
+        if (string.Equals(value, "root", System.StringComparison.Ordinal))
+            return value;
+
+        return elementByName.TryGetValue(value, out var target) && IsAncestorOf(target, element)
+            ? value
+            : null;
+    }
+
+    /// <summary>Whether <paramref name="candidate"/> is a strict ancestor of <paramref name="node"/>.</summary>
+    private static bool IsAncestorOf(DomElement candidate, DomNode node)
+    {
+        for (var parent = node.ParentNode; parent != null; parent = parent.ParentNode)
+        {
+            if (ReferenceEquals(parent, candidate))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>
