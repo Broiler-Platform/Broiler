@@ -26,6 +26,17 @@ internal sealed class LinuxInputCoordinator : IAsyncDisposable
     private readonly object _gate = new();
     private readonly InputDeviceId _externalPointerId = InputDeviceId.FromOpaqueValue("linux:writer:x11-pointer");
     private MouseButtons _buttons;
+
+    /// <summary>
+    /// Modifier keys last reported by the keyboard, stamped onto pointer events.
+    /// </summary>
+    /// <remarks>
+    /// On evdev the mouse and the keyboard are separate devices, so the mouse
+    /// backend cannot know whether Shift is held — only a coordinator that sees both
+    /// streams can. Windows gets this for free from the message's wParam; here it has
+    /// to be carried across.
+    /// </remarks>
+    private InputModifiers _modifiers;
     private long _externalSequence;
     private LinuxKeyboardProvider? _keyboardProvider;
     private LinuxMouseProvider? _mouseProvider;
@@ -106,7 +117,8 @@ internal sealed class LinuxInputCoordinator : IAsyncDisposable
                     header,
                     InputPoint.ClientDeviceIndependentPixels(_pointerX, _pointerY),
                     _buttons,
-                    InputEventSource.Semantic));
+                    InputEventSource.Semantic,
+                    _modifiers));
             }
         }
 
@@ -329,6 +341,12 @@ internal sealed class LinuxInputCoordinator : IAsyncDisposable
     private void OnKeyChanged(KeyboardKeyEvent inputEvent)
     {
         KeyboardKeyEvent normalized = NormalizeKeyboardEvent(inputEvent);
+        lock (_gate)
+        {
+            // Identical layouts, pinned by Broiler.Input.Contract.Tests.
+            _modifiers = (InputModifiers)normalized.Modifiers;
+        }
+
         _pending.Enqueue(UiInputEvent.FromKeyboardKey(normalized));
 
         if (TryCreateTextInput(normalized, out string text))
@@ -364,7 +382,8 @@ internal sealed class LinuxInputCoordinator : IAsyncDisposable
                 inputEvent.Header,
                 InputPoint.ClientDeviceIndependentPixels(_pointerX, _pointerY),
                 inputEvent.Buttons,
-                InputEventSource.Semantic));
+                InputEventSource.Semantic,
+                _modifiers));
         }
 
         if (uiEvent is not null)
@@ -385,7 +404,8 @@ internal sealed class LinuxInputCoordinator : IAsyncDisposable
                 inputEvent.Buttons,
                 inputEvent.Button,
                 inputEvent.Transition,
-                InputEventSource.Semantic));
+                InputEventSource.Semantic,
+                _modifiers));
         }
 
         _pending.Enqueue(uiEvent);
@@ -404,7 +424,8 @@ internal sealed class LinuxInputCoordinator : IAsyncDisposable
                 inputEvent.Buttons,
                 inputEvent.Axis,
                 inputEvent.DeltaNotches,
-                InputEventSource.Semantic));
+                InputEventSource.Semantic,
+                _modifiers));
         }
 
         _pending.Enqueue(uiEvent);

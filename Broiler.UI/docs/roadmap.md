@@ -101,21 +101,30 @@ sequencing and exit gates are in
 - Complete dependency, license, API, and attributable human review before a
   stable release.
 
-## Pointer events carry no modifier state
+## Pointer events carry modifier state
 
-`Broiler.Input`'s `MouseButtonEvent` has no modifier field, and
-`UiInputEvent.FromMouseButton` reports `KeyboardModifierState.None` for every pointer
-press. Any control that wants Ctrl-click or Shift-click therefore cannot have it: the
-modified click is indistinguishable from a plain one.
+`Broiler.Input`'s `MouseButtonEvent`, `MouseMoveEvent` and `MouseWheelEvent` carry an
+`InputModifiers` value, and `UiInputEvent.FromMouse*` passes it through, so a control
+can tell a Ctrl-click or Shift-click from a plain one.
 
-This surfaced building `UiListSelectionMode.Multiple` for `UiListView`, where the
-platform convention is plain-click-replaces / Ctrl-toggles / Shift-extends. The
-control ships with click-toggles instead — the behaviour that stays usable with no
-modifiers, and the one touch needs anyway — and keeps ranges on the keyboard
-(Shift+arrow extends, Space toggles in place). `UiListView.SelectRangeTo` and
-`ToggleItem` are public and tested, so a modifier-aware click is a small change to
-`StandardListView` once the input contract can express it.
+`InputModifiers` lives in the root `Broiler.Input` assembly rather than on the
+keyboard package: every device abstraction depends on the root and none depend on
+each other (Broiler.Input ADR 0001), and modifier state belongs to a chord rather than
+to a keyboard. It mirrors `KeyboardModifierState` member for member so the UI layer
+can cast between them in one place; `Broiler.Input.Contract.Tests` pins the two
+layouts against each other.
 
-Closing this means adding modifier state to `MouseButtonEvent` (and the pen/touch
-equivalents) and populating it in every platform backend, which is a `Broiler.Input`
-contract change rather than a Broiler.UI one.
+What populates it varies by platform, and consumers should not assume it is complete:
+
+- **Windows** fills Shift and Ctrl straight from the mouse message's `wParam`. Alt is
+  *not* there — Windows delivers it as `WM_SYSCOMMAND` — so an Alt-click reports no
+  modifier.
+- **Linux/evdev** cannot fill it in the mouse backend at all, because the mouse and
+  the keyboard are separate devices. The coordinator that merges both streams stamps
+  the last-seen keyboard modifiers instead (see `LinuxInputCoordinator`).
+- **Touch** contacts arrive as synthesized pointer presses and never carry modifiers,
+  which is why `StandardListView` toggles on an unmodified click rather than requiring
+  Ctrl to accumulate — the convention would put multi-selection out of touch's reach.
+
+Pen and touch events do not carry modifiers yet; adding them is the same shape of
+change as this one.

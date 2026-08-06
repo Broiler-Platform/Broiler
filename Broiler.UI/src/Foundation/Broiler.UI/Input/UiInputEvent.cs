@@ -100,14 +100,23 @@ public sealed class UiInputEvent
 
     public InputEventSource Source { get; }
 
+    /// <summary>
+    /// Maps a device-neutral <see cref="InputModifiers"/> onto the keyboard flags the
+    /// UI layer routes on. The two enums are declared with identical members and
+    /// values — <c>Broiler.Input.Contract.Tests</c> pins that — because
+    /// <c>KeyboardModifierState</c> is published API on the keyboard package and
+    /// pointer events must not depend on it (Broiler.Input ADR 0001).
+    /// </summary>
+    private static KeyboardModifierState ToModifiers(InputModifiers modifiers) => (KeyboardModifierState)modifiers;
+
     public static UiInputEvent FromMouseMove(MouseMoveEvent input) =>
-        new(input.Header, UiInputEventKind.PointerMove, ToPoint(input.Position), null, null, MouseButton.None, null, null, KeyboardModifierState.None, 0, null, MouseWheelAxis.Vertical, 0, 0, null, null, PenButtons.None, 0, 0, 0, input.Source);
+        new(input.Header, UiInputEventKind.PointerMove, ToPoint(input.Position), null, null, MouseButton.None, null, null, ToModifiers(input.Modifiers), 0, null, MouseWheelAxis.Vertical, 0, 0, null, null, PenButtons.None, 0, 0, 0, input.Source);
 
     public static UiInputEvent FromMouseButton(MouseButtonEvent input) =>
-        new(input.Header, UiInputEventKind.PointerButton, ToPoint(input.Position), null, null, input.Button, input.Transition, null, KeyboardModifierState.None, 0, null, MouseWheelAxis.Vertical, 0, 0, null, null, PenButtons.None, 0, 0, 0, input.Source);
+        new(input.Header, UiInputEventKind.PointerButton, ToPoint(input.Position), null, null, input.Button, input.Transition, null, ToModifiers(input.Modifiers), 0, null, MouseWheelAxis.Vertical, 0, 0, null, null, PenButtons.None, 0, 0, 0, input.Source);
 
     public static UiInputEvent FromMouseWheel(MouseWheelEvent input) =>
-        new(input.Header, UiInputEventKind.PointerWheel, ToPoint(input.Position), null, null, MouseButton.None, null, null, KeyboardModifierState.None, 0, null, input.Axis, input.DeltaNotches, 0, null, null, PenButtons.None, 0, 0, 0, input.Source);
+        new(input.Header, UiInputEventKind.PointerWheel, ToPoint(input.Position), null, null, MouseButton.None, null, null, ToModifiers(input.Modifiers), 0, null, input.Axis, input.DeltaNotches, 0, null, null, PenButtons.None, 0, 0, 0, input.Source);
 
     public static UiInputEvent FromTouchContact(TouchContactEvent input) =>
         new(input.Header, UiInputEventKind.TouchContact, ToPoint(input.Position), null, null, MouseButton.None, null, null, KeyboardModifierState.None, 0, null, MouseWheelAxis.Vertical, 0, input.ContactId, input.State, null, PenButtons.None, input.Pressure, 0, 0, input.Source);

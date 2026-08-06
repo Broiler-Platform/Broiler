@@ -4,4 +4,5 @@ public readonly record struct MouseMoveEvent(
     InputEventHeader Header,
     InputPoint Position,
     MouseButtons Buttons,
-    InputEventSource Source = InputEventSource.Semantic);
+    InputEventSource Source = InputEventSource.Semantic,
+    InputModifiers Modifiers = InputModifiers.None);

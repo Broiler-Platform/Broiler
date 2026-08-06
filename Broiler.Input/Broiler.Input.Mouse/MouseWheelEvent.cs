@@ -6,4 +6,5 @@ public readonly record struct MouseWheelEvent(
     MouseButtons Buttons,
     MouseWheelAxis Axis,
     double DeltaNotches,
-    InputEventSource Source = InputEventSource.Semantic);
+    InputEventSource Source = InputEventSource.Semantic,
+    InputModifiers Modifiers = InputModifiers.None);

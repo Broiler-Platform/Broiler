@@ -189,7 +189,7 @@ Submission carries the form data set for GET and POST, in all three HTML encodin
 
 Known limits, none of them silent:
 
-- **Multi-selection is keyboard-or-click, not Ctrl-click** — see below.
+- **An unmodified click toggles rather than replacing** in a multi-selection list — see below.
 - **`<textarea>` typing depends on a pending submodule patch**, below.
 
 ## Multi-selection, and why a click toggles
@@ -206,19 +206,22 @@ That is now an additive, opt-in feature of the component:
   `OldItemIds`/`NewItemIds`; a handler written against the single-selection args is
   untouched.
 
-**A click toggles the row rather than replacing the selection, and that is forced
-rather than chosen.** The desktop convention — plain click replaces, Ctrl toggles,
-Shift extends — is not implementable today: `Broiler.Input`'s `MouseButtonEvent`
-carries no modifier state, and `UiInputEvent.FromMouseButton` reports
-`KeyboardModifierState.None` for every pointer press, so a Ctrl-click cannot be told
-from a plain one. Toggling is what stays usable with no modifiers, and it is what
-touch needs regardless.
+**A click toggles the row rather than replacing the selection.** That is a deliberate
+departure from the desktop convention of replace-unless-Ctrl: a touch contact arrives
+as a synthesized pointer press and can never carry a modifier, so requiring Ctrl to
+accumulate would leave multi-selection unreachable by touch entirely. Ctrl-click
+therefore toggles too — the same result the convention gives it — and Shift-click
+extends a range from the anchor, so muscle memory still works.
 
-Ranges are therefore keyboard-only for now: Shift with an arrow extends from the
-anchor, and Space toggles in place so a discontiguous selection is reachable without a
-pointer. `SelectRangeTo` is on the abstraction and tested; a modifier-aware click
-starts working the day pointer events carry modifiers, which is a `Broiler.Input`
-contract change rather than a Broiler.UI one.
+From the keyboard, Shift with an arrow extends and Space toggles in place, so a
+discontiguous selection is reachable without a pointer.
+
+Shift-click was not possible when this was first built: pointer events carried no
+modifier state. `MouseButtonEvent`, `MouseMoveEvent` and `MouseWheelEvent` now carry
+`InputModifiers`, populated from the message's `wParam` on Windows and stamped from
+the last-seen keyboard state by the coordinator on Linux, where the mouse and keyboard
+are separate evdev devices. See the Broiler.UI roadmap for what each platform can
+actually fill in.
 
 ## Why textarea ships as a patch
 

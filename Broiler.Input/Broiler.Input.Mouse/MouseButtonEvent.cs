@@ -6,4 +6,5 @@ public readonly record struct MouseButtonEvent(
     MouseButtons Buttons,
     MouseButton Button,
     MouseButtonTransition Transition,
-    InputEventSource Source = InputEventSource.Semantic);
+    InputEventSource Source = InputEventSource.Semantic,
+    InputModifiers Modifiers = InputModifiers.None);

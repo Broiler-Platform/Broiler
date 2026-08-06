@@ -194,7 +194,7 @@ public sealed class StandardListView : UiListView, IStandardThemedControl
             return false;
 
         if (input.MouseButtonTransition == MouseButtonTransition.Down)
-            return HandlePointerDown(input.Position);
+            return HandlePointerDown(input.Position, input.KeyModifiers);
 
         if (input.MouseButtonTransition == MouseButtonTransition.Up && _isDraggingScrollbar)
         {
@@ -205,7 +205,7 @@ public sealed class StandardListView : UiListView, IStandardThemedControl
         return false;
     }
 
-    private bool HandlePointerDown(BPoint position)
+    private bool HandlePointerDown(BPoint position, KeyboardModifierState modifiers)
     {
         Session?.SetFocus(this);
         if (HasVerticalScrollbar && TryHandleScrollbarPointerDown(position))
@@ -218,7 +218,7 @@ public sealed class StandardListView : UiListView, IStandardThemedControl
         if ((uint)index < (uint)Items.Count)
         {
             string itemId = Items[index].Id;
-            ApplyClick(itemId);
+            ApplyClick(itemId, modifiers);
             ScrollIntoView(itemId);
         }
 
@@ -343,27 +343,29 @@ public sealed class StandardListView : UiListView, IStandardThemedControl
     }
 
     /// <summary>
-    /// Applies a click: a single-selection list replaces its selection, a
-    /// multi-selection list toggles the row that was hit.
+    /// Applies a click: a single-selection list replaces its selection; a
+    /// multi-selection list extends the range on Shift and otherwise toggles the row.
     /// </summary>
     /// <remarks>
-    /// Toggling — rather than the desktop convention of replacing, with Ctrl to
-    /// toggle and Shift to extend — is forced rather than chosen.
-    /// <c>Broiler.Input</c>'s <c>MouseButtonEvent</c> has no modifier field, and
-    /// <c>UiInputEvent.FromMouseButton</c> reports
-    /// <see cref="KeyboardModifierState.None"/> for every pointer press, so a
-    /// Ctrl-click cannot be told from a plain one. Toggling is the behaviour that
-    /// stays usable with no modifiers at all, and it is what touch needs anyway.
-    /// Modifier-driven clicks are reachable once pointer events carry modifier state;
-    /// the range and toggle operations they would call are already on
-    /// <see cref="UiListView"/> and are exercised from the keyboard.
+    /// An unmodified click toggles rather than replacing, which is a deliberate
+    /// departure from the desktop convention of replace-unless-Ctrl. A touch contact
+    /// arrives as a synthesized pointer press and can never carry a modifier, so
+    /// requiring Ctrl to accumulate would leave multi-selection unreachable by touch
+    /// entirely. Ctrl-click therefore also toggles — the same result the convention
+    /// gives it — and Shift-click is the range, so muscle memory still works.
     /// </remarks>
-    private void ApplyClick(string itemId)
+    private void ApplyClick(string itemId, KeyboardModifierState modifiers)
     {
-        if (SelectionMode == UiListSelectionMode.Multiple)
-            ToggleItem(itemId);
-        else
+        if (SelectionMode != UiListSelectionMode.Multiple)
+        {
             SelectItem(itemId);
+            return;
+        }
+
+        if (modifiers.HasFlag(KeyboardModifierState.Shift))
+            SelectRangeTo(itemId);
+        else
+            ToggleItem(itemId);
     }
 
     private void CoerceOffset()

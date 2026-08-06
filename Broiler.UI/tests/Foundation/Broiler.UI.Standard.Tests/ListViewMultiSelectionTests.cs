@@ -58,9 +58,9 @@ public sealed class ListViewMultiSelectionTests
     }
 
     /// <summary>
-    /// A plain click toggles rather than replacing, because pointer events carry no
-    /// modifier state — see <c>StandardListView.ApplyClick</c>. Without this a
-    /// multi-selection list would be unusable by mouse or touch.
+    /// An unmodified click toggles rather than replacing: a touch contact arrives as
+    /// a synthesized pointer press with no modifiers, so requiring Ctrl would put
+    /// multi-selection out of reach of touch entirely.
     /// </summary>
     [Fact]
     public void A_Click_Adds_And_Removes_One_Item()
@@ -75,10 +75,60 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["c"], listView.SelectedItemIds);
     }
 
+    [Fact]
+    public void Shift_Click_Selects_The_Range_From_The_Anchor()
+    {
+        StandardListView listView = CreateList(UiListSelectionMode.Multiple);
+
+        listView.DispatchInput(PointerDown(5, RowY(1)));
+        listView.DispatchInput(PointerDown(5, RowY(3), KeyboardModifierState.Shift));
+
+        Assert.Equal(["b", "c", "d"], listView.SelectedItemIds);
+        // The anchor does not move, so shifting again resizes one range.
+        Assert.Equal("b", listView.SelectedItemId);
+
+        listView.DispatchInput(PointerDown(5, RowY(2), KeyboardModifierState.Shift));
+        Assert.Equal(["b", "c"], listView.SelectedItemIds);
+    }
+
+    [Fact]
+    public void Shift_Click_Ranges_Backwards_Too()
+    {
+        StandardListView listView = CreateList(UiListSelectionMode.Multiple);
+
+        listView.DispatchInput(PointerDown(5, RowY(3)));
+        listView.DispatchInput(PointerDown(5, RowY(1), KeyboardModifierState.Shift));
+
+        Assert.Equal(["b", "c", "d"], listView.SelectedItemIds);
+    }
+
     /// <summary>
-    /// Ranges are keyboard-only for now — a pointer press carries no modifier state,
-    /// so Shift-click cannot be distinguished from a plain click.
+    /// Ctrl-click toggles, the same result the desktop convention gives it, so
+    /// muscle memory from other platforms still works.
     /// </summary>
+    [Fact]
+    public void Control_Click_Toggles_Like_An_Unmodified_Click()
+    {
+        StandardListView listView = CreateList(UiListSelectionMode.Multiple);
+
+        listView.DispatchInput(PointerDown(5, RowY(0), KeyboardModifierState.Control));
+        listView.DispatchInput(PointerDown(5, RowY(2), KeyboardModifierState.Control));
+
+        Assert.Equal(["a", "c"], listView.SelectedItemIds);
+    }
+
+    [Fact]
+    public void A_Single_Selection_List_Ignores_Modifiers()
+    {
+        StandardListView listView = CreateList(UiListSelectionMode.Single);
+
+        listView.DispatchInput(PointerDown(5, RowY(0)));
+        listView.DispatchInput(PointerDown(5, RowY(2), KeyboardModifierState.Shift));
+
+        // Shift cannot build a range a single-selection list cannot hold.
+        Assert.Equal(["c"], listView.SelectedItemIds);
+    }
+
     [Fact]
     public void Shift_Arrow_Extends_And_A_Plain_Arrow_Replaces()
     {
@@ -203,13 +253,8 @@ public sealed class ListViewMultiSelectionTests
         Assert.False(listView.IsSelected("b"));
     }
 
-    /// <summary>
-    /// A pointer press. There is no modifier parameter because there is nowhere to
-    /// put one: <c>MouseButtonEvent</c> has no modifier field and
-    /// <c>UiInputEvent.FromMouseButton</c> reports <c>None</c> — which is exactly why
-    /// a click has to toggle rather than wait for Ctrl.
-    /// </summary>
-    private static UiInputEvent PointerDown(double x, double y) =>
+    /// <summary>A pointer press, optionally with modifier keys held.</summary>
+    private static UiInputEvent PointerDown(double x, double y, KeyboardModifierState modifiers = KeyboardModifierState.None) =>
         UiInputEvent.FromMouseButton(
             new MouseButtonEvent(
                 Header("mouse", 1),
@@ -217,7 +262,8 @@ public sealed class ListViewMultiSelectionTests
                 MouseButtons.Left,
                 MouseButton.Left,
                 MouseButtonTransition.Down,
-                InputEventSource.Synthetic));
+                InputEventSource.Synthetic,
+                (InputModifiers)modifiers));
 
     private static UiInputEvent KeyDown(string name, KeyboardModifierState modifiers) =>
         UiInputEvent.FromKeyboardKey(
