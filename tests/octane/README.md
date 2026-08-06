@@ -42,6 +42,14 @@ In CI the [Octane Benchmarks workflow](../../.github/workflows/octane-benchmarks
 (`workflow_dispatch`) runs all three engines and commits the refreshed results.
 It also uploads the per-suite logs as an `octane-logs` artifact.
 
+Benchmarking takes hours, so the branch has usually moved by the time there is
+anything to commit. The commit step goes through
+[`scripts/ci-commit-generated-results.sh`](../../scripts/ci-commit-generated-results.sh),
+which rebuilds its commit on the branch tip as it is *then* and pushes again
+instead of failing on the non-fast-forward — merge PRs during a run, not around
+it. Results are generated wholesale, so if two runs touch the same file the
+later measurement wins; nothing else on the branch is disturbed.
+
 A single-engine run still refreshes the whole comparison: any per-engine result
 already in `results/` is folded back in, so `--engines jint` updates the Jint
 column against the last committed Chromium and Broiler ones. That is only honest
