@@ -1,0 +1,261 @@
+From bc596e5bbee99afcf2ebf2c366c870b181d95cb7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 6 Aug 2026 13:10:20 +0000
+Subject: [PATCH] Count item 3-1's cost side at the consumers instead of at the
+ read
+
+The read expression cannot carry a counter -- it is also the assignment
+target -- but a consumer's operand can, because it is a value and
+nothing else. VisitConsumedBy is already the single choke point for the
+five consumer categories 0105 plumbed, so one hook covers an
+assignment's right-hand side into an element, a property or a local, a
+call argument, and a return value.
+
+Non-perturbation checked before anything was read from it: the
+roots-consumed-by-a-refused-local count reproduces at 18 657 518
+against 18 657 828, 1.000 on every suite, and the three failing suites
+fail identically with the counter off.
+
+It is a LOWER BOUND on the cost and is quoted as one -- every JSValue
+consumer outside those five is missing. That direction is the useful
+one: a bound above the saving refutes the representation, a bound below
+it does not confirm it.
+
+Against 16 426 721 boxed writes the instrumented consumers see
+5 768 745 boxing reads, 0.35. Three causes are already refuted at the
+bound: CallResult 9.41, NeverOffered 3.72, PropertyRead 1.83 -- together
+1.4 M writes. The two causes carrying 14.2 M of the 16.4 M come in at
+ElementRead 0.04 and DroppedCandidate 0.03, so the un-instrumented
+consumers would have to supply twenty-five times every read counted to
+reach break-even.
+
+Per suite the split is the same shape: Crypto 0.02, Gameboy 0.04, PdfJS
+0.00, NavierStokes 0.00 -- its refused locals are read only inside trees
+-- Box2D 0.23, against Typescript 11.18 and EarleyBoyer 35.35.
+
+This is the first affirmative evidence phase 3 has produced for widening
+the numeric tier, and item 3-8a is why it is still a bound rather than a
+verdict.
+
+2 further cases, one being that a read inside a tree is charged to the
+free side and not to the consumer. 8 171 tests across eight projects, no
+failures.
+---
+ .../NumberBoxingConversionSiteTests.cs        | 62 +++++++++++++++++++
+ .../FastCompiler.NumericSpeculation.cs        | 34 ++++++++++
+ .../NumericLocalLeafReadCensus.cs             | 39 ++++++++++++
+ .../SpecializingTierMetrics.cs                |  9 +++
+ 4 files changed, 144 insertions(+)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumberBoxingConversionSiteTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumberBoxingConversionSiteTests.cs
+index 94e8038c..c01bfa8b 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumberBoxingConversionSiteTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumberBoxingConversionSiteTests.cs
+@@ -474,6 +474,68 @@ public sealed class NumberBoxingConversionSiteTests
+         Assert.Equal(boxingOff.ConversionRequests, boxingOn.ConversionRequests);
+     }
+ 
++    [Fact]
++    public void A_refused_local_handed_straight_to_a_consumer_is_counted_as_a_boxing_read()
++    {
++        // `t` is refused for the element read and then passed straight to a call, which needs a
++        // JSValue — the cost side of the ratio. Counted at the consumer because the read
++        // expression is also the assignment target and cannot carry a counter.
++        var previously = NumericLocalLeafReadCensus.Enabled;
++        try
++        {
++            NumericLocalLeafReadCensus.Reset();
++            NumericLocalLeafReadCensus.Enabled = true;
++            Count(
++                """
++                function sink(x) { return x; }
++                function f(a, b) {
++                  var s = 0;
++                  for (var i = 0; i < 100; i++) { var t = a[0] * b + i; s = sink(t); }
++                  return s;
++                }
++                f([2], 3);
++                """);
++
++            Assert.True(NumericLocalLeafReadCensus.ConsumerAt(NumericLocalMiss.ElementRead) > 0);
++        }
++        finally
++        {
++            NumericLocalLeafReadCensus.Enabled = previously;
++            NumericLocalLeafReadCensus.Reset();
++        }
++    }
++
++    [Fact]
++    public void A_read_inside_a_tree_is_free_and_not_charged_to_the_consumer()
++    {
++        // The two halves must not both claim the same read. `t` here is only ever read as a
++        // guarded leaf, so the free side must be non-zero and the cost side zero — which is
++        // exactly the shape NavierStokes shows on the corpus.
++        var previously = NumericLocalLeafReadCensus.Enabled;
++        try
++        {
++            NumericLocalLeafReadCensus.Reset();
++            NumericLocalLeafReadCensus.Enabled = true;
++            Count(
++                """
++                function f(a, b) {
++                  var s = 0;
++                  for (var i = 0; i < 100; i++) { var t = a[0] * b + i; s = t * b + i; }
++                  return s;
++                }
++                f([2], 3);
++                """);
++
++            Assert.True(NumericLocalLeafReadCensus.At(NumericLocalMiss.ElementRead) > 0);
++            Assert.Equal(0, NumericLocalLeafReadCensus.ConsumerAt(NumericLocalMiss.ElementRead));
++        }
++        finally
++        {
++            NumericLocalLeafReadCensus.Enabled = previously;
++            NumericLocalLeafReadCensus.Reset();
++        }
++    }
++
+     [Fact]
+     public void Leaf_counting_is_off_by_default()
+     {
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
+index 144eab9b..dfaf8c30 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
+@@ -107,6 +107,13 @@ partial class FastCompiler
+         NumberBoxingConversionSite consumer,
+         NumericLocalMiss miss = NumericLocalMiss.Unknown)
+     {
++        // A refused local handed STRAIGHT to this consumer is a read the consumer needs as a
++        // JSValue — the cost side of item 3-1's ratio, counted here because the read expression
++        // itself is also the assignment target and cannot carry a counter. Only a bare identifier
++        // qualifies: anything else is an expression whose own root is counted at its own site.
++        if (node is AstIdentifier consumed)
++            return CountConsumerRead(consumed, Visit(node));
++
+         if (node is not AstBinaryExpression)
+             return Visit(node);
+ 
+@@ -524,6 +531,33 @@ partial class FastCompiler
+     /// the syntax, so it cannot change which trees specialize. Both are checked by re-running the
+     /// census and requiring the roots-into-a-refused-local count to be unchanged.
+     /// </remarks>
++    /// <summary>
++    /// Counts a refused local read straight into a consumer that needs a <c>JSValue</c>
++    /// (docs/performance-roadmap.md item 3-1).
++    /// </summary>
++    /// <remarks>
++    /// Safe for the reason the reverted read-side counter was not: the value wrapped here is the
++    /// consumer's operand — an argument, a stored value, a returned value — never the node the
++    /// assignment path writes through.
++    /// </remarks>
++    private BExpression CountConsumerRead(AstIdentifier node, BExpression value)
++    {
++        if (!NumericLocalLeafReadCensus.Enabled || value.Type != typeof(JSValue))
++            return value;
++
++        var miss = MissFor(node.Name.Value);
++        if (miss == NumericLocalMiss.Unknown)
++            return value;
++
++        return BExpression.Call(null, RecordConsumerReadMethod, value, BExpression.Constant((int)miss));
++    }
++
++    private static readonly System.Reflection.MethodInfo RecordConsumerReadMethod =
++        typeof(NumericLocalLeafReadCensus).GetMethod(
++            nameof(NumericLocalLeafReadCensus.RecordConsumer),
++            [typeof(JSValue), typeof(int)])
++        ?? throw new System.InvalidOperationException("NumericLocalLeafReadCensus.RecordConsumer not found");
++
+     private BExpression CountLeafRead(AstExpression node, BExpression expression)
+     {
+         if (!NumericLocalLeafReadCensus.Enabled
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/NumericLocalLeafReadCensus.cs b/Broiler.JS/Broiler.JavaScript.Runtime/NumericLocalLeafReadCensus.cs
+index 4ab85f2f..ed4b83e0 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/NumericLocalLeafReadCensus.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/NumericLocalLeafReadCensus.cs
+@@ -44,6 +44,13 @@ public static class NumericLocalLeafReadCensus
+ 
+     private static readonly long[] leafReads = new long[Buckets];
+ 
++    /// <summary>
++    /// Reads of a refused local handed straight to a consumer that needs a <see cref="JSValue"/> —
++    /// the COST side of the ratio, counted at the consumer because the read itself has no safe
++    /// hook (docs/performance-roadmap.md item 3-1).
++    /// </summary>
++    private static readonly long[] consumerReads = new long[Buckets];
++
+     /// <summary>
+     /// Whether guarded-leaf reads of a refused local are counted. Read at COMPILE time, so it must
+     /// be set before the corpus is compiled. Off by default.
+@@ -60,6 +67,35 @@ public static class NumericLocalLeafReadCensus
+         return value;
+     }
+ 
++    /// <summary>
++    /// Records one read of a refused local consumed by something that needs a
++    /// <see cref="JSValue"/>, and hands the value back so the counter can sit at the consumer's
++    /// operand position.
++    /// </summary>
++    /// <remarks>
++    /// <b>Counted at the consumer rather than at the read, and that is the whole design.</b> The
++    /// read expression is also the assignment target, so a counter there crashes the compiler. A
++    /// consumer's operand is a value and nothing else — an argument, a stored value, a returned
++    /// value — so it can carry one safely.
++    /// <para>
++    /// <b>It is a LOWER BOUND and must be quoted as one.</b> Only the consumer positions the
++    /// compiler already routes through <c>VisitConsumedBy</c> are counted — an assignment's
++    /// right-hand side into an element, a property or a local, a call argument, and a return
++    /// value. Every other JSValue consumer in the language is missing, so the true cost is higher
++    /// than this. That direction is the useful one: a bound that already exceeds the saving
++    /// refutes the representation, while a bound below it settles nothing.
++    /// </para>
++    /// </remarks>
++    public static JSValue RecordConsumer(JSValue value, int miss)
++    {
++        Interlocked.Increment(ref consumerReads[(uint)miss < Buckets ? miss : 0]);
++        return value;
++    }
++
++    /// <summary>Boxing reads attributed to one refusal, at the consumers that were instrumented.</summary>
++    public static long ConsumerAt(NumericLocalMiss miss)
++        => (uint)(int)miss < Buckets ? Interlocked.Read(ref consumerReads[(int)miss]) : 0;
++
+     /// <summary>Guarded-leaf reads attributed to one refusal.</summary>
+     public static long At(NumericLocalMiss miss)
+         => (uint)(int)miss < Buckets ? Interlocked.Read(ref leafReads[(int)miss]) : 0;
+@@ -67,6 +103,9 @@ public static class NumericLocalLeafReadCensus
+     public static void Reset()
+     {
+         for (var i = 0; i < Buckets; i++)
++        {
+             Interlocked.Exchange(ref leafReads[i], 0);
++            Interlocked.Exchange(ref consumerReads[i], 0);
++        }
+     }
+ }
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index daab9513..64311741 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -825,6 +825,15 @@ internal static class SpecializingTierMetrics
+             leafReadsCallResult = NumericLocalLeafReadCensus.At(NumericLocalMiss.CallResult),
+             leafReadsNeverOffered = NumericLocalLeafReadCensus.At(NumericLocalMiss.NeverOffered),
+ 
++            // The COST side, counted at the consumers rather than at the read. A LOWER BOUND: only
++            // the consumer positions VisitConsumedBy routes are instrumented.
++            consumerReadsElementRead = NumericLocalLeafReadCensus.ConsumerAt(NumericLocalMiss.ElementRead),
++            consumerReadsDroppedCandidate = NumericLocalLeafReadCensus.ConsumerAt(NumericLocalMiss.DroppedCandidate),
++            consumerReadsPropertyRead = NumericLocalLeafReadCensus.ConsumerAt(NumericLocalMiss.PropertyRead),
++            consumerReadsParameter = NumericLocalLeafReadCensus.ConsumerAt(NumericLocalMiss.Parameter),
++            consumerReadsCallResult = NumericLocalLeafReadCensus.ConsumerAt(NumericLocalMiss.CallResult),
++            consumerReadsNeverOffered = NumericLocalLeafReadCensus.ConsumerAt(NumericLocalMiss.NeverOffered),
++
+             // Item 3-1's shared half, counted on the far side of the boundary: not what the
+             // compiler could prove, but what the operators were actually handed. arithmeticGeneric
+             // is every invocation of a two-JSValue arithmetic or bitwise operator;
+-- 
+2.43.0
+

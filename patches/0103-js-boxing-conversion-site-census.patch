@@ -1,0 +1,1195 @@
+From 4a3abac084d4f86c1d46872a5ddc6872b72e1d69 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 6 Aug 2026 11:01:29 +0000
+Subject: [PATCH 103/104] Attribute every boxing conversion to the compiler
+ site that mints it
+
+Item 3-1's storage half was re-opened by 4.2a on a conversion count that
+had tripled once the census stopped running 7 of 15 suites, and whose
+dominant producer had changed identity. The counter that produced that
+finding sits in the boxing factory: it can say a raw double crossed into
+a JSValue, and not which of the compiler's emission sites did it. Item
+0113 then settled the storage question from the other side by counting
+the read/write ratio, but nothing had ever said where the conversions
+themselves come from.
+
+So each of the compiler's 21 boxing sites now declares itself and the
+census reports the split. The site travels as a constant argument on the
+one code path the engine ships, rather than as a factory entry per site
+or an argument gated behind the counter flag, which would leave the
+measured arm and the shipping arm running different code.
+
+Counted over all 15 suites: 61.8% of the corpus's 69.3 M conversions are
+the guarded tree's ROOT box, and the generic fallback arm it can leak to
+is 226 of 69.3 M. The tree is not leaking; what is left is the one box
+per evaluation the design keeps.
+
+Two defects found on the way. NumberBoxingDiagnostics.Reset did not
+clear item 3-8a's speculative-read counter, so a host resetting between
+suites carried it forward and every suite but the first read high --
+which is exactly the shape a per-suite census produces. And the census
+runs its suites in one process in a fixed order, so Mandreel taking the
+process down cost every suite after it; the suites are now selectable,
+and Gameboy, Typescript, Box2D, zlib and CodeLoad have rows for the
+first time.
+
+Verified by 7 cases that prove the instrument discriminates on
+constructed shapes before any corpus number is read from it, the load
+bearing one being that the eight sites partition the factory's own
+independent conversion total.
+---
+ .../Number/JSNumber.cs                        | 107 +++++++----
+ .../Number/NumberBoxingDiagnostics.cs         |  84 ++++++--
+ .../NumberBoxingConversionSiteTests.cs        | 179 ++++++++++++++++++
+ .../FastCompiler.NumericSpeculation.cs        |  24 ++-
+ .../FastCompiler.VisitAssignmentExpression.cs |   2 +-
+ .../FastCompiler.VisitBinaryExpression.cs     |  10 +-
+ .../FastCompiler.VisitUnaryExpression.cs      |   6 +-
+ .../FastCompiler.InternalUpdateExpression.cs  |   8 +-
+ .../ListOfExpressionsExtensions.cs            |   6 +-
+ .../Scope/FastFunctionScope.cs                |   2 +-
+ .../LinqExpressions/JSNumberBuilder.cs        |  30 ++-
+ .../NumberBoxingConversionSite.cs             |  80 ++++++++
+ .../Program.cs                                | 127 +++++++------
+ .../SpecializingTierMetrics.cs                |  82 +++++++-
+ 14 files changed, 595 insertions(+), 152 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumberBoxingConversionSiteTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Runtime/NumberBoxingConversionSite.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
+index e0384f6e..46853ca6 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/JSNumber.cs
+@@ -195,24 +195,47 @@ public sealed partial class JSNumber : JSPrimitive
+         return Create(value);
+     }
+ 
+-    /// <summary>
+-    /// The <see cref="JSNumber"/> for a raw <c>double</c> the COMPILER is boxing to hand to
+-    /// something that takes a <see cref="JSValue"/> — the root of an arithmetic tree on its way
+-    /// into a local, a slot or an element, a return value, an argument
+-    /// (docs/performance-roadmap.md item 3-1).
+-    /// </summary>
+-    /// <remarks>
+-    /// Identical to <see cref="Create"/> but the counter, for the reason
+-    /// <see cref="CreateLiteral"/> is: item 3-1's guarded tree removed 12.2% of the corpus's
+-    /// boxes and left NavierStokes, the single biggest boxer in it, down only 1.8% — so the
+-    /// question is where the rest are minted, and the sharpest division is between a box an
+-    /// <em>operator</em> produced and a box the compiler minted to cross a representation
+-    /// boundary. Only the second is what a typed backing store could remove.
+-    /// </remarks>
+-    public static JSValue CreateConversion(double value)
+-    {
+-        if (NumberBoxingDiagnostics.Enabled)
+-            NumberBoxingDiagnostics.RecordConversionRequest();
++    /// <summary>
++    /// The <see cref="JSNumber"/> for a raw <c>double</c> the COMPILER is boxing to hand to
++    /// something that takes a <see cref="JSValue"/> — the root of an arithmetic tree on its way
++    /// into a local, a slot or an element, a return value, an argument
++    /// (docs/performance-roadmap.md item 3-1).
++    /// </summary>
++    /// <remarks>
++    /// Identical to <see cref="Create"/> but the counter, for the reason
++    /// <see cref="CreateLiteral"/> is: item 3-1's guarded tree removed 12.2% of the corpus's
++    /// boxes and left NavierStokes, the single biggest boxer in it, down only 1.8% — so the
++    /// question is where the rest are minted, and the sharpest division is between a box an
++    /// <em>operator</em> produced and a box the compiler minted to cross a representation
++    /// boundary. Only the second is what a typed backing store could remove.
++    /// </remarks>
++    public static JSValue CreateConversion(double value)
++    {
++        if (NumberBoxingDiagnostics.Enabled)
++            NumberBoxingDiagnostics.RecordConversionRequest();
++        return Create(value);
++    }
++
++    /// <summary>
++    /// A boxing conversion that names the compiler emission site that made it, so the conversion
++    /// count can be attributed rather than only totalled
++    /// (docs/performance-roadmap.md item 3-1, §4.2a).
++    /// </summary>
++    /// <param name="value">The raw <c>double</c> being boxed.</param>
++    /// <param name="site">
++    /// A <see cref="NumberBoxingConversionSite"/>, passed as its underlying <c>int</c> because the
++    /// compiler emits it as a constant and does not reference this assembly.
++    /// </param>
++    /// <remarks>
++    /// §4.2a re-opened item 3-1's typed backing store on a conversion count that had tripled and
++    /// changed its dominant producer — Gameboy at 26.9 M, more than the whole previously-measured
++    /// corpus. Whether a typed store removes any of them depends on which emission site mints
++    /// them, and the factory-level counter cannot say. This entry is that split.
++    /// </remarks>
++    public static JSValue CreateConversion(double value, int site)
++    {
++        if (NumberBoxingDiagnostics.Enabled)
++            NumberBoxingDiagnostics.RecordConversionRequest(site);
+         return Create(value);
+     }
+ 
+@@ -231,9 +254,9 @@ public sealed partial class JSNumber : JSPrimitive
+     {
+         if (NumberBoxingDiagnostics.Enabled)
+             NumberBoxingDiagnostics.RecordSpeculativeReadRequest();
+-        return Create(value);
+-    }
+-
++        return Create(value);
++    }
++
+     public override double DoubleValue => value;
+ 
+     public override bool BooleanValue => !double.IsNaN(value) && value != 0;
+@@ -422,23 +445,23 @@ public sealed partial class JSNumber : JSPrimitive
+ 
+     public static bool IsNaN(JSValue n) => double.IsNaN(n.DoubleValue);
+ 
+-    // Counted here as well as on the base, for the reason AddValue is: a Number receiver never
+-    // reaches the base (item 3-1).
+-    public override JSValue Negate()
+-    {
+-        if (ArithmeticOperandDiagnostics.Enabled)
+-            ArithmeticOperandDiagnostics.RecordUnaryNegate();
+-        return Create(-value);
+-    }
++    // Counted here as well as on the base, for the reason AddValue is: a Number receiver never
++    // reaches the base (item 3-1).
++    public override JSValue Negate()
++    {
++        if (ArithmeticOperandDiagnostics.Enabled)
++            ArithmeticOperandDiagnostics.RecordUnaryNegate();
++        return Create(-value);
++    }
+ 
+     public override JSValue AddValue(JSValue value)
+     {
+-        // Counted here as well as on the base, because a Number receiver never reaches the base
+-        // (item 3-1). The receiver is a Number by construction, so the question the census asks
+-        // reduces to whether the other operand is one.
+-        if (ArithmeticOperandDiagnostics.Enabled)
+-            ArithmeticOperandDiagnostics.RecordGeneric(true, value.IsNumber);
+-
++        // Counted here as well as on the base, because a Number receiver never reaches the base
++        // (item 3-1). The receiver is a Number by construction, so the question the census asks
++        // reduces to whether the other operand is one.
++        if (ArithmeticOperandDiagnostics.Enabled)
++            ArithmeticOperandDiagnostics.RecordGeneric(true, value.IsNumber);
++
+         value = value is JSObject obj ? obj.ToDefaultPrimitive() : value;
+ 
+         if (value is JSPrimitiveObject po)
+@@ -453,13 +476,13 @@ public sealed partial class JSNumber : JSPrimitive
+         return Create(this.value + value.DoubleValue);
+     }
+ 
+-    public override JSValue AddValue(double value)
+-    {
+-        if (ArithmeticOperandDiagnostics.Enabled)
+-            ArithmeticOperandDiagnostics.RecordRawDoubleOperand(true);
+-
+-        return Create(this.value + value);
+-    }
++    public override JSValue AddValue(double value)
++    {
++        if (ArithmeticOperandDiagnostics.Enabled)
++            ArithmeticOperandDiagnostics.RecordRawDoubleOperand(true);
++
++        return Create(this.value + value);
++    }
+ 
+     public override JSValue AddValue(string value) => new JSString(ToECMAString(this.value) + value);
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
+index b6043eec..c1da7a59 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Number/NumberBoxingDiagnostics.cs
+@@ -1,4 +1,5 @@
+ using System.Threading;
++using Broiler.JavaScript.Runtime;
+ 
+ namespace Broiler.JavaScript.BuiltIns.Number;
+ 
+@@ -43,9 +44,22 @@ public static class NumberBoxingDiagnostics
+     private static long factoryAllocations;
+     private static long allocations;
+     private static long literalRequests;
+-    private static long conversionRequests;
++    private static long conversionRequests;
+     private static long speculativeReadRequests;
+ 
++    /// <summary>
++    /// Conversion requests attributed to the emission site that made them, indexed by
++    /// <see cref="NumberBoxingConversionSite"/>. Sums to <c>conversionRequests</c>.
++    /// </summary>
++    private static readonly long[] conversionSites = new long[ConversionSiteCount];
++
++    /// <summary>
++    /// One past the largest <see cref="NumberBoxingConversionSite"/>. A site id outside the array
++    /// is folded into <see cref="NumberBoxingConversionSite.Unclassified"/> rather than throwing —
++    /// a diagnostic counter must never be able to fail a run it is only observing.
++    /// </summary>
++    private const int ConversionSiteCount = (int)NumberBoxingConversionSite.ConstantOperand + 1;
++
+     /// <summary>Whether boxing is counted. Off by default.</summary>
+     public static bool Enabled;
+ 
+@@ -59,13 +73,24 @@ public static class NumberBoxingDiagnostics
+     /// </summary>
+     internal static void RecordLiteralRequest() => Interlocked.Increment(ref literalRequests);
+ 
+-    /// <summary>
+-    /// A request from the compiler's boxing CONVERSION — a raw double crossing into a
+-    /// <c>JSValue</c>. Disjoint from the literal count and from every operator result, so
+-    /// `Requests - conversion - literal` is what the operators and builtins mint.
+-    /// </summary>
+-    internal static void RecordConversionRequest() => Interlocked.Increment(ref conversionRequests);
+-
++    /// <summary>
++    /// A request from the compiler's boxing CONVERSION — a raw double crossing into a
++    /// <c>JSValue</c>. Disjoint from the literal count and from every operator result, so
++    /// `Requests - conversion - literal` is what the operators and builtins mint.
++    /// </summary>
++    internal static void RecordConversionRequest() => Interlocked.Increment(ref conversionRequests);
++
++    /// <summary>
++    /// A conversion request, attributed to the compiler emission site that made it — the split
++    /// item 3-1's re-opened storage half is decided on (docs/performance-roadmap.md §4.2a).
++    /// </summary>
++    internal static void RecordConversionRequest(int site)
++    {
++        Interlocked.Increment(ref conversionRequests);
++        Interlocked.Increment(
++            ref conversionSites[(uint)site < ConversionSiteCount ? site : 0]);
++    }
++
+     /// <summary>
+     /// A request made READING item 3-8a's speculative local — the box its dual representation
+     /// costs whenever a consumer cannot take the raw <c>double</c>
+@@ -94,14 +119,21 @@ public static class NumberBoxingDiagnostics
+     internal static void RecordAllocation() => Interlocked.Increment(ref allocations);
+ 
+     public static NumberBoxingSnapshot Snapshot()
+-        => new(
++    {
++        var sites = new long[ConversionSiteCount];
++        for (var i = 0; i < ConversionSiteCount; i++)
++            sites[i] = Interlocked.Read(ref conversionSites[i]);
++
++        return new(
+             Interlocked.Read(ref requests),
+             Interlocked.Read(ref cacheHits),
+             Interlocked.Read(ref factoryAllocations),
+             Interlocked.Read(ref allocations),
+-            Interlocked.Read(ref literalRequests),
++            Interlocked.Read(ref literalRequests),
+             Interlocked.Read(ref conversionRequests),
+-            Interlocked.Read(ref speculativeReadRequests));
++            Interlocked.Read(ref speculativeReadRequests),
++            sites);
++    }
+ 
+     public static void Reset()
+     {
+@@ -110,7 +142,15 @@ public static class NumberBoxingDiagnostics
+         Interlocked.Exchange(ref factoryAllocations, 0);
+         Interlocked.Exchange(ref allocations, 0);
+         Interlocked.Exchange(ref literalRequests, 0);
+-        Interlocked.Exchange(ref conversionRequests, 0);
++        Interlocked.Exchange(ref conversionRequests, 0);
++
++        // Item 3-8a's counter was added to the snapshot and not to the reset, so a host that
++        // resets between suites carried it forward and every suite but the first read high. The
++        // census reports per suite, which is exactly the shape that defect corrupts.
++        Interlocked.Exchange(ref speculativeReadRequests, 0);
++
++        for (var i = 0; i < ConversionSiteCount; i++)
++            Interlocked.Exchange(ref conversionSites[i], 0);
+     }
+ }
+ 
+@@ -119,17 +159,31 @@ public static class NumberBoxingDiagnostics
+ /// <param name="FactoryAllocations">Those the factory allocated for — the population an unboxed representation reaches.</param>
+ /// <param name="Allocations">Every <see cref="JSNumber"/> constructed, factory or not.</param>
+ /// <param name="LiteralRequests">Factory calls made by a compile-time numeric literal.</param>
+-/// <param name="ConversionRequests">Factory calls made by the compiler boxing a raw double to cross into a <c>JSValue</c>.</param>
++/// <param name="ConversionRequests">Factory calls made by the compiler boxing a raw double to cross into a <c>JSValue</c>.</param>
+ /// <param name="SpeculativeReadRequests">Factory calls made reading item 3-8a's speculative local.</param>
++/// <param name="ConversionSites">
++/// <see cref="ConversionRequests"/> split by the compiler emission site that made each, indexed by
++/// <see cref="NumberBoxingConversionSite"/>.
++/// </param>
+ public readonly record struct NumberBoxingSnapshot(
+     long Requests,
+     long CacheHits,
+     long FactoryAllocations,
+     long Allocations,
+-    long LiteralRequests,
++    long LiteralRequests,
+     long ConversionRequests,
+-    long SpeculativeReadRequests)
++    long SpeculativeReadRequests,
++    long[] ConversionSites)
+ {
++    /// <summary>Conversion requests attributed to one emission site.</summary>
++    public long ConversionsAt(NumberBoxingConversionSite site)
++    {
++        var index = (int)site;
++        return ConversionSites != null && (uint)index < ConversionSites.Length
++            ? ConversionSites[index]
++            : 0;
++    }
++
+     /// <summary>
+     /// Boxes minted by a builtin writing <c>new JSNumber(x)</c> instead of going through the
+     /// factory — the population no change to the compiler's representation can reach.
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumberBoxingConversionSiteTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumberBoxingConversionSiteTests.cs
+new file mode 100644
+index 00000000..e11b8912
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/NumberBoxingConversionSiteTests.cs
+@@ -0,0 +1,179 @@
++using Broiler.JavaScript.BuiltIns;
++using Broiler.JavaScript.BuiltIns.Number;
++using Broiler.JavaScript.Engine;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// The instrument that decides item 3-1's re-opened storage half
++// (docs/performance-roadmap.md item 3-1, §4.2a).
++//
++// §4.2a re-opened the typed backing store on a conversion count that had tripled — 24.6 M to
++// 69.3 M once the census stopped running 7 of 15 suites — and whose dominant producer had changed
++// identity: Gameboy alone mints 26.9 M at 51.0% of its own requests, on a `Uint8Array` memory
++// image, which is the shape the item was originally written for. But the counter that produced
++// that finding sits in the boxing factory. It can say a raw double crossed into a JSValue; it
++// cannot say which of the compiler's emission sites did it — and a typed backing store only
++// reaches the ones an element read or an element write mints.
++//
++// So each emission site now declares itself and the census reports the split. Item 3-9 was closed
++// at a population of zero using an instrument that had first been proven to discriminate on nine
++// constructed shapes, and the reason that mattered is that a counter reading zero and a counter
++// that is not wired up are indistinguishable from the number alone. The same applies here in the
++// opposite direction: a site reading high has to be shown to read high FOR THE RIGHT SHAPE. Each
++// case below is a shape whose boxing the compiler emits from one known site.
++//
++// The partition test is the one that cannot be faked: the eight sites must sum to the factory's
++// own independent conversion total, so a site that double-counts or one that is never reached
++// shows up as a broken sum rather than as a plausible-looking row.
++[Collection(Phase3DiagnosticsCollection.Name)]
++public sealed class NumberBoxingConversionSiteTests
++{
++    private static JSContext Context()
++        => JavaScriptBootstrap.CreateContextBuilder()
++            .UseBuiltInRegistry(DefaultBuiltInRegistry.Instance)
++            .Build();
++
++    /// <summary>Runs <paramref name="source"/> with boxing counted and returns the totals.</summary>
++    private static (string Answer, NumberBoxingSnapshot Boxing) Count(string source)
++    {
++        var previously = NumberBoxingDiagnostics.Enabled;
++        try
++        {
++            NumberBoxingDiagnostics.Reset();
++            NumberBoxingDiagnostics.Enabled = true;
++            using var context = Context();
++            var answer = context.Eval(source).ToString();
++            return (answer, NumberBoxingDiagnostics.Snapshot());
++        }
++        finally
++        {
++            NumberBoxingDiagnostics.Enabled = previously;
++            NumberBoxingDiagnostics.Reset();
++        }
++    }
++
++    private static long At(NumberBoxingSnapshot boxing, NumberBoxingConversionSite site)
++        => boxing.ConversionsAt(site);
++
++    [Fact]
++    public void The_eight_sites_partition_the_conversion_total()
++    {
++        // Deliberately mixed: an arithmetic tree, a numeric local read into a call argument, an
++        // update step and a unary negation, so several sites are non-zero at once. A partition
++        // that only holds when one site is live proves nothing.
++        var (answer, boxing) = Count(
++            """
++            function f(a, b) { var s = 0; for (var i = 0; i < 200; i++) { s = s + (a * b + i); s = -s; s++; } return s; }
++            f(2, 3);
++            """);
++
++        Assert.NotEqual("0", answer);
++
++        var summed = 0L;
++        foreach (NumberBoxingConversionSite site in Enum.GetValues<NumberBoxingConversionSite>())
++            summed += At(boxing, site);
++
++        Assert.Equal(boxing.ConversionRequests, summed);
++        Assert.True(boxing.ConversionRequests > 0, "the shape must box at all for the partition to mean anything");
++    }
++
++    [Fact]
++    public void No_conversion_is_left_unclassified()
++    {
++        // Every JSNumberBuilder.New call site in the compiler names a site. If one is added
++        // without naming one, it lands in Unclassified and this fails — which is the only way a
++        // future site can be stopped from silently diluting the split the item is decided on.
++        var (_, boxing) = Count(
++            """
++            function f(a) { var s = 0; for (var i = 0; i < 200; i++) { s = s + a * 1.5; s = -s; s++; } return s; }
++            f(3);
++            """);
++
++        Assert.Equal(0, At(boxing, NumberBoxingConversionSite.Unclassified));
++    }
++
++    [Fact]
++    public void An_arithmetic_tree_boxes_at_its_root_and_not_at_every_node()
++    {
++        // Item 3-1's whole claim is that a guarded tree mints ONE box for the root instead of one
++        // per operator. A left-leaning four-operand sum evaluates three operators; if the root
++        // count tracked the operator count rather than the evaluation count, this is where it
++        // would show.
++        var (_, boxing) = Count(
++            """
++            function f(a, b, c, d) { var s = 0; for (var i = 0; i < 100; i++) { s = a + b + c + d; } return s; }
++            f(1, 2, 3, 4);
++            """);
++
++        var root = At(boxing, NumberBoxingConversionSite.GuardedTreeRoot);
++        Assert.True(root > 0, "a guarded tree must box its root");
++
++        // Three operators over 100 iterations would be ~300 if the tree boxed per node.
++        Assert.True(root <= 200, $"root boxing tracked the operator count rather than the tree count ({root})");
++    }
++
++    [Fact]
++    public void Reading_a_numeric_local_is_attributed_to_the_local_and_not_to_the_operator()
++    {
++        // The site that separates "the operators mint the boxes" from "the representation does".
++        // `n` is a proven-numeric local living in a raw double; handing it to a call argument
++        // boxes it AT THE READ, with no operator anywhere in the expression.
++        var (_, boxing) = Count(
++            """
++            function sink(x) { return x; }
++            function f() { var n = 7.5; var s = 0; for (var i = 0; i < 100; i++) { s = sink(n); } return s; }
++            f();
++            """);
++
++        Assert.True(
++            At(boxing, NumberBoxingConversionSite.NumericLocalRead) > 0,
++            "reading a raw-double local into a JSValue consumer must be attributed to the read");
++    }
++
++    [Fact]
++    public void The_update_step_is_attributed_to_the_update_and_not_to_the_binary_operator()
++    {
++        // `++` was measured at 30.9% of the corpus's boxing (item 3-8's re-opening) and is a
++        // different mechanism from `s = s + 1` — it belongs to the numeric local, which is why the
++        // two must not share a row.
++        var (_, boxing) = Count(
++            """
++            function sink(x) { return x; }
++            function f() { var n = 0; var s = 0; for (var i = 0; i < 100; i++) { s = sink(n++); } return s; }
++            f();
++            """);
++
++        Assert.True(
++            At(boxing, NumberBoxingConversionSite.UpdateStep) > 0,
++            "the ++ step must be attributed to the update site");
++    }
++
++    [Fact]
++    public void Resetting_clears_every_counter_including_the_speculative_read()
++    {
++        // Item 3-8a's counter was added to the snapshot and not to Reset(), so a host that resets
++        // between suites carried it forward and every suite but the first read high. The census
++        // reports per suite, which is exactly the shape that defect corrupts.
++        Count("function f(a) { var s = 0; for (var i = 0; i < 100; i++) { s = s + a; } return s; } f(2);");
++
++        NumberBoxingDiagnostics.Reset();
++        var cleared = NumberBoxingDiagnostics.Snapshot();
++
++        Assert.Equal(0, cleared.Requests);
++        Assert.Equal(0, cleared.ConversionRequests);
++        Assert.Equal(0, cleared.LiteralRequests);
++        Assert.Equal(0, cleared.SpeculativeReadRequests);
++
++        foreach (NumberBoxingConversionSite site in Enum.GetValues<NumberBoxingConversionSite>())
++            Assert.Equal(0, At(cleared, site));
++    }
++
++    [Fact]
++    public void Counting_is_off_by_default()
++    {
++        // The counter sits on an allocation path. A run that leaves it on is a run whose wall
++        // clock the census's own documentation says is distorted.
++        Assert.False(NumberBoxingDiagnostics.Enabled);
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
+index c0d7e0c1..85e11001 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.NumericSpeculation.cs
+@@ -183,7 +183,7 @@ partial class FastCompiler
+ 
+         body.Add(BExpression.Condition(
+             guard,
+-            JSNumberBuilder.New(nativeTree),
++            JSNumberBuilder.New(nativeTree, NumberBoxingConversionSite.GuardedTreeRoot),
+             genericTree,
+             typeof(JSValue)));
+ 
+@@ -261,7 +261,7 @@ partial class FastCompiler
+         if (guarded == 0)
+             return Refuse(NumericTreeRefusal.NothingToGuard);
+ 
+-        body.Add(AsJSValue(node));
++        body.Add(AsJSValue(node, NumberBoxingConversionSite.GuardedTreeRoot));
+ 
+         CompilerSpecializationDiagnostics.RecordSpeculativeNumericTree(guarded);
+         CompilerSpecializationDiagnostics.RecordNumericTreeDecision(NumericTreeRefusal.Specialized);
+@@ -349,7 +349,10 @@ partial class FastCompiler
+                     BExpression.Assign(value, native),
+                     BExpression.Constant(true)),
+                 BExpression.Block(
+-                    BExpression.Assign(boxed, BinaryOperation.Operation(AsJSValue(l), AsJSValue(r), binary.Operator)),
++                    BExpression.Assign(boxed, BinaryOperation.Operation(
++                        AsJSValue(l, NumberBoxingConversionSite.GuardedTreeOperand),
++                        AsJSValue(r, NumberBoxingConversionSite.GuardedTreeOperand),
++                        binary.Operator)),
+                     BExpression.Constant(false)),
+                 typeof(bool))));
+ 
+@@ -424,10 +427,17 @@ partial class FastCompiler
+     }
+ 
+     /// <summary>The subtree's value as a <c>JSValue</c>, which is what the generic arm needs.</summary>
+-    private static BExpression AsJSValue(OrderedNode node)
++    /// <param name="site">
++    /// Which boxing the caller is asking for. The same helper serves the tree's ROOT — the one box
++    /// a specialized tree is meant to keep — and the OPERANDS an interior node hands to its generic
++    /// arm, and item 3-1's remaining prize depends entirely on which of the two a run is paying
++    /// for. A root box is the design working; an operand box is a leaf the speculation could not
++    /// keep native.
++    /// </param>
++    private static BExpression AsJSValue(OrderedNode node, NumberBoxingConversionSite site)
+     {
+         if (node.Ok == null)
+-            return JSNumberBuilder.New(node.Native);
++            return JSNumberBuilder.New(node.Native, site);
+ 
+         // A guarded leaf's saved operand is already the value, whichever way its test went — so
+         // reading it costs nothing and, more to the point, does not re-test it.
+@@ -436,7 +446,7 @@ partial class FastCompiler
+ 
+         return BExpression.Condition(
+             node.Ok,
+-            JSNumberBuilder.New(node.Native),
++            JSNumberBuilder.New(node.Native, site),
+             node.Value,
+             typeof(JSValue));
+     }
+@@ -620,6 +630,6 @@ partial class FastCompiler
+         }
+ 
+         var leaf = compiled[node];
+-        return leaf.Local is { } local ? local : JSNumberBuilder.New(leaf.Native);
++        return leaf.Local is { } local ? local : JSNumberBuilder.New(leaf.Native, NumberBoxingConversionSite.GuardedTreeOperand);
+     }
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitAssignmentExpression.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitAssignmentExpression.cs
+index 92ba6670..3140e80f 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitAssignmentExpression.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitAssignmentExpression.cs
+@@ -79,7 +79,7 @@ partial class FastCompiler
+     /// `++`/`--`. Non-numeric bindings already yield a JSValue and pass through untouched.
+     /// </remarks>
+     private static BExpression NumericStoreResult(BExpression store, bool discardResult)
+-        => discardResult || store.Type != typeof(double) ? store : JSNumberBuilder.New(store);
++        => discardResult || store.Type != typeof(double) ? store : JSNumberBuilder.New(store, NumberBoxingConversionSite.AssignmentResult);
+ 
+     private BExpression VisitAssignmentExpression(AstExpression left, TokenTypes assignmentOperator, AstExpression right)
+     {
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs
+index 138a7e5b..dcc8c922 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitBinaryExpression.cs
+@@ -77,7 +77,7 @@ partial class FastCompiler
+         {
+             case TokenTypes.Plus:
+                 if (isLeftNumber && isRightNumber)
+-                    return JSNumberBuilder.New(BExpression.Add(left, right));
++                    return JSNumberBuilder.New(BExpression.Add(left, right), NumberBoxingConversionSite.BinaryOperator);
+ 
+                 if (isLeftString && isRightString)
+                     return JSStringBuilder.New(ClrStringBuilder.Concat(left, right));
+@@ -172,7 +172,7 @@ partial class FastCompiler
+             return JSStringBuilder.New(exp);
+ 
+         if (exp.Type == typeof(double))
+-            return JSNumberBuilder.New(exp);
++            return JSNumberBuilder.New(exp, NumberBoxingConversionSite.BinaryOperator);
+ 
+         throw new NotImplementedException();
+     }
+@@ -236,7 +236,7 @@ partial class FastCompiler
+     private static BExpression TryCreateNativeNumericOperation(TokenTypes @operator, BExpression left, BExpression right)
+     {
+         if (TryCreateNativeNumericValue(@operator, left, right) is { } value)
+-            return JSNumberBuilder.New(value);
++            return JSNumberBuilder.New(value, NumberBoxingConversionSite.BinaryOperator);
+ 
+         return @operator switch
+         {
+@@ -308,8 +308,8 @@ partial class FastCompiler
+             : BExpression.Binary(JSValueBuilder.DoubleValue(valueLocal), ToBinaryOperator(@operator), nativeLocal);
+ 
+         var generic = leftIsNative
+-            ? BinaryOperation.Operation(JSNumberBuilder.New(nativeLocal), valueLocal, @operator)
+-            : BinaryOperation.Operation(valueLocal, JSNumberBuilder.New(nativeLocal), @operator);
++            ? BinaryOperation.Operation(JSNumberBuilder.New(nativeLocal, NumberBoxingConversionSite.BinaryOperator), valueLocal, @operator)
++            : BinaryOperation.Operation(valueLocal, JSNumberBuilder.New(nativeLocal, NumberBoxingConversionSite.BinaryOperator), @operator);
+ 
+         if (generic == null)
+             return null;
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitUnaryExpression.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitUnaryExpression.cs
+index a0be5077..53acae17 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitUnaryExpression.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitUnaryExpression.cs
+@@ -22,7 +22,7 @@ partial class FastCompiler
+         switch (unaryExpression.Operator)
+         {
+             case UnaryOperator.Plus:
+-                return JSNumberBuilder.New(BExpression.UnaryPlus(DoubleValue(target)));
++                return JSNumberBuilder.New(BExpression.UnaryPlus(DoubleValue(target)), NumberBoxingConversionSite.UnaryOperator);
+ 
+             case UnaryOperator.Minus:
+                 if (target.Type == FastNodeType.Literal)
+@@ -30,13 +30,13 @@ partial class FastCompiler
+                     AstLiteral l = unaryExpression.Argument as AstLiteral;
+ 
+                     if (l.TokenType == TokenTypes.Number)
+-                        return JSNumberBuilder.New(BExpression.Constant(-l.NumericValue));
++                        return JSNumberBuilder.New(BExpression.Constant(-l.NumericValue), NumberBoxingConversionSite.UnaryOperator);
+ 
+                     if (l.TokenType == TokenTypes.BigInt)
+                         return JSBigIntBuilder.New("-" + l.StringValue);
+ 
+                     if (l.TokenType == TokenTypes.String)
+-                        return JSNumberBuilder.New(BExpression.Negate(DoubleValue(target)));
++                        return JSNumberBuilder.New(BExpression.Negate(DoubleValue(target)), NumberBoxingConversionSite.UnaryOperator);
+                 }
+ 
+                 return JSValueBuilder.Negate(Visit(target));
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.InternalUpdateExpression.cs b/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.InternalUpdateExpression.cs
+index 297b46ec..b0a00a92 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.InternalUpdateExpression.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.InternalUpdateExpression.cs
+@@ -150,14 +150,14 @@ partial class FastCompiler
+                 // Outside a statement position the expression still has to produce a
+                 // JSValue, so the result — and only the result — is boxed.
+                 if (updateExpression.Prefix)
+-                    return JSNumberBuilder.New(advance);
++                    return JSNumberBuilder.New(advance, NumberBoxingConversionSite.UpdateStep);
+ 
+                 using var previousValue = scope.Top.GetTempVariable(typeof(double));
+                 return BExpression.Block(
+                     previousValue.Variable.AsSequence(),
+                     BExpression.Assign(previousValue.Variable, storage),
+                     advance,
+-                    JSNumberBuilder.New(previousValue.Expression));
++                    JSNumberBuilder.New(previousValue.Expression, NumberBoxingConversionSite.UpdateStep));
+             }
+ 
+             // Item 3-8a: the step is the whole reason the dual representation exists. While the
+@@ -212,11 +212,11 @@ partial class FastCompiler
+                 var nativeArm = updateExpression.Prefix
+                     ? BExpression.Block(
+                         BExpression.Assign(raw, BExpression.Add(raw, step)),
+-                        JSNumberBuilder.New(raw))
++                        JSNumberBuilder.New(raw, NumberBoxingConversionSite.UpdateStep))
+                     : BExpression.Block(
+                         BExpression.Assign(before.Variable, raw),
+                         BExpression.Assign(raw, BExpression.Add(raw, step)),
+-                        JSNumberBuilder.New(before.Expression));
++                        JSNumberBuilder.New(before.Expression, NumberBoxingConversionSite.UpdateStep));
+ 
+                 return BExpression.Block(
+                     locals,
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/ListOfExpressionsExtensions.cs b/Broiler.JS/Broiler.JavaScript.Compiler/ListOfExpressionsExtensions.cs
+index 1688bb07..626304a1 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/ListOfExpressionsExtensions.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/ListOfExpressionsExtensions.cs
+@@ -189,7 +189,7 @@ public static class ListOfExpressionsExtensions
+                     continue;
+ 
+                 case BExpressionType.DoubleConstant:
+-                    result.Add(JSNumberBuilder.New(exp as BDoubleConstantExpression));
++                    result.Add(JSNumberBuilder.New(exp as BDoubleConstantExpression, NumberBoxingConversionSite.ConstantOperand));
+                     continue;
+             }
+ 
+@@ -202,7 +202,7 @@ public static class ListOfExpressionsExtensions
+             Expression item = ce.Value switch
+             {
+                 string @string => JSStringBuilder.New(ce),
+-                double @double => JSNumberBuilder.New(ce),
++                double @double => JSNumberBuilder.New(ce, NumberBoxingConversionSite.ConstantOperand),
+                 _ => throw new NotImplementedException(),
+             };
+ 
+@@ -254,7 +254,7 @@ public static class ListOfExpressionsExtensions
+                     break;
+ 
+                 case double @double:
+-                    item = JSNumberBuilder.New(ce);
++                    item = JSNumberBuilder.New(ce, NumberBoxingConversionSite.ConstantOperand);
+                     break;
+ 
+                 default:
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Scope/FastFunctionScope.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Scope/FastFunctionScope.cs
+index e5a8cd95..15e7c112 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Scope/FastFunctionScope.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Scope/FastFunctionScope.cs
+@@ -872,7 +872,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
+         var ve = variableType == typeof(JSVariable)
+             ? JSVariable.ValueExpression(pe)
+             : variableType == typeof(double)
+-                ? JSNumberBuilder.New(pe)
++                ? JSNumberBuilder.New(pe, NumberBoxingConversionSite.NumericLocalRead)
+                 : speculativeFlag != null
+                     ? BExpression.Condition(speculativeFlag, JSNumberBuilder.NewSpeculativeRead(speculativeDouble), pe, typeof(JSValue))
+                     : pe;
+diff --git a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs
+index e8322c12..7ab11a21 100644
+--- a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs
++++ b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/JSNumberBuilder.cs
+@@ -10,7 +10,8 @@ public class JSNumberBuilder
+     private static Type type;
+     private static MethodInfo _create;
+     private static MethodInfo _createLiteral;
+-    private static MethodInfo _createConversion;
++    private static MethodInfo _createConversion;
++    private static MethodInfo _createConversionAtSite;
+     private static MethodInfo _createSpeculativeRead;
+ 
+     public static Expression NaN;
+@@ -28,8 +29,10 @@ public class JSNumberBuilder
+         type = numberType;
+         _create = type.GetMethod("Create", [typeof(double)])
+             ?? throw new InvalidOperationException("JSNumber.Create(double) not found");
+-        _createConversion = type.GetMethod("CreateConversion", [typeof(double)])
+-            ?? throw new NotSupportedException();
++        _createConversion = type.GetMethod("CreateConversion", [typeof(double)])
++            ?? throw new NotSupportedException();
++        _createConversionAtSite = type.GetMethod("CreateConversion", [typeof(double), typeof(int)])
++            ?? throw new InvalidOperationException("JSNumber.CreateConversion(double, int) not found");
+         _createLiteral = type.GetMethod("CreateLiteral", [typeof(double)])
+             ?? throw new InvalidOperationException("JSNumber.CreateLiteral(double) not found");
+         _createSpeculativeRead = type.GetMethod("CreateSpeculativeRead", [typeof(double)])
+@@ -52,7 +55,26 @@ public class JSNumberBuilder
+         if (exp.Type != typeof(double))
+             exp = Expression.Convert(exp, typeof(double));
+ 
+-        return Expression.Call(null, _createConversion, exp);
++        return Expression.Call(null, _createConversion, exp);
++    }
++
++    /// <summary>
++    /// Emits the creation of a number for a boxing conversion, naming the emission site so the
++    /// census can attribute it (docs/performance-roadmap.md item 3-1, §4.2a).
++    /// </summary>
++    /// <remarks>
++    /// The site is an ordinary constant argument on the one code path the engine ships, rather
++    /// than a factory entry per site or an argument gated behind the counter flag. Nine entries
++    /// would be nine near-identical methods, and a gated argument would leave the arm that is
++    /// measured and the arm that ships running different code — which is the defect §3.5 keeps
++    /// finding in this campaign's own instruments.
++    /// </remarks>
++    public static Expression New(Expression exp, NumberBoxingConversionSite site)
++    {
++        if (exp.Type != typeof(double))
++            exp = Expression.Convert(exp, typeof(double));
++
++        return Expression.Call(null, _createConversionAtSite, exp, Expression.Constant((int)site));
+     }
+ 
+     /// <summary>
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/NumberBoxingConversionSite.cs b/Broiler.JS/Broiler.JavaScript.Runtime/NumberBoxingConversionSite.cs
+new file mode 100644
+index 00000000..3fe59fb9
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/NumberBoxingConversionSite.cs
+@@ -0,0 +1,80 @@
++namespace Broiler.JavaScript.Runtime;
++
++/// <summary>
++/// Which emission site minted a compiler boxing conversion — a raw <c>double</c> crossing into a
++/// <see cref="JSValue"/> (docs/performance-roadmap.md item 3-1).
++/// </summary>
++/// <remarks>
++/// <para>
++/// <strong>The census this splits could name the category and not the producer.</strong>
++/// §4.2a widened phase 3's corpus from seven suites to twelve and found conversions going
++/// 24.6 M → 69.3 M, with <em>Gameboy alone minting 26.9 M at 51.0% of its own requests</em> — more
++/// than all seven previously-measured suites together, on a <c>Uint8Array</c> memory image, which
++/// is the shape item 3-1's typed backing store was written for. On that evidence 3-1's storage half
++/// was re-opened as <em>unmeasured</em> rather than refuted. But the counter that produced the
++/// finding sits in the boxing factory, so it can say a conversion happened and not which of the
++/// compiler's emission sites emitted it — and a typed backing store only reaches conversions minted
++/// by an element read or an element write.
++/// </para>
++/// <para>
++/// So each of the compiler's boxing sites declares itself, and the census reports the split per
++/// suite. That is what turns *"Gameboy mints 26.9 M conversions"* into a claim about whether a
++/// typed store would remove any of them.
++/// </para>
++/// <para>
++/// <strong>The site travels as a constant argument, on the same single code path the engine
++/// ships.</strong> A separate factory entry per site — the shape <c>CreateLiteral</c> and
++/// <c>CreateConversion</c> already use — would multiply into nine, and the alternative of gating
++/// the argument behind the counter flag would leave the measured arm and the shipping arm running
++/// different code. One <c>ldc.i4</c> at each site is cheaper than either, and it keeps the
++/// counters-off arm exactly what it was.
++/// </para>
++/// </remarks>
++public enum NumberBoxingConversionSite
++{
++    /// <summary>A conversion whose site has not been attributed.</summary>
++    Unclassified = 0,
++
++    /// <summary>
++    /// Reading a scalar-replaced numeric local. The local lives in a raw <c>double</c>, so every
++    /// consumer wanting a <see cref="JSValue"/> boxes it at the read
++    /// (<c>FastFunctionScope.DeclareVariable</c>).
++    /// </summary>
++    NumericLocalRead = 1,
++
++    /// <summary>
++    /// The root of item 3-1's guarded arithmetic tree — the one box a specialized tree is
++    /// supposed to keep, its whole point being that the interior nodes no longer mint any.
++    /// </summary>
++    GuardedTreeRoot = 2,
++
++    /// <summary>
++    /// An operand inside a guarded tree that has to be handed to the generic arm as a
++    /// <see cref="JSValue"/>, so the tree pays for a leaf it could not keep native.
++    /// </summary>
++    GuardedTreeOperand = 3,
++
++    /// <summary>The result of a unary <c>+</c> or <c>-</c> computed natively.</summary>
++    UnaryOperator = 4,
++
++    /// <summary>The result of a binary arithmetic or bitwise operator computed natively.</summary>
++    BinaryOperator = 5,
++
++    /// <summary>
++    /// The value of an assignment to a numeric local, boxed because the assignment is in
++    /// expression position and its value is consumed.
++    /// </summary>
++    AssignmentResult = 6,
++
++    /// <summary>
++    /// The step or the result of <c>++</c>/<c>--</c> on a numeric local — the operator item 3-8's
++    /// re-opening measured at 30.9% of the corpus's boxing.
++    /// </summary>
++    UpdateStep = 7,
++
++    /// <summary>
++    /// A compile-time numeric constant in an argument or element list, boxed once per evaluation
++    /// of the list.
++    /// </summary>
++    ConstantOperand = 8,
++}
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+index d171074d..3c786e10 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/Program.cs
+@@ -62,60 +62,61 @@ public static class Program
+             return;
+         }
+ 
+-        if (args.Length == 1 && args[0] == "--deferred-cell-cost")
+-        {
+-            DeferredCellCostMetrics.Write();
+-            return;
+-        }
+-
++        if (args.Length == 1 && args[0] == "--deferred-cell-cost")
++        {
++            DeferredCellCostMetrics.Write();
++            return;
++        }
++
+         if (args.Length == 2 && args[0] == "--suite-cache-metrics")
+         {
+             SuiteCacheMetrics.Write(args[1]);
+             return;
+         }
+ 
+-        if (args.Length == 2 && args[0] == "--type-feedback")
+-        {
+-            TypeFeedbackMetrics.Write(args[1]);
+-            return;
+-        }
+-
+-        if (args.Length >= 1 && args[0] == "--call-prologue-probe")
+-        {
+-            CallPrologueMetrics.Poke(false);
+-            CallPrologueMetrics.Write(
+-                args.Length >= 2 ? long.Parse(args[1]) : 200_000_000,
+-                args.Length >= 3 ? int.Parse(args[2]) : 6);
+-            return;
+-        }
+-
+-        if (args.Length >= 1 && args[0] == "--inlining-call-probe")
+-        {
+-            SpecializingTierMetrics.WriteCallProbe(
+-                args.Length >= 2 ? int.Parse(args[1]) : 20_000_000,
+-                args.Length >= 3 ? int.Parse(args[2]) : 6);
+-            return;
+-        }
+-
+-        if (args.Length >= 1 && args[0] == "--specializing-read-probe")
+-        {
+-            SpecializingTierMetrics.WriteReadProbe(
+-                args.Length >= 2 ? int.Parse(args[1]) : 20_000_000,
+-                args.Length >= 3 ? int.Parse(args[2]) : 6);
+-            return;
+-        }
+-
+-        if (args.Length >= 2 && args[0] == "--specializing-tier")
+-        {
+-            SpecializingTierMetrics.Write(
+-                args[1],
+-                args.Length >= 3 && Enum.TryParse<SpecializingTierMetrics.Arm>(args[2], true, out var arm)
+-                    ? arm
+-                    : SpecializingTierMetrics.Arm.Specializing,
+-                counters: args.Length < 4 || args[3] != "timing");
+-            return;
+-        }
+-
++        if (args.Length == 2 && args[0] == "--type-feedback")
++        {
++            TypeFeedbackMetrics.Write(args[1]);
++            return;
++        }
++
++        if (args.Length >= 1 && args[0] == "--call-prologue-probe")
++        {
++            CallPrologueMetrics.Poke(false);
++            CallPrologueMetrics.Write(
++                args.Length >= 2 ? long.Parse(args[1]) : 200_000_000,
++                args.Length >= 3 ? int.Parse(args[2]) : 6);
++            return;
++        }
++
++        if (args.Length >= 1 && args[0] == "--inlining-call-probe")
++        {
++            SpecializingTierMetrics.WriteCallProbe(
++                args.Length >= 2 ? int.Parse(args[1]) : 20_000_000,
++                args.Length >= 3 ? int.Parse(args[2]) : 6);
++            return;
++        }
++
++        if (args.Length >= 1 && args[0] == "--specializing-read-probe")
++        {
++            SpecializingTierMetrics.WriteReadProbe(
++                args.Length >= 2 ? int.Parse(args[1]) : 20_000_000,
++                args.Length >= 3 ? int.Parse(args[2]) : 6);
++            return;
++        }
++
++        if (args.Length >= 2 && args[0] == "--specializing-tier")
++        {
++            SpecializingTierMetrics.Write(
++                args[1],
++                args.Length >= 3 && Enum.TryParse<SpecializingTierMetrics.Arm>(args[2], true, out var arm)
++                    ? arm
++                    : SpecializingTierMetrics.Arm.Specializing,
++                counters: args.Length < 4 || args[3] != "timing",
++                only: args.Length >= 5 ? args[4] : null);
++            return;
++        }
++
+         if (args.Length == 1 && args[0] == "--legacy-frame-shape")
+         {
+             LegacyFrameShapeMetrics.Write();
+@@ -140,12 +141,12 @@ public static class Program
+             return;
+         }
+ 
+-        if (args.Length == 1 && args[0] == "--compile-scaling")
+-        {
+-            CompileScalingMetrics.Write();
+-            return;
+-        }
+-
++        if (args.Length == 1 && args[0] == "--compile-scaling")
++        {
++            CompileScalingMetrics.Write();
++            return;
++        }
++
+         if (args.Length >= 2 && args[0] == "--defer-population")
+         {
+             DeferPopulationMetrics.Write(args[1], args.Length >= 3 ? args[2] : null);
+@@ -161,15 +162,15 @@ public static class Program
+             return;
+         }
+ 
+-        if (args.Length >= 2 && args[0] == "--compile-profile")
+-        {
+-            CompileProfileMetrics.Write(
+-                args[1],
+-                args.Length >= 3 ? int.Parse(args[2]) : 3,
+-                args.Length >= 4 ? args[3] : null);
+-            return;
+-        }
+-
++        if (args.Length >= 2 && args[0] == "--compile-profile")
++        {
++            CompileProfileMetrics.Write(
++                args[1],
++                args.Length >= 3 ? int.Parse(args[2]) : 3,
++                args.Length >= 4 ? args[3] : null);
++            return;
++        }
++
+         BenchmarkSwitcher
+             .FromTypes([
+                 typeof(ContextStartupBenchmarks),
+diff --git a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+index f1c3707e..035c5273 100644
+--- a/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
++++ b/Broiler.JS/benchmarks/Broiler.JavaScript.Engine.Benchmarks/SpecializingTierMetrics.cs
+@@ -1,4 +1,5 @@
+ ﻿using System;
++using System.Linq;
+ using System.Collections.Generic;
+ using System.Diagnostics;
+ using System.IO;
+@@ -387,7 +388,22 @@ internal static class SpecializingTierMetrics
+         Specializing,
+     }
+ 
+-    internal static void Write(string octaneDirectory, Arm arm, bool counters)
++    /// <param name="only">
++    /// Comma-separated suite names to run, or <c>null</c> for all of them. Matched
++    /// case-insensitively against <see cref="Suites"/>.
++    /// </param>
++    /// <remarks>
++    /// <b>Checkpointing saved the rows before an abort; it does not get the rows AFTER one.</b>
++    /// §4.2a fixed the census losing eight suites when the ninth took the process down, and the
++    /// per-suite checkpoint it added is why the run above has any rows at all. But the suites are
++    /// run in a fixed order in one process, so a suite that still aborts — Mandreel, which is
++    /// where the widened census dies, now by exhausting memory rather than by overflowing the
++    /// stack — silently costs every suite listed after it. That is the same defect one level up:
++    /// *a corpus that cannot be resumed past its worst member is a corpus that is never
++    /// completed*, and it is the reason Gameboy, Typescript, Box2D, zlib and CodeLoad had no rows
++    /// in the first widened run either.
++    /// </remarks>
++    internal static void Write(string octaneDirectory, Arm arm, bool counters, string only = null)
+     {
+         if (!Directory.Exists(octaneDirectory))
+         {
+@@ -407,12 +423,41 @@ internal static class SpecializingTierMetrics
+         var baseSource = File.ReadAllText(basePath);
+         var rows = new List<object>();
+ 
++        var selected = Suites;
++        if (!string.IsNullOrWhiteSpace(only))
++        {
++            var wanted = new HashSet<string>(
++                only.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
++                StringComparer.OrdinalIgnoreCase);
++
++            var unknown = wanted.Where(name => !Suites.Any(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase))).ToArray();
++            if (unknown.Length > 0)
++            {
++                // Named and not run is the failure mode this flag exists to prevent, so it is an
++                // error rather than an empty selection.
++                Console.Error.WriteLine($"unknown suite(s): {string.Join(", ", unknown)}");
++                Environment.ExitCode = 2;
++                return;
++            }
++
++            selected = Suites.Where(s => wanted.Contains(s.Name)).ToArray();
++        }
++
++        // A partial corpus has to say so in its own output; the report's `suites` count is what a
++        // reader compares against, and a filtered run that looked complete would be worse than no
++        // run at all.
++        PartialPath = only == null
++            ? DefaultPartialPath
++            : Path.Combine(
++                Path.GetTempPath(),
++                $"broiler-specializing-tier-partial-{string.Join("-", selected.Select(s => s.Name))}.json");
++
+         // On the shell's stack, and checkpointed after every suite. Mandreel's global_init takes
+         // the default stack down with an UNCATCHABLE overflow, and a census that serializes only
+         // at the end loses every suite before the one that aborts.
+         BenchmarkContext.RunOnScriptHostStack(() =>
+         {
+-            foreach (var suite in Suites)
++            foreach (var suite in selected)
+             {
+                 Console.Error.WriteLine($"{suite.Name}: running ...");
+                 var row = RunSuite(octaneDirectory, baseSource, suite, arm, counters);
+@@ -427,7 +472,13 @@ internal static class SpecializingTierMetrics
+     }
+ 
+     /// <summary>Where an in-progress census parks its rows so an abort cannot discard them.</summary>
+-    internal static string PartialPath { get; } =
++    /// <remarks>
++    /// A filtered run writes to its own path, so a partial corpus can never overwrite the full
++    /// one's checkpoint and be read later as if it were complete.
++    /// </remarks>
++    internal static string PartialPath { get; private set; } = DefaultPartialPath;
++
++    private static string DefaultPartialPath { get; } =
+         Path.Combine(Path.GetTempPath(), "broiler-specializing-tier-partial.json");
+ 
+     private static string Report(List<object> rows, Arm arm, bool counters)
+@@ -698,6 +749,29 @@ internal static class SpecializingTierMetrics
+             // the second number exceeds the first.
+             boxingSpeculativeReadRequests = boxing.SpeculativeReadRequests,
+ 
++            // Item 3-1's re-opened storage half (§4.2a). The conversion count above says a raw
++            // double crossed into a JSValue; it cannot say which emission site did it, and a typed
++            // backing store only reaches the ones an element read or an element write mints. These
++            // eight sum to boxingConversionRequests and are what decides the item.
++            boxingConversionNumericLocalRead =
++                boxing.ConversionsAt(NumberBoxingConversionSite.NumericLocalRead),
++            boxingConversionGuardedTreeRoot =
++                boxing.ConversionsAt(NumberBoxingConversionSite.GuardedTreeRoot),
++            boxingConversionGuardedTreeOperand =
++                boxing.ConversionsAt(NumberBoxingConversionSite.GuardedTreeOperand),
++            boxingConversionUnaryOperator =
++                boxing.ConversionsAt(NumberBoxingConversionSite.UnaryOperator),
++            boxingConversionBinaryOperator =
++                boxing.ConversionsAt(NumberBoxingConversionSite.BinaryOperator),
++            boxingConversionAssignmentResult =
++                boxing.ConversionsAt(NumberBoxingConversionSite.AssignmentResult),
++            boxingConversionUpdateStep =
++                boxing.ConversionsAt(NumberBoxingConversionSite.UpdateStep),
++            boxingConversionConstantOperand =
++                boxing.ConversionsAt(NumberBoxingConversionSite.ConstantOperand),
++            boxingConversionUnclassified =
++                boxing.ConversionsAt(NumberBoxingConversionSite.Unclassified),
++
+             // Item 3-1's shared half, counted on the far side of the boundary: not what the
+             // compiler could prove, but what the operators were actually handed. arithmeticGeneric
+             // is every invocation of a two-JSValue arithmetic or bitwise operator;
+@@ -761,7 +835,7 @@ internal static class SpecializingTierMetrics
+             callbackCalls = callPath.CallbackCalls,
+             userCalls = callPath.UserCalls,
+             userCallsFromPromoted = callPath.UserCallsFromPromoted,
+-            strictTransitions = callPath.StrictTransitions,
++            strictTransitions = callPath.StrictTransitions,
+             legacyFrames = callPath.LegacyFrames,
+             thisCoercions = callPath.ThisCoercions,
+         };
+-- 
+2.43.0
+

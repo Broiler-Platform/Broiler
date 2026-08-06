@@ -1,0 +1,328 @@
+From 6e39f936cd94d039bc49062e9c9d39ccdd024785 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 6 Aug 2026 11:01:43 +0000
+Subject: [PATCH 104/104] Hand the displaced legacy frame back through an out
+ parameter
+
+Item 4-5 attributed 92% of a call's bookkeeping to the Annex B
+caller/arguments frame -- 44 ns on 60.16% of the corpus's calls -- and
+item 0111 then priced the named fix, relocating the frame to a
+thread-local stack, at 0.20% and refused it. Its third arm is why: one
+56-byte Arguments copy alone is 8.19 ns, so the cost is the copying, and
+relocating where the copying lands does not remove it. The lever it
+pointed at is removing copies.
+
+PushLegacyFrame returned a 72-byte LegacyFrame by value and the caller
+assigned it. An out parameter writes it straight into the caller's local
+instead, which is the same displaced frame with two fewer copies of it
+and no semantic change at all.
+
+Measured in situ with call-entry-cost, twelve interleaved ABBA pairs
+against a baseline binary built from the unmodified tree on this
+machine: InvokeFunction 117.32 -> 115.50 ns and the legacy frame itself
+44.05 -> 42.02, out ahead on 9 of 12 pairs. That is 1.83 ns on
+59 372 476 invocations -- 109 ms of a 108 879 ms driver, 0.100% -- and
+9 of 12 is not the clean separation 3.5 requires to claim a win. It is
+kept because it is strictly less work for identical semantics, not
+because 0.100% is established.
+
+The gap between the two numbers is the finding worth keeping. 0111
+priced a struct copy at 8.19 ns and this removes two of them for 1.83,
+so most of the return-by-value traffic was already elided before it
+reached the machine: a struct copy in the source is not a struct copy in
+the code, and a replica that counts copies in C# overstates what the JIT
+actually emits.
+
+Annex B behaviour is unchanged -- LegacyCallerArgumentsTests, 14 cases,
+and 8 057 tests across six projects with no failures.
+---
+ .../Function/JSFunction.cs                    | 171 +++++++++---------
+ 1 file changed, 89 insertions(+), 82 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs
+index 6dbfd626..a2eb828c 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSFunction.cs
+@@ -16,28 +16,28 @@ namespace Broiler.JavaScript.BuiltIns.Function;
+ [JSFunctionGenerator("Function", Register = false)]
+ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+ {
+-    /// <summary>
+-    /// An ordinary function tracks its named properties by shape, so statics on a constructor
+-    /// reach an inline cache (roadmap item 2-8).
+-    /// </summary>
+-    /// <remarks>
+-    /// Earned by two things, both of which had to be fixed first. Every named property this
+-    /// class installs — <c>length</c>, <c>name</c>, <c>prototype</c> — now goes through
+-    /// <c>FastAddValue</c> rather than a bare <c>ownProperties.Put</c>, so the shape's key set is
+-    /// the object's complete set of own named properties; and the Annex B <c>caller</c> and
+-    /// <c>arguments</c> cells are recorded as keys with no slot value rather than abandoning the
+-    /// layout, so a non-strict function keeps its shape (see
+-    /// <c>JSObject.TrackShapeKeyWithoutSlotValue</c>). Without the second, this would help only
+-    /// strict functions and classes, and the idiom that motivates it — statics on a constructor,
+-    /// which is how DeltaBlue reads <c>Strength.REQUIRED</c> in its hot path — is sloppy.
+-    /// <para>
+-    /// Exact-type, like every other override of this: a subclass reaching the property store
+-    /// another way must make the claim for itself. <c>JSClass</c> does, having had the same two
+-    /// fixes; the async, generator and bound-function forms deliberately do not.
+-    /// </para>
+-    /// </remarks>
+-    internal override bool SupportsShapeTracking => GetType() == typeof(JSFunction);
+-
++    /// <summary>
++    /// An ordinary function tracks its named properties by shape, so statics on a constructor
++    /// reach an inline cache (roadmap item 2-8).
++    /// </summary>
++    /// <remarks>
++    /// Earned by two things, both of which had to be fixed first. Every named property this
++    /// class installs — <c>length</c>, <c>name</c>, <c>prototype</c> — now goes through
++    /// <c>FastAddValue</c> rather than a bare <c>ownProperties.Put</c>, so the shape's key set is
++    /// the object's complete set of own named properties; and the Annex B <c>caller</c> and
++    /// <c>arguments</c> cells are recorded as keys with no slot value rather than abandoning the
++    /// layout, so a non-strict function keeps its shape (see
++    /// <c>JSObject.TrackShapeKeyWithoutSlotValue</c>). Without the second, this would help only
++    /// strict functions and classes, and the idiom that motivates it — statics on a constructor,
++    /// which is how DeltaBlue reads <c>Strength.REQUIRED</c> in its hot path — is sloppy.
++    /// <para>
++    /// Exact-type, like every other override of this: a subclass reaching the property store
++    /// another way must make the claim for itself. <c>JSClass</c> does, having had the same two
++    /// fixes; the async, generator and bound-function forms deliberately do not.
++    /// </para>
++    /// </remarks>
++    internal override bool SupportsShapeTracking => GetType() == typeof(JSFunction);
++
+     internal static JSFunctionDelegate empty = (in Arguments a) => a.This;
+ 
+     [EditorBrowsable(EditorBrowsableState.Never)]
+@@ -68,34 +68,34 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         prototype = value as JSObject;
+     }
+ 
+-    /// <summary>
+-    /// Keeps <c>prototype</c> off the shape write fast paths, because writing it has an effect
+-    /// beyond the property store: it re-caches the <see cref="prototype"/> field above, which is
+-    /// what <c>[[Construct]]</c> reads.
+-    /// </summary>
+-    /// <remarks>
+-    /// Every observable write path on this type — the indexer, <see cref="SetValue"/>,
+-    /// <see cref="DefineProperty"/> — calls <see cref="AssignPrototypeField"/>. A shape fast path
+-    /// is none of them: it writes <c>ownProperties</c> and <c>shapeSlots</c> and returns. So a
+-    /// cached store to <c>f.prototype</c> updated the observable property and left
+-    /// <c>[[Construct]]</c> reading the previous object, and `new f()` produced instances on a
+-    /// stale prototype.
+-    /// <para>
+-    /// That is not hypothetical and it is not obscure: it is DeltaBlue. Its `inheritsFrom` helper
+-    /// does `this.prototype = new Inheriter()` from one emitted site, called once per class, so
+-    /// the first call missed and was correct and every call after it hit and was not — leaving
+-    /// the second level of every inheritance chain unlinked and `this.addConstraint` undefined.
+-    /// Item 2-8 admitted functions to shape tracking and this is the hole that opened; the
+-    /// synthetic loop that measured 2-8's win could not see it, because it never wrote a
+-    /// prototype.
+-    /// </para>
+-    /// <para>
+-    /// Only this one key is withheld. <c>length</c>, <c>name</c> and every static a constructor
+-    /// carries keep their slots, which is where 2-8's win actually is.
+-    /// </para>
+-    /// </remarks>
+-    internal override bool AllowsDirectShapeWrite(uint key) => key != KeyStrings.prototype.Key;
+-
++    /// <summary>
++    /// Keeps <c>prototype</c> off the shape write fast paths, because writing it has an effect
++    /// beyond the property store: it re-caches the <see cref="prototype"/> field above, which is
++    /// what <c>[[Construct]]</c> reads.
++    /// </summary>
++    /// <remarks>
++    /// Every observable write path on this type — the indexer, <see cref="SetValue"/>,
++    /// <see cref="DefineProperty"/> — calls <see cref="AssignPrototypeField"/>. A shape fast path
++    /// is none of them: it writes <c>ownProperties</c> and <c>shapeSlots</c> and returns. So a
++    /// cached store to <c>f.prototype</c> updated the observable property and left
++    /// <c>[[Construct]]</c> reading the previous object, and `new f()` produced instances on a
++    /// stale prototype.
++    /// <para>
++    /// That is not hypothetical and it is not obscure: it is DeltaBlue. Its `inheritsFrom` helper
++    /// does `this.prototype = new Inheriter()` from one emitted site, called once per class, so
++    /// the first call missed and was correct and every call after it hit and was not — leaving
++    /// the second level of every inheritance chain unlinked and `this.addConstraint` undefined.
++    /// Item 2-8 admitted functions to shape tracking and this is the hole that opened; the
++    /// synthetic loop that measured 2-8's win could not see it, because it never wrote a
++    /// prototype.
++    /// </para>
++    /// <para>
++    /// Only this one key is withheld. <c>length</c>, <c>name</c> and every static a constructor
++    /// carries keep their slots, which is where 2-8's win actually is.
++    /// </para>
++    /// </remarks>
++    internal override bool AllowsDirectShapeWrite(uint key) => key != KeyStrings.prototype.Key;
++
+     private StringSpan source;
+ 
+     internal JSFunction constructor;
+@@ -239,9 +239,18 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+     /// applied here, on entry, rather than at read time, because it depends on the
+     /// calling function, which is only known now.
+     /// </remarks>
+-    private LegacyFrame PushLegacyFrame(JSValue callerFunction, in Arguments arguments)
++    /// <param name="saved">
++    /// The displaced frame, written straight into the caller's local. An <c>out</c> parameter
++    /// rather than a return value because <c>LegacyFrame</c> is 72 bytes and this runs on 60.16%
++    /// of the corpus's calls (docs/performance-roadmap.md item 4-5, `0110`): returning it by value
++    /// and assigning the result is two copies of that struct where <c>out</c> is none. `0111`
++    /// measured one 56-byte <c>Arguments</c> copy at 8.19 ns and concluded *"the cost is the
++    /// copying, and relocating where the copying lands does not remove it"* — this removes copies
++    /// instead of relocating them, which is the lever that finding pointed at.
++    /// </param>
++    private void PushLegacyFrame(JSValue callerFunction, in Arguments arguments, out LegacyFrame saved)
+     {
+-        var saved = new LegacyFrame(legacyCallerValue, legacyFrameArguments, legacyFrameActive);
++        saved = new LegacyFrame(legacyCallerValue, legacyFrameArguments, legacyFrameActive);
+ 
+         legacyCallerValue = callerFunction is JSFunction ordinary
+             && ordinary.IsOrdinaryUserFunction
+@@ -250,8 +259,6 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+             : NullValue;
+         legacyFrameArguments = arguments;
+         legacyFrameActive = true;
+-
+-        return saved;
+     }
+ 
+     private void PopLegacyFrame(in LegacyFrame saved)
+@@ -418,7 +425,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         prototype = type.prototype;
+ 
+         prototype.FastAddValue(KeyStrings.constructor, type, JSPropertyAttributes.EnumerableConfigurableValue);
+-        FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
++        FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
+ 
+         FastAddValue(KeyStrings.name, name.IsEmpty ? CreateString("native") : CreateString(name.Value), JSPropertyAttributes.ConfigurableReadonlyValue);
+         FastAddValue(KeyStrings.length, CreateNumber(0), JSPropertyAttributes.ConfigurableReadonlyValue);
+@@ -446,9 +453,9 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         prototype = _prototype;
+         prototype.GetOwnProperties(true).Put(KeyStrings.constructor, this);
+ 
+-            FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
+-        FastAddValue(KeyStrings.length, NumberZero, JSPropertyAttributes.ConfigurableReadonlyValue);
+-        FastAddValue(KeyStrings.name, name.IsEmpty ? CreateString("native") : CreateString(name.Value), JSPropertyAttributes.ConfigurableReadonlyValue);
++            FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
++        FastAddValue(KeyStrings.length, NumberZero, JSPropertyAttributes.ConfigurableReadonlyValue);
++        FastAddValue(KeyStrings.name, name.IsEmpty ? CreateString("native") : CreateString(name.Value), JSPropertyAttributes.ConfigurableReadonlyValue);
+ 
+         constructor = this;
+     }
+@@ -482,14 +489,14 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         // Own-key order per spec: a function's "length" and "name" are installed
+         // before its "prototype" (SetFunctionName/SetFunctionLength then
+         // MakeConstructor), so getOwnPropertyNames yields [length, name, prototype].
+-        FastAddValue(KeyStrings.length, CreateNumber(length), JSPropertyAttributes.ConfigurableReadonlyValue);
+-        FastAddValue(KeyStrings.name, CreateString(publicName), JSPropertyAttributes.ConfigurableReadonlyValue);
++        FastAddValue(KeyStrings.length, CreateNumber(length), JSPropertyAttributes.ConfigurableReadonlyValue);
++        FastAddValue(KeyStrings.name, CreateString(publicName), JSPropertyAttributes.ConfigurableReadonlyValue);
+ 
+         if (createPrototype)
+         {
+             prototype = new JSObject();
+             prototype.FastAddValue(KeyStrings.constructor, this, JSPropertyAttributes.ConfigurableValue);
+-            FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
++            FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
+         }
+ 
+         constructor = this;
+@@ -513,14 +520,14 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         IsAnonymousNamePending = name.IsEmpty && !source.IsEmpty;
+ 
+         // Own-key order per spec: [length, name, prototype] (see above).
+-        FastAddValue(KeyStrings.length, CreateNumber(length), JSPropertyAttributes.ConfigurableReadonlyValue);
+-        FastAddValue(KeyStrings.name, CreateString(publicName), JSPropertyAttributes.ConfigurableReadonlyValue);
++        FastAddValue(KeyStrings.length, CreateNumber(length), JSPropertyAttributes.ConfigurableReadonlyValue);
++        FastAddValue(KeyStrings.name, CreateString(publicName), JSPropertyAttributes.ConfigurableReadonlyValue);
+ 
+         if (createPrototype)
+         {
+             prototype = new JSObject();
+             prototype.FastAddValue(KeyStrings.constructor, this, JSPropertyAttributes.ConfigurableValue);
+-            FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
++            FastAddValue(KeyStrings.prototype, prototype, JSPropertyAttributes.Value);
+         }
+ 
+         constructor = this;
+@@ -557,15 +564,15 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+             length: 0,
+             createPrototype: false);
+ 
+-        throwTypeError.FastAddValue(KeyStrings.length, NumberZero, JSPropertyAttributes.ReadonlyValue);
+-        throwTypeError.FastAddValue(KeyStrings.name, CreateString(string.Empty), JSPropertyAttributes.ReadonlyValue);
++        throwTypeError.FastAddValue(KeyStrings.length, NumberZero, JSPropertyAttributes.ReadonlyValue);
++        throwTypeError.FastAddValue(KeyStrings.name, CreateString(string.Empty), JSPropertyAttributes.ReadonlyValue);
+         throwTypeError.f = (in Arguments a) => throw JSEngine.NewTypeError(message);
+         throwTypeError.PreventExtensions();
+         return throwTypeError;
+     }
+ 
+     internal void SetNameProperty(string name, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableReadonlyValue)
+-        => FastAddValue(KeyStrings.name, CreateString(name), attributes);
++        => FastAddValue(KeyStrings.name, CreateString(name), attributes);
+ 
+     // Override the source text reported by Function.prototype.toString. Used by the
+     // dynamic Function constructor, which builds the function from an *anonymous*
+@@ -770,18 +777,18 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         // object (the function's `prototype` property was overwritten with a
+         // primitive), the new instance falls back to %Object.prototype% — which a
+         // default `new JSObject()` already adopts.
+-        //
+-        // Installed by the constructor rather than by an initializer that overwrites what
+-        // the constructor just set. The end state is identical, but the second write looked
+-        // like a [[SetPrototypeOf]] on a live object — prototypeChain was no longer null —
+-        // so it published a global prototype-mutation notice and retired every
+-        // prototype-keyed inline-cache entry in the process. Once per `new`. That is the
+-        // defect P1-2's guard was written to prevent (see JSObject.BasePrototypeObject),
+-        // reached by a path that stepped around it: measured at 200 001 invalidations for
+-        // 200 000 allocations, against 0 for the same objects built as literals, halving the
+-        // hit rate at an inherited-method site in any loop that also allocates.
++        //
++        // Installed by the constructor rather than by an initializer that overwrites what
++        // the constructor just set. The end state is identical, but the second write looked
++        // like a [[SetPrototypeOf]] on a live object — prototypeChain was no longer null —
++        // so it published a global prototype-mutation notice and retired every
++        // prototype-keyed inline-cache entry in the process. Once per `new`. That is the
++        // defect P1-2's guard was written to prevent (see JSObject.BasePrototypeObject),
++        // reached by a path that stepped around it: measured at 200 001 invalidations for
++        // 200 000 allocations, against 0 for the same objects built as literals, halving the
++        // hit rate at an inherited-method site in any loop that also allocates.
+         JSValue obj = instancePrototype != null
+-            ? new JSObject(instancePrototype)
++            ? new JSObject(instancePrototype)
+             : new JSObject();
+         var a1 = a.OverrideThis(obj);
+         if (ec != null)
+@@ -803,7 +810,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         var trackLegacyCaller = HasLegacyCallerArguments;
+         var savedLegacyFrame = default(LegacyFrame);
+         if (trackLegacyCaller)
+-            savedLegacyFrame = PushLegacyFrame(previousExecutingFunction, in a1);
++            PushLegacyFrame(previousExecutingFunction, in a1, out savedLegacyFrame);
+         try
+         {
+             // [[Construct]] must run the body under its own strict-mode setting,
+@@ -933,7 +940,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+                     CallPathDiagnostics.RecordEntryShape(trackLegacyCaller, current.CoerceThisOnInvoke);
+                 var savedLegacyFrame = default(LegacyFrame);
+                 if (trackLegacyCaller)
+-                    savedLegacyFrame = current.PushLegacyFrame(previousExecutingFunction, in currentArguments);
++                    current.PushLegacyFrame(previousExecutingFunction, in currentArguments, out savedLegacyFrame);
+ 
+                 using (current.EnterRealm())
+                 using (JSEngine.EnterStrictMode(current.IsStrictMode))
+@@ -1070,8 +1077,8 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
+         };
+         if (originalFunction != null)
+             fx.prototypeChain = originalFunction.prototypeChain;
+-        fx.FastAddValue(KeyStrings.name, CreateString(boundName), JSPropertyAttributes.ConfigurableReadonlyValue);
+-        fx.FastAddValue(KeyStrings.length, CreateNumber(boundLength), JSPropertyAttributes.ConfigurableReadonlyValue);
++        fx.FastAddValue(KeyStrings.name, CreateString(boundName), JSPropertyAttributes.ConfigurableReadonlyValue);
++        fx.FastAddValue(KeyStrings.length, CreateNumber(boundLength), JSPropertyAttributes.ConfigurableReadonlyValue);
+ 
+         // Function.prototype.toString of a bound function is the implementation-defined
+         // NativeFunction form with NO name: the bound "name" property ("bound …") is not a
+-- 
+2.43.0
+
