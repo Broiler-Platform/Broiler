@@ -670,21 +670,27 @@ public sealed partial class DomBridge
             // the backdrop rather than over an opaque snapshot fill.
             if (capture.HasOld)
             {
+                var scale = SnapshotScale(capture.OldWidth, groupW);
                 var oldBox = CreateStyledBox(BaseStyle(
                     ("position", "absolute"), ("left", "0"), ("top", "0"),
-                    ("width", Px(capture.OldWidth)), ("height", Px(capture.OldHeight))),
+                    ("width", Px(capture.OldWidth * scale)), ("height", Px(capture.OldHeight * scale))),
                     LookupPseudo(pseudoRules, "old", capture));
-                AttachSnapshotPaint(oldBox, capture.OldContent, capture.OldBackground);
+                AttachSnapshotPaint(
+                    oldBox, capture.OldContent, capture.OldBackground,
+                    scale, capture.OldWidth, capture.OldHeight);
                 AppendBridgeChild(imagePair, oldBox);
             }
 
             if (capture.HasNew)
             {
+                var scale = SnapshotScale(capture.NewWidth, groupW);
                 var newBox = CreateStyledBox(BaseStyle(
                     ("position", "absolute"), ("left", "0"), ("top", "0"),
-                    ("width", Px(capture.NewWidth)), ("height", Px(capture.NewHeight))),
+                    ("width", Px(capture.NewWidth * scale)), ("height", Px(capture.NewHeight * scale))),
                     LookupPseudo(pseudoRules, "new", capture));
-                AttachSnapshotPaint(newBox, capture.NewContent, capture.NewBackground);
+                AttachSnapshotPaint(
+                    newBox, capture.NewContent, capture.NewBackground,
+                    scale, capture.NewWidth, capture.NewHeight);
                 AppendBridgeChild(imagePair, newBox);
             }
 
@@ -808,15 +814,73 @@ public sealed partial class DomBridge
         parent.AppendChild(child);
     }
 
+    /// <summary>
+    /// The factor a snapshot is drawn at inside its group. Per the css-view-transitions UA
+    /// stylesheet a <c>::view-transition-old</c>/<c>-new</c> is <c>inline-size: 100%</c> of its
+    /// group with <c>block-size: auto</c> — it fills the group's width and keeps its own aspect
+    /// ratio, because the snapshot is an image, not a re-laid-out box. A group whose size differs
+    /// from the capture's therefore scales what it shows: WPT
+    /// <c>root-to-shared-animation-incoming</c> (issue #1544 problem 19) renames the root onto a
+    /// 100x120 element, so the new snapshot is drawn into a group still at the old viewport-sized
+    /// geometry and must cover it.
+    /// <para>
+    /// Returns exactly <c>1</c> whenever the group and the capture already agree — the case for
+    /// every transition that does not resize, which is nearly all of them — so those snapshots keep
+    /// the boxes they have always had.
+    /// </para>
+    /// </summary>
+    private static double SnapshotScale(double capturedWidth, double groupWidth)
+    {
+        if (capturedWidth <= 0 || groupWidth <= 0)
+            return 1;
+
+        var scale = groupWidth / capturedWidth;
+        return double.IsFinite(scale) && scale > 0 ? scale : 1;
+    }
+
     /// <summary>Fills a snapshot box: appends its captured content box (which carries the element's
     /// baked paint and cloned content) when present, else falls back to a flat background fill (the
-    /// implicit root capture and one-sided names, which have no content box).</summary>
-    private void AttachSnapshotPaint(DomElement box, DomElement? content, string fallbackBackground)
+    /// implicit root capture and one-sided names, which have no content box).
+    /// <para>
+    /// At a <paramref name="scale"/> other than 1 the content box is pinned to the captured pixel
+    /// size and scaled from its top-left corner, rather than being stretched by the box sizing it
+    /// would otherwise inherit (<c>100%</c> of the snapshot box). Stretching would resize the
+    /// snapshot's own layout — text would reflow, a border would thicken on one axis only — where
+    /// the spec scales a captured image uniformly. The flat-fill fallback needs neither: it has no
+    /// content to scale, and the box it fills is already the scaled size.
+    /// </para>
+    /// </summary>
+    private void AttachSnapshotPaint(
+        DomElement box, DomElement? content, string fallbackBackground,
+        double scale = 1, double capturedWidth = 0, double capturedHeight = 0)
     {
-        if (content is not null)
-            AppendBridgeChild(box, CloneSnapshotContentForRender(content));
-        else
+        if (content is null)
+        {
             InlineStyle(box)["background-color"] = fallbackBackground;
+            return;
+        }
+
+        var clone = CloneSnapshotContentForRender(content);
+        if (scale is not 1 && capturedWidth > 0 && capturedHeight > 0)
+        {
+            // The snapshot must grow from its top-left corner, but the paint walker applies every
+            // transform about the box's centre and does not read `transform-origin`. Composing a
+            // translate of half the growth ahead of the scale expresses a top-left-origin scale in
+            // terms of the centre-origin one it does implement: a point p maps to C + T·S·(p - C),
+            // so t = C(s - 1) puts the corner back at the origin. Without it the snapshot expands
+            // equally in all four directions and the group clips away everything above and left of
+            // its centre — which is exactly what this looked like: a 200x120 capture scaled 5.12x
+            // showed 612x368 of blue instead of filling the group.
+            var growthX = capturedWidth * (scale - 1) / 2;
+            var growthY = capturedHeight * (scale - 1) / 2;
+            var style = InlineStyle(clone);
+            style["width"] = Px(capturedWidth);
+            style["height"] = Px(capturedHeight);
+            style["transform"] =
+                $"translate({Px(growthX)}, {Px(growthY)}) scale({scale.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)})";
+        }
+
+        AppendBridgeChild(box, clone);
     }
 
     // The paint- and text-affecting computed properties baked onto a snapshot's content box so it
