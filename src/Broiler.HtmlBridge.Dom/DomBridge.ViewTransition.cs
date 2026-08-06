@@ -40,6 +40,13 @@ public sealed partial class DomBridge
 
     private sealed class ViewTransitionState
     {
+        /// <summary>
+        /// The page observed <c>finished</c> while its screenshot was still pending, so the
+        /// transition is over as far as the page is concerned — but whether the page went on to
+        /// release the screenshot cannot be read yet. See <see cref="FinishedThenable"/>.
+        /// </summary>
+        public bool FinishedObserved { get; set; }
+
         /// <summary>The transition's active types (the <c>types</c> option), matched by
         /// <c>:active-view-transition-type()</c>.</summary>
         public HashSet<string> Types { get; } = new(System.StringComparer.Ordinal);
@@ -247,8 +254,26 @@ public sealed partial class DomBridge
                         $"View transition finished callback threw: {ex.Message}", ex);
                 }
             }
-            if (waitBefore && !ScreenshotPending())
+            if (!waitBefore)
+                return;
+
+            if (!ScreenshotPending())
+            {
                 _activeViewTransition = null;
+                return;
+            }
+
+            // The callback has not released the screenshot *yet*, which does not mean it never
+            // will. `await transition.finished` hands us the async function's continuation, and
+            // invoking that only schedules the resumption — the `reftest-wait` removal happens in a
+            // microtask, after this check has already run. Reading it here therefore says "still
+            // pending" for every await-based test, which kept the transition active and left its
+            // pseudo tree baked over the finished page (WPT reset-state-after-scrolled-view-
+            // transition, issue #1544 problem 26, where a flat root-snapshot fill covered the whole
+            // viewport). Record the observation and let the serialize-time bake re-read the class,
+            // by which point any microtask has run.
+            if (_activeViewTransition is not null)
+                _activeViewTransition.FinishedObserved = true;
         }
 
         var thenable = new JSObject();
@@ -279,6 +304,17 @@ public sealed partial class DomBridge
     {
         if (_activeViewTransition is null || _layoutGeometryPassActive)
             return;
+
+        // A transition whose `finished` the page observed is over once that page releases its
+        // screenshot; the release may have landed in a microtask after `finished` returned, so this
+        // is the first point that can see it. Nothing to bake for a transition that has ended.
+        if (_activeViewTransition.FinishedObserved
+            && !(GetAttr(DocumentElement, "class") ?? string.Empty)
+                .Contains("reftest-wait", System.StringComparison.Ordinal))
+        {
+            _activeViewTransition = null;
+            return;
+        }
 
         ApplyActiveViewTransitionTypeRules(root);
         ApplyViewTransitionPseudoTree(root);
