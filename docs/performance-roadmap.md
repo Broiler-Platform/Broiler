@@ -1374,7 +1374,10 @@ These were paid for once each. They apply to every phase below.
   while making **1 488 of 59.7 M calls**, so it is almost the entire denominator and none of the
   numerator. Over the twelve the same data reads **2.43% and 8.06%**, both *larger* than the
   seven-suite figures, and 4-4's conclusion changes from *"too small to matter"* to *"too small to
-  beat 4-5"*. **The catch came from a cross-check run for an unrelated reason** — a counters-off
+  beat 4-5"*. **A fourth has since followed**: item 3-2's numeric-read table, whose 50.1% becomes
+  **55.2% of 186 831 813** and whose *"3-2 is a Box2D item, 98% of the corpus's numeric reads are
+  Box2D's"* becomes **9.6%** — the item was re-specified around a suite that turns out to be a
+  fifteenth of its own population, while Typescript and Gameboy, 89% of it, had never been counted. **The catch came from a cross-check run for an unrelated reason** — a counters-off
   driver, to price the instrument's own overhead, which turned out to be nil (0.946×) and instead
   put the per-suite times side by side, where one row was 72% of the column. *A widening that fixes
   the numerator's coverage silently changes what belongs in the denominator; print the per-suite
@@ -5858,7 +5861,7 @@ pre-existing win-x64 host-environment ones. **test262 over all four pinned manif
 
 **Size: M**, and it landed at that size.
 
-### 3-2 · Unboxed doubles in shape slots — **measured; its premise sentence is wrong and its population is one suite**
+### 3-2 · Unboxed doubles in shape slots — **measured; its premise sentence is wrong, and the "one suite" was an artifact of the seven-suite corpus**
 
 The object-field twin of 3-1: `shapeSlots` holds `JSValue` references, so
 `vector.x = 1.5` allocates. This is what RayTrace and Box2D need, and it **composes
@@ -5922,7 +5925,51 @@ missing — and the per-suite column is the one that decides the plan:
   Together they are **85% of the corpus's boxes and essentially no property traffic**: their
   numbers live in `new Array` read by index. *No amount of work on shape slots reaches them.*
 
+#### The table above is the seven suites, and widened it overturns the re-specification below
+
+**The signal 3-2 was missing was collected on exactly the corpus §4.2a found the censuses were stuck
+on**, and the total gives it away: 20 065 493 cache-answered reads, against **186 831 813** over the
+twelve suites that run. *The seven are 10.7% of the corpus's cache-answered reads and 9.7% of its
+numeric ones.* `SpecializingTierMetrics` has reached all fifteen since `0103`, so this is a re-read
+rather than a new instrument — the fourth figure in this document to need one.
+
+| Suite | cache-answered reads | of them numeric | | boxes allocated | in the seven |
+|---|--:|--:|--:|--:|---|
+| **Typescript** | **115 082 436** | **64 199 239** | **55.8%** | 8 797 514 | — |
+| **Gameboy** | **47 152 809** | **27 437 672** | **58.2%** | **29 322 416** | — |
+| Box2D | 18 242 021 | 9 853 002 | 54.0% | 5 225 033 | yes |
+| PdfJS | 3 190 918 | 1 054 355 | 33.0% | 6 394 984 | — |
+| Splay | 1 338 329 | 415 070 | 31.0% | 29 337 | — |
+| Crypto | 651 171 | 74 382 | 11.4% | 13 409 653 | yes |
+| NavierStokes | 388 | **0** | 0.0% | 11 747 635 | yes |
+| **all twelve** | **186 831 813** | **103 158 443** | **55.2%** | **75 704 490** | |
+
+**The premise strengthens and the plan inverts.** *"Half of every property read the cache answers
+hands back a number"* goes from 50.1% to **55.2%**, so the item's founding observation is if
+anything better than recorded. But **"3-2 is a Box2D item" is wrong**: Box2D is **9.6%** of the
+corpus's numeric reads, not 98%. ***3-2 is a Typescript-and-Gameboy item*** — those two are
+**64.2 M and 27.4 M numeric reads, 89% of the corpus's between them**, and neither had ever been
+counted.
+
+**The box split inverts with it.** *"3-1 carries 85% of the corpus's boxes (NavierStokes' 30.0 M plus
+Crypto's 42.4 M)"* — over twelve suites those two are **25.2 M of 75.7 M, 33.2%**. **Gameboy alone is
+29.3 M, 38.7%**, the largest single source in the corpus, and it is *not* one of 3-1's suites.
+
+***And `0113` says which item Gameboy belongs to.*** Its dense element read/write ratio is **1.03**,
+so a typed backing store there is an allocation wash — while **58.2% of its cache-answered property
+reads hand back a number**. **For the corpus's biggest box source, 3-2 is the item and 3-1 is not.**
+That is the opposite of the ordering below, and the two measurements were taken independently.
+
+**What survives unchanged.** *"3-2 cannot touch 3-1's suites"* holds exactly as written and is
+sharper for the widening: NavierStokes performs **388** property reads, **zero** numeric, against
+11.7 M boxes; Crypto reads 651 171 against 13.4 M. Their numbers still live in `new Array` read by
+index, and no work on shape slots reaches them. The two items are still one mechanism with two
+backends — the identical per-iteration figures above are untouched by any of this.
+
 #### Re-specification
+
+> **Superseded in its ordering by the widened table above**, which was taken after it. The
+> *mechanism* argument — one compiler half, two backends — stands; the *ranking* does not.
 
 **3-1 first, then 3-2, and the split is now quantitative rather than a guess.**
 
@@ -9571,6 +9618,10 @@ the inline cache answers, how many hand back a number. This is item 4-1's third 
 It costs one `IsNumber` test on the two hit returns and only while
 `PropertyOptimizationDiagnostics.Enabled`. **Read it per suite:** the corpus total is 50.1%, and
 that single figure conceals Box2D at 54.0% of 18.2 M reads against NavierStokes at 0% of 388.
+**And that 50.1% was another seven-suite figure**: over the twelve that run it is **55.2% of
+186 831 813** — the seven are **10.7%** of the corpus's cache-answered reads — which **inverts item
+3-2's plan**. Box2D is **9.6%** of the corpus's numeric reads rather than 98%; **Typescript
+(64.2 M) and Gameboy (27.4 M) are 89% of them** and neither had been counted.
 
 **`--specializing-tier … counters` also reports the arithmetic-operand census** (item 3-1):
 `arithmeticGeneric` is every invocation of a generic two-`JSValue` arithmetic or bitwise operator,
