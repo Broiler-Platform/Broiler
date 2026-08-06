@@ -21,139 +21,44 @@ so only the parent can hold the combined view.
 - **Acceptance protocol:** unchanged and unchallenged —
   [`Broiler.JS/docs/performance.md`](../Broiler.JS/docs/performance.md) governs what
   may be *claimed*. **Nothing in this document closes on the numbers it quotes.**
-- **Provenance:** the pinned submodule pointer is **`14fa4f10`**, checked 2026-08-05 against
-  the gitlink rather than against the prose — **and checking it is what caught that this line
-  said `cca39b4d`**, which the pointer had moved thirteen commits past. That is the *sixth*
-  consecutive time this line was stale when read (`07adeb44`, `2ebc0c3c`, `71dda1b7`, `9bf9639b`
-  and `61c8cc65` before that), which is no longer a coincidence: **a pointer written into prose goes
-  stale silently**, and the only reliable reading of it is `git submodule status`. Six readings,
-  six staleness findings, is a rate rather than an anecdote — the line is wrong *by default*, so
-  the sentence to write next to any pointer is the command that reads it. **The two other
-  submodules now carry the same note**: `Broiler.HTML` is `2f94c0d5` and `Broiler.CSS` `076ed5d5`,
-  both of which had also moved since anything here described them.
-  It is why §4.1's and §3.4's figures below carry the
-  commit they were taken at rather than "the pin". `2ebc0c3c`, `a6f101cc`, `71dda1b7`,
-  `685026c0`, `cdb2fd41`, `7ef80c03` and `8228b0da` are all **ancestors** of the current pin
-  (`merge-base --is-ancestor`), so nothing recorded against any of them is invalidated and item
-  0-1's substance holds; `685026c0` carries item 0-9's probe corpus (`aa2b1562`, #938).
-  **The patch handoff has completed again, twice over.** The five files pending at the last
-  reading (`0067`–`0071`, items 3-3's two halves, 4-1, 4-3a and 4-3b) **and the six written after
-  them** (`0072`–`0077`, items 4-2a, 4-2b, 4-4's premise, 4-5, 3-5 and 3-6) have all been applied,
-  pushed and the pointer bumped. The six were checked **patch by patch against the submodule log
-  rather than inferred from this prose** — each patch's `Subject` matched to a commit, that
-  commit's `format-patch` output diffed against the patch file (identical modulo line endings and
-  the `[PATCH n/m]` numbering), and each commit confirmed an ancestor of the pin: `3f8d5db4`,
-  `34270c76`, `af5b8b78`, `53690423`, `8073e4fb`, `61c8cc65` in patch order. **So every figure
-  recorded for items 4-2, 4-4, 4-5, 3-5 and 3-6 now describes the pinned pointer directly**,
-  rather than a local build plus a patch series applied in order, which is what their sections
-  used to have to say.
-  **The four patches pending at the last reading have been applied and the pointer bumped.**
-  `0078`–`0081` (items 3-7, 3-8, 3-1 and 3-2) are now `37905aeb`, `14ac195f`, `cb2e63c6` and
-  `07adeb44` — matched patch by patch to the submodule log rather than inferred from this prose,
-  and `61c8cc65` is an ancestor of the pin, so every figure recorded for those four items now
-  describes the pinned pointer directly rather than a local build plus a patch series.
-  **The patch handoff has completed a third time, and `patches/` is empty.** The five files pending
-  at the last reading — `0082`–`0086`, item 1-1's remaining half and item 3-1's four — have all been
-  applied, pushed and the pointer bumped, which is what moved it off `07adeb44`. They were checked
-  **patch by patch against the submodule log rather than inferred from this prose**: each `Subject`
-  resolved to a commit, that commit's `format-patch` output diffed against the patch file (identical
-  once the `From <sha>` line, the blob `index` lines and the trailing git version are set aside —
-  that is the whole of the difference on all five), and `07adeb44` confirmed an ancestor of the new
-  pin. In patch order they are **`0aa8a558`, `9e5b57d3`, `0dda32b2`, `23fc8fb9`, `cca39b4d`**.
-  **So every figure recorded for items 1-1's remaining half and 3-1's census, guarded tree,
-  boxing-source census and `ToNumeric` reuse now describes the pinned pointer directly**, rather
-  than a local build of `07adeb44` plus a patch series applied in order, which is what their
-  sections used to have to say.
-  **The handoff has completed a fourth time, and this time it took all three submodules at once.**
-  The thirteen `Broiler.JS` files pending at the last reading (`0089`–`0101`) **and the HTML and CSS
-  pair beside them** (`0087`, `0088`) have all been applied, pushed and their pointers bumped, so
-  `patches/` was empty for the second time since it was written. All fifteen were checked **patch by
-  patch against each submodule's log rather than inferred from this prose** — each `Subject` resolved
-  to a commit, that commit's `format-patch` output diffed against the patch file (identical once the
-  `From <sha>` line, the blob `index` lines and the trailing git version are set aside, which is the
-  whole of the difference on all fifteen), and each pending-against pointer confirmed an ancestor of
-  the new pin. In patch order the `Broiler.JS` thirteen are **`12760bb9`, `48ad65e7`, `01c79c46`,
-  `2bab9775`, `16389682`, `e0bb9b40`, `cfed00ef`, `c2667c29`, `6ff52f3b`, `ba31a4a9`, `b80327ac`,
-  `3fa35e14`, `14fa4f10`**; `0087` is `Broiler.HTML` `2f94c0d5` and `0088` is `Broiler.CSS`
-  `076ed5d5`. **So every figure recorded for item 3-1's order-preserving guard placement, the GC-pause
-  denominator, the update-target census, items 3-8a and 3-9, the three async-correctness fixes and
-  item 1-1's free-name scan now describes the pinned pointers directly**, rather than a local build
-  plus a patch series applied in order, which is what those sections had to say while they were
-  pending. The renumbering note that series carried — written `0087`–`0099`, shifted `+2` when `main`
-  landed the HTML and CSS pair on the same two numbers — retires with it; **what does not retire is
-  why it happened**: `patches/` is one flat namespace across every submodule, so two branches
-  numbering from the same high-water mark collide whenever both are open, which is the ordinary case
-  rather than an unlucky one.
-  **Twelve patches are pending again, and five of them are one item.**
-  **[`patches/0102`](../patches/0102-js-deferral-population.patch)** — item 1-1's remaining half,
-  its population counted at **728 capture-free sites of 5 762, 12.6%**, and the shortcut that looked
-  available refused by the counter built to test it.
-  **[`0103`](../patches/0103-js-widen-census-corpus.patch)** — the census corpus, widened past the
-  **7 of 15** suites it could reach, which moves item 4-1's headline from **93.54% to 80.11%** and
-  fixes what had been keeping Mandreel out of every census: an **uncatchable stack overflow in the
-  benchmark host**, because item 0-2's stack reserve is a property of the *shell* and no benchmark
-  host had it (§4.2a).
-  **[`0104`](../patches/0104-js-capture-layout-checker.patch)** — item 1-1's *named* obstacle
-  settled: the capture layout derived from source alone **misses nothing on 5 157 sites**, at the
-  price of over-approximating on 2 712 of them, and **two soundness defects in `0101`'s own code**
-  fixed on the way, both about a function's own name.
-  **[`0105`](../patches/0105-js-deferred-body-reentry.patch)** — the obstacle the item does
-  *not* name: a nested body **compiled a second time from the enclosing scope kept alive**, after
-  the enclosing compilation has finished.
-  **[`0106`](../patches/0106-js-reentry-structural-partition.patch)** — that check's residual
-  settled: **5 723 of 5 723 re-entered bodies agree with their eager tree in every token a compiler
-  counter did not produce**, and the 471 whose counter ordinals differ are **all** either the site
-  table's `-1` (the check's own second compilation exhausts it) or 4-2b's tier-2 site re-use, with
-  nothing unexplained.
-  **[`0107`](../patches/0107-js-generic-operator-ceiling.patch)** — item 4-2's arithmetic half
-  priced and **refused by its own arithmetic** at **0.119%** of the corpus, the relational lead it
-  points at closed with it at **0.022%**, and **the whole generic binary-operator surface bounded
-  at 0.475%**.
-  **[`0108`](../patches/0108-js-call-entry-cost.patch)** — item 4-5 **unblocked**: pricing the
-  engine's two call entries against each other, which 4-4 named as the first thing 4-5 should do and
-  nobody had done, says **44% of a call entry (50.18 ns of 114.60) is bookkeeping the short path
-  already skips** — **2.85% of the corpus**, so the missing "~85% unattributable from outside the
-  engine" was the *replicas* being the wrong instrument rather than a missing profiler.
-  **[`0109`](../patches/0109-js-call-bookkeeping-attribution.patch)** — that bookkeeping
-  **attributed**, with the sum closing to within 0.5 ns: **92% of it is Annex B `caller`/`arguments`**
-  at 44.40 ns per call to every ordinary non-strict function, while the
-  strict-mode `AsyncLocal` write costs **102.87 ns per crossing** on **4.74%** of calls — nine of
-  twelve suites never cross, PdfJS crosses on 52.65% of its.
-  **[`0110`](../patches/0110-js-legacy-frame-census.patch)** — that frame **counted** rather
-  than bounded: **60.16% of all calls push one, 1.46% of the corpus**, with Richards at 100% and
-  the two strict suites at ~0% — plus the two instrument defects `0103` surfaced and left (the
-  stale `round-up-16` "current" label, and a histogram bucket that could go negative) **closed**.
-  **[`0111`](../patches/0111-js-legacy-frame-shape.patch)** — that item's named fix **priced
-  before being built and refused at 0.730×**: relocating the frame to a thread-local stack saves
-  **6.19 ns, 0.20% of the corpus for an M–L**, because the cost is the 56-byte `Arguments` copying
-  and moving where it lands does not remove it.
-  **[`0112`](../patches/0112-js-capture-layout-order.patch)** — item 1-1's layout question
-  asked as the item states it, **as an index**: `0104` validated membership and this document
-  recorded it as the layout, which it is not. **14 605 sites ordered, 0 mismatched** where the sets
-  agree — and the over-approximation turns out to shift slots, so the prediction must **drive** the
-  layout rather than match it.
-  And **[`0113`](../patches/0113-js-dense-element-ratio.patch)** — item 3-1's read/write ratio
-  counted for the first time: **3.34 numeric reads per numeric write** over the corpus, 5.26 on
-  NavierStokes and 4.80 on Crypto, and **1.03 on Gameboy — the suite §4.2a re-opened the item on**,
-  so a typed store is an allocation wash there and a loss everywhere else.
-  Usual terms: the push to the submodule remote returned 403, so the pointer is
-  deliberately unbumped and every set of figures was measured on a local build of `14fa4f10` plus
-  the patches in question. `0102` and `0103` are **independent of each other**, but `0104` builds on
-  `0102` and `0105` on both, so **`0102` → `0103` → `0104` → `0105` is the order** — verified by
-  applying all four in sequence to a clean checkout of the pin with `git am --keep-cr` and diffing
-  the result against the tree they were generated from. None needs
-  a main-repo fallback: `0102`'s and `0104`'s counters and `0105`'s retention are off by default
-  (`BROILER_JS_DEFER_TREE_COUNT=1`, `BROILER_JS_CAPTURE_LAYOUT_CHECK=1`, `BROILER_JS_DEFER_TREE=1`)
-  and change no emission on any setting, and `0103` touches only the benchmark host.
-  **Measurements and the test262 run in §4.1 and §3.4 were taken at `cdb2fd41` and have not
-  been repeated** — `685026c0` also carries a string-allocation fix (#936). Octane code
-  sites verified at `45f4f679`. **Phase 2's own measurements — §0, and each 2-x section —
-  were taken at `685026c0` plus the then-pending `0050`–`0058`, which is exactly the tree
-  `a6f101cc` now is**, so they describe the pinned pointer directly and no longer depend on
-  a patch series being applied in order. Item rows were
-  checked against the tree rather than inherited from the prose above them; doing that is
-  what caught this, and it also caught that **item 1-2's acceptance criterion
-  already passed before any work** (phase 1).
+- **Provenance:** the pinned `Broiler.JS` pointer is **`8308df51`**, read 2026-08-06 with
+  `git submodule status` rather than from prose. **Read the pointer with the command; never from
+  this line.** Seven consecutive readings have now found this sentence stale — `07adeb44`,
+  `2ebc0c3c`, `71dda1b7`, `9bf9639b`, `61c8cc65`, `cca39b4d` and `14fa4f10` before it — which is a
+  rate rather than an anecdote: **a pointer written into prose is wrong by default**, so the
+  sentence to write next to any pointer is the command that reads it. The sibling submodules are
+  `Broiler.HTML` **`2f94c0dc`** and `Broiler.CSS` **`f960f943`**, both of which had also moved
+  since anything here described them. It is why §4.1's and §3.4's figures carry the commit they
+  were taken at rather than "the pin".
+- **Everything this document measures is in the pin, and `patches/` holds no `Broiler.JS` patch.**
+  The twelve open at the last reading — `0102`–`0113`: item 1-1's remaining half in five of them,
+  plus the widened census corpus, item 4-2's arithmetic half, item 4-5's four, and item 3-1's
+  read/write ratio — have been applied, pushed and the pointer bumped. In patch order they are
+  **`861daccc`, `18524c34`, `db81b5b2`, `d2711e1b`, `a49d8ba5`, `5ea934fb`, `a06ef9eb`, `046a55fc`,
+  `2f8ed84f`, `19b7ac5b`, `ddb20e7d`, `8308df51`** — twelve subjects matched against the twelve
+  commits `14fa4f10..HEAD` contains, in one unbroken run with nothing else in it. **That is a
+  weaker check than the patch-by-patch `format-patch` diff earlier rounds recorded, and the reason
+  is worth keeping:** a patch file is deleted once it lands, so the diff is available only while the
+  handoff is still open. Verify a landed claim against the submodule log, not against `patches/`.
+  **So every figure in this document describes the pinned pointer directly**, rather than a local
+  build plus a patch series applied in order, which is what a succession of sections used to have
+  to say. Every commit cited for a measurement anywhere below — `a6f101cc`, `685026c0`, `cdb2fd41`,
+  `9bf9639b`, `61c8cc65`, `07adeb44`, `cca39b4d`, `14fa4f10`, `2ebc0c3c`, `71dda1b7`, `7ef80c03`,
+  `8228b0da`, `45f4f679` — is an **ancestor** of the pin (`merge-base --is-ancestor`), so nothing
+  recorded against any of them is invalidated.
+- **A patch number is a citation of this document's history, not a stable file name.** `patches/`
+  is one flat namespace across every submodule, so two branches numbering from the same high-water
+  mark collide whenever both are open — the ordinary case rather than an unlucky one. It has just
+  happened again: **`0102` is now a `Broiler.CSS` patch**, reusing the number item 1-1's
+  capture-free population census held one reading ago. Sections below cite `0102`–`0113` as the
+  units of work they were; the durable reference for each is the commit above.
+- **Measurement dates.** §4.1's figures and §3.4's test262 run were taken at `cdb2fd41` and have
+  not been repeated — `685026c0` also carries a string-allocation fix (#936) and item 0-9's probe
+  corpus (`aa2b1562`, #938). Octane code sites verified at `45f4f679`. **Phase 2's own
+  measurements — §0 and each 2-x section — were taken at exactly the tree `a6f101cc` now is.**
+  Item rows are checked against the tree rather than inherited from the prose above them; doing
+  that is what caught that **item 1-2's acceptance criterion already passed before any work**
+  (phase 1).
 
 > **Path convention.** Because this document moved up a level, every path is written
 > **relative to the repository root**. Paths carrying a `Broiler.JS/` prefix are inside
@@ -165,7 +70,7 @@ so only the parent can hold the combined view.
 
 ## 0. Status
 
-**Last updated 2026-08-05.** Snapshot of where the campaign stands; every claim is detailed in
+**Last updated 2026-08-06.** Snapshot of where the campaign stands; every claim is detailed in
 the item's own section below, and nothing here is *closed* — see the acceptance protocol in §3.
 
 | Phase | State |
@@ -263,7 +168,7 @@ comparable to the committed run's 498 and must never be quoted as if it were. On
 column is the finding.
 
 **The conformance gate is satisfied, and was re-run five times for items 3-3, 4-1, 4-3a and 4-3b.** All
-four pinned manifests were run **2026-08-03 on linux-x64 at the pinned `9bf9639b`** — plus
+four pinned manifests were run **2026-08-03 on linux-x64 at `9bf9639b` (the pin at the time)** — plus
 `patches/0067`, and then plus each successive prefix through all five of `0067`–`0071` —
 against the pinned suite ref `ccaac100`: **8 220 passed, 84 failed, 44 skipped, 9 timed out, and
 every count is identical to §3.4's recorded run on all five, manifest by manifest.** The 84 are the same
@@ -273,26 +178,23 @@ because 2-1, 2-2, 2-4 and 2-8 all touch `OrdinarySetWithOwnDescriptor`, are **cl
 rewrites the storage underneath that path, adds no failure; and neither does 3-3's `let`/`const`
 half.** A **fifth manifest** was added with that item — `test262-lexical-declarations`, because
 none of the four covered `let` or `const` at all — and it is clean on both arms (§3.4).
-**Re-run again 2026-08-04 at the pinned `61c8cc65` plus `patches/0078` for item 3-7, on both
+**Re-run again 2026-08-04 at `61c8cc65` (the pin at the time) plus `patches/0078` for item 3-7, on both
 settings of that patch's switch**: every count is identical, manifest by manifest. One run of
 `properties-proxy` reported an extra failure whose captured stderr reads *"The JavaScript compiler
 is not available"* — **a `dotnet build` rewriting the assembly under a running suite, which was
 mine**, not an engine result; re-run with nothing else building it is clean (§3.4).
 
-**The patch handoff, which was the third gate, is done and has stayed done.** `patches/0049`–`0058`
-were applied, pushed and the pointer bumped to `a6f101cc`, and `0059`–`0086` have followed it in
-six further bumps, most recently to **`cca39b4d`**; the patch files are cleared and
-[`patches/README.md`](../patches/README.md)'s index is **empty for the first time since it was
-written**. What phase 2 measured and what CI now clones are the same tree — which is the condition
-both remaining gates were waiting on, and it is why the conformance one could be run at all. **The
-handoff has now cleared four times running**, so a 403 has come to mean *deferred* rather than
-*stranded*; what makes that safe is that the pointer is never bumped locally, so nothing here can
-name a commit CI cannot clone. The fourth clearing took **all three open stacks at once** — the
-thirteen `Broiler.JS` patches plus the `Broiler.HTML` and `Broiler.CSS` pair — and left `patches/`
-empty for the second time since it was written. **Twelve patches are open again** (`0102`–`0113`: item 1-1's remaining
-half in four of them — its capture-free population, its capture layout, a body compiled from a kept
-enclosing scope, and that check's residual settled — plus the widened census corpus, item 4-2's
-arithmetic half priced and refused, item 4-5 unblocked, attributed, counted and its named fix refused, and two instrument defects closed), on the usual 403 terms.
+**The patch handoff, which was the third gate, is done and has stayed done.** Every
+`Broiler.JS` patch this campaign has written — `0049` through `0113` — has been applied, pushed and
+the pointer bumped, in **five clearings running**, most recently the twelve-patch stack that took
+the pointer to **`8308df51`**;
+[`patches/README.md`](../patches/README.md)'s index carries no `Broiler.JS` row. What phase 2
+measured and what CI now clones are the same tree — which is the condition both remaining gates
+were waiting on, and it is why the conformance one could be run at all. **A 403 has come to mean
+*deferred* rather than *stranded***; what makes that safe is that the pointer is never bumped
+locally, so nothing here can name a commit CI cannot clone. **No engine work is currently held
+outside the pin**, so for the first time since this document was merged there is no arm of it
+measured on a local build plus a patch series.
 
 **Two pre-existing defects found in passing**, both reproducing on a pristine build at the
 pinned pointer, neither owned by this campaign: a refused write to a function's `prototype`
@@ -530,12 +432,12 @@ The pinned manifests are `test262-arrays`, `test262-properties-proxy`,
 `test262-lexical-declarations`. First taken 2026-08-01 at `cdb2fd41`
 (suite ref `ccaac100`), **re-run 2026-08-02 at `a6f101cc` plus 2-9 with every count
 unchanged**, **re-run at `71dda1b7` plus 3-3 with every count unchanged**, and **re-run five
-times on 2026-08-03 on linux-x64 at the pinned `9bf9639b` — plus `patches/0067`, plus `0067` and
+times on 2026-08-03 on linux-x64 at `9bf9639b` (the pin at the time) — plus `patches/0067`, plus `0067` and
 `0068`, plus `0067`–`0069`, plus `0067`–`0070`, and plus all five of `0067`–`0071` — with every count
 identical every time, manifest by manifest** — so the table below describes the pinned pointer as well as the commit it was first
 measured at.
 
-**Re-run 2026-08-05 on linux-x64 at the pinned `cca39b4d` plus item 3-1's order-preserving guard
+**Re-run 2026-08-05 on linux-x64 at `cca39b4d` (the pin at the time) plus item 3-1's order-preserving guard
 placement, on both settings of its switch. On the shipping arm every count is identical to the row
 below, manifest by manifest — 8 710 executed, 8 617 passed, 84 failed, 251 skipped, 9 timed out.**
 This is the run that most needed taking of anything in phase 3, because the change *removes an
@@ -581,7 +483,7 @@ smaller one is the runner's own selection count printed before it runs anything 
 runnable test(s)"** for `arrays`, which is the executed count in the row below to the test, and the
 same for the other four.
 
-**Re-run 2026-08-04 on linux-x64 at the pinned `61c8cc65`, plus `patches/0078` (item 3-7), plus
+**Re-run 2026-08-04 on linux-x64 at `61c8cc65` (the pin at the time), plus `patches/0078` (item 3-7), plus
 `0078`–`0079` (item 3-8), plus `0078`–`0080` (item 3-1) and plus `0078`–`0081` (item 3-2): every
 count is identical to the row below, manifest by manifest, on every arm.** The `0080` run matters most of the five, because that
 patch changes what six core operators *emit* — `&`, `|`, `^`, `<<`, `>>`, `>>>` — and
@@ -632,7 +534,7 @@ Item 3-3's `let`/`const` half changes how lexical bindings are *compiled*, and *
 manifest covered `let` or `const` at all** — `test262-language-basics` is twelve entries about
 `throw`, commas and relational operators. The manifest is
 `language/statements/{let,const,variable}` plus `language/block-scope`, and it was run **six
-times from the same tree**: at the pinned `9bf9639b`, and at that commit plus each successive
+times from the same tree**: at `9bf9639b` (the pin at the time), and at that commit plus each successive
 prefix of `patches/0067`–`0071`. **Identical, 397 of 397 passing on each.** So it did not
 *detect* anything — its value is that a future regression on those paths now fails a pinned gate
 instead of passing unnoticed, and `language/statements/variable` is exactly what `0068` touches.
@@ -2122,7 +2024,7 @@ suite down.
 
 #### At the pinned pointer it is **17 of 17**, and phase 2's exit criterion finally has an answer
 
-Run 2026-08-03 at the pinned `2ebc0c3c` on **linux-x64**, against upstream `chromium/octane`
+Run 2026-08-03 at `2ebc0c3c` (the pin at the time) on **linux-x64**, against upstream `chromium/octane`
 `570ad1cc` (Octane v9), with the shell rebuilt by the harness rather than reused — and this
 time **both engines on the same machine**, so the ×-slower column is internally valid in a way
 no previous run's was.
@@ -4139,7 +4041,7 @@ its own control and is wrong, and that follow-up would not have removed the loss
 #### The losing-side hypothesis was measured, and it is wrong — **`prototype` is what materializes**
 
 > **In the pin.** Shipped as `patches/0061` while its push was blocked by a 403; since applied
-> and pushed, and it is now **`e6222df3`**, an ancestor of the pinned `61c8cc65`. Measurement
+> and pushed, and it is now **`e6222df3`**, an ancestor of `61c8cc65` (the pin at the time). Measurement
 > and instrumentation only — no behaviour change.
 
 The mechanism above was recorded as a hypothesis and flagged *"do not treat as settled"*. It is
@@ -4471,7 +4373,7 @@ curve whose median is ~180×, and this phase is the reason they are.
 ### 2-10 · DeltaBlue's dictionary fallbacks — **found, fixed, and it is not the explanation**
 
 > **In the pin.** Shipped as `patches/0062` while its push was blocked by a 403; since applied
-> and pushed, and it is now **`0812d80d`**, an ancestor of the pinned `61c8cc65`.
+> and pushed, and it is now **`0812d80d`**, an ancestor of `61c8cc65` (the pin at the time).
 
 Phase 2's exit criterion split (Richards 183× passes, DeltaBlue 576× fails), and every phase 2
 item was sized on a probe rather than on the suite. §3.5 already records what that costs: 2-8 was
@@ -4605,7 +4507,7 @@ and it wants the Octane cluster run against it — which is now possible.
 #### 2-11 · The redundant prototype write — **landed, and it is the largest cache win since 2-0**
 
 > **In the pin.** Shipped as `patches/0063` while its push was blocked by a 403; since applied
-> and pushed, and it is now **`4d1c4796`**, an ancestor of the pinned `61c8cc65`.
+> and pushed, and it is now **`4d1c4796`**, an ancestor of `61c8cc65` (the pin at the time).
 
 The class path was tracked to `JSClass.CreateInstance`, and the two obvious sites were already
 correct: the instance is built with `new JSObject(instancePrototype)`, carrying 2-0's own comment.
@@ -4658,7 +4560,7 @@ surface. Octane still runs 15 of 15 suites `ok`.
 #### 2-12 · The stale cache entry that could never be replaced — **DeltaBlue 69% → 93%**
 
 > **In the pin.** Shipped as `patches/0064` while its push was blocked by a 403; since applied
-> and pushed, and it is now **`fb1e2f4c`**, an ancestor of the pinned `61c8cc65`.
+> and pushed, and it is now **`fb1e2f4c`**, an ancestor of `61c8cc65` (the pin at the time).
 
 2-10 owed a per-site attribution, and this is it. The bare miss counter cannot say *why* a read
 missed, so the lookup's exits are now counted separately:
@@ -9121,7 +9023,7 @@ failure record byte-identical to the earlier runs.
 > **Delivered as a patch, not in the pin.** The push to `Broiler-Platform/Broiler.JS` returned
 > **403** — the submodule remote was outside that session's GitHub scope — so the change shipped
 > as `patches/0059` with the pointer unbumped. **It has since been applied and pushed, and is now
-> `962ca06a`, an ancestor of the pinned `61c8cc65`.** Every figure below was measured on a local
+> `962ca06a`, an ancestor of `61c8cc65` (the pin at the time).** Every figure below was measured on a local
 > build of the then-pinned `2ebc0c3c` **plus** that patch, with the control built from the same
 > tree minus it — so they describe the tree the pin now contains.
 
@@ -9203,7 +9105,7 @@ not provide; **not one failure is in a `replace` directory.** Repository suite
 #### The retained-result-list follow-up landed — 2 033 bytes a match, and the guard is the change
 
 > **In the pin.** Shipped as `patches/0060` for the same 403 as the section above; since applied
-> and pushed, and it is now **`6f56d24f`**, an ancestor of the pinned `61c8cc65`. Figures below
+> and pushed, and it is now **`6f56d24f`**, an ancestor of `61c8cc65` (the pin at the time). Figures below
 > were measured on a local build of the then-pinned `2ebc0c3c` plus it and `0059`.
 
 `RegExp.prototype[@@replace]` collects every match in step 14 and only reads their properties in
