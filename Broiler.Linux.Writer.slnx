@@ -38,6 +38,7 @@
   </Folder>
   <Folder Name="/Dependencies/Broiler.Media/">
     <Project Path="Broiler.Media/Broiler.Media.Image/Broiler.Media.Image.csproj" />
+    <Project Path="Broiler.Media/Broiler.Media.Image.Managed/Broiler.Media.Image.Managed.csproj" />
     <Project Path="Broiler.Media/Broiler.Media/Broiler.Media.csproj" />
   </Folder>
   <Folder Name="/Dependencies/Broiler.UI/">

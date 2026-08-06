@@ -36,7 +36,12 @@ public readonly record struct InlineStyleDelta
 
     public string? LinkHref { get; init; }
 
-    /// <summary>Applies this delta over <paramref name="style"/>.</summary>
+    /// <summary>
+    /// Applies this delta over <paramref name="style"/>. An
+    /// <see cref="InlineStyle.Image"/> is content rather than formatting and is
+    /// never touched here — clearing formatting over a picture must not delete
+    /// the picture.
+    /// </summary>
     public InlineStyle Apply(InlineStyle style) => style with
     {
         Bold = Bold ?? style.Bold,

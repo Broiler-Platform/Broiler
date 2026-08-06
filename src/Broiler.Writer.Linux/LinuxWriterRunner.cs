@@ -52,7 +52,8 @@ internal static class LinuxWriterRunner
             {
                 lastFrameContext = new BFrameContext(WriterPalette.Canvas, frameIndex++, RenderOptions);
                 renderer.Render(surface, renderList, lastFrameContext);
-            });
+            },
+            getRenderer: () => renderer);
         using WriterApp app = new(host, () => closeRequested = true);
 
         await using LinuxInputCoordinator input = new(canUseEvdev, Console.WriteLine, externalPointer: x11Window is not null);

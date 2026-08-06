@@ -71,6 +71,24 @@ public sealed class MarkdownWriterTests
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "markdown.inline-style");
     }
 
+    [Fact]
+    public void Writes_An_Embedded_Image_As_A_Data_Uri()
+    {
+        var image = new InlineImage(new byte[] { 1, 2, 3 }, "image/png", 40, 20, "a logo");
+        RichTextDocument document = RichTextDocument.FromParagraphs(new[]
+        {
+            MakeParagraph(
+                ParagraphStyle.Default,
+                ("before ", InlineStyle.Default),
+                (InlineImage.PlaceholderText, InlineStyle.Default with { Image = image })),
+        });
+
+        string markdown = Write(document);
+
+        Assert.Contains("![a logo](data:image/png;base64,AQID)", markdown, StringComparison.Ordinal);
+        Assert.DoesNotContain("\uFFFC", markdown, StringComparison.Ordinal);
+    }
+
     private static string Write(RichTextDocument document) =>
         System.Text.Encoding.UTF8.GetString(MarkdownDocumentCodec.WriteToArray(document));
 

@@ -95,6 +95,23 @@ public sealed class HtmlWriterTests
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "html.list");
     }
 
+    [Fact]
+    public void Writes_An_Embedded_Image_As_A_Data_Uri()
+    {
+        var image = new InlineImage(new byte[] { 1, 2, 3 }, "image/png", 40, 20, "a logo");
+        RichTextDocument document = SingleParagraph(
+            ("before", InlineStyle.Default),
+            (InlineImage.PlaceholderText, InlineStyle.Default with { Image = image }));
+
+        string html = Write(document);
+
+        Assert.Contains("<img src=\"data:image/png;base64,AQID\"", html, StringComparison.Ordinal);
+        Assert.Contains("alt=\"a logo\"", html, StringComparison.Ordinal);
+        Assert.Contains("width: 40pt", html, StringComparison.Ordinal);
+        Assert.Contains("before", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("\uFFFC", html, StringComparison.Ordinal);
+    }
+
     private static string Write(RichTextDocument document) =>
         Encoding.UTF8.GetString(HtmlDocumentCodec.WriteToArray(document));
 

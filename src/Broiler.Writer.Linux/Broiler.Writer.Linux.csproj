@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Broiler.Writer\Broiler.Writer.Core.csproj" />
+    <ProjectReference Include="..\..\Broiler.Media\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" />
     <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj" />
     <ProjectReference Include="..\..\Broiler.Graphics\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj" />
     <ProjectReference Include="..\..\Broiler.Input\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj" />

@@ -35,6 +35,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
     }
 
     private readonly List<VisualLine> _lines = [];
+    private readonly Dictionary<InlineImage, BImageHandle> _imageHandles = new(ReferenceEqualityComparer.Instance);
     private RichTextDocument? _layoutDocument;
     private BFontStyle? _layoutFont;
     private double _layoutWidth = double.NaN;
@@ -53,6 +54,12 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
     private bool _isTouchScrolling;
 
     private const double TouchScrollThreshold = 6;
+
+    /// <summary>The box an image with no known size is drawn in, and the minimum for any image.</summary>
+    private const double FallbackImageExtent = 72;
+
+    /// <summary>Space left around an inline image so it does not touch the text above and below it.</summary>
+    private const double ImageMargin = 2;
 
     public BColor Background { get; set; } = StandardControlPaint.Surface;
 
@@ -213,11 +220,24 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
         };
     }
 
+    protected override void OnAttached()
+    {
+        base.OnAttached();
+
+        // A layout built before the session existed sized its images from the
+        // fallback box, because no host was there to decode them. Rebuild it now
+        // that one is, or those sizes would stick until the document changes.
+        _layoutValid = false;
+    }
+
     protected override void OnDetached()
     {
         if (Session?.Host is IUiTextInputHost textInput)
             textInput.ClearCaret(this);
 
+        // The handles belong to the detaching session's renderer, so they are
+        // released here rather than kept for a session that cannot draw them.
+        ReleaseImages();
         base.OnDetached();
     }
 
@@ -312,10 +332,45 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
             foreach (LineSegment segment in LineSegments(line))
             {
                 BColor color = IsEnabled && !segment.Style.Foreground.IsEmpty ? segment.Style.Foreground : fallback;
+                if (segment.Image is InlineImage image)
+                {
+                    DrawInlineImage(renderList, image, segment, y, line.Height, color);
+                    continue;
+                }
+
                 renderList.DrawText(new BTextRun(segment.Text, segment.Font, color), new BPoint(segment.X, y));
                 DrawDecorations(renderList, segment, y, line.Height, color);
             }
         }
+    }
+
+    /// <summary>
+    /// Draws one inline picture, bottom-aligned in its line the way Word sits an
+    /// inline image on the text baseline. An image the backend could not decode
+    /// is drawn as an outlined box, so the document still shows where it is.
+    /// </summary>
+    private void DrawInlineImage(
+        BRenderList renderList,
+        InlineImage image,
+        LineSegment segment,
+        double lineTop,
+        double lineHeight,
+        BColor color)
+    {
+        BSize size = ImageDisplaySize(image);
+        double height = Math.Min(size.Height, Math.Max(0, lineHeight - (ImageMargin * 2)));
+        double top = lineTop + Math.Max(ImageMargin, lineHeight - height - ImageMargin);
+        var destination = new BRect(segment.X, top, segment.Advance, height);
+
+        BImageHandle handle = ResolveImage(image);
+        if (handle.IsValid)
+        {
+            var source = new BRect(0, 0, handle.PixelSize.Width, handle.PixelSize.Height);
+            renderList.DrawImage(handle, source, destination, IsEnabled ? 1.0 : 0.5);
+            return;
+        }
+
+        StandardControlPaint.StrokeRounded(renderList, destination, color, StandardControlPaint.ControlRadius, 1);
     }
 
     private void DrawDecorations(BRenderList renderList, LineSegment segment, double y, double lineHeight, BColor color)
@@ -379,6 +434,30 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
                 continue;
 
             string text = paragraph.Text.Substring(segStart, segEnd - segStart);
+            if (run.Style.Image is InlineImage image)
+            {
+                // Every placeholder character in an image run draws the image, so
+                // a run that happens to hold two of them draws two pictures
+                // rather than one stretched across both character positions.
+                foreach (char character in text)
+                {
+                    if (character == InlineImage.Placeholder)
+                    {
+                        double width = ImageDisplaySize(image).Width;
+                        yield return LineSegment.ForImage(image, run.Style, x, width);
+                        x += width;
+                        continue;
+                    }
+
+                    string single = character.ToString();
+                    double advance = MeasurePieces(single, run.Style, RunFont(run.Style));
+                    yield return new LineSegment(single, run.Style, RunFont(run.Style), x, advance);
+                    x += advance;
+                }
+
+                continue;
+            }
+
             foreach (ShapedPiece piece in ShapePieces(text, run.Style, RunFont(run.Style)))
             {
                 double advance = BTextMeasurer.MeasureAdvance(piece.Text, piece.Font);
@@ -386,6 +465,57 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
                 x += advance;
             }
         }
+    }
+
+    /// <summary>
+    /// The size an inline image is drawn at: the display size the document
+    /// states, else the decoded pixel size, else a fixed box. The box keeps a
+    /// picture the backend could not decode visible and selectable instead of
+    /// collapsing it to nothing.
+    /// </summary>
+    private BSize ImageDisplaySize(InlineImage image)
+    {
+        if (image.HasExplicitSize)
+            return new BSize(image.Width, image.Height);
+
+        BImageHandle handle = ResolveImage(image);
+        if (handle.IsValid && handle.PixelSize.Width > 0 && handle.PixelSize.Height > 0)
+            return handle.PixelSize;
+
+        return new BSize(FallbackImageExtent, FallbackImageExtent);
+    }
+
+    /// <summary>
+    /// The backend handle for an image, created once per image object and kept
+    /// until the control is detached. A host with no image capability, or bytes
+    /// the backend cannot decode, cache as invalid so the failure is not retried
+    /// on every frame.
+    /// </summary>
+    private BImageHandle ResolveImage(InlineImage image)
+    {
+        if (_imageHandles.TryGetValue(image, out BImageHandle cached))
+            return cached;
+
+        BImageHandle handle = BImageHandle.Invalid;
+        if (Session?.Host is IUiImageHost imageHost && !image.Data.IsEmpty)
+            handle = imageHost.CreateImage(image.Data.Span);
+
+        _imageHandles[image] = handle;
+        return handle;
+    }
+
+    private void ReleaseImages()
+    {
+        if (Session?.Host is IUiImageHost imageHost)
+        {
+            foreach (BImageHandle handle in _imageHandles.Values)
+            {
+                if (handle.IsValid)
+                    imageHost.ReleaseImage(handle);
+            }
+        }
+
+        _imageHandles.Clear();
     }
 
     /// <summary>How much smaller a small-caps letter is drawn than a full capital.</summary>
@@ -453,6 +583,27 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
         double advance = 0;
         foreach (ShapedPiece piece in ShapePieces(text, style, font))
             advance += BTextMeasurer.MeasureAdvance(piece.Text, piece.Font);
+
+        return advance;
+    }
+
+    /// <summary>
+    /// The advance of a substring of one run, counting a picture as the width it
+    /// is drawn at. Caret placement, selection rectangles, and wrapping all come
+    /// through here, so an image occupies the same horizontal space in each.
+    /// </summary>
+    private double MeasureRunText(string text, InlineStyle style)
+    {
+        if (style.Image is not InlineImage image)
+            return MeasurePieces(text, style, RunFont(style));
+
+        double advance = 0;
+        foreach (char character in text)
+        {
+            advance += character == InlineImage.Placeholder
+                ? ImageDisplaySize(image).Width
+                : MeasurePieces(character.ToString(), style, RunFont(style));
+        }
 
         return advance;
     }
@@ -1146,7 +1297,7 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
                 continue;
 
             string text = paragraph.Text.Substring(segmentStart, segmentEnd - segmentStart);
-            advance += MeasurePieces(text, run.Style, RunFont(run.Style));
+            advance += MeasureRunText(text, run.Style);
         }
 
         return advance;
@@ -1210,6 +1361,46 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
         }
 
         _contentHeight = y;
+        ReleaseImagesNotIn(document);
+    }
+
+    /// <summary>
+    /// Releases the handles of images the document no longer contains. Layout is
+    /// the right moment: it runs when the document actually changed, not once per
+    /// frame, and opening a second document would otherwise leave the first
+    /// document's pictures uploaded for the life of the control.
+    /// </summary>
+    private void ReleaseImagesNotIn(RichTextDocument document)
+    {
+        if (_imageHandles.Count == 0)
+            return;
+
+        var live = new HashSet<InlineImage>(ReferenceEqualityComparer.Instance);
+        foreach (RichTextParagraph paragraph in document.Paragraphs)
+        {
+            foreach (StyleRun run in paragraph.Runs)
+            {
+                if (run.Style.Image is InlineImage image)
+                    live.Add(image);
+            }
+        }
+
+        List<InlineImage>? stale = null;
+        foreach (KeyValuePair<InlineImage, BImageHandle> entry in _imageHandles)
+        {
+            if (!live.Contains(entry.Key))
+                (stale ??= []).Add(entry.Key);
+        }
+
+        if (stale is null)
+            return;
+
+        var imageHost = Session?.Host as IUiImageHost;
+        foreach (InlineImage image in stale)
+        {
+            if (_imageHandles.Remove(image, out BImageHandle handle) && handle.IsValid)
+                imageHost?.ReleaseImage(handle);
+        }
     }
 
     private static IEnumerable<(int Start, int End)> HardSegments(string text)
@@ -1272,7 +1463,11 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
             if (Math.Max(start, runStart) >= Math.Min(end, runEnd))
                 continue;
 
-            height = Math.Max(height, BTextMeasurer.GetLineHeight(RunFont(run.Style)));
+            // A picture makes its line as tall as it needs to be, or the image
+            // would be clipped by the surrounding text's line height.
+            height = run.Style.Image is InlineImage image
+                ? Math.Max(height, ImageDisplaySize(image).Height + (ImageMargin * 2))
+                : Math.Max(height, BTextMeasurer.GetLineHeight(RunFont(run.Style)));
         }
 
         return height;
@@ -1283,6 +1478,12 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
         string text = paragraph.Text;
         InlineStyle style = paragraph.StyleAt(index);
         BFontStyle font = RunFont(style);
+        if (text[index] == InlineImage.Placeholder && style.Image is InlineImage image)
+        {
+            step = 1;
+            return ImageDisplaySize(image).Width;
+        }
+
         if (index + 1 < text.Length && char.IsHighSurrogate(text[index]) && char.IsLowSurrogate(text[index + 1]))
         {
             step = 2;
@@ -1323,5 +1524,20 @@ public sealed class StandardRichEdit : UiRichEdit, IStandardThemedControl, IUiTe
 
     private readonly record struct VisualLine(int ParagraphIndex, int Start, int End, double Top, double Height);
 
-    private readonly record struct LineSegment(string Text, InlineStyle Style, BFontStyle Font, double X, double Advance);
+    /// <summary>
+    /// A stretch of a visual line as it is drawn. <see cref="Image"/> is set only
+    /// for a picture, and then <see cref="Text"/> is the placeholder character it
+    /// occupies rather than anything to draw as glyphs.
+    /// </summary>
+    private readonly record struct LineSegment(
+        string Text,
+        InlineStyle Style,
+        BFontStyle Font,
+        double X,
+        double Advance,
+        InlineImage? Image = null)
+    {
+        public static LineSegment ForImage(InlineImage image, InlineStyle style, double x, double width) =>
+            new(InlineImage.PlaceholderText, style, BFontStyle.Default, x, width, image);
+    }
 }

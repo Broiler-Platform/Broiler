@@ -5,6 +5,39 @@ namespace Broiler.Documents.Rtf.Tests;
 
 public sealed class RtfWriterTests
 {
+    [Fact]
+    public void Writes_An_Embedded_Png_As_A_Pict_Destination()
+    {
+        var image = new InlineImage(new byte[] { 0xDE, 0xAD }, "image/png", 40, 20);
+        RichTextDocument document = RichTextDocument.FromParagraphs(new[]
+        {
+            RichTextParagraph.Create(InlineImage.PlaceholderText, InlineStyle.Default with { Image = image }),
+        });
+
+        string rtf = Write(document);
+
+        Assert.Contains("{\\pict\\pngblip", rtf, StringComparison.Ordinal);
+        Assert.Contains("\\picwgoal800", rtf, StringComparison.Ordinal);
+        Assert.Contains("\\pichgoal400", rtf, StringComparison.Ordinal);
+        Assert.Contains("dead}", rtf, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Drops_An_Image_Format_Rtf_Cannot_Name()
+    {
+        var image = new InlineImage(new byte[] { 1, 2 }, "image/webp", 40, 20);
+        RichTextDocument document = RichTextDocument.FromParagraphs(new[]
+        {
+            RichTextParagraph.Create(InlineImage.PlaceholderText, InlineStyle.Default with { Image = image }),
+        });
+
+        using var stream = new MemoryStream();
+        DocumentWriteResult result = RtfWriter.Write(document, stream);
+
+        Assert.DoesNotContain("\\pict", Encoding.ASCII.GetString(stream.ToArray()), StringComparison.Ordinal);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "rtf.image.format");
+    }
+
     private static string Write(RichTextDocument document) =>
         Encoding.ASCII.GetString(RtfWriter.WriteToArray(document));
 

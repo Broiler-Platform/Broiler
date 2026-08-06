@@ -89,6 +89,17 @@ internal sealed class WriterApp : IDisposable
         new("HTML (*.html)", "*.html;*.htm", ".html"),
         new("Markdown (*.md)", "*.md;*.markdown", ".md"),
     ];
+    private static readonly UiFileDialogFilter[] OpenPictureFileFilters =
+    [
+        new("Images", "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp", ".png"),
+        new("PNG (*.png)", "*.png", ".png"),
+        new("JPEG (*.jpg, *.jpeg)", "*.jpg;*.jpeg", ".jpg"),
+        new("GIF (*.gif)", "*.gif", ".gif"),
+        new("Bitmap (*.bmp)", "*.bmp", ".bmp"),
+    ];
+
+    /// <summary>The widest a freshly inserted picture is placed at, in editor units.</summary>
+    private const double MaxInsertedPictureWidth = 420;
 
     public WriterApp(
         WriterUiHost host,
@@ -307,6 +318,7 @@ internal sealed class WriterApp : IDisposable
         dispatcher.Add(new StandardCommand("file.save", SaveDocument));
         dispatcher.Add(new StandardCommand("file.save-as", ShowSaveDialog));
         dispatcher.Add(new StandardCommand("file.exit", _requestClose));
+        dispatcher.Add(new StandardCommand("insert.picture", ShowInsertPictureDialog));
         dispatcher.Add(new StandardCommand("view.formatting-codes", ToggleFormattingCodes));
         AddFormatCodeCommands(dispatcher);
         dispatcher.Add(new StandardCommand("format.font", ShowFontDialog, () => _editor.GetCommandState(RichEditCommand.SetFont).IsEnabled));
@@ -352,6 +364,12 @@ internal sealed class WriterApp : IDisposable
         format.Children.Add(RichEditItem("underline", "Underline", "format.underline", RichEditCommand.Underline, 'U', checkable: true));
         format.Children.Add(RichEditItem("strike", "Strikethrough", "format.strike", RichEditCommand.Strikethrough, 'S', checkable: true));
         format.Children.Add(RichEditItem("clear", "Clear formatting", "format.clear", RichEditCommand.ClearFormatting, 'C'));
+
+        format.Children.Add(new UiMenuItem("picture", "Insert picture...")
+        {
+            CommandName = "insert.picture",
+            AccessKey = 'R',
+        });
 
         var insertCode = new UiMenuItem("insert-code", "Insert Code") { AccessKey = 'D' };
         insertCode.Children.Add(new UiMenuItem("code-bold", "Bold") { CommandName = "formatcodes.insert.bold" });
@@ -741,6 +759,79 @@ internal sealed class WriterApp : IDisposable
 
         _session.SetFocus(_editor);
         RefreshUi();
+    }
+
+    private void ShowInsertPictureDialog()
+    {
+        var dialog = new StandardFileDialog
+        {
+            Mode = UiFileDialogMode.Open,
+            CurrentDirectory = GetDialogDirectory(),
+            PreferredSize = FileDialogPreferredSize,
+        };
+        dialog.SetFileTypeFilters(OpenPictureFileFilters);
+        dialog.ResultCompleted += (_, e) =>
+        {
+            if (e.Result.Kind == UiDialogResultKind.Accepted && !string.IsNullOrWhiteSpace(e.Result.Value))
+                InsertPicture(e.Result.Value);
+        };
+
+        dialog.ShowOpenModal(_rootWindow, GetDialogPlacement());
+        _lastAction = "Insert picture";
+        RefreshUi();
+    }
+
+    /// <summary>
+    /// Reads an image file and inserts it at the caret as a single inline image
+    /// character. The size comes from the decoded pixels, scaled down so a photo
+    /// straight from a camera does not arrive several thousand units wide.
+    /// </summary>
+    internal bool InsertPicture(string path)
+    {
+        try
+        {
+            string fullPath = Path.GetFullPath(path);
+            byte[] bytes = File.ReadAllBytes(fullPath);
+            string? contentType = WriterImageFormats.ContentTypeFor(fullPath, bytes);
+            if (contentType is null)
+            {
+                _lastAction = "Insert picture failed: unsupported image format";
+                RefreshUi();
+                return false;
+            }
+
+            _lastDirectory = Path.GetDirectoryName(fullPath) ?? _lastDirectory;
+            BSize size = WriterImageFormats.MeasureDisplaySize(bytes, MaxInsertedPictureWidth);
+            var image = new InlineImage(
+                bytes,
+                contentType,
+                size.Width,
+                size.Height,
+                altText: Path.GetFileNameWithoutExtension(fullPath),
+                name: Path.GetFileNameWithoutExtension(fullPath));
+
+            // The rich-paste primitive is the only insertion path that carries a
+            // style of its own; InsertText takes the caret's style, which has no
+            // image on it.
+            bool inserted = _editor.InsertDocument(RichTextDocument.FromParagraphs(
+            [
+                RichTextParagraph.Create(
+                    InlineImage.PlaceholderText,
+                    _editor.CaretInlineStyle with { Image = image }),
+            ]));
+            _lastAction = inserted
+                ? "Inserted picture " + Path.GetFileName(fullPath)
+                : "Insert picture unavailable";
+            _session.SetFocus(_editor);
+            RefreshUi();
+            return inserted;
+        }
+        catch (Exception ex) when (IsFileOperationException(ex))
+        {
+            _lastAction = "Insert picture failed: " + ex.Message;
+            RefreshUi();
+            return false;
+        }
     }
 
     private void ShowFontDialog()
