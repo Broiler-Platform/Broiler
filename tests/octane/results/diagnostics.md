@@ -1,8 +1,8 @@
 # Octane failure diagnostics
 
-- Generated: `2026-08-05T14:56:55.463Z`
-- Broiler: `Broiler.JS (BroilerJS --script-host)` — per-suite timeout 1800s (floor; a suite may raise its own — the budget each ran under is in its section below)
-- Jint: `Jint 4.15.3 (interpreter)` — per-suite timeout 1800s (floor; a suite may raise its own — the budget each ran under is in its section below)
+- Generated: `2026-08-06T09:26:43.784Z`
+- Broiler: `Broiler.JS (BroilerJS --script-host)` — per-suite timeout 1800s (floor; a suite may raise its own — the budget each ran under is in its section below), 3 repetitions
+- Jint: `Jint 4.15.3 (interpreter)` — per-suite timeout 1800s (floor; a suite may raise its own — the budget each ran under is in its section below), 3 repetitions
 
 Statuses: **error** — Octane caught the throw and scored the rest;
 **crash** — the process died and took the suite with it;
