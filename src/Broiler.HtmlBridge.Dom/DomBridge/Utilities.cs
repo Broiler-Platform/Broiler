@@ -391,6 +391,10 @@ public sealed partial class DomBridge
         // Baked-style overlay (Phase 4 item 2 increment 3): serialize-time bakes now live off the
         // inline-style dict, so copy the overlay too. A no-op unless the source was cloned after baking.
         CopyBakedStyleOverlay(source, clone);
+
+        // Web Animations targeting a pseudo-element bake outside the inline style (a pseudo has no
+        // node); the serialization pass reads them off the projected element, so they travel here.
+        CopyAnimatedPseudoStyles(source, clone);
     }
 
     /// <summary>

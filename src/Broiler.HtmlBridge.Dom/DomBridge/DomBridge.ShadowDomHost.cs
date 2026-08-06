@@ -29,6 +29,7 @@ public sealed partial class DomBridge : Dom.Features.IShadowDomHost
 
     DomElement Dom.Features.IShadowDomHost.AttachShadowRoot(DomElement host, string mode)
     {
+        _hasShadowRoots = true;
         var shadowRoot = CreateBridgeElement("#shadow-root");
         // SetParent links the shadow root to its host, so GetOwningDocument derives the shadow root's
         // owning document from the host's tree position — no OwnerDocRoot inheritance needed (P4.4c).

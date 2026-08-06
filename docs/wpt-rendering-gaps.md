@@ -5,6 +5,12 @@
   problems 4–30. Each of those 27 tests renders at **0.0–2.5%** of its Chromium
   reference, so each is a whole-canvas difference rather than a tolerance
   problem.
+- **Later runs get their own section rather than a rewrite**, since most of each
+  new list is the same tests under new numbers:
+  [#1497 (2026-07-30)](#the-next-run-issue-1497-2026-07-30) and
+  [#1538 (2026-08-05)](#the-next-run-issue-1538-2026-08-05). Where a re-run
+  contradicts something below, the section says so and the row here is struck
+  through — read the newest section first.
 - **Not in scope:** problem 1 (the `DomDocument.CreateElement` crash) is fixed —
   frames no longer parse a non-HTML resource as markup, and `patches/0035-…`
   carried the DOM-layer fix (since applied). Problems 2 and 3 are both per-test
@@ -896,6 +902,418 @@ confirmed or contradicted. Cross-referencing the two lists:
   face, so it would not carry a test over the 99% threshold anyway, and could
   regress tests that pass today. Worth doing; not worth doing blind.
 
+## The next run (issue #1538, 2026-08-05)
+
+20 048 failures, no incomplete shards. Cross-referencing the list against the two
+runs above: **nine of the thirty are re-reports** under new numbers — problems 1,
+2, 3, 4, 9 and 10 are #1491's problems 4, 5, 12, 13, 26 and #1497's problem 25,
+and problems 5, 6, 7 and 18 are #1491's 16/17, 18 and 14/15. **The other
+twenty-one are new to this list.** As above, this section records only what is
+new, what landed, and what the measurements said — including where they
+contradict an earlier verdict.
+
+Every local number below is this container measured against a locally generated
+Chromium reference, over a sparse WPT checkout of the directories the list names.
+**Twenty-two of the thirty reproduce locally to within 0.1 of CI** — every one
+that was measured except two — which is what makes the diagnoses in this section
+worth writing down; those two are called out individually. (Problem 17 joined that
+count late: it appeared not to reproduce until its reference was regenerated.)
+
+### Shadow trees leaked their styles into the whole page — problems 16 and 20, **fixed**
+
+- **Tests:** `css/css-shadow/shadow-directionality-001.tentative` and `-002`, at
+  1.3% and 1.1% on CI and reproduced here to the decimal.
+- **Owner:** HtmlBridge (`DomBridge/ShadowTreeSelectors.cs`), with a `Broiler.CSS`
+  half in [`patches/0102`](../patches/README.md).
+- **Two independent bugs, and the pixels only move when both are understood.**
+  A shadow root's `<style>` is serialized inline into the render document, so the
+  renderer sees its rules as ordinary global rules with no provenance — a shadow
+  tree's `div { background: red }` repainted **every** `div` in the page. On top
+  of that, `:dir()` sat in `CssSelectorMatcher`'s `RecognizedPseudoClasses` with
+  no arm in the pseudo-class switch, so it fell through to the deliberately
+  lenient default for recognised-but-unmodelled names and matched *every* element
+  — `:dir(ltr)` and `:dir(rtl)` at once. Together they turned each of these
+  tests' four small shadow rules into one canvas-wide repaint.
+- **What landed, in two halves.**
+  1. **Main repo — `ScopeShadowTreeSelectors`.** It reuses the shape
+     `ScopeShadowHostSelectors` already established for the mirror-image `:host`
+     problem: stamp every element of the tree with
+     `data-broiler-shadow-scope="N"` (the host is deliberately *not* stamped — it
+     belongs to the outer tree and is reachable only through `:host`), then append
+     `[data-broiler-shadow-scope="N"]` to each selector's subject compound. It
+     runs *before* the `:host` pass, which rewrites the keyword this one keys off.
+  2. **`patches/0102` (`Broiler.CSS`).** `:dir()` now resolves HTML's
+     directionality: nearest ancestor-or-self with a valid `dir`, `ltr` at the
+     root, `dir=auto` (and `<bdi>`, whose default it is) from the first strong
+     directional character. Strictly a narrowing, so it can only remove matches
+     the lenient default invented. **The push was refused (403), as
+     `CLAUDE.md` describes**, so it is a patch — but it is listed in
+     `scripts/apply-pending-wpt-patches.sh`, so the WPT run exercises it on CI.
+- **The subject compound, not every compound — and that is a deliberate choice.**
+  Scoping the subject is what stops the leak: a rule whose subject is outside the
+  tree cannot apply. Scoping *every* compound is closer to the spec (it would also
+  require each ancestor in a descendant selector to be in the same tree) but adds
+  one attribute selector per compound, so it changes specificity **unevenly**
+  between rules of the same sheet — `div span` (0,0,2) and `.foo` (0,1,0) swap
+  cascade order once they become `div[s] span[s]` (0,2,2) and `.foo[s]` (0,2,0).
+  Subject-only adds exactly (0,1,0) to every rule, so their order relative to each
+  other is preserved exactly, and the sheet as a whole outranks page rules
+  reaching into the tree — the correct direction, since per spec those should not
+  match at all.
+- **A serialization pass is not free, and the suite says so.** Both this pass and
+  the `animate({pseudoElement})` one added later walk the whole document, and
+  running them unconditionally pushed
+  `RunTestWithTimeout_GridTemplateColumnsCrash_Completes_Without_Timing_Out` — a
+  **6-second** budget on a `grid-template-columns` with five million tracks — over
+  its limit. It only failed in a full-suite run, never in isolation, which is
+  exactly the shape that reads as flakiness; the control that settled it was
+  running the *same full suite* against unmodified `origin/main` sources, where the
+  test passes. Both passes now early-out on a flag (`_hasShadowRoots`,
+  `_hasAnimatedPseudoStyles`), so a document with no shadow DOM and no pseudo
+  animation pays nothing. Suite back to its 56 pre-existing failures, and
+  `css/css-shadow` 157/207 and `css/css-pseudo` 237/358 are unchanged by the guard.
+- **Compounds left alone, each for a reason:** `:host`/`:host-context` (the host
+  is not in the tree), and `::slotted`/`::part` (their subject is a light-DOM
+  node). `@keyframes`, `@font-face` and friends are copied verbatim — their blocks
+  hold keyframe selectors and descriptors, not selectors — while the conditional
+  group rules (`@media`, `@supports`, `@container`, `@layer`, `@scope`,
+  `@starting-style`) are recursed into, because those do hold style rules.
+- **Measured.** The two tests go **1.1% / 1.3% → 99.55%**, and across the 207-test
+  `css/css-shadow` subset **153 → 157 passing with nothing lost** — the other two
+  gains being `css-scoping-shadow-with-rules-no-style-leak` (98.1% → 99.2%, the
+  test named for exactly this bug) and `host-specificity-003` (88.0% → 99.6%).
+  Ten more tests moved up without crossing the threshold. Checked for regressions
+  over **1 669 further tests** in `css-view-transitions`, `css-masking`,
+  `css-position` and `css-pseudo`: **345/490, 222/439, 238/382 and 236/358 both
+  before and after, with no test changing state in either direction.**
+- **The one test that moved down** is `css-view-transitions/names-are-tree-scoped`,
+  96.12% → 94.84% — failing on both sides, and already recorded in
+  [the #1497 section](#the-next-run-issue-1497-2026-07-30) as blocked on captured
+  elements still painting in place. Its shadow rules now correctly stop reaching
+  light-tree boxes, which is why the number moves; the test cannot pass until that
+  separate gap closes.
+- **The main-repo half carries both tests on its own.** Measured with the patch
+  reverted, `css/css-shadow` is the same 157 — with `:dir()` still matching
+  everything, all four shadow rules happen to apply anyway. The patch is what makes
+  them pass *for the right reason*, and it is why the fix is not resting on that
+  coincidence.
+
+### An `overlay` entry transition that never finished — problem 21, **fixed**
+
+- **Test:** `css/css-position/overlay/overlay-transition-finished`, 1.8% on CI and
+  1.81% here.
+- **Owner:** HtmlBridge (`DomBridge/AnchorResolver/Dialogs.cs`). Main repo, so it
+  is on CI immediately.
+- **The CSSOM answer and the painted answer are taken at different instants, and
+  conflating them made the test unwinnable.** It reads
+  `getComputedStyle(el).overlay` synchronously after `showPopover()` and paints
+  itself pink unless it sees `none` — the transition must be observed *running* at
+  script time — then screenshots from `transitionend`, by which point the popover
+  must be in the top layer covering a fixed red div.
+  `PopoverHeldOutByOverlayTransitionIn` answered "held out" for both, because it
+  returns true whenever an element merely *declares* a discrete `overlay`
+  transition. Our render was 98.2% red with an 8px green band: the popover painted
+  beneath the fixed div, which is "held out" exactly.
+- **What landed.** `ComputeOverlayValue` keeps answering for t≈0; only the two
+  paint sites move, through `PopoverHeldOutOfTopLayerForPaint`. The renderer has no
+  clock, so "which instant" is read from what the page says — the same thing the
+  runner already does for `takeScreenshotDelayed(N)` via
+  `WptTestRunner.ScreenshotPresentationTime`. A test that gates its screenshot on
+  `transitionend` is making that statement without a number, and
+  `ScreenshotWaitsForTransitionEnd` recognises the shape: the document is still
+  `reftest-wait` *and* a `transitionend` listener is reachable from the element
+  (itself, an ancestor, the document, or the window — it bubbles).
+- **The `reftest-wait` half is what keeps it from being a one-way door.** Broiler
+  dispatches no transition events, so a page waiting on one waits forever and the
+  class survives to serialization. If transition events are implemented later, the
+  natural shape — dispatch `transitionend`, the listener calls `takeScreenshot()`,
+  the class goes — makes the predicate false while the transition is genuinely
+  over, and the ordinary path elevates the popover. The rule degrades into the real
+  one rather than inverting.
+- **Nothing else in the directory matches the shape**, which is what says this is a
+  rule and not a fit to one test: the three tests that must keep the popover held
+  out — `-in-rendering` (60s), `-backdrop-entry` (2s delay + 2s), `-out-rendering`
+  — screenshot immediately and register no such listener, and
+  `overlay-transition-dialog` is `reftest-wait` but releases it from a
+  `requestAnimationFrame`.
+- **Measured: 1.81% → 100%**, and the 382-test `css-position` subset goes
+  **238 → 239 passing with nothing lost**. Four tests in
+  `OverlayTransitionScreenshotTimeTests` cover both directions, the ancestor
+  listener, and the script-time half that must not move.
+
+### A Web Animation on a pseudo-element was silently inert — problem 11, **fixed**
+
+- **Test:** `css/css-pseudo/backdrop-animate-002`, 0.8% on CI and 0.77% here.
+- **Owner:** HtmlBridge (`DomBridge/WebAnimations.cs`, `DomBridge.Serialization.cs`,
+  `Dialogs.cs`). Main repo.
+- **Two gaps, and the test needs both.** It animates `::backdrop` to a
+  10%-opacity green with
+  `{opacity: [0.1, 0.1], backgroundColor: ["green", "green"]}` and got the UA modal
+  scrim. **Its own reference writes the same declarations as CSS and already
+  rendered correctly** — which is what said the gap was the API rather than the
+  pseudo-element.
+  1. **The property-indexed keyframe form was not parsed at all.**
+     `ParseAnimationKeyframes` required a `JSArray`, so
+     `{ opacity: [0, 1] }` — the other half of the Web Animations keyframe
+     argument — resolved to zero keyframes and the whole animation was inert. Each
+     property is now turned into its own keyframes, which is exactly how
+     `ResolveKeyframeProperties` reads them: it brackets each property against only
+     the keyframes that define it, so properties with different list lengths need
+     no common offset grid.
+  2. **`pseudoElement` was ignored.** A pseudo-element has no node, so the
+     element-inline bake `animate()` performs has nowhere to land. Those values are
+     kept aside per element and pseudo, and emitted at serialization as
+     `#id::pseudo { … !important }` author rules.
+- **The rule alone did not close it, and the reason is worth recording.** With the
+  rule emitted and verifiably present in the serialized HTML, the backdrop went
+  green but stayed opaque. The WPT path renders a modal backdrop as a *synthesized*
+  `<div>`, and a `#id::backdrop` selector cannot match a `<div>` — the div is
+  filled from the bridge's own `::backdrop` cascade instead. So the animated values
+  are merged into that cascade too, in `BackdropDeclarationsFor`, which both the
+  synthesized div and the native marker read. The serialized rule is still what
+  carries the native `::backdrop` box and any other pseudo.
+- **Measured: 0.77% → 99.74%**, and the 358-test `css-pseudo` subset goes
+  **236 → 237 passing with nothing lost**. Five tests in `AnimatePseudoElementTests`
+  pin the animated backdrop against the equivalent style rule, the two keyframe
+  forms, the single-value case, and that one element's pseudo bake does not reach
+  another's.
+- **Checked wider, because keyframe parsing touches every `animate()` call:**
+  `css-view-transitions` 346/490, `css-masking` 222/439, `css-shadow` 157/207,
+  `css-transforms/animation` 30/64 and `css-align/animation` 4/6 — all unchanged,
+  no test changing state in either direction. Four `transform-interpolation-*`
+  testharness tests move (two up, two down, none crossing the threshold) because
+  more of their subtests now actually run.
+- **A method note that cost real time.** The first `css-view-transitions` diff
+  showed `auto-name-from-id` falling 97.46% → 1.27% and `auto-name-from-id-shadow`
+  98.73% → 0.64%. Neither was this change: the reference set had been regenerated
+  between the two runs, and **this directory's references are timing-sensitive
+  enough to differ between generations**. Rendering the test three times on each
+  build gives a deterministic 1.27% on *both* — and 1.27% is what CI reports.
+  Re-baselining against the same reference set showed 346/490 either way. Compare
+  runs only against references generated in the same pass.
+
+### `font-size: math` collapsed the element it was on — problem 30, **fixed**
+
+- **Test:** `css/css-fonts/math-script-level-and-math-style/font-size-math-001.tentative`,
+  3.9% on CI and 3.93% here.
+- **Owner:** `Broiler.Layout` (`Engine/CssBoxProperties.cs`). Main repo, so it is on
+  CI immediately.
+- **The keyword is `1em`, and the bug was not that it failed to scale.** MathML
+  Core makes `font-size: math` the inherited size times the math scaling factor,
+  and that factor is driven entirely by a *change* in `math-depth` — with no change
+  it is 1. Broiler models no math depth, so the keyword is always `1em`, which is
+  exactly what the test's reference asserts: it is the same document with `math`
+  written as `1em`. `math` had no arm in the font-size keyword switch, so it fell
+  through to the length parser, which reads an unrecognised token as **0** — and
+  the zero clamp turned that into a **0.001pt** font. Every relative size beneath
+  it then resolved against 0.001pt, so the whole subtree vanished. Ours rendered
+  99.6% white against a reference that is 96% black.
+- **Two call sites, because the computed and used sizes resolve keywords
+  separately** (`ComputedFontSizePoints` and `ActualFont`, the latter on the
+  non-zoom path).
+- **Measured: 3.93% → 99.86%**, and the one arm carries **five more tests** with
+  it — the 14-test `math-script-level-and-math-style` subset goes **7 → 13
+  passing**, including two at 67.92%. Swept the whole 552-test `css/css-fonts`
+  directory: **347 → 353 passing, nothing lost and nothing else moved.** Five tests
+  in `MathFontSizeTests` cover the resolution, case-insensitivity, that the
+  subtree no longer collapses, and that the arm does not swallow other keywords.
+
+### Problem 28 is two things, and only the smaller one is fixed
+
+- **Test:** `css/css-view-transitions/reset-state-after-scrolled-view-transition`,
+  3.6% on CI and 3.61% here.
+- **The transition machinery is not what fails.** Rendering the test and its own
+  `-ref.html` — which performs the same scroll without a transition — gives
+  **byte-identical output here**, 100% `lightblue` for both, against a Chromium
+  reference that is 96.36% `lightgreen` / 3.61% `lightblue`. When a test and its
+  reference agree with each other and both disagree with the other engine, the gap
+  is in what they share.
+- **Half of it was a scroll that never stopped at the end — fixed.** CSSOM View
+  §"scroll an element" normalizes the requested position to the scrolling box's
+  scrolling area, so a scroll past either end comes to rest at the end.
+  `scrollTo`/`scrollBy` — window and element alike — passed `clamp: false`, so
+  `scrollBy({top: scrollHeight})`, the standard "scroll to the bottom" idiom (since
+  `scrollHeight` is always at least the maximum offset), landed *beyond* the content
+  and painted the bare canvas. Reduced to a probe: a page with a `lightblue` canvas,
+  a `lightgreen` body and a 200vh block renders 96.36/3.61 unscrolled — Chromium's
+  numbers exactly — and 100% canvas after that `scrollBy`. With the clamp it is
+  98.42/1.56.
+- **Measured honestly: this closes no test.** `css/cssom-view` is 193/234 and
+  `css/css-view-transitions` 345/490 **both before and after, with nothing changing
+  state in either direction.** It is a conformance fix found while diagnosing, kept
+  because it is right and covered (`ScrollClampingTests`, five cases, four of which
+  fail without it), not because it moved a number.
+- **The other half keeps the test failing, and it is already tracked.** With a 2s
+  `::view-transition-group(*)` animation the transition is still running at
+  screenshot time, so what paints is the root snapshot — and the root capture
+  carries only a background colour, which is the `lightblue` we render. That is the
+  rasterised-root-snapshot gap from
+  [problems 19/21/23 of the #1491 list](#view-transitions-do-not-capture-the-document--still-open-2-will-not-be-won-here),
+  where cloning the DOM into the snapshot was implemented, measured at +8/−7 and
+  reverted. Problem 28 belongs to that item, not to a scroll bug.
+
+### A runner note: scroll metrics ignore the configured viewport size
+
+Hit twice while writing tests for the fixes above, so it is worth recording rather
+than working around a third time. `new WptTestRunner(w, h)` renders at the given
+size, but the scroll metrics — `vh` lengths and the maximum scroll offset — resolve
+against the default 1024x768 regardless. A page built to be "taller than the
+viewport" at 200x200 therefore scrolls to somewhere that is not the bottom of the
+canvas, and a test asserting on what is on screen fails for a reason that has
+nothing to do with what it is testing. Both `ScrollClampingTests` and
+`ViewTransitionOldCaptureScrollTests` pin their renders to the default size for
+this reason. Out of scope for issue #1538, but it is a real defect in the runner,
+not just a test-authoring trap.
+
+### Problems 12 and 13 are an unshipped draft feature, not a layout bug
+
+`css-grid/…/subgrid/grid-subgridded-to-grid-lanes/…` (0.80% and 0.89%, both
+reproduced here) are built on `display: inline grid-lanes` — CSS Grid Level 3 —
+combined with `grid-template-columns: subgrid` and `repeat(auto-fill, [line-names])`.
+Broiler already **deliberately** treats `grid-lanes` as an invalid display value so
+the declaration is dropped and the element keeps its default display, on the stated
+grounds that no stable browser ships it unflagged
+(`Broiler.Layout/Engine/CssUtils.cs`, and the pinned `Broiler.CSS` rejects it at
+validation). So both engines lack the feature and what remains is a difference in
+how the *unfeatured fallback* lays out — 93.98% between our render of the test and
+our render of its own reference. Worth a maintainer's call on whether these belong
+in the "reference is the unfeatured render" bucket before any engine work; chasing
+byte-compatibility on a dropped declaration is not the same as implementing subgrid.
+
+### An earlier verdict that no longer held — problem 7, re-triaged and then **fixed**
+
+**It was recorded as an untrustworthy pass, and it was neither.** The #1491 table
+below has it as "passes only by rendering nothing — the reference is a blank white
+canvas". That stopped being true: Chromium's reference is now **100% green** and
+Broiler rendered **100% red**, a 0.0% match that reproduces CI exactly. Re-checking
+what a reference actually contains is cheap; carrying a stale verdict is not — and
+once it was re-triaged as an ordinary failure it turned out to be a one-line rule.
+
+- **Owner:** HtmlBridge (`DomBridge.ViewTransition.cs`). Main repo.
+- **`view-transition-group: <custom-ident>` resolves against the *ancestor* chain**,
+  not against the whole document (css-view-transitions-2) — the test's own title is
+  "Explicit view-transition-group name can only match ancestors".
+  `ResolveGroupParentName` accepted any captured element with that name, so a group
+  nested under its **sibling**. The colour follows from there:
+  `::view-transition-group(test) { background: inherit }` then inherited the
+  sibling's red instead of the green `::view-transition` root, and since every group
+  in that family is `position: absolute; inset: 0`, the last one painted takes the
+  whole canvas.
+- **The family is six tests against one reference**, which is what makes the rule
+  checkable rather than guessable: `-direct` (parent) and `-nested` (grandparent)
+  must keep nesting, while `-non-ancestor` (sibling), `-non-existent`, `-self` and
+  `-nested-vt-names` must not. All six render 100% green after the change. `root`
+  keeps qualifying explicitly, since the document element is an ancestor of every
+  other captured element.
+- **Measured: 0.0% → 100%**, and the 490-test `css-view-transitions` subset goes
+  **344 → 345 passing with nothing lost and nothing else moved**. Four tests in
+  `ViewTransitionGroupAncestorTests` read the nesting off one colour — green when
+  the group nested, blue when it stayed top-level — and cover both directions, so
+  the fix cannot degenerate into "never nest". Only the sibling case fails without
+  it, which is the shape of a narrowing.
+
+### Diagnosed, not fixed
+
+Each of these reproduces locally, so the diagnosis is from a real render rather
+than from reading code.
+
+- **Problems 22, 23, 25 and 26 — the `massive-element-*` family — are two separate
+  bugs in the capture, not scrolling. One is fixed.**
+  The tests put a 40 000px element in a `writing-mode: vertical-lr` document, call
+  `scrollIntoView()` on its far end, and screenshot the transition. Rendering the
+  tests' **own `-ref.html`**, which performs the identical scroll without a
+  transition, gives white 87.1% / green 10.6% / blue 1.3% against Chromium's white
+  87.2% / green 11.5% / blue 0.7% — so scrolling a vertical writing mode is right,
+  and the gap is in the transition. Instrumenting the capture said what it is:
+
+      capture target: old=(8,8,40000x100)  new=(-38986,8,40000x100)
+
+  1. **The old capture was not in the snapshot containing block — fixed.** Both
+     captures call the same `GetBoundingClientRectForDomElement`, but at different
+     moments against different layouts, and only one has the scroll folded in: the
+     new capture runs on the render projection, where the scroll is already baked
+     into box positions, while the old one runs during script, where it is not. The
+     page scroll is now subtracted from the old capture, which reproduces the new
+     capture's −38 986 exactly. **A `position: fixed` element — or anything inside
+     one — is excluded**, since it does not move with the page and its document
+     coordinates are already viewport coordinates; without that exception
+     `new-content-transform-position-fixed` falls from 100% to 98.73%, which is how
+     the exception was found rather than guessed.
+     **Measured: `css-view-transitions` 346 → 349 of 490, nothing lost.** The gains
+     are `massive-element-on-top-of-viewport-partially-onscreen-old`/`-new`
+     (96.70% → 99.58% — the *vertical*-scroll members of the family) and
+     `transformed-element-scroll-transform` (98.73% → 100%).
+     `snapshot-containing-block-absolute` moves 55.85% → 54.89%, failing on both
+     sides.
+  2. **The snapshot clone still lays its children out horizontally — open.** Ours is
+     green 85.1% — a green band ~651px tall where the element is 100px tall — so
+     `.middle`'s `block-size: 39800px` is resolving as a height. It is **not** a
+     lost `writing-mode` bake: `BuildViewTransitionSnapshotContent` carries
+     `writing-mode: vertical-lr` onto the content box correctly, so the miss is
+     further in, in how the clone's box is sized. **This is what still fails the
+     four tests the list names** — they are the horizontal-scroll members, where the
+     block axis and the scrolled axis are the same one.
+
+  The family is 20 tests locally, and the fixed half moved two of them.
+- **Problems 14, 15 and 27 (`clip-path`, ~1.0% and 2.9%) need a real path clip.**
+  `TryCreateInsetClipPathItem` in `Broiler.HTML`'s `PaintWalker.Geometry` models
+  `clip-path` as a **rectangle** — it parses `inset()` and nothing else. Problems
+  14 and 15 use `polygon()` (an L-shape on the document element, which must also
+  clip the propagated root background), and problem 27 references an SVG
+  `<clipPath>` by `url(#…)`. Both need a path clip in the graphics backend rather
+  than a `ClipItem` rect, in a submodule this session cannot push to. Our render
+  is the unclipped page in every case.
+
+### Two that do not reproduce here
+
+Judge them from a CI artifact, not from this container. Per the caveats above, a
+*better* local score than CI usually means the offline render is not the one CI
+scored.
+
+- **Problem 8 (`css-view-transitions/nothing-captured`)**: CI 0.0%, **99.54%
+  locally against a genuine reference** (white/green/blue, not blank).
+- **Problem 19 (`view-transition-waituntil-animation-manipulation`)**: CI 1.3%,
+  **98.46% locally**.
+- **Problem 17 (`css-view-transitions/auto-name-from-id`)**: CI 1.3%, **97.46%
+  locally** — and it belongs to the `auto-name` family that problem 18 heads,
+  where the reference is Chromium's *unfeatured* render (see problems 14/15 in the
+  #1491 table). Worth settling as one group rather than test by test.
+
+### #1538 problems, at a glance
+
+CI percentages are the issue's. Local numbers are this container against locally
+generated Chromium references; **"—" means not measured here** (no reference
+generated for that directory in this session — all six are re-reports already
+owned by a section above). Re-reported problems point at that section.
+
+| # | Test | CI | Local | Status |
+| --- | --- | --- | --- | --- |
+| 1 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | — | re-report of #1491 problem 4 — needs the server's `trickle` pipe |
+| 2 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | — | re-report of #1491 problem 5 — needs `.sub` substitution and a second host |
+| 3 | `css-page/page-margin-002-print` | 0.0% | — | re-report of #1491 problem 12 — [screen-layout gaps](#screen-layout-gaps-behind-the-three-print-html-tests) |
+| 4 | `css-transforms/animation/transform-interpolation-002` | 0.0% | — | re-report of #1491 problem 13 — both engines empty offline |
+| 5, 6 | `css-view-transitions/iframe-and-main-frame-transition-old-main-*` (2) | 0.0% | 0.00% | re-report of #1491 problems 16/17 — needs a transition in a nested browsing context |
+| 7 | `css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative` | 0.0% | **0.00% → 100%** | **fixed** — an explicit `view-transition-group` name now only matches an ancestor, main repo. (Also a corrected verdict: it was not the blank-reference pass the #1491 table records) |
+| 8 | `css-view-transitions/nothing-captured` | 0.0% | **99.54% (passes)** | does not reproduce — judge from CI |
+| 9 | `resource-timing/initiator-type/frameset` | 0.0% | — | re-report of #1491 problem 26 — [frameset frames render nothing](#frameset-frames-render-nothing) |
+| 10 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | — | **won't fix** — #1497 problem 25: Chromium fails this reftest against its own reference |
+| 11 | `css-pseudo/backdrop-animate-002` | 0.8% | **0.77% → 99.74%** | **fixed** — property-indexed keyframes + `animate({pseudoElement})`, main repo |
+| 12, 13 | `css-grid/…/subgrid/…` (2) | 0.8%, 0.9% | 0.80%, 0.89% | open — built on `display: inline grid-lanes`, which Broiler deliberately drops as invalid because no stable browser ships it unflagged. See above. The 241-test `grid-subgridded-to-grid-lanes` subset is 122 passing |
+| 14, 15 | `css-masking/clip-path/clip-path-document-element{,-will-change}` (2) | 1.0% | 0.95% | open — `polygon()` needs a real path clip; see above |
+| 16 | `css-shadow/shadow-directionality-002.tentative` | 1.1% | **1.09% → 99.55%** | **fixed** — shadow-tree scoping (main repo) + `:dir()` ([`patches/0102`](../patches/README.md)) |
+| 17 | `css-view-transitions/auto-name-from-id` | 1.3% | 1.27% | open — **it does reproduce**; the earlier 97.46% was a stale reference (see the method note above). `auto-name` family — see problem 18 |
+| 18 | `css-view-transitions/auto-name` | 1.3% | 1.27% | **won't fix** — #1491 problems 14/15: reference is the unfeatured render |
+| 19 | `css-view-transitions/view-transition-waituntil-animation-manipulation` | 1.3% | 98.46% | does not reproduce — judge from CI |
+| 20 | `css-shadow/shadow-directionality-001.tentative` | 1.3% | **1.27% → 99.55%** | **fixed** — same change as problem 16 |
+| 21 | `css-position/overlay/overlay-transition-finished` | 1.8% | **1.81% → 100%** | **fixed** — the paint-time half of the `overlay` entry transition, main repo |
+| 22, 23 | `css-view-transitions/massive-element-left-of-viewport-partially-onscreen-{new,old}` | 1.8% | 1.81% | open — **half fixed**: the old capture is now in the snapshot containing block (which closed the two `on-top-of` siblings); these still fail on the clone's box sizing. See above |
+| 24 | `css-align/animation/row-gap-interpolation` | 2.6% | 2.59% | open — a **testharness** test: its reference is Chromium's results table, so closing it means passing the `row-gap` interpolation subtests, not one fix |
+| 25, 26 | `css-view-transitions/massive-element-right-of-viewport-partially-onscreen-{new,old}` | 2.6% | 2.65% | open — same two causes as 22/23 |
+| 27 | `css-masking/clip-path/clip-path-element-userSpaceOnUse-004` | 2.9% | 2.86% | open — SVG `<clipPath>` reference needs a real path clip |
+| 28 | `css-view-transitions/reset-state-after-scrolled-view-transition` | 3.6% | 3.61% | **part-fixed** — the scroll no longer overshoots the end (CSSOM View clamp, main repo); still failing on the rasterised root snapshot, which is #1491's problems 19/21/23 |
+| 29 | `html/…/form-validation-validity-textarea-defaultValue` | 3.8% | 3.78% | open — a **testharness** test whose reference is Chromium's results table; three of its five subtests drive `test_driver.send_keys`, which the runner only stubs |
+| 30 | `css-fonts/…/font-size-math-001.tentative` | 3.9% | **3.93% → 99.86%** | **fixed** — `font-size: math` is `1em`; the subset goes 7 → 13 of 14, main repo |
+
 ## Reported problems, at a glance
 
 Local numbers come from this container against locally generated Chromium
@@ -918,7 +1336,7 @@ feature they test — closing those means rendering less, not more.
 | 13 | `css-transforms/animation/transform-interpolation-002` | 0.0% | 100% — both empty offline | open |
 | 14, 15 | `css-view-transitions/auto-name*` (2) | 0.0% | ours captures both items + backdrop; Chromium drops `view-transition-name: auto` | **won't fix** — reference is the unfeatured render |
 | 16, 17 | `css-view-transitions/iframe-and-main-frame-*` (2) | 0.0% | ours 99.5% white, Chromium 74.5% green + 25% blue | open — needs a transition in a nested browsing context |
-| 18 | `css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative` | 0.0% | 100% — reference is a blank white canvas | **untrustworthy** — passes only by rendering nothing |
+| 18 | `css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative` | 0.0% | 100% — reference is a blank white canvas | ~~**untrustworthy** — passes only by rendering nothing~~ **stale, and since fixed**: the reference is now 100% green, and an explicit `view-transition-group` name matching a non-ancestor was the cause. See [#1538 problem 7](#an-earlier-verdict-that-no-longer-held--problem-7-re-triaged-and-then-fixed) |
 | 19, 21 | `css-view-transitions/old-/new-content-captures-root` (2) | 0.0% | ours 98.7% pink (backdrop through the page) | open — needs a rasterised root snapshot |
 | 20, 22 | `css-view-transitions/*-root-scrollbar-with-fixed-background` (2) | 0.0% | 100% — reference is 99% `lightblue`, genuine | passing locally |
 | 23 | `css-view-transitions/root-captured-as-different-tag` | 0.0% | ours 100% red (the `(root)` trap rule) | part-fixed — the `(root)` rules no longer match; still needs the root snapshot |

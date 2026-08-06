@@ -47,6 +47,11 @@ set -euo pipefail
 #     Listing it would fail this script and take the whole run down, so it needs
 #     regenerating against the current pointer before it can go back in.
 PENDING_PATCHES=(
+  # `:dir()` was a recognised-but-unmodelled pseudo-class, so it matched every
+  # element. WPT-relevant (issue #1538 problems 16 and 20,
+  # css/css-shadow/shadow-directionality-001 and -002) and it applies cleanly to
+  # the pinned Broiler.CSS pointer.
+  "Broiler.CSS|patches/0102-css-dir-pseudo-class.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

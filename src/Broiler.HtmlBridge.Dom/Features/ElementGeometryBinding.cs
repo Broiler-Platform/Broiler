@@ -193,7 +193,8 @@ internal static class ElementGeometryBinding
     private static JSValue Scroll(IElementGeometryHost host, DomElement element, in Arguments a)
     {
         var (left, top, behavior) = host.GetScrollArguments(a);
-        host.SetElementScrollOffsetsWithBehavior(element, left, top, clamp: false, behavior: behavior);
+        // Clamped to the scrolling area — see the note in WindowScrollBinding.
+        host.SetElementScrollOffsetsWithBehavior(element, left, top, clamp: true, behavior: behavior);
         return JSUndefined.Value;
     }
 
@@ -201,7 +202,7 @@ internal static class ElementGeometryBinding
     private static JSValue ScrollBy(IElementGeometryHost host, DomElement element, in Arguments a)
     {
         var (left, top, behavior) = host.GetScrollArguments(a);
-        host.SetElementScrollOffsetsWithBehavior(element, left, top, relative: true, clamp: false, behavior: behavior);
+        host.SetElementScrollOffsetsWithBehavior(element, left, top, relative: true, clamp: true, behavior: behavior);
         return JSUndefined.Value;
     }
 

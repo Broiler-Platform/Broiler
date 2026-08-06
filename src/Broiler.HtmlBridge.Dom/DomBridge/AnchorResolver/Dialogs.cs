@@ -192,12 +192,14 @@ public sealed partial class DomBridge
                     BakedInlineStyle(el)["left"] = "0";
             }
 
-            // An open popover whose `overlay` is still transitioning in is out of the top layer: it
-            // keeps the UA fixed positioning above but gets no elevation, so it paints in ordinary
-            // stacking order beneath the top layer (WPT css/css-position/overlay/
-            // overlay-transition-in-rendering, -backdrop-entry, -finished). Laying it out in normal
-            // flow instead would also displace the static position of following out-of-flow boxes.
-            if (PopoverHeldOutByOverlayTransitionIn(el))
+            // An open popover whose `overlay` is still transitioning in at screenshot time is out of
+            // the top layer: it keeps the UA fixed positioning above but gets no elevation, so it
+            // paints in ordinary stacking order beneath the top layer (WPT css/css-position/overlay/
+            // overlay-transition-in-rendering, -backdrop-entry). Laying it out in normal flow instead
+            // would also displace the static position of following out-of-flow boxes. A page that
+            // gates its screenshot on `transitionend` is asking to be rendered after the transition,
+            // so it is elevated (-finished) — see PopoverHeldOutOfTopLayerForPaint.
+            if (PopoverHeldOutOfTopLayerForPaint(el))
                 continue;
 
             // Elevate into the top layer, ordered by show order, so the popover paints above
@@ -241,8 +243,7 @@ public sealed partial class DomBridge
             // ::backdrop box (it overlays author geometry from the cascade but does not run the
             // position-try pass for a renderer-generated box). Route those through the synthesized
             // <div> path, which resolves the fallback below; everything else goes native.
-            var backdropDecls = GetSyncedScopedEngine(dialog)
-                .GetCascadedDeclaredValues(dialog, "::backdrop");
+            var backdropDecls = BackdropDeclarationsFor(dialog);
 
             // A ::backdrop cascaded to `display: none` is not generated at all — e.g. an @container
             // query switches it off (WPT css-conditional container-queries/dialog-backdrop-remove,
@@ -411,14 +412,43 @@ public sealed partial class DomBridge
     /// pseudo-element by checking CSS rules for <c>::backdrop</c> selectors
     /// that match the given dialog element.
     /// </summary>
+    /// <summary>
+    /// The declarations that decide what a <c>::backdrop</c> looks like: its author cascade, with
+    /// any <c>element.animate(…, { pseudoElement: "::backdrop" })</c> values layered on top.
+    /// <para>
+    /// A Web Animation is not in the cascade — a pseudo-element has no node, so those values are
+    /// baked aside (see <c>AnimatedPseudoStyle</c>) — and it outranks author declarations, so it
+    /// goes last. Without this the animation reached the renderer only through the serialized rule
+    /// <c>ApplyAnimatedPseudoSerializationOverrides</c> emits, which the *synthesized* backdrop
+    /// <c>&lt;div&gt;</c> cannot see: a <c>#id::backdrop</c> selector does not match a
+    /// <c>&lt;div&gt;</c>. That is the whole of WPT <c>css/css-pseudo/backdrop-animate-002</c>
+    /// (issue #1538 problem 11), whose <c>opacity</c> was dropped while its
+    /// <c>background-color</c> — resolved here — came through.
+    /// </para>
+    /// </summary>
+    private IReadOnlyDictionary<string, string> BackdropDeclarationsFor(DomElement dialog)
+    {
+        var declarations = GetSyncedScopedEngine(dialog)
+            .GetCascadedDeclaredValues(dialog, "::backdrop");
+
+        if (AnimatedPseudoStyle(dialog, "::backdrop") is not { } animated)
+            return declarations;
+
+        var merged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (property, value) in declarations)
+            merged[property] = value;
+        foreach (var (property, value) in animated)
+            merged[property] = value;
+        return merged;
+    }
+
     private string GetBackdropBackground(DomElement dialog, string defaultBg = "rgb(229, 229, 229)")
     {
         // Default modal-dialog backdrop color: pre-composited rgba(0,0,0,0.1) over
         // white (255*(1-0.1) + 0*0.1 = 229.5 ≈ 229). Callers pass "transparent"
         // for popovers, whose ::backdrop has no UA scrim.
 
-        var declarations = GetSyncedScopedEngine(dialog)
-            .GetCascadedDeclaredValues(dialog, "::backdrop");
+        var declarations = BackdropDeclarationsFor(dialog);
 
         if (declarations.TryGetValue("background", out var bg))
         {
@@ -497,8 +527,9 @@ public sealed partial class DomBridge
             DialogStateFor(element).PopoverOpen.TryGet(out var open) &&
             open is true &&
             // A popover held out of the top layer while `overlay` transitions in generates no
-            // ::backdrop (the backdrop belongs to the top layer).
-            !PopoverHeldOutByOverlayTransitionIn(element))
+            // ::backdrop (the backdrop belongs to the top layer). Judged at screenshot time, so a
+            // page waiting on `transitionend` gets the backdrop it would have by then.
+            !PopoverHeldOutOfTopLayerForPaint(element))
         {
             results.Add((element, ParentEl(element), true));
         }
@@ -574,6 +605,77 @@ public sealed partial class DomBridge
             return false;
         return HasDiscreteOverlayTransition(element);
     }
+
+    /// <summary>
+    /// The paint-time half of <see cref="PopoverHeldOutByOverlayTransitionIn"/>: whether the popover
+    /// is still out of the top layer <em>at the moment the page asks to be screenshotted</em>.
+    /// <para>
+    /// The CSSOM answer and the painted answer are taken at different instants, and conflating them
+    /// is what made <c>overlay-transition-finished</c> unwinnable. That test reads
+    /// <c>getComputedStyle(el).overlay</c> synchronously after <c>showPopover()</c> and fails itself
+    /// (paints pink) unless it sees <c>none</c> — the transition must be observed as *running* at
+    /// script time — and then screenshots from <c>transitionend</c>, by which point the popover must
+    /// be in the top layer and covering the fixed red div. So
+    /// <see cref="ComputeOverlayValue"/> keeps answering for t≈0 and only the render path moves.
+    /// </para>
+    /// <para>
+    /// The renderer has no clock, so "which instant" has to be read from what the page says. The
+    /// runner already does exactly this for <c>takeScreenshotDelayed(N)</c>, whose N becomes
+    /// <c>WptTestRunner.ScreenshotPresentationTime</c>; a test that instead gates its screenshot on
+    /// <c>transitionend</c> is making the same statement without a number — *render me after this
+    /// transition ends*. <see cref="ScreenshotWaitsForTransitionEnd"/> recognises that shape, and
+    /// nothing else in <c>css/css-position/overlay</c> matches it: the three tests that must keep the
+    /// popover held out (<c>-in-rendering</c> at 60s, <c>-backdrop-entry</c> at 2s+2s,
+    /// <c>-out-rendering</c>) screenshot immediately and register no such listener.
+    /// </para>
+    /// </summary>
+    private bool PopoverHeldOutOfTopLayerForPaint(DomElement element) =>
+        PopoverHeldOutByOverlayTransitionIn(element) &&
+        !ScreenshotWaitsForTransitionEnd(element);
+
+    /// <summary>
+    /// Whether the page has declared that its screenshot belongs after a transition on
+    /// <paramref name="element"/> finishes: the document is still <c>reftest-wait</c> (so nothing has
+    /// released the screenshot yet) and a <c>transitionend</c> listener is reachable from the element
+    /// — on itself, an ancestor, the document or the window, since the event bubbles.
+    /// <para>
+    /// The <c>reftest-wait</c> half is what keeps this from being a one-way door. Broiler dispatches
+    /// no transition events today, so a page waiting on one waits forever and the class survives to
+    /// serialization. If transition events are implemented later, the natural shape — dispatch
+    /// <c>transitionend</c>, the listener calls <c>takeScreenshot()</c>, the class is removed — makes
+    /// this predicate return <see langword="false"/> while the transition is genuinely over, and the
+    /// popover is elevated by the ordinary path instead. Either way the popover ends up in the top
+    /// layer, so the rule degrades into the real one rather than inverting.
+    /// </para>
+    /// </summary>
+    private bool ScreenshotWaitsForTransitionEnd(DomElement element)
+    {
+        if (RenderedDocumentElement is not { } documentElement ||
+            !HasClass(documentElement, "reftest-wait"))
+            return false;
+
+        for (DomElement? node = element; node is not null; node = ParentEl(node))
+        {
+            if (HasAttr(node, "ontransitionend") || HasTransitionEndListener(node))
+                return true;
+        }
+
+        // The document node is on the propagation path too but is not a DomElement, so the walk
+        // above stops one short of it — `document.addEventListener('transitionend', …)` is the
+        // idiomatic way to write this gate and must count.
+        return HasTransitionEndListener(_document) ||
+            (_eventTargets.TryGetWindowListeners("transitionend", out var windowListeners) &&
+                windowListeners.Count > 0);
+    }
+
+    private bool HasTransitionEndListener(DomNode node) =>
+        _eventTargets.NodeListeners(node).TryGetValue("transitionend", out var listeners) &&
+        listeners.Count > 0;
+
+    private static bool HasClass(DomElement element, string name) =>
+        (element.ClassName ?? string.Empty)
+            .Split((char[])[' ', '\t', '\n', '\r', '\f'], StringSplitOptions.RemoveEmptyEntries)
+            .Contains(name, StringComparer.Ordinal);
 
     // CSS Position 4 §overlay: the computed value of the UA-controlled `overlay` property.
     // A top-layer element (open popover / modal dialog) computes to `auto`; everything else to

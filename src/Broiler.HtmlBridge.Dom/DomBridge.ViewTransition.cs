@@ -315,12 +315,64 @@ public sealed partial class DomBridge
                 continue;
 
             var (l, t, w, h) = GetBoundingClientRectForDomElement(element, isRoot: false);
+            (l, t) = ToSnapshotContainingBlockCoordinates(element, l, t);
             // Snapshot the old content now, before the update callback mutates (or removes) the
             // element — the "old" image must show its pre-callback state.
             state.OldCaptures[name] = new NamedSnapshot(l, t, w, h,
                 style.GetValueOrDefault("background-color") ?? "transparent",
                 BuildViewTransitionSnapshotContent(element));
         }
+    }
+
+    /// <summary>
+    /// Converts a captured rect's origin from the live layout's document coordinates into the
+    /// snapshot containing block — i.e. subtracts the page scroll.
+    /// <para>
+    /// The old and new captures both call <see cref="GetBoundingClientRectForDomElement"/>, but at
+    /// different moments against different layouts, and only one of them has the scroll folded in.
+    /// The new capture runs on the render projection, where the scroll is already baked into box
+    /// positions; the old one runs during script, against a layout where it is not. So a page that
+    /// scrolls and *then* starts a transition captured its old geometry unscrolled while the new
+    /// geometry was correct — measured on WPT
+    /// <c>massive-element-left-of-viewport-partially-onscreen</c> (issue #1538 problems 22/23/25/26)
+    /// as <c>old=(8,8,…)</c> against <c>new=(-38986,8,…)</c>, where the page had scrolled 38 994px.
+    /// The <c>-old</c> variants paint <c>::view-transition-old</c>, so they showed the element's
+    /// leading edge where the reference shows its trailing one.
+    /// </para>
+    /// <para>
+    /// A <c>position: fixed</c> element — or anything inside one — does not move with the page, so
+    /// its document coordinates are already viewport coordinates and subtracting the scroll would
+    /// push it off by the scroll amount. Measured: without this exception
+    /// <c>new-content-transform-position-fixed</c> falls from 100% to 98.73%.
+    /// </para>
+    /// <para>
+    /// Only the page scroll is subtracted, which is what these tests exercise and what the render
+    /// bake accounts for. An element inside a scrolled sub-container is not adjusted here.
+    /// </para>
+    /// </summary>
+    private (double Left, double Top) ToSnapshotContainingBlockCoordinates(DomElement element, double left, double top)
+    {
+        if (DocumentElement is not { } documentElement || HasFixedPositionAncestorOrSelf(element))
+            return (left, top);
+
+        return (left - GetElementScrollOffset(documentElement, vertical: false),
+                top - GetElementScrollOffset(documentElement, vertical: true));
+    }
+
+    private bool HasFixedPositionAncestorOrSelf(DomElement element)
+    {
+        for (DomNode? node = element; node is not null; node = node.ParentNode)
+        {
+            if (node is not DomElement ancestor)
+                continue;
+            if (string.Equals(
+                    UsedStyleForCapture(ancestor).GetValueOrDefault("position"),
+                    "fixed",
+                    System.StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -435,12 +487,40 @@ public sealed partial class DomBridge
         if (value is null || value.Equals("contain", System.StringComparison.OrdinalIgnoreCase))
             return NearestCapturedAncestorName(element, name, elementByName, root, requireContain: true);
 
-        // An explicit <custom-ident>: nest under that group when it is itself captured. A group
-        // cannot reference its own name (css-view-transitions-2: a self-reference is invalid and the
-        // group falls back to the flat `normal` layout) — WPT compute-explicit-name-self.
+        // An explicit <custom-ident> nests under that group only when the element carrying that
+        // view-transition-name is an ANCESTOR — css-view-transitions-2 resolves the name against the
+        // ancestor chain, not against the whole document, so a sibling or a cousin does not qualify
+        // (WPT nested/compute-explicit-name-non-ancestor, whose title is exactly that). Matching any
+        // captured element nested a group under its sibling, and since the test's
+        // `::view-transition-group(test) { background: inherit }` then inherited the sibling's red
+        // instead of the green `::view-transition` root, the whole canvas came out red.
+        //
+        // A group cannot reference its own name either (a self-reference is invalid and the group
+        // falls back to the flat `normal` layout) — WPT compute-explicit-name-self — and a name that
+        // no element carries falls back the same way (compute-explicit-name-non-existent).
         if (string.Equals(value, name, System.StringComparison.Ordinal))
             return null;
-        return elementByName.ContainsKey(value) || value == "root" ? value : null;
+
+        // `root` is the document element's name, and the document element is an ancestor of every
+        // other captured element, so it always qualifies.
+        if (string.Equals(value, "root", System.StringComparison.Ordinal))
+            return value;
+
+        return elementByName.TryGetValue(value, out var target) && IsAncestorOf(target, element)
+            ? value
+            : null;
+    }
+
+    /// <summary>Whether <paramref name="candidate"/> is a strict ancestor of <paramref name="node"/>.</summary>
+    private static bool IsAncestorOf(DomElement candidate, DomNode node)
+    {
+        for (var parent = node.ParentNode; parent != null; parent = parent.ParentNode)
+        {
+            if (ReferenceEquals(parent, candidate))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>

@@ -792,12 +792,32 @@ internal abstract partial class CssBoxProperties
                 CssConstants.XXLarge => CssConstants.FontSize + 4,
                 CssConstants.Smaller => parentSize - 2,
                 CssConstants.Larger => parentSize + 2,
+                _ when IsMathFontSize(FontSize) => parentSize,
                 _ => CssLengthParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
             };
 
             return fsize <= 0 ? 0.001 : fsize;
         }
     }
+
+    /// <summary>
+    /// <c>font-size: math</c> (MathML Core §the-math-script-level-property, CSS Fonts 4).
+    /// <para>
+    /// It computes to the inherited size scaled by the math scaling factor, and that factor is
+    /// driven entirely by a <em>change</em> in <c>math-depth</c> — with no change it is 1, so the
+    /// keyword is exactly <c>1em</c>. Broiler models no math depth, so the keyword is always that.
+    /// </para>
+    /// <para>
+    /// Without this arm the keyword fell through to the length parser, which reads an unrecognised
+    /// token as <c>0</c>, and the zero clamp turned that into a 0.001pt font — so it did not merely
+    /// fail to scale, it collapsed the element and everything under it. WPT
+    /// <c>css/css-fonts/math-script-level-and-math-style/font-size-math-001.tentative</c> (issue
+    /// #1538 problem 30) nests it inside a chain of relative sizes precisely to catch that: its
+    /// reference is the same document with <c>math</c> written as <c>1em</c>.
+    /// </para>
+    /// </summary>
+    private static bool IsMathFontSize(string fontSize) =>
+        fontSize.Equals("math", StringComparison.OrdinalIgnoreCase);
 
     // CSS Anchor Positioning: the cascaded values are surfaced on the box so the
     // layout engine's anchor-placement post-pass can read them (HtmlBridge
@@ -1960,6 +1980,7 @@ internal abstract partial class CssBoxProperties
                     CssConstants.XXLarge => CssConstants.FontSize + 4,
                     CssConstants.Smaller => parentSize - 2,
                     CssConstants.Larger => parentSize + 2,
+                    _ when IsMathFontSize(FontSize) => parentSize,
                     _ => CssLengthParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
                 };
             }
