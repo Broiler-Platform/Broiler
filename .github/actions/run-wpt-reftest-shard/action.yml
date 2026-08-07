@@ -1,0 +1,211 @@
+name: Run WPT reftest shard
+description: >
+  Provision a runner, run one shard of the WPT *reftest* suite, and upload its
+  results as an artifact. The reftest counterpart of ./.github/actions/run-wpt-shard,
+  and deliberately the same shape so the initial pass and the end-of-workflow retry
+  pass share one definition of how a shard is measured.
+
+  What it does NOT do is the point: no Playwright, no Chromium, no reference-image
+  cache. A reftest declares its own reference inside the WPT checkout, and both the
+  test and that reference are rendered by Broiler, so a shard needs nothing but the
+  checkout and the .NET SDK. That also removes the browser-provisioning outage this
+  suite's sibling has to defend against (issue #1534) — there is no browser to fail
+  to download.
+
+inputs:
+  shard-index:
+    description: Zero-based index of the shard to run.
+    required: true
+  shard-count:
+    description: Total number of shards the reftest suite is split into.
+    required: true
+  attempt-suffix:
+    description: >
+      Suffix appended to this attempt's artifact and result-file names — empty for
+      the first attempt, "-retry" for the end-of-workflow rerun. The names have to
+      differ because every shard artifact is downloaded into one merged directory;
+      scripts/merge-wpt-shards.py reads the suffix back off the file name so a retry
+      supersedes the attempt it replaces instead of being summed alongside it.
+    required: false
+    default: ''
+  subset:
+    description: Semicolon-separated WPT subset patterns, or empty for every reftest.
+    required: false
+    default: ''
+  rerun-failed:
+    description: >
+      "true" to rerun only the previously-failed reftests listed in failed-tests-file.
+    required: false
+    default: 'false'
+  failed-tests-file:
+    description: Path to the committed failing-reftest manifest used by rerun-failed.
+    required: true
+  cache-epoch:
+    description: Cache epoch; bumping it refreshes the WPT checkout.
+    required: true
+  wpt-checkout-dir:
+    description: Directory holding the (cached) WPT checkout.
+    required: true
+  results-dir:
+    description: Directory the runner writes its results into.
+    required: true
+  test-timeout-seconds:
+    description: Per-test timeout in seconds.
+    required: true
+  memory-limit-mb:
+    description: Per-test RAM cap in MiB (0 disables).
+    required: true
+  pass-threshold:
+    description: >
+      Percentage of pixels that must match for a reftest to pass — here, between
+      Broiler's render of the test and Broiler's render of the test's own reference
+      (99 = the two are at least 99% identical).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: |
+          8.0.x
+          10.0.x
+
+    # Node is deliberately absent — it is the golden-image shard's Playwright
+    # dependency and nothing here needs it. Python stays: the collect step below
+    # folds the runner's failure marker into the shard status file with it.
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+
+    - name: Restore WPT checkout
+      uses: actions/cache@v5
+      with:
+        path: ${{ inputs.wpt-checkout-dir }}
+        key: wpt-checkout-${{ inputs.cache-epoch }}
+
+    # Apply any submodule fix that could not be pushed to its remote (push 403 →
+    # captured under patches/) and is not yet in the pinned pointer, so the runner
+    # exercises it. Same mechanism, same patch set, and for the same reason as the
+    # golden-image suite: without this step those fixes are absent from the run no
+    # matter how many times it is re-run, because their remotes are outside the
+    # session's GitHub scope. The build compiles submodule source in place, so
+    # patching the checked-out working tree is enough — no pointer bump. A patch
+    # gone stale against a drifted pointer fails this step loudly rather than being
+    # skipped, which is the whole point of having the step.
+    - name: Apply pending submodule patches
+      shell: bash
+      run: bash scripts/apply-pending-wpt-patches.sh
+
+    - name: Run WPT reftest shard ${{ inputs.shard-index }}${{ inputs.attempt-suffix }}
+      id: wpt
+      shell: bash
+      env:
+        SHARD_INDEX: ${{ inputs.shard-index }}
+        SHARD_COUNT: ${{ inputs.shard-count }}
+        SUBSET: ${{ inputs.subset }}
+        RERUN_FAILED: ${{ inputs.rerun-failed }}
+        FAILED_TESTS_FILE: ${{ inputs.failed-tests-file }}
+        RESULTS_DIR: ${{ inputs.results-dir }}
+        BROILER_WPT_TIMEOUT_SECONDS: ${{ inputs.test-timeout-seconds }}
+        BROILER_WPT_MEMORY_LIMIT_MB: ${{ inputs.memory-limit-mb }}
+        # Pixel pass threshold for the test-vs-reference comparison. The runner
+        # reads the variable itself and forwards the resolved value to its workers,
+        # so the first pass and the retry pass use the same bar.
+        BROILER_WPT_PASS_THRESHOLD: ${{ inputs.pass-threshold }}
+        # Deliberately NOT set here, unlike the golden-image suite: deferring
+        # promise_test bodies exists to freeze the DOM at the moment Chromium's
+        # reference generator screenshots (`load`). A reftest has no Chromium
+        # capture to line up with — the test and its reference are both taken at
+        # Broiler's own capture point — so the override would only make this run
+        # measure something other than what the page does.
+      run: |
+        # --wpt-dir is deliberately not passed: left to its default the script
+        # clones the checkout itself, so a cache miss costs a clone instead of
+        # failing the shard. The cached path and that default are the same
+        # directory (tests/wpt/checkout).
+        ARGS=(--shard-index "$SHARD_INDEX" --shard-count "$SHARD_COUNT")
+        ARGS+=(--output-dir "$RESULTS_DIR")
+        if [ -n "$SUBSET" ]; then
+          ARGS+=(--subset "$SUBSET")
+        fi
+        if [ "$RERUN_FAILED" = "true" ]; then
+          # Incremental: rerun only the previously-failed reftests. Nothing has to
+          # be regenerated first — a reftest's baseline is the checkout — so this
+          # is simply a narrower test list.
+          ARGS+=(--rerun-json "$FAILED_TESTS_FILE")
+        fi
+        EXIT=0
+        bash scripts/run-wpt-reftests.sh "${ARGS[@]}" || EXIT=$?
+        echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
+        echo "Reftest shard $SHARD_INDEX finished (exit $EXIT)."
+        exit "$EXIT"
+
+    - name: Collect shard result
+      if: always()
+      shell: bash
+      env:
+        RESULTS_DIR: ${{ inputs.results-dir }}
+        SHARD_INDEX: ${{ inputs.shard-index }}
+        ATTEMPT_SUFFIX: ${{ inputs.attempt-suffix }}
+        WPT_EXIT_CODE: ${{ steps.wpt.outputs.exit_code }}
+      run: |
+        mkdir -p shard-out
+        STEM="wpt-shard-${SHARD_INDEX}${ATTEMPT_SUFFIX}"
+        cp "$RESULTS_DIR/wpt-results.json" "shard-out/${STEM}.json" 2>/dev/null || true
+        cp "$RESULTS_DIR/wpt-results.log"  "shard-out/${STEM}.log"  2>/dev/null || true
+        EXIT="$WPT_EXIT_CODE"
+        if ! [[ "$EXIT" =~ ^[0-9]+$ ]]; then
+          EXIT=1
+        fi
+        # The runner leaves a marker when the shard could not run a single test.
+        # Folding it into the status file lets the merge step name the real cause
+        # instead of guessing at one.
+        python3 - "$SHARD_INDEX" "$EXIT" \
+          "$RESULTS_DIR/wpt-shard-failure.json" \
+          "shard-out/${STEM}-status.json" <<'PY'
+        import json, sys
+
+        shard_index, exit_code, marker_path, out_path = sys.argv[1:5]
+        status = {"shardIndex": int(shard_index), "exitCode": int(exit_code)}
+        try:
+            with open(marker_path, encoding="utf-8") as handle:
+                marker = json.load(handle)
+        except (OSError, ValueError):
+            marker = None
+        if isinstance(marker, dict):
+            if marker.get("reason"):
+                status["failureReason"] = str(marker["reason"])
+            if marker.get("detail"):
+                status["failureDetail"] = str(marker["detail"])
+        with open(out_path, "w", encoding="utf-8") as handle:
+            json.dump(status, handle)
+            handle.write("\n")
+        PY
+
+    - name: Shard step summary
+      if: always()
+      shell: bash
+      env:
+        RESULTS_DIR: ${{ inputs.results-dir }}
+        SHARD_INDEX: ${{ inputs.shard-index }}
+        SHARD_COUNT: ${{ inputs.shard-count }}
+        ATTEMPT_SUFFIX: ${{ inputs.attempt-suffix }}
+      run: |
+        SUMMARY="$RESULTS_DIR/wpt-summary.txt"
+        if [ -f "$SUMMARY" ]; then
+          LABEL="WPT reftest shard ${SHARD_INDEX}/${SHARD_COUNT}"
+          if [ -n "$ATTEMPT_SUFFIX" ]; then
+            LABEL="$LABEL (retry)"
+          fi
+          echo "### $LABEL" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - uses: actions/upload-artifact@v6
+      if: always()
+      with:
+        name: wpt-shard-${{ inputs.shard-index }}${{ inputs.attempt-suffix }}
+        path: shard-out

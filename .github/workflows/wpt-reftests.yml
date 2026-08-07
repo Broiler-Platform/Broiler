@@ -1,0 +1,467 @@
+name: WPT Reftests
+
+# Web Platform Tests **reftest** runner — Broiler on both sides, no other engine.
+#
+# This is the sibling of wpt-tests.yml and is modelled directly on it: same plan →
+# prepare → run → retry → report → persist-failed shape, same sharding, same merge
+# and issue-filing tooling. One thing differs, and it is the reason the workflow
+# exists.
+#
+# wpt-tests.yml measures Broiler against a Chromium screenshot: every shard
+# downloads Chromium through Playwright, screenshots each test, and compares
+# Broiler's render to that PNG. A reftest needs none of that. A WPT reftest states
+# its own correct rendering inside the checkout —
+#
+#     <link rel="match"    href="foo-ref.html">   the render must equal this
+#     <link rel="mismatch" href="bar-ref.html">   the render must differ from this
+#
+# — so this workflow runs *only* the tests carrying such a declaration (or a
+# reference image), renders BOTH the test and its reference with Broiler, and
+# compares the two. Tests with no reference are not run at all, and no reference
+# images are generated, cached, or read.
+#
+# What that buys and what it costs, stated plainly:
+#   + No browser download, so no Chromium provisioning outage (issue #1534) and a
+#     far cheaper run — no Playwright cache, no reference cache, no epoch to bump
+#     for references.
+#   + A failure is never a Chromium-vs-Broiler font, scrollbar, or anti-aliasing
+#     difference. Test and reference go through the same renderer, so a mismatch is
+#     a genuine disagreement with what WPT says the test should look like.
+#   − A bug that hits the test and its reference identically still passes here. This
+#     suite proves self-consistency against WPT's own reference, not correctness
+#     against a shipping browser. It complements wpt-tests.yml; it does not replace
+#     it, and its pass rate is not comparable to that suite's.
+#
+# The manually dispatched workflow can target every reftest, a subset, a single
+# shard, or only the previously-failed reftests. Every run merges the shard results
+# and, when failures exist, files the same two GitHub issues the golden-image suite
+# does (most common failure groups, and the run's biggest problems), titled so the
+# two suites' issues are never confused.
+#
+# Any shard that aborts abnormally — evicted runner, hard crash, i.e. no conclusive
+# report — is rerun once at the end of the workflow by the `retry` job, before the
+# results are merged. A rerun shard's artifacts carry a `-retry` suffix, and
+# merge-wpt-shards.py keeps only the latest attempt per shard. Shards that merely
+# *fail* tests are not rerun — they already measured their slice.
+
+on:
+  workflow_dispatch:
+    inputs:
+      subset:
+        description: >
+          Semicolon-separated WPT subset patterns with optional wildcards, applied
+          before the reftest filter. Examples: "css/css-flexbox", "css/CSS2;css/css-*".
+          Empty = every reftest in the checkout.
+        required: false
+        default: ''
+      shard_index:
+        description: Zero-based shard index to run, or -1 for all shards.
+        required: false
+        default: '-1'
+      rerun_failed_only:
+        description: >
+          Rerun only the previously-failed reftests from the committed manifest
+          (tests/wpt-baseline/failed-reftests.json).
+        type: boolean
+        required: false
+        default: false
+      test_timeout_seconds:
+        description: Per-test timeout in seconds.
+        required: false
+        default: '30'
+      memory_limit_mb:
+        description: >
+          Per-test RAM cap in MiB, measured as growth of the rendering process's
+          resident set. A test that passes it is aborted and reported as
+          MemoryLimitExceeded; a worker that reaches it is recycled between tests.
+          0 disables the cap.
+        required: false
+        default: '1024'
+      pass_threshold:
+        description: >
+          Pixel pass threshold in percent: a reftest passes when Broiler's render of
+          the test is at least this percent identical to Broiler's render of the
+          test's own reference (99 = at most 1% of the pixels may differ).
+        required: false
+        default: '99'
+      most_common_problems_limit:
+        description: Maximum number of common failure groups to include in the GitHub issue.
+        required: false
+        default: '10'
+      biggest_problems_limit:
+        description: Maximum number of biggest problems to include in the second (severity-focused) GitHub issue.
+        required: false
+        default: '3'
+
+permissions:
+  contents: write   # persist-failed commits the failing-reftest manifest
+  issues: write
+
+env:
+  # Bump to invalidate the cached WPT checkout. Unlike the golden-image suite there
+  # are no cached reference images behind this, so bumping it costs one clone.
+  CACHE_EPOCH: '1'
+  SHARD_COUNT: '8'
+  WPT_CHECKOUT_DIR: tests/wpt/checkout
+  RESULTS_DIR: tests/wpt-reftest-results
+  # Its own manifest: a reftest failure and a golden-image failure are different
+  # measurements of the same test, and folding them into one file would let either
+  # suite's rerun set be silently rewritten by the other's.
+  FAILED_TESTS_FILE: tests/wpt-baseline/failed-reftests.json
+  MOST_COMMON_PROBLEMS_LIMIT: ${{ github.event.inputs.most_common_problems_limit || '10' }}
+  BIGGEST_PROBLEMS_LIMIT: ${{ github.event.inputs.biggest_problems_limit || '3' }}
+
+jobs:
+  # ── Resolve the shard matrix and whether to run incrementally ────────────
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shard-matrix: ${{ steps.resolve.outputs.shard-matrix }}
+      rerun-failed: ${{ steps.resolve.outputs.rerun-failed }}
+      expected-shards: ${{ steps.resolve.outputs.expected-shards }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve plan
+        id: resolve
+        shell: bash
+        env:
+          SELECTED_SHARD_INDEX: ${{ github.event.inputs.shard_index || '-1' }}
+          RERUN_FAILED_ONLY: ${{ github.event.inputs.rerun_failed_only || 'false' }}
+        run: |
+          python <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          shard_count = int(os.environ["SHARD_COUNT"])
+          try:
+              selected = int(os.environ["SELECTED_SHARD_INDEX"])
+          except ValueError:
+              sys.exit(f"shard_index must be an integer, got {os.environ['SELECTED_SHARD_INDEX']!r}")
+
+          if selected == -1:
+              matrix = [{"shard-index": i} for i in range(shard_count)]
+          elif 0 <= selected < shard_count:
+              matrix = [{"shard-index": selected}]
+          else:
+              sys.exit(f"shard_index must be -1 or between 0 and {shard_count - 1}, got {selected}")
+
+          rerun_requested = os.environ["RERUN_FAILED_ONLY"].strip().lower() == "true"
+          rerun_failed = rerun_requested and Path(os.environ["FAILED_TESTS_FILE"]).exists()
+
+          # The exact set of shard indexes this run dispatches. The merge step uses
+          # it to spot a dispatched shard that uploaded nothing (its job cancelled
+          # mid-run), which would otherwise be silently dropped from the merged
+          # totals rather than flagged as an incomplete shard.
+          expected_shards = ",".join(str(entry["shard-index"]) for entry in matrix)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"shard-matrix={json.dumps(matrix)}\n")
+              fh.write(f"rerun-failed={'true' if rerun_failed else 'false'}\n")
+              fh.write(f"expected-shards={expected_shards}\n")
+          PY
+
+  # ── Clone + cache the WPT checkout once (shared by all shards) ────────────
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache WPT checkout
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.WPT_CHECKOUT_DIR }}
+          key: wpt-checkout-${{ env.CACHE_EPOCH }}
+
+      - name: Clone WPT (shallow) on cache miss
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --single-branch --branch master --depth 1 \
+            https://github.com/web-platform-tests/wpt.git "$WPT_CHECKOUT_DIR"
+
+  # ── Run one shard of the reftest suite ──────────────────────────────────
+  run:
+    needs: [plan, prepare]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.plan.outputs.shard-matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      # Every provisioning/run/collect/upload step lives in the composite action,
+      # so the retry pass below runs a shard exactly the way this pass did.
+      - uses: ./.github/actions/run-wpt-reftest-shard
+        with:
+          shard-index: ${{ matrix.shard-index }}
+          shard-count: ${{ env.SHARD_COUNT }}
+          subset: ${{ github.event.inputs.subset || '' }}
+          rerun-failed: ${{ needs.plan.outputs.rerun-failed }}
+          failed-tests-file: ${{ env.FAILED_TESTS_FILE }}
+          cache-epoch: ${{ env.CACHE_EPOCH }}
+          wpt-checkout-dir: ${{ env.WPT_CHECKOUT_DIR }}
+          results-dir: ${{ env.RESULTS_DIR }}
+          test-timeout-seconds: ${{ github.event.inputs.test_timeout_seconds || '30' }}
+          memory-limit-mb: ${{ github.event.inputs.memory_limit_mb || '1024' }}
+          pass-threshold: ${{ github.event.inputs.pass_threshold || '99' }}
+
+  # ── Decide which shards aborted abnormally and deserve one rerun ─────────
+  #
+  # "Abnormally" is not "some tests failed": a shard that finishes and reports
+  # failures exits 1 with a full report, and rerunning it would only burn time to
+  # produce the same answer. What is retried is a shard that produced *no
+  # conclusive report* — its runner was evicted mid-run, or it crashed hard enough
+  # to lose its report. Those are exactly the shards merge-wpt-shards.py already
+  # flags as incomplete, so the same code decides here rather than a second,
+  # drifting definition of "incomplete".
+  retry-plan:
+    needs: [plan, run]
+    # !cancelled() rather than always(): if a human cancels the workflow, every
+    # shard looks incomplete and retrying them all is the opposite of what was
+    # asked. A single evicted shard does not cancel the run, so it still retries.
+    if: ${{ !cancelled() && needs.run.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    outputs:
+      retry-matrix: ${{ steps.detect.outputs.incomplete_shard_matrix }}
+      retry-shards: ${{ steps.detect.outputs.incomplete_shard_indexes }}
+      has-retries: ${{ steps.detect.outputs.has_incomplete_shards }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # Tolerated failure: when *every* shard died before its upload step there is
+      # no artifact to match, and download-artifact treats that as an error. That
+      # case is precisely the one worth retrying, so it must not stop the job — the
+      # detect step below then sees an empty directory and flags every dispatched
+      # shard.
+      - name: Download shard results
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          pattern: wpt-shard-*
+          path: shard-results
+          merge-multiple: true
+
+      - name: Detect shards that aborted abnormally
+        id: detect
+        shell: bash
+        run: |
+          mkdir -p shard-results
+          python scripts/merge-wpt-shards.py \
+            --shard-dir shard-results \
+            --expected-shards "${{ needs.plan.outputs.expected-shards }}" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Report the retry plan
+        shell: bash
+        env:
+          RETRY_SHARDS: ${{ steps.detect.outputs.incomplete_shard_indexes }}
+        run: |
+          if [ -n "$RETRY_SHARDS" ]; then
+            echo "### WPT reftest retry pass" >> "$GITHUB_STEP_SUMMARY"
+            echo "Rerunning shard(s) that aborted abnormally: \`$RETRY_SHARDS\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # ── Rerun the aborted shards, once, at the end of the workflow ───────────
+  #
+  # One retry pass only: a shard that aborts twice is reported as incomplete just
+  # as before, rather than looping the workflow for hours. Each retry uploads to
+  # `wpt-shard-<i>-retry`, whose files carry the same `-retry` suffix, so the merge
+  # step can tell the two attempts apart in the flattened download directory and
+  # let the retry supersede — not add to — the attempt it replaces.
+  retry:
+    needs: [plan, prepare, retry-plan]
+    if: ${{ !cancelled() && needs.retry-plan.outputs.has-retries == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.retry-plan.outputs.retry-matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/run-wpt-reftest-shard
+        with:
+          shard-index: ${{ matrix.shard-index }}
+          shard-count: ${{ env.SHARD_COUNT }}
+          attempt-suffix: '-retry'
+          subset: ${{ github.event.inputs.subset || '' }}
+          rerun-failed: ${{ needs.plan.outputs.rerun-failed }}
+          failed-tests-file: ${{ env.FAILED_TESTS_FILE }}
+          cache-epoch: ${{ env.CACHE_EPOCH }}
+          wpt-checkout-dir: ${{ env.WPT_CHECKOUT_DIR }}
+          results-dir: ${{ env.RESULTS_DIR }}
+          test-timeout-seconds: ${{ github.event.inputs.test_timeout_seconds || '30' }}
+          memory-limit-mb: ${{ github.event.inputs.memory_limit_mb || '1024' }}
+          pass-threshold: ${{ github.event.inputs.pass_threshold || '99' }}
+
+  # ── Merge shard results; file an issue when there are failures ───────────
+  #
+  # Depends on `retry` as well as `run` so the merge sees the reruns' artifacts;
+  # `always()` keeps it running when the retry job was skipped (nothing aborted)
+  # or itself failed.
+  report:
+    needs: [plan, run, retry]
+    if: always() && needs.run.result != 'skipped'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Download shard results
+        uses: actions/download-artifact@v7
+        with:
+          pattern: wpt-shard-*
+          path: shard-results
+          merge-multiple: true
+
+      - name: Merge shard results
+        id: merge
+        shell: bash
+        env:
+          WPT_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python scripts/merge-wpt-shards.py \
+            --shard-dir shard-results \
+            --merged-json wpt-merged/wpt-results.json \
+            --issue-md wpt-merged/issue.md \
+            --biggest-issue-md wpt-merged/biggest-issue.md \
+            --problem-limit "$MOST_COMMON_PROBLEMS_LIMIT" \
+            --biggest-problem-limit "$BIGGEST_PROBLEMS_LIMIT" \
+            --expected-shards "${{ needs.plan.outputs.expected-shards }}" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Publish merged summary
+        if: always()
+        run: |
+          if [ -f wpt-merged/issue.md ]; then
+            cat wpt-merged/issue.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: wpt-reftests-merged
+          path: wpt-merged
+
+      - name: Create GitHub issue for the most common failures
+        if: steps.merge.outputs.create_issue == 'true'
+        uses: actions/github-script@v8
+        env:
+          FAILED_COUNT: ${{ steps.merge.outputs.failed_count }}
+          INCOMPLETE_SHARD_COUNT: ${{ steps.merge.outputs.incomplete_shard_count }}
+        with:
+          # Prefer the configured PAT/App token, then use this workflow's token.
+          github-token: ${{ secrets.ISSUE_TOKEN || github.token }}
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('wpt-merged/issue.md', 'utf8').trim();
+            const today = new Date().toISOString().slice(0, 10);
+            const incomplete = Number(process.env.INCOMPLETE_SHARD_COUNT || 0);
+            const failureSummary = incomplete > 0
+              ? `${process.env.FAILED_COUNT} failing reftest(s), ${incomplete} incomplete shard(s)`
+              : `${process.env.FAILED_COUNT} failing reftest(s)`;
+            // "reftest run" in the title, so these never read as the golden-image
+            // suite's issues: the two measure the same tests against different
+            // baselines and their counts are not comparable.
+            const title = `WPT reftest run: ${failureSummary} (${today})`;
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
+            core.info(`Created issue #${issue.data.number}: ${issue.data.html_url}`);
+
+      - name: Create GitHub issue for the biggest problems
+        if: steps.merge.outputs.create_biggest_issue == 'true'
+        uses: actions/github-script@v8
+        env:
+          BIGGEST_PROBLEM_COUNT: ${{ steps.merge.outputs.biggest_problem_count }}
+        with:
+          # Prefer the configured PAT/App token, then use this workflow's token.
+          github-token: ${{ secrets.ISSUE_TOKEN || github.token }}
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('wpt-merged/biggest-issue.md', 'utf8').trim();
+            const today = new Date().toISOString().slice(0, 10);
+            const count = Number(process.env.BIGGEST_PROBLEM_COUNT || 0);
+            const title = `WPT reftest run: top ${count} biggest problem(s) (${today})`;
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
+            core.info(`Created biggest-problems issue #${issue.data.number}: ${issue.data.html_url}`);
+
+  # ── Persist the failing-reftest manifest for incremental reruns ──────────
+  persist-failed:
+    needs: [run, retry]
+    # Refresh the manifest after any run that actually executed shards — success OR
+    # failure. The run job reports `failure` precisely when some tests failed (the
+    # runner exits 1 on any failure), which is exactly when there are failures worth
+    # recording; gating on `success` alone would skip persistence in that case and
+    # never record them. `skipped`/`cancelled` are excluded (the shards never ran).
+    #
+    # Persistence is scope-aware (merge-wpt-shards.py --merge-into): only tests this
+    # run actually exercised are refreshed, while entries for tests outside the
+    # run's subset/shards are preserved. So a partial subset/single-shard/rerun run
+    # updates just its own slice without shrinking the manifest — and a crashed
+    # shard leaves its tests' existing entries untouched rather than dropping them.
+    #
+    # `retry` is in `needs` only so the reruns' artifacts are on hand before the
+    # merge; it is not part of the gate, since it is skipped on the normal path
+    # where nothing aborted.
+    if: >-
+      always()
+      && (needs.run.result == 'success' || needs.run.result == 'failure')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Download shard results
+        uses: actions/download-artifact@v7
+        with:
+          pattern: wpt-shard-*
+          path: shard-results
+          merge-multiple: true
+
+      - name: Merge failures into the manifest
+        run: |
+          python scripts/merge-wpt-shards.py \
+            --shard-dir shard-results \
+            --merge-into "$FAILED_TESTS_FILE" \
+            --merged-json "$FAILED_TESTS_FILE"
+
+      # Same race as the golden-image suite: the sharded run takes long enough that
+      # the branch has usually moved on, so the push has to be rebuilt on the
+      # current tip rather than assumed to fast-forward.
+      - name: Commit manifest
+        run: |
+          bash scripts/ci-commit-generated-results.sh \
+            --branch "${{ github.ref_name }}" \
+            --message "ci: update WPT failed-reftests manifest [skip ci]" \
+            "$FAILED_TESTS_FILE"
