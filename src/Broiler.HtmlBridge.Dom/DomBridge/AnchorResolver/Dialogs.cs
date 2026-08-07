@@ -51,10 +51,13 @@ public sealed partial class DomBridge
     /// where top-layer elements are always treated as fixed-positioned.
     /// Must be called <em>before</em> anchor resolution so that anchor()
     /// function values are resolved with the correct positioning context.
+    /// <para><paramref name="elements"/> is the document to apply it to: the main document's
+    /// <see cref="Elements"/>, or a nested browsing context's — a frame is severed from the main
+    /// tree, so it has to be walked separately (see <c>Dialogs.SubDocuments.cs</c>).</para>
     /// </summary>
-    private void ApplyDialogUAPositioning(DomElement root)
+    private void ApplyDialogUAPositioning(IEnumerable<DomElement> elements)
     {
-        foreach (var el in Elements)
+        foreach (var el in elements)
         {
             if (!string.Equals(el.TagName, "dialog", StringComparison.OrdinalIgnoreCase))
                 continue;
@@ -172,9 +175,9 @@ public sealed partial class DomBridge
     // so the counter has headroom.
     private const int TopLayerZIndexBase = 2_000_000_000;
 
-    private void ApplyPopoverUAPositioning(DomElement root)
+    private void ApplyPopoverUAPositioning(IEnumerable<DomElement> elements)
     {
-        foreach (var el in Elements)
+        foreach (var el in elements)
         {
             if (!(DialogStateFor(el).PopoverOpen.TryGet(out var open) && open is true))
                 continue;

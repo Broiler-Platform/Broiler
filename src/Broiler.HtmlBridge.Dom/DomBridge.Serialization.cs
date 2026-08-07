@@ -165,6 +165,9 @@ public sealed partial class DomBridge
         // A host's light-DOM children render only where a <slot> assigns them; with no slot in
         // the shadow tree they generate no boxes.
         HideUnslottedShadowHostChildren(root);
+        // A frame loaded from `src` has no attribute its live document round-trips through, so a
+        // scripted one is stamped onto its container here. See DomBridge.FrameDocumentProjection.cs.
+        ProjectScriptedFrameDocuments(root);
         ApplyBaseHrefToStyleUrls(root);
         ApplyMetaColorScheme(root);
         // Zoom baking is applied by the callers (GetRenderDocument/SerializeToHtml) before this,
@@ -802,7 +805,7 @@ public sealed partial class DomBridge
         if (subDocumentRoot == null || subDocumentRoot.ChildNodes.Count == 0)
             return null;
 
-        return string.Concat(ChildElements(subDocumentRoot).Select(SerializeElementToHtml));
+        return RenderedSubDocumentMarkup(subDocumentRoot);
     }
 
 }

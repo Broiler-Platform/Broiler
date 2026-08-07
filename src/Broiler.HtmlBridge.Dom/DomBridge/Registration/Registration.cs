@@ -101,6 +101,13 @@ public sealed partial class DomBridge
     /// through <c>window.removeEventListener</c>. Properties the global already owns are left
     /// alone, so engine builtins and the explicit aliases above always win.
     /// </para>
+    /// <para>
+    /// This pass covers the members <em>the bridge</em> installs. A member a <em>page script</em>
+    /// adds later — the shape every WPT support library has, <c>window.foo = …</c> in one
+    /// <c>&lt;script&gt;</c> and an unqualified <c>foo(…)</c> in the next — appears after it has
+    /// run, so a host that evaluates scripts one at a time must call
+    /// <see cref="SyncWindowMembersOntoGlobal"/> between them.
+    /// </para>
     /// </summary>
     private static void MirrorWindowMembersOntoGlobal(JSContext context, JSObject window)
     {
@@ -134,4 +141,30 @@ public sealed partial class DomBridge
         }
     }
 
+    /// <summary>
+    /// Re-runs the <c>window</c> → global mirror over the members present now, picking up whatever
+    /// the scripts that have run since the last call added to <c>window</c>.
+    /// <para>
+    /// Because <c>window</c> and the global object are distinct here, a script that assigns
+    /// <c>window.foo = …</c> leaves the unqualified <c>foo</c> a <c>ReferenceError</c> — and that
+    /// aborts the whole <c>&lt;script&gt;</c> that referenced it, not just the one statement. Every
+    /// WPT support library has exactly that shape: <c>/css/support/interpolation-testcommon.js</c>
+    /// closes by exporting <c>window.test_interpolation</c> and friends, and the test's own inline
+    /// script then calls <c>test_interpolation({…})</c> unqualified. Broiler dropped every such
+    /// page on the floor and rendered it blank (issue #1552 problems 4, 18 and 22 — the
+    /// <c>transform</c>, <c>row-gap</c> and <c>column-gap</c> interpolation tests — and the ~100
+    /// other <c>*-interpolation</c> tests behind them).
+    /// </para>
+    /// <para>
+    /// Idempotent and cheap to repeat: a name the global already has is left alone, so a second
+    /// call only copies what is genuinely new. A host that evaluates a document's scripts one at a
+    /// time should call this after each one, which is where a browser would have had nothing to do
+    /// because its <c>window</c> <em>is</em> the global object.
+    /// </para>
+    /// </summary>
+    public void SyncWindowMembersOntoGlobal()
+    {
+        if (_jsContext is { } context && _windowJSObject is { } window)
+            MirrorWindowMembersOntoGlobal(context, window);
+    }
 }

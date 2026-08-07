@@ -120,8 +120,8 @@ public sealed partial class DomBridge
 
         // 0. Apply UA default position:fixed to modal dialogs before anchor
         //    resolution, since browsers treat top-layer elements as fixed.
-        ApplyDialogUAPositioning(DocumentElement);
-        ApplyPopoverUAPositioning(DocumentElement);
+        ApplyDialogUAPositioning(Elements);
+        ApplyPopoverUAPositioning(Elements);
 
         // 1. Build an anchor registry from CSS rules with anchor-name.
         var anchorRegistry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);
@@ -210,6 +210,11 @@ public sealed partial class DomBridge
         InsertDialogBackdrops(
             DocumentElement, viewportWidth, viewportHeight,
             anchorRegistry, positionTryRules);
+
+        // 4b. The same top-layer passes for every nested browsing context: a frame's document is
+        //     severed from this tree, so a modal <dialog> inside one is reached only by walking it
+        //     separately. See Dialogs.SubDocuments.cs.
+        ApplySubDocumentTopLayer(anchorRegistry, positionTryRules);
 
         // 5. Fixed-position sizing from opposing insets (e.g. top:0;bottom:0) is resolved
         //    natively by the Broiler.Layout engine (CSS2.1 §10.3.7, incl. the fixed→viewport

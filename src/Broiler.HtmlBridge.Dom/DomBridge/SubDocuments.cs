@@ -341,6 +341,12 @@ public sealed partial class DomBridge
 
         var subWindow = _subWindows.GetOrCreate(containerElement);
 
+        // What the frame's scripts declare has to end up on the frame's own window, so a parent page
+        // can reach it as frames[0].window.foo. They are evaluated in the shared context, so the
+        // globals they add are identified by diffing against this snapshot.
+        // See DomBridge.SubDocumentGlobals.cs.
+        var globalsBefore = GlobalOwnPropertyNames();
+
         RunWithWindowContext(subWindow, () =>
         {
             foreach (var script in extraction.Scripts)
@@ -408,6 +414,10 @@ public sealed partial class DomBridge
                     }
                 }
             }
+
+            // Recorded, not published: the window these scripts ran against is a re-entrant
+            // throwaway that the outer GetOrCreate replaces. See DomBridge.SubDocumentGlobals.cs.
+            RecordSubDocumentGlobals(containerElement, globalsBefore);
         });
     }
 
@@ -707,6 +717,11 @@ public sealed partial class DomBridge
         document.AppendChild(parsedRoot);
 
         LinkContentDocument(containerElement, document);
+
+        // The pristine, pre-script shape of the frame — what its resource says. A `src` frame is
+        // rendered from that file unless it moves away from this. See
+        // DomBridge.FrameDocumentProjection.cs.
+        RecordSubDocumentSourceMarkup(document, html);
 
         return document;
     }

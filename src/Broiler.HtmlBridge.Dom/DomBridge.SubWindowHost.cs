@@ -44,4 +44,7 @@ public sealed partial class DomBridge : ISubWindowHost
         BuildComputedStyleObject(element, pseudoElement);
 
     JSValue? ISubWindowHost.GetGlobal(string name) => _jsContext?[name];
+
+    void ISubWindowHost.PublishPendingSubDocumentGlobals(DomElement containerElement, JSObject subWindow) =>
+        PublishPendingSubDocumentGlobals(containerElement, subWindow);
 }

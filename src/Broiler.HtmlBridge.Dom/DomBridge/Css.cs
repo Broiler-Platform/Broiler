@@ -561,9 +561,63 @@ public sealed partial class DomBridge
             var attributeHeight = ParseViewportDimensionAttribute(GetAttr(parent, "height"));
             if (attributeWidth > 0 || attributeHeight > 0)
                 return (attributeWidth, attributeHeight);
+
+            // A stylesheet rule sizes the frame just as much as an inline style does, and only the
+            // two shapes above were read — so `iframe { width: 50vw; height: 50vh }` left the frame
+            // a 0×0 viewport. Everything resolved against it then collapsed: `dvw`/`vh` lengths
+            // inside the frame, its media queries, and the pixel-sized backdrop the bridge
+            // synthesizes for a modal <dialog> in it (WPT css-view-transitions/dialog-in-rtl-iframe,
+            // whose scrim vanished at 0×0).
+            if (CascadedFrameViewport(parent) is { } cascaded)
+                return cascaded;
         }
         return (0, 0); // Default: headless 0×0 viewport
     }
+
+    /// <summary>
+    /// The frame element's cascaded <c>width</c>/<c>height</c> in pixels, or <c>null</c> when
+    /// neither resolves to a length. Relative units are resolved against the viewport the frame
+    /// itself lives in, which for a nested frame is its parent frame's — the same recursion the
+    /// containing chain has.
+    /// </summary>
+    /// <remarks>
+    /// Only lengths are read. A percentage needs the containing block, which this bridge does not
+    /// measure here, and <c>auto</c> needs layout; both fall through to the caller's default rather
+    /// than guessing a number the renderer would disagree with.
+    /// </remarks>
+    private (int Width, int Height)? CascadedFrameViewport(DomElement frame)
+    {
+        // The frame's own size is resolved through its containing document's engine, which resolves
+        // that document's viewport in turn. Guard the walk: a cycle through the browsing-context
+        // map (a frame reachable from its own document) would otherwise recur without end.
+        if (!_frameViewportResolutions.Add(frame))
+            return null;
+
+        try
+        {
+            var (outerWidth, outerHeight) = GetViewportForDocRoot(GetDocumentRootFor(frame));
+            var props = GetComputedProps(frame);
+            var width = ResolveFrameLength("width");
+            var height = ResolveFrameLength("height");
+            return width > 0 || height > 0 ? (width, height) : null;
+
+            int ResolveFrameLength(string property)
+            {
+                if (!props.TryGetValue(property, out var value) || string.IsNullOrWhiteSpace(value))
+                    return 0;
+                var px = ParseCssLengthToPixels(value.Trim(), outerWidth, outerHeight);
+                return !double.IsNaN(px) && px > 0 ? (int)px : 0;
+            }
+        }
+        finally
+        {
+            _frameViewportResolutions.Remove(frame);
+        }
+    }
+
+    /// <summary>The frames whose viewport is being resolved right now — see
+    /// <see cref="CascadedFrameViewport"/>.</summary>
+    private readonly HashSet<DomElement> _frameViewportResolutions = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// Extracts a pixel dimension from a CSS style string for a given property name.

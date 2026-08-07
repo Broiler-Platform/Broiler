@@ -1057,11 +1057,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // aspect-ratio height. The final ActualBottom is re-established after
         // child layout below; this only makes the height visible to
         // descendants beforehand, mirroring the §10.5 pre-resolution above.
-        else if ((Height == CssConstants.Auto || string.IsNullOrEmpty(Height))
-            && Display == CssConstants.Block
-            && Float == CssConstants.None
-            && Position != CssConstants.Absolute && Position != CssConstants.Fixed
-            && !IsImage
+        else if (CanTransferAspectRatioToBlockHeight
             && TryResolveAspectRatioBlockHeight(out double aspectRatioPreHeight))
         {
             Size = new SizeF(Size.Width, (float)aspectRatioPreHeight);
@@ -1352,14 +1348,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // (height) axis derives its used height from its used inline (width) size.
         // Runs after the explicit-height paths above (so an author height still
         // wins) and before the §10.7 min-/max-height clamp below (so e.g. a
-        // min-height floors the transferred square). Scoped to in-flow block-level
-        // boxes, whose used width is already resolved and does not itself depend on
-        // the aspect ratio; replaced elements keep their intrinsic-ratio sizing.
-        if ((Height == CssConstants.Auto || string.IsNullOrEmpty(Height))
-            && Display == CssConstants.Block
-            && Float == CssConstants.None
-            && Position != CssConstants.Absolute && Position != CssConstants.Fixed
-            && !IsImage
+        // min-height floors the transferred square). Scoped by
+        // CanTransferAspectRatioToBlockHeight to boxes whose used width is already
+        // resolved and does not itself depend on the aspect ratio; <img> and the
+        // other intrinsically-sized replaced elements keep their own ratio sizing.
+        if (CanTransferAspectRatioToBlockHeight
             && TryResolveAspectRatioBlockHeight(out double aspectRatioBorderBoxHeight))
         {
             ActualBottom = Location.Y + aspectRatioBorderBoxHeight;

@@ -93,6 +93,9 @@ internal sealed class BrowsingContextManager
         _contentDocuments.TryGetValue(container, out var document) ? document : null;
     public DomElement? GetContainerForDocument(DomDocument document) =>
         _documentContainers.TryGetValue(document, out var container) ? container : null;
+    /// <summary>Every nested browsing context's document this session has materialised — what a
+    /// render-time pass has to walk to reach frames, which are severed from the main tree.</summary>
+    public IEnumerable<DomDocument> ContentDocuments => _contentDocuments.Values;
     public void LinkContentDocument(DomElement container, DomDocument document)
     {
         _contentDocuments[container] = document;

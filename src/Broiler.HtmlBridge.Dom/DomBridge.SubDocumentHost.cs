@@ -75,4 +75,7 @@ public sealed partial class DomBridge : ISubDocumentHost
     void ISubDocumentHost.NotifyNodeIteratorPreRemoval(DomNode node) => NotifyNodeIteratorPreRemoval(node);
     void ISubDocumentHost.NotifyChildRemoved(DomElement parent, DomNode removedChild, int index) =>
         NotifyChildRemoved(parent, removedChild, index);
+
+    JSValue ISubDocumentHost.StartViewTransition(DomNode docRoot, in Arguments arguments) =>
+        StartSubDocumentViewTransition(docRoot, in arguments);
 }

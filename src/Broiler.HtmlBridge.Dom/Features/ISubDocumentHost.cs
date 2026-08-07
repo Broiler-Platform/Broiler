@@ -77,4 +77,11 @@ internal interface ISubDocumentHost
     void InsertNodeAt(DomNode parent, DomNode node, int index);
     void NotifyNodeIteratorPreRemoval(DomNode node);
     void NotifyChildRemoved(DomElement parent, DomNode removedChild, int index);
+
+    // -------- view transitions --------
+
+    /// <summary>Runs <c>startViewTransition()</c> scoped to the sub-document rooted at
+    /// <paramref name="docRoot"/> — a page drives a nested browsing context's transition through
+    /// <c>frame.contentDocument</c>, and it must not touch the main document's.</summary>
+    JSValue StartViewTransition(DomNode docRoot, in Arguments arguments);
 }

@@ -47,6 +47,17 @@ public sealed partial class DomBridge
         /// </summary>
         public bool FinishedObserved { get; set; }
 
+        /// <summary>
+        /// A <c>ready</c> callback is what released the reftest's screenshot, so the still being
+        /// captured is the <em>running</em> transition however the page went on to observe
+        /// <c>finished</c>. Without this, a page that attaches a cleanup handler to <c>finished</c>
+        /// and screenshots from <c>ready</c> — the shape every css-view-transitions-2 nested test
+        /// has, through <c>resources/compute-test.js</c> — looked identical at bake time to one
+        /// that screenshots from <c>finished</c>: both leave <c>reftest-wait</c> gone and
+        /// <see cref="FinishedObserved"/> set. See <see cref="FinishedThenable"/>.
+        /// </summary>
+        public bool ScreenshotReleasedByReady { get; set; }
+
         /// <summary>The transition's active types (the <c>types</c> option), matched by
         /// <c>:active-view-transition-type()</c>.</summary>
         public HashSet<string> Types { get; } = new(System.StringComparer.Ordinal);
@@ -61,6 +72,18 @@ public sealed partial class DomBridge
         /// same element resolves to the same name across the old and new captures — the two snapshots
         /// must pair into one group — and stays stable for the transition's lifetime.</summary>
         public Dictionary<DomElement, string> AutoNames { get; } = new();
+
+        /// <summary>
+        /// What each nested browsing context on the page was <em>displaying</em> when the old state
+        /// was captured, keyed by its browsing-context root.
+        /// <para>The root snapshot is a picture of the whole page, frames included, so a document
+        /// frozen showing its old snapshot must show the frames as they were then — not as they are
+        /// now. WPT <c>iframe-and-main-frame-transition-old-main</c> says so in as many words: it
+        /// starts a transition <em>inside</em> the frame after the main one has been captured and
+        /// expects the change not to show, "because the old screenshot on the main frame still has
+        /// the iframe's old content".</para>
+        /// </summary>
+        public Dictionary<DomNode, string> FrameMarkupAtCapture { get; } = new();
     }
 
     private readonly record struct NamedSnapshot(
@@ -174,7 +197,7 @@ public sealed partial class DomBridge
     private JSObject BuildViewTransitionObject(ViewTransitionState state)
     {
         var transition = new JSObject();
-        transition.FastAddValue((KeyString)"ready", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
+        transition.FastAddValue((KeyString)"ready", ReadyThenable(state), JSPropertyAttributes.EnumerableConfigurableValue);
         // `finished` resolving means the transition is over: the ::view-transition tree has been
         // removed and the DOM is back to its plain final state. A reftest that screenshots from
         // finished (rather than ready) therefore expects the final DOM, not the pseudo tree — so
@@ -225,6 +248,59 @@ public sealed partial class DomBridge
         return thenable;
     }
 
+    /// <summary>
+    /// The <c>ready</c> promise: a resolved thenable that additionally records when its own callback
+    /// is the one that released the reftest's screenshot.
+    /// <para>
+    /// A page that screenshots from <c>ready</c> is capturing the <em>running</em> transition — the
+    /// pseudo tree must still bake — while one that screenshots from <c>finished</c> wants the plain
+    /// final DOM. <see cref="FinishedThenable"/> tells them apart by watching for the
+    /// <c>reftest-wait</c> class disappearing, but it can only re-read that class at bake time, long
+    /// after both chains have run. A page that does both — a cleanup handler on <c>finished</c> and
+    /// <c>takeScreenshot</c> on <c>ready</c>, which is exactly what the css-view-transitions-2
+    /// nested tests do through <c>resources/compute-test.js</c> — is indistinguishable from the
+    /// screenshot-on-finished shape at that point, and the transition was torn down: the whole
+    /// nested cluster rendered its own red page instead of the green pseudo tree. Noting the
+    /// release here settles it at the moment it happens.
+    /// </para>
+    /// </summary>
+    private JSObject ReadyThenable(ViewTransitionState state)
+    {
+        bool ScreenshotPending() =>
+            (GetAttr(DocumentElement, "class") ?? string.Empty)
+                .Contains("reftest-wait", System.StringComparison.Ordinal);
+
+        void Run(JSFunction? cb)
+        {
+            bool waitBefore = ScreenshotPending();
+            if (cb is not null)
+            {
+                try { cb.InvokeFunction(new Arguments(cb, JSUndefined.Value)); }
+                catch (System.Exception ex)
+                {
+                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.viewTransition.ready.then",
+                        $"View transition ready callback threw: {ex.Message}", ex);
+                }
+            }
+
+            if (waitBefore && !ScreenshotPending())
+                state.ScreenshotReleasedByReady = true;
+        }
+
+        var thenable = new JSObject();
+        JSValue Then(in Arguments args)
+        {
+            Run(args.Length > 0 ? args[0] as JSFunction : null);
+            return thenable;
+        }
+        thenable.FastAddValue((KeyString)"then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue((KeyString)"finally",
+            new DomFunction((in a) => { Run(a.Length > 0 ? a[0] as JSFunction : null); return thenable; }, "finally", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        return thenable;
+    }
+
     /// <summary>The <c>finished</c> promise as an already-resolved thenable that first marks the
     /// transition complete — clearing <see cref="_activeViewTransition"/> so the serialize-time pseudo
     /// tree bake is skipped and the plain final DOM renders — then, like <see cref="ResolvedThenable"/>,
@@ -255,6 +331,12 @@ public sealed partial class DomBridge
                 }
             }
             if (!waitBefore)
+                return;
+
+            // A `ready` callback that already took the screenshot settles it: the still is of the
+            // running transition, so observing `finished` afterwards must not tear the pseudo tree
+            // down. (Ordering does not matter — the nested tests attach to `finished` first.)
+            if (_activeViewTransition?.ScreenshotReleasedByReady == true)
                 return;
 
             if (!ScreenshotPending())
@@ -307,8 +389,11 @@ public sealed partial class DomBridge
 
         // A transition whose `finished` the page observed is over once that page releases its
         // screenshot; the release may have landed in a microtask after `finished` returned, so this
-        // is the first point that can see it. Nothing to bake for a transition that has ended.
+        // is the first point that can see it. Nothing to bake for a transition that has ended —
+        // unless a `ready` callback is what released the screenshot, in which case the still is of
+        // the running transition and the missing `reftest-wait` says nothing about `finished`.
         if (_activeViewTransition.FinishedObserved
+            && !_activeViewTransition.ScreenshotReleasedByReady
             && !(GetAttr(DocumentElement, "class") ?? string.Empty)
                 .Contains("reftest-wait", System.StringComparison.Ordinal))
         {
@@ -357,6 +442,44 @@ public sealed partial class DomBridge
             state.OldCaptures[name] = new NamedSnapshot(l, t, w, h,
                 style.GetValueOrDefault("background-color") ?? "transparent",
                 BuildViewTransitionSnapshotContent(element));
+        }
+
+        CaptureFrameMarkup(state);
+    }
+
+    /// <summary>
+    /// Records what every nested browsing context on the page is displaying right now, so a root
+    /// snapshot frozen at this moment can keep showing it. See
+    /// <see cref="ViewTransitionState.FrameMarkupAtCapture"/>.
+    /// <para>What is recorded is the <em>effective</em> markup, not the live sub-tree: a frame already
+    /// holding its own old snapshot is displaying that, and the page's root snapshot has to agree
+    /// with what was on screen.</para>
+    /// <para>Only frames that are <em>part of</em> the root snapshot are recorded. A frame carrying
+    /// its own <c>view-transition-name</c> is captured as its own group instead, and that group's
+    /// rules — not the root's — decide which of its states shows: WPT
+    /// <c>sibling-frames-transition</c> and <c>-with-name-on-iframe</c> both freeze the root on its
+    /// old snapshot while pinning the named frames to their <em>new</em> state, and say so in their
+    /// comments ("the iframe is showing the live screenshot").</para>
+    /// </summary>
+    private void CaptureFrameMarkup(ViewTransitionState state)
+    {
+        foreach (var element in DocumentElement.Descendants().OfType<DomElement>())
+        {
+            if (!string.Equals(element.TagName, "iframe", System.StringComparison.OrdinalIgnoreCase)
+                || !HasAttr(element, "srcdoc"))
+            {
+                continue;
+            }
+
+            var style = UsedStyleForCapture(element);
+            if (ResolveUsedViewTransitionName(element, style.GetValueOrDefault("view-transition-name")) is not null)
+                continue;
+
+            if (GetContentDocument(element) is { } frameRoot
+                && EffectiveSubDocumentMarkup(frameRoot) is { Length: > 0 } markup)
+            {
+                state.FrameMarkupAtCapture[frameRoot] = markup;
+            }
         }
     }
 
