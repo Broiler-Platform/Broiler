@@ -1,0 +1,822 @@
+{
+  "generatedAt": "2026-08-07T12:54:20.314Z",
+  "platform": "linux-arm64",
+  "octaneVersion": "9",
+  "engines": {
+    "chromium": {
+      "label": "Chromium 149.0.7827.0",
+      "geomean": 63545
+    },
+    "broiler": {
+      "label": "Broiler.JS (BroilerJS --script-host)",
+      "geomean": 369
+    },
+    "jint": {
+      "label": "Jint 4.15.3 (interpreter)",
+      "geomean": 650
+    }
+  },
+  "benchmarks": [
+    {
+      "name": "Box2D",
+      "chromium": {
+        "score": 110608,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 654,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 617,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.006,
+      "broilerTimesSlower": 169.1,
+      "jintVsChromium": 0.006,
+      "broilerVsJint": 1.06,
+      "stability": {
+        "chromium": {
+          "samples": [
+            110608,
+            110286,
+            110718
+          ],
+          "bandPercent": 0.4
+        },
+        "broiler": {
+          "samples": [
+            662,
+            650,
+            654
+          ],
+          "bandPercent": 1.8
+        },
+        "jint": {
+          "samples": [
+            616,
+            623,
+            617
+          ],
+          "bandPercent": 1.1
+        }
+      }
+    },
+    {
+      "name": "CodeLoad",
+      "chromium": {
+        "score": 29845,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 150,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 6216,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.005,
+      "broilerTimesSlower": 199,
+      "jintVsChromium": 0.208,
+      "broilerVsJint": 0.024,
+      "stability": {
+        "chromium": {
+          "samples": [
+            29845,
+            29942,
+            29538
+          ],
+          "bandPercent": 1.4
+        },
+        "broiler": {
+          "samples": [
+            147,
+            150,
+            155
+          ],
+          "bandPercent": 5.3
+        },
+        "jint": {
+          "samples": [
+            6316,
+            6216,
+            6105
+          ],
+          "bandPercent": 3.4
+        }
+      }
+    },
+    {
+      "name": "Crypto",
+      "chromium": {
+        "score": 57095,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 285,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 162,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.005,
+      "broilerTimesSlower": 200.3,
+      "jintVsChromium": 0.003,
+      "broilerVsJint": 1.759,
+      "stability": {
+        "chromium": {
+          "samples": [
+            57080,
+            57095,
+            57114
+          ],
+          "bandPercent": 0.1
+        },
+        "broiler": {
+          "samples": [
+            294,
+            276,
+            285
+          ],
+          "bandPercent": 6.3
+        },
+        "jint": {
+          "samples": [
+            162,
+            162,
+            162
+          ],
+          "bandPercent": 0
+        }
+      }
+    },
+    {
+      "name": "DeltaBlue",
+      "chromium": {
+        "score": 97584,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 211,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 191,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.002,
+      "broilerTimesSlower": 462.5,
+      "jintVsChromium": 0.002,
+      "broilerVsJint": 1.105,
+      "stability": {
+        "chromium": {
+          "samples": [
+            96301,
+            97584,
+            101220
+          ],
+          "bandPercent": 5
+        },
+        "broiler": {
+          "samples": [
+            212,
+            210,
+            211
+          ],
+          "bandPercent": 0.9
+        },
+        "jint": {
+          "samples": [
+            191,
+            193,
+            191
+          ],
+          "bandPercent": 1
+        }
+      }
+    },
+    {
+      "name": "EarleyBoyer",
+      "chromium": {
+        "score": 79598,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 449,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 464,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.006,
+      "broilerTimesSlower": 177.3,
+      "jintVsChromium": 0.006,
+      "broilerVsJint": 0.968,
+      "stability": {
+        "chromium": {
+          "samples": [
+            79689,
+            78131,
+            79598
+          ],
+          "bandPercent": 2
+        },
+        "broiler": {
+          "samples": [
+            449,
+            456,
+            449
+          ],
+          "bandPercent": 1.6
+        },
+        "jint": {
+          "samples": [
+            464,
+            461,
+            466
+          ],
+          "bandPercent": 1.1
+        }
+      }
+    },
+    {
+      "name": "Gameboy",
+      "chromium": {
+        "score": 120685,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 1114,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 945,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.009,
+      "broilerTimesSlower": 108.3,
+      "jintVsChromium": 0.008,
+      "broilerVsJint": 1.179,
+      "stability": {
+        "chromium": {
+          "samples": [
+            120685,
+            121490,
+            120685
+          ],
+          "bandPercent": 0.7
+        },
+        "broiler": {
+          "samples": [
+            1117,
+            1114,
+            1098
+          ],
+          "bandPercent": 1.7
+        },
+        "jint": {
+          "samples": [
+            945,
+            946,
+            942
+          ],
+          "bandPercent": 0.4
+        }
+      }
+    },
+    {
+      "name": "Mandreel",
+      "chromium": {
+        "score": 53594,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 188,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 95,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.004,
+      "broilerTimesSlower": 285.1,
+      "jintVsChromium": 0.002,
+      "broilerVsJint": 1.979,
+      "stability": {
+        "chromium": {
+          "samples": [
+            54190,
+            53066,
+            53594
+          ],
+          "bandPercent": 2.1
+        },
+        "broiler": {
+          "samples": [
+            189,
+            188,
+            188
+          ],
+          "bandPercent": 0.5
+        },
+        "jint": {
+          "samples": [
+            94.4,
+            95.9,
+            95
+          ],
+          "bandPercent": 1.6
+        }
+      }
+    },
+    {
+      "name": "MandreelLatency",
+      "chromium": {
+        "score": 77894,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 19.1,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 754,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0,
+      "broilerTimesSlower": 4078.2,
+      "jintVsChromium": 0.01,
+      "broilerVsJint": 0.025,
+      "stability": {
+        "chromium": {
+          "samples": [
+            79130,
+            77894,
+            76695
+          ],
+          "bandPercent": 3.1
+        },
+        "broiler": {
+          "samples": [
+            19.1,
+            19.1,
+            19.1
+          ],
+          "bandPercent": 0
+        },
+        "jint": {
+          "samples": [
+            754,
+            759,
+            750
+          ],
+          "bandPercent": 1.2
+        }
+      }
+    },
+    {
+      "name": "NavierStokes",
+      "chromium": {
+        "score": 42294,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 497,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 257,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.012,
+      "broilerTimesSlower": 85.1,
+      "jintVsChromium": 0.006,
+      "broilerVsJint": 1.934,
+      "stability": {
+        "chromium": {
+          "samples": [
+            42294,
+            42252,
+            42294
+          ],
+          "bandPercent": 0.1
+        },
+        "broiler": {
+          "samples": [
+            497,
+            499,
+            497
+          ],
+          "bandPercent": 0.4
+        },
+        "jint": {
+          "samples": [
+            259,
+            257,
+            257
+          ],
+          "bandPercent": 0.8
+        }
+      }
+    },
+    {
+      "name": "PdfJS",
+      "chromium": {
+        "score": 69792,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 543,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 982,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.008,
+      "broilerTimesSlower": 128.5,
+      "jintVsChromium": 0.014,
+      "broilerVsJint": 0.553,
+      "stability": {
+        "chromium": {
+          "samples": [
+            69792,
+            69584,
+            69792
+          ],
+          "bandPercent": 0.3
+        },
+        "broiler": {
+          "samples": [
+            542,
+            543,
+            551
+          ],
+          "bandPercent": 1.7
+        },
+        "jint": {
+          "samples": [
+            982,
+            983,
+            970
+          ],
+          "bandPercent": 1.3
+        }
+      }
+    },
+    {
+      "name": "RayTrace",
+      "chromium": {
+        "score": 108112,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 494,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 491,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.005,
+      "broilerTimesSlower": 218.9,
+      "jintVsChromium": 0.005,
+      "broilerVsJint": 1.006,
+      "stability": {
+        "chromium": {
+          "samples": [
+            108556,
+            108112,
+            107964
+          ],
+          "bandPercent": 0.5
+        },
+        "broiler": {
+          "samples": [
+            495,
+            494,
+            483
+          ],
+          "bandPercent": 2.4
+        },
+        "jint": {
+          "samples": [
+            491,
+            492,
+            491
+          ],
+          "bandPercent": 0.2
+        }
+      }
+    },
+    {
+      "name": "RegExp",
+      "chromium": {
+        "score": 10062,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 121,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 190,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.012,
+      "broilerTimesSlower": 83.2,
+      "jintVsChromium": 0.019,
+      "broilerVsJint": 0.637,
+      "stability": {
+        "chromium": {
+          "samples": [
+            10062,
+            10112,
+            9427
+          ],
+          "bandPercent": 6.8
+        },
+        "broiler": {
+          "samples": [
+            122,
+            121,
+            121
+          ],
+          "bandPercent": 0.8
+        },
+        "jint": {
+          "samples": [
+            191,
+            190,
+            190
+          ],
+          "bandPercent": 0.5
+        }
+      }
+    },
+    {
+      "name": "Richards",
+      "chromium": {
+        "score": 34645,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 249,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 182,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.007,
+      "broilerTimesSlower": 139.1,
+      "jintVsChromium": 0.005,
+      "broilerVsJint": 1.368,
+      "stability": {
+        "chromium": {
+          "samples": [
+            34645,
+            34695,
+            34621
+          ],
+          "bandPercent": 0.2
+        },
+        "broiler": {
+          "samples": [
+            250,
+            249,
+            246
+          ],
+          "bandPercent": 1.6
+        },
+        "jint": {
+          "samples": [
+            182,
+            181,
+            183
+          ],
+          "bandPercent": 1.1
+        }
+      }
+    },
+    {
+      "name": "Splay",
+      "chromium": {
+        "score": 52741,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 497,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 933,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.009,
+      "broilerTimesSlower": 106.1,
+      "jintVsChromium": 0.018,
+      "broilerVsJint": 0.533,
+      "stability": {
+        "chromium": {
+          "samples": [
+            52741,
+            51608,
+            53018
+          ],
+          "bandPercent": 2.7
+        },
+        "broiler": {
+          "samples": [
+            497,
+            496,
+            513
+          ],
+          "bandPercent": 3.4
+        },
+        "jint": {
+          "samples": [
+            942,
+            929,
+            933
+          ],
+          "bandPercent": 1.4
+        }
+      }
+    },
+    {
+      "name": "SplayLatency",
+      "chromium": {
+        "score": 83880,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 1850,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 3107,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.022,
+      "broilerTimesSlower": 45.3,
+      "jintVsChromium": 0.037,
+      "broilerVsJint": 0.595,
+      "stability": {
+        "chromium": {
+          "samples": [
+            80859,
+            83880,
+            85237
+          ],
+          "bandPercent": 5.2
+        },
+        "broiler": {
+          "samples": [
+            1850,
+            1805,
+            1880
+          ],
+          "bandPercent": 4.1
+        },
+        "jint": {
+          "samples": [
+            3124,
+            3107,
+            3104
+          ],
+          "bandPercent": 0.6
+        }
+      }
+    },
+    {
+      "name": "Typescript",
+      "chromium": {
+        "score": 115285,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 2187,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 2487,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.019,
+      "broilerTimesSlower": 52.7,
+      "jintVsChromium": 0.022,
+      "broilerVsJint": 0.879,
+      "stability": {
+        "chromium": {
+          "samples": [
+            115914,
+            115077,
+            115285
+          ],
+          "bandPercent": 0.7
+        },
+        "broiler": {
+          "samples": [
+            2187,
+            2182,
+            2194
+          ],
+          "bandPercent": 0.5
+        },
+        "jint": {
+          "samples": [
+            2479,
+            2518,
+            2487
+          ],
+          "bandPercent": 1.6
+        }
+      }
+    },
+    {
+      "name": "zlib",
+      "chromium": {
+        "score": 107314,
+        "status": "ok"
+      },
+      "broiler": {
+        "score": 505,
+        "status": "ok"
+      },
+      "jint": {
+        "score": 5722,
+        "status": "ok"
+      },
+      "broilerVsChromium": 0.005,
+      "broilerTimesSlower": 212.5,
+      "jintVsChromium": 0.053,
+      "broilerVsJint": 0.088,
+      "stability": {
+        "chromium": {
+          "samples": [
+            107314,
+            107465,
+            107314
+          ],
+          "bandPercent": 0.1
+        },
+        "broiler": {
+          "samples": [
+            505,
+            504,
+            509
+          ],
+          "bandPercent": 1
+        },
+        "jint": {
+          "samples": [
+            5741,
+            5717,
+            5722
+          ],
+          "bandPercent": 0.4
+        }
+      }
+    }
+  ],
+  "summary": {
+    "scoresReported": {
+      "chromium": 17,
+      "broiler": 17,
+      "jint": 17,
+      "expected": 17
+    },
+    "geomean": {
+      "chromium": 63545,
+      "broiler": 369,
+      "jint": 650
+    },
+    "spread": {
+      "factor": 90,
+      "best": {
+        "name": "SplayLatency",
+        "timesSlower": 45.3
+      },
+      "worst": {
+        "name": "MandreelLatency",
+        "timesSlower": 4078.2
+      }
+    },
+    "broilerVsJint": {
+      "ratio": 0.567,
+      "benchmarks": 17
+    },
+    "repetitionsByEngine": {
+      "chromium": 3,
+      "broiler": 3,
+      "jint": 3
+    },
+    "repetitions": 3,
+    "broilerRepetitions": 3,
+    "noiseBandPercent": 7.5
+  }
+}

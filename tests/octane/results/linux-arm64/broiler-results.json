@@ -1,0 +1,474 @@
+{
+  "engine": "broiler",
+  "engineLabel": "Broiler.JS (BroilerJS --script-host)",
+  "octaneVersion": "9",
+  "perSuiteTimeoutSec": 1800,
+  "repetitions": 3,
+  "noiseBandPercent": 7.5,
+  "benchmarks": {
+    "Richards": 249,
+    "DeltaBlue": 211,
+    "Crypto": 285,
+    "RayTrace": 494,
+    "EarleyBoyer": 449,
+    "RegExp": 121,
+    "Splay": 497,
+    "SplayLatency": 1850,
+    "NavierStokes": 497,
+    "PdfJS": 543,
+    "Mandreel": 188,
+    "MandreelLatency": 19.1,
+    "Gameboy": 1114,
+    "CodeLoad": 150,
+    "Box2D": 654,
+    "zlib": 505,
+    "Typescript": 2187
+  },
+  "stability": {
+    "Richards": {
+      "samples": [
+        250,
+        249,
+        246
+      ],
+      "bandPercent": 1.6
+    },
+    "DeltaBlue": {
+      "samples": [
+        212,
+        210,
+        211
+      ],
+      "bandPercent": 0.9
+    },
+    "Crypto": {
+      "samples": [
+        294,
+        276,
+        285
+      ],
+      "bandPercent": 6.3
+    },
+    "RayTrace": {
+      "samples": [
+        495,
+        494,
+        483
+      ],
+      "bandPercent": 2.4
+    },
+    "EarleyBoyer": {
+      "samples": [
+        449,
+        456,
+        449
+      ],
+      "bandPercent": 1.6
+    },
+    "RegExp": {
+      "samples": [
+        122,
+        121,
+        121
+      ],
+      "bandPercent": 0.8
+    },
+    "Splay": {
+      "samples": [
+        497,
+        496,
+        513
+      ],
+      "bandPercent": 3.4
+    },
+    "SplayLatency": {
+      "samples": [
+        1850,
+        1805,
+        1880
+      ],
+      "bandPercent": 4.1
+    },
+    "NavierStokes": {
+      "samples": [
+        497,
+        499,
+        497
+      ],
+      "bandPercent": 0.4
+    },
+    "PdfJS": {
+      "samples": [
+        542,
+        543,
+        551
+      ],
+      "bandPercent": 1.7
+    },
+    "Mandreel": {
+      "samples": [
+        189,
+        188,
+        188
+      ],
+      "bandPercent": 0.5
+    },
+    "MandreelLatency": {
+      "samples": [
+        19.1,
+        19.1,
+        19.1
+      ],
+      "bandPercent": 0
+    },
+    "Gameboy": {
+      "samples": [
+        1117,
+        1114,
+        1098
+      ],
+      "bandPercent": 1.7
+    },
+    "CodeLoad": {
+      "samples": [
+        147,
+        150,
+        155
+      ],
+      "bandPercent": 5.3
+    },
+    "Box2D": {
+      "samples": [
+        662,
+        650,
+        654
+      ],
+      "bandPercent": 1.8
+    },
+    "zlib": {
+      "samples": [
+        505,
+        504,
+        509
+      ],
+      "bandPercent": 1
+    },
+    "Typescript": {
+      "samples": [
+        2187,
+        2182,
+        2194
+      ],
+      "bandPercent": 0.5
+    }
+  },
+  "suiteStatus": {
+    "Richards": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 2854,
+      "filesLoaded": [
+        "base.js",
+        "richards.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/Richards.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "DeltaBlue": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 3938,
+      "filesLoaded": [
+        "base.js",
+        "deltablue.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/DeltaBlue.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Crypto": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 16555,
+      "filesLoaded": [
+        "base.js",
+        "crypto.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/Crypto.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "RayTrace": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 7179,
+      "filesLoaded": [
+        "base.js",
+        "raytrace.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/RayTrace.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "EarleyBoyer": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 21806,
+      "filesLoaded": [
+        "base.js",
+        "earley-boyer.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/EarleyBoyer.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "RegExp": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 17899,
+      "filesLoaded": [
+        "base.js",
+        "regexp.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/RegExp.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Splay": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 4540,
+      "filesLoaded": [
+        "base.js",
+        "splay.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/Splay.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "NavierStokes": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 6858,
+      "filesLoaded": [
+        "base.js",
+        "navier-stokes.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/NavierStokes.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "PdfJS": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 14575,
+      "filesLoaded": [
+        "base.js",
+        "pdfjs.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/PdfJS.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Mandreel": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 235857,
+      "filesLoaded": [
+        "base.js",
+        "mandreel.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/Mandreel.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Gameboy": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 11862,
+      "filesLoaded": [
+        "base.js",
+        "gbemu-part1.js",
+        "gbemu-part2.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/Gameboy.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "CodeLoad": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 20063,
+      "filesLoaded": [
+        "base.js",
+        "code-load.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/CodeLoad.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Box2D": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 9853,
+      "filesLoaded": [
+        "base.js",
+        "box2d.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/Box2D.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "zlib": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 301049,
+      "filesLoaded": [
+        "base.js",
+        "zlib.js",
+        "zlib-data.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/zlib.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Typescript": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 63324,
+      "filesLoaded": [
+        "base.js",
+        "typescript.js",
+        "typescript-input.js",
+        "typescript-compiler.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests/octane/logs/broiler/Typescript.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    }
+  },
+  "geomean": 369,
+  "generatedAt": "2026-08-07T12:54:20.314Z",
+  "platform": "linux-arm64"
+}
