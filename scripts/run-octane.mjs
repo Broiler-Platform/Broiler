@@ -1119,7 +1119,7 @@ function summarize(cmp, results) {
     // "Smoothness": how far apart the best and worst suites are. A uniformly
     // slow engine is a healthier engine than a mostly-fine one with an outlier,
     // because the outlier is a single subsystem failing rather than a broad
-    // deficit — see tests/octane/roadmap.md §1.
+    // deficit — see Broiler.JS/docs/roadmap/Roadmap.md §2 (the metric).
     spread: scored.length < 2 ? null : {
       factor: Number((Math.max(...factors) / Math.min(...factors)).toFixed(1)),
       best: best && { name: best.name, timesSlower: best.broilerTimesSlower },
@@ -1219,7 +1219,11 @@ export function renderMarkdown(cmp, results) {
       lines.push(`Broiler's best suite is **${s.spread.best.name}** at ${s.spread.best.timesSlower}× slower ` +
         `and its worst is **${s.spread.worst.name}** at ${s.spread.worst.timesSlower}×. The spread between them ` +
         'is the "smoothness" number — a large one means a single subsystem is pathological rather than the ' +
-        'engine being uniformly behind. See [`../roadmap.md`](../roadmap.md).');
+        // Four levels up because the report is written into the per-platform
+        // tests/octane/results/<platform>/, and the roadmap it points at moved
+        // into the Broiler.JS submodule.
+        'engine being uniformly behind. See ' +
+        '[`Broiler.JS/docs/roadmap/Roadmap.md`](../../../../Broiler.JS/docs/roadmap/Roadmap.md).');
       lines.push('');
     }
     if (s.broilerVsJint) {

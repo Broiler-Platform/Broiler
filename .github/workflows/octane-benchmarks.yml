@@ -15,7 +15,7 @@ name: Octane Benchmarks
 #
 # The `platform` input picks which of the release RIDs to measure on —
 # win-x64, linux-x64, linux-arm64, or `all` for the full matrix that
-# docs/performance/protocol.md §3.1 requires before a result may be claimed.
+# Broiler.JS/docs/roadmap/Measurement.md §3.1 requires before a result may be claimed.
 # Each platform is its own job on its own runner and writes its own results
 # directory, tests/octane/results/<platform>/: Octane scores do not carry
 # across machines, and the harness folds a previously committed engine result
@@ -103,7 +103,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          # The release matrix of docs/performance/protocol.md §3.1. linux-arm64
+          # The release matrix of Broiler.JS/docs/roadmap/Measurement.md §3.1. linux-arm64
           # is a GitHub-hosted Arm runner; the label is a distinct image, not a
           # ubuntu-latest variant, so it is spelled out rather than derived.
           runner_for() {

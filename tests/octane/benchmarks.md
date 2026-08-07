@@ -25,7 +25,7 @@ Chromium 149.0.7827.55 vs the `BroilerJS --script-host` shell).
 > is **7.5%**, and a local three-repetition run has since shown the true band is
 > per suite and ranges forty-fold (Splay 15.9%, Richards 10.6%, DeltaBlue 9.1%,
 > median 5.5%). See
-> [`docs/performance-roadmap.md` §0](../../docs/performance-roadmap.md).
+> [`Broiler.JS/docs/roadmap/Roadmap.md` §0](../../Broiler.JS/docs/roadmap/Roadmap.md).
 
 ---
 
@@ -478,7 +478,7 @@ its end.
 
 Ordered by how much of the gap each accounts for, using the engine's own
 measurements in
-[`Broiler.JS/docs/performance-roadmap.md`](../../Broiler.JS/docs/performance-roadmap.md)
+[`Broiler.JS/docs/roadmap/Archive.md`](../../Broiler.JS/docs/roadmap/Archive.md)
 as evidence.
 
 ### B1 · Every JavaScript value is a heap-allocated object
@@ -507,7 +507,7 @@ The pipeline is source → `FastParser` → `FastCompiler` → LINQ expression t
 IL via the custom `Broiler.JavaScript.ExpressionCompiler` → RyuJIT. Real machine
 code comes out of the end, so this is not "an interpreter" — but it is compiled
 **once, generically, with no knowledge of the types that will flow through it**,
-and `docs/performance.md` records that function tiering is off unless a host
+and `Broiler.JS/docs/roadmap/Measurement.md` records that function tiering is off unless a host
 opts in.
 
 That means every `+` is a call to a runtime helper implementing the full §13.15
@@ -658,7 +658,7 @@ total win and by far the largest change.
 
 _Sources: [`results/linux-x64/comparison.md`](results/linux-x64/comparison.md),
 [`results/linux-x64/diagnostics.md`](results/linux-x64/diagnostics.md),
-[`Broiler.JS/docs/performance-roadmap.md`](../../Broiler.JS/docs/performance-roadmap.md),
-[`Broiler.JS/docs/performance.md`](../../Broiler.JS/docs/performance.md),
+[`Broiler.JS/docs/roadmap/Archive.md`](../../Broiler.JS/docs/roadmap/Archive.md),
+[`Broiler.JS/docs/roadmap/Measurement.md`](../../Broiler.JS/docs/roadmap/Measurement.md),
 [`patches/README.md`](../../patches/README.md). Benchmark provenance from
 [chromium/octane](https://github.com/chromium/octane)._

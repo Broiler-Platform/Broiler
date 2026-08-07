@@ -23,7 +23,7 @@ Broiler *loses* to an interpreter is pointing at a specific defect.
 This file covers *how* the harness runs. For what each benchmark actually does,
 which engine subsystem it loads, and where Broiler's time goes on it, see
 [`benchmarks.md`](benchmarks.md); for the plan that follows from those findings,
-[`roadmap.md`](roadmap.md).
+[`roadmap.md`](../../Broiler.JS/docs/roadmap/Roadmap.md).
 
 ## Running
 
@@ -44,7 +44,7 @@ A run writes to `results/<platform>/`, where `<platform>` is the .NET runtime
 identifier the harness detects from the host — `linux-x64`, `win-x64`,
 `linux-arm64` — or whatever `--platform` says. Octane scores do not carry across
 machines, and the release matrix that
-[`docs/performance/protocol.md`](../../docs/performance/protocol.md) §3.1
+[`Broiler.JS/docs/roadmap/Measurement.md`](../../Broiler.JS/docs/roadmap/Measurement.md) §3.1
 requires before a result may be *claimed* is all three of those RIDs, so each
 keeps its own directory rather than overwriting the last one measured.
 
@@ -100,7 +100,7 @@ others is reported as **flaky** rather than averaged into a pass.
 
 The comparison also leads with the three numbers the run is read for: how many
 of the expected scores were reported, the geomean, and the **spread between the
-best and worst suite** — the last being the one [`roadmap.md`](roadmap.md) is
+best and worst suite** — the last being the one [`roadmap.md`](../../Broiler.JS/docs/roadmap/Roadmap.md) is
 organized around. Below them sits **Broiler ÷ Jint**, the geometric mean of the
 per-benchmark ratios over the suites both managed engines completed. It is a
 geomean of ratios rather than a ratio of geomeans because each engine's geomean

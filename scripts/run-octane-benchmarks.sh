@@ -18,7 +18,7 @@
 #                          from uname). Results are written per platform —
 #                          a score only means something next to the machine
 #                          that produced it, and the release matrix in
-#                          docs/performance/protocol.md is all three.
+#                          Broiler.JS/docs/roadmap/Measurement.md is all three.
 #     --octane-dir <dir>   Existing Octane checkout (default: clone into tests/octane/checkout)
 #     --out-dir <dir>      Results directory (default: tests/octane/results/<platform>)
 #     --log-dir <dir>      Per-suite diagnostic logs (default: tests/octane/logs)

@@ -11,7 +11,7 @@ conformance, and implementation work belongs with that component.
 | --- | --- |
 | [Root roadmap](ROADMAP.md) | The unfinished cross-repository work and its exit gates |
 | [Broiler Code roadmap](broiler-code-roadmap.md) | The phased plan for a shared C#/.NET IDE, multi-project editing, diagnostics, and .NET/Android/WebAssembly builds |
-| [Performance and benchmark roadmap](performance-roadmap.md) | JavaScript execution speed: the phased plan, the Octane and probe metrics it is judged on, and the evidence each phase still owes. Spans the `tests/octane` harness and the `Broiler.JS` engine. **The entry point; the per-phase detail is in [`performance/`](performance/) and is indexed from it** |
+| [Performance and benchmark roadmap](../Broiler.JS/docs/roadmap/Roadmap.md) | **Moved into the `Broiler.JS` submodule on 2026-08-07** — it was `docs/performance-roadmap.md` with its detail in `docs/performance/`, and it is now [`Broiler.JS/docs/roadmap/`](../Broiler.JS/docs/roadmap/) in full. JavaScript execution speed: the phased plan, the Octane and probe metrics it is judged on, and the evidence each phase still owes. It spans the main-repo `tests/octane` harness and the engine, and the harness half is reached by name rather than by link — a submodule cannot link to its parent. It moved because every *item* in it changes engine source |
 | [WPT rendering gaps](wpt-rendering-gaps.md) | The worst-scoring WPT pixel mismatches, the capability each one is missing, and its owning component |
 | [Broiler Code architecture](architecture/broiler-code.md) | Source of truth for Broiler Code's capability boundary, workspace and diagnostic model, trust boundary, and build-worker contract |
 | [Broiler Code budgets and support matrix](architecture/broiler-code-budgets.md) | The frozen performance budgets, the traces they are measured against, the recorded baselines, and what is still unmeasured |
@@ -36,8 +36,12 @@ The component roadmaps are the source of truth for component-local work:
 - [Broiler.Graphics](../Broiler.Graphics/docs/roadmap.md)
 - [Broiler.HTML](../Broiler.HTML/docs/roadmap.md)
 - [Broiler.Input](../Broiler.Input/docs/roadmap.md)
-- [Broiler.JS](../Broiler.JS/docs/roadmap.md)
-- [Broiler.JS performance](../Broiler.JS/docs/performance.md)
+- [Broiler.JS](../Broiler.JS/docs/roadmap/) — all three of its plans, indexed; the
+  component roadmap is [`component.md`](../Broiler.JS/docs/roadmap/Component.md) and the
+  performance campaign is
+  [`performance.md`](../Broiler.JS/docs/roadmap/Roadmap.md)
+- [Broiler.JS performance acceptance](../Broiler.JS/docs/roadmap/Measurement.md) — the gate
+  every performance claim in this repository passes, engine or harness
 - [Broiler.Regex](../Broiler.JS/Broiler.Regex/docs/roadmap.md)
 - [Broiler.Layout](../Broiler.Layout/docs/roadmap.md)
 - [Broiler.Media](../Broiler.Media/docs/roadmap.md)
