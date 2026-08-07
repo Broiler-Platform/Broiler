@@ -6,7 +6,8 @@ description: >
   retry pass that re-runs any shard which aborted abnormally. Keeping them in
   one place is what guarantees a retried shard is measured identically to the
   attempt it replaces — a retry run with a different reference cache or a
-  different patch set would not be comparable at the 99% pixel threshold.
+  different patch set would not be comparable at the run's pixel pass threshold
+  (99% by default).
 
 inputs:
   shard-index:
@@ -56,6 +57,11 @@ inputs:
   memory-limit-mb:
     description: Per-test RAM cap in MiB (0 disables).
     required: true
+  pass-threshold:
+    description: >
+      Percentage of pixels that must match the Chromium reference for a test to
+      pass (99 = the render is at least 99% identical to the reference).
+    required: true
 
 runs:
   using: composite
@@ -93,8 +99,9 @@ runs:
     # a redirect to the one Google bucket that geo-blocked shard 0 in issue
     # #1534. Its ESRP mirror carries no x64 Linux Chromium at all. Caching is the
     # only fallback that keeps the *same* binary, and the binary has to stay the
-    # same: references are compared at a 99% pixel threshold, so regenerating a
-    # slice with a different Chrome build would read as an engine regression.
+    # same: references are compared at a pixel threshold of 99% by default, so
+    # regenerating a slice with a different Chrome build would read as an engine
+    # regression.
     #
     # Keyed on the lockfile rather than the cache epoch: bumping the epoch
     # refreshes WPT master and the reference slices, which is exactly when you
@@ -140,6 +147,11 @@ runs:
         FAILED_TESTS_FILE: ${{ inputs.failed-tests-file }}
         BROILER_WPT_TIMEOUT_SECONDS: ${{ inputs.test-timeout-seconds }}
         BROILER_WPT_MEMORY_LIMIT_MB: ${{ inputs.memory-limit-mb }}
+        # Pixel pass threshold: a test passes when its render is at least this
+        # percent identical to the Chromium reference. The runner reads the
+        # variable itself (and forwards the resolved value to its workers), so
+        # both the reference comparison and the retry pass use the same bar.
+        BROILER_WPT_PASS_THRESHOLD: ${{ inputs.pass-threshold }}
         # Match Chromium's reference generator, which screenshots at `load` before
         # any promise_test body runs: skip executing stub promise_test bodies in
         # Broiler's runner so post-load layout mutations (scrollTo, display toggling)

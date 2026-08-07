@@ -65,6 +65,13 @@ on:
           0 disables the cap.
         required: false
         default: '1024'
+      pass_threshold:
+        description: >
+          Pixel pass threshold in percent: a test passes when Broiler's render is
+          at least this percent identical to the Chromium reference (99 = at most
+          1% of the pixels may differ).
+        required: false
+        default: '99'
       most_common_problems_limit:
         description: Maximum number of common failure groups to include in the GitHub issue.
         required: false
@@ -189,6 +196,7 @@ jobs:
           results-dir: ${{ env.RESULTS_DIR }}
           test-timeout-seconds: ${{ github.event.inputs.test_timeout_seconds || '30' }}
           memory-limit-mb: ${{ github.event.inputs.memory_limit_mb || '1024' }}
+          pass-threshold: ${{ github.event.inputs.pass_threshold || '99' }}
 
   # ── Decide which shards aborted abnormally and deserve one rerun ─────────
   #
@@ -288,6 +296,7 @@ jobs:
           results-dir: ${{ env.RESULTS_DIR }}
           test-timeout-seconds: ${{ github.event.inputs.test_timeout_seconds || '30' }}
           memory-limit-mb: ${{ github.event.inputs.memory_limit_mb || '1024' }}
+          pass-threshold: ${{ github.event.inputs.pass_threshold || '99' }}
 
   # ── Merge shard results; file an issue when there are failures ───────────
   #

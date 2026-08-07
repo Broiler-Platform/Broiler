@@ -789,19 +789,39 @@ internal sealed partial class WptTestRunner
 })();
 ";
 
+    /// <summary>
+    /// Percentage of pixels that must match the reference for a test to pass when no
+    /// other threshold is requested: 99% match, i.e. at most 1% of the pixels differ.
+    /// </summary>
+    public const double DefaultPassThresholdPercent = 99;
+
     private readonly int _width;
     private readonly int _height;
     private readonly string? _failureImageDir;
     private readonly bool _verifyReferenceHtml;
+    private readonly HTML.Core.IR.DeterministicRenderConfig _pixelDiffConfig;
 
     public WptTestRunner(int width = 1024, int height = 768, string? failureImageDir = null,
-        bool verifyReferenceHtml = false)
+        bool verifyReferenceHtml = false, double passThresholdPercent = DefaultPassThresholdPercent)
     {
         _width = width;
         _height = height;
         _failureImageDir = failureImageDir;
         _verifyReferenceHtml = verifyReferenceHtml;
+        _pixelDiffConfig = CreatePixelDiffConfig(passThresholdPercent);
     }
+
+    /// <summary>
+    /// Translates a pass threshold expressed as a percentage of matching pixels into the
+    /// diff-ratio form <see cref="PixelDiffRunner"/> compares against — 99% match becomes
+    /// a 0.01 maximum diff ratio. The colour tolerance stays at the deterministic-render
+    /// default; only the how-many-pixels-may-differ half is configurable.
+    /// </summary>
+    internal static HTML.Core.IR.DeterministicRenderConfig CreatePixelDiffConfig(double passThresholdPercent)
+        => new()
+        {
+            PixelDiffThreshold = Math.Clamp((100.0 - passThresholdPercent) / 100.0, 0.0, 1.0),
+        };
 
     /// <summary>
     /// Saves the rendered, reference, and diff bitmaps for a failing comparison
@@ -1398,7 +1418,7 @@ internal sealed partial class WptTestRunner
                 return null;
 
             using var refRender = RenderHtmlFileBitmap(refPath, wptRoot);
-            using var diff = PixelDiffRunner.Compare(testRender, refRender);
+            using var diff = PixelDiffRunner.Compare(testRender, refRender, _pixelDiffConfig);
             if (!diff.IsMatch)
                 return null;
 
@@ -1691,7 +1711,7 @@ internal sealed partial class WptTestRunner
 
             using (reference)
             {
-                using var diff = PixelDiffRunner.Compare(rendered, reference);
+                using var diff = PixelDiffRunner.Compare(rendered, reference, _pixelDiffConfig);
 
                 // Compute percent match for every comparison so it can be
                 // included in the logfile output and used for sorting.
@@ -1723,7 +1743,7 @@ internal sealed partial class WptTestRunner
                     try
                     {
                         using var refGolden = HTML.Image.BBitmap.Decode(refGoldenPath);
-                        using var refDiff = PixelDiffRunner.Compare(rendered, refGolden);
+                        using var refDiff = PixelDiffRunner.Compare(rendered, refGolden, _pixelDiffConfig);
                         if (refDiff.IsMatch)
                         {
                             return new WptTestResult
@@ -1820,7 +1840,7 @@ internal sealed partial class WptTestRunner
             rendered = RenderHtmlFileBitmap(testPath, wptRoot);
             reference = RenderHtmlFileBitmap(refHtmlPath, wptRoot);
 
-            using var diff = PixelDiffRunner.Compare(rendered, reference);
+            using var diff = PixelDiffRunner.Compare(rendered, reference, _pixelDiffConfig);
             double matchPct = (1.0 - diff.DiffRatio) * 100;
 
             if (diff.IsMatch)
