@@ -46,13 +46,14 @@ public class SubDocumentViewTransitionTests
     /// both the nested document and the main one.
     /// </summary>
     private static ((int R, int G, int B) Frame, (int R, int G, int B) Main) Render(
-        string framePinning, string script)
+        string framePinning, string script, string mainPinning = "", string frameAttributes = "")
     {
         var html = $$"""
 <!DOCTYPE html>
 <html class="reftest-wait">
 <style>iframe{position:fixed;top:0;left:0;width:200px;height:150px;border:0}</style>
-<iframe srcdoc="{{framePinning.Replace("\"", "&quot;").Replace("\n", " ")}}<body></body>"></iframe>
+{{mainPinning}}
+<iframe {{frameAttributes}} srcdoc="{{framePinning.Replace("\"", "&quot;").Replace("\n", " ")}}<body></body>"></iframe>
 </html>
 """;
         using var context = new JSContext();
@@ -230,4 +231,136 @@ public class SubDocumentViewTransitionTests
 
         Assert.Contains("data-seen=\"ready,updateCallbackDone,finished\"", bridge.SerializeToHtml());
     }
+
+    // ── The root snapshot's copy of a frame ──────────────────────────────────
+    //
+    // A root snapshot is a picture of the whole page, frames included, so a document frozen showing
+    // its old snapshot must show the frames as they were then. WPT
+    // iframe-and-main-frame-transition-old-main says so in as many words: it starts a transition
+    // INSIDE the frame after the main one was captured and expects the change not to show, "because
+    // the old screenshot on the main frame still has the iframe's old content".
+
+    /// <summary>The main pinning that freezes the page on its old root snapshot.</summary>
+    private const string MainPinOldVisible = """
+<style>
+  ::view-transition-group(root) { animation-duration: 300s; }
+  ::view-transition-old(root) { animation: unset; opacity: 1; }
+  ::view-transition-new(root) { animation: unset; opacity: 0; }
+</style>
+""";
+
+    /// <summary>
+    /// The page is frozen on a snapshot taken before the frame changed, so the frame keeps showing
+    /// what it showed then — the change made inside it afterwards does not appear.
+    /// </summary>
+    [Fact]
+    public void RootSnapshotFrozenOnOldState_HoldsTheFrameAsItWasCaptured()
+    {
+        var (frame, _) = Render(FrameBackground("orange"), """
+            function runTest() {
+              document.documentElement.style.background = 'green';
+              document.startViewTransition(function() { document.documentElement.style.background = 'lightgreen'; });
+
+              var cd = document.querySelector('iframe').contentDocument;
+              cd.documentElement.style.background = 'blue';
+              cd.startViewTransition(function() { cd.documentElement.style.background = 'lightblue'; });
+            }
+            onload = runTest;
+        """, mainPinning: MainPinOldVisible);
+
+        Assert.Equal(Orange, frame);
+    }
+
+    /// <summary>
+    /// The hold reaches back only as far as the capture: a frame changed <em>before</em> the main
+    /// transition started is captured in its changed state, not its original one.
+    /// </summary>
+    [Fact]
+    public void RootSnapshotHoldsTheStateAtCaptureTime_NotTheOriginal()
+    {
+        var (frame, _) = Render(FrameBackground("orange"), """
+            function runTest() {
+              var cd = document.querySelector('iframe').contentDocument;
+              cd.documentElement.style.background = 'blue';
+
+              document.documentElement.style.background = 'green';
+              document.startViewTransition(function() { document.documentElement.style.background = 'lightgreen'; });
+
+              cd.documentElement.style.background = 'lightblue';
+            }
+            onload = runTest;
+        """, mainPinning: MainPinOldVisible);
+
+        Assert.Equal(Blue, frame);
+    }
+
+    /// <summary>
+    /// A frame carrying its own <c>view-transition-name</c> is captured as its own group, so the root
+    /// snapshot has no copy of it and its live content shows through — what
+    /// <c>sibling-frames-transition</c> and <c>-with-name-on-iframe</c> pin.
+    /// </summary>
+    [Fact]
+    public void NamedFrame_IsNotPartOfTheRootSnapshot()
+    {
+        var (frame, _) = Render(FrameBackground("orange"), """
+            function runTest() {
+              document.documentElement.style.background = 'green';
+              document.startViewTransition(function() { document.documentElement.style.background = 'lightgreen'; });
+
+              var cd = document.querySelector('iframe').contentDocument;
+              cd.documentElement.style.background = 'lightblue';
+            }
+            onload = runTest;
+        """, mainPinning: MainPinOldVisible, frameAttributes: "style=\"view-transition-name:inner\"");
+
+        Assert.Equal(LightBlue, frame);
+    }
+
+    /// <summary>With the page showing its NEW state there is no old snapshot on screen, so nothing is
+    /// held and the frame renders live.</summary>
+    [Fact]
+    public void RootSnapshotShowingNewState_DoesNotHoldTheFrame()
+    {
+        var (frame, _) = Render(FrameBackground("orange"), """
+            function runTest() {
+              document.documentElement.style.background = 'green';
+              document.startViewTransition(function() { document.documentElement.style.background = 'lightgreen'; });
+
+              var cd = document.querySelector('iframe').contentDocument;
+              cd.documentElement.style.background = 'lightblue';
+            }
+            onload = runTest;
+        """);
+
+        Assert.Equal(LightBlue, frame);
+    }
+
+    /// <summary>
+    /// The two holds compose: a frame already frozen on its own old state is what the page's snapshot
+    /// records, so both agree about what was on screen.
+    /// </summary>
+    [Fact]
+    public void RootSnapshotRecordsWhatAFrozenFrameWasShowing()
+    {
+        var (frame, _) = Render(PinOldVisible, """
+            function runTest() {
+              var cd = document.querySelector('iframe').contentDocument;
+              cd.documentElement.style.background = 'blue';
+              cd.startViewTransition(function() { cd.documentElement.style.background = 'lightblue'; });
+
+              document.documentElement.style.background = 'green';
+              document.startViewTransition(function() { document.documentElement.style.background = 'lightgreen'; });
+            }
+            onload = runTest;
+        """, mainPinning: MainPinOldVisible);
+
+        Assert.Equal(Blue, frame);
+    }
+
+    /// <summary>A frame whose document sets its own background, for cases that need a third colour
+    /// distinct from the ones the script assigns.</summary>
+    private static string FrameBackground(string colour) =>
+        $"<style>html{{background:{colour}}}</style>";
+
+    private static readonly (int R, int G, int B) Orange = (255, 165, 0);
 }

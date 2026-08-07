@@ -802,13 +802,15 @@ public sealed partial class DomBridge
         if (subDocumentRoot == null || subDocumentRoot.ChildNodes.Count == 0)
             return null;
 
-        // A view transition running inside this frame whose own rules leave the OLD root snapshot
-        // showing renders the document as it stood before the update callback, not as it stands now.
-        // See DomBridge.ViewTransition.SubDocument.cs.
-        if (TryGetHeldSubDocumentViewTransitionMarkup(subDocumentRoot) is { } heldMarkup)
-            return heldMarkup;
+        // An enclosing document frozen on an old root snapshot is showing a picture of the page taken
+        // before this frame changed, so that picture's copy of the frame wins over anything the frame
+        // has done since — including its own transition. See DomBridge.ViewTransition.SubDocument.cs.
+        if (TryGetFrameMarkupHeldByRootSnapshot(subDocumentRoot) is { } snapshotMarkup)
+            return snapshotMarkup;
 
-        return string.Concat(ChildElements(subDocumentRoot).Select(SerializeElementToHtml));
+        // Otherwise a view transition running inside this frame whose own rules leave the OLD root
+        // snapshot showing renders the document as it stood before its update callback.
+        return EffectiveSubDocumentMarkup(subDocumentRoot);
     }
 
 }

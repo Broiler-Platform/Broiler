@@ -102,6 +102,36 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// What a nested browsing context is <em>displaying</em>: the old state it is holding for its own
+    /// transition, else its live sub-tree. This is what the container's <c>srcdoc</c> carries and what
+    /// an enclosing document's root snapshot records, so the two can never disagree about what was on
+    /// screen.
+    /// </summary>
+    private string? EffectiveSubDocumentMarkup(DomNode docRoot) =>
+        TryGetHeldSubDocumentViewTransitionMarkup(docRoot) ?? SerializeSubDocumentChildren(docRoot);
+
+    /// <summary>
+    /// The markup a frame must show because an <em>enclosing</em> document is frozen displaying a root
+    /// snapshot captured while the frame looked like that — or <c>null</c> when no such snapshot is on
+    /// screen.
+    /// <para>This outranks the frame's own transition: the page is showing a picture taken at a moment
+    /// in the past, and everything in that picture, frames included, has to be from that moment.</para>
+    /// </summary>
+    private string? TryGetFrameMarkupHeldByRootSnapshot(DomNode docRoot)
+    {
+        if (_activeViewTransition is not { } transition
+            || !transition.FrameMarkupAtCapture.TryGetValue(docRoot, out var markup))
+        {
+            return null;
+        }
+
+        return DocumentElement is { } root
+            && RootSnapshotShowsOldState(CollectViewTransitionPseudoDeclarations(root))
+            ? markup
+            : null;
+    }
+
+    /// <summary>
     /// The held pre-callback markup for <paramref name="docRoot"/> when its own
     /// <c>::view-transition-*</c> rules leave the <em>old</em> root snapshot showing, otherwise
     /// <c>null</c> so the live sub-document serializes.

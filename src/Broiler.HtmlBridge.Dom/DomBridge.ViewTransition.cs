@@ -72,6 +72,18 @@ public sealed partial class DomBridge
         /// same element resolves to the same name across the old and new captures — the two snapshots
         /// must pair into one group — and stays stable for the transition's lifetime.</summary>
         public Dictionary<DomElement, string> AutoNames { get; } = new();
+
+        /// <summary>
+        /// What each nested browsing context on the page was <em>displaying</em> when the old state
+        /// was captured, keyed by its browsing-context root.
+        /// <para>The root snapshot is a picture of the whole page, frames included, so a document
+        /// frozen showing its old snapshot must show the frames as they were then — not as they are
+        /// now. WPT <c>iframe-and-main-frame-transition-old-main</c> says so in as many words: it
+        /// starts a transition <em>inside</em> the frame after the main one has been captured and
+        /// expects the change not to show, "because the old screenshot on the main frame still has
+        /// the iframe's old content".</para>
+        /// </summary>
+        public Dictionary<DomNode, string> FrameMarkupAtCapture { get; } = new();
     }
 
     private readonly record struct NamedSnapshot(
@@ -430,6 +442,44 @@ public sealed partial class DomBridge
             state.OldCaptures[name] = new NamedSnapshot(l, t, w, h,
                 style.GetValueOrDefault("background-color") ?? "transparent",
                 BuildViewTransitionSnapshotContent(element));
+        }
+
+        CaptureFrameMarkup(state);
+    }
+
+    /// <summary>
+    /// Records what every nested browsing context on the page is displaying right now, so a root
+    /// snapshot frozen at this moment can keep showing it. See
+    /// <see cref="ViewTransitionState.FrameMarkupAtCapture"/>.
+    /// <para>What is recorded is the <em>effective</em> markup, not the live sub-tree: a frame already
+    /// holding its own old snapshot is displaying that, and the page's root snapshot has to agree
+    /// with what was on screen.</para>
+    /// <para>Only frames that are <em>part of</em> the root snapshot are recorded. A frame carrying
+    /// its own <c>view-transition-name</c> is captured as its own group instead, and that group's
+    /// rules — not the root's — decide which of its states shows: WPT
+    /// <c>sibling-frames-transition</c> and <c>-with-name-on-iframe</c> both freeze the root on its
+    /// old snapshot while pinning the named frames to their <em>new</em> state, and say so in their
+    /// comments ("the iframe is showing the live screenshot").</para>
+    /// </summary>
+    private void CaptureFrameMarkup(ViewTransitionState state)
+    {
+        foreach (var element in DocumentElement.Descendants().OfType<DomElement>())
+        {
+            if (!string.Equals(element.TagName, "iframe", System.StringComparison.OrdinalIgnoreCase)
+                || !HasAttr(element, "srcdoc"))
+            {
+                continue;
+            }
+
+            var style = UsedStyleForCapture(element);
+            if (ResolveUsedViewTransitionName(element, style.GetValueOrDefault("view-transition-name")) is not null)
+                continue;
+
+            if (GetContentDocument(element) is { } frameRoot
+                && EffectiveSubDocumentMarkup(frameRoot) is { Length: > 0 } markup)
+            {
+                state.FrameMarkupAtCapture[frameRoot] = markup;
+            }
         }
     }
 
