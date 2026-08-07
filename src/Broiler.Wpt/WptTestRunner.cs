@@ -56,6 +56,15 @@ internal enum SkipReason
     UnsupportedWptVariant,
 
     /// <summary>
+    /// Reftest mode only: the test declares no usable <c>&lt;link rel="match"&gt;</c> /
+    /// <c>&lt;link rel="mismatch"&gt;</c> reference, or every href it declares names a
+    /// file that is not on disk. Reftest mode has nothing to compare against, so the
+    /// case is reported as skipped rather than failed. See
+    /// <see cref="WptTestRunner.RunReferenceTest"/>.
+    /// </summary>
+    NoReferenceDeclared,
+
+    /// <summary>
     /// A WPT <em>manual</em> test (filename ends in <c>-manual</c>). These
     /// require human interaction and cannot be validated by an automated pixel
     /// harness, so — like the upstream wptrunner, which excludes them unless
@@ -799,15 +808,18 @@ internal sealed partial class WptTestRunner
     private readonly int _height;
     private readonly string? _failureImageDir;
     private readonly bool _verifyReferenceHtml;
+    private readonly bool _referenceTestsOnly;
     private readonly HTML.Core.IR.DeterministicRenderConfig _pixelDiffConfig;
 
     public WptTestRunner(int width = 1024, int height = 768, string? failureImageDir = null,
-        bool verifyReferenceHtml = false, double passThresholdPercent = DefaultPassThresholdPercent)
+        bool verifyReferenceHtml = false, double passThresholdPercent = DefaultPassThresholdPercent,
+        bool referenceTestsOnly = false)
     {
         _width = width;
         _height = height;
         _failureImageDir = failureImageDir;
         _verifyReferenceHtml = verifyReferenceHtml;
+        _referenceTestsOnly = referenceTestsOnly;
         _pixelDiffConfig = CreatePixelDiffConfig(passThresholdPercent);
     }
 
@@ -1257,6 +1269,7 @@ internal sealed partial class WptTestRunner
     private static readonly Regex MetaTagPattern = new(@"<meta\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex RelHelpPattern = new(@"\brel\s*=\s*[""']?\s*help\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex RelMatchPattern = new(@"\brel\s*=\s*[""']?\s*match\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex RelMismatchPattern = new(@"\brel\s*=\s*[""']?\s*mismatch\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex NameAssertPattern = new(@"\bname\s*=\s*[""']?\s*assert\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex NameVariantPattern = new(@"\bname\s*=\s*[""']?\s*variant\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex HrefValuePattern = new(@"\bhref\s*=\s*(?:""([^""]*)""|'([^']*)'|([^\s>]+))", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -1334,6 +1347,120 @@ internal sealed partial class WptTestRunner
     }
 
     /// <summary>
+    /// One reference a test declares about itself: the href of a
+    /// <c>&lt;link rel="match"&gt;</c> (the render must be identical to it) or of a
+    /// <c>&lt;link rel="mismatch"&gt;</c> (the render must <em>differ</em> from it).
+    /// </summary>
+    internal readonly record struct WptReferenceLink(string Href, bool IsMatch);
+
+    /// <summary>
+    /// Extracts every reference a test declares — both <c>rel="match"</c> and
+    /// <c>rel="mismatch"</c> links, in document order. This is the reftest half of
+    /// WPT: a test carrying one of these links says what its own correct rendering
+    /// looks like, so it can be checked without a second engine's screenshot.
+    /// Returns an empty list for a test that declares nothing.
+    /// </summary>
+    internal static IReadOnlyList<WptReferenceLink> ExtractReferenceLinks(string html)
+    {
+        var links = new List<WptReferenceLink>();
+        foreach (Match link in LinkTagPattern.Matches(html))
+        {
+            bool isMatch = RelMatchPattern.IsMatch(link.Value);
+            if (!isMatch && !RelMismatchPattern.IsMatch(link.Value))
+                continue;
+            if (TryExtractAttributeValue(HrefValuePattern, link.Value, out var href))
+                links.Add(new WptReferenceLink(href, isMatch));
+        }
+
+        return links;
+    }
+
+    /// <summary>
+    /// Resolves a reference href onto the file it names: a root-relative
+    /// <c>/css/foo-ref.html</c> maps under <paramref name="wptRoot"/>, anything else
+    /// resolves against the test's own directory, and any query/fragment is stripped
+    /// first. Purely syntactic — the caller decides whether the file has to exist.
+    /// Returns false for an empty or unusable href.
+    /// </summary>
+    internal static bool TryResolveReferenceHref(
+        string? href, string testPath, string? wptRoot, out string referencePath)
+    {
+        referencePath = string.Empty;
+        if (string.IsNullOrWhiteSpace(href))
+            return false;
+
+        try
+        {
+            var trimmed = href.Split('#', '?')[0].Trim();
+            if (trimmed.Length == 0)
+                return false;
+
+            referencePath = trimmed.StartsWith("/", StringComparison.Ordinal) && wptRoot != null
+                ? Path.GetFullPath(Path.Combine(wptRoot, trimmed.TrimStart('/')))
+                : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(testPath))!, trimmed));
+            return true;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            referencePath = string.Empty;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Image extensions a reference href may name directly. WPT reftests normally
+    /// point at a reference <em>document</em>, but a reference that is already a
+    /// bitmap needs no rendering at all — it is decoded and compared as-is.
+    /// </summary>
+    private static readonly HashSet<string> ReferenceImageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp",
+    };
+
+    /// <summary>
+    /// True when a reference href names a bitmap rather than a document to render.
+    /// </summary>
+    internal static bool IsReferenceImagePath(string referencePath)
+        => ReferenceImageExtensions.Contains(Path.GetExtension(referencePath));
+
+    /// <summary>
+    /// True when <paramref name="testPath"/> declares at least one reference —
+    /// image or HTML — that is actually present on disk. This is the membership
+    /// test for the reftest suite: a case that answers false has nothing to be
+    /// compared against without a second engine, so reftest mode never runs it.
+    /// Never throws; an unreadable file simply answers false.
+    /// </summary>
+    internal static bool HasResolvableReference(string testPath, string? wptRoot)
+    {
+        try
+        {
+            foreach (var link in ExtractReferenceLinks(File.ReadAllText(testPath)))
+            {
+                if (TryResolveReferenceHref(link.Href, testPath, wptRoot, out var referencePath)
+                    && File.Exists(referencePath))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Narrows a discovered test set to the cases reftest mode can actually run:
+    /// those declaring a <c>rel="match"</c> / <c>rel="mismatch"</c> reference that
+    /// exists on disk. Every other case is dropped here rather than reported as
+    /// skipped, so a reftest run's totals describe only tests it could decide.
+    /// </summary>
+    internal static IEnumerable<string> FilterToReferenceTests(IEnumerable<string> tests, string? wptRoot)
+        => tests.Where(testPath => HasResolvableReference(testPath, wptRoot));
+
+    /// <summary>
     /// Resolves the committed golden PNG for a reftest's <c>rel="match"</c>
     /// reference file, mirroring how <see cref="RunTest"/> derives the test's
     /// own golden path (relative to <paramref name="wptRoot"/> with a
@@ -1357,17 +1484,8 @@ internal sealed partial class WptTestRunner
         referenceGoldenPath = string.Empty;
         try
         {
-            var href = ExtractMatchHref(html);
-            if (string.IsNullOrWhiteSpace(href))
+            if (!TryResolveReferenceHref(ExtractMatchHref(html), testPath, wptRoot, out var refPath))
                 return false;
-
-            href = href.Split('#', '?')[0].Trim();
-            if (href.Length == 0)
-                return false;
-
-            string refPath = href.StartsWith("/", StringComparison.Ordinal) && wptRoot != null
-                ? Path.GetFullPath(Path.Combine(wptRoot, href.TrimStart('/')))
-                : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(testPath)!, href));
 
             string refRelative = wptRoot is not null
                 ? Path.GetRelativePath(wptRoot, refPath)
@@ -1401,21 +1519,13 @@ internal sealed partial class WptTestRunner
     {
         try
         {
-            var href = ExtractMatchHref(html);
-            if (string.IsNullOrWhiteSpace(href))
-                return null;
-
             // Strip any fragment/query and resolve relative to the test file
             // (a root-relative "/foo" maps under the WPT root).
-            href = href.Split('#', '?')[0].Trim();
-            if (href.Length == 0)
+            if (!TryResolveReferenceHref(ExtractMatchHref(html), testPath, wptRoot, out var refPath)
+                || !File.Exists(refPath))
+            {
                 return null;
-
-            string refPath = href.StartsWith("/", StringComparison.Ordinal) && wptRoot != null
-                ? Path.GetFullPath(Path.Combine(wptRoot, href.TrimStart('/')))
-                : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(testPath)!, href));
-            if (!File.Exists(refPath))
-                return null;
+            }
 
             using var refRender = RenderHtmlFileBitmap(refPath, wptRoot);
             using var diff = PixelDiffRunner.Compare(testRender, refRender, _pixelDiffConfig);
@@ -1473,9 +1583,17 @@ internal sealed partial class WptTestRunner
     /// <summary>
     /// Runs a single test: renders the HTML with the Broiler stack and
     /// compares the result against a Chromium/Playwright reference image.
+    /// <para>
+    /// When the runner was constructed with <c>referenceTestsOnly</c>, the case is
+    /// instead decided as a WPT reftest — both sides rendered by Broiler, no
+    /// reference directory consulted. See <see cref="RunReferenceTest"/>.
+    /// </para>
     /// </summary>
     internal WptTestResult RunTest(string testPath, string referenceDir, string? wptRoot = null)
     {
+        if (_referenceTestsOnly)
+            return RunReferenceTest(testPath, wptRoot);
+
         if (!File.Exists(testPath))
         {
             return new WptTestResult
@@ -1811,6 +1929,326 @@ internal sealed partial class WptTestRunner
             }
         }
     }
+
+    /// <summary>
+    /// Decides one WPT reftest entirely inside Broiler: the test document and the
+    /// reference it declares are both rendered by this engine and compared against
+    /// each other at the runner's pass threshold. Nothing outside the WPT checkout is
+    /// consulted — no Chromium screenshot, no committed golden — so the only thing a
+    /// result can say is whether Broiler agrees with WPT's own statement of what the
+    /// test should look like.
+    /// <para>
+    /// A <c>rel="match"</c> reference must be reproduced pixel-for-pixel (within the
+    /// threshold); a <c>rel="mismatch"</c> reference must <em>not</em> be. When a test
+    /// declares several <c>rel="match"</c> references it passes on the first one it
+    /// reproduces, which is WPT's own rule; the closest of the failing candidates is
+    /// the one reported. A test whose references are all <c>rel="mismatch"</c> passes
+    /// only when it differs from every one of them.
+    /// </para>
+    /// <para>
+    /// A reference href that already names a bitmap is decoded rather than rendered.
+    /// Reference chains (a reference that itself declares a reference) are not
+    /// followed: the declared reference is rendered as written, which is what the
+    /// chain asserts it looks like anyway.
+    /// </para>
+    /// </summary>
+    /// <param name="testPath">Path to the test HTML file.</param>
+    /// <param name="wptRoot">WPT checkout root, for fonts and root-relative resources.</param>
+    internal WptTestResult RunReferenceTest(string testPath, string? wptRoot = null)
+    {
+        if (!File.Exists(testPath))
+        {
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = false,
+                Message = "Test file not found.",
+                Category = FailureCategory.FileIO,
+            };
+        }
+
+        // Manual tests need a human, exactly as in the golden-image path.
+        if (IsManualTest(testPath))
+        {
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Skipped = true,
+                SkipReason = SkipReason.ManualTest,
+                Message = "WPT manual test (filename ends in -manual, or a manual/ path segment); requires human interaction.",
+            };
+        }
+
+        string html;
+        try
+        {
+            html = File.ReadAllText(testPath);
+        }
+        catch (Exception ex)
+        {
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = false,
+                Message = $"Failed to read test file: {ex.Message}",
+                Category = FailureCategory.FileIO,
+                StackTrace = ex.StackTrace,
+            };
+        }
+
+        var metadata = ExtractTestMetadata(html);
+
+        if (IsWptVariantTest(html))
+        {
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Skipped = true,
+                SkipReason = SkipReason.UnsupportedWptVariant,
+                Message = "WPT variant test; Broiler's pixel runner does not expand query-specific variants yet.",
+                HelpLinks = metadata.HelpLinks,
+                Assertion = metadata.Assertion,
+            };
+        }
+
+        if (IsMediaPlaybackTest(html))
+        {
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Skipped = true,
+                SkipReason = SkipReason.UnsupportedMediaPlayback,
+                Message = "Test requires media playback (video/audio) which is not supported.",
+            };
+        }
+
+        var references = new List<(string Path, bool IsMatch)>();
+        foreach (var link in ExtractReferenceLinks(html))
+        {
+            if (TryResolveReferenceHref(link.Href, testPath, wptRoot, out var referencePath)
+                && File.Exists(referencePath))
+            {
+                references.Add((referencePath, link.IsMatch));
+            }
+        }
+
+        if (references.Count == 0)
+        {
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Skipped = true,
+                SkipReason = SkipReason.NoReferenceDeclared,
+                Message = "No rel=match/rel=mismatch reference on disk; nothing to compare against in reftest mode.",
+                HelpLinks = metadata.HelpLinks,
+                Assertion = metadata.Assertion,
+            };
+        }
+
+        // Fonts before the first render, for the same reason the golden path loads them
+        // there: the first text measurement caches the typeface it resolves per family.
+        if (wptRoot != null)
+            EnsureWptFontsLoaded(wptRoot);
+
+        HTML.Image.BBitmap rendered;
+        try
+        {
+            rendered = RenderHtmlFileBitmap(testPath, wptRoot);
+        }
+        catch (Exception ex)
+        {
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = false,
+                Message = $"Rendering failed: {ex.Message}",
+                Category = FailureCategory.RenderingError,
+                StackTrace = ex.StackTrace,
+                HelpLinks = metadata.HelpLinks,
+                Assertion = metadata.Assertion,
+            };
+        }
+
+        using (rendered)
+        {
+            var matches = references.Where(r => r.IsMatch).ToList();
+            return matches.Count > 0
+                ? CompareAgainstMatchReferences(testPath, wptRoot, rendered, matches, metadata)
+                : CompareAgainstMismatchReferences(testPath, wptRoot, rendered, references, metadata);
+        }
+    }
+
+    /// <summary>
+    /// The <c>rel="match"</c> half of <see cref="RunReferenceTest"/>: pass on the first
+    /// reference the render reproduces, otherwise report the closest candidate.
+    /// </summary>
+    private WptTestResult CompareAgainstMatchReferences(
+        string testPath,
+        string? wptRoot,
+        HTML.Image.BBitmap rendered,
+        IReadOnlyList<(string Path, bool IsMatch)> references,
+        TestMetadata metadata)
+    {
+        WptTestResult? closestFailure = null;
+        foreach (var (referencePath, _) in references)
+        {
+            if (!TryLoadReferenceBitmap(testPath, referencePath, wptRoot, metadata, out var reference, out var loadFailure))
+            {
+                // A reference that cannot be produced is itself the finding; keep it only
+                // if no comparison ever happens, so a later reference can still pass.
+                closestFailure ??= loadFailure;
+                continue;
+            }
+
+            using (reference)
+            {
+                using var diff = PixelDiffRunner.Compare(rendered, reference, _pixelDiffConfig);
+                double matchPct = (1.0 - diff.DiffRatio) * 100;
+
+                if (diff.IsMatch)
+                {
+                    return new WptTestResult
+                    {
+                        TestPath = testPath,
+                        Passed = true,
+                        MatchPercent = matchPct,
+                        Message = $"Matches {DescribeReference(referencePath, wptRoot)} at {matchPct:F1}%.",
+                    };
+                }
+
+                if (closestFailure is null || matchPct > (closestFailure.MatchPercent ?? -1))
+                {
+                    var diagnostics = MismatchClassifier.Classify(
+                        diff, rendered.Width, rendered.Height, reference.Width, reference.Height);
+                    var bands = DisplacementBandAnalyzer.Analyze(diff.Mismatches);
+                    var displacementProfile = DisplacementBandAnalyzer.DescribeNonUniform(bands);
+                    var message =
+                        $"Pixel mismatch against {DescribeReference(referencePath, wptRoot)}: " +
+                        $"{matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ) — {diagnostics.Summary}";
+                    if (displacementProfile != null)
+                        message = $"{message} [{displacementProfile}]";
+
+                    var images = SaveFailureImages(testPath, wptRoot, rendered, reference, diff.DiffBitmap);
+
+                    closestFailure = new WptTestResult
+                    {
+                        TestPath = testPath,
+                        Passed = false,
+                        MatchPercent = matchPct,
+                        Message = message,
+                        Category = FailureCategory.PixelMismatch,
+                        MismatchDiagnostics = diagnostics,
+                        DisplacementProfile = displacementProfile,
+                        RenderedImagePath = images.Rendered,
+                        ReferenceImagePath = images.Reference,
+                        DiffImagePath = images.Diff,
+                        HelpLinks = metadata.HelpLinks,
+                        Assertion = metadata.Assertion,
+                    };
+                }
+            }
+        }
+
+        return closestFailure!;
+    }
+
+    /// <summary>
+    /// The <c>rel="mismatch"</c> half of <see cref="RunReferenceTest"/>: the render has
+    /// to differ from every declared reference, so any one it reproduces is a failure.
+    /// </summary>
+    private WptTestResult CompareAgainstMismatchReferences(
+        string testPath,
+        string? wptRoot,
+        HTML.Image.BBitmap rendered,
+        IReadOnlyList<(string Path, bool IsMatch)> references,
+        TestMetadata metadata)
+    {
+        foreach (var (referencePath, _) in references)
+        {
+            if (!TryLoadReferenceBitmap(testPath, referencePath, wptRoot, metadata, out var reference, out var loadFailure))
+                return loadFailure!;
+
+            using (reference)
+            {
+                using var diff = PixelDiffRunner.Compare(rendered, reference, _pixelDiffConfig);
+                if (!diff.IsMatch)
+                    continue;
+
+                double matchPct = (1.0 - diff.DiffRatio) * 100;
+                var images = SaveFailureImages(testPath, wptRoot, rendered, reference, diff.DiffBitmap);
+                return new WptTestResult
+                {
+                    TestPath = testPath,
+                    Passed = false,
+                    MatchPercent = matchPct,
+                    Message =
+                        $"Render is identical ({matchPct:F1}%) to {DescribeReference(referencePath, wptRoot)}, " +
+                        "which the test declares it must differ from (rel=mismatch).",
+                    Category = FailureCategory.PixelMismatch,
+                    RenderedImagePath = images.Rendered,
+                    ReferenceImagePath = images.Reference,
+                    DiffImagePath = images.Diff,
+                    HelpLinks = metadata.HelpLinks,
+                    Assertion = metadata.Assertion,
+                };
+            }
+        }
+
+        return new WptTestResult
+        {
+            TestPath = testPath,
+            Passed = true,
+            Message = $"Differs from all {references.Count} rel=mismatch reference(s), as required.",
+        };
+    }
+
+    /// <summary>
+    /// Produces the bitmap a reference stands for: decoded when the href names an
+    /// image, rendered by Broiler when it names a document. On failure returns the
+    /// result the test should carry (a decode error and a render error are distinct
+    /// categories, and neither is the test's own fault).
+    /// </summary>
+    private bool TryLoadReferenceBitmap(
+        string testPath,
+        string referencePath,
+        string? wptRoot,
+        TestMetadata metadata,
+        out HTML.Image.BBitmap bitmap,
+        out WptTestResult? failure)
+    {
+        bool isImage = IsReferenceImagePath(referencePath);
+        try
+        {
+            bitmap = isImage
+                ? HTML.Image.BBitmap.Decode(referencePath)
+                : RenderHtmlFileBitmap(referencePath, wptRoot);
+            failure = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            bitmap = null!;
+            failure = new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = false,
+                Message = isImage
+                    ? $"Failed to decode reference image {DescribeReference(referencePath, wptRoot)}: {ex.Message}"
+                    : $"Failed to render reference document {DescribeReference(referencePath, wptRoot)}: {ex.Message}",
+                Category = isImage ? FailureCategory.ReferenceDecodeError : FailureCategory.RenderingError,
+                StackTrace = ex.StackTrace,
+                HelpLinks = metadata.HelpLinks,
+                Assertion = metadata.Assertion,
+            };
+            return false;
+        }
+    }
+
+    /// <summary>Names a reference the way a report should show it: relative to the WPT root.</summary>
+    private static string DescribeReference(string referencePath, string? wptRoot)
+        => (wptRoot is not null
+            ? Path.GetRelativePath(wptRoot, referencePath)
+            : Path.GetFileName(referencePath)).Replace('\\', '/');
 
     /// <summary>
     /// Runs a WPT <c>rel="match"</c> test by rendering both the test HTML and

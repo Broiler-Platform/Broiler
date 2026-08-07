@@ -125,6 +125,14 @@ something to attempt from inside the container.
   Pixel pass threshold defaults to 99% match (≤1% differing pixels) and is
   configurable: `--pass-threshold <percent>`, `BROILER_WPT_PASS_THRESHOLD`, or the
   `pass_threshold` input of the WPT Tests workflow.
+- WPT **reftest** runner — a second, independent suite that uses no other engine:
+  `./scripts/run-wpt-reftests.sh --wpt-dir tests/wpt/checkout [--subset <path>]`,
+  or `dotnet run --project src/Broiler.Wpt -- --wpt-dir <dir> --reftests-only`.
+  It runs only the tests declaring `<link rel="match">` / `<link rel="mismatch">`
+  (or a reference image) and renders **both** the test and its reference with
+  Broiler — no Chromium, no reference-image directory. CI: the `WPT Reftests`
+  workflow. Its pass rate is not comparable to the golden-image suite's; see
+  `docs/wpt-reftests.md`.
 - WPT per-test limits: 30s timeout (`--timeout`, `BROILER_WPT_TIMEOUT_SECONDS`)
   and a 1024 MiB RAM cap (`--memory-limit-mb`, `BROILER_WPT_MEMORY_LIMIT_MB`,
   0 disables). The cap is on the *growth* of the rendering process's resident

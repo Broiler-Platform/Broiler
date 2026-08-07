@@ -96,6 +96,7 @@ public class Program
         int shardCount = 1;
         int shardIndex = WptTestRunner.AllShards;
         bool nonJavaScriptOnly = false;
+        bool referenceTestsOnly = false;
         bool verifyReference = false;
         bool workerMode = false;
         bool noWorkerIsolation = false;
@@ -194,6 +195,9 @@ public class Program
                 case "--non-js":
                     nonJavaScriptOnly = true;
                     break;
+                case "--reftests-only":
+                    referenceTestsOnly = true;
+                    break;
                 case "--verify-reference":
                     verifyReference = true;
                     break;
@@ -267,7 +271,7 @@ public class Program
         }
 
         if (workerMode)
-            return RunWorkerMode(wptPath, referenceDir, failureImagesDir, verifyReference, runPassThresholdPercent);
+            return RunWorkerMode(wptPath, referenceDir, failureImagesDir, verifyReference, runPassThresholdPercent, referenceTestsOnly);
 
         if (!TryResolveRunTestTimeout(timeoutSeconds, out var runTestTimeout, out var timeoutError))
         {
@@ -288,11 +292,14 @@ public class Program
         }
 
         Console.WriteLine($"WPT directory : {Path.GetFullPath(wptPath)}");
-        Console.WriteLine($"Reference dir : {Path.GetFullPath(referenceDir)}");
+        if (referenceTestsOnly)
+            Console.WriteLine("Reference dir : (unused — reftest mode renders both sides with Broiler)");
+        else
+            Console.WriteLine($"Reference dir : {Path.GetFullPath(referenceDir)}");
         Console.WriteLine($"Timeout       : {FormatSeconds(runTestTimeout)} second(s)");
         Console.WriteLine($"Pass threshold: {FormatPassThreshold(runPassThresholdPercent)}% pixel match " +
                           $"(at most {FormatPassThreshold(100 - runPassThresholdPercent)}% of the pixels may differ)");
-        Console.WriteLine($"Mode          : {(nonJavaScriptOnly ? "non-JavaScript visual tests" : "all discovered tests")}");
+        Console.WriteLine($"Mode          : {DescribeRunMode(referenceTestsOnly, nonJavaScriptOnly)}");
         var useWorkerIsolation = !noWorkerIsolation && RunTestExecutorOverride.Value is null;
         Console.WriteLine(
             useWorkerIsolation
@@ -317,7 +324,8 @@ public class Program
         var runner = new WptTestRunner(
             failureImageDir: failureImagesDir,
             verifyReferenceHtml: verifyReference,
-            passThresholdPercent: runPassThresholdPercent);
+            passThresholdPercent: runPassThresholdPercent,
+            referenceTestsOnly: referenceTestsOnly);
 
         if (!string.IsNullOrWhiteSpace(failureImagesDir))
             Console.WriteLine($"Failure images: {Path.GetFullPath(failureImagesDir)}");
@@ -339,6 +347,22 @@ public class Program
         var discoveredTests = WptTestRunner
             .DiscoverTests(wptPath, subsetPatterns, nonJavaScriptOnly)
             .ToList();
+
+        // Reftest mode runs exactly the cases that carry their own answer: a
+        // rel=match / rel=mismatch reference present in the checkout. Everything else
+        // is dropped before the run rather than reported as skipped, so the totals
+        // describe only tests this mode could actually decide. Applied before the
+        // rerun and shard filters so a shard's slice is a slice of the reftests.
+        if (referenceTestsOnly)
+        {
+            int beforeFilter = discoveredTests.Count;
+            discoveredTests = WptTestRunner
+                .FilterToReferenceTests(discoveredTests, wptPath)
+                .ToList();
+            Console.WriteLine(
+                $"Reftests      : {discoveredTests.Count} of {beforeFilter} discovered document(s) declare a reference");
+        }
+
         if (!string.IsNullOrWhiteSpace(rerunJsonPath))
         {
             if (!TryLoadRerunSelection(rerunJsonPath, wptPath, rerunSelectionKind, out var rerunTests, out var rerunError))
@@ -391,7 +415,8 @@ public class Program
                 failureImagesDir,
                 verifyReference,
                 runTestMemoryLimitBytes,
-                runPassThresholdPercent)
+                runPassThresholdPercent,
+                referenceTestsOnly)
             : null;
         int completed = 0, runningPassed = 0, runningFailed = 0, runningSkipped = 0;
 
@@ -603,7 +628,8 @@ public class Program
         string referenceDir,
         string? failureImagesDir,
         bool verifyReference,
-        double passThresholdPercent)
+        double passThresholdPercent,
+        bool referenceTestsOnly)
     {
         var protocolOut = Console.Out;
         Console.SetOut(Console.Error);
@@ -611,7 +637,8 @@ public class Program
         var runner = new WptTestRunner(
             failureImageDir: failureImagesDir,
             verifyReferenceHtml: verifyReference,
-            passThresholdPercent: passThresholdPercent);
+            passThresholdPercent: passThresholdPercent,
+            referenceTestsOnly: referenceTestsOnly);
 
         protocolOut.WriteLine(JsonSerializer.Serialize(new WptWorkerResponse { Ready = true }, WorkerJsonOptions));
         protocolOut.Flush();
@@ -762,6 +789,7 @@ public class Program
         private readonly bool _verifyReference;
         private readonly long _memoryLimitBytes;
         private readonly double _passThresholdPercent;
+        private readonly bool _referenceTestsOnly;
         private Process? _process;
         private Task<string?>? _pendingResponse;
 
@@ -771,7 +799,8 @@ public class Program
             string? failureImagesDir,
             bool verifyReference,
             long memoryLimitBytes = 0,
-            double passThresholdPercent = DefaultPassThresholdPercent)
+            double passThresholdPercent = DefaultPassThresholdPercent,
+            bool referenceTestsOnly = false)
         {
             _wptPath = wptPath;
             _referenceDir = referenceDir;
@@ -779,6 +808,7 @@ public class Program
             _verifyReference = verifyReference;
             _memoryLimitBytes = memoryLimitBytes;
             _passThresholdPercent = passThresholdPercent;
+            _referenceTestsOnly = referenceTestsOnly;
         }
 
         internal int? CurrentProcessId
@@ -983,6 +1013,12 @@ public class Program
 
             if (_verifyReference)
                 startInfo.ArgumentList.Add("--verify-reference");
+
+            // The worker decides the case, so it has to know it is deciding a reftest —
+            // otherwise it would compare against a reference PNG the reftest run never
+            // generates and report every test as a missing reference.
+            if (_referenceTestsOnly)
+                startInfo.ArgumentList.Add("--reftests-only");
 
             startInfo.RedirectStandardInput = true;
             startInfo.RedirectStandardOutput = true;
@@ -2555,6 +2591,23 @@ public class Program
             writer.WriteLine($"- `{FormatSubsetCommand(bucket.Key)}` ({bucket.Value} timeout(s))");
     }
 
+    /// <summary>
+    /// One line describing what this run measures, for the header block. Reftest mode
+    /// is named first because it changes what a result <em>means</em>: no reference
+    /// image is involved and no second engine is consulted.
+    /// </summary>
+    private static string DescribeRunMode(bool referenceTestsOnly, bool nonJavaScriptOnly)
+    {
+        if (referenceTestsOnly)
+        {
+            return nonJavaScriptOnly
+                ? "reftests only (non-JavaScript), both sides rendered by Broiler"
+                : "reftests only (rel=match/rel=mismatch), both sides rendered by Broiler";
+        }
+
+        return nonJavaScriptOnly ? "non-JavaScript visual tests" : "all discovered tests";
+    }
+
     private static void PrintUsage()
     {
         Console.WriteLine("Usage: Broiler.Wpt <wpt-directory> [OPTIONS]");
@@ -2575,6 +2628,11 @@ public class Program
         Console.WriteLine("  --shard-count <N>          Split discovered tests into N deterministic shards (default: 1)");
         Console.WriteLine("  --shard-index <I>          Run only shard I (0-based), or -1 for all shards (default: -1)");
         Console.WriteLine("  --non-js                   Exclude JavaScript-dependent documents (Broiler.HTML WPT policy)");
+        Console.WriteLine("  --reftests-only            Run only WPT reftests — the tests that declare their own");
+        Console.WriteLine("                             reference via <link rel=\"match\"> / <link rel=\"mismatch\">, or");
+        Console.WriteLine("                             a reference image — and decide each by rendering BOTH the test");
+        Console.WriteLine("                             and its reference with Broiler. No reference directory is read");
+        Console.WriteLine("                             and no other engine is involved; --reference-dir is ignored.");
         Console.WriteLine("  --defer-promise-tests      Do not run stub promise_test bodies before the snapshot, matching");
         Console.WriteLine("                             Chromium's reference generator (captures at load). Fixes the");
         Console.WriteLine("                             css-anchor-position scroll cluster. Env: BROILER_WPT_DEFER_PROMISE_TESTS=1");

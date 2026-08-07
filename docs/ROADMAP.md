@@ -95,6 +95,15 @@ The current WPT artifacts remain the evidence source:
 - Re-run the Google comparison against a recorded input and Chromium revision;
   record actual milestone measurements rather than inferring compliance from API
   presence.
+- Cross-check the golden-image suite against the engine-independent one. The
+  [WPT Reftests](../.github/workflows/wpt-reftests.yml) workflow decides the
+  reftest half of the corpus with no second engine — Broiler renders both the
+  test and the `rel=match`/`rel=mismatch` reference it declares — so a test
+  failing there is disagreeing with WPT's own statement of the result rather
+  than with a Chromium screenshot. A test that fails the golden-image suite but
+  passes here is evidence the golden, not the engine, is the outlier; the
+  converse is a real defect the Chromium comparison happened to mask. See
+  [WPT reftests](wpt-reftests.md).
 - Keep prioritized WPT failures in generated reports and component roadmaps.
   Root tracking should cover only cross-component runner, timeout, reference, and
   ownership problems. The worst-scoring pixel mismatches of the current run, with
