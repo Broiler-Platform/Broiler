@@ -11,7 +11,7 @@ conformance, and implementation work belongs with that component.
 | --- | --- |
 | [Root roadmap](ROADMAP.md) | The unfinished cross-repository work and its exit gates |
 | [Broiler Code roadmap](broiler-code-roadmap.md) | The phased plan for a shared C#/.NET IDE, multi-project editing, diagnostics, and .NET/Android/WebAssembly builds |
-| [Performance and benchmark roadmap](performance-roadmap.md) | JavaScript execution speed: the phased plan, the Octane and probe metrics it is judged on, and the evidence each phase still owes. Spans the `tests/octane` harness and the `Broiler.JS` engine |
+| [Performance and benchmark roadmap](performance-roadmap.md) | JavaScript execution speed: the phased plan, the Octane and probe metrics it is judged on, and the evidence each phase still owes. Spans the `tests/octane` harness and the `Broiler.JS` engine. **The entry point; the per-phase detail is in [`performance/`](performance/) and is indexed from it** |
 | [WPT rendering gaps](wpt-rendering-gaps.md) | The worst-scoring WPT pixel mismatches, the capability each one is missing, and its owning component |
 | [Broiler Code architecture](architecture/broiler-code.md) | Source of truth for Broiler Code's capability boundary, workspace and diagnostic model, trust boundary, and build-worker contract |
 | [Broiler Code budgets and support matrix](architecture/broiler-code-budgets.md) | The frozen performance budgets, the traces they are measured against, the recorded baselines, and what is still unmeasured |
