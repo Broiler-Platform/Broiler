@@ -1,115 +1,115 @@
 {
-  "generatedAt": "2026-08-06T09:26:43.784Z",
+  "generatedAt": "2026-08-07T07:41:16.371Z",
   "octaneVersion": "9",
   "engines": {
     "chromium": {
       "label": "Chromium 149.0.7827.55",
-      "geomean": 57092
+      "geomean": 58718
     },
     "broiler": {
       "label": "Broiler.JS (BroilerJS --script-host)",
-      "geomean": 375
+      "geomean": 372
     },
     "jint": {
       "label": "Jint 4.15.3 (interpreter)",
-      "geomean": 634
+      "geomean": 577
     }
   },
   "benchmarks": [
     {
       "name": "Box2D",
       "chromium": {
-        "score": 100949,
+        "score": 102475,
         "status": "ok"
       },
       "broiler": {
-        "score": 702,
+        "score": 717,
         "status": "ok"
       },
       "jint": {
-        "score": 642,
+        "score": 570,
         "status": "ok"
       },
       "broilerVsChromium": 0.007,
-      "broilerTimesSlower": 143.8,
+      "broilerTimesSlower": 142.9,
       "jintVsChromium": 0.006,
-      "broilerVsJint": 1.093,
+      "broilerVsJint": 1.258,
       "stability": {
         "chromium": {
           "samples": [
-            100949,
-            100507,
-            102034
+            102475,
+            101933,
+            102680
           ],
-          "bandPercent": 1.5
+          "bandPercent": 0.7
         },
         "broiler": {
           "samples": [
-            730,
-            702,
-            695
+            709,
+            717,
+            723
           ],
-          "bandPercent": 5
+          "bandPercent": 2
         },
         "jint": {
           "samples": [
-            642,
-            632,
-            643
+            572,
+            570,
+            569
           ],
-          "bandPercent": 1.7
+          "bandPercent": 0.5
         }
       }
     },
     {
       "name": "CodeLoad",
       "chromium": {
-        "score": 31161,
+        "score": 28215,
         "status": "ok"
       },
       "broiler": {
-        "score": 148,
+        "score": 144,
         "status": "ok"
       },
       "jint": {
-        "score": 4790,
+        "score": 4074,
         "status": "ok"
       },
       "broilerVsChromium": 0.005,
-      "broilerTimesSlower": 210.5,
-      "jintVsChromium": 0.154,
-      "broilerVsJint": 0.031,
+      "broilerTimesSlower": 195.9,
+      "jintVsChromium": 0.144,
+      "broilerVsJint": 0.035,
       "stability": {
         "chromium": {
           "samples": [
-            31108,
-            31161,
-            31262
+            28560,
+            28173,
+            28215
           ],
-          "bandPercent": 0.5
+          "bandPercent": 1.4
         },
         "broiler": {
           "samples": [
-            136,
-            148,
-            148
+            146,
+            141,
+            144
           ],
-          "bandPercent": 8.1
+          "bandPercent": 3.5
         },
         "jint": {
           "samples": [
-            4434,
-            4790,
-            4901
+            4056,
+            4074,
+            4144
           ],
-          "bandPercent": 9.7
+          "bandPercent": 2.2
         }
       }
     },
     {
       "name": "Crypto",
       "chromium": {
-        "score": 38368,
+        "score": 41963,
         "status": "ok"
       },
       "broiler": {
@@ -117,667 +117,667 @@
         "status": "ok"
       },
       "jint": {
-        "score": 147,
+        "score": 138,
         "status": "ok"
       },
-      "broilerVsChromium": 0.008,
-      "broilerTimesSlower": 129.2,
-      "jintVsChromium": 0.004,
-      "broilerVsJint": 2.02,
+      "broilerVsChromium": 0.007,
+      "broilerTimesSlower": 141.3,
+      "jintVsChromium": 0.003,
+      "broilerVsJint": 2.152,
       "stability": {
         "chromium": {
           "samples": [
-            37421,
-            38368,
-            38425
+            41813,
+            41963,
+            42412
           ],
-          "bandPercent": 2.6
+          "bandPercent": 1.4
         },
         "broiler": {
           "samples": [
+            293,
             297,
-            304,
-            276
+            302
           ],
-          "bandPercent": 9.4
+          "bandPercent": 3
         },
         "jint": {
           "samples": [
-            147,
-            147,
-            150
+            138,
+            138,
+            141
           ],
-          "bandPercent": 2
+          "bandPercent": 2.2
         }
       }
     },
     {
       "name": "DeltaBlue",
       "chromium": {
-        "score": 99693,
+        "score": 105994,
         "status": "ok"
       },
       "broiler": {
-        "score": 240,
+        "score": 207,
         "status": "ok"
       },
       "jint": {
-        "score": 186,
+        "score": 167,
         "status": "ok"
       },
       "broilerVsChromium": 0.002,
-      "broilerTimesSlower": 415.4,
+      "broilerTimesSlower": 512,
       "jintVsChromium": 0.002,
-      "broilerVsJint": 1.29,
+      "broilerVsJint": 1.24,
       "stability": {
         "chromium": {
           "samples": [
-            101465,
-            99693,
-            99679
+            104896,
+            107362,
+            105994
           ],
-          "bandPercent": 1.8
+          "bandPercent": 2.3
         },
         "broiler": {
           "samples": [
-            233,
-            240,
-            244
+            210,
+            199,
+            207
           ],
-          "bandPercent": 4.6
+          "bandPercent": 5.3
         },
         "jint": {
           "samples": [
-            186,
-            180,
-            188
+            170,
+            167,
+            160
           ],
-          "bandPercent": 4.3
+          "bandPercent": 6
         }
       }
     },
     {
       "name": "EarleyBoyer",
       "chromium": {
-        "score": 90103,
+        "score": 87285,
         "status": "ok"
       },
       "broiler": {
-        "score": 423,
+        "score": 406,
         "status": "ok"
       },
       "jint": {
-        "score": 413,
+        "score": 367,
         "status": "ok"
       },
       "broilerVsChromium": 0.005,
-      "broilerTimesSlower": 213,
-      "jintVsChromium": 0.005,
-      "broilerVsJint": 1.024,
+      "broilerTimesSlower": 215,
+      "jintVsChromium": 0.004,
+      "broilerVsJint": 1.106,
       "stability": {
         "chromium": {
           "samples": [
-            92442,
-            90103,
-            87417
+            87699,
+            87285,
+            83184
           ],
-          "bandPercent": 5.6
+          "bandPercent": 5.2
         },
         "broiler": {
           "samples": [
-            423,
-            423,
-            421
+            406,
+            419,
+            387
           ],
-          "bandPercent": 0.5
+          "bandPercent": 7.9
         },
         "jint": {
           "samples": [
-            403,
-            413,
-            415
+            367,
+            367,
+            375
           ],
-          "bandPercent": 2.9
+          "bandPercent": 2.2
         }
       }
     },
     {
       "name": "Gameboy",
       "chromium": {
-        "score": 90383,
+        "score": 99597,
         "status": "ok"
       },
       "broiler": {
-        "score": 1116,
+        "score": 1090,
         "status": "ok"
       },
       "jint": {
-        "score": 949,
+        "score": 853,
         "status": "ok"
       },
-      "broilerVsChromium": 0.012,
-      "broilerTimesSlower": 81,
-      "jintVsChromium": 0.01,
-      "broilerVsJint": 1.176,
+      "broilerVsChromium": 0.011,
+      "broilerTimesSlower": 91.4,
+      "jintVsChromium": 0.009,
+      "broilerVsJint": 1.278,
       "stability": {
         "chromium": {
           "samples": [
-            91552,
-            90294,
-            90383
+            101109,
+            98809,
+            99597
           ],
-          "bandPercent": 1.4
+          "bandPercent": 2.3
         },
         "broiler": {
           "samples": [
-            1181,
-            1116,
-            1090
+            1090,
+            1120,
+            1081
           ],
-          "bandPercent": 8.2
+          "bandPercent": 3.6
         },
         "jint": {
           "samples": [
-            949,
-            946,
-            971
+            857,
+            853,
+            850
           ],
-          "bandPercent": 2.6
+          "bandPercent": 0.8
         }
       }
     },
     {
       "name": "Mandreel",
       "chromium": {
-        "score": 48329,
+        "score": 46988,
         "status": "ok"
       },
       "broiler": {
-        "score": 180,
+        "score": 173,
         "status": "ok"
       },
       "jint": {
-        "score": 96.3,
+        "score": 86.9,
         "status": "ok"
       },
       "broilerVsChromium": 0.004,
-      "broilerTimesSlower": 268.5,
+      "broilerTimesSlower": 271.6,
       "jintVsChromium": 0.002,
-      "broilerVsJint": 1.869,
+      "broilerVsJint": 1.991,
       "stability": {
         "chromium": {
           "samples": [
-            47949,
-            48329,
-            48425
+            47483,
+            45935,
+            46988
           ],
-          "bandPercent": 1
+          "bandPercent": 3.3
         },
         "broiler": {
           "samples": [
-            180,
-            180,
-            181
+            173,
+            171,
+            175
           ],
-          "bandPercent": 0.6
+          "bandPercent": 2.3
         },
         "jint": {
           "samples": [
-            95.4,
-            96.3,
-            96.4
+            86.2,
+            89.4,
+            86.9
           ],
-          "bandPercent": 1
+          "bandPercent": 3.7
         }
       }
     },
     {
       "name": "MandreelLatency",
       "chromium": {
-        "score": 68290,
+        "score": 67368,
         "status": "ok"
       },
       "broiler": {
-        "score": 14.6,
+        "score": 15.4,
         "status": "ok"
       },
       "jint": {
-        "score": 798,
+        "score": 727,
         "status": "ok"
       },
       "broilerVsChromium": 0,
-      "broilerTimesSlower": 4677.4,
-      "jintVsChromium": 0.012,
-      "broilerVsJint": 0.018,
+      "broilerTimesSlower": 4374.5,
+      "jintVsChromium": 0.011,
+      "broilerVsJint": 0.021,
       "stability": {
         "chromium": {
           "samples": [
-            67368,
             68290,
-            68290
+            66469,
+            67368
           ],
-          "bandPercent": 1.4
+          "bandPercent": 2.7
         },
         "broiler": {
           "samples": [
-            14.6,
-            14.5,
-            14.6
+            15.4,
+            15.4,
+            15.4
           ],
-          "bandPercent": 0.7
+          "bandPercent": 0
         },
         "jint": {
           "samples": [
-            788,
-            798,
-            805
+            719,
+            742,
+            727
           ],
-          "bandPercent": 2.1
+          "bandPercent": 3.2
         }
       }
     },
     {
       "name": "NavierStokes",
       "chromium": {
-        "score": 35397,
+        "score": 38436,
         "status": "ok"
       },
       "broiler": {
-        "score": 491,
+        "score": 519,
         "status": "ok"
       },
       "jint": {
-        "score": 263,
+        "score": 257,
         "status": "ok"
       },
       "broilerVsChromium": 0.014,
-      "broilerTimesSlower": 72.1,
+      "broilerTimesSlower": 74.1,
       "jintVsChromium": 0.007,
-      "broilerVsJint": 1.867,
+      "broilerVsJint": 2.019,
       "stability": {
         "chromium": {
           "samples": [
-            35214,
-            35397,
-            35397
+            38507,
+            38436,
+            38397
           ],
-          "bandPercent": 0.5
+          "bandPercent": 0.3
         },
         "broiler": {
           "samples": [
-            492,
-            491,
-            491
+            521,
+            519,
+            518
           ],
-          "bandPercent": 0.2
+          "bandPercent": 0.6
         },
         "jint": {
           "samples": [
-            263,
-            268,
-            260
+            250,
+            257,
+            259
           ],
-          "bandPercent": 3
+          "bandPercent": 3.5
         }
       }
     },
     {
       "name": "PdfJS",
       "chromium": {
-        "score": 58258,
+        "score": 60750,
         "status": "ok"
       },
       "broiler": {
-        "score": 494,
+        "score": 506,
         "status": "ok"
       },
       "jint": {
-        "score": 929,
+        "score": 778,
         "status": "ok"
       },
       "broilerVsChromium": 0.008,
-      "broilerTimesSlower": 117.9,
-      "jintVsChromium": 0.016,
-      "broilerVsJint": 0.532,
+      "broilerTimesSlower": 120.1,
+      "jintVsChromium": 0.013,
+      "broilerVsJint": 0.65,
       "stability": {
         "chromium": {
           "samples": [
-            58491,
-            58258,
-            56700
+            60750,
+            60507,
+            62276
           ],
-          "bandPercent": 3.1
+          "bandPercent": 2.9
         },
         "broiler": {
           "samples": [
-            507,
-            493,
-            494
+            505,
+            506,
+            506
           ],
-          "bandPercent": 2.8
+          "bandPercent": 0.2
         },
         "jint": {
           "samples": [
-            929,
-            912,
-            941
+            837,
+            772,
+            778
           ],
-          "bandPercent": 3.1
+          "bandPercent": 8.4
         }
       }
     },
     {
       "name": "RayTrace",
       "chromium": {
-        "score": 118398,
+        "score": 117214,
         "status": "ok"
       },
       "broiler": {
-        "score": 508,
+        "score": 448,
         "status": "ok"
       },
       "jint": {
-        "score": 450,
+        "score": 411,
         "status": "ok"
       },
       "broilerVsChromium": 0.004,
-      "broilerTimesSlower": 233.1,
+      "broilerTimesSlower": 261.6,
       "jintVsChromium": 0.004,
-      "broilerVsJint": 1.129,
+      "broilerVsJint": 1.09,
       "stability": {
         "chromium": {
           "samples": [
-            118546,
-            118398,
-            116770
+            117214,
+            117510,
+            114920
           ],
-          "bandPercent": 1.5
+          "bandPercent": 2.2
         },
         "broiler": {
           "samples": [
-            502,
-            508,
-            509
+            448,
+            440,
+            466
           ],
-          "bandPercent": 1.4
+          "bandPercent": 5.8
         },
         "jint": {
           "samples": [
-            451,
-            450,
-            439
+            411,
+            407,
+            419
           ],
-          "bandPercent": 2.7
+          "bandPercent": 2.9
         }
       }
     },
     {
       "name": "RegExp",
       "chromium": {
-        "score": 10385,
+        "score": 10223,
         "status": "ok"
       },
       "broiler": {
-        "score": 124,
+        "score": 113,
         "status": "ok"
       },
       "jint": {
-        "score": 209,
+        "score": 187,
         "status": "ok"
       },
-      "broilerVsChromium": 0.012,
-      "broilerTimesSlower": 83.8,
-      "jintVsChromium": 0.02,
-      "broilerVsJint": 0.593,
+      "broilerVsChromium": 0.011,
+      "broilerTimesSlower": 90.5,
+      "jintVsChromium": 0.018,
+      "broilerVsJint": 0.604,
       "stability": {
         "chromium": {
           "samples": [
-            10313,
-            10385,
-            10393
+            10323,
+            10223,
+            10193
           ],
-          "bandPercent": 0.8
+          "bandPercent": 1.3
         },
         "broiler": {
           "samples": [
-            124,
-            127,
-            124
+            113,
+            115,
+            113
           ],
-          "bandPercent": 2.4
+          "bandPercent": 1.8
         },
         "jint": {
           "samples": [
-            209,
-            208,
-            209
+            189,
+            187,
+            185
           ],
-          "bandPercent": 0.5
+          "bandPercent": 2.1
         }
       }
     },
     {
       "name": "Richards",
       "chromium": {
-        "score": 38260,
+        "score": 37710,
         "status": "ok"
       },
       "broiler": {
-        "score": 271,
+        "score": 260,
         "status": "ok"
       },
       "jint": {
-        "score": 189,
+        "score": 173,
         "status": "ok"
       },
       "broilerVsChromium": 0.007,
-      "broilerTimesSlower": 141.2,
+      "broilerTimesSlower": 145,
       "jintVsChromium": 0.005,
-      "broilerVsJint": 1.434,
+      "broilerVsJint": 1.503,
       "stability": {
         "chromium": {
           "samples": [
-            38260,
-            38080,
-            38405
+            37371,
+            38052,
+            37710
           ],
-          "bandPercent": 0.8
+          "bandPercent": 1.8
         },
         "broiler": {
           "samples": [
-            276,
-            271,
-            262
+            260,
+            255,
+            260
           ],
-          "bandPercent": 5.2
+          "bandPercent": 1.9
         },
         "jint": {
           "samples": [
-            187,
-            190,
-            189
+            170,
+            173,
+            175
           ],
-          "bandPercent": 1.6
+          "bandPercent": 2.9
         }
       }
     },
     {
       "name": "Splay",
       "chromium": {
-        "score": 43484,
+        "score": 45430,
         "status": "ok"
       },
       "broiler": {
-        "score": 660,
+        "score": 780,
         "status": "ok"
       },
       "jint": {
-        "score": 851,
+        "score": 817,
         "status": "ok"
       },
-      "broilerVsChromium": 0.015,
-      "broilerTimesSlower": 65.9,
-      "jintVsChromium": 0.02,
-      "broilerVsJint": 0.776,
+      "broilerVsChromium": 0.017,
+      "broilerTimesSlower": 58.2,
+      "jintVsChromium": 0.018,
+      "broilerVsJint": 0.955,
       "stability": {
         "chromium": {
           "samples": [
-            43907,
-            43484,
-            42172
+            45839,
+            44119,
+            45430
           ],
-          "bandPercent": 4
+          "bandPercent": 3.8
         },
         "broiler": {
           "samples": [
-            693,
-            660,
-            552
+            812,
+            780,
+            772
           ],
-          "bandPercent": 21.4
+          "bandPercent": 5.1
         },
         "jint": {
           "samples": [
-            781,
-            853,
-            851
+            813,
+            826,
+            817
           ],
-          "bandPercent": 8.5
+          "bandPercent": 1.6
         }
       }
     },
     {
       "name": "SplayLatency",
       "chromium": {
-        "score": 69390,
+        "score": 76352,
         "status": "ok"
       },
       "broiler": {
-        "score": 2101,
+        "score": 2412,
         "status": "ok"
       },
       "jint": {
-        "score": 3261,
+        "score": 3357,
         "status": "ok"
       },
-      "broilerVsChromium": 0.03,
-      "broilerTimesSlower": 33,
-      "jintVsChromium": 0.047,
-      "broilerVsJint": 0.644,
+      "broilerVsChromium": 0.032,
+      "broilerTimesSlower": 31.7,
+      "jintVsChromium": 0.044,
+      "broilerVsJint": 0.718,
       "stability": {
         "chromium": {
           "samples": [
-            71342,
-            69390,
-            69040
+            76352,
+            75719,
+            76845
           ],
-          "bandPercent": 3.3
+          "bandPercent": 1.5
         },
         "broiler": {
           "samples": [
-            2101,
-            2143,
-            2090
+            2485,
+            2412,
+            2392
           ],
-          "bandPercent": 2.5
+          "bandPercent": 3.9
         },
         "jint": {
           "samples": [
-            3349,
-            3261,
-            3231
+            3385,
+            3354,
+            3357
           ],
-          "bandPercent": 3.6
+          "bandPercent": 0.9
         }
       }
     },
     {
       "name": "Typescript",
       "chromium": {
-        "score": 94589,
+        "score": 99226,
         "status": "ok"
       },
       "broiler": {
-        "score": 2486,
+        "score": 2308,
         "status": "ok"
       },
       "jint": {
-        "score": 2628,
+        "score": 2261,
         "status": "ok"
       },
-      "broilerVsChromium": 0.026,
-      "broilerTimesSlower": 38,
-      "jintVsChromium": 0.028,
-      "broilerVsJint": 0.946,
+      "broilerVsChromium": 0.023,
+      "broilerTimesSlower": 43,
+      "jintVsChromium": 0.023,
+      "broilerVsJint": 1.021,
       "stability": {
         "chromium": {
           "samples": [
-            89983,
-            94589,
-            96376
+            99226,
+            94659,
+            100083
           ],
-          "bandPercent": 6.8
+          "bandPercent": 5.5
         },
         "broiler": {
           "samples": [
-            2490,
-            2486,
-            2471
+            2257,
+            2325,
+            2308
           ],
-          "bandPercent": 0.8
+          "bandPercent": 2.9
         },
         "jint": {
           "samples": [
-            2618,
-            2628,
-            2650
+            2243,
+            2285,
+            2261
           ],
-          "bandPercent": 1.2
+          "bandPercent": 1.9
         }
       }
     },
     {
       "name": "zlib",
       "chromium": {
-        "score": 81241,
+        "score": 91233,
         "status": "ok"
       },
       "broiler": {
-        "score": 435,
+        "score": 444,
         "status": "ok"
       },
       "jint": {
-        "score": 5338,
+        "score": 4967,
         "status": "ok"
       },
       "broilerVsChromium": 0.005,
-      "broilerTimesSlower": 186.8,
-      "jintVsChromium": 0.066,
-      "broilerVsJint": 0.081,
+      "broilerTimesSlower": 205.5,
+      "jintVsChromium": 0.054,
+      "broilerVsJint": 0.089,
       "stability": {
         "chromium": {
           "samples": [
-            81285,
-            81241,
-            81069
+            91233,
+            90799,
+            91233
           ],
-          "bandPercent": 0.3
+          "bandPercent": 0.5
         },
         "broiler": {
           "samples": [
-            433,
-            437,
-            435
+            446,
+            443,
+            444
           ],
-          "bandPercent": 0.9
+          "bandPercent": 0.7
         },
         "jint": {
           "samples": [
-            5338,
-            5371,
-            5149
+            4823,
+            5014,
+            4967
           ],
-          "bandPercent": 4.2
+          "bandPercent": 3.8
         }
       }
     }
@@ -790,23 +790,23 @@
       "expected": 17
     },
     "geomean": {
-      "chromium": 57092,
-      "broiler": 375,
-      "jint": 634
+      "chromium": 58718,
+      "broiler": 372,
+      "jint": 577
     },
     "spread": {
-      "factor": 141.7,
+      "factor": 138,
       "best": {
         "name": "SplayLatency",
-        "timesSlower": 33
+        "timesSlower": 31.7
       },
       "worst": {
         "name": "MandreelLatency",
-        "timesSlower": 4677.4
+        "timesSlower": 4374.5
       }
     },
     "broilerVsJint": {
-      "ratio": 0.591,
+      "ratio": 0.644,
       "benchmarks": 17
     },
     "repetitionsByEngine": {

@@ -6,160 +6,160 @@
   "repetitions": 3,
   "noiseBandPercent": 7.5,
   "benchmarks": {
-    "Richards": 271,
-    "DeltaBlue": 240,
+    "Richards": 260,
+    "DeltaBlue": 207,
     "Crypto": 297,
-    "RayTrace": 508,
-    "EarleyBoyer": 423,
-    "RegExp": 124,
-    "Splay": 660,
-    "SplayLatency": 2101,
-    "NavierStokes": 491,
-    "PdfJS": 494,
-    "Mandreel": 180,
-    "MandreelLatency": 14.6,
-    "Gameboy": 1116,
-    "CodeLoad": 148,
-    "Box2D": 702,
-    "zlib": 435,
-    "Typescript": 2486
+    "RayTrace": 448,
+    "EarleyBoyer": 406,
+    "RegExp": 113,
+    "Splay": 780,
+    "SplayLatency": 2412,
+    "NavierStokes": 519,
+    "PdfJS": 506,
+    "Mandreel": 173,
+    "MandreelLatency": 15.4,
+    "Gameboy": 1090,
+    "CodeLoad": 144,
+    "Box2D": 717,
+    "zlib": 444,
+    "Typescript": 2308
   },
   "stability": {
     "Richards": {
       "samples": [
-        276,
-        271,
-        262
+        260,
+        255,
+        260
       ],
-      "bandPercent": 5.2
+      "bandPercent": 1.9
     },
     "DeltaBlue": {
       "samples": [
-        233,
-        240,
-        244
+        210,
+        199,
+        207
       ],
-      "bandPercent": 4.6
+      "bandPercent": 5.3
     },
     "Crypto": {
       "samples": [
+        293,
         297,
-        304,
-        276
+        302
       ],
-      "bandPercent": 9.4
+      "bandPercent": 3
     },
     "RayTrace": {
       "samples": [
-        502,
-        508,
-        509
+        448,
+        440,
+        466
       ],
-      "bandPercent": 1.4
+      "bandPercent": 5.8
     },
     "EarleyBoyer": {
       "samples": [
-        423,
-        423,
-        421
+        406,
+        419,
+        387
       ],
-      "bandPercent": 0.5
+      "bandPercent": 7.9
     },
     "RegExp": {
       "samples": [
-        124,
-        127,
-        124
+        113,
+        115,
+        113
       ],
-      "bandPercent": 2.4
+      "bandPercent": 1.8
     },
     "Splay": {
       "samples": [
-        693,
-        660,
-        552
+        812,
+        780,
+        772
       ],
-      "bandPercent": 21.4
+      "bandPercent": 5.1
     },
     "SplayLatency": {
       "samples": [
-        2101,
-        2143,
-        2090
+        2485,
+        2412,
+        2392
       ],
-      "bandPercent": 2.5
+      "bandPercent": 3.9
     },
     "NavierStokes": {
       "samples": [
-        492,
-        491,
-        491
-      ],
-      "bandPercent": 0.2
-    },
-    "PdfJS": {
-      "samples": [
-        507,
-        493,
-        494
-      ],
-      "bandPercent": 2.8
-    },
-    "Mandreel": {
-      "samples": [
-        180,
-        180,
-        181
+        521,
+        519,
+        518
       ],
       "bandPercent": 0.6
     },
+    "PdfJS": {
+      "samples": [
+        505,
+        506,
+        506
+      ],
+      "bandPercent": 0.2
+    },
+    "Mandreel": {
+      "samples": [
+        173,
+        171,
+        175
+      ],
+      "bandPercent": 2.3
+    },
     "MandreelLatency": {
       "samples": [
-        14.6,
-        14.5,
-        14.6
+        15.4,
+        15.4,
+        15.4
       ],
-      "bandPercent": 0.7
+      "bandPercent": 0
     },
     "Gameboy": {
       "samples": [
-        1181,
-        1116,
-        1090
+        1090,
+        1120,
+        1081
       ],
-      "bandPercent": 8.2
+      "bandPercent": 3.6
     },
     "CodeLoad": {
       "samples": [
-        136,
-        148,
-        148
+        146,
+        141,
+        144
       ],
-      "bandPercent": 8.1
+      "bandPercent": 3.5
     },
     "Box2D": {
       "samples": [
-        730,
-        702,
-        695
+        709,
+        717,
+        723
       ],
-      "bandPercent": 5
+      "bandPercent": 2
     },
     "zlib": {
       "samples": [
-        433,
-        437,
-        435
+        446,
+        443,
+        444
       ],
-      "bandPercent": 0.9
+      "bandPercent": 0.7
     },
     "Typescript": {
       "samples": [
-        2490,
-        2486,
-        2471
+        2257,
+        2325,
+        2308
       ],
-      "bandPercent": 0.8
+      "bandPercent": 2.9
     }
   },
   "suiteStatus": {
@@ -167,7 +167,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 2923,
+      "durationMs": 2941,
       "filesLoaded": [
         "base.js",
         "richards.js",
@@ -187,7 +187,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 2991,
+      "durationMs": 3011,
       "filesLoaded": [
         "base.js",
         "deltablue.js",
@@ -207,7 +207,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 16055,
+      "durationMs": 15800,
       "filesLoaded": [
         "base.js",
         "crypto.js",
@@ -227,7 +227,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 7287,
+      "durationMs": 7573,
       "filesLoaded": [
         "base.js",
         "raytrace.js",
@@ -247,7 +247,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 21785,
+      "durationMs": 22230,
       "filesLoaded": [
         "base.js",
         "earley-boyer.js",
@@ -267,7 +267,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 16985,
+      "durationMs": 18100,
       "filesLoaded": [
         "base.js",
         "regexp.js",
@@ -287,7 +287,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 4786,
+      "durationMs": 4716,
       "filesLoaded": [
         "base.js",
         "splay.js",
@@ -307,7 +307,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 7004,
+      "durationMs": 6742,
       "filesLoaded": [
         "base.js",
         "navier-stokes.js",
@@ -327,7 +327,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 14944,
+      "durationMs": 14588,
       "filesLoaded": [
         "base.js",
         "pdfjs.js",
@@ -347,7 +347,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 293911,
+      "durationMs": 281709,
       "filesLoaded": [
         "base.js",
         "mandreel.js",
@@ -367,7 +367,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 11973,
+      "durationMs": 11902,
       "filesLoaded": [
         "base.js",
         "gbemu-part1.js",
@@ -388,7 +388,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 20159,
+      "durationMs": 20633,
       "filesLoaded": [
         "base.js",
         "code-load.js",
@@ -408,7 +408,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 10497,
+      "durationMs": 10046,
       "filesLoaded": [
         "base.js",
         "box2d.js",
@@ -428,7 +428,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 352522,
+      "durationMs": 344980,
       "filesLoaded": [
         "base.js",
         "zlib.js",
@@ -449,7 +449,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 57358,
+      "durationMs": 60938,
       "filesLoaded": [
         "base.js",
         "typescript.js",
@@ -468,6 +468,6 @@
       ]
     }
   },
-  "geomean": 375,
-  "generatedAt": "2026-08-06T09:26:43.784Z"
+  "geomean": 372,
+  "generatedAt": "2026-08-07T07:41:16.371Z"
 }

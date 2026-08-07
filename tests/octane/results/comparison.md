@@ -1,45 +1,45 @@
 # Octane 2.0 benchmark — Chromium vs Broiler vs Jint
 
-- Generated: `2026-08-06T09:26:43.784Z`
+- Generated: `2026-08-07T07:41:16.371Z`
 - Octane version: `9`
-- Chromium: `Chromium 149.0.7827.55` — **overall score 57092**
-- Broiler: `Broiler.JS (BroilerJS --script-host)` — **overall score 375**
-- Jint: `Jint 4.15.3 (interpreter)` — **overall score 634**
+- Chromium: `Chromium 149.0.7827.55` — **overall score 58718**
+- Broiler: `Broiler.JS (BroilerJS --script-host)` — **overall score 372**
+- Jint: `Jint 4.15.3 (interpreter)` — **overall score 577**
 - Repetitions per suite: 3 (median reported; noise band 7.5%)
 
 |  | Chromium | Broiler | Jint |
 |---|--:|--:|--:|
 | Scores reported (of 17) | 17 | 17 | 17 |
-| Overall (geomean) | 57092 | 375 | 634 |
-| Spread (worst ÷ best suite) | — | 141.7× | — |
+| Overall (geomean) | 58718 | 372 | 577 |
+| Spread (worst ÷ best suite) | — | 138× | — |
 
-Broiler's best suite is **SplayLatency** at 33× slower and its worst is **MandreelLatency** at 4677.4×. The spread between them is the "smoothness" number — a large one means a single subsystem is pathological rather than the engine being uniformly behind. See [`../roadmap.md`](../roadmap.md).
+Broiler's best suite is **SplayLatency** at 31.7× slower and its worst is **MandreelLatency** at 4374.5×. The spread between them is the "smoothness" number — a large one means a single subsystem is pathological rather than the engine being uniformly behind. See [`../roadmap.md`](../roadmap.md).
 
-Against Jint — a managed interpreter on the same runtime, and so the closer reference point — Broiler scores **0.591×** across the 17 benchmarks both engines completed (geometric mean of the per-benchmark ratios).
+Against Jint — a managed interpreter on the same runtime, and so the closer reference point — Broiler scores **0.644×** across the 17 benchmarks both engines completed (geometric mean of the per-benchmark ratios).
 
 Higher is better. "Broiler / Chromium" is the ratio of scores on suites both engines completed.
 "Broiler / Jint" is the same ratio against the other managed engine: above 1, Broiler is ahead.
 
 | Benchmark | Chromium | Broiler | Jint | Broiler spread | Broiler / Chromium | × slower | Broiler / Jint |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| Box2D | 100949 | 702 | 642 | 5% | 0.007 | 143.8× | 1.093 |
-| CodeLoad | 31161 | 148 | 4790 | 8.1% ⚠ | 0.005 | 210.5× | 0.031 |
-| Crypto | 38368 | 297 | 147 | 9.4% ⚠ | 0.008 | 129.2× | 2.020 |
-| DeltaBlue | 99693 | 240 | 186 | 4.6% | 0.002 | 415.4× | 1.290 |
-| EarleyBoyer | 90103 | 423 | 413 | 0.5% | 0.005 | 213× | 1.024 |
-| Gameboy | 90383 | 1116 | 949 | 8.2% ⚠ | 0.012 | 81× | 1.176 |
-| Mandreel | 48329 | 180 | 96.3 | 0.6% | 0.004 | 268.5× | 1.869 |
-| MandreelLatency | 68290 | 14.6 | 798 | 0.7% | 0.000 | 4677.4× | 0.018 |
-| NavierStokes | 35397 | 491 | 263 | 0.2% | 0.014 | 72.1× | 1.867 |
-| PdfJS | 58258 | 494 | 929 | 2.8% | 0.008 | 117.9× | 0.532 |
-| RayTrace | 118398 | 508 | 450 | 1.4% | 0.004 | 233.1× | 1.129 |
-| RegExp | 10385 | 124 | 209 | 2.4% | 0.012 | 83.8× | 0.593 |
-| Richards | 38260 | 271 | 189 | 5.2% | 0.007 | 141.2× | 1.434 |
-| Splay | 43484 | 660 | 851 | 21.4% ⚠ | 0.015 | 65.9× | 0.776 |
-| SplayLatency | 69390 | 2101 | 3261 | 2.5% | 0.030 | 33× | 0.644 |
-| Typescript | 94589 | 2486 | 2628 | 0.8% | 0.026 | 38× | 0.946 |
-| zlib | 81241 | 435 | 5338 | 0.9% | 0.005 | 186.8× | 0.081 |
-| **Overall (geomean)** | **57092** | **375** | **634** | | 0.007 | 152× | 0.591 |
+| Box2D | 102475 | 717 | 570 | 2% | 0.007 | 142.9× | 1.258 |
+| CodeLoad | 28215 | 144 | 4074 | 3.5% | 0.005 | 195.9× | 0.035 |
+| Crypto | 41963 | 297 | 138 | 3% | 0.007 | 141.3× | 2.152 |
+| DeltaBlue | 105994 | 207 | 167 | 5.3% | 0.002 | 512× | 1.240 |
+| EarleyBoyer | 87285 | 406 | 367 | 7.9% ⚠ | 0.005 | 215× | 1.106 |
+| Gameboy | 99597 | 1090 | 853 | 3.6% | 0.011 | 91.4× | 1.278 |
+| Mandreel | 46988 | 173 | 86.9 | 2.3% | 0.004 | 271.6× | 1.991 |
+| MandreelLatency | 67368 | 15.4 | 727 | 0% | 0.000 | 4374.5× | 0.021 |
+| NavierStokes | 38436 | 519 | 257 | 0.6% | 0.014 | 74.1× | 2.019 |
+| PdfJS | 60750 | 506 | 778 | 0.2% | 0.008 | 120.1× | 0.650 |
+| RayTrace | 117214 | 448 | 411 | 5.8% | 0.004 | 261.6× | 1.090 |
+| RegExp | 10223 | 113 | 187 | 1.8% | 0.011 | 90.5× | 0.604 |
+| Richards | 37710 | 260 | 173 | 1.9% | 0.007 | 145× | 1.503 |
+| Splay | 45430 | 780 | 817 | 5.1% | 0.017 | 58.2× | 0.955 |
+| SplayLatency | 76352 | 2412 | 3357 | 3.9% | 0.032 | 31.7× | 0.718 |
+| Typescript | 99226 | 2308 | 2261 | 2.9% | 0.023 | 43× | 1.021 |
+| zlib | 91233 | 444 | 4967 | 0.7% | 0.005 | 205.5× | 0.089 |
+| **Overall (geomean)** | **58718** | **372** | **577** | | 0.006 | 158× | 0.644 |
 
 ⚠ marks a benchmark whose spread across Broiler's 3 repetitions exceeded the 7.5% band.
 
