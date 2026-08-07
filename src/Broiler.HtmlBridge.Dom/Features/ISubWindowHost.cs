@@ -56,4 +56,9 @@ internal interface ISubWindowHost
     /// constructors — <c>Event</c>, <c>MouseEvent</c>, … — and <c>MessageChannel</c>), or <c>null</c>
     /// when the context has no such global (or no context).</summary>
     JSValue? GetGlobal(string name);
+
+    /// <summary>Publishes on <paramref name="subWindow"/> whatever this frame's own scripts declared
+    /// while it was being built, so a parent page can reach them as <c>frames[0].window.foo</c>.
+    /// See <c>DomBridge.SubDocumentGlobals.cs</c>.</summary>
+    void PublishPendingSubDocumentGlobals(DomElement containerElement, JSObject subWindow);
 }

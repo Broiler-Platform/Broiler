@@ -115,6 +115,11 @@ internal sealed class SubWindowBinding(
         subWindow.FastAddValue((KeyString)"getComputedStyle", new DomFunction((in a) => GetComputedStyle(in a), "getComputedStyle", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // Last, so the bridge's own members are already in place and win over a same-named
+        // declaration: whatever the frame's scripts declared while the sub-document above was being
+        // built now becomes reachable as frames[0].window.foo.
+        _host.PublishPendingSubDocumentGlobals(containerElement, subWindow);
+
         return subWindow;
     }
 

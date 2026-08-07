@@ -502,6 +502,19 @@ internal static class FragmentTreeBuilder
     private static (string Html, string BaseUrl) TryLoadEmbeddedDocument(CssBox box)
     {
         string tagName = box.HtmlTag.Name;
+
+        // A nested browsing context that has been scripted is no longer what its `src` resource
+        // says: its own scripts, or a parent reaching in through `frames[0]`, have moved the live
+        // document on. Re-reading the file would paint the frame as it never was, so the bridge
+        // stamps the live document here — the `src` counterpart of `srcdoc`, together with the URL
+        // it was loaded from so relative references inside still resolve against the resource.
+        // Only a frame that has actually diverged carries it; see DomBridge.FrameDocumentProjection.
+        if (box.GetAttribute("data-broiler-frame-document") is { Length: > 0 } liveDocument)
+        {
+            string liveBaseUrl = box.GetAttribute("data-broiler-frame-base");
+            return (liveDocument, string.IsNullOrEmpty(liveBaseUrl) ? ContainerBaseUrl(box) : liveBaseUrl);
+        }
+
         string url;
         if (tagName.Equals("object", StringComparison.OrdinalIgnoreCase))
         {

@@ -111,6 +111,16 @@ public sealed partial class DomBridge
         TryGetHeldSubDocumentViewTransitionMarkup(docRoot) ?? SerializeSubDocumentChildren(docRoot);
 
     /// <summary>
+    /// The markup a frame renders right now, resolving the two things that can outrank its live
+    /// sub-tree — an enclosing document frozen on a root snapshot taken before the frame changed,
+    /// then the frame's own transition holding its old root. Shared by both routes a frame's content
+    /// reaches the renderer by: the <c>srcdoc</c> attribute it round-trips through, and the stamped
+    /// live document a <c>src</c> frame carries (see <c>DomBridge.FrameDocumentProjection.cs</c>).
+    /// </summary>
+    private string? RenderedSubDocumentMarkup(DomNode docRoot) =>
+        TryGetFrameMarkupHeldByRootSnapshot(docRoot) ?? EffectiveSubDocumentMarkup(docRoot);
+
+    /// <summary>
     /// The markup a frame must show because an <em>enclosing</em> document is frozen displaying a root
     /// snapshot captured while the frame looked like that — or <c>null</c> when no such snapshot is on
     /// screen.
