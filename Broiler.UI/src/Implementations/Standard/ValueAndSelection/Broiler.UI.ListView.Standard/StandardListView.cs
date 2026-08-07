@@ -131,7 +131,7 @@ public sealed class StandardListView : UiListView, IStandardThemedControl
         {
             BRect row = GetItemBounds(index);
             UiListItem item = Items[index];
-            if (StringComparer.Ordinal.Equals(item.Id, SelectedItemId))
+            if (IsSelected(item.Id))
                 context.RenderList.FillRect(StandardControlPaint.Inset(row, 2), SelectedBackground);
 
             context.RenderList.DrawText(new BTextRun(item.Text, Font, Foreground), new BPoint(row.Left + 6, row.Top + Math.Max(0, (row.Height - BTextMeasurer.GetLineHeight(Font)) / 2)));
@@ -164,7 +164,7 @@ public sealed class StandardListView : UiListView, IStandardThemedControl
         {
             UiListItem item = Items[index];
             UiSemanticState state = UiSemanticState.Visible | UiSemanticState.Enabled;
-            if (StringComparer.Ordinal.Equals(item.Id, SelectedItemId))
+            if (IsSelected(item.Id))
                 state |= UiSemanticState.Selected;
             nodes.Add(new UiSemanticNode(UiSemanticRole.Generic, item.Text, GetItemBounds(index), state, []));
         }
@@ -194,7 +194,7 @@ public sealed class StandardListView : UiListView, IStandardThemedControl
             return false;
 
         if (input.MouseButtonTransition == MouseButtonTransition.Down)
-            return HandlePointerDown(input.Position);
+            return HandlePointerDown(input.Position, input.KeyModifiers);
 
         if (input.MouseButtonTransition == MouseButtonTransition.Up && _isDraggingScrollbar)
         {
@@ -205,7 +205,7 @@ public sealed class StandardListView : UiListView, IStandardThemedControl
         return false;
     }
 
-    private bool HandlePointerDown(BPoint position)
+    private bool HandlePointerDown(BPoint position, KeyboardModifierState modifiers)
     {
         Session?.SetFocus(this);
         if (HasVerticalScrollbar && TryHandleScrollbarPointerDown(position))
@@ -218,7 +218,7 @@ public sealed class StandardListView : UiListView, IStandardThemedControl
         if ((uint)index < (uint)Items.Count)
         {
             string itemId = Items[index].Id;
-            SelectItem(itemId);
+            ApplyClick(itemId, modifiers);
             ScrollIntoView(itemId);
         }
 
@@ -297,33 +297,75 @@ public sealed class StandardListView : UiListView, IStandardThemedControl
         if (input.KeyTransition != KeyboardKeyTransition.Down)
             return false;
 
+        // Shift with an arrow extends the range, matching the pointer's Shift-click.
+        bool extend = input.KeyModifiers.HasFlag(KeyboardModifierState.Shift);
         int index = SelectedIndex >= 0 ? SelectedIndex : 0;
+
         if (IsKey(input, BVirtualKey.Down, "Down"))
-            return SelectAndReveal(Math.Min(Items.Count - 1, index + 1));
+            return SelectAndReveal(Math.Min(Items.Count - 1, index + 1), extend);
         if (IsKey(input, BVirtualKey.Up, "Up"))
-            return SelectAndReveal(Math.Max(0, index - 1));
+            return SelectAndReveal(Math.Max(0, index - 1), extend);
         if (IsKey(input, BVirtualKey.Home, "Home"))
-            return SelectAndReveal(0);
+            return SelectAndReveal(0, extend);
         if (IsKey(input, BVirtualKey.End, "End"))
-            return SelectAndReveal(Items.Count - 1);
+            return SelectAndReveal(Items.Count - 1, extend);
         if (IsKey(input, BVirtualKey.PageDown, "PageDown"))
-            return SelectAndReveal(Math.Min(Items.Count - 1, index + Math.Max(1, VisibleItemCount - 1)));
+            return SelectAndReveal(Math.Min(Items.Count - 1, index + Math.Max(1, VisibleItemCount - 1)), extend);
         if (IsKey(input, BVirtualKey.PageUp, "PageUp"))
-            return SelectAndReveal(Math.Max(0, index - Math.Max(1, VisibleItemCount - 1)));
+            return SelectAndReveal(Math.Max(0, index - Math.Max(1, VisibleItemCount - 1)), extend);
+
+        // Space toggles without moving, which is the only way to build a
+        // discontiguous selection from the keyboard alone.
+        if (SelectionMode == UiListSelectionMode.Multiple &&
+            IsKey(input, BVirtualKey.Space, "Space") &&
+            SelectedIndex >= 0)
+        {
+            return ToggleItem(Items[SelectedIndex].Id);
+        }
 
         return false;
     }
 
-    private bool SelectAndReveal(int index)
+    private bool SelectAndReveal(int index, bool extend = false)
     {
         if ((uint)index >= (uint)Items.Count)
             return false;
 
         Session?.SetFocus(this);
         string itemId = Items[index].Id;
-        SelectItem(itemId);
+        if (extend && SelectionMode == UiListSelectionMode.Multiple)
+            SelectRangeTo(itemId);
+        else
+            SelectItem(itemId);
+
         ScrollIntoView(itemId);
         return true;
+    }
+
+    /// <summary>
+    /// Applies a click: a single-selection list replaces its selection; a
+    /// multi-selection list extends the range on Shift and otherwise toggles the row.
+    /// </summary>
+    /// <remarks>
+    /// An unmodified click toggles rather than replacing, which is a deliberate
+    /// departure from the desktop convention of replace-unless-Ctrl. A touch contact
+    /// arrives as a synthesized pointer press and can never carry a modifier, so
+    /// requiring Ctrl to accumulate would leave multi-selection unreachable by touch
+    /// entirely. Ctrl-click therefore also toggles — the same result the convention
+    /// gives it — and Shift-click is the range, so muscle memory still works.
+    /// </remarks>
+    private void ApplyClick(string itemId, KeyboardModifierState modifiers)
+    {
+        if (SelectionMode != UiListSelectionMode.Multiple)
+        {
+            SelectItem(itemId);
+            return;
+        }
+
+        if (modifiers.HasFlag(KeyboardModifierState.Shift))
+            SelectRangeTo(itemId);
+        else
+            ToggleItem(itemId);
     }
 
     private void CoerceOffset()

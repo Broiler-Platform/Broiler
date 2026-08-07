@@ -11,6 +11,13 @@ public sealed class WindowsMouseInputDevice : MouseInputDevice, IWindowsInputMes
     private const int MkXButton1 = 0x0020;
     private const int MkXButton2 = 0x0040;
 
+    // WM_*BUTTON* and WM_MOUSEMOVE report Shift and Ctrl in the same wParam word as
+    // the button state. Alt is not among them: Windows delivers it to the window as
+    // WM_SYSCOMMAND rather than in the mouse message, so an Alt-click reports no
+    // modifier here and a consumer that needs it must track the keyboard.
+    private const int MkShift = 0x0004;
+    private const int MkControl = 0x0008;
+
     private const int XButton1 = 0x0001;
     private const int XButton2 = 0x0002;
     private const int WheelDelta = 120;
@@ -45,7 +52,8 @@ public sealed class WindowsMouseInputDevice : MouseInputDevice, IWindowsInputMes
                     NextEventHeader(message.Timestamp),
                     PositionFromLParam(message.LParam, options),
                     ButtonsFromWParam(message.WParam),
-                    InputEventSource.Semantic));
+                    InputEventSource.Semantic,
+                    ModifiersFromWParam(message.WParam)));
                 return true;
 
             case WindowsMessageIds.LeftButtonDown:
@@ -106,7 +114,8 @@ public sealed class WindowsMouseInputDevice : MouseInputDevice, IWindowsInputMes
             ButtonsFromWParam(message.WParam),
             ButtonFromMessage(message.Message, message.WParam),
             transition,
-            InputEventSource.Semantic));
+            InputEventSource.Semantic,
+            ModifiersFromWParam(message.WParam)));
     }
 
     private void DispatchWheel(
@@ -122,7 +131,8 @@ public sealed class WindowsMouseInputDevice : MouseInputDevice, IWindowsInputMes
             ButtonsFromWParam(message.WParam),
             axis,
             delta,
-            InputEventSource.Semantic));
+            InputEventSource.Semantic,
+            ModifiersFromWParam(message.WParam)));
     }
 
     private static InputPoint PositionFromLParam(IntPtr lParam, WindowsMouseMessageOptions options) =>
@@ -152,6 +162,19 @@ public sealed class WindowsMouseInputDevice : MouseInputDevice, IWindowsInputMes
     {
         double scale = options.CoordinateScale <= 0 ? 1.0 : options.CoordinateScale;
         return new InputPoint(x / scale, y / scale, string.IsNullOrWhiteSpace(options.CoordinateSpace) ? "client-pixels" : options.CoordinateSpace);
+    }
+
+    private static InputModifiers ModifiersFromWParam(IntPtr wParam)
+    {
+        int keys = LowWord(wParam);
+        InputModifiers modifiers = InputModifiers.None;
+
+        if ((keys & MkShift) != 0)
+            modifiers |= InputModifiers.Shift;
+        if ((keys & MkControl) != 0)
+            modifiers |= InputModifiers.Control;
+
+        return modifiers;
     }
 
     private static MouseButtons ButtonsFromWParam(IntPtr wParam)

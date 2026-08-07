@@ -10,7 +10,11 @@ using Broiler.Input.Mouse;
 using Broiler.Input.Touch;
 using Broiler.UI;
 using Broiler.UI.Button.Standard;
+using Broiler.UI.Dialog;
+using Broiler.UI.Dialog.Standard;
 using Broiler.UI.Edit.Standard;
+using Broiler.UI.FileDialog;
+using Broiler.UI.FileDialog.Standard;
 using Broiler.UI.Label;
 using Broiler.UI.Label.Standard;
 using Broiler.UI.Standard;
@@ -28,7 +32,7 @@ internal sealed class BrowserApp : IDisposable
     private readonly Action<bool> _setAnimationActive;
     private readonly UiSession _session;
     private readonly FavoritesManager _favorites = new();
-    private readonly List<string> _history = [];
+    private readonly List<PageRequest> _history = [];
     private readonly StandardButton _backButton;
     private readonly StandardButton _forwardButton;
     private readonly StandardButton _refreshButton;
@@ -39,6 +43,7 @@ internal sealed class BrowserApp : IDisposable
     private readonly StandardLabel _status;
     private readonly BrowserViewport _viewport;
     private readonly BrowserContent _content;
+    private readonly StandardWindow _rootWindow;
     private int _historyIndex = -1;
     private bool _isPageBusy;
     private bool _isShuttingDown;
@@ -94,7 +99,7 @@ internal sealed class BrowserApp : IDisposable
             _viewport,
             _status);
 
-        var root = new StandardWindow
+        _rootWindow = new StandardWindow
         {
             Title = "Broiler Browser",
             Background = BrowserPalette.Canvas,
@@ -102,8 +107,8 @@ internal sealed class BrowserApp : IDisposable
             ActiveBorderColor = BrowserPalette.Accent,
             BorderThickness = 1,
         };
-        root.AddChild(_content);
-        _session.AddRoot(root);
+        _rootWindow.AddChild(_content);
+        _session.AddRoot(_rootWindow);
 
         _backButton.Clicked += (_, _) => GoHistory(-1);
         _forwardButton.Clicked += (_, _) => GoHistory(1);
@@ -113,6 +118,7 @@ internal sealed class BrowserApp : IDisposable
         _starButton.Clicked += (_, _) => ToggleFavorite();
         _address.Submitted += (_, _) => NavigateTo(_address.Text);
         _viewport.LinkActivated += OnViewportLinkActivated;
+        _viewport.FilePickRequested += OnViewportFilePickRequested;
 
         _favorites.Load();
         RefreshFavoritesBar();
@@ -190,8 +196,18 @@ internal sealed class BrowserApp : IDisposable
     {
         BeginShutdown();
         _viewport.LinkActivated -= OnViewportLinkActivated;
+        _viewport.FilePickRequested -= OnViewportFilePickRequested;
         _session.Dispose();
     }
+
+    /// <summary>
+    /// Prepares fetched or script-produced HTML for the rendering surface: the shared
+    /// replaced-element passes, plus synthetic ids on checkbox, radio and select controls so
+    /// Broiler.UI controls can be hosted over them (their geometry is only reachable
+    /// by id). Applies to the renderer's copy only — scripts run on the original.
+    /// </summary>
+    private static string PrepareForBrowsing(string html) =>
+        HtmlPostProcessor.StampFormControlIds(HtmlPostProcessor.ProcessForBrowsing(html));
 
     private static StandardButton CreateChromeButton(string text, string semanticName) =>
         new()
@@ -241,18 +257,22 @@ internal sealed class BrowserApp : IDisposable
         return false;
     }
 
-    private void NavigateTo(string url)
+    private void NavigateTo(string url) => NavigateTo(PageRequest.ForUrl(url));
+
+    private void NavigateTo(PageRequest request)
     {
-        if (_isShuttingDown || string.IsNullOrWhiteSpace(url))
+        if (_isShuttingDown || string.IsNullOrWhiteSpace(request.Url))
             return;
 
-        url = NormalizeInput(url);
+        request = request with { Url = NormalizeInput(request.Url) };
         if (_historyIndex < _history.Count - 1)
             _history.RemoveRange(_historyIndex + 1, _history.Count - _historyIndex - 1);
 
-        _history.Add(url);
+        // History holds the whole request, so revisiting a POST can re-issue it —
+        // behind a confirmation, since repeating a submission is not free.
+        _history.Add(request);
         _historyIndex = _history.Count - 1;
-        LoadUrl(url);
+        LoadUrl(request);
     }
 
     private void GoHistory(int delta)
@@ -264,8 +284,21 @@ internal sealed class BrowserApp : IDisposable
         if (target < 0 || target >= _history.Count)
             return;
 
+        PageRequest request = _history[target];
+        if (!request.IsRepeatable)
+        {
+            // Re-issuing a submission can charge a card twice. Ask first, and only
+            // move the history cursor if the user agrees.
+            ConfirmResubmission(() =>
+            {
+                _historyIndex = target;
+                LoadUrl(request);
+            });
+            return;
+        }
+
         _historyIndex = target;
-        LoadUrl(_history[target]);
+        LoadUrl(request);
     }
 
     private void Reload()
@@ -273,9 +306,59 @@ internal sealed class BrowserApp : IDisposable
         if (_isShuttingDown)
             return;
 
-        if (_historyIndex >= 0 && _historyIndex < _history.Count)
-            LoadUrl(_history[_historyIndex]);
+        if (_historyIndex < 0 || _historyIndex >= _history.Count)
+            return;
+
+        PageRequest request = _history[_historyIndex];
+        if (request.IsRepeatable)
+        {
+            LoadUrl(request);
+            return;
+        }
+
+        ConfirmResubmission(() => LoadUrl(request));
     }
+
+    /// <summary>
+    /// Asks before repeating a form submission, and runs <paramref name="resubmit"/>
+    /// only if the user agrees. A POST is not safe to replay on its own — reloading a
+    /// checkout would place the order twice — so revisiting one goes through here.
+    /// </summary>
+    private void ConfirmResubmission(Action resubmit)
+    {
+        StandardDialog dialog = new()
+        {
+            Title = "Confirm resubmission",
+            PreferredSize = ResubmitDialogSize,
+        };
+
+        StandardLabel message = new()
+        {
+            Text = "This page was the result of a form submission. Sending it again may repeat the action.",
+            Font = new BFontStyle("Segoe UI", 13),
+            Foreground = BrowserPalette.Text,
+            Trimming = UiTextTrimming.None,
+        };
+        StandardButton resend = CreateChromeButton("Resend", "Resend");
+        StandardButton cancel = CreateChromeButton("Cancel", "Cancel");
+
+        resend.Clicked += (_, _) => dialog.Accept();
+        cancel.Clicked += (_, _) => dialog.Cancel();
+
+        dialog.AddChild(new ResubmitPrompt(message, resend, cancel));
+        dialog.ResultCompleted += (_, e) =>
+        {
+            if (e.Result.Kind == UiDialogResultKind.Accepted)
+                resubmit();
+
+            _host.RequestInvalidate();
+        };
+
+        dialog.ShowModal(_rootWindow, GetDialogPlacement(ResubmitDialogSize));
+        _host.RequestInvalidate();
+    }
+
+    private static readonly BSize ResubmitDialogSize = new(420, 170);
 
     private void StopLoading()
     {
@@ -291,11 +374,14 @@ internal sealed class BrowserApp : IDisposable
         _host.RequestInvalidate();
     }
 
-    private void LoadUrl(string url)
+    private void LoadUrl(string url) => LoadUrl(PageRequest.ForUrl(url));
+
+    private void LoadUrl(PageRequest request)
     {
         if (_isShuttingDown)
             return;
 
+        string url = request.Url;
         long navigationGeneration = BeginNavigation();
         SetUrlText(url);
         UpdateNavigationButtons();
@@ -314,7 +400,7 @@ internal sealed class BrowserApp : IDisposable
 
         var cancellation = new CancellationTokenSource();
         _navigationCancellation = cancellation;
-        _ = LoadUrlInBackgroundAsync(navigationGeneration, url, cancellation);
+        _ = LoadUrlInBackgroundAsync(navigationGeneration, request, cancellation);
     }
 
     private long BeginNavigation()
@@ -327,13 +413,13 @@ internal sealed class BrowserApp : IDisposable
 
     private async Task LoadUrlInBackgroundAsync(
         long navigationGeneration,
-        string url,
+        PageRequest request,
         CancellationTokenSource cancellation)
     {
         NavigationLoadResult? result = null;
         try
         {
-            result = await LoadUrlOnWorkerAsync(url, cancellation.Token).ConfigureAwait(false);
+            result = await LoadUrlOnWorkerAsync(request, cancellation.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -350,16 +436,16 @@ internal sealed class BrowserApp : IDisposable
         }
     }
 
-    private static async Task<NavigationLoadResult> LoadUrlOnWorkerAsync(string url, CancellationToken cancellationToken)
+    private static async Task<NavigationLoadResult> LoadUrlOnWorkerAsync(PageRequest request, CancellationToken cancellationToken)
     {
         using var pipeline = new RenderingPipeline(
             new PageLoader(new HttpClient()),
             new ScriptEngine());
 
-        var (normalisedUrl, content) = await pipeline.LoadPageAsync(url, cancellationToken).ConfigureAwait(false);
+        var (normalisedUrl, content) = await pipeline.LoadPageAsync(request, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
 
-        string html = HtmlPostProcessor.ProcessForBrowsing(content.Html);
+        string html = PrepareForBrowsing(content.Html);
         InteractiveSession? session = null;
         try
         {
@@ -370,7 +456,7 @@ internal sealed class BrowserApp : IDisposable
             {
                 string initial = session.CurrentHtml();
                 if (!string.IsNullOrWhiteSpace(initial))
-                    html = HtmlPostProcessor.ProcessForBrowsing(initial);
+                    html = PrepareForBrowsing(initial);
 
                 if (!session.HasPendingWork)
                 {
@@ -470,12 +556,60 @@ internal sealed class BrowserApp : IDisposable
         _host.RequestInvalidate();
     }
 
+    /// <summary>
+    /// Opens a file dialog for a page's <c>&lt;input type="file"&gt;</c>. The viewport
+    /// hosts the control but has no window to parent a modal to, so the shell does
+    /// this half and hands the chosen path back.
+    /// </summary>
+    private void OnViewportFilePickRequested(object? sender, HtmlFilePickEventArgs e)
+    {
+        if (_isShuttingDown)
+            return;
+
+        StandardFileDialog dialog = new()
+        {
+            Mode = UiFileDialogMode.Open,
+            CurrentDirectory = Environment.CurrentDirectory,
+            PreferredSize = FileDialogPreferredSize,
+            Title = e.AllowsMultiple ? "Add a file" : "Choose a file",
+        };
+
+        dialog.ResultCompleted += (_, result) =>
+        {
+            if (result.Result.Kind == UiDialogResultKind.Accepted &&
+                !string.IsNullOrWhiteSpace(result.Result.Value))
+            {
+                _viewport.RecordPickedFile(e.ControlId, e.ControlName, result.Result.Value, e.AllowsMultiple);
+            }
+
+            _host.RequestInvalidate();
+        };
+
+        dialog.ShowOpenModal(_rootWindow, GetDialogPlacement(FileDialogPreferredSize));
+        _host.RequestInvalidate();
+    }
+
+    private static readonly BSize FileDialogPreferredSize = new(560, 380);
+
+    private BRect GetDialogPlacement(BSize preferred)
+    {
+        BSize viewport = _host.ViewportSize;
+        double width = Math.Min(preferred.Width, Math.Max(280, viewport.Width - 24));
+        double height = Math.Min(preferred.Height, Math.Max(160, viewport.Height - 64));
+        return new BRect(
+            Math.Max(12, (viewport.Width - width) / 2),
+            Math.Max(42, (viewport.Height - height) / 2),
+            width,
+            height);
+    }
+
     private void OnViewportLinkActivated(object? sender, BrowserLinkEventArgs e)
     {
         if (_isShuttingDown)
             return;
 
-        NavigateTo(ResolveLinkUrl(e.Link));
+        // Only the URL is resolved against the page; a submission's body travels as-is.
+        NavigateTo(e.Request with { Url = ResolveLinkUrl(e.Link) });
     }
 
     private string ResolveLinkUrl(string link)
@@ -514,7 +648,7 @@ internal sealed class BrowserApp : IDisposable
 
     private string CurrentHistoryUrl() =>
         _historyIndex >= 0 && _historyIndex < _history.Count
-            ? _history[_historyIndex]
+            ? _history[_historyIndex].Url
             : string.Empty;
 
     private void ToggleFavorite()
@@ -866,6 +1000,10 @@ internal sealed class BrowserApp : IDisposable
         private const double KeyScrollStep = 48;
 
         private readonly Func<IBroilerRenderer?> _getRenderer;
+        private readonly HtmlFormEditor _formEditor;
+        private readonly HtmlFormState _formState = new();
+        private readonly HtmlFormControlHost _controlHost;
+        private bool _controlsDirty = true;
         private HtmlContainer _container = CreateContentContainer(WelcomePage, string.Empty);
         private HtmlGraphicsRenderList? _renderList;
         private InteractiveSession? _interactiveSession;
@@ -888,9 +1026,33 @@ internal sealed class BrowserApp : IDisposable
         {
             _getRenderer = getRenderer ?? throw new ArgumentNullException(nameof(getRenderer));
             _container.LinkClicked += OnLinkClicked;
+            _formEditor = new HtmlFormEditor(this);
+            _formEditor.Committed += (_, _) => MarkLayoutDirty();
+            _formEditor.SubmitRequested += (_, e) => SubmitHostedField(e.FieldId, e.FieldName);
+            _controlHost = new HtmlFormControlHost(this, _formState);
+            _controlHost.Changed += (_, _) => Invalidate(UiInvalidationKind.Render);
+            _controlHost.FilePickRequested += (_, e) => FilePickRequested?.Invoke(this, e);
         }
 
         public event EventHandler<BrowserLinkEventArgs>? LinkActivated;
+
+        /// <summary>Raised when a hosted file control was activated; the shell shows the dialog.</summary>
+        public event EventHandler<HtmlFilePickEventArgs>? FilePickRequested;
+
+        /// <summary>
+        /// Records the file the shell's dialog returned and refreshes the control. A
+        /// <c>multiple</c> input accumulates, so picking again adds to its selection
+        /// instead of replacing it — the dialog chooses one file at a time.
+        /// </summary>
+        public void RecordPickedFile(string controlId, string controlName, string path, bool allowsMultiple)
+        {
+            if (allowsMultiple)
+                _formState.AddSelectedFile(controlId, controlName, path);
+            else
+                _formState.SetSelectedFile(controlId, controlName, path);
+
+            _controlHost.RefreshFileLabels();
+        }
 
         public string BaseUrl { get; private set; } = string.Empty;
 
@@ -900,6 +1062,10 @@ internal sealed class BrowserApp : IDisposable
         {
             ArgumentNullException.ThrowIfNull(container);
             StopSession();
+            _formEditor.Cancel();
+            _formState.Reset();
+            _controlHost.Clear();
+            _controlsDirty = true;
             DisposeRenderList();
             _container.LinkClicked -= OnLinkClicked;
             _container.Dispose();
@@ -924,7 +1090,7 @@ internal sealed class BrowserApp : IDisposable
                 _suppressNavigation = true;
                 try
                 {
-                    _container.SetHtmlWithStyleSet(HtmlPostProcessor.ProcessForBrowsing(html), baseUrl: BaseUrl);
+                    _container.SetHtmlWithStyleSet(PrepareForBrowsing(html), baseUrl: BaseUrl);
                 }
                 finally
                 {
@@ -995,7 +1161,40 @@ internal sealed class BrowserApp : IDisposable
                 BMatrix3x2.Translation(Bounds.Left, Bounds.Top));
             ReplayCommands(context.RenderList, htmlList.Commands);
             context.RenderList.PopTransform();
+
+            // Hosted form controls paint over the page, in viewport coordinates,
+            // so they are placed and drawn outside the document transform.
+            RebuildHostedControlsIfNeeded();
+            PlaceHostedControls(Bounds);
+            base.RenderCore(context);
             context.RenderList.PopClip();
+        }
+
+        /// <summary>
+        /// Positions the Broiler.UI controls hosted over the page's form fields.
+        /// The viewport arranges them itself — the default child arrangement would
+        /// stretch each one across the whole viewport and swallow every click.
+        /// </summary>
+        protected override void ArrangeCore(BRect finalRect) => PlaceHostedControls(finalRect);
+
+        private void PlaceHostedControls(BRect viewportBounds)
+        {
+            _formEditor.UpdateViewport(viewportBounds, _viewportZoom, _scrollY);
+            _controlHost.UpdateViewport(_container, viewportBounds, _viewportZoom, _scrollY);
+        }
+
+        /// <summary>
+        /// Discovers the page's checkbox, radio and select controls once per page. The parse is
+        /// the expensive half, so it is deferred to the first render after the page
+        /// changed rather than repeated per layout.
+        /// </summary>
+        private void RebuildHostedControlsIfNeeded()
+        {
+            if (!_controlsDirty)
+                return;
+
+            _controlsDirty = false;
+            _controlHost.Rebuild(GetPageHtml());
         }
 
         protected override bool OnInput(UiInputEvent input)
@@ -1072,6 +1271,11 @@ internal sealed class BrowserApp : IDisposable
 
             if (input.MouseButtonTransition == MouseButtonTransition.Down)
             {
+                // A click on a text field starts editing instead of a text selection.
+                if (left && BeginFormEdit(point))
+                    return true;
+
+                _formEditor.Commit();
                 Session?.SetFocus(this);
                 _container.HandleMouseDown(point, left, right);
                 InvalidateRenderedContent();
@@ -1086,6 +1290,17 @@ internal sealed class BrowserApp : IDisposable
             }
 
             return false;
+        }
+
+        private bool BeginFormEdit(PointF viewportPoint)
+        {
+            if (!_formEditor.TryBegin(_container, viewportPoint))
+                return false;
+
+            Session?.SetFocus(_formEditor.Editor);
+            PlaceHostedControls(Bounds);
+            Invalidate(UiInvalidationKind.Arrange | UiInvalidationKind.Render);
+            return true;
         }
 
         private bool HandlePointerMove(UiInputEvent input)
@@ -1275,7 +1490,42 @@ internal sealed class BrowserApp : IDisposable
             if (_suppressNavigation)
                 return;
 
-            LinkActivated?.Invoke(this, new BrowserLinkEventArgs(e.Link, e.Attributes));
+            // The renderer resolves a submit control to its form's action and nothing
+            // more; serialize the form's fields so the submission actually carries them.
+            PageRequest request = _formState.TryBuildSubmitRequest(GetPageHtml(), e.Attributes, e.Link)
+                ?? PageRequest.ForUrl(e.Link);
+            LinkActivated?.Invoke(this, new BrowserLinkEventArgs(request, e.Attributes));
+        }
+
+        /// <summary>
+        /// The live document as the renderer serializes it — values the user has
+        /// committed are already in it. Empty when the page cannot be serialized,
+        /// which only costs the caller its fallback.
+        /// </summary>
+        private string GetPageHtml()
+        {
+            try
+            {
+                return _container.GetHtml();
+            }
+            catch (Exception)
+            {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Submits the form containing a hosted field, which is what pressing Enter in
+        /// a text control does.
+        /// </summary>
+        private void SubmitHostedField(string fieldId, string fieldName)
+        {
+            if (_suppressNavigation)
+                return;
+
+            PageRequest? request = _formState.TryBuildFieldSubmitRequest(GetPageHtml(), fieldId, fieldName, BaseUrl);
+            if (request is not null)
+                LinkActivated?.Invoke(this, new BrowserLinkEventArgs(request, new Dictionary<string, string>()));
         }
 
         private void DisposeRenderList()
@@ -1330,13 +1580,71 @@ internal sealed class BrowserApp : IDisposable
         }
     }
 
+    /// <summary>
+    /// Lays out the resubmission prompt: the message across the top, its two buttons
+    /// on a row at the bottom right. A dialog's default child arrangement stretches
+    /// every child over the whole surface, so this places them itself.
+    /// </summary>
+    private sealed class ResubmitPrompt : UiElement
+    {
+        private const double Margin = 16;
+        private const double ButtonHeight = 28;
+        private const double ButtonWidth = 84;
+        private const double ButtonGap = 8;
+
+        private readonly StandardLabel _message;
+        private readonly StandardButton _accept;
+        private readonly StandardButton _cancel;
+
+        public ResubmitPrompt(StandardLabel message, StandardButton accept, StandardButton cancel)
+        {
+            _message = message;
+            _accept = accept;
+            _cancel = cancel;
+            AddChild(_message);
+            AddChild(_cancel);
+            AddChild(_accept);
+        }
+
+        protected override BSize MeasureCore(BSize availableSize)
+        {
+            foreach (UiElement child in Children)
+                child.Measure(availableSize);
+
+            return availableSize;
+        }
+
+        protected override void ArrangeCore(BRect finalRect)
+        {
+            double buttonTop = Math.Max(finalRect.Top, finalRect.Bottom - Margin - ButtonHeight);
+            _message.Arrange(new BRect(
+                finalRect.Left + Margin,
+                finalRect.Top + Margin,
+                Math.Max(0, finalRect.Width - (2 * Margin)),
+                Math.Max(0, buttonTop - finalRect.Top - (2 * Margin))));
+
+            double acceptLeft = finalRect.Right - Margin - ButtonWidth;
+            _accept.Arrange(new BRect(acceptLeft, buttonTop, ButtonWidth, ButtonHeight));
+            _cancel.Arrange(new BRect(acceptLeft - ButtonGap - ButtonWidth, buttonTop, ButtonWidth, ButtonHeight));
+        }
+    }
+
     private sealed class BrowserLinkEventArgs : EventArgs
     {
         public BrowserLinkEventArgs(string link, IReadOnlyDictionary<string, string> attributes)
+            : this(PageRequest.ForUrl(link), attributes)
         {
-            Link = link;
+        }
+
+        public BrowserLinkEventArgs(PageRequest request, IReadOnlyDictionary<string, string> attributes)
+        {
+            Request = request;
+            Link = request.Url;
             Attributes = attributes;
         }
+
+        /// <summary>The navigation to perform — a plain URL, or a form submission with a body.</summary>
+        public PageRequest Request { get; }
 
         public string Link { get; }
 

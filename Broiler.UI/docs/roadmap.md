@@ -100,3 +100,31 @@ sequencing and exit gates are in
 - Validate independent package consumption and non-Windows builds.
 - Complete dependency, license, API, and attributable human review before a
   stable release.
+
+## Pointer events carry modifier state
+
+`Broiler.Input`'s `MouseButtonEvent`, `MouseMoveEvent` and `MouseWheelEvent` carry an
+`InputModifiers` value, and `UiInputEvent.FromMouse*` passes it through, so a control
+can tell a Ctrl-click or Shift-click from a plain one.
+
+`InputModifiers` lives in the root `Broiler.Input` assembly rather than on the
+keyboard package: every device abstraction depends on the root and none depend on
+each other (Broiler.Input ADR 0001), and modifier state belongs to a chord rather than
+to a keyboard. It mirrors `KeyboardModifierState` member for member so the UI layer
+can cast between them in one place; `Broiler.Input.Contract.Tests` pins the two
+layouts against each other.
+
+What populates it varies by platform, and consumers should not assume it is complete:
+
+- **Windows** fills Shift and Ctrl straight from the mouse message's `wParam`. Alt is
+  *not* there — Windows delivers it as `WM_SYSCOMMAND` — so an Alt-click reports no
+  modifier.
+- **Linux/evdev** cannot fill it in the mouse backend at all, because the mouse and
+  the keyboard are separate devices. The coordinator that merges both streams stamps
+  the last-seen keyboard modifiers instead (see `LinuxInputCoordinator`).
+- **Touch** contacts arrive as synthesized pointer presses and never carry modifiers,
+  which is why `StandardListView` toggles on an unmodified click rather than requiring
+  Ctrl to accumulate — the convention would put multi-selection out of touch's reach.
+
+Pen and touch events do not carry modifiers yet; adding them is the same shape of
+change as this one.
