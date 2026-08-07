@@ -61,6 +61,12 @@ PENDING_PATCHES=(
   # transfer widened past block-level boxes) to have any effect; that half is
   # already in-tree.
   "Broiler.HTML|patches/0116-html-svg-viewbox-intrinsic-sizing.patch"
+  # :valid/:invalid/:required/:optional were recognised-but-unmodelled, so they
+  # matched every element — <body> included, whose background propagates to the
+  # canvas. WPT-relevant (issue #1552 problem 21,
+  # html/semantics/forms/constraints/form-validation-validity-textarea-defaultValue)
+  # and it applies cleanly to the pinned Broiler.CSS pointer.
+  "Broiler.CSS|patches/0117-css-constraint-validation-pseudo-classes.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
