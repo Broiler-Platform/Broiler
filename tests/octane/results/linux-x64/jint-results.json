@@ -6,160 +6,160 @@
   "repetitions": 3,
   "noiseBandPercent": 7.5,
   "benchmarks": {
-    "Richards": 173,
-    "DeltaBlue": 167,
-    "Crypto": 138,
+    "Richards": 172,
+    "DeltaBlue": 165,
+    "Crypto": 139,
     "RayTrace": 411,
-    "EarleyBoyer": 367,
-    "RegExp": 187,
-    "Splay": 817,
-    "SplayLatency": 3357,
-    "NavierStokes": 257,
-    "PdfJS": 778,
-    "Mandreel": 86.9,
-    "MandreelLatency": 727,
-    "Gameboy": 853,
-    "CodeLoad": 4074,
-    "Box2D": 570,
-    "zlib": 4967,
-    "Typescript": 2261
+    "EarleyBoyer": 380,
+    "RegExp": 188,
+    "Splay": 845,
+    "SplayLatency": 3453,
+    "NavierStokes": 268,
+    "PdfJS": 826,
+    "Mandreel": 89.4,
+    "MandreelLatency": 744,
+    "Gameboy": 843,
+    "CodeLoad": 4400,
+    "Box2D": 601,
+    "zlib": 5035,
+    "Typescript": 2257
   },
   "stability": {
     "Richards": {
       "samples": [
-        170,
-        173,
-        175
+        172,
+        168,
+        173
       ],
       "bandPercent": 2.9
     },
     "DeltaBlue": {
       "samples": [
-        170,
-        167,
-        160
+        164,
+        166,
+        165
       ],
-      "bandPercent": 6
+      "bandPercent": 1.2
     },
     "Crypto": {
       "samples": [
         138,
-        138,
-        141
+        139,
+        139
       ],
-      "bandPercent": 2.2
+      "bandPercent": 0.7
     },
     "RayTrace": {
       "samples": [
         411,
-        407,
-        419
+        418,
+        411
       ],
-      "bandPercent": 2.9
+      "bandPercent": 1.7
     },
     "EarleyBoyer": {
       "samples": [
-        367,
-        367,
-        375
-      ],
-      "bandPercent": 2.2
-    },
-    "RegExp": {
-      "samples": [
-        189,
-        187,
-        185
+        383,
+        375,
+        380
       ],
       "bandPercent": 2.1
     },
+    "RegExp": {
+      "samples": [
+        188,
+        187,
+        188
+      ],
+      "bandPercent": 0.5
+    },
     "Splay": {
       "samples": [
-        813,
-        826,
-        817
+        845,
+        855,
+        840
       ],
-      "bandPercent": 1.6
+      "bandPercent": 1.8
     },
     "SplayLatency": {
       "samples": [
-        3385,
-        3354,
-        3357
+        3427,
+        3493,
+        3453
       ],
-      "bandPercent": 0.9
+      "bandPercent": 1.9
     },
     "NavierStokes": {
       "samples": [
-        250,
-        257,
-        259
+        268,
+        269,
+        265
       ],
-      "bandPercent": 3.5
+      "bandPercent": 1.5
     },
     "PdfJS": {
       "samples": [
-        837,
-        772,
-        778
+        845,
+        785,
+        826
       ],
-      "bandPercent": 8.4
+      "bandPercent": 7.3
     },
     "Mandreel": {
       "samples": [
-        86.2,
+        87.2,
         89.4,
-        86.9
+        91
       ],
-      "bandPercent": 3.7
+      "bandPercent": 4.3
     },
     "MandreelLatency": {
       "samples": [
-        719,
-        742,
-        727
+        748,
+        728,
+        744
       ],
-      "bandPercent": 3.2
+      "bandPercent": 2.7
     },
     "Gameboy": {
       "samples": [
-        857,
-        853,
-        850
+        850,
+        843,
+        843
       ],
       "bandPercent": 0.8
     },
     "CodeLoad": {
       "samples": [
-        4056,
-        4074,
-        4144
+        3883,
+        4400,
+        4465
       ],
-      "bandPercent": 2.2
+      "bandPercent": 13.2
     },
     "Box2D": {
       "samples": [
-        572,
-        570,
-        569
+        602,
+        592,
+        601
       ],
-      "bandPercent": 0.5
+      "bandPercent": 1.7
     },
     "zlib": {
       "samples": [
-        4823,
-        5014,
-        4967
+        5215,
+        5026,
+        5035
       ],
       "bandPercent": 3.8
     },
     "Typescript": {
       "samples": [
-        2243,
-        2285,
-        2261
+        2282,
+        2257,
+        2256
       ],
-      "bandPercent": 1.9
+      "bandPercent": 1.2
     }
   },
   "suiteStatus": {
@@ -167,7 +167,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 2746,
+      "durationMs": 2750,
       "filesLoaded": [
         "base.js",
         "richards.js",
@@ -187,7 +187,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 3801,
+      "durationMs": 3788,
       "filesLoaded": [
         "base.js",
         "deltablue.js",
@@ -207,7 +207,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 31534,
+      "durationMs": 31802,
       "filesLoaded": [
         "base.js",
         "crypto.js",
@@ -227,7 +227,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 8215,
+      "durationMs": 8339,
       "filesLoaded": [
         "base.js",
         "raytrace.js",
@@ -247,7 +247,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 28904,
+      "durationMs": 29131,
       "filesLoaded": [
         "base.js",
         "earley-boyer.js",
@@ -267,7 +267,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 12574,
+      "durationMs": 12895,
       "filesLoaded": [
         "base.js",
         "regexp.js",
@@ -287,7 +287,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 4112,
+      "durationMs": 4089,
       "filesLoaded": [
         "base.js",
         "splay.js",
@@ -307,7 +307,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 11128,
+      "durationMs": 10970,
       "filesLoaded": [
         "base.js",
         "navier-stokes.js",
@@ -327,7 +327,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 6818,
+      "durationMs": 7748,
       "filesLoaded": [
         "base.js",
         "pdfjs.js",
@@ -347,7 +347,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 93345,
+      "durationMs": 89140,
       "filesLoaded": [
         "base.js",
         "mandreel.js",
@@ -367,7 +367,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 13447,
+      "durationMs": 13535,
       "filesLoaded": [
         "base.js",
         "gbemu-part1.js",
@@ -388,7 +388,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 2800,
+      "durationMs": 2761,
       "filesLoaded": [
         "base.js",
         "code-load.js",
@@ -408,7 +408,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 9442,
+      "durationMs": 8977,
       "filesLoaded": [
         "base.js",
         "box2d.js",
@@ -428,7 +428,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 31518,
+      "durationMs": 31087,
       "filesLoaded": [
         "base.js",
         "zlib.js",
@@ -449,7 +449,7 @@
       "status": "ok",
       "exitCode": 0,
       "signal": null,
-      "durationMs": 57416,
+      "durationMs": 57548,
       "filesLoaded": [
         "base.js",
         "typescript.js",
@@ -468,6 +468,7 @@
       ]
     }
   },
-  "geomean": 577,
-  "generatedAt": "2026-08-07T07:41:16.371Z"
+  "geomean": 590,
+  "generatedAt": "2026-08-07T12:54:23.500Z",
+  "platform": "linux-x64"
 }

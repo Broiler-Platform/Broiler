@@ -6,166 +6,166 @@
   "repetitions": 3,
   "noiseBandPercent": 7.5,
   "benchmarks": {
-    "Richards": 37710,
-    "DeltaBlue": 105994,
-    "Crypto": 41963,
-    "RayTrace": 117214,
-    "EarleyBoyer": 87285,
-    "RegExp": 10223,
-    "Splay": 45430,
-    "SplayLatency": 76352,
-    "NavierStokes": 38436,
-    "PdfJS": 60750,
+    "Richards": 37438,
+    "DeltaBlue": 107389,
+    "Crypto": 42249,
+    "RayTrace": 115364,
+    "EarleyBoyer": 87379,
+    "RegExp": 10354,
+    "Splay": 46417,
+    "SplayLatency": 75158,
+    "NavierStokes": 38545,
+    "PdfJS": 62276,
     "Mandreel": 46988,
-    "MandreelLatency": 67368,
-    "Gameboy": 99597,
-    "CodeLoad": 28215,
-    "Box2D": 102475,
-    "zlib": 91233,
-    "Typescript": 99226
+    "MandreelLatency": 66469,
+    "Gameboy": 95267,
+    "CodeLoad": 28203,
+    "Box2D": 102136,
+    "zlib": 91397,
+    "Typescript": 91731
   },
   "stability": {
     "Richards": {
       "samples": [
-        37371,
-        38052,
-        37710
+        36753,
+        38048,
+        37438
       ],
-      "bandPercent": 1.8
+      "bandPercent": 3.5
     },
     "DeltaBlue": {
       "samples": [
-        104896,
-        107362,
-        105994
+        107389,
+        109260,
+        104149
       ],
-      "bandPercent": 2.3
+      "bandPercent": 4.8
     },
     "Crypto": {
       "samples": [
-        41813,
-        41963,
-        42412
+        41922,
+        42277,
+        42249
       ],
-      "bandPercent": 1.4
+      "bandPercent": 0.8
     },
     "RayTrace": {
       "samples": [
-        117214,
-        117510,
-        114920
+        115364,
+        115808,
+        112404
       ],
-      "bandPercent": 2.2
+      "bandPercent": 3
     },
     "EarleyBoyer": {
       "samples": [
-        87699,
-        87285,
-        83184
+        86736,
+        89071,
+        87379
       ],
-      "bandPercent": 5.2
+      "bandPercent": 2.7
     },
     "RegExp": {
       "samples": [
-        10323,
-        10223,
-        10193
+        10354,
+        10354,
+        10344
       ],
-      "bandPercent": 1.3
+      "bandPercent": 0.1
     },
     "Splay": {
       "samples": [
-        45839,
-        44119,
-        45430
+        44942,
+        46548,
+        46417
       ],
-      "bandPercent": 3.8
+      "bandPercent": 3.5
     },
     "SplayLatency": {
       "samples": [
-        76352,
-        75719,
-        76845
+        73229,
+        75971,
+        75158
       ],
-      "bandPercent": 1.5
+      "bandPercent": 3.6
     },
     "NavierStokes": {
       "samples": [
-        38507,
-        38436,
-        38397
+        38584,
+        38545,
+        38469
       ],
       "bandPercent": 0.3
     },
     "PdfJS": {
       "samples": [
-        60750,
-        60507,
-        62276
+        62276,
+        62400,
+        62153
       ],
-      "bandPercent": 2.9
+      "bandPercent": 0.4
     },
     "Mandreel": {
       "samples": [
-        47483,
-        45935,
-        46988
+        47668,
+        46988,
+        46755
       ],
-      "bandPercent": 3.3
+      "bandPercent": 1.9
     },
     "MandreelLatency": {
       "samples": [
-        68290,
-        66469,
-        67368
+        67368,
+        65595,
+        66469
       ],
       "bandPercent": 2.7
     },
     "Gameboy": {
       "samples": [
-        101109,
         98809,
-        99597
+        95267,
+        93980
       ],
-      "bandPercent": 2.3
+      "bandPercent": 5.1
     },
     "CodeLoad": {
       "samples": [
-        28560,
-        28173,
-        28215
+        27962,
+        28225,
+        28203
       ],
-      "bandPercent": 1.4
+      "bandPercent": 0.9
     },
     "Box2D": {
       "samples": [
-        102475,
-        101933,
-        102680
+        102136,
+        98877,
+        103223
       ],
-      "bandPercent": 0.7
+      "bandPercent": 4.3
     },
     "zlib": {
       "samples": [
-        91233,
-        90799,
+        91397,
+        91397,
         91233
       ],
-      "bandPercent": 0.5
+      "bandPercent": 0.2
     },
     "Typescript": {
       "samples": [
-        99226,
-        94659,
-        100083
+        89919,
+        91731,
+        93342
       ],
-      "bandPercent": 5.5
+      "bandPercent": 3.7
     }
   },
   "suiteStatus": {
     "Richards": {
       "status": "ok",
-      "durationMs": 2107,
+      "durationMs": 2116,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Richards.rep3.log",
       "repetitions": 3,
@@ -177,7 +177,7 @@
     },
     "DeltaBlue": {
       "status": "ok",
-      "durationMs": 2111,
+      "durationMs": 2113,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/DeltaBlue.rep3.log",
       "repetitions": 3,
@@ -189,7 +189,7 @@
     },
     "Crypto": {
       "status": "ok",
-      "durationMs": 4189,
+      "durationMs": 4188,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Crypto.rep3.log",
       "repetitions": 3,
@@ -201,7 +201,7 @@
     },
     "RayTrace": {
       "status": "ok",
-      "durationMs": 2106,
+      "durationMs": 2108,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/RayTrace.rep3.log",
       "repetitions": 3,
@@ -213,7 +213,7 @@
     },
     "EarleyBoyer": {
       "status": "ok",
-      "durationMs": 4200,
+      "durationMs": 4202,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/EarleyBoyer.rep3.log",
       "repetitions": 3,
@@ -225,7 +225,7 @@
     },
     "RegExp": {
       "status": "ok",
-      "durationMs": 2149,
+      "durationMs": 2157,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/RegExp.rep3.log",
       "repetitions": 3,
@@ -237,7 +237,7 @@
     },
     "Splay": {
       "status": "ok",
-      "durationMs": 2162,
+      "durationMs": 2165,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Splay.rep3.log",
       "repetitions": 3,
@@ -249,7 +249,7 @@
     },
     "NavierStokes": {
       "status": "ok",
-      "durationMs": 2111,
+      "durationMs": 2116,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/NavierStokes.rep3.log",
       "repetitions": 3,
@@ -261,7 +261,7 @@
     },
     "PdfJS": {
       "status": "ok",
-      "durationMs": 1422,
+      "durationMs": 1432,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/PdfJS.rep3.log",
       "repetitions": 3,
@@ -273,7 +273,7 @@
     },
     "Mandreel": {
       "status": "ok",
-      "durationMs": 1722,
+      "durationMs": 1733,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Mandreel.rep3.log",
       "repetitions": 3,
@@ -285,7 +285,7 @@
     },
     "Gameboy": {
       "status": "ok",
-      "durationMs": 1151,
+      "durationMs": 1155,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Gameboy.rep3.log",
       "repetitions": 3,
@@ -309,7 +309,7 @@
     },
     "Box2D": {
       "status": "ok",
-      "durationMs": 1125,
+      "durationMs": 1128,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Box2D.rep3.log",
       "repetitions": 3,
@@ -321,7 +321,7 @@
     },
     "zlib": {
       "status": "ok",
-      "durationMs": 1795,
+      "durationMs": 1800,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/zlib.rep3.log",
       "repetitions": 3,
@@ -333,7 +333,7 @@
     },
     "Typescript": {
       "status": "ok",
-      "durationMs": 1559,
+      "durationMs": 1650,
       "timeoutSec": 1800,
       "log": "tests/octane/logs/chromium/Typescript.rep3.log",
       "repetitions": 3,
@@ -344,6 +344,7 @@
       ]
     }
   },
-  "geomean": 58718,
-  "generatedAt": "2026-08-07T07:41:16.371Z"
+  "geomean": 58393,
+  "generatedAt": "2026-08-07T12:54:23.500Z",
+  "platform": "linux-x64"
 }
