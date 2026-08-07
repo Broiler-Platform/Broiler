@@ -249,6 +249,14 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
             new DomFunction((in a) => CreateNodeIterator(in a), "createNodeIterator", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // startViewTransition() — CSS View Transitions, scoped to this nested browsing context.
+        // Absent here, a page driving a transition inside its <iframe> through contentDocument hit a
+        // TypeError that aborted the rest of its script, so the main frame's own transition never ran
+        // either (WPT css-view-transitions/iframe-and-main-frame-transition-*).
+        doc.FastAddValue((KeyString)"startViewTransition",
+            new DomFunction((in a) => _host.StartViewTransition(docRoot, in a), "startViewTransition", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // createRange()
         doc.FastAddValue((KeyString)"createRange",
             new DomFunction((in _) => _host.BuildRange(docRoot), "createRange", 0),

@@ -802,6 +802,12 @@ public sealed partial class DomBridge
         if (subDocumentRoot == null || subDocumentRoot.ChildNodes.Count == 0)
             return null;
 
+        // A view transition running inside this frame whose own rules leave the OLD root snapshot
+        // showing renders the document as it stood before the update callback, not as it stands now.
+        // See DomBridge.ViewTransition.SubDocument.cs.
+        if (TryGetHeldSubDocumentViewTransitionMarkup(subDocumentRoot) is { } heldMarkup)
+            return heldMarkup;
+
         return string.Concat(ChildElements(subDocumentRoot).Select(SerializeElementToHtml));
     }
 
