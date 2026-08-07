@@ -26,6 +26,17 @@ and unchallenged by this document. To *claim* a performance result:
 Release matrix: **win-x64, linux-x64, linux-arm64.** SIMD claims additionally require
 x64 with the feature enabled and disabled, and an AdvSimd-capable Arm64 host.
 
+For the Octane half of that matrix the
+[Octane Benchmarks workflow](../../.github/workflows/octane-benchmarks.yml) takes a
+`platform` input — one RID, or `all` to fan out to a job per RID on `ubuntu-latest`,
+`windows-latest` and `ubuntu-24.04-arm`. Each writes and commits its own
+`tests/octane/results/<platform>/`, because a score off one machine says nothing
+about another; a locally driven run picks the same directory up from
+`--platform`, defaulting to the host's own RID. That is the *harness* covering the
+matrix, not the matrix being satisfied — §3.1's other conditions (an idle physical
+machine above all) still decide whether a run may be claimed, and a GitHub-hosted
+runner is not one.
+
 > **Standing caveat on every number in §4.** The engine campaign's figures come from
 > an ad-hoc in-process harness on a shared 4-core container with 10–15% run-to-run
 > variance, reporting the slower of two runs. Allocation counts are deterministic and
@@ -68,7 +79,7 @@ thirty minutes to look like work.
 experimental — a suite may score, throw, hang, or abort the process — and isolation
 means one bad suite never discards the other sixteen. Failures are classified
 `ok` / `error` / `timeout` / `crash` / `flaky`, with full evidence in
-[`tests/octane/results/diagnostics.md`](../../tests/octane/results/diagnostics.md).
+[`tests/octane/results/<platform>/diagnostics.md`](../../tests/octane/results/linux-x64/diagnostics.md).
 
 Harness parsing is covered by a test that needs no engine, checkout, or network:
 

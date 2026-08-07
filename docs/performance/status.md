@@ -35,7 +35,7 @@ wall-clock figure is a median of interleaved process-granularity pairs against a
 | 2-9 | A shape-tracked property cost ~150 B of radix trie to store an 8-byte reference. The trie is no longer written at all while an object is shape-tracked — **a three-field object is 0.36x and an eight-field one 0.15x**, against **+8 B on every object** for the attribute array. Over an Octane run **six in seven property maps are never built**: 16.2 M → 2.5 M, live map bytes 0.15x. All 22 cache rows byte-identical. **Losing side, measured against a built control: ~20% on compile-and-first-run**, corroborated by Octane CodeLoad at 0.844 |
 
 **Owed.** **0-6 is done in both halves.** The CI Octane run has happened, has been refreshed
-three times, and the run committed **2026-08-07** — what `tests/octane/results/` now holds — is
+three times, and the run committed **2026-08-07** — what `tests/octane/results/linux-x64/` now holds — is
 the first that reports its own noise. What it settles and what it does not:
 
 - **Coverage: 17 of 17 scores, all 15 suites `ok`, for all three engines** — Broiler, Jint and

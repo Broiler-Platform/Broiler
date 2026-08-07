@@ -368,7 +368,7 @@ results. Also: `--keep-scripts` (keep the combined script for passing suites),
 `--broiler-env BROILER_GENERATE_IL_LOGS=1`.
 
 **Start a failure diagnosis at
-[`tests/octane/results/diagnostics.md`](../../tests/octane/results/diagnostics.md)**, not
+[`tests/octane/results/linux-x64/diagnostics.md`](../../tests/octane/results/linux-x64/diagnostics.md)**, not
 at the logs. For every suite that did not complete it gives the failing exception type,
 the benchmark / phase / iteration it died in, the .NET stack, the JavaScript stack, and
 a command to re-run that one suite. Three things make that possible: Broiler's managed

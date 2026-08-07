@@ -38,9 +38,23 @@ which engine subsystem it loads, and where Broiler's time goes on it, see
 ./scripts/run-octane-benchmarks.sh --octane-dir /path/to/octane --engines broiler,jint
 ```
 
+### Results are per platform
+
+A run writes to `results/<platform>/`, where `<platform>` is the .NET runtime
+identifier the harness detects from the host — `linux-x64`, `win-x64`,
+`linux-arm64` — or whatever `--platform` says. Octane scores do not carry across
+machines, and the release matrix that
+[`docs/performance/protocol.md`](../../docs/performance/protocol.md) §3.1
+requires before a result may be *claimed* is all three of those RIDs, so each
+keeps its own directory rather than overwriting the last one measured.
+
 In CI the [Octane Benchmarks workflow](../../.github/workflows/octane-benchmarks.yml)
 (`workflow_dispatch`) runs all three engines and commits the refreshed results.
-It also uploads the per-suite logs as an `octane-logs` artifact.
+Its `platform` input picks the RID to measure on — one of the three, or `all`
+for the full matrix, which fans out to one job per RID on its own runner
+(`ubuntu-latest`, `windows-latest`, `ubuntu-24.04-arm`). Results and per-suite
+logs are uploaded as `octane-results-<platform>` and `octane-logs-<platform>`
+artifacts, and each job commits only its own results directory.
 
 Benchmarking takes hours, so the branch has usually moved by the time there is
 anything to commit. The commit step goes through
@@ -51,10 +65,12 @@ it. Results are generated wholesale, so if two runs touch the same file the
 later measurement wins; nothing else on the branch is disturbed.
 
 A single-engine run still refreshes the whole comparison: any per-engine result
-already in `results/` is folded back in, so `--engines jint` updates the Jint
-column against the last committed Chromium and Broiler ones. That is only honest
-when the runs come from the same machine — which is why the published numbers
-come from the workflow rather than from a workstation.
+already in `results/<platform>/` is folded back in, so `--engines jint` updates
+the Jint column against the last committed Chromium and Broiler ones. That is
+only honest when the runs come from the same machine — which is why the
+per-platform directory is the unit that gets folded, why each result file
+records the platform it was measured on, and why the published numbers come
+from the workflow rather than from a workstation.
 
 ### Measuring, rather than just running
 
@@ -128,7 +144,7 @@ completed, matching Octane's own methodology.
 A suite that reports `error` or `crash` is a Broiler bug report, so the harness
 keeps the evidence rather than a one-line summary of it.
 
-**Start with [`results/diagnostics.md`](results/diagnostics.md).** For every
+**Start with [`results/<platform>/diagnostics.md`](results/linux-x64/diagnostics.md).** For every
 suite that did not complete it gives the failing exception type, the benchmark /
 phase / iteration it died in, the engine (.NET) stack, the JavaScript stack, and
 a command to re-run that one suite. It carries a section per shell engine:
@@ -203,12 +219,13 @@ tests/octane/
 │   ├── chromium/<suite>.log
 │   └── partial/            # output of a --only run
 └── results/                # committed
-    ├── chromium-results.json
-    ├── broiler-results.json
-    ├── jint-results.json
-    ├── comparison.json
-    ├── comparison.md       # human-readable table
-    └── diagnostics.md      # why each failing suite failed, per engine
+    └── <platform>/         # one per RID: linux-x64, win-x64, linux-arm64
+        ├── chromium-results.json
+        ├── broiler-results.json
+        ├── jint-results.json
+        ├── comparison.json
+        ├── comparison.md       # human-readable table
+        └── diagnostics.md      # why each failing suite failed, per engine
 ```
 
 The Jint shell is built by `run-octane-benchmarks.sh` alongside the BroilerJS

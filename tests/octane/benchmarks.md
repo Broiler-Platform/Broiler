@@ -6,7 +6,7 @@ actually does, which engine subsystem it puts under load, and — using the
 committed results in [`results/`](results/) — where Broiler's time goes.
 
 Numbers quoted for Broiler are from
-[`results/comparison.md`](results/comparison.md) (generated 2026-08-05,
+[`results/linux-x64/comparison.md`](results/linux-x64/comparison.md) (generated 2026-08-05,
 Chromium 149.0.7827.55 vs the `BroilerJS --script-host` shell).
 
 > **The results are current, and the five suites that used to fail all score.**
@@ -656,8 +656,8 @@ total win and by far the largest change.
 
 ---
 
-_Sources: [`results/comparison.md`](results/comparison.md),
-[`results/diagnostics.md`](results/diagnostics.md),
+_Sources: [`results/linux-x64/comparison.md`](results/linux-x64/comparison.md),
+[`results/linux-x64/diagnostics.md`](results/linux-x64/diagnostics.md),
 [`Broiler.JS/docs/performance-roadmap.md`](../../Broiler.JS/docs/performance-roadmap.md),
 [`Broiler.JS/docs/performance.md`](../../Broiler.JS/docs/performance.md),
 [`patches/README.md`](../../patches/README.md). Benchmark provenance from
