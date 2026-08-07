@@ -40,6 +40,15 @@ public class Program
     /// </summary>
     private const int DefaultRunTestMemoryLimitMegabytes = 1024;
     private const string RunTestMemoryLimitEnvironmentVariable = "BROILER_WPT_MEMORY_LIMIT_MB";
+
+    /// <summary>
+    /// Share of pixels a render must have in common with the reference for the test to
+    /// pass, in percent. The default 99 means a render passes when it is at least 99%
+    /// identical to the Chromium reference (at most 1% of the pixels differ).
+    /// </summary>
+    private const double DefaultPassThresholdPercent = WptTestRunner.DefaultPassThresholdPercent;
+    private const string PassThresholdEnvironmentVariable = "BROILER_WPT_PASS_THRESHOLD";
+
     private const int ProgressCheckpointInterval = 25;
     private const int TopBucketLimit = 5;
     private const int MissingContentDominantBucketMinimumFailures = 5;
@@ -83,6 +92,7 @@ public class Program
         RerunSelectionKind rerunSelectionKind = RerunSelectionKind.Failures;
         double? timeoutSeconds = null;
         int? memoryLimitMegabytes = null;
+        double? passThresholdPercent = null;
         int shardCount = 1;
         int shardIndex = WptTestRunner.AllShards;
         bool nonJavaScriptOnly = false;
@@ -153,6 +163,15 @@ public class Program
 
                     memoryLimitMegabytes = parsedMemoryLimitMegabytes;
                     break;
+                case "--pass-threshold" when i + 1 < args.Length:
+                    if (!TryParsePassThresholdPercent(args[++i], out var parsedPassThresholdPercent))
+                    {
+                        Console.Error.WriteLine("Error: '--pass-threshold' must be a percentage between 0 and 100.");
+                        return 1;
+                    }
+
+                    passThresholdPercent = parsedPassThresholdPercent;
+                    break;
                 case "--shard-count" when i + 1 < args.Length:
                     if (!int.TryParse(args[++i], NumberStyles.Integer, CultureInfo.InvariantCulture, out shardCount) || shardCount < 1)
                     {
@@ -190,6 +209,7 @@ public class Program
                 case "--rerun-kind":
                 case "--timeout":
                 case "--memory-limit-mb":
+                case "--pass-threshold":
                 case "--shard-count":
                 case "--shard-index":
                     Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
@@ -238,8 +258,16 @@ public class Program
         // Default reference directory to <wptPath>/references if not specified.
         referenceDir ??= Path.Combine(wptPath, "references");
 
+        // Resolved before the worker branch: a worker process does the pixel comparison
+        // itself, so it needs the same threshold the parent run was asked for.
+        if (!TryResolvePassThreshold(passThresholdPercent, out var runPassThresholdPercent, out var passThresholdError))
+        {
+            Console.Error.WriteLine(passThresholdError);
+            return 1;
+        }
+
         if (workerMode)
-            return RunWorkerMode(wptPath, referenceDir, failureImagesDir, verifyReference);
+            return RunWorkerMode(wptPath, referenceDir, failureImagesDir, verifyReference, runPassThresholdPercent);
 
         if (!TryResolveRunTestTimeout(timeoutSeconds, out var runTestTimeout, out var timeoutError))
         {
@@ -262,6 +290,8 @@ public class Program
         Console.WriteLine($"WPT directory : {Path.GetFullPath(wptPath)}");
         Console.WriteLine($"Reference dir : {Path.GetFullPath(referenceDir)}");
         Console.WriteLine($"Timeout       : {FormatSeconds(runTestTimeout)} second(s)");
+        Console.WriteLine($"Pass threshold: {FormatPassThreshold(runPassThresholdPercent)}% pixel match " +
+                          $"(at most {FormatPassThreshold(100 - runPassThresholdPercent)}% of the pixels may differ)");
         Console.WriteLine($"Mode          : {(nonJavaScriptOnly ? "non-JavaScript visual tests" : "all discovered tests")}");
         var useWorkerIsolation = !noWorkerIsolation && RunTestExecutorOverride.Value is null;
         Console.WriteLine(
@@ -284,7 +314,10 @@ public class Program
         }
         Console.WriteLine();
 
-        var runner = new WptTestRunner(failureImageDir: failureImagesDir, verifyReferenceHtml: verifyReference);
+        var runner = new WptTestRunner(
+            failureImageDir: failureImagesDir,
+            verifyReferenceHtml: verifyReference,
+            passThresholdPercent: runPassThresholdPercent);
 
         if (!string.IsNullOrWhiteSpace(failureImagesDir))
             Console.WriteLine($"Failure images: {Path.GetFullPath(failureImagesDir)}");
@@ -352,7 +385,13 @@ public class Program
             "SIGINT",
             terminationDiagnostics.Write);
         using var workerClient = useWorkerIsolation
-            ? new WptWorkerClient(wptPath, referenceDir, failureImagesDir, verifyReference, runTestMemoryLimitBytes)
+            ? new WptWorkerClient(
+                wptPath,
+                referenceDir,
+                failureImagesDir,
+                verifyReference,
+                runTestMemoryLimitBytes,
+                runPassThresholdPercent)
             : null;
         int completed = 0, runningPassed = 0, runningFailed = 0, runningSkipped = 0;
 
@@ -563,14 +602,16 @@ public class Program
         string wptPath,
         string referenceDir,
         string? failureImagesDir,
-        bool verifyReference)
+        bool verifyReference,
+        double passThresholdPercent)
     {
         var protocolOut = Console.Out;
         Console.SetOut(Console.Error);
 
         var runner = new WptTestRunner(
             failureImageDir: failureImagesDir,
-            verifyReferenceHtml: verifyReference);
+            verifyReferenceHtml: verifyReference,
+            passThresholdPercent: passThresholdPercent);
 
         protocolOut.WriteLine(JsonSerializer.Serialize(new WptWorkerResponse { Ready = true }, WorkerJsonOptions));
         protocolOut.Flush();
@@ -720,6 +761,7 @@ public class Program
         private readonly string? _failureImagesDir;
         private readonly bool _verifyReference;
         private readonly long _memoryLimitBytes;
+        private readonly double _passThresholdPercent;
         private Process? _process;
         private Task<string?>? _pendingResponse;
 
@@ -728,13 +770,15 @@ public class Program
             string referenceDir,
             string? failureImagesDir,
             bool verifyReference,
-            long memoryLimitBytes = 0)
+            long memoryLimitBytes = 0,
+            double passThresholdPercent = DefaultPassThresholdPercent)
         {
             _wptPath = wptPath;
             _referenceDir = referenceDir;
             _failureImagesDir = failureImagesDir;
             _verifyReference = verifyReference;
             _memoryLimitBytes = memoryLimitBytes;
+            _passThresholdPercent = passThresholdPercent;
         }
 
         internal int? CurrentProcessId
@@ -919,12 +963,16 @@ public class Program
 
         private Process StartWorkerProcess()
         {
+            // The worker runs the comparison, so the resolved threshold is passed
+            // explicitly rather than left to the worker's own default resolution.
             var startInfo = CreateCurrentProgramStartInfo([
                 "--wpt-worker",
                 "--wpt-dir",
                 _wptPath,
                 "--reference-dir",
                 _referenceDir,
+                "--pass-threshold",
+                _passThresholdPercent.ToString("R", CultureInfo.InvariantCulture),
             ]);
 
             if (!string.IsNullOrWhiteSpace(_failureImagesDir))
@@ -1105,6 +1153,51 @@ public class Program
         return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out memoryLimitMegabytes) &&
                memoryLimitMegabytes >= 0;
     }
+
+    /// <summary>
+    /// Resolves the pixel pass threshold, in percent, from (in order) the command line,
+    /// the <c>BROILER_WPT_PASS_THRESHOLD</c> environment variable, and the 99% default.
+    /// A test passes when its render is at least this percent identical to the reference.
+    /// </summary>
+    internal static bool TryResolvePassThreshold(
+        double? cliPassThresholdPercent,
+        out double passThresholdPercent,
+        out string? error)
+    {
+        passThresholdPercent = DefaultPassThresholdPercent;
+        error = null;
+
+        if (cliPassThresholdPercent.HasValue)
+        {
+            passThresholdPercent = cliPassThresholdPercent.Value;
+            return true;
+        }
+
+        var envPassThreshold = Environment.GetEnvironmentVariable(PassThresholdEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(envPassThreshold))
+        {
+            if (!TryParsePassThresholdPercent(envPassThreshold, out var parsedEnvPassThresholdPercent))
+            {
+                error = $"Error: '{PassThresholdEnvironmentVariable}' must be a percentage between 0 and 100.";
+                return false;
+            }
+
+            passThresholdPercent = parsedEnvPassThresholdPercent;
+        }
+
+        return true;
+    }
+
+    private static bool TryParsePassThresholdPercent(string value, out double passThresholdPercent)
+    {
+        return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out passThresholdPercent) &&
+               passThresholdPercent >= 0 &&
+               passThresholdPercent <= 100;
+    }
+
+    /// <summary>Formats a percentage without trailing zeros (99, 99.5, 99.95).</summary>
+    internal static string FormatPassThreshold(double percent)
+        => percent.ToString("0.####", CultureInfo.InvariantCulture);
 
     private static bool TryParseRerunSelectionKind(string value, out RerunSelectionKind selectionKind)
     {
@@ -2492,6 +2585,10 @@ public class Program
         Console.WriteLine($"                             reported as {FailureCategory.MemoryLimitExceeded}. A worker whose own resident");
         Console.WriteLine("                             set reaches the cap is recycled between tests. 0 disables");
         Console.WriteLine($"                             (default: {DefaultRunTestMemoryLimitMegabytes}, env: {RunTestMemoryLimitEnvironmentVariable})");
+        Console.WriteLine("  --pass-threshold <PCT>     Percentage of pixels that must match the reference for a test");
+        Console.WriteLine("                             to pass; 99 means the render passes when it is at least 99%");
+        Console.WriteLine("                             identical to the Chromium reference");
+        Console.WriteLine($"                             (default: {FormatPassThreshold(DefaultPassThresholdPercent)}, env: {PassThresholdEnvironmentVariable})");
         Console.WriteLine("  --no-worker-isolation      Run tests in-process instead of the default worker process");
         Console.WriteLine("                             isolation. Useful for debugger sessions only.");
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");

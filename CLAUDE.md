@@ -122,7 +122,9 @@ something to attempt from inside the container.
     [Android development environment](docs/architecture/android.md#development-environment).
 - WPT runner: `dotnet run --project src/Broiler.Wpt -- --wpt-dir tests/wpt
   --reference-dir tests/wpt/references [--subset <path>] [--failure-images <dir>]`.
-  Pixel pass threshold is 99% match (≤1% differing pixels).
+  Pixel pass threshold defaults to 99% match (≤1% differing pixels) and is
+  configurable: `--pass-threshold <percent>`, `BROILER_WPT_PASS_THRESHOLD`, or the
+  `pass_threshold` input of the WPT Tests workflow.
 - WPT per-test limits: 30s timeout (`--timeout`, `BROILER_WPT_TIMEOUT_SECONDS`)
   and a 1024 MiB RAM cap (`--memory-limit-mb`, `BROILER_WPT_MEMORY_LIMIT_MB`,
   0 disables). The cap is on the *growth* of the rendering process's resident
