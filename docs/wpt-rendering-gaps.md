@@ -1320,12 +1320,16 @@ owned by a section above). Re-reported problems point at that section.
 19 927 failures, no incomplete shards. Cross-referencing the list against the
 three runs above: **seventeen of the thirty are tests those sections already
 name, or new members of families they own** (the nested view transitions, the
-`grid-lanes` subgrid pair, `auto-name`, the `massive-element-*` four); **seven
-more are new and were not investigated**; and the remaining **six — problems
-21–26 — are the `css-contain` background cluster this session closed**, the
-largest single-cause group on the list and new to it. So unlike the sections
-above, the at-a-glance table below carries a local number only for those six.
-Everything else points at the section that already owns it rather than being
+`grid-lanes` subgrid pair, `auto-name`, the `massive-element-*` four). The other
+thirteen are new to the list, and this session worked the tail of them —
+**problems 21–30**. Three of those thirteen (17, 18, 20) were left untouched.
+
+What the ten came to: **problems 21–26 fixed** (the `css-contain` background
+cluster, the largest single-cause group on the list), **problem 27 fixed**,
+**problems 28 and 29 won't fix** — their reference is a render Chromium itself
+fails the reftest with — and **problem 30 diagnosed but not fixed**. So the
+at-a-glance table below carries a local number only where one was measured;
+everything else points at the section that already owns it rather than being
 re-measured.
 
 ### Containment other than `paint` never stopped background propagation — problems 21–26, **fixed**
@@ -1396,11 +1400,118 @@ re-measured.
   elements, both `content-visibility` values, the `none`/absent controls, the
   root's own background, and `display: none` on body.
 
+### A colour-only SVG filter chain now recolours the shape — problem 27, **fixed**
+
+- **Test:** `css/filter-effects/fecolormatrix-negative`, 7.7% on CI and
+  **reproducing here at the same 7.7%**. Its reference is a cyan rectangle, which is also what the test's own
+  assertion says to expect; Broiler painted the unfiltered `#ffaa00` orange.
+- **Owner:** `Broiler.Layout` (`IR/SvgColorFilter.cs`, `IR/SvgRenderer.cs`,
+  `IR/SvgFilterTable.cs`) — **main repo, so it is on CI immediately**, no patch.
+- **What the filter does, in closed form.** `feColorMatrix` with the negative
+  entries inverts each channel — `#ffaa00` → (0, 0.333, 1) — and the arithmetic
+  `feComposite` with `k2="255"` multiplies the premultiplied channels by 255, so
+  every non-zero one saturates: (0, 1, 1), cyan. There is no raster pipeline
+  needed to know that, because **a shape filled with one solid colour has a
+  source graphic that is that colour inside it and transparent black outside**,
+  and a chain of per-pixel colour operations therefore produces exactly two
+  colours. That is the same kind of modelling the engine already applies to an
+  `feFlood`-only filter (`SvgFilterTable.FloodFilter`), extended to a chain.
+- **Why the region does not have to be modelled too** — the trap that makes this
+  cheap rather than a filter engine. Every step modelled here maps zero alpha to
+  zero alpha, so the *outside* colour stays transparent and the filter region
+  never becomes visible. `AMatrixThatZeroesAlpha_MakesTheShapeTransparent` pins
+  that property rather than leaving it as a comment.
+- **Deliberately narrow, and every bail-out renders unfiltered.** Only
+  `feColorMatrix` (`type="matrix"`, its default) and `feComposite`
+  (`operator="arithmetic"`); only a straight chain, where each primitive consumes
+  the previous one's `result`; only when the filter declares
+  `color-interpolation-filters="sRGB"`, because the default is linearRGB and the
+  conversion is not modelled — a filter that does not say sRGB is left alone
+  rather than computed in the wrong space. Applied only to an **unstroked**
+  `<rect>`: a stroked shape is not one colour, so recolouring its fill would not
+  describe what the filter does to it.
+- **A pre-existing over-match found while testing this, and left alone.**
+  `CollectFloodFilters` takes the first `feFlood` in a filter body whatever else
+  is in the chain, so a filter that is `feColorMatrix` + `feFlood` is treated as
+  flood-only. This change neither introduces nor fixes it; the test file records
+  it and declines to pin it.
+- **Measured.** `css/filter-effects` goes **180 → 181 passing** over 388 tests,
+  the test itself **7.7% → 99.6%**, and the per-test diff across the whole subset
+  is two lines: that test, and `fecolormatrix-display-p3` improving 97.2% → 98.0%
+  without crossing the threshold (its residual is the Display-P3 colour space, a
+  separate gap). **Nothing else moved in either direction.** 14 cases in
+  `SvgColorFilterTests` cover the WPT chain, an identity matrix, the alpha rule,
+  and six bail-outs.
+
+### Chromium fails two of these reftests against its own reference — problems 28 and 29, **won't fix**
+
+- **Tests:** `css/filter-effects/svg-filter-filter-units-user-space` and
+  `svg-filter-primitive-units-user-space`, both 8.0% on CI and **both reproducing
+  here at the same 8.0%**.
+- **The reference is a fully green 1024×768 canvas** — for both tests. Rendering
+  each test *and* its own `-ref.html` under Chromium settles what that means: the
+  `-ref.html` is the six-container layout the test describes (green 75×75 in the
+  150px `<svg>`, 100×100 in the 200px one, 50×50 for the filtered `<div>`s),
+  while the test itself comes out uniformly green. **Chromium fails these
+  reftests against their own references**, and the runner scores Broiler against
+  Chromium's failing render.
+- **Which element does it, isolated rather than assumed.** Reducing the test to
+  one element at a time: a `<div>` carrying `filter: url(#f)` for a filter with
+  `filterUnits="userSpaceOnUse"` and percentage `width`/`height` floods the
+  **entire viewport** green, while the same filter on an SVG `<rect>` stays local
+  and paints nothing outside the `<svg>`. So it is the CSS `filter: url()` path on
+  an HTML element whose filter region resolves unbounded.
+- **Broiler is already closer to the spec render than Chromium is.** Ours is the
+  six-container layout with the flood regions off — the green boxes are the
+  default `objectBoundingBox` region rather than the resolved
+  `filterUnits`/`primitiveUnits` subregion — which is a real gap, but a *smaller*
+  one than a whole-canvas flood. Passing the comparison would mean reproducing
+  Chromium's flood, i.e. rendering strictly worse. Same trap as #1491's problems
+  14/15 and #1538's problem 18; see the warning at the top of this document.
+- **The underlying gap is still worth naming, for whenever the reference is
+  fixed upstream.** Both regions are computable from what the tests contain:
+  the filter region (`filterUnits`, defaulting to `objectBoundingBox` at
+  −10%/+120%) intersected with the primitive subregion (`primitiveUnits`,
+  defaulting to `userSpaceOnUse`, with `x`/`y`/`width`/`height` defaulting to the
+  filter region and percentages resolving against the SVG viewport). Working the
+  six containers through that by hand reproduces the `-ref.html` exactly in both
+  tests. `SvgRenderer` currently hardcodes the default `objectBoundingBox` region
+  and ignores the primitive subregion entirely.
+
+### `<canvas>` is not a replaced element — problem 30, diagnosed, not fixed
+
+- **Test:** `css/css-sizing/replaced-max-size-saturation`, 8.3% on CI.
+  **No local percentage here** — the `css-sizing` subset was not run this session;
+  the diagnosis below is from rendering this test and eight constructed probes and
+  reading the pixels, not from a scored run. A `<canvas width=8000 height=8000>` under
+  `max-width: 120px; max-height: 100px` must render as a **100×100** green square
+  (CSS2.1 §10.4: both constraints violated, and `max-width/w > max-height/h`, so
+  the height wins and the width follows the 1:1 ratio). Broiler renders it
+  8000×8000, clipped by the viewport into a full-page green block.
+- **Not a max-size bug — a replaced-element bug.** Five constructed probes
+  separate the two: the same CSS on a `<div>` clamps correctly to 120×100, and so
+  does an `<img>` with the same attributes; a `<canvas>` with `display: block`
+  forced on it also clamps, to 120×100. Left alone, a `<canvas>` behaves exactly
+  like a `<span>` with the same CSS. So `<canvas>` is being laid out as a
+  **non-replaced inline** box, which is the one box type `max-width`/`max-height`
+  do not apply to. `DomParser` special-cases `<video>`, `<audio>`, `<iframe>` and
+  `<svg>` as replaced elements; `<canvas>` is missing from that list.
+- **Three things are needed, and only the first is small.** (1) Model `<canvas>`
+  as a replaced element sized from its `width`/`height` content attributes with
+  the 300×150 default, mirroring the `<video>` handling in `DomParser`
+  (`Broiler.HTML`, so a patch). (2) `max-height` on an `inline-block` is not
+  applied either — a `display: inline-block` canvas probe clamps the width to 120
+  and leaves the height unclamped, which is a second, separate gap. (3) Getting
+  100×100 rather than 120×100 needs the CSS2.1 §10.4 constrained-ratio algorithm,
+  which considers both violated constraints together; the current code applies
+  min-width, max-height and min-height one at a time and has **no max-width arm at
+  all** (`CssLayoutEngine`, main repo). Left for a session that can do all three.
+
 ### #1562 problems, at a glance
 
-CI percentages are the issue's. **"—" means not measured here** — only problems
-21–26 were investigated this session; the rest point at the section that already
-owns them, and their status is that section's, not a fresh measurement.
+CI percentages are the issue's. **"—" means not measured here** — problems 21–30
+were investigated this session; the rest point at the section that already owns
+them, and their status is that section's, not a fresh measurement.
 
 | # | Test | CI | Local | Status |
 | --- | --- | --- | --- | --- |
@@ -1419,9 +1530,9 @@ owns them, and their status is that section's, not a fresh measurement.
 | 19 | `css-backgrounds/background-image-shared-stylesheet` | 5.7% | — | re-report of #1538 problem 1 — needs the server's `trickle` pipe |
 | 20 | `css-overflow/overflow-scroll-resize-visibility-hidden` | 5.9% | — | new to this list — not investigated |
 | 21–26 | `css-contain/contain-{body,html}-bg-00{1,3,4}` (6) | 7.5% | **7.5% → 99.8%** | **fixed** — any containment on html or body disables propagation from body ([`patches/0120`](../patches/README.md)) |
-| 27 | `css/filter-effects/fecolormatrix-negative` | 7.7% | — | new to this list — not investigated |
-| 28, 29 | `css/filter-effects/svg-filter-{filter,primitive}-units-user-space` (2) | 8.0% | — | new to this list — not investigated |
-| 30 | `css-sizing/replaced-max-size-saturation` | 8.3% | — | new to this list — not investigated |
+| 27 | `css/filter-effects/fecolormatrix-negative` | 7.7% | **7.7% → 99.6%** | **fixed** — a colour-only filter chain over a solid fill recolours the shape; main repo, on CI immediately |
+| 28, 29 | `css/filter-effects/svg-filter-{filter,primitive}-units-user-space` (2) | 8.0% | 8.0% | **won't fix** — the reference is an all-green canvas: Chromium fails both against their own `-ref.html`. Ours is already the closer render |
+| 30 | `css-sizing/replaced-max-size-saturation` | 8.3% | — | open — **diagnosed**: `<canvas>` is not modelled as a replaced element, so it lays out as a non-atomic inline and `max-width`/`max-height` never apply. Three parts, see above |
 
 ## Reported problems, at a glance
 

@@ -109,6 +109,15 @@ internal static partial class SvgRenderer
                 continue;
             }
 
+            var rectFill = GetColor(attrs, "fill", BColor.Black);
+            var rectStroke = GetColor(attrs, "stroke", BColor.Empty);
+
+            // A colour-only filter chain over a solid fill is equivalent to recolouring the shape;
+            // its geometry is untouched (WPT css/filter-effects/fecolormatrix-negative, whose
+            // feColorMatrix + arithmetic feComposite turn #ffaa00 into cyan).
+            if (TryResolveColorFilter(attrs, rectFill, rectStroke, out var filteredFill))
+                rectFill = filteredFill;
+
             items.Add(new DrawSvgRectItem
             {
                 Bounds = bounds,
@@ -116,8 +125,8 @@ internal static partial class SvgRenderer
                 Y = GetFloat(attrs, "y") * sy + ty,
                 Width = GetFloat(attrs, "width") * sx,
                 Height = GetFloat(attrs, "height") * sy,
-                Fill = GetColor(attrs, "fill", BColor.Black),
-                Stroke = GetColor(attrs, "stroke", BColor.Empty),
+                Fill = rectFill,
+                Stroke = rectStroke,
                 StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
             });
         }
@@ -369,6 +378,141 @@ internal static partial class SvgRenderer
     }
 
     /// <summary>
+    /// Scans one <c>&lt;svg&gt;</c> string for <c>&lt;filter&gt;</c> definitions that only transform
+    /// colour, and records each under its <c>id</c> in the document-wide <see cref="SvgFilterTable"/>.
+    /// Runs alongside <see cref="CollectFloodFilters"/> — the two model disjoint filters, since a
+    /// flood-only chain has no colour step and a colour chain has no flood.
+    /// </summary>
+    internal static void CollectColorFilters(string svgXml)
+    {
+        if (string.IsNullOrEmpty(svgXml) || svgXml.IndexOf("<filter", StringComparison.OrdinalIgnoreCase) < 0)
+            return;
+
+        foreach (Match fm in FilterBlockRegex().Matches(svgXml))
+        {
+            var filterAttrs = ParseAttributes(fm.Groups[1].Value);
+            if (!filterAttrs.TryGetValue("id", out var id) || string.IsNullOrEmpty(id))
+                continue;
+
+            if (TryParseColorFilterChain(fm.Groups[2].Value, filterAttrs) is { } filter)
+                SvgFilterTable.AddColorFilter(id, filter);
+        }
+    }
+
+    /// <summary>
+    /// Reads a filter body as a straight chain of colour-only primitives, or returns <c>null</c> when
+    /// it is anything else. See <see cref="SvgColorFilter"/> for why the modelled subset is this
+    /// narrow; every bail-out below leaves the referencing shape rendering unfiltered, which is what
+    /// it did before this existed.
+    /// </summary>
+    private static SvgColorFilter? TryParseColorFilterChain(
+        string body, Dictionary<string, string> filterAttrs)
+    {
+        // The default colour space for filter operations is linearRGB, which this does not model.
+        // Only an explicit sRGB filter is taken; anything else renders unfiltered rather than wrong.
+        if (!filterAttrs.TryGetValue("color-interpolation-filters", out var space)
+            || !space.Trim().Equals("sRGB", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var primitives = FilterPrimitiveRegex().Matches(body);
+        if (primitives.Count == 0)
+            return null;
+
+        var steps = new List<SvgColorFilter.Step>(primitives.Count);
+        string? previousResult = null;
+        bool first = true;
+
+        foreach (Match pm in primitives)
+        {
+            var name = pm.Groups[1].Value;
+            var attrs = ParseAttributes(pm.Groups[2].Value);
+
+            // The chain must be straight: each primitive consumes the previous one's output (an
+            // absent `in` means exactly that), and the first consumes the source graphic.
+            if (!ConsumesPreviousResult(attrs, "in", previousResult, first)
+                || (attrs.ContainsKey("in2") && !ConsumesPreviousResult(attrs, "in2", previousResult, first)))
+            {
+                return null;
+            }
+
+            if (name.Equals("feColorMatrix", StringComparison.OrdinalIgnoreCase))
+            {
+                // `matrix` is the default type; the shorthand types (saturate, hueRotate,
+                // luminanceToAlpha) are not modelled.
+                if (attrs.TryGetValue("type", out var type)
+                    && !type.Trim().Equals("matrix", StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+                if (!attrs.TryGetValue("values", out var values)
+                    || ParseFloatList(values) is not { Length: 20 } matrix)
+                {
+                    return null;
+                }
+                steps.Add(new SvgColorFilter.Step { Matrix = matrix });
+            }
+            else if (name.Equals("feComposite", StringComparison.OrdinalIgnoreCase))
+            {
+                // Only `arithmetic` is a pure colour operation; the Porter-Duff operators combine
+                // two different inputs, which a single-colour model cannot represent.
+                if (!attrs.TryGetValue("operator", out var op)
+                    || !op.Trim().Equals("arithmetic", StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+                steps.Add(new SvgColorFilter.Step
+                {
+                    Arithmetic = (
+                        GetFloat(attrs, "k1"), GetFloat(attrs, "k2"),
+                        GetFloat(attrs, "k3"), GetFloat(attrs, "k4")),
+                });
+            }
+            else
+            {
+                return null;
+            }
+
+            attrs.TryGetValue("result", out previousResult);
+            first = false;
+        }
+
+        return new SvgColorFilter(steps);
+    }
+
+    /// <summary>
+    /// Whether a primitive's <c>in</c>/<c>in2</c> names the previous primitive's result. An absent
+    /// attribute means the previous result (or the source graphic for the first primitive), which is
+    /// the spec default.
+    /// </summary>
+    private static bool ConsumesPreviousResult(
+        Dictionary<string, string> attrs, string attribute, string? previousResult, bool first)
+    {
+        if (!attrs.TryGetValue(attribute, out var value) || string.IsNullOrWhiteSpace(value))
+            return true;
+
+        value = value.Trim();
+        if (first)
+            return value.Equals("SourceGraphic", StringComparison.OrdinalIgnoreCase);
+
+        return previousResult != null && value.Equals(previousResult, StringComparison.Ordinal);
+    }
+
+    /// <summary>Parses a whitespace/comma separated list of numbers, or <c>null</c> if any is malformed.</summary>
+    private static float[]? ParseFloatList(string value)
+    {
+        var parts = value.Split([' ', ',', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+        var result = new float[parts.Length];
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (!float.TryParse(parts[i], NumberStyles.Float, CultureInfo.InvariantCulture, out result[i]))
+                return null;
+        }
+        return result;
+    }
+
+    /// <summary>
     /// If <paramref name="attrs"/> carries a <c>filter="url(#id)"</c> that resolves to a modelled
     /// flood filter, returns its colour. Such a filter replaces the shape with a solid fill of that
     /// colour over the filter region.
@@ -380,6 +524,30 @@ internal static partial class SvgRenderer
             return false;
         var id = SvgFilterTable.ExtractUrlReferenceId(filterRef);
         return id != null && SvgFilterTable.TryGetFlood(id, out var flood) && (color = flood.Color).A > 0;
+    }
+
+    /// <summary>
+    /// If <paramref name="attrs"/> carries a <c>filter="url(#id)"</c> that resolves to a modelled
+    /// colour-transform filter, returns the colour the shape's solid <paramref name="fill"/> becomes.
+    /// A stroked shape is not uniformly coloured, so it is left unfiltered.
+    /// </summary>
+    private static bool TryResolveColorFilter(
+        Dictionary<string, string> attrs, BColor fill, BColor stroke, out BColor filtered)
+    {
+        filtered = default;
+        if (stroke.A > 0
+            || !attrs.TryGetValue("filter", out var filterRef)
+            || string.IsNullOrEmpty(filterRef))
+        {
+            return false;
+        }
+
+        var id = SvgFilterTable.ExtractUrlReferenceId(filterRef);
+        if (id == null || !SvgFilterTable.TryGetColorFilter(id, out var filter))
+            return false;
+
+        filtered = filter.Apply(fill);
+        return true;
     }
 
     private static Dictionary<string, string> ParseAttributes(string attrStr)
@@ -523,6 +691,12 @@ internal static partial class SvgRenderer
 
     [GeneratedRegex(@"<feflood\b([^>]*?)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex FeFloodRegex();
+
+    // Every filter primitive, in document order: the element name and its attribute text. Matches
+    // both the self-closing and the open/close spellings (the closing tag is left to the next
+    // iteration to skip, since `</feColorMatrix>` does not start with `<fe` + a name character).
+    [GeneratedRegex(@"<(fe[A-Za-z]+)\b([^>]*?)/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex FilterPrimitiveRegex();
 
     [GeneratedRegex(@"([\w\-]+)\s*=\s*""([^""]*)""")]
     private static partial Regex ParseAttrRegex();
