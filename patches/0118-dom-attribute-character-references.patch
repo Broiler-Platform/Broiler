@@ -1,0 +1,179 @@
+From 11f552a7043b2c6306489752f83b341b9549238e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 7 Aug 2026 15:08:23 +0000
+Subject: [PATCH] Decode an attribute value's character references in the
+ tokenizer
+
+WHATWG 13.2.5 decodes character references in an attribute value in the
+tokenizer, exactly as it does in character data, so the DOM holds the value the
+attribute means rather than the source text that spelled it.
+
+This tokenizer left the raw text and let Broiler.HTML's box builder decode it
+on the way to the renderer. That made the rendering right and every reader of
+the DOM wrong by exactly one level of escaping: getAttribute("href") on
+href="?a=1&amp;b=2" returned the escaped spelling, an [attr="..."] selector had to
+be written against it, and serializing escaped it again -- so a DOM round-trip
+grew another &amp; each time round. The downstream decode is removed in the same
+change; the two are halves of one balance and neither is correct alone.
+
+Only a reference terminated by ';' is decoded, which is what makes DecodeReferences
+safe to share with attribute values: the spec's ambiguous-ampersand rule exists to
+keep href="?a=1&copy=2" from turning into a copyright sign, and a semicolon-only
+decoder never had to be told. The cost is the other half of that rule -- a
+terminator-less title="&copy" stays literal -- the same conservative gap this
+helper already had in character data.
+
+8 tests in HtmlTokenizerAttributeReferenceTests cover named, decimal and hex
+references, the single-level-of-escaping case, the unterminated reference, an
+unquoted value and a reference-free value.
+---
+ .../HtmlTokenizerAttributeReferenceTests.cs   | 85 +++++++++++++++++++
+ Broiler.Dom.Html/HtmlTokenizer.cs             | 31 +++++--
+ 2 files changed, 108 insertions(+), 8 deletions(-)
+ create mode 100644 Broiler.Dom.Html.Tests/HtmlTokenizerAttributeReferenceTests.cs
+
+diff --git a/Broiler.Dom.Html.Tests/HtmlTokenizerAttributeReferenceTests.cs b/Broiler.Dom.Html.Tests/HtmlTokenizerAttributeReferenceTests.cs
+new file mode 100644
+index 0000000..a7a8a80
+--- /dev/null
++++ b/Broiler.Dom.Html.Tests/HtmlTokenizerAttributeReferenceTests.cs
+@@ -0,0 +1,85 @@
++using Broiler.Dom.Html;
++using Xunit;
++
++namespace Broiler.Dom.Html.Tests;
++
++/// <summary>
++/// Character references in attribute values (WHATWG §13.2.5, the attribute-value
++/// character-reference states). The tokenizer used to leave an attribute value as the source text
++/// that spelled it and let the renderer decode it when building boxes — which made the rendering
++/// right and everything reading the DOM wrong: <c>getAttribute("href")</c> on
++/// <c>href="?a=1&amp;amp;b=2"</c> returned the escaped spelling, an <c>[attr="…"]</c> selector had
++/// to be written against it, and serializing re-escaped the ampersand so a round-trip corrupted
++/// the value a little more each time.
++/// </summary>
++public sealed class HtmlTokenizerAttributeReferenceTests
++{
++    private static string Attribute(string html, string name = "x") =>
++        new HtmlTokenizer().Tokenize(html)
++            .First(t => t.Type == TokenType.StartTag)
++            .Attributes[name];
++
++    [Fact]
++    public void Named_References_Are_Decoded()
++    {
++        Assert.Equal("a\"b", Attribute("""<i x="a&quot;b">"""));
++        Assert.Equal("a&b", Attribute("""<i x="a&amp;b">"""));
++        Assert.Equal("a<b>c", Attribute("""<i x="a&lt;b&gt;c">"""));
++    }
++
++    [Fact]
++    public void Numeric_And_Hexadecimal_References_Are_Decoded()
++    {
++        Assert.Equal("AB", Attribute("""<i x="&#65;&#x42;">"""));
++    }
++
++    [Fact]
++    public void A_NonBreaking_Space_Is_Decoded_To_Its_Character()
++    {
++        Assert.Equal("a b", Attribute("""<i x="a&nbsp;b">"""));
++    }
++
++    /// <summary>The shape the bug was found through: a query string's escaped separator is an
++    /// ampersand, so the URL the DOM reports is the URL the page meant.</summary>
++    [Fact]
++    public void An_Escaped_Query_Separator_Decodes_To_An_Ampersand()
++    {
++        Assert.Equal("?a=1&b=2", Attribute("""<a x="?a=1&amp;b=2">"""));
++    }
++
++    /// <summary>
++    /// One level of escaping, not two: <c>&amp;amp;amp;</c> is the spelling of a literal
++    /// <c>&amp;amp;</c>. This is what the removed downstream decode used to eat.
++    /// </summary>
++    [Fact]
++    public void Only_One_Level_Of_Escaping_Is_Removed()
++    {
++        Assert.Equal("&amp;", Attribute("""<i x="&amp;amp;">"""));
++    }
++
++    /// <summary>
++    /// A reference with no terminating <c>;</c> is left alone. That is what keeps a query string's
++    /// <c>&amp;copy=2</c> from becoming a <c>©</c> — the spec's ambiguous-ampersand rule — at the
++    /// cost of its other half, a terminator-less <c>&amp;copy</c> that a browser would resolve.
++    /// </summary>
++    [Fact]
++    public void An_Unterminated_Reference_Is_Left_Literal()
++    {
++        Assert.Equal("?a=1&copy=2", Attribute("""<a x="?a=1&copy=2">"""));
++    }
++
++    /// <summary>Quoting does not change what a value means: an unquoted attribute decodes too.
++    /// </summary>
++    [Fact]
++    public void An_Unquoted_Value_Is_Decoded()
++    {
++        Assert.Equal("a&b", Attribute("<i x=a&amp;b>"));
++    }
++
++    /// <summary>A value with no reference in it is returned unchanged.</summary>
++    [Fact]
++    public void A_Value_With_No_Reference_Is_Untouched()
++    {
++        Assert.Equal("plain value", Attribute("""<i x="plain value">"""));
++    }
++}
+diff --git a/Broiler.Dom.Html/HtmlTokenizer.cs b/Broiler.Dom.Html/HtmlTokenizer.cs
+index 6251dc0..2cb4759 100644
+--- a/Broiler.Dom.Html/HtmlTokenizer.cs
++++ b/Broiler.Dom.Html/HtmlTokenizer.cs
+@@ -305,11 +305,18 @@ public sealed class HtmlTokenizer
+ 
+     private void Flush()
+     {
+-        // Attribute-value character references are decoded downstream (Broiler.HTML's
+-        // HtmlParser decodes them for rendering; the bridge preserves the existing
+-        // behaviour), so keep the raw attribute text here to avoid a double-decode.
++        // An attribute value's character references are decoded here, in the tokenizer, exactly as
++        // character data's are (WHATWG §13.2.5, the attribute-value character-reference states) —
++        // so the DOM holds the value the attribute *means*, not the source text that spelled it.
++        //
++        // This used to leave the raw text for Broiler.HTML's HtmlParser to decode when it built
++        // boxes, which made the rendering right and everything reading the DOM wrong:
++        // `getAttribute("href")` on `href="?a=1&amp;b=2"` returned `?a=1&amp;b=2`, an
++        // `[attr="…"]` selector had to be written against the escaped spelling, and serializing
++        // re-escaped the ampersand so a DOM round-trip corrupted the value a little more each time.
++        // The downstream decode is gone with it — decoding twice would eat a level of escaping.
+         if (_an != null && _an.Length > 0 && !_attrs.ContainsKey(_an))
+-            _attrs[_an] = _av.ToString();
++            _attrs[_an] = DecodeReferences(_av.ToString());
+         _an = null; _av.Clear();
+     }
+ 
+@@ -337,11 +344,19 @@ public sealed class HtmlTokenizer
+ 
+     /// <summary>
+     /// Decodes HTML character references (named like <c>&amp;nbsp;</c>, decimal
+-    /// <c>&amp;#160;</c>, and hex <c>&amp;#xA0;</c>) in ordinary character data (WHATWG §13.2.5
+-    /// character-reference state). Raw-text element content (<c>&lt;script&gt;</c>/
+-    /// <c>&lt;style&gt;</c>) is emitted undecoded — its call sites pass <c>decode: false</c>.
+-    /// A fast path skips strings with no ampersand.
++    /// <c>&amp;#160;</c>, and hex <c>&amp;#xA0;</c>) in ordinary character data and in attribute
++    /// values (WHATWG §13.2.5 character-reference state). Raw-text element content
++    /// (<c>&lt;script&gt;</c>/<c>&lt;style&gt;</c>) is emitted undecoded — its call sites pass
++    /// <c>decode: false</c>. A fast path skips strings with no ampersand.
+     /// </summary>
++    /// <remarks>
++    /// Only a reference terminated by <c>;</c> is decoded, which is what makes this safe to share
++    /// with attribute values: the spec's ambiguous-ampersand rule exists to keep
++    /// <c>href="?a=1&amp;copy=2"</c> from turning into a <c>©</c>, and a semicolon-only decoder
++    /// never had to be told. The cost is the other half of that rule — a terminator-less
++    /// <c>title="&amp;copy"</c> stays literal where a browser would resolve it — which is the
++    /// same conservative gap this helper already had in character data.
++    /// </remarks>
+     private static string DecodeReferences(string value) =>
+         value.IndexOf('&') < 0 ? value : System.Net.WebUtility.HtmlDecode(value);
+ 
+-- 
+2.43.0
+

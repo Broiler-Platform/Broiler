@@ -67,6 +67,17 @@ PENDING_PATCHES=(
   # html/semantics/forms/constraints/form-validation-validity-textarea-defaultValue)
   # and it applies cleanly to the pinned Broiler.CSS pointer.
   "Broiler.CSS|patches/0117-css-constraint-validation-pseudo-classes.patch"
+  # An attribute value's character references were left undecoded by the
+  # tokenizer and decoded again downstream by Broiler.HTML's box builder, so the
+  # rendering was right and every reader of the DOM was wrong by one level of
+  # escaping. These two are HALVES OF ONE BALANCE and must be applied TOGETHER
+  # and IN THIS ORDER: 0118 alone would make the renderer decode twice, 0119
+  # alone would leave every attribute value escaped. Each applies cleanly to its
+  # pinned pointer. Not WPT-visible on its own — four subsets (2023 tests) came
+  # out byte-identical across the pair, which is the point: the renderer sees the
+  # same values while the DOM stops being wrong.
+  "Broiler.DOM|patches/0118-dom-attribute-character-references.patch"
+  "Broiler.HTML|patches/0119-html-attribute-value-taken-as-is.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
