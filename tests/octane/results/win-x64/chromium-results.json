@@ -1,0 +1,350 @@
+{
+  "engine": "chromium",
+  "engineLabel": "Chromium 149.0.7827.55",
+  "octaneVersion": "9",
+  "perSuiteTimeoutSec": 1800,
+  "repetitions": 3,
+  "noiseBandPercent": 7.5,
+  "benchmarks": {
+    "Richards": 37763,
+    "DeltaBlue": 91210,
+    "Crypto": 39926,
+    "RayTrace": 112848,
+    "EarleyBoyer": 79635,
+    "RegExp": 8837,
+    "Splay": 36932,
+    "SplayLatency": 29703,
+    "NavierStokes": 37100,
+    "PdfJS": 62400,
+    "Mandreel": 35917,
+    "MandreelLatency": 56013,
+    "Gameboy": 67942,
+    "CodeLoad": 22535,
+    "Box2D": 80787,
+    "zlib": 78609,
+    "Typescript": 78610
+  },
+  "stability": {
+    "Richards": {
+      "samples": [
+        36936,
+        37763,
+        37981
+      ],
+      "bandPercent": 2.8
+    },
+    "DeltaBlue": {
+      "samples": [
+        100380,
+        91210,
+        78469
+      ],
+      "bandPercent": 24
+    },
+    "Crypto": {
+      "samples": [
+        37926,
+        40975,
+        39926
+      ],
+      "bandPercent": 7.6
+    },
+    "RayTrace": {
+      "samples": [
+        113440,
+        111960,
+        112848
+      ],
+      "bandPercent": 1.3
+    },
+    "EarleyBoyer": {
+      "samples": [
+        82937,
+        79635,
+        77020
+      ],
+      "bandPercent": 7.4
+    },
+    "RegExp": {
+      "samples": [
+        8166,
+        8910,
+        8837
+      ],
+      "bandPercent": 8.4
+    },
+    "Splay": {
+      "samples": [
+        36492,
+        37908,
+        36932
+      ],
+      "bandPercent": 3.8
+    },
+    "SplayLatency": {
+      "samples": [
+        30019,
+        29703,
+        27742
+      ],
+      "bandPercent": 7.7
+    },
+    "NavierStokes": {
+      "samples": [
+        36509,
+        37100,
+        38173
+      ],
+      "bandPercent": 4.5
+    },
+    "PdfJS": {
+      "samples": [
+        64222,
+        62400,
+        60447
+      ],
+      "bandPercent": 6
+    },
+    "Mandreel": {
+      "samples": [
+        37991,
+        35606,
+        35917
+      ],
+      "bandPercent": 6.6
+    },
+    "MandreelLatency": {
+      "samples": [
+        62315,
+        56013,
+        47478
+      ],
+      "bandPercent": 26.5
+    },
+    "Gameboy": {
+      "samples": [
+        70276,
+        67942,
+        61855
+      ],
+      "bandPercent": 12.4
+    },
+    "CodeLoad": {
+      "samples": [
+        22535,
+        21858,
+        23022
+      ],
+      "bandPercent": 5.2
+    },
+    "Box2D": {
+      "samples": [
+        78154,
+        88831,
+        80787
+      ],
+      "bandPercent": 13.2
+    },
+    "zlib": {
+      "samples": [
+        80387,
+        58326,
+        78609
+      ],
+      "bandPercent": 28.1
+    },
+    "Typescript": {
+      "samples": [
+        78610,
+        79592,
+        74696
+      ],
+      "bandPercent": 6.2
+    }
+  },
+  "suiteStatus": {
+    "Richards": {
+      "status": "ok",
+      "durationMs": 2112,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\Richards.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "DeltaBlue": {
+      "status": "ok",
+      "durationMs": 2118,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\DeltaBlue.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Crypto": {
+      "status": "ok",
+      "durationMs": 4192,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\Crypto.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "RayTrace": {
+      "status": "ok",
+      "durationMs": 2117,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\RayTrace.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "EarleyBoyer": {
+      "status": "ok",
+      "durationMs": 4216,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\EarleyBoyer.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "RegExp": {
+      "status": "ok",
+      "durationMs": 2153,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\RegExp.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Splay": {
+      "status": "ok",
+      "durationMs": 2187,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\Splay.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "NavierStokes": {
+      "status": "ok",
+      "durationMs": 2127,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\NavierStokes.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "PdfJS": {
+      "status": "ok",
+      "durationMs": 1338,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\PdfJS.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Mandreel": {
+      "status": "ok",
+      "durationMs": 1856,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\Mandreel.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Gameboy": {
+      "status": "ok",
+      "durationMs": 1183,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\Gameboy.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "CodeLoad": {
+      "status": "ok",
+      "durationMs": 2211,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\CodeLoad.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Box2D": {
+      "status": "ok",
+      "durationMs": 1131,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\Box2D.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "zlib": {
+      "status": "ok",
+      "durationMs": 2070,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\zlib.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Typescript": {
+      "status": "ok",
+      "durationMs": 2000,
+      "timeoutSec": 1800,
+      "log": "tests\\octane\\logs\\chromium\\Typescript.rep3.log",
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    }
+  },
+  "geomean": 48318,
+  "generatedAt": "2026-08-07T12:55:06.809Z",
+  "platform": "win-x64"
+}

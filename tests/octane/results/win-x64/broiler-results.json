@@ -1,0 +1,526 @@
+{
+  "engine": "broiler",
+  "engineLabel": "Broiler.JS (BroilerJS --script-host)",
+  "octaneVersion": "9",
+  "perSuiteTimeoutSec": 1800,
+  "repetitions": 3,
+  "noiseBandPercent": 7.5,
+  "benchmarks": {
+    "Richards": 235,
+    "DeltaBlue": 207,
+    "Crypto": 280,
+    "RayTrace": 485,
+    "EarleyBoyer": 389,
+    "RegExp": 121,
+    "Splay": 659,
+    "SplayLatency": 2019,
+    "NavierStokes": 550,
+    "PdfJS": 487,
+    "Gameboy": 1059,
+    "CodeLoad": 130,
+    "Box2D": 577,
+    "zlib": 430,
+    "Typescript": 2124
+  },
+  "stability": {
+    "Richards": {
+      "samples": [
+        150,
+        235,
+        265
+      ],
+      "bandPercent": 48.9
+    },
+    "DeltaBlue": {
+      "samples": [
+        147,
+        214,
+        207
+      ],
+      "bandPercent": 32.4
+    },
+    "Crypto": {
+      "samples": [
+        280,
+        285,
+        269
+      ],
+      "bandPercent": 5.7
+    },
+    "RayTrace": {
+      "samples": [
+        489,
+        479,
+        485
+      ],
+      "bandPercent": 2.1
+    },
+    "EarleyBoyer": {
+      "samples": [
+        399,
+        386,
+        389
+      ],
+      "bandPercent": 3.3
+    },
+    "RegExp": {
+      "samples": [
+        121,
+        118,
+        122
+      ],
+      "bandPercent": 3.3
+    },
+    "Splay": {
+      "samples": [
+        639,
+        659,
+        676
+      ],
+      "bandPercent": 5.6
+    },
+    "SplayLatency": {
+      "samples": [
+        2033,
+        1971,
+        2019
+      ],
+      "bandPercent": 3.1
+    },
+    "NavierStokes": {
+      "samples": [
+        560,
+        499,
+        550
+      ],
+      "bandPercent": 11.1
+    },
+    "PdfJS": {
+      "samples": [
+        544,
+        487,
+        454
+      ],
+      "bandPercent": 18.5
+    },
+    "Gameboy": {
+      "samples": [
+        1029,
+        1059,
+        1081
+      ],
+      "bandPercent": 4.9
+    },
+    "CodeLoad": {
+      "samples": [
+        130,
+        129,
+        131
+      ],
+      "bandPercent": 1.5
+    },
+    "Box2D": {
+      "samples": [
+        577,
+        565,
+        668
+      ],
+      "bandPercent": 17.9
+    },
+    "zlib": {
+      "samples": [
+        437,
+        430,
+        429
+      ],
+      "bandPercent": 1.9
+    },
+    "Typescript": {
+      "samples": [
+        1697,
+        2149,
+        2124
+      ],
+      "bandPercent": 21.3
+    }
+  },
+  "suiteStatus": {
+    "Richards": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 3148,
+      "filesLoaded": [
+        "base.js",
+        "richards.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\Richards.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "DeltaBlue": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 3159,
+      "filesLoaded": [
+        "base.js",
+        "deltablue.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\DeltaBlue.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Crypto": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 14555,
+      "filesLoaded": [
+        "base.js",
+        "crypto.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\Crypto.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "RayTrace": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 7555,
+      "filesLoaded": [
+        "base.js",
+        "raytrace.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\RayTrace.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "EarleyBoyer": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 24745,
+      "filesLoaded": [
+        "base.js",
+        "earley-boyer.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\EarleyBoyer.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "RegExp": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 18232,
+      "filesLoaded": [
+        "base.js",
+        "regexp.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\RegExp.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Splay": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 4885,
+      "filesLoaded": [
+        "base.js",
+        "splay.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\Splay.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "NavierStokes": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 6784,
+      "filesLoaded": [
+        "base.js",
+        "navier-stokes.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\NavierStokes.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "PdfJS": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 16172,
+      "filesLoaded": [
+        "base.js",
+        "pdfjs.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\PdfJS.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Mandreel": {
+      "status": "error",
+      "error": "Maximum call stack size exceeded",
+      "errorType": "RangeError",
+      "errorKind": "js",
+      "message": "Maximum call stack size exceeded",
+      "clrStack": [],
+      "clrInner": [],
+      "jsStack": [
+        {
+          "fn": "EnsureWithinStackBudget",
+          "file": "/_/Broiler.JS/Broiler.JavaScript.Engine/CallFrames.cs",
+          "line": 215
+        },
+        {
+          "fn": "mandreelAppInit",
+          "file": "mandreel.js",
+          "line": 1460
+        },
+        {
+          "fn": "mandreelAppStartRenderWebGL",
+          "file": "mandreel.js",
+          "line": 1763
+        },
+        {
+          "fn": "_mandreelAppStartReady",
+          "file": "mandreel.js",
+          "line": 1438
+        },
+        {
+          "fn": "_mandreelAppAudioReady",
+          "file": "mandreel.js",
+          "line": 1449
+        },
+        {
+          "fn": "setupMandreel",
+          "file": "mandreel.js",
+          "line": 56
+        },
+        {
+          "fn": "RunNextSetup",
+          "file": "base.js",
+          "line": 356
+        },
+        {
+          "fn": "RunStep",
+          "file": "base.js",
+          "line": 157
+        },
+        {
+          "fn": "inline",
+          "file": "base.js",
+          "line": 173
+        },
+        {
+          "fn": "__octaneRun",
+          "file": "octane-runner.js",
+          "line": 217
+        },
+        {
+          "fn": "native",
+          "file": "octane-runner.js",
+          "line": 225
+        }
+      ],
+      "failedAt": {
+        "benchmark": "Mandreel",
+        "phase": "Setup",
+        "iteration": 0
+      },
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 503403,
+      "filesLoaded": [
+        "base.js",
+        "mandreel.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\Mandreel.rep1.log",
+      "script": "tests\\octane\\logs\\broiler\\scripts\\Mandreel.js",
+      "repro": "dotnet D:/a/Broiler/Broiler/Broiler.JS/Broiler.JS/Broiler.JavaScript/bin/Release/net10.0/BroilerJS.dll --script-host D:\\a\\Broiler\\Broiler\\tests\\octane\\logs\\broiler\\scripts\\Mandreel.js",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "error",
+        "error",
+        "error"
+      ]
+    },
+    "Gameboy": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 12261,
+      "filesLoaded": [
+        "base.js",
+        "gbemu-part1.js",
+        "gbemu-part2.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\Gameboy.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "CodeLoad": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 21435,
+      "filesLoaded": [
+        "base.js",
+        "code-load.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\CodeLoad.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Box2D": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 10979,
+      "filesLoaded": [
+        "base.js",
+        "box2d.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\Box2D.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "zlib": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 357257,
+      "filesLoaded": [
+        "base.js",
+        "zlib.js",
+        "zlib-data.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\zlib.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    },
+    "Typescript": {
+      "status": "ok",
+      "exitCode": 0,
+      "signal": null,
+      "durationMs": 66606,
+      "filesLoaded": [
+        "base.js",
+        "typescript.js",
+        "typescript-input.js",
+        "typescript-compiler.js",
+        "octane-runner.js"
+      ],
+      "startedRunning": true,
+      "log": "tests\\octane\\logs\\broiler\\Typescript.rep3.log",
+      "timeoutSec": 1800,
+      "repetitions": 3,
+      "statusPerRepetition": [
+        "ok",
+        "ok",
+        "ok"
+      ]
+    }
+  },
+  "geomean": 457,
+  "generatedAt": "2026-08-07T12:55:06.809Z",
+  "platform": "win-x64"
+}
