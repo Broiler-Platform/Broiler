@@ -111,7 +111,7 @@ from 14.5 to 1000 is worth more than tripling every score already above 300. A r
 where every suite is uniformly 150× off is a far healthier engine than today's at a
 similar geomean, because no single subsystem is pathological.
 
-All three are emitted by `run-octane.mjs` into `results/comparison.md` and
+All three are emitted by `run-octane.mjs` into `results/<platform>/comparison.md` and
 `comparison.json`, so the trend comes out of the run rather than being reconstructed
 by hand.
 

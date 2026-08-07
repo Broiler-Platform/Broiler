@@ -52,7 +52,7 @@ organized around. A run where every suite is uniformly 150× off is a far
 healthier engine than today's, at a similar geomean, because it means no single
 subsystem is pathological.
 
-All three are now emitted by `run-octane.mjs` into `results/comparison.md` and
+All three are now emitted by `run-octane.mjs` into `results/<platform>/comparison.md` and
 `comparison.json` (§2.4), so the trend comes out of the run rather than being
 reconstructed by hand. The "last committed run" column above is stale in the way
 §2.1 describes and will be superseded by the first Phase 0 gate run.

@@ -1,0 +1,7 @@
+# The Octane benchmark harness is a bash script, and the workflow's win-x64 leg
+# runs it through Git Bash on a Windows runner. Git Bash cannot execute a script
+# checked out with CRLF line endings — it fails on the stray `\r` in the shebang
+# — so pin shell scripts to LF rather than depending on whatever `core.autocrlf`
+# the runner image happens to set. Every .sh in the tree is already LF, so this
+# records the invariant instead of changing anything.
+*.sh text eol=lf

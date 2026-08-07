@@ -48,7 +48,12 @@
 //                          Required when broiler is in --engines.
 //   --jint-dll <path>      Broiler.Octane.JintHost.dll — the Jint shell.
 //                          Required when jint is in --engines.
-//   --out-dir <dir>        Where result JSON/MD are written (default: tests/octane/results)
+//   --platform <rid>       Runtime identifier this run is labelled with, e.g.
+//                          win-x64, linux-x64, linux-arm64 (default: detected
+//                          from the host). Recorded in every report, and the
+//                          default --out-dir is per platform.
+//   --out-dir <dir>        Where result JSON/MD are written
+//                          (default: tests/octane/results/<platform>)
 //   --log-dir <dir>        Where per-suite logs are written (default: tests/octane/logs)
 //   --suites <path>        Suite manifest (default: scripts/octane-suites.json)
 //   --runner <path>        Shared runner JS (default: scripts/octane-runner.js)
@@ -88,13 +93,30 @@ const REPORT_MESSAGE_CHARS = 2000;
 const REPORT_JS_FRAMES = 15;
 const REPORT_CLR_FRAMES = 30;
 
+// The .NET runtime identifier for the host, used to label the run and to keep
+// each platform's results apart. A score is only meaningful next to the machine
+// that produced it, and the harness folds a previously committed engine result
+// back into the comparison — which is only honest within one platform.
+export function detectPlatform(platform = process.platform, arch = process.arch) {
+  const os = { win32: 'win', linux: 'linux', darwin: 'osx' }[platform] ?? platform;
+  const cpu = { x64: 'x64', arm64: 'arm64' }[arch] ?? arch;
+  return `${os}-${cpu}`;
+}
+
 function parseArgs(argv) {
+  // Read --platform first: it decides the default --out-dir, which an explicit
+  // --out-dir later in the loop then overrides.
+  const platform = (() => {
+    const i = argv.indexOf('--platform');
+    return i >= 0 && argv[i + 1] ? argv[i + 1] : detectPlatform();
+  })();
   const opts = {
     octaneDir: null,
     engines: 'chromium,broiler,jint',
     broilerDll: null,
     jintDll: null,
-    outDir: join(REPO_ROOT, 'tests', 'octane', 'results'),
+    platform,
+    outDir: join(REPO_ROOT, 'tests', 'octane', 'results', platform),
     logDir: join(REPO_ROOT, 'tests', 'octane', 'logs'),
     suites: join(__dirname, 'octane-suites.json'),
     runner: join(__dirname, 'octane-runner.js'),
@@ -115,6 +137,7 @@ function parseArgs(argv) {
       case '--engines': opts.engines = next(); break;
       case '--broiler-dll': opts.broilerDll = next(); break;
       case '--jint-dll': opts.jintDll = next(); break;
+      case '--platform': next(); break; // already read above
       case '--out-dir': opts.outDir = next(); break;
       case '--log-dir': opts.logDir = next(); break;
       case '--suites': opts.suites = next(); break;
@@ -1018,7 +1041,7 @@ async function runChromium(opts, suites, baseJs, runnerJs, dirs) {
 // reference points it is read against.
 export const ENGINE_IDS = ['chromium', 'broiler', 'jint'];
 
-export function buildComparison(results, generatedAt) {
+export function buildComparison(results, generatedAt, platform = null) {
   const chromium = results.chromium;
   const broiler = results.broiler;
   const jint = results.jint;
@@ -1044,6 +1067,7 @@ export function buildComparison(results, generatedAt) {
 
   const comparison = {
     generatedAt,
+    platform,
     octaneVersion: present.map((id) => results[id].octaneVersion).find(Boolean) ?? null,
     engines: Object.fromEntries(ENGINE_IDS.map((id) => [
       id,
@@ -1158,6 +1182,10 @@ export function renderMarkdown(cmp, results) {
   lines.push(`# Octane 2.0 benchmark — ${present.map((id) => ENGINE_TITLES[id]).join(' vs ') || 'no engines'}`);
   lines.push('');
   lines.push(`- Generated: \`${cmp.generatedAt}\``);
+  // Which machine produced this. Octane scores are not comparable across
+  // platforms, so a table that does not say which one it is invites exactly
+  // that comparison.
+  if (cmp.platform) lines.push(`- Platform: \`${cmp.platform}\``);
   lines.push(`- Octane version: \`${cmp.octaneVersion ?? 'unknown'}\``);
   for (const id of present) {
     lines.push(`- ${ENGINE_TITLES[id]}: \`${cmp.engines[id].label}\` — **overall score ${cmp.engines[id].geomean ?? 'n/a'}**`);
@@ -1265,12 +1293,15 @@ export function renderMarkdown(cmp, results) {
 // a Broiler bug, but "both managed engines fail this suite the same way" is the
 // fastest way to tell a Broiler defect from a benchmark that expects a host
 // facility neither shell provides.
-export function renderDiagnostics(results, generatedAt) {
+export function renderDiagnostics(results, generatedAt, platform = null) {
   const engines = Object.keys(SHELL_ENGINES).filter((id) => results[id]);
   const lines = [];
   lines.push('# Octane failure diagnostics');
   lines.push('');
   lines.push(`- Generated: \`${generatedAt}\``);
+  // A failure can be a property of the platform rather than of the engine —
+  // item 1-2's stack-overflow repro was win-x64 only — so say which one this is.
+  if (platform) lines.push(`- Platform: \`${platform}\``);
   for (const id of engines) {
     const r = results[id];
     lines.push(`- ${ENGINE_TITLES[id]}: \`${r.engineLabel}\` — per-suite timeout ${r.perSuiteTimeoutSec}s ` +
@@ -1408,6 +1439,7 @@ async function main() {
       ? await runChromium(opts, suites, baseJs, runnerJs, dirs)
       : await runShellEngine(engine, opts, suites, baseJs, runnerJs, dirs);
     r.generatedAt = generatedAt;
+    r.platform = opts.platform;
     results[engine] = r;
     const out = join(outDir, `${engine}-results.json`);
     writeFileSync(out, `${JSON.stringify(r, null, 2)}\n`);
@@ -1417,7 +1449,7 @@ async function main() {
   const diagnosed = Object.keys(SHELL_ENGINES).filter((id) => results[id]);
   if (diagnosed.length) {
     const diagnostics = join(outDir, 'diagnostics.md');
-    writeFileSync(diagnostics, renderDiagnostics(results, generatedAt));
+    writeFileSync(diagnostics, renderDiagnostics(results, generatedAt, opts.platform));
     const failed = diagnosed
       .map((id) => `${id}: ${Object.values(results[id].suiteStatus).filter((s) => s.status !== 'ok').length}`)
       .join(', ');
@@ -1436,10 +1468,20 @@ async function main() {
   for (const engine of ENGINE_IDS) {
     if (results[engine]) continue;
     const p = join(outDir, `${engine}-results.json`);
-    if (existsSync(p)) results[engine] = JSON.parse(readFileSync(p, 'utf8'));
+    if (!existsSync(p)) continue;
+    const prior = JSON.parse(readFileSync(p, 'utf8'));
+    // Per-platform out-dirs normally make this impossible; an explicit
+    // --out-dir can still put two machines' results in one directory, and a
+    // cross-platform column is a comparison of the hardware, not the engines.
+    if (prior.platform && prior.platform !== opts.platform) {
+      process.stderr.write(
+        `[compare] warning: ${engine}-results.json in ${outDir} was measured on ` +
+        `${prior.platform}, this run is ${opts.platform} — the folded-in column is not comparable\n`);
+    }
+    results[engine] = prior;
   }
 
-  const cmp = buildComparison(results, generatedAt);
+  const cmp = buildComparison(results, generatedAt, opts.platform);
   writeFileSync(join(outDir, 'comparison.json'), `${JSON.stringify(cmp, null, 2)}\n`);
   writeFileSync(join(outDir, 'comparison.md'), renderMarkdown(cmp, results));
   process.stderr.write('[compare] wrote comparison.json + comparison.md\n');

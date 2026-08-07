@@ -11,13 +11,31 @@ name: Octane Benchmarks
 #
 # Each Octane suite runs in isolation (a fresh Chromium page / a fresh shell
 # process) so a crash, hang, or error in one suite never discards the others —
-# Broiler is experimental and some suites do not yet complete. Results and the
-# comparison are written to tests/octane/results and, on the default branch,
-# committed.
+# Broiler is experimental and some suites do not yet complete.
+#
+# The `platform` input picks which of the release RIDs to measure on —
+# win-x64, linux-x64, linux-arm64, or `all` for the full matrix that
+# docs/performance/protocol.md §3.1 requires before a result may be claimed.
+# Each platform is its own job on its own runner and writes its own results
+# directory, tests/octane/results/<platform>/: Octane scores do not carry
+# across machines, and the harness folds a previously committed engine result
+# back into the comparison, which is only honest within one platform.
 
 on:
   workflow_dispatch:
     inputs:
+      platform:
+        description: >-
+          Release RID to benchmark on. `all` fans out to every one of them —
+          three jobs, three results directories, nothing shared.
+        type: choice
+        required: false
+        default: linux-x64
+        options:
+          - linux-x64
+          - win-x64
+          - linux-arm64
+          - all
       engines:
         description: Comma-separated engines to run (chromium,broiler,jint).
         required: false
@@ -62,14 +80,65 @@ on:
 permissions:
   contents: write   # commit the refreshed Octane results
 
+# Keyed by platform as well as ref: a win-x64 dispatch measures something a
+# linux-x64 one does not, so it must not cancel it.
 concurrency:
-  group: octane-${{ github.ref }}
+  group: octane-${{ github.ref }}-${{ github.event.inputs.platform || 'linux-x64' }}
   cancel-in-progress: true
 
 jobs:
-  benchmark:
-    name: Octane (Chromium vs Broiler vs Jint)
+  # Turns the single `platform` input into the matrix the benchmark job runs.
+  # Kept as a step rather than a runner-label expression inline in `runs-on` so
+  # the RID-to-runner mapping is written once, in one readable place.
+  select-platforms:
+    name: Select platforms
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - name: Map the requested RIDs to runner labels
+        id: select
+        env:
+          PLATFORM: ${{ github.event.inputs.platform || 'linux-x64' }}
+        run: |
+          set -euo pipefail
+
+          # The release matrix of docs/performance/protocol.md §3.1. linux-arm64
+          # is a GitHub-hosted Arm runner; the label is a distinct image, not a
+          # ubuntu-latest variant, so it is spelled out rather than derived.
+          runner_for() {
+            case "$1" in
+              linux-x64)   echo 'ubuntu-latest' ;;
+              win-x64)     echo 'windows-latest' ;;
+              linux-arm64) echo 'ubuntu-24.04-arm' ;;
+              *) echo "Unknown platform: $1" >&2; exit 1 ;;
+            esac
+          }
+
+          case "$PLATFORM" in
+            all) platforms='linux-x64 win-x64 linux-arm64' ;;
+            *)   platforms="$PLATFORM" ;;
+          esac
+
+          entries=''
+          for p in $platforms; do
+            entries="${entries:+$entries,}{\"platform\":\"$p\",\"runner\":\"$(runner_for "$p")\"}"
+          done
+          matrix="{\"include\":[$entries]}"
+
+          echo "Benchmarking on: $platforms"
+          echo "$matrix"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  benchmark:
+    name: Octane (${{ matrix.platform }})
+    needs: select-platforms
+    strategy:
+      # One platform failing must not cancel the measurements already running on
+      # the others — a lost three-hour run is the expensive failure here.
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.select-platforms.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
     # Jint adds about ten minutes to the previous 90: it completes every suite,
     # and its slowest (Mandreel) measured 104s against Broiler's 313s.
     #
@@ -80,9 +149,23 @@ jobs:
     # of a recursive-submodule checkout and a Release build. Tripling the
     # benchmark half lands near 95 minutes, which the previous 105 would have cut
     # off often enough to make the band unobtainable — the failure mode being a
-    # run that costs the full 105 minutes and commits nothing.
+    # run that costs the full 105 minutes and commits nothing. The same budget
+    # covers every platform: win-x64 and linux-arm64 have no measured figure of
+    # their own yet, and the first runs on them are what will produce one.
     timeout-minutes: 180
+    defaults:
+      run:
+        # The harness is one bash script on every platform; on windows-latest
+        # that is Git Bash, which is why the script converts the paths it hands
+        # to Node back into native ones.
+        shell: bash
     steps:
+      # Windows checkouts of a recursively-nested submodule tree hit MAX_PATH
+      # before they hit anything interesting. Set before checkout, not after.
+      - name: Allow long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --global core.longpaths true
+
       - uses: actions/checkout@v5
         with:
           # Nested submodules are required: without them the Broiler.JS build
@@ -102,10 +185,12 @@ jobs:
 
       - name: Run Octane benchmarks
         env:
+          PLATFORM: ${{ matrix.platform }}
           ONLY: ${{ github.event.inputs.only }}
           VERBOSE: ${{ github.event.inputs.verbose }}
         run: |
           args=(
+            --platform "$PLATFORM"
             --engines "${{ github.event.inputs.engines || 'chromium,broiler,jint' }}"
             --timeout "${{ github.event.inputs.timeout_seconds || '180' }}"
             --repetitions "${{ github.event.inputs.repetitions || '3' }}"
@@ -117,8 +202,14 @@ jobs:
 
       - name: Publish comparison and failure diagnostics to job summary
         if: always()
+        env:
+          PLATFORM: ${{ matrix.platform }}
         run: |
-          for f in tests/octane/results/comparison.md tests/octane/results/diagnostics.md; do
+          # With `all` dispatched, three jobs write into one summary; each says
+          # up front which machine it is reporting on.
+          echo "## $PLATFORM" >> "$GITHUB_STEP_SUMMARY"
+          for f in "tests/octane/results/$PLATFORM/comparison.md" \
+                   "tests/octane/results/$PLATFORM/diagnostics.md"; do
             [ -f "$f" ] && cat "$f" >> "$GITHUB_STEP_SUMMARY"
           done
           exit 0
@@ -126,8 +217,8 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: octane-results
-          path: tests/octane/results/
+          name: octane-results-${{ matrix.platform }}
+          path: tests/octane/results/${{ matrix.platform }}/
 
       # The per-suite logs hold the whole story for a failing suite — full
       # stdout/stderr, the exit code, the phase it died in, and the combined
@@ -135,7 +226,7 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: octane-logs
+          name: octane-logs-${{ matrix.platform }}
           path: tests/octane/logs/
           if-no-files-found: ignore
 
@@ -143,10 +234,16 @@ jobs:
       # has usually moved by the time it has something to commit — a plain push
       # is rejected as non-fast-forward and the whole run's measurements are
       # lost. The helper rebuilds the commit on the current tip and retries.
+      #
+      # Under `all` the three jobs commit concurrently, and that is safe: each
+      # names only its own results directory, and the helper replaces exactly
+      # the paths it is given on top of whatever the tip has become — so the
+      # win-x64 job's commit carries the linux-x64 job's results forward
+      # untouched rather than reverting them.
       - name: Commit results
         if: ${{ github.event.inputs.commit_results != 'false' }}
         run: |
           bash scripts/ci-commit-generated-results.sh \
             --branch "${{ github.ref_name }}" \
-            --message "ci: update Octane benchmark results [skip ci]" \
-            tests/octane/results/
+            --message "ci: update Octane benchmark results (${{ matrix.platform }}) [skip ci]" \
+            "tests/octane/results/${{ matrix.platform }}/"

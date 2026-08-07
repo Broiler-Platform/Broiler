@@ -13,8 +13,14 @@
 #     ./scripts/run-octane-benchmarks.sh [OPTIONS]
 #
 # Options:
+#     --platform <rid>     Runtime identifier the run is labelled with, e.g.
+#                          win-x64, linux-x64, linux-arm64 (default: detected
+#                          from uname). Results are written per platform —
+#                          a score only means something next to the machine
+#                          that produced it, and the release matrix in
+#                          docs/performance/protocol.md is all three.
 #     --octane-dir <dir>   Existing Octane checkout (default: clone into tests/octane/checkout)
-#     --out-dir <dir>      Results directory (default: tests/octane/results)
+#     --out-dir <dir>      Results directory (default: tests/octane/results/<platform>)
 #     --log-dir <dir>      Per-suite diagnostic logs (default: tests/octane/logs)
 #     --engines <list>     Comma-separated engines to run: chromium, broiler, jint
 #                          (default: chromium,broiler,jint)
@@ -54,9 +60,43 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# The .NET runtime identifier this machine is. Used to label the run and to keep
+# each platform's results in their own directory: the harness folds a previously
+# committed engine result back into the comparison, which is only honest when
+# every column came off the same machine.
+detect_platform() {
+    local os arch
+    case "$(uname -s)" in
+        Linux)                        os=linux ;;
+        Darwin)                       os=osx ;;
+        MINGW*|MSYS*|CYGWIN*|Windows_NT) os=win ;;
+        *)                            os="$(uname -s | tr '[:upper:]' '[:lower:]')" ;;
+    esac
+    case "$(uname -m)" in
+        x86_64|amd64)  arch=x64 ;;
+        aarch64|arm64) arch=arm64 ;;
+        *)             arch="$(uname -m)" ;;
+    esac
+    printf '%s-%s\n' "$os" "$arch"
+}
+
+# Node is a native Windows binary under Git Bash, where an absolute path is an
+# MSYS one (/d/a/...) that Node would resolve against the current drive — every
+# result file would land somewhere nobody looks. Hand it a real Windows path
+# instead; `cygpath -m` keeps forward slashes, which Node and bash both accept.
+# A no-op everywhere cygpath does not exist, which is everywhere but Windows.
+to_native() {
+    if command -v cygpath > /dev/null 2>&1; then
+        cygpath -m "$1"
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
+PLATFORM=""
 OCTANE_DIR=""
-OUT_DIR="$REPO_ROOT/tests/octane/results"
-LOG_DIR="$REPO_ROOT/tests/octane/logs"
+OUT_DIR=""
+LOG_DIR=""
 ENGINES="chromium,broiler,jint"
 TIMEOUT=180
 OCTANE_REF="master"
@@ -66,6 +106,7 @@ EXTRA_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --platform) PLATFORM="$2"; shift 2 ;;
         --octane-dir) OCTANE_DIR="$2"; shift 2 ;;
         --out-dir) OUT_DIR="$2"; shift 2 ;;
         --log-dir) LOG_DIR="$2"; shift 2 ;;
@@ -81,14 +122,19 @@ while [[ $# -gt 0 ]]; do
         --no-trace) EXTRA_ARGS+=(--no-trace); shift ;;
         --broiler-env) EXTRA_ARGS+=(--broiler-env "$2"); shift 2 ;;
         -h|--help)
-            sed -n '2,43p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
 
+[[ -n "$PLATFORM" ]] || PLATFORM="$(detect_platform)"
+[[ -n "$OUT_DIR" ]] || OUT_DIR="$REPO_ROOT/tests/octane/results/$PLATFORM"
+[[ -n "$LOG_DIR" ]] || LOG_DIR="$REPO_ROOT/tests/octane/logs"
+
 echo "=== Broiler Octane Benchmark Runner ==="
 echo "Repository root : $REPO_ROOT"
+echo "Platform        : $PLATFORM"
 echo "Output directory: $OUT_DIR"
 echo "Log directory   : $LOG_DIR"
 echo "Engines         : $ENGINES"
@@ -115,7 +161,10 @@ else
 fi
 echo ""
 
-NODE_ARGS=(--octane-dir "$OCTANE_DIR" --out-dir "$OUT_DIR" --log-dir "$LOG_DIR" \
+NODE_ARGS=(--octane-dir "$(to_native "$OCTANE_DIR")" \
+           --out-dir "$(to_native "$OUT_DIR")" \
+           --log-dir "$(to_native "$LOG_DIR")" \
+           --platform "$PLATFORM" \
            --engines "$ENGINES" --timeout "$TIMEOUT" "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}")
 
 # --- Step 2: Build the shell hosts for whichever engines are running ----------
@@ -124,7 +173,7 @@ if [[ ",$ENGINES," == *",broiler,"* ]]; then
     BROILER_PROJ="$REPO_ROOT/Broiler.JS/Broiler.JS/Broiler.JavaScript/Broiler.JavaScript.csproj"
     if [[ "$SKIP_BUILD" != "true" ]]; then
         echo "--- Step 2a: Building BroilerJS shell (Release) ---"
-        dotnet build "$BROILER_PROJ" --configuration Release --nologo --verbosity quiet 2>&1 | tail -3
+        dotnet build "$(to_native "$BROILER_PROJ")" --configuration Release --nologo --verbosity quiet 2>&1 | tail -3
         echo "  ✓ Build succeeded"
     else
         echo "--- Step 2a: Skipping BroilerJS build (--skip-build) ---"
@@ -132,7 +181,7 @@ if [[ ",$ENGINES," == *",broiler,"* ]]; then
     BROILER_DLL="$(find "$REPO_ROOT/Broiler.JS/Broiler.JS/Broiler.JavaScript/bin/Release" -name BroilerJS.dll | head -1)"
     [[ -n "$BROILER_DLL" ]] || { echo "  ✗ BroilerJS.dll not found; build first." >&2; exit 1; }
     echo "  BroilerJS.dll: $BROILER_DLL"
-    NODE_ARGS+=(--broiler-dll "$BROILER_DLL")
+    NODE_ARGS+=(--broiler-dll "$(to_native "$BROILER_DLL")")
     echo ""
 fi
 
@@ -142,7 +191,7 @@ if [[ ",$ENGINES," == *",jint,"* ]]; then
     JINT_PROJ="$REPO_ROOT/tests/octane/jint-host/Broiler.Octane.JintHost.csproj"
     if [[ "$SKIP_BUILD" != "true" ]]; then
         echo "--- Step 2b: Building the Jint shell (Release) ---"
-        dotnet build "$JINT_PROJ" --configuration Release --nologo --verbosity quiet 2>&1 | tail -3
+        dotnet build "$(to_native "$JINT_PROJ")" --configuration Release --nologo --verbosity quiet 2>&1 | tail -3
         echo "  ✓ Build succeeded"
     else
         echo "--- Step 2b: Skipping Jint shell build (--skip-build) ---"
@@ -150,7 +199,7 @@ if [[ ",$ENGINES," == *",jint,"* ]]; then
     JINT_DLL="$(find "$REPO_ROOT/tests/octane/jint-host/bin/Release" -name Broiler.Octane.JintHost.dll | head -1)"
     [[ -n "$JINT_DLL" ]] || { echo "  ✗ Broiler.Octane.JintHost.dll not found; build first." >&2; exit 1; }
     echo "  Jint shell: $JINT_DLL"
-    NODE_ARGS+=(--jint-dll "$JINT_DLL")
+    NODE_ARGS+=(--jint-dll "$(to_native "$JINT_DLL")")
     echo ""
 fi
 
@@ -165,7 +214,14 @@ if [[ ",$ENGINES," == *",chromium,"* ]]; then
     else
         npm install 2>&1 | tail -5
     fi
-    npx playwright install --with-deps chromium 2>&1 | tail -5
+    # --with-deps installs the system libraries Chromium needs, which Playwright
+    # only knows how to do on Debian/Ubuntu; on Windows it is an error, not a
+    # no-op, so ask for the browser alone there.
+    if [[ "$PLATFORM" == linux-* ]]; then
+        npx playwright install --with-deps chromium 2>&1 | tail -5
+    else
+        npx playwright install chromium 2>&1 | tail -5
+    fi
     popd > /dev/null
     echo "  ✓ Chromium ready"
     echo ""
@@ -177,13 +233,13 @@ fi
 # just without saying where — a silent loss that is easy to miss.
 
 echo "--- Step 4: Harness self-test ---"
-node "$REPO_ROOT/tests/octane/harness-selftest.mjs"
+node "$(to_native "$REPO_ROOT/tests/octane/harness-selftest.mjs")"
 echo ""
 
 # --- Step 5: Run the benchmarks ----------------------------------------------
 
 echo "--- Step 5: Running Octane suites ---"
-node "$SCRIPT_DIR/run-octane.mjs" "${NODE_ARGS[@]}"
+node "$(to_native "$SCRIPT_DIR/run-octane.mjs")" "${NODE_ARGS[@]}"
 echo ""
 
 # --- Step 6: Summary ----------------------------------------------------------
