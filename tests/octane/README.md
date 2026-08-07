@@ -56,6 +56,15 @@ for the full matrix, which fans out to one job per RID on its own runner
 logs are uploaded as `octane-results-<platform>` and `octane-logs-<platform>`
 artifacts, and each job commits only its own results directory.
 
+The workflow carries the RID in `OCTANE_PLATFORM`, not `PLATFORM`, and the
+prefix is load-bearing: the step also runs `dotnet build`, and MSBuild reads
+every environment variable as a global property. A variable named `PLATFORM`
+therefore sets `$(Platform)`, and any value but `AnyCPU` moves the build to
+`bin/<platform>/<configuration>/`. Name benchmark variables so no MSBuild
+property answers to them. The harness no longer assumes the default path
+either — it asks MSBuild for `TargetPath` — so a stray `Platform` in the
+environment relocates the build without losing it.
+
 Benchmarking takes hours, so the branch has usually moved by the time there is
 anything to commit. The commit step goes through
 [`scripts/ci-commit-generated-results.sh`](../../scripts/ci-commit-generated-results.sh),

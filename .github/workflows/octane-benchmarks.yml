@@ -99,7 +99,7 @@ jobs:
       - name: Map the requested RIDs to runner labels
         id: select
         env:
-          PLATFORM: ${{ github.event.inputs.platform || 'linux-x64' }}
+          OCTANE_PLATFORM: ${{ github.event.inputs.platform || 'linux-x64' }}
         run: |
           set -euo pipefail
 
@@ -115,9 +115,9 @@ jobs:
             esac
           }
 
-          case "$PLATFORM" in
+          case "$OCTANE_PLATFORM" in
             all) platforms='linux-x64 win-x64 linux-arm64' ;;
-            *)   platforms="$PLATFORM" ;;
+            *)   platforms="$OCTANE_PLATFORM" ;;
           esac
 
           entries=''
@@ -183,33 +183,40 @@ jobs:
         with:
           node-version: '20'
 
+      # OCTANE_PLATFORM, not PLATFORM: this step runs `dotnet build`, and MSBuild
+      # reads every environment variable as a global property. A variable named
+      # PLATFORM therefore sets $(Platform), and any value other than AnyCPU
+      # moves the whole build to bin/<platform>/<configuration>/ — the harness
+      # then found no bin/Release and every platform's job died before it
+      # benchmarked anything. Keep benchmark-harness variables under a prefix no
+      # MSBuild property answers to.
       - name: Run Octane benchmarks
         env:
-          PLATFORM: ${{ matrix.platform }}
-          ONLY: ${{ github.event.inputs.only }}
-          VERBOSE: ${{ github.event.inputs.verbose }}
+          OCTANE_PLATFORM: ${{ matrix.platform }}
+          OCTANE_ONLY: ${{ github.event.inputs.only }}
+          OCTANE_VERBOSE: ${{ github.event.inputs.verbose }}
         run: |
           args=(
-            --platform "$PLATFORM"
+            --platform "$OCTANE_PLATFORM"
             --engines "${{ github.event.inputs.engines || 'chromium,broiler,jint' }}"
             --timeout "${{ github.event.inputs.timeout_seconds || '180' }}"
             --repetitions "${{ github.event.inputs.repetitions || '3' }}"
             --octane-ref "${{ github.event.inputs.octane_ref || 'master' }}"
           )
-          [ -n "$ONLY" ] && args+=(--only "$ONLY")
-          [ "$VERBOSE" = "true" ] && args+=(--verbose)
+          [ -n "$OCTANE_ONLY" ] && args+=(--only "$OCTANE_ONLY")
+          [ "$OCTANE_VERBOSE" = "true" ] && args+=(--verbose)
           bash scripts/run-octane-benchmarks.sh "${args[@]}"
 
       - name: Publish comparison and failure diagnostics to job summary
         if: always()
         env:
-          PLATFORM: ${{ matrix.platform }}
+          OCTANE_PLATFORM: ${{ matrix.platform }}
         run: |
           # With `all` dispatched, three jobs write into one summary; each says
           # up front which machine it is reporting on.
-          echo "## $PLATFORM" >> "$GITHUB_STEP_SUMMARY"
-          for f in "tests/octane/results/$PLATFORM/comparison.md" \
-                   "tests/octane/results/$PLATFORM/diagnostics.md"; do
+          echo "## $OCTANE_PLATFORM" >> "$GITHUB_STEP_SUMMARY"
+          for f in "tests/octane/results/$OCTANE_PLATFORM/comparison.md" \
+                   "tests/octane/results/$OCTANE_PLATFORM/diagnostics.md"; do
             [ -f "$f" ] && cat "$f" >> "$GITHUB_STEP_SUMMARY"
           done
           exit 0
