@@ -93,6 +93,18 @@ to_native() {
     fi
 }
 
+# Where MSBuild actually put a project's assembly, asked rather than assumed.
+# bin/<configuration>/ is only the default: MSBuild reads every environment
+# variable as a global property, so a caller carrying PLATFORM=linux-arm64 (or
+# any other $(Platform) that is not AnyCPU) redirects the build to
+# bin/<platform>/<configuration>/ — which is how the CI matrix's own
+# per-platform variable once made every job fail to find the shell it had just
+# built. Querying the same evaluation the build used cannot drift from it.
+target_path() {
+    dotnet msbuild "$(to_native "$1")" -nologo -p:Configuration=Release \
+        -getProperty:TargetPath 2>/dev/null | tr -d '\r' | tail -1
+}
+
 PLATFORM=""
 OCTANE_DIR=""
 OUT_DIR=""
@@ -178,10 +190,10 @@ if [[ ",$ENGINES," == *",broiler,"* ]]; then
     else
         echo "--- Step 2a: Skipping BroilerJS build (--skip-build) ---"
     fi
-    BROILER_DLL="$(find "$REPO_ROOT/Broiler.JS/Broiler.JS/Broiler.JavaScript/bin/Release" -name BroilerJS.dll | head -1)"
-    [[ -n "$BROILER_DLL" ]] || { echo "  ✗ BroilerJS.dll not found; build first." >&2; exit 1; }
+    BROILER_DLL="$(to_native "$(target_path "$BROILER_PROJ")")"
+    [[ -f "$BROILER_DLL" ]] || { echo "  ✗ BroilerJS.dll not found; build first." >&2; exit 1; }
     echo "  BroilerJS.dll: $BROILER_DLL"
-    NODE_ARGS+=(--broiler-dll "$(to_native "$BROILER_DLL")")
+    NODE_ARGS+=(--broiler-dll "$BROILER_DLL")
     echo ""
 fi
 
@@ -196,10 +208,10 @@ if [[ ",$ENGINES," == *",jint,"* ]]; then
     else
         echo "--- Step 2b: Skipping Jint shell build (--skip-build) ---"
     fi
-    JINT_DLL="$(find "$REPO_ROOT/tests/octane/jint-host/bin/Release" -name Broiler.Octane.JintHost.dll | head -1)"
-    [[ -n "$JINT_DLL" ]] || { echo "  ✗ Broiler.Octane.JintHost.dll not found; build first." >&2; exit 1; }
+    JINT_DLL="$(to_native "$(target_path "$JINT_PROJ")")"
+    [[ -f "$JINT_DLL" ]] || { echo "  ✗ Broiler.Octane.JintHost.dll not found; build first." >&2; exit 1; }
     echo "  Jint shell: $JINT_DLL"
-    NODE_ARGS+=(--jint-dll "$(to_native "$JINT_DLL")")
+    NODE_ARGS+=(--jint-dll "$JINT_DLL")
     echo ""
 fi
 
