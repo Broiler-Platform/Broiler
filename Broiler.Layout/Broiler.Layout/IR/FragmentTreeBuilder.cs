@@ -490,6 +490,15 @@ internal static class FragmentTreeBuilder
     /// <c>(null, null)</c> when the element is not an embedded HTML document
     /// or the source cannot be read.
     /// </summary>
+    /// <summary>
+    /// The base URL a nested document with no URL of its own inherits from its container — an
+    /// <c>about:srcdoc</c> or <c>data:</c> document. <see cref="Uri.AbsoluteUri"/> throws on a
+    /// relative <see cref="Uri"/>, and a page rendered without a base URL has one, so reading it
+    /// unguarded turned a frame into an exception out of the whole render.
+    /// </summary>
+    private static string ContainerBaseUrl(CssBox box) =>
+        box.BaseUrl is { IsAbsoluteUri: true } baseUrl ? baseUrl.AbsoluteUri : null;
+
     private static (string Html, string BaseUrl) TryLoadEmbeddedDocument(CssBox box)
     {
         string tagName = box.HtmlTag.Name;
@@ -514,6 +523,25 @@ internal static class FragmentTreeBuilder
         else if (tagName.Equals("iframe", StringComparison.OrdinalIgnoreCase)
                  || tagName.Equals("frame", StringComparison.OrdinalIgnoreCase))
         {
+            // HTML §4.8.5: an <iframe>'s `srcdoc` carries the nested document's markup inline, and
+            // when present it is what the frame navigates to — `src` is not consulted at all. Only
+            // `src` was read here, so every srcdoc frame rendered as an empty box and the parent
+            // showed through it: the whole WPT css-view-transitions iframe family (issue #1552
+            // problems 5 and 6) differed from its reference by exactly the frame's area.
+            //
+            // Its base URL is the container document's — an `about:srcdoc` document inherits the
+            // base URL of the browsing context that created it (HTML §"the base element") — so a
+            // relative link inside resolves the same way one in the parent would.
+            //
+            // An absent or empty `srcdoc` is not a document: the reference browser leaves the frame
+            // showing nothing (its canvas is transparent), which is what returning null produces.
+            // <frame> has no srcdoc content attribute, so this is scoped to <iframe>.
+            if (tagName.Equals("iframe", StringComparison.OrdinalIgnoreCase)
+                && box.GetAttribute("srcdoc") is { Length: > 0 } srcDoc)
+            {
+                return (srcDoc, ContainerBaseUrl(box));
+            }
+
             url = box.GetAttribute("src");
             if (string.IsNullOrEmpty(url))
                 return (null, null);
@@ -528,7 +556,7 @@ internal static class FragmentTreeBuilder
         {
             int comma = url.IndexOf(',');
             if (comma >= 0 && comma + 1 < url.Length)
-                return (Uri.UnescapeDataString(url[(comma + 1)..]), box.BaseUrl?.AbsoluteUri);
+                return (Uri.UnescapeDataString(url[(comma + 1)..]), ContainerBaseUrl(box));
             return (null, null);
         }
 
