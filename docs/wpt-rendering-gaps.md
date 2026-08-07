@@ -7,8 +7,9 @@
   problem.
 - **Later runs get their own section rather than a rewrite**, since most of each
   new list is the same tests under new numbers:
-  [#1497 (2026-07-30)](#the-next-run-issue-1497-2026-07-30) and
-  [#1538 (2026-08-05)](#the-next-run-issue-1538-2026-08-05). Where a re-run
+  [#1497 (2026-07-30)](#the-next-run-issue-1497-2026-07-30),
+  [#1538 (2026-08-05)](#the-next-run-issue-1538-2026-08-05) and
+  [#1562 (2026-08-07)](#the-next-run-issue-1562-2026-08-07). Where a re-run
   contradicts something below, the section says so and the row here is struck
   through — read the newest section first.
 - **Not in scope:** problem 1 (the `DomDocument.CreateElement` crash) is fixed —
@@ -1313,6 +1314,114 @@ owned by a section above). Re-reported problems point at that section.
 | 28 | `css-view-transitions/reset-state-after-scrolled-view-transition` | 3.6% | 3.61% | **part-fixed** — the scroll no longer overshoots the end (CSSOM View clamp, main repo); still failing on the rasterised root snapshot, which is #1491's problems 19/21/23 |
 | 29 | `html/…/form-validation-validity-textarea-defaultValue` | 3.8% | 3.78% | open — a **testharness** test whose reference is Chromium's results table; three of its five subtests drive `test_driver.send_keys`, which the runner only stubs |
 | 30 | `css-fonts/…/font-size-math-001.tentative` | 3.9% | **3.93% → 99.86%** | **fixed** — `font-size: math` is `1em`; the subset goes 7 → 13 of 14, main repo |
+
+## The next run (issue #1562, 2026-08-07)
+
+19 927 failures, no incomplete shards. Cross-referencing the list against the
+three runs above: **seventeen of the thirty are tests those sections already
+name, or new members of families they own** (the nested view transitions, the
+`grid-lanes` subgrid pair, `auto-name`, the `massive-element-*` four); **seven
+more are new and were not investigated**; and the remaining **six — problems
+21–26 — are the `css-contain` background cluster this session closed**, the
+largest single-cause group on the list and new to it. So unlike the sections
+above, the at-a-glance table below carries a local number only for those six.
+Everything else points at the section that already owns it rather than being
+re-measured.
+
+### Containment other than `paint` never stopped background propagation — problems 21–26, **fixed**
+
+- **Tests:** `css/css-contain/contain-body-bg-001` (layout), `-003` (size),
+  `-004` (style) and `contain-html-bg-001`/`-003`/`-004` (the same three, set on
+  the root instead of body). All six are 7.5% on CI and **reproduce here at 7.5%
+  exactly** — 727 836 of 786 432 pixels differ, which is the whole 1024×768
+  canvas but for the test's 300×200 white `<p>`.
+- **Owner:** `Broiler.HTML` (`IR/PaintWalker.CanvasBackground.cs` and
+  `HtmlContainerInt.cs`), so it ships as
+  [`patches/0120`](../patches/README.md) — the push is 403, as `CLAUDE.md`
+  describes. It is listed in `scripts/apply-pending-wpt-patches.sh`, so the WPT
+  run exercises it on CI ahead of a maintainer landing it.
+- **One condition, one keyword too narrow.** Each test paints `<body>` red under
+  a white `<p>` that covers it exactly, so the only red that can reach the screen
+  is red the *canvas* took from body. `FindCanvasBackgroundAndImage` suppressed
+  propagation for `contain: paint` only (plus `strict`/`content`, the shorthands
+  that include it), so `layout`, `size` and `style` propagated as if no
+  containment were set and flooded the canvas. That is why `-002` — the `paint`
+  member of each family — was the one already passing, and why it is not on the
+  issue's list.
+- **The spec names all four, and it names both elements.** CSS Contain 2 §2:
+  *"when any containments are active on either the html or body elements,
+  propagation of properties from the body element to the initial containing
+  block, the viewport, or the canvas background, is disabled"*. So the check is
+  now "is **any** containment active", tokenised rather than substring-matched
+  (`none` must not read as a keyword), and it also answers yes for
+  `content-visibility: hidden`/`auto`, which apply containment by other means.
+  Both halves of the cascade were fixed together: `PaintWalker` decides what
+  paints the canvas, and `HtmlContainerInt.GetRootBackgroundColor` decides the
+  colour the surface is erased with — they have to agree, or the erase colour
+  wins in the margins.
+- **The mirror-image half, which the tests do not cover and Chromium settles.**
+  The old code applied the same suppression to the *root's own* background, so
+  `html { contain: paint; background: green }` painted a white canvas. That is
+  wrong in the other direction: the root element's background **is** the canvas
+  background rather than something propagated to it, and the spec disables
+  propagation *from body*. Asked directly — Chromium under Playwright, five
+  documents differing only in the `contain` value — the whole canvas comes back
+  `rgb(0,128,0)` for `layout`, `paint`, `size`, `style` and no containment alike.
+  Only `display: none` still holds the root's background back.
+- **Calibrated against Chromium rather than inferred.** Ten further probes fixed
+  the edges of the rule. Suppressing, on body: `contain: layout`, `style`,
+  `inline-size`, `content-visibility: hidden` and `content-visibility: auto`. On
+  html: `contain: inline-size` and `content-visibility: auto`. **Not**
+  suppressing: `contain: none`, and no `contain` at all — both still flood the
+  canvas red, which is what keeps the fix from over-suppressing.
+- **One divergence, recorded rather than papered over.** Containment does not
+  apply to a non-atomic inline, and Chromium duly keeps propagating for
+  `body { display: inline; contain: layout }`. Broiler cannot reproduce that
+  distinction: instrumenting both code paths shows the box tree reporting
+  `<body>` as `display: block` whatever `display` says, so a guard for it would
+  be unreachable. The first draft carried one; it was removed once the
+  instrumentation said so, and the comment now says why.
+- **Measured.** The 584-test `css/css-contain` subset goes **413 → 419 passing**,
+  the six tests **7.5% → 99.8%**, and the failing-test set differs by exactly
+  those six in one direction and nothing in the other. Average match
+  96.57% → 97.62% — and that +1.05 is precisely the six tests' own contribution
+  (6 × (99.8 − 7.5) ÷ 524), so no other test in the subset moved even
+  sub-threshold.
+- **Regression-checked on the two subsets that own the canvas.** `css-backgrounds`
+  (956 tests) and `css-color-adjust` (36) were run against the pinned engine and
+  against the patched one: **all 991 result lines byte-identical** — same passes,
+  same failures, same match percentages to the decimal. `RootBackgroundTests` and
+  `ContainPaintClipTests` are unchanged, and 20 new cases in
+  `CanvasBackgroundContainmentTests` cover every containment keyword on both
+  elements, both `content-visibility` values, the `none`/absent controls, the
+  root's own background, and `display: none` on body.
+
+### #1562 problems, at a glance
+
+CI percentages are the issue's. **"—" means not measured here** — only problems
+21–26 were investigated this session; the rest point at the section that already
+owns them, and their status is that section's, not a fresh measurement.
+
+| # | Test | CI | Local | Status |
+| --- | --- | --- | --- | --- |
+| 1 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | — | re-report of #1538 problem 2 — needs `.sub` substitution and a second host |
+| 2 | `css-page/page-margin-002-print` | 0.0% | — | re-report of #1538 problem 3 — [screen-layout gaps](#screen-layout-gaps-behind-the-three-print-html-tests) |
+| 3, 4 | `css-view-transitions/nested/nested-{position-with-border,root-capture-with-clip}` (2) | 0.0% | — | new to this list — the nested-transition family of [view transitions do not capture the document](#view-transitions-do-not-capture-the-document--still-open-2-will-not-be-won-here) |
+| 5 | `resource-timing/initiator-type/frameset` | 0.0% | — | re-report of #1538 problem 9 — [frameset frames render nothing](#frameset-frames-render-nothing) |
+| 6 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | — | **won't fix** — #1538 problem 10: Chromium fails this reftest against its own reference |
+| 7, 8 | `css-grid/…/grid-subgridded-to-grid-lanes/…` (2) | 0.8%, 0.9% | — | open — same `display: inline grid-lanes` family as #1538 problems 12/13, which Broiler drops as invalid because no stable browser ships it unflagged |
+| 9, 10 | `css-view-transitions/auto-name{-from-id-shadow,}` (2) | 1.3% | — | **won't fix** — the `auto-name` family, #1538 problem 18: the reference is Chromium's unfeatured render |
+| 11 | `css-view-transitions/view-transition-waituntil-animation-manipulation` | 1.3% | — | does not reproduce offline (98.46% at #1538 problem 19) — judge from CI |
+| 12 | `css-view-transitions/root-to-shared-animation-start` | 1.5% | — | new to this list — needs the rasterised root snapshot, #1491 problems 19/21/23 |
+| 13–16 | `css-view-transitions/massive-element-{left,right}-of-viewport-partially-onscreen-{new,old}` (4) | 2.0%, 2.6% | — | open — **half fixed** at #1538 problems 22/23/25/26; these still fail on the snapshot clone's box sizing |
+| 17 | `quirks/tables-inherit-color-from-body-quirk-007` | 5.1% | — | new to this list — not investigated |
+| 18 | `css-grid/subgrid/orthogonal-writing-mode-006` | 5.6% | — | new to this list — not investigated |
+| 19 | `css-backgrounds/background-image-shared-stylesheet` | 5.7% | — | re-report of #1538 problem 1 — needs the server's `trickle` pipe |
+| 20 | `css-overflow/overflow-scroll-resize-visibility-hidden` | 5.9% | — | new to this list — not investigated |
+| 21–26 | `css-contain/contain-{body,html}-bg-00{1,3,4}` (6) | 7.5% | **7.5% → 99.8%** | **fixed** — any containment on html or body disables propagation from body ([`patches/0120`](../patches/README.md)) |
+| 27 | `css/filter-effects/fecolormatrix-negative` | 7.7% | — | new to this list — not investigated |
+| 28, 29 | `css/filter-effects/svg-filter-{filter,primitive}-units-user-space` (2) | 8.0% | — | new to this list — not investigated |
+| 30 | `css-sizing/replaced-max-size-saturation` | 8.3% | — | new to this list — not investigated |
 
 ## Reported problems, at a glance
 
