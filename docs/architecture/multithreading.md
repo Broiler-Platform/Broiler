@@ -6,12 +6,25 @@ the tooling.
 
 ## Status
 
+**Phase 2 is under way.** Item #9 — the gate — has landed; the rest of the phase
+is not started. What building it changed is in
+[What building Phase 2 changed](#what-building-phase-2-changed).
+
+| Item | State | Evidence |
+|---|---|---|
+| #9 — shared render-path caches | **Done** | `FontsHandler`, `BImageRenderer`, `FallbackSystemFont` contour caches and `TrueTypeFont`'s five lazy tables; `RenderPathConcurrencyTests` (6 cases, 5 of which fail against the code before the change). Both P0-c residuals closed with it |
+| #3/#4 — band-parallel raster | Not started | Blocked on nothing now, but see [§2 below](#2-the-rasterizer-the-profile-measures-is-item-4s-copy-not-item-3s) — the stage the profile measures is item #4's copy, not item #3's |
+| #5 — tile-parallel replay | Not started | — |
+| #6/#7/#8 — image decode | Not started | #8 was blocked on `BImageRenderer._images`; that is now unblocked |
+| #10 — shaped-run cache | Not started | Was blocked on #9 |
+| #17 — preload scan | Not started | — |
+
 **Phase 1 is complete.** All four items landed; what each one turned out to be
 worth is in [What building Phase 1 changed](#what-building-phase-1-changed).
 
 | Item | State | Evidence |
 |---|---|---|
-| #1 — WPT worker pool | **Done** | `--workers <N>\|auto` in `src/Broiler.Wpt/Program.cs`; 45.2 s → 23.4 s on a 61-test subset at 4 cores, identical classification at 1, 4 and auto |
+| #1 — WPT worker pool | **Done** | `--workers <N>\|auto` in `src/Broiler.Wpt/Program.cs`; **full corpus 90 min → 45 min (2.0×)** at 4 cores, 45.2 s → 23.4 s on the 61-test subset it was developed against, identical classification at 1, 4 and auto |
 | #20 — CLI batch parallelism | **Done** | `src/Broiler.Cli/BatchRunner.cs`; batch capture byte-identical at 1 and 4 threads, fuzz 14.8 s → 8.9 s with the same 224 failure files |
 | #2 — concurrent sub-resource fetch | **Done, partly** | `SubResourcePrefetcher`; wired to external scripts and `<link>` stylesheets. Iframes/`fetch()`/XHR are **not** wired — see the item below |
 | #11 — CSS rule indexing | **Done** | `patches/0123-css-cascade-rule-index.patch`; exit gate met — cascade cost is flat in total rules (32× rules: 30.8× → **1.64×** time, 32.0× → **1.13×** bytes); corpus `rules` page 5 219 ms → 1 842 ms; WPT unchanged |
@@ -248,9 +261,97 @@ Sized `min(cores, availableRam / 1.5 GiB)`, which on the 4-core/13 GiB container
 4×, because worker startup and the runner's own serial reporting are a fixed share
 of a 61-test run. On a full shard the constant amortizes.
 
+**It does.** A full WPT run on the same 4-core shape goes **90 minutes → 45**, so
+the whole-corpus figure is **2.0×** against the subset's 1.93× — the fixed cost
+this section predicted would wash out at scale does wash out, and the remaining
+gap to 4× is the per-test GiB budget capping the pool at four workers, not the
+runner's serial remainder. That is the first measurement of item #1 at corpus
+scale; every earlier figure here is the 61-test subset.
+
 Where the memory figure cannot be read at all, the pool stays at **one** worker.
 Guessing high on an unreadable budget is how a runner OOM-kills a CI box, and the
 per-test allowance is a full GiB.
+
+## What building Phase 2 changed
+
+One item so far — #9, the gate — and it moved two things that were not on the plan.
+
+### 1. Item #9 was four sites, not one, and the audit's method is what hid two of them
+
+The item is scoped as "make the font caches thread-safe", and P0-c had already
+corrected the roadmap once on this point: the hazard is **instance** state on a
+process-wide singleton, not `static` fields, which is why a scan for mutable
+statics reported the render path as almost clean. Building it corrected the
+method a second time. Two of the four sites are not caches at all:
+
+* **`FallbackSystemFont`'s two contour caches** were left as plain dictionaries
+  when the four advance/glyph-index caches beside them were converted. Same
+  shape, same read-path population, same singleton — and they are the ones a
+  *painting* thread reaches, which is the thread this phase adds.
+* **`TrueTypeFont`'s five lazily-parsed OpenType tables**, which is the one worth
+  generalising from. Each was `if (_parsed) return _t; _parsed = true; _t =
+  Parse();` — the latch published **before** the value. A second thread inside
+  that window reads a null table, and every accessor reads null as *this font
+  does not have this table*. Nothing throws. The render is simply wrong: no
+  ligatures, no mark positioning, or — for a CFF-outline font — `HasOutlines`
+  false and the text drawn with the built-in 5×7 block glyphs.
+
+**A lazy-init latch is as much shared mutable state as a cache is**, and neither
+the roadmap's framing nor P0-c's enumeration looks for one. That is worth carrying
+into #12 and #13, where the same shape is likely to exist in the style and layout
+caches.
+
+It also cost a test. The first draft of the lazy-table test probed
+`IsMarkGlyph('A')` and a `liga` substitution on `'A'` — both of which answer the
+same with and without the table, so the test passed against the bug. It now picks
+a glyph the *warm* font calls a mark and asks that first, from every thread, on a
+font instance nobody has touched. Five of the six new tests fail against the code
+before the change and pass after it; that is the claim the item rests on, not the
+64/64 after.
+
+### 2. The rasterizer the profile measures is item #4's copy, not item #3's
+
+Item #3 is credited in the master table with "**4–6× on 8 cores** of a stage
+measured at 46.9–80.8% of a render — the largest measured share in the document".
+The share is real. The attribution is not: `Broiler.Render.Stage.Benchmarks`
+resolves `BBitmap` to `Broiler.HTML.Image.BBitmap` and times
+`HtmlRender.RenderToImageCore`, so the pixels in that 46.9–80.8% are drawn by
+`Broiler.HTML/Source/Broiler.HTML.Image/BCanvas.cs` — **item #4**. Item #3's
+`Broiler.Graphics/Rendering/BCanvas.cs` backs `BImageRenderer`, and through it
+Broiler.UI and the Writer, none of which the corpus renders.
+
+Two consequences for whoever starts the raster work:
+
+* **The order in the Broiler.Graphics roadmap below is right for a reason it does
+  not give.** It says unify the two rasterizers first so the parallelism is not
+  built twice. The stronger reason is that building it against item #3's copy
+  first would parallelize the rasterizer the corpus does not exercise, and the
+  measurement proving it worked would have to come from a benchmark that does not
+  exist yet.
+* **The two files are not the same length** (949 vs 1 180 lines), so "the same
+  scanline rasterizer twice" is an approximation and unification is a real piece
+  of work, not a merge.
+
+### 3. Item #9 removes the constraint Phase 1 §2 imposed on everything below it
+
+Phase 1's finding was that the render path's unsynchronised caches made two
+in-process renders a data race, so *every* CPU-parallel render-path item was
+really a process-parallel item — which is why the CLI parallelizes capture and
+layout fuzz across child processes rather than threads. Both caches it named are
+now synchronised, and `BImageRenderer` additionally moved its replay transform
+state per-call, so two threads can render through one renderer into two surfaces.
+
+That does not retroactively make the CLI's process isolation a workaround: it is
+still what makes "identical output at any worker count" checkable by comparing
+bytes. It does mean items #8, #10, #12 and #13 no longer have to route around
+this, and that a future in-process worker pool is now a design choice rather than
+a blocked one.
+
+**What is still owed before that pool exists:** the ambient-state contract is
+instrumented on all three slots but still off by default, and nothing yet calls
+`AmbientRenderState.Establish` on a worker thread because there are no worker
+threads. The first item that creates one has to arm `EnforceOnThisThread` in the
+same place it calls `Establish`, or the instrumentation bought here goes unused.
 
 ## Master table
 
@@ -268,7 +369,7 @@ non-deterministic correctness defect.
 | 6 | Media | [`JpegDecoder.cs:385`](../../Broiler.Media/Broiler.Media.Image.Managed/Jpeg/JpegDecoder.cs) dequantize+IDCT per block, `:424` upsample + YCbCr→RGB per row | Sequential | `Parallel.For` over blocks / rows. Entropy decode stays sequential (optionally per-RST-interval) | Nothing structural; blocks and output rows are disjoint | **2–2.5× on decode** (Amdahl: Huffman ≈35% stays serial) | Low | 2–3 d | 2 |
 | 7 | Media | [`PngDecoder.cs:293`](../../Broiler.Media/Broiler.Media.Image.Managed/Png/PngDecoder.cs) expand-to-RGBA | Sequential | `Parallel.For` over rows | Inflate (`:62`) and unfilter (`:63`) are genuinely sequential — Up/Paeth read the previous row | **1.3–1.6× on decode** only | Low | 1–2 d | 2 |
 | 8 | Media / HTML | Per-image decode, driven from [`ImageLoadHandler.cs:177`](../../Broiler.HTML/Source/Broiler.HTML.Core/Handlers/ImageLoadHandler.cs) | Already `ThreadPool.QueueUserWorkItem` for file reads; decode is on the completion path | Decode *N* page images concurrently — coarser and better than #6/#7 | Decoder statics must be verified re-entrant; `BImageRenderer._images` is a plain `Dictionary` | **Near-linear in image count** up to core count | Low | 2–3 d | 2 |
-| 9 | Graphics | [`FontsHandler.cs:13`](../../Broiler.Graphics/Broiler.Graphics/Text/FontsHandler.cs) `_fontsCache`, `_featuredFontsCache`; [`TrueTypeFont.cs`](../../Broiler.Graphics/Broiler.Graphics/Text/TrueTypeFont.cs) | Plain `Dictionary`, no synchronization | Not a speedup itself — a **hard prerequisite** for #10, #12, #13 | Nested `Dictionary<string, Dictionary<double, Dictionary<FontStyle, RFont>>>` corrupts under concurrent read/write | Enables ~3 items | Low | 2 d | 2 |
+| 9 | Graphics | [`FontsHandler.cs`](../../Broiler.Graphics/Broiler.Graphics/Text/FontsHandler.cs), [`TrueTypeFont.cs`](../../Broiler.Graphics/Broiler.Graphics/Text/TrueTypeFont.cs), [`FallbackSystemFont.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/FallbackSystemFont.cs), [`BImageRenderer.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/BImageRenderer.cs) — **DONE** | Plain `Dictionary`, no synchronization; and two lazy-init latches published before their values | Not a speedup itself — a **hard prerequisite** for #10, #12, #13, and per Phase 1 §2 for *every* CPU-parallel render-path item | Nothing now | **DONE.** Nested map flattened to one concurrent dictionary; image table concurrent and handle allocation interlocked; replay transform state moved per-call; `TrueTypeFont`'s five lazy tables re-published through `Lazy` in `ExecutionAndPublication`. Both P0-c residuals closed with it. Enables ~4 items | Low | Done | 2 |
 | 10 | Graphics | [`ComplexTextShaper.Shape:72`](../../Broiler.Graphics/Broiler.Graphics/Text/ComplexTextShaper.cs) | Called per run during layout | Already a static pure function → parallel-safe. Add a shaped-run cache keyed by (font, text, features) | Needs #9 | **Cache alone is the bigger win**; parallel shaping 3–5× on the shaping stage | Low | 3–4 d | 2 |
 | 11 | CSS | [`CssStyleEngine.CollectFromRules:623`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) — linear scan of every rule of every sheet, per element | O(elements × rules) | **Not multithreading.** Rule index (bucket by id/class/tag) + ancestor bloom filter | Nothing — this is the standard engine design and it is simply absent | **DONE.** Exit gate met: with matches fixed at four, 32× the rules now costs 1.64× the time and 1.13× the bytes (was 30.8× / 32.0×) — up to **136.9× faster** and **600× less garbage** at 3 200 rules. On a whole render the corpus `rules` page is 5 218.96 ms → 1 841.71 ms (2.8×); see [What building Phase 1 changed](#what-building-phase-1-changed) §1. `patches/0123-css-cascade-rule-index.patch` | Low | Done | 1 |
 | 12 | CSS | `GetComputedStyle:151` / `GetCascadedDeclarationMap:555` over the element set | Sequential per element; caches under one global `_sync` lock | Parallel style recalc over DOM subtrees, Stylo-style | Global lock over `_cache`/`_sparseCache`/`_declaredCascadeCache` becomes the bottleneck; needs sharding + per-thread L1. Do #11 first or you parallelize the wrong thing | **2–4× on styling** after #11 | Medium | 10–15 d | 3 |
@@ -447,7 +548,13 @@ The best return in the repository, and the least risky.
    rasterizer twice. Parallelizing both separately doubles the work and the risk.
    *Exit gate:* one rasterizer, both consumers on it, pixel output unchanged
    against the WPT reference set.
-2. **Make the font caches thread-safe** (item #9). Blocks items 10, 12, 13.
+2. **Make the font caches thread-safe** (item #9) — **DONE**. It was four sites,
+   not one, and two of them were not caches: see
+   [What building Phase 2 changed](#what-building-phase-2-changed) §1.
+   *Exit gate — met.* `RenderPathConcurrencyTests`, 6 cases; 5 fail against the
+   code before the change and pass after it, `Broiler.Graphics.Tests` 64/64 over
+   five consecutive runs. Blocked items 10, 12, 13 — and, per Phase 1 §2, every
+   CPU-parallel render-path item.
 3. **Scanline-band parallelism inside the primitives** (item #3): hoist
    `coverage[]` and the clip stack to per-band state, `Parallel.For` over bands
    with a minimum band height so small fills stay on one thread.
@@ -638,7 +745,7 @@ Recording these so they are not revisited each time the topic comes up:
 |---|---|---|
 | **0 — Make it measurable and deterministic** | P0-a benchmarks, P0-b single-threaded event loop (#15), P0-c static-state audit, GC config evaluation (#19) | Nothing after this is trustworthy without it. #15 is a correctness fix that also removes lock overhead from the cascade. |
 | **1 — Free wins and the sequential fixes** — **DONE** | WPT worker pool (#1), CLI batch (#20), concurrent sub-resource fetch (#2), CSS rule indexing (#11) | Cheap, low-risk, and #1 shortens the feedback loop for everything else. #11 is single-threaded but must precede #12. **What it changed:** #11 met its exit gate (cascade cost is now flat in total rules) but is 2.8× on a whole render, and `parse+cascade` still dominates the rule-heavy page — so #12 needs that stage split before it is started; #20 had to use processes, which makes item #9 a gate on every render-path item, not three. |
-| **2 — Raster, decode, text** | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), shaped-run cache (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. |
+| **2 — Raster, decode, text** — *in progress* | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), shaped-run cache (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed:** the item was four sites rather than one, two of which were lazy-init latches that no cache audit looks for; and the raster stage the profile measures turns out to be item **#4's** copy of the rasterizer, not item #3's, which is what decides where the unification step starts. See [What building Phase 2 changed](#what-building-phase-2-changed). |
 | **3 — Style and incremental layout** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. |
 | **4 — Parallel layout and workers** | Parallel intrinsic sizing and independent subtrees (#13), Web Workers (#18) | Highest cost, highest risk, lowest ceiling. Only worth starting once Phase 3's measurements say layout is still the bottleneck. |
 

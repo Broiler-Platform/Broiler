@@ -94,28 +94,34 @@ against an implementation that stored the record in a plain `static`.
 
 ### Two things the assertion is not, and why
 
-**It is off by default** (`AmbientRenderState.EnforceOnThisThread`, which is thread-scoped so a test cannot arm it for a layout test running beside it). Turning it on
-unconditionally fails every render in the repository, because
-`DocumentModeContext.CurrentQuirksMode` is **never written on the HTML-string render
-path** — only the HtmlBridge DOM path publishes it
-(`src/Broiler.HtmlBridge.Dom/DomBridge.HtmlParsing.cs:48`). Single-threaded that is
-harmless: the thread-static default is `false`, and standards mode is what the
-string path wants. But `DocumentModeContext`'s own class comment claims "each parse
-overwrites it, so a stale `true` never leaks into a later standards-mode render",
-and **that holds only because one thread renders one document at a time**. On a
-pooled thread that previously rendered a quirks-mode document through the DOM path,
-it does not hold. The switch is there for the work that introduces worker threads
-to turn on; leaving it on now would report a currently-unreachable defect as a test
-failure across the suite.
+**It is off by default** (`AmbientRenderState.EnforceOnThisThread`, which is thread-scoped so a test cannot arm it for a layout test running beside it). The switch is for
+the code that introduces worker threads, which is also the code that calls
+`Establish`; arming it process-wide would make every existing single-threaded render
+pay for a hazard it does not have.
 
-**The `Viewport` slot has no read-side assertion yet.** `CssLengthParser` is in the
-`Broiler.CSS` submodule, and instrumenting its eight thread-statics needs a patch
-there rather than a main-repo edit. `AmbientRenderState.Establish` fills the slot and
-records it, so a thread that goes through the contract is covered; a thread that
-calls `CssLengthParser.SetViewportSize` directly — which `HtmlContainerInt.PerformLayout`
-does today — is not credited for it and would assert if a reader were instrumented.
-Closing this means one Broiler.CSS patch: mark the slot from `SetViewportSize`, assert
-from the factor reads.
+*Until Phase 2 there was a second, stronger reason, and it was a finding rather than
+a preference:* turning it on failed every render in the repository, because
+`DocumentModeContext.CurrentQuirksMode` was **never written on the HTML-string render
+path** — only the HtmlBridge DOM path published it
+(`src/Broiler.HtmlBridge.Dom/DomBridge.HtmlParsing.cs:48`). Single-threaded that was
+harmless: the thread-static default is `false`, and standards mode is what the
+string path wants. But `DocumentModeContext`'s own class comment claimed "each parse
+overwrites it, so a stale `true` never leaks into a later standards-mode render",
+and **that held only because one thread rendered one document at a time**. Item #9
+closed it — `HtmlContainerInt.SetHtmlWithStyleSet` now publishes the flag with the
+same `IsQuirksHtml` call the DOM path makes — so the slot is established on both
+paths and the assertion has nothing left to report here.
+
+**The `Viewport` slot now has its read-side assertion** (Phase 2, item #9). It lives in
+`CssLengthParser` rather than beside the other two slots, because the eight factors are
+`[ThreadStatic]` in `Broiler.CSS` and that assembly cannot reference `Broiler.Layout` —
+the dependency runs the other way. `CssLengthParser` records the establish, exposes the
+bit, and asserts from the factor reads; `AmbientRenderState.EstablishedOnThisThread`
+reads the bit for its `Viewport` slot and arms both switches from one setter. Recording
+the write *there* is what closed the gap: `HtmlContainerInt.PerformLayout` establishes
+the viewport by calling `SetViewportSize` directly rather than through `Establish`, so
+an assertion crediting only `Establish` would have reported the repository's own render
+path as skipping a contract it satisfies.
 
 ## Classification
 
@@ -157,8 +163,8 @@ These are the sites parallel rendering has to deal with, and none of them is a
 
 | Root | Instance state | Status |
 |---|---|---|
-| `CompatProvider.ImageAdapter` → `RAdapter._fontsHandler` | Four unsynchronised `Dictionary` caches, one of them a triply-nested map | **Item #9.** Partly addressed: `patches/0114-graphics-font-cache-thread-safety.patch` makes `FallbackSystemFont`'s four caches `ConcurrentDictionary`. `FontsHandler`'s own four are still plain `Dictionary`. |
-| `BImageRenderer._images` | `Dictionary<ulong, BBitmap>` | Named by the roadmap; unaddressed. Blocks item #8 (concurrent image decode). |
+| `CompatProvider.ImageAdapter` → `RAdapter._fontsHandler` | Four unsynchronised `Dictionary` caches, one of them a triply-nested map | **Item #9 — DONE.** All four are concurrent, and the triply-nested map is now one flat `ConcurrentDictionary` keyed by (family, size, style): nesting could not be fixed level by level, because the lookup read the outer map and then *wrote* a fresh inner map, so two threads missing on one family both published one and the loser took its cached sizes with it. |
+| `BImageRenderer._images` | `Dictionary<ulong, BBitmap>` | **Item #9 — DONE**, and it was the smaller half of the site. `++_nextImageId` was a read-modify-write handing two threads one handle; the transform stack was on the instance, so two `Render` calls popped each other's transforms. Table concurrent, id interlocked, replay state per call. |
 | `CssStyleEngine` `_cache`, `_sparseCache`, `_declaredCascadeCache` | Behind one `_sync` | Correct but serialising. The roadmap's own step 2 for Broiler.CSS is to shard it; see the measured cascade cost below for why this matters more than it looks. |
 | `HandlerFactory.Instance`, `RGraphicsRasterBackend.Instance` | None — both are stateless dispatchers whose per-call state is in parameters | Safe as they stand. Worth re-checking if either grows a field. |
 | `HttpClient` (2 sites) | Thread-safe by contract | Safe. |
@@ -175,7 +181,18 @@ These are the sites parallel rendering has to deal with, and none of them is a
 2. **The exit-gate list is short and specific**, which is good news: three ambient
    slots and eight shared instance roots, of which two (`FontsHandler`,
    `BImageRenderer._images`) are genuine unsynchronised caches on the render path.
-3. **`DocumentModeContext` has a latent per-thread defect today**, documented above.
-   It is unreachable single-threaded and becomes reachable with the first pooled
-   render thread. It is cheap to fix — publish the flag on the string path too — and
-   should be fixed before, not after, item #13.
+3. **`DocumentModeContext` had a latent per-thread defect** — unreachable
+   single-threaded, reachable with the first pooled render thread. **Fixed in Phase 2**
+   (item #9), as was the missing `Viewport` read-side assertion, so both residuals this
+   document named are closed and every entry in the table above is either safe by
+   construction or synchronised.
+4. **The audit under-counted by looking only for caches.** Both extra sites item #9 found
+   are instance state that no dictionary scan reaches: `FallbackSystemFont`'s two *contour*
+   caches (left plain when the four beside them were converted) and — the one worth
+   generalising from — `TrueTypeFont`'s five lazily-parsed OpenType tables. Those were
+   `if (_parsed) return _t; _parsed = true; _t = Parse();`, publishing the latch **before**
+   the value, and every accessor reads a null table as "this font does not have this
+   table". So the failure mode is not a torn container that throws; it is no ligatures, no
+   mark positioning, or `HasOutlines` false and text drawn with the built-in block glyphs.
+   **A lazy-init latch is as much shared mutable state as a cache is**, and the enumeration
+   in this document does not look for one.
