@@ -1,0 +1,208 @@
+{
+  "viewport": {
+    "width": 1280,
+    "height": 1024
+  },
+  "iterations": 15,
+  "warmup": 5,
+  "runtime": "10.0.10",
+  "processorCount": 4,
+  "serverGc": false,
+  "pages": [
+    {
+      "Page": "text",
+      "Loads": "line breaking, text measurement, glyph raster",
+      "SourceLength": 77629,
+      "TotalMilliseconds": 494.096,
+      "AttributedShare": 0.9630195346653282,
+      "Rows": [
+        {
+          "Stage": "parse\u002Bcascade",
+          "Milliseconds": 125.7147,
+          "Share": 0.2544337537644506,
+          "Derived": false
+        },
+        {
+          "Stage": "layout",
+          "Milliseconds": 32.0175,
+          "Share": 0.06480016029273664,
+          "Derived": false
+        },
+        {
+          "Stage": "paint (display list)",
+          "Milliseconds": 3.3399,
+          "Share": 0.006759617564198051,
+          "Derived": false
+        },
+        {
+          "Stage": "raster",
+          "Milliseconds": 314.752,
+          "Share": 0.6370260030439429,
+          "Derived": true
+        },
+        {
+          "Stage": "(unattributed)",
+          "Milliseconds": 18.271900000000016,
+          "Share": 0.036980465334671836,
+          "Derived": true
+        }
+      ]
+    },
+    {
+      "Page": "rules",
+      "Loads": "cascade: per-element rule scan (item #11)",
+      "SourceLength": 110296,
+      "TotalMilliseconds": 5218.957,
+      "AttributedShare": 0.9979002701114418,
+      "Rows": [
+        {
+          "Stage": "parse\u002Bcascade",
+          "Milliseconds": 5035.3493,
+          "Share": 0.964819081667084,
+          "Derived": false
+        },
+        {
+          "Stage": "layout",
+          "Milliseconds": 33.713,
+          "Share": 0.006459719825244775,
+          "Derived": false
+        },
+        {
+          "Stage": "paint (display list)",
+          "Milliseconds": 3.6776,
+          "Share": 0.000704661870178275,
+          "Derived": false
+        },
+        {
+          "Stage": "raster",
+          "Milliseconds": 135.25869999999998,
+          "Share": 0.025916806748934696,
+          "Derived": true
+        },
+        {
+          "Stage": "(unattributed)",
+          "Milliseconds": 10.958400000000438,
+          "Share": 0.0020997298885582767,
+          "Derived": true
+        }
+      ]
+    },
+    {
+      "Page": "boxes",
+      "Loads": "layout: nested block/flex/grid tree",
+      "SourceLength": 47210,
+      "TotalMilliseconds": 528.6037,
+      "AttributedShare": 0.9865564694306906,
+      "Rows": [
+        {
+          "Stage": "parse\u002Bcascade",
+          "Milliseconds": 423.2818,
+          "Share": 0.8007545160958957,
+          "Derived": false
+        },
+        {
+          "Stage": "layout",
+          "Milliseconds": 26.0825,
+          "Share": 0.049342257725399956,
+          "Derived": false
+        },
+        {
+          "Stage": "paint (display list)",
+          "Milliseconds": 2.9256,
+          "Share": 0.005534581010310749,
+          "Derived": false
+        },
+        {
+          "Stage": "raster",
+          "Milliseconds": 69.2075,
+          "Share": 0.13092511459908435,
+          "Derived": true
+        },
+        {
+          "Stage": "(unattributed)",
+          "Milliseconds": 7.106300000000033,
+          "Share": 0.013443530569309357,
+          "Derived": true
+        }
+      ]
+    },
+    {
+      "Page": "paint",
+      "Loads": "raster: overlapping gradients, borders, alpha",
+      "SourceLength": 211592,
+      "TotalMilliseconds": 1932.969,
+      "AttributedShare": 1.0008461594572908,
+      "Rows": [
+        {
+          "Stage": "parse\u002Bcascade",
+          "Milliseconds": 403.6881,
+          "Share": 0.2088435458613149,
+          "Derived": false
+        },
+        {
+          "Stage": "layout",
+          "Milliseconds": 19.159,
+          "Share": 0.009911695428121195,
+          "Derived": false
+        },
+        {
+          "Stage": "paint (display list)",
+          "Milliseconds": 8.0589,
+          "Share": 0.004169182226926557,
+          "Derived": false
+        },
+        {
+          "Stage": "raster",
+          "Milliseconds": 1503.6986,
+          "Share": 0.7779217359409282,
+          "Derived": true
+        },
+        {
+          "Stage": "(unattributed)",
+          "Milliseconds": 0,
+          "Share": 0,
+          "Derived": true
+        }
+      ]
+    },
+    {
+      "Page": "mixed",
+      "Loads": "blended control: table, borders, text",
+      "SourceLength": 20102,
+      "TotalMilliseconds": 497.9023,
+      "AttributedShare": 0.9844519697940739,
+      "Rows": [
+        {
+          "Stage": "parse\u002Bcascade",
+          "Milliseconds": 221.1982,
+          "Share": 0.4442602494505448,
+          "Derived": false
+        },
+        {
+          "Stage": "layout",
+          "Milliseconds": 19.3986,
+          "Share": 0.0389606555342283,
+          "Derived": false
+        },
+        {
+          "Stage": "paint (display list)",
+          "Milliseconds": 2.2356,
+          "Share": 0.004490037503341518,
+          "Derived": false
+        },
+        {
+          "Stage": "raster",
+          "Milliseconds": 247.3285,
+          "Share": 0.49674102730595937,
+          "Derived": true
+        },
+        {
+          "Stage": "(unattributed)",
+          "Milliseconds": 7.741400000000056,
+          "Share": 0.015548030205926053,
+          "Derived": true
+        }
+      ]
+    }
+  ]
+}

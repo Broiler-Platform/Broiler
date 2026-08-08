@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <Optimize>true</Optimize>
+    <RootNamespace>Broiler.Render.Stage.Benchmarks</RootNamespace>
+    <AssemblyName>Broiler.Render.Stage.Benchmarks</AssemblyName>
+    <!--
+      Deliberately NOT setting ServerGarbageCollection. Multithreading item #19 is the open question
+      of whether Server GC helps a headless render, and a benchmark project that pinned one mode
+      would be unable to answer it: GCSettings.IsServerGC is fixed at runtime start. The mode is
+      chosen per run through DOTNET_gcServer, which is what the `gc-config` mode reports and compares.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The headless render stack, entered at HtmlRender / HtmlContainer. -->
+    <ProjectReference Include="..\..\..\Broiler.HTML\Source\Broiler.HTML.Image\Broiler.HTML.Image.csproj" />
+    <!--
+      Not referenced in source, and required anyway. `CompatProvider` resolves the default rendering
+      adapter by Assembly.Load at first use, so without this the very first `new BBitmap(...)` throws
+      FileNotFoundException at run time rather than failing the build. Broiler.Wpt carries the same
+      reference for the same reason.
+    -->
+    <ProjectReference Include="..\..\..\Broiler.HTML\Source\Broiler.HTML.Image.Compat\Broiler.HTML.Image.Compat.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.HTML\Source\Broiler.HTML.Orchestration\Broiler.HTML.Orchestration.csproj" />
+    <!-- The cascade, driven directly rather than through a render, for CascadeBenchmarks. -->
+    <ProjectReference Include="..\..\..\Broiler.CSS\Broiler.CSS.Dom\Broiler.CSS.Dom.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.DOM\Broiler.Dom.Html\Broiler.Dom.Html.csproj" />
+    <!-- BColor, and the image encode formats the decode benchmark builds its fixtures with. -->
+    <ProjectReference Include="..\..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Media\Broiler.Media.Image\Broiler.Media.Image.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,212 @@
+From b38cf22a09af07f169be029da67cbab5c6186349 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 8 Aug 2026 07:20:07 +0000
+Subject: [PATCH] Route async-generator await resumption through the engine's
+ job dispatch
+
+JSGenerator.AwaitThenable was the last site in the engine still deciding for
+itself where an await resumption runs. It preferred whatever
+SynchronizationContext happened to be current and fell back to
+ThreadPool.QueueUserWorkItem when there was none - the two answers
+JSMicrotaskQueue's remarks record as wrong, because a context being present was
+never the same claim as that context being the JavaScript thread. Resuming an
+async generator runs the rest of its body, so this let a second thread into a
+context that ECMAScript defines as single-threaded.
+
+JSPromise.Post and JSAsyncFunction.ToPromise were moved onto JSContext.PostJob
+already; this brings the third named site over. The continuation context is
+still captured at the await rather than read at the post, matching
+JSAsyncFunction: a thenable calls back from wherever its then decides, which can
+be later and on another thread.
+
+AsyncGeneratorExclusionTests covers it, and records which of its two cases is
+the regression test. The obvious shape - drive the dispatch and watch
+JSContext.ExecutionConcurrency - passes against the unfixed engine, because the
+counter is incremented by EnterExecution and the whole defect is that the
+resumption never entered the context. The discriminating case is ordering: the
+fix runs the resumption before the host's next statement, where the
+specification puts a microtask. 5 of 5 failures against the pre-fix dispatch,
+5 of 5 passes with it.
+
+Broiler.JavaScript.BuiltIns.Tests 2118 passed; Integration.Tests 4594 passed
+with one pre-existing environmental failure (M8_DocumentationFiles_Exist
+resolves the aggregate repo root rather than this submodule's, so it looks for
+this repository's docs one level too high; it fails the same way on a clean
+tree).
+---
+ .../Generator/JSGenerator.cs                  |  26 ++--
+ .../AsyncGeneratorExclusionTests.cs           | 118 ++++++++++++++++++
+ 2 files changed, 134 insertions(+), 10 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Integration.Tests/AsyncGeneratorExclusionTests.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Generator/JSGenerator.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Generator/JSGenerator.cs
+index f0881b17..232aaa78 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Generator/JSGenerator.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Generator/JSGenerator.cs
+@@ -417,9 +417,21 @@ public partial class JSGenerator : JSObject, IJSGenerator
+         }
+     }
+ 
+-    // Awaits a thenable on the pumped synchronization context (see
+-    // JSAsyncFunction.ToPromise for the rationale), invoking onFulfilled/onRejected
+-    // with the settled value/reason; the returned promise resolves to their result.
++    // Awaits a thenable and resumes the async generator with the settled value/reason; the returned
++    // promise resolves to onFulfilled/onRejected's result.
++    //
++    // Resuming an async generator runs the rest of its body, which is user JavaScript, so where the
++    // resumption is dispatched is the same decision a promise reaction makes — and JSContext.PostJob
++    // owns that decision for the whole engine. This used to make its own: prefer whatever
++    // SynchronizationContext happened to be current, and fall back to ThreadPool.QueueUserWorkItem
++    // when there was none. Those are exactly the two answers JSMicrotaskQueue's remarks record as
++    // wrong, both of which let a second thread into the context; JSPromise.Post and
++    // JSAsyncFunction.ToPromise were moved off them and this was the one site left behind.
++    //
++    // `continuationContext` is captured HERE rather than read inside Queue, matching
++    // JSAsyncFunction: a thenable calls back from wherever its `then` decides, which can be later
++    // and on another thread, and by then the pump this await belongs to is no longer current. It is
++    // passed to PostJob as the `captured` argument, where only an IJSJobPump is trusted.
+     private static JSValue AwaitThenable(JSValue thenable, Func<JSValue, JSValue> onFulfilled, Func<JSValue, JSValue> onRejected)
+     {
+         var continuationContext = SynchronizationContext.Current
+@@ -427,13 +439,7 @@ public partial class JSGenerator : JSObject, IJSGenerator
+ 
+         return (JSValue)JSEngine.CreatePromiseFromDelegate((resolve, reject) =>
+         {
+-            void Queue(Action action)
+-            {
+-                if (continuationContext != null)
+-                    continuationContext.Post(_ => action(), null);
+-                else
+-                    ThreadPool.QueueUserWorkItem(_ => action());
+-            }
++            void Queue(Action action) => JSContext.PostJob(action, continuationContext);
+ 
+             thenable.InvokeMethod(in KeyStrings.then,
+                 CreateFunction((in Arguments a) =>
+diff --git a/Broiler.JS/Broiler.JavaScript.Integration.Tests/AsyncGeneratorExclusionTests.cs b/Broiler.JS/Broiler.JavaScript.Integration.Tests/AsyncGeneratorExclusionTests.cs
+new file mode 100644
+index 00000000..705b7bd5
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Integration.Tests/AsyncGeneratorExclusionTests.cs
+@@ -0,0 +1,118 @@
++using System.Threading.Tasks;
++using Broiler.JavaScript.Engine;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.Integration.Tests;
++
++// Resuming an async generator after `await` runs the rest of its body, which is user JavaScript, so
++// the resumption is subject to the same exclusion as a promise reaction: one thread runs JavaScript
++// in a context at a time.
++//
++// `JSGenerator.AwaitThenable` was the last site still making that decision for itself, after
++// `JSPromise.Post` and `JSAsyncFunction.ToPromise` were moved onto `JSContext.PostJob`. It preferred
++// whatever `SynchronizationContext` happened to be current and fell back to
++// `ThreadPool.QueueUserWorkItem` when there was none — the two answers `JSMicrotaskQueue`'s remarks
++// record as wrong, because "a context is present" was never the same claim as "that context is the
++// JavaScript thread".
++//
++// **Which of these two is the regression test, and why it is not the one it looks like.** The
++// obvious shape — drive the racy dispatch and watch `JSContext.ExecutionConcurrency` — was written
++// first and **passes against the unfixed engine**, so it is not evidence of anything. The counter is
++// incremented by `JSMicrotaskQueue.EnterExecution`, and the whole of the pre-fix defect is that the
++// resumption ran *without entering the context at all*: a bare `ThreadPool.QueueUserWorkItem` never
++// reaches `RunJob`, so the thread it lets in is exactly the thread the counter cannot see. That is
++// worth recording rather than deleting — a counter that only observes entries can never observe the
++// absence of one, and the same blind spot applies to any future site that dispatches around
++// `PostJob`.
++//
++// `TheResumptionStillRunsAndItsSideEffectIsWhole` is the one that discriminates, and it does so on
++// **ordering** rather than on corruption: the fix makes the resumption run before the host's next
++// statement, which is where the specification puts a microtask, while the thread pool runs it at an
++// arbitrary later moment on an arbitrary thread. Checked both ways — 5 of 5 failures against the
++// pre-fix dispatch, 5 of 5 passes with it.
++[Collection(nameof(AsyncGeneratorExclusionTests))]
++public sealed class AsyncGeneratorExclusionTests
++{
++    // A hand-written thenable rather than a promise, and that is what reaches the site. A native
++    // promise settles through `JSPromise.Post`, which was already routed correctly; only a foreign
++    // thenable — an object with a callable `then` — takes `AwaitThenable`'s own dispatch. `then`
++    // parks the resumption callback in a global so a host thread can fire it later, which is the
++    // shape that gets a job dispatched with nothing executing.
++    private const string Arm = """
++        globalThis.sink = 0;
++        globalThis.resumed = 0;
++        globalThis.thenable = { then: function (onFulfilled) { globalThis.fire = onFulfilled; } };
++        async function* generate() {
++            await globalThis.thenable;
++            for (var i = 0; i < 200000; i++) { globalThis.sink += i; }
++            globalThis.resumed += 1;
++            yield 1;
++        }
++        globalThis.pending = generate().next();
++        """;
++
++    private const string Busy =
++        "(function () { var t = 0; for (var j = 0; j < 20000; j++) { t += j; } return t; })()";
++
++    [Fact]
++    public void AnAsyncGeneratorResumedFromAHostThreadDoesNotOverlapAnEvaluation()
++    {
++        // The generator suspends at `await` with nothing else running, so firing the thenable's
++        // callback from a host thread dispatches the resumption while the main thread is inside
++        // `Eval`. With `JSContext.PostJob` that is either this context's queue or a pool dispatch
++        // that takes the execution lock, and neither overlaps.
++        //
++        // **Kept as a guard, not offered as proof**: this passes against the pre-fix dispatch too,
++        // for the reason in the class comment — an unentered thread is invisible to a counter of
++        // entries. What it does catch is a future change that routes the resumption through
++        // `EnterExecution` on a second thread, which is a different and equally real defect.
++        JSContext.ResetExecutionConcurrency();
++
++        for (var round = 0; round < 30; round++)
++        {
++            using var context = new JSContext();
++            context.Eval(Arm);
++
++            // No SynchronizationContext is installed on this thread and none was supplied to the
++            // context, so the pre-fix code took its `ThreadPool.QueueUserWorkItem` branch here.
++            // That is deliberate: it is the branch the fix removes.
++            var fire = context["fire"];
++            var settled = Task.Run(() => fire.InvokeFunction(new Arguments(JSUndefined.Value, JSUndefined.Value)));
++
++            for (var i = 0; i < 20; i++)
++                context.Eval(Busy);
++
++            settled.Wait();
++            context.Eval("1");
++        }
++
++        var (peak, overlaps) = JSContext.ExecutionConcurrency;
++        Assert.Equal(0, overlaps);
++        Assert.Equal(1, peak);
++    }
++
++    [Fact]
++    public void TheResumptionStillRunsAndItsSideEffectIsWhole()
++    {
++        // **The discriminating case.** Two things are asserted at once and both matter: the
++        // resumption still runs (a dispatch rule that "fixed" the race by dropping the job would
++        // satisfy the counter above and break every async generator), and it runs *by the time the
++        // host's next statement does*. The second is what fails against the pre-fix dispatch, which
++        // hands the resumption to the pool and returns — `resumed` is still 0 when the assertion
++        // reads it. `sink` accumulates in a loop, so a torn read-modify-write from a second thread
++        // shows as a wrong total rather than as nothing at all.
++        using var context = new JSContext();
++        context.Eval(Arm);
++
++        var fire = context["fire"];
++        using (context.EnterExecution())
++            fire.InvokeFunction(new Arguments(JSUndefined.Value, JSUndefined.Value));
++
++        context.Eval("1");
++
++        Assert.Equal("1", context.Eval("String(globalThis.resumed)").ToString());
++
++        // 0 + 1 + ... + 199999.
++        Assert.Equal("19999900000", context.Eval("String(globalThis.sink)").ToString());
++    }
++}
+-- 
+2.43.0
+

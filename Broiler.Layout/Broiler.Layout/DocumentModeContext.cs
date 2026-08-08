@@ -23,10 +23,26 @@ public static partial class DocumentModeContext
     private static bool _quirksMode;
 
     /// <summary>The quirks-mode flag of the document currently being laid out.</summary>
+    /// <remarks>
+    /// The paragraph above is true of the HtmlBridge DOM path, which publishes this on every parse.
+    /// It is <b>not</b> true of the HTML-string render path, which never writes here at all — see
+    /// <see cref="AmbientRenderState"/>, whose assertion exists to make that visible the moment a
+    /// second thread is involved.
+    /// </remarks>
     public static bool CurrentQuirksMode
     {
-        get => _quirksMode;
-        set => _quirksMode = value;
+        get
+        {
+            AmbientRenderState.AssertEstablished(
+                AmbientRenderState.Slots.DocumentMode, nameof(CurrentQuirksMode));
+            return _quirksMode;
+        }
+
+        set
+        {
+            _quirksMode = value;
+            AmbientRenderState.MarkEstablished(AmbientRenderState.Slots.DocumentMode);
+        }
     }
 
     /// <summary>

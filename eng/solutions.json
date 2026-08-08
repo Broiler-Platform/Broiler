@@ -209,7 +209,7 @@
     },
     {
       "path": "Broiler.Code.Phase0.slnx",
-      "description": "Broiler Code Phase 0 harnesses: the edit-to-classification prototype, the trusted build worker, and the Roslyn footprint measurement. The SampleReports fixture under tests/broiler-code-phase0/fixture is deliberately absent — it fails to compile by design and would break build verification.",
+      "description": "Broiler Code Phase 0 harnesses: the edit-to-classification prototype, the trusted build worker, and the Roslyn footprint measurement. The SampleReports fixture under tests/broiler-code-phase0/fixture is deliberately absent \u2014 it fails to compile by design and would break build verification.",
       "roots": [
         "tests/broiler-code-phase0/Broiler.Code.Phase0.Prototype/Broiler.Code.Phase0.Prototype.csproj",
         "tests/broiler-code-phase0/Broiler.Code.Phase0.Roslyn/Broiler.Code.Phase0.Roslyn.csproj",
@@ -221,10 +221,11 @@
     },
     {
       "path": "Broiler.Benchmarks.slnx",
-      "description": "Repository-level formatting-code performance harnesses.",
+      "description": "Repository-level performance harnesses: formatting codes, and the render-stage profile behind the multithreading roadmap's Phase 0.",
       "roots": [
         "tests/formatting-codes-phase0/Broiler.FormattingCodes.Phase0.Benchmarks/Broiler.FormattingCodes.Phase0.Benchmarks.csproj",
-        "tests/formatting-codes-phase1/Broiler.FormattingCodes.Phase1.Benchmarks/Broiler.FormattingCodes.Phase1.Benchmarks.csproj"
+        "tests/formatting-codes-phase1/Broiler.FormattingCodes.Phase1.Benchmarks/Broiler.FormattingCodes.Phase1.Benchmarks.csproj",
+        "tests/render-stages/Broiler.Render.Stage.Benchmarks/Broiler.Render.Stage.Benchmarks.csproj"
       ],
       "forbiddenProjectPatterns": [
         "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"
