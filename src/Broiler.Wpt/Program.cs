@@ -333,6 +333,7 @@ public class Program
             Environment.ProcessorCount,
             GetAvailableMemoryBytes());
         Console.WriteLine($"Workers       : {DescribeWorkerPool(workerPoolSize, requestedWorkerCount, useWorkerIsolation)}");
+        Console.WriteLine($"Render threads: {ApplyRenderThreadBudget(workerPoolSize, Environment.ProcessorCount)}");
         Console.WriteLine(
             runTestMemoryLimitBytes > 0
                 ? $"Memory limit  : {WptMemoryGuard.FormatMebibytes(runTestMemoryLimitBytes)} of growth per test" +
@@ -837,6 +838,57 @@ public class Program
         long byMemory = availableMemoryBytes / WorkerMemoryBudgetBytes;
         return (int)Math.Clamp(byMemory, 1, byCores);
     }
+
+    /// <summary>
+    /// Divides the machine's cores between the worker pool and the threads each worker's render
+    /// may spend inside itself, and publishes the result to the environment the workers inherit.
+    /// Returns a one-line description for the run header.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The two kinds of parallelism in this runner multiply, and nothing else notices.</b> The
+    /// pool (item #1) runs <c>N</c> worker processes; band-parallel raster (item #4) and
+    /// band-parallel image decode (items #6, #7) each default to one thread per core <em>inside</em>
+    /// a process. Left alone that is <c>N × cores</c> runnable threads on <c>cores</c> cores, which
+    /// is slower than either parallelism alone and turns the per-test timeout into a lottery. So
+    /// the runner divides: <c>max(1, cores / workers)</c> render threads each.
+    /// </para>
+    /// <para>
+    /// <b>An explicit setting always wins.</b> If the caller has already put either variable in the
+    /// environment, it is left exactly as it is — this is a default for a runner that happens to
+    /// know both numbers, not a policy the runner imposes on someone who has measured something.
+    /// </para>
+    /// </remarks>
+    internal static string ApplyRenderThreadBudget(int workerCount, int processorCount)
+    {
+        var perWorker = Math.Max(1, Math.Max(1, processorCount) / Math.Max(1, workerCount));
+        var applied = new List<string>();
+
+        foreach (var variable in RenderThreadVariables)
+        {
+            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(variable)))
+                continue;
+
+            Environment.SetEnvironmentVariable(variable, perWorker.ToString(CultureInfo.InvariantCulture));
+            applied.Add(variable);
+        }
+
+        return applied.Count == 0
+            ? "inherited from the environment (both variables already set)"
+            : $"{perWorker} per worker — {Math.Max(1, processorCount)} core(s) / {Math.Max(1, workerCount)} worker(s), " +
+              $"set as {string.Join(" and ", applied)}";
+    }
+
+    /// <summary>
+    /// The in-process thread budgets a worker inherits. Named here rather than referenced from the
+    /// rendering assemblies because both are internal to components the runner does not link
+    /// against; the environment is the seam they are configured through.
+    /// </summary>
+    private static readonly string[] RenderThreadVariables =
+    [
+        "BROILER_RASTER_THREADS",
+        "BROILER_IMAGE_DECODE_THREADS",
+    ];
 
     private static string DescribeWorkerPool(int workerCount, int? requested, bool useWorkerIsolation)
     {

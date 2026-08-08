@@ -373,26 +373,69 @@ internal static class JpegDecoder
 
     // ---- Reconstruction -------------------------------------------------
 
+    /// <summary>
+    /// Dequantize + inverse DCT of every block of every component, into per-component sample planes.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Parallel over block rows</b> — multithreading roadmap item #6, first half. A block reads
+    /// its own 64 coefficients and writes its own 8×8 patch of the component's sample plane, so a
+    /// band of block rows touches memory no other band touches. The entropy decode that produced
+    /// <c>Coefficients</c> is sequential and has already finished; this is the part of a JPEG that
+    /// is not.
+    /// </para>
+    /// <para>
+    /// <b>The scratch buffers move inside the band.</b> The dequantized block and the IDCT's
+    /// intermediate were one allocation shared across the whole image; they are now one pair per
+    /// band, which is both what makes the pass thread-safe and — because <c>JpegDct.Inverse</c>
+    /// used to allocate its intermediate per block — less garbage than the sequential version
+    /// produced.
+    /// </para>
+    /// </remarks>
     private static void Reconstruct(Component[] components, int[][] quant, int width, int height)
     {
-        var block = new double[64];
         foreach (Component c in components)
         {
             int[] q = quant[c.QuantId] ?? throw new FormatException("JPEG references a missing quant table.");
             c.PlaneWidth = c.BlocksPerLine * 8;
             c.Samples = new byte[c.PlaneWidth * c.BlocksPerColumn * 8];
 
-            for (int by = 0; by < c.BlocksPerColumn; by++)
-                for (int bx = 0; bx < c.BlocksPerLine; bx++)
+            Component component = c;
+            ImageDecodeParallelism.For(
+                0,
+                c.BlocksPerColumn,
+                BlockRowsPerBand(c.BlocksPerLine),
+                (fromRow, toRow) =>
                 {
-                    int coefOffset = (by * c.AllocBlocksPerLine + bx) * 64;
-                    for (int i = 0; i < 64; i++)
-                        block[i] = c.Coefficients[coefOffset + i] * (double)q[i];
-                    JpegDct.Inverse(block);
-                    StoreBlock(c, block, bx * 8, by * 8);
-                }
+                    var block = new double[64];
+                    var scratch = new double[64];
+
+                    for (int by = fromRow; by < toRow; by++)
+                        for (int bx = 0; bx < component.BlocksPerLine; bx++)
+                        {
+                            int coefOffset = (by * component.AllocBlocksPerLine + bx) * 64;
+                            for (int i = 0; i < 64; i++)
+                                block[i] = component.Coefficients[coefOffset + i] * (double)q[i];
+                            JpegDct.Inverse(block, scratch);
+                            StoreBlock(component, block, bx * 8, by * 8);
+                        }
+                });
         }
     }
+
+    /// <summary>
+    /// Smallest number of block rows worth giving a thread, as a pixel budget: one block row of a
+    /// wide component is far more work than one of a narrow chroma plane, and the split should
+    /// follow the work rather than the row count.
+    /// </summary>
+    private static int BlockRowsPerBand(int blocksPerLine) =>
+        Math.Max(1, MinimumPixelsPerBand / Math.Max(1, blocksPerLine * 64));
+
+    /// <summary>
+    /// Pixels a band must be worth before a pass is split. Small JPEGs — thumbnails, sprites —
+    /// decode inline rather than pay a scheduler round trip for a few hundred microseconds of work.
+    /// </summary>
+    private const int MinimumPixelsPerBand = 32 * 1024;
 
     private static void StoreBlock(Component c, double[] block, int x0, int y0)
     {
@@ -417,20 +460,27 @@ internal static class JpegDecoder
         }
 
         byte[] rgba = new byte[(long)width * height * 4];
+        int rowsPerBand = Math.Max(1, MinimumPixelsPerBand / Math.Max(1, width));
 
+        // Parallel over output rows — multithreading roadmap item #6, second half. Upsampling reads
+        // the finished sample planes and colour conversion is per pixel, so a band of output rows
+        // reads shared immutable state and writes only its own rows.
         if (components.Length == 1)
         {
             Component y = components[0];
-            for (int py = 0; py < height; py++)
-                for (int px = 0; px < width; px++)
-                {
-                    byte g = y.Samples[py * y.PlaneWidth + px];
-                    int d = (py * width + px) * 4;
-                    rgba[d] = g;
-                    rgba[d + 1] = g;
-                    rgba[d + 2] = g;
-                    rgba[d + 3] = 255;
-                }
+            ImageDecodeParallelism.For(0, height, rowsPerBand, (fromRow, toRow) =>
+            {
+                for (int py = fromRow; py < toRow; py++)
+                    for (int px = 0; px < width; px++)
+                    {
+                        byte g = y.Samples[py * y.PlaneWidth + px];
+                        int d = (py * width + px) * 4;
+                        rgba[d] = g;
+                        rgba[d + 1] = g;
+                        rgba[d + 2] = g;
+                        rgba[d + 3] = 255;
+                    }
+            });
             return new ImageBuffer(width, height, rgba);
         }
 
@@ -438,23 +488,26 @@ internal static class JpegDecoder
         Component cb = components[1];
         Component cr = components[2];
 
-        for (int py = 0; py < height; py++)
-            for (int px = 0; px < width; px++)
-            {
-                int yy = Sample(cy, px, py, hMax, vMax);
-                int cbv = Sample(cb, px, py, hMax, vMax) - 128;
-                int crv = Sample(cr, px, py, hMax, vMax) - 128;
+        ImageDecodeParallelism.For(0, height, rowsPerBand, (fromRow, toRow) =>
+        {
+            for (int py = fromRow; py < toRow; py++)
+                for (int px = 0; px < width; px++)
+                {
+                    int yy = Sample(cy, px, py, hMax, vMax);
+                    int cbv = Sample(cb, px, py, hMax, vMax) - 128;
+                    int crv = Sample(cr, px, py, hMax, vMax) - 128;
 
-                int r = (int)Math.Round(yy + 1.402 * crv);
-                int g = (int)Math.Round(yy - 0.344136 * cbv - 0.714136 * crv);
-                int b = (int)Math.Round(yy + 1.772 * cbv);
+                    int r = (int)Math.Round(yy + 1.402 * crv);
+                    int g = (int)Math.Round(yy - 0.344136 * cbv - 0.714136 * crv);
+                    int b = (int)Math.Round(yy + 1.772 * cbv);
 
-                int d = (py * width + px) * 4;
-                rgba[d] = (byte)Math.Clamp(r, 0, 255);
-                rgba[d + 1] = (byte)Math.Clamp(g, 0, 255);
-                rgba[d + 2] = (byte)Math.Clamp(b, 0, 255);
-                rgba[d + 3] = 255;
-            }
+                    int d = (py * width + px) * 4;
+                    rgba[d] = (byte)Math.Clamp(r, 0, 255);
+                    rgba[d + 1] = (byte)Math.Clamp(g, 0, 255);
+                    rgba[d + 2] = (byte)Math.Clamp(b, 0, 255);
+                    rgba[d + 3] = 255;
+                }
+        });
 
         return new ImageBuffer(width, height, rgba);
     }

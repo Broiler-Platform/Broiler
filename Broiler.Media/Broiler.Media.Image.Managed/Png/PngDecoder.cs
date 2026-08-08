@@ -477,32 +477,71 @@ internal static class PngDecoder
     /// with step 1) into <paramref name="rgba"/>, scattering pixel <c>(i, j)</c> of
     /// the pass to <c>(xStart + i·xStep, yStart + j·yStep)</c> of the full image.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The one parallel pass of a PNG decode</b> — multithreading roadmap item #7. Every row is
+    /// addressed by its own <c>rowData</c> offset into the already-unfiltered buffer and writes only
+    /// its own destination row, so rows have no dependency on one another at all; the sequential
+    /// part of PNG (inflate, and the Up/Paeth filters that read the reconstructed previous row) has
+    /// happened by the time this runs. Bands are handed out by
+    /// <see cref="ImageDecodeParallelism"/>, which runs them inline when the pass is too small to
+    /// be worth a thread.
+    /// </para>
+    /// <para>
+    /// This holds for the interlaced case unchanged: an Adam7 pass writes a strided subset of the
+    /// full image, but two rows of one pass still land on two different <c>y</c>, so bands of a
+    /// pass remain disjoint. The seven passes themselves stay sequential — they overwrite each
+    /// other's pixels by design.
+    /// </para>
+    /// </remarks>
     private static void ExpandPass(
         byte[] raw, int baseOffset, byte[] rgba, in ImageContext ctx,
         int passWidth, int passHeight, int stride,
         int xStart, int yStart, int xStep, int yStep)
     {
         int rowLen = stride + 1;
+        ImageContext context = ctx; // `in` parameters cannot be captured by the band delegate.
 
-        for (int j = 0; j < passHeight; j++)
-        {
-            int y = yStart + j * yStep;
-            int rowData = baseOffset + j * rowLen + 1;
-            var reader = new SampleReader(raw, rowData, ctx.BitDepth);
-
-            for (int i = 0; i < passWidth; i++)
+        ImageDecodeParallelism.For(
+            0,
+            passHeight,
+            RowsPerBand(passWidth),
+            (fromRow, toRow) =>
             {
-                ExtractPixel(ref reader, ctx, out byte r, out byte g, out byte b, out byte a);
+                for (int j = fromRow; j < toRow; j++)
+                {
+                    int y = yStart + j * yStep;
+                    int rowData = baseOffset + j * rowLen + 1;
+                    var reader = new SampleReader(raw, rowData, context.BitDepth);
 
-                int x = xStart + i * xStep;
-                int dst = (y * ctx.Width + x) * 4;
-                rgba[dst] = r;
-                rgba[dst + 1] = g;
-                rgba[dst + 2] = b;
-                rgba[dst + 3] = a;
-            }
-        }
+                    for (int i = 0; i < passWidth; i++)
+                    {
+                        ExtractPixel(ref reader, context, out byte r, out byte g, out byte b, out byte a);
+
+                        int x = xStart + i * xStep;
+                        int dst = (y * context.Width + x) * 4;
+                        rgba[dst] = r;
+                        rgba[dst + 1] = g;
+                        rgba[dst + 2] = b;
+                        rgba[dst + 3] = a;
+                    }
+                }
+            });
     }
+
+    /// <summary>
+    /// Smallest number of rows worth giving a thread, expressed as a pixel budget so the answer
+    /// tracks row width rather than a row count that means something different at 16px and 4096px.
+    /// </summary>
+    private static int RowsPerBand(int passWidth) =>
+        Math.Max(1, MinimumPixelsPerBand / Math.Max(1, passWidth));
+
+    /// <summary>
+    /// Pixels a band must be worth before the pass is split. Below roughly this much work the
+    /// scheduler round trip costs more than the expansion does, and page images at this size —
+    /// icons, spacers, sprites — are common enough that paying it would show up.
+    /// </summary>
+    private const int MinimumPixelsPerBand = 32 * 1024;
 
     private static void ExtractPixel(
         ref SampleReader reader, in ImageContext ctx, out byte r, out byte g, out byte b, out byte a)

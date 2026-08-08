@@ -6,17 +6,22 @@ the tooling.
 
 ## Status
 
-**Phase 2 is under way.** Item #9 — the gate — has landed; the rest of the phase
-is not started. What building it changed is in
-[What building Phase 2 changed](#what-building-phase-2-changed).
+**Phase 2 is under way.** Five of its nine items have landed (#9, #4, #6, #7,
+#10); four have not (#3, #5, #8, #17). What building them
+changed is in [What building Phase 2 changed](#what-building-phase-2-changed) —
+including the two findings that matter most for what is left: **band parallelism
+inside a primitive is the wrong unit for a page** (§4), and **the largest single
+win the phase has produced was a cache, not a thread** (§5).
 
 | Item | State | Evidence |
 |---|---|---|
 | #9 — shared render-path caches | **Done** | `FontsHandler`, `BImageRenderer`, `FallbackSystemFont` contour caches and `TrueTypeFont`'s five lazy tables; `RenderPathConcurrencyTests` (6 cases, 5 of which fail against the code before the change). Both P0-c residuals closed with it |
-| #3/#4 — band-parallel raster | Not started | Blocked on nothing now, but see [§2 below](#2-the-rasterizer-the-profile-measures-is-item-4s-copy-not-item-3s) — the stage the profile measures is item #4's copy, not item #3's |
-| #5 — tile-parallel replay | Not started | — |
-| #6/#7/#8 — image decode | Not started | #8 was blocked on `BImageRenderer._images`; that is now unblocked |
-| #10 — shaped-run cache | Not started | Was blocked on #9 |
+| #4 — band-parallel raster (`Broiler.HTML.Image`) | **Done** | `BRasterParallelism`, `patches/0124-…`; corpus `paint` page **1 594.7 ms → 1 096.5 ms (1.42×)** at 4 threads, 92.7% of its fill area split; pixels identical at 1/2/4 on all five pages, `RasterBandParallelismTests` 42 cases. Flat on the three pages whose raster is glyphs — see [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page) |
+| #3 — band-parallel raster (`Broiler.Graphics`) | Not started | The partitioner and the exit-gate harness now exist; this is porting them to the second copy, and [§2](#2-the-rasterizer-the-profile-measures-is-item-4s-copy-not-item-3s) still says unify first |
+| #5 — tile-parallel replay | Not started | **Now the phase's main remaining item**, and [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page) is the measurement that says why |
+| #6/#7 — image decode | **Done** | `ImageDecodeParallelism`; JPEG **2.08–2.61×**, PNG **1.22–1.29×** at 4 threads, byte-identical at every setting (`--decode-scaling`, plus two cases in `Broiler.Media.Image.Managed.Tests`) |
+| #8 — concurrent decode across images | Not started | Unblocked by #9, but the headless render path loads images **synchronously and inline** (`AvoidAsyncImagesLoading`), so this needs #2's prefetch/consume split rather than a `Parallel.For` — see [§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor) |
+| #10 — glyph outline cache | **Done** | `TrueTypeFont` caches outlines by glyph index; raster stage **1.34×** on `text`, **1.54×** on `boxes`, **1.00×** on the text-free `paint` control. The shaped-run cache the item names is *not* built — see [§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names) |
 | #17 — preload scan | Not started | — |
 
 **Phase 1 is complete.** All four items landed; what each one turned out to be
@@ -101,6 +106,22 @@ does, it is said.
 
 The cheapest high-value item in the whole document is the **WPT runner**: it
 runs 188 tests through a *single* worker process in a `foreach`.
+
+**Finding 1 has since been half-refuted.** The rasterizer is the largest stage, as
+it says. But "both rasterizers are scanline loops, so parallelize the loops" turned
+out to be the wrong reading of it: building that against the copy the profile
+measures moved one corpus page and left three untouched, because a page's raster is
+thousands of *small* fills rather than a few large ones. Only the sentence about
+tile-parallel replay survives intact, and it is now the whole of the finding —
+[What building Phase 2 changed §4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page).
+
+**Finding 4 needs a third example.** It names the cascade's rule scan and layout's
+full-tree relayout as single-threaded fixes that must precede any threading. The
+glyph outline path was a third, hidden in a phase about threads and larger than the
+threading item that shared its stage
+([§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names)).
+The generalisation the finding is reaching for: **before parallelizing a stage,
+check what the stage is recomputing.**
 
 **Findings 1, 4, and 5 have since been measured, and one of them was wrong.** The
 next section has the numbers; in short, finding 1 holds, finding 4 understates the
@@ -274,7 +295,9 @@ per-test allowance is a full GiB.
 
 ## What building Phase 2 changed
 
-One item so far — #9, the gate — and it moved two things that were not on the plan.
+Six findings. The first three came out of item #9, the gate; the rest came out of
+the raster, text and decode work that followed it, and two of them change what the
+rest of the phase should be.
 
 ### 1. Item #9 was four sites, not one, and the audit's method is what hid two of them
 
@@ -353,6 +376,148 @@ instrumented on all three slots but still off by default, and nothing yet calls
 threads. The first item that creates one has to arm `EnforceOnThisThread` in the
 same place it calls `Establish`, or the instrumentation bought here goes unused.
 
+Band-parallel raster (item #4) does **not** discharge that debt, and it is worth
+saying why it does not need to: a band never leaves the primitive it was created
+in, so it inherits nothing and establishes nothing. The ambient slots are read
+during *layout* and during display-list *construction*, both of which have
+finished before a fill starts. The first item that has to arm the enforcement is
+still the first one that renders a whole document off the calling thread.
+
+### 4. Band parallelism inside a primitive is the wrong unit for a page
+
+Item #3 is credited in the master table with **4–6× on 8 cores**, and §2 above
+established that the stage the profile measures is item **#4's** copy of the
+rasterizer. Building #4 produced a number, and it is not 4–6×. It is **1.42× on
+one of the five corpus pages and nothing at all on three of them** — and the
+reason is worth more than the number.
+
+The partitioner counts what it decided. On the corpus, at 1 280×1 024:
+
+| Page | fills taken inline | fills split | fill area inline | fill area split | share of area split |
+|---|---:|---:|---:|---:|---:|
+| text | 3 858 | 0 | 365 760 | 0 | 0.0% |
+| rules | 1 659 | 0 | 123 929 | 0 | 0.0% |
+| boxes | 717 | 0 | 108 349 | 0 | 0.0% |
+| paint | 5 600 | 2 800 | 1 353 600 | 17 248 400 | 92.7% |
+| mixed | 4 390 | 11 | 372 865 | 1 345 172 | 78.3% |
+
+**A page's raster is not a few big fills; it is thousands of small ones.** The
+`paint` page — built specifically to load the rasterizer — issues 8 400 fills
+averaging about 2 200 pixels each. The `text` page issues 3 858 fills averaging
+95 pixels: they are glyphs, and a glyph is one or two dozen scanlines. There is no
+threshold at which splitting a 95-pixel fill pays, so on three of the five pages
+band parallelism is structurally unable to do anything, at any core count.
+
+**The threshold is where a plausible number makes a feature inert.** The first
+value tried was 24 K pixels — a defensible "don't split anything small" figure. At
+that setting *not one fill on four of the five pages reached it*, `paint` split
+19% of its area, and the whole feature measured 1.03×. Lowering it to 2 048
+pixels — still 20× a glyph — moved `paint` to 92.7% of area split and 1.42×
+end-to-end (raster stage 1.61×) with pixels unchanged. A tuning constant nobody
+measured would have shipped a no-op and called it item #4.
+
+**What this says about item #5.** Tile-parallel replay partitions the *surface*
+and replays the whole display list per tile, so its unit of work is a tile's worth
+of the page — every fill that touches the tile — rather than one primitive. That
+is precisely the unit the table above says exists on all five pages and the
+per-primitive unit does not. Item #5 was scheduled as "supersedes #3 for whole-page
+renders"; the measurement upgrades it to **the only shape of raster parallelism
+the corpus can use**, and the 4–6× estimate on rows #3/#4 should be read as
+belonging to #5.
+
+### 5. The phase's largest win so far is a cache, and not the one item #10 names
+
+Item #10 says to add a shaped-run cache and, in its own words, to *measure the
+cache alone before adding threads; it may be the whole win*. Following that
+instruction found a different cache, and the item's advice was right about the
+wrong object.
+
+`ComplexTextShaper.Shape` — what item #10 proposes caching — runs only when
+`RequiresShaping` is true: complex scripts, RTL, or explicit
+`font-feature-settings`. The corpus is Latin by design (so that a page measuring
+layout does not also measure shaping), so a shaped-run cache would have measured
+**zero** on every page available, and it remains unbuilt for that reason rather
+than being claimed as done.
+
+What was actually being repeated per glyph was one layer down.
+`TrueTypeFont.GetGlyphContours` re-walked `glyf` — or re-ran the CFF charstring
+interpreter — re-flattened the quadratic segments and allocated fresh arrays **on
+every draw of every glyph**, for the same glyph index, thousands of times per page.
+`FallbackSystemFont` has always cached exactly this; `TrueTypeFont` did not, and
+nothing in the roadmap or in P0-c pointed at it because it is not shared mutable
+state and not a thread. Caching it, on the same corpus, two runs each side:
+
+| Page | raster before | raster after | ratio |
+|---|---:|---:|---:|
+| text | 292.7 ms | 218.4 ms | **1.34×** |
+| boxes | 71.0 ms | 46.2 ms | **1.54×** |
+| mixed | 154.8 ms | 134.6 ms | 1.15× |
+| rules | 126.2 ms | 91.4 ms | 1.38× |
+| paint | 829.1 ms | 827.9 ms | 1.00× |
+
+**`paint` is the control, and it is the reason the rest is believable.** That page
+draws no text; if it had moved, the table would be measuring the host's mood
+rather than the cache. It did not.
+
+This is a **single-threaded fix inside a phase about threads**, and it beat the
+threading item that shares its stage. Finding 4 of the summary already says two of
+the biggest render-path speedups are single-threaded fixes that must come first;
+this is a third, and the general lesson is narrower and more useful than "cache
+things": *before parallelizing a stage, check what the stage is recomputing.* A
+thread makes redundant work finish sooner; deleting it makes the work not happen.
+
+### 6. Item #8 is a prefetch/consume split, not a `Parallel.For`
+
+The master table describes item #8 as decoding *N* page images concurrently and
+lists its blocker as `BImageRenderer._images`, which item #9 cleared. Reading the
+path shows a second blocker the row does not name, and it is the one that decides
+the item's shape.
+
+`ImageLoadHandler.SetImageFromFile` already queues decode to the thread pool —
+*unless* `AvoidAsyncImagesLoading` is set, and every headless entry point sets it
+(`HtmlRender.RenderToImageCore` and its two siblings), because the render is
+synchronous and must have every image before layout and paint. So on exactly the
+paths this document measures, images are decoded **one at a time, inline**, and
+the concurrency the row credits the code with is switched off.
+
+That makes item #8 the same shape as item #2, not the shape its row implies: the
+URL set has to be discovered when the document is parsed, all decodes issued at
+once, and the existing synchronous call site left where it is, consuming from a
+cache. The `SubResourcePrefetcher` written for #2 is the precedent, and item #17
+(the preload scan) is what supplies the URL set — so **#17 should come before
+#8**, which is the reverse of the order the component roadmap lists them in.
+
+**What the exit gate actually ran on.** The corpus scaling harness compares pixels
+per page, which is five documents. The gate the roadmap sets is the WPT corpus, and
+it was run twice at four workers — once with the raster and decode budgets forced
+to **4** and once to **1** — over all 147 discovered tests. Both runs report
+**104 passed, 36 failed, 7 skipped**, and diffing their full output leaves only
+reordered `[RUN ]` progress lines: every per-test verdict, every pixel-match
+percentage, every failure bucket identical. The 61-test `css/css-backgrounds`
+subset was run the same way at 1 and 4 workers with the same result, and there the
+pool's own 2× is visible in the wall clock (46 s → 23 s) while the classification
+does not move.
+
+### 7. Two kinds of parallelism now multiply, and the runner has to divide
+
+Phase 1 gave the WPT runner a pool of *N* worker processes. Phase 2 gives every
+process band-parallel raster and band-parallel decode, each defaulting to one
+thread per core. Nobody sees both numbers except the runner: the default is
+per-process and correct in isolation, and the pool size is per-run and correct in
+isolation, but together they are *N × cores* runnable threads on *cores* cores.
+That is slower than either alone, and it makes the per-test timeout a lottery
+rather than a limit.
+
+`Program.ApplyRenderThreadBudget` divides — `max(1, cores / workers)` — and
+publishes the result into the environment the workers inherit, leaving any
+variable the caller set explicitly untouched. It is printed in the run header next
+to the pool size, because a run whose two parallelism settings are invisible is a
+run whose timings cannot be compared with another's.
+
+This generalises past the WPT runner: **every host that runs more than one render
+at once now owns a division it did not have to make before** — the CLI's batch
+processes are the other one in this repository.
+
 ## Master table
 
 Gain is per-stage unless stated. Effort is engineering days for one person
@@ -363,14 +528,14 @@ non-deterministic correctness defect.
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Tooling | [`Broiler.Wpt/Program.cs`](../../src/Broiler.Wpt/Program.cs) `RunDiscoveredTests` — **DONE** | Pool of *N* worker processes draining a shared queue (`--workers <N>\|auto`) | Work queue over *N* worker processes; results already buffered into `allResults` and sorted after the run, so order is not load-bearing | Nothing. Worker protocol is already one-command-per-line JSON over stdio | **Measured: 1.93× at 4 workers** on a 61-test subset (45.2 s → 23.4 s); identical classification at 1, 4 and auto. Bounded by RAM, not cores | Low | Done | 1 |
 | 2 | HtmlBridge | [`ScriptExtractionService.cs:303`](../../src/Broiler.HtmlBridge.Core/Scripting/ScriptExtractionService.cs), [`ResourceLoader.cs:56`](../../src/Broiler.HtmlBridge.Dom/Runtime/ResourceLoader.cs), [`SubDocuments.cs:581`](../../src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs) | Serial `GetStringAsync(..).GetAwaiter().GetResult()`, one resource at a time | Bounded-concurrency prefetch (6/host, browser convention) into a content-addressed cache; call sites then hit the cache | Call sites are synchronous and ordering-sensitive for `document.write`; needs a prefetch/consume split, not an `async` conversion | **Done for scripts and `<link>` stylesheets** (`SubResourcePrefetcher`, bounded 6/host). Iframes and `fetch()`/XHR are not wired: they have no point where the URL set is known before it is consumed, which is what item #17 supplies | Medium | Done (scripts, sheets) | 1 |
-| 3 | Graphics | [`Rendering/BCanvas.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/BCanvas.cs) `FillRect:106`, `FillGlyphContours:241`, `DrawBitmap:345`, `FillRectTiled:389`, `FillLinear/Radial/ConicGradientRect:425/468/508` | Single-threaded scanline loops | `Parallel.For` over scanline bands; per-band coverage buffer and clip stack | Per-row `coverage[]` and the `_clipOperations` list are instance state shared across rows — must become per-worker | **4–6× on 8 cores** (estimate) of a stage **measured at 46.9–80.8% of a render** — the largest measured share in the document | Low | 4–6 d | 2 |
-| 4 | HTML | [`Broiler.HTML.Image/BCanvas.cs`](../../Broiler.HTML/Source/Broiler.HTML.Image/BCanvas.cs) `:128/262/364/406/456/508/554/655` | Same scanline shape, second copy of the rasterizer | Same as #3 | Same as #3, plus the duplication itself | Same as #3 | Low | 3–4 d (or 0, if unified with #3 first) | 2 |
-| 5 | Graphics / Layout | [`DisplayList.cs`](../../Broiler.Layout/Broiler.Layout/IR/DisplayList.cs) + [`BRenderList.cs`](../../Broiler.Graphics/Broiler.Graphics/RenderList/BRenderList.cs) replayed by [`RGraphicsRasterBackend`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs) | One pass, whole surface | **Tile-parallel replay**: partition the target into tiles, each worker replays the whole immutable list clipped to its tile | Already immutable and flat with explicit `ClipItem`/`RestoreItem`/`OpacityItem` stack items — this is the right structure. Needs per-tile state and layer (`OpacityItem`) handling | **5–7× on 8 cores** (estimate) for full-page renders; better locality than #3. **Measured:** the replay is 46.9–80.8% of a render while the display-list *build* is 0.3–0.7%, so only the replay is worth parallelizing | Low–Medium | 6–10 d | 2 |
-| 6 | Media | [`JpegDecoder.cs:385`](../../Broiler.Media/Broiler.Media.Image.Managed/Jpeg/JpegDecoder.cs) dequantize+IDCT per block, `:424` upsample + YCbCr→RGB per row | Sequential | `Parallel.For` over blocks / rows. Entropy decode stays sequential (optionally per-RST-interval) | Nothing structural; blocks and output rows are disjoint | **2–2.5× on decode** (Amdahl: Huffman ≈35% stays serial) | Low | 2–3 d | 2 |
-| 7 | Media | [`PngDecoder.cs:293`](../../Broiler.Media/Broiler.Media.Image.Managed/Png/PngDecoder.cs) expand-to-RGBA | Sequential | `Parallel.For` over rows | Inflate (`:62`) and unfilter (`:63`) are genuinely sequential — Up/Paeth read the previous row | **1.3–1.6× on decode** only | Low | 1–2 d | 2 |
-| 8 | Media / HTML | Per-image decode, driven from [`ImageLoadHandler.cs:177`](../../Broiler.HTML/Source/Broiler.HTML.Core/Handlers/ImageLoadHandler.cs) | Already `ThreadPool.QueueUserWorkItem` for file reads; decode is on the completion path | Decode *N* page images concurrently — coarser and better than #6/#7 | Decoder statics must be verified re-entrant; `BImageRenderer._images` is a plain `Dictionary` | **Near-linear in image count** up to core count | Low | 2–3 d | 2 |
+| 3 | Graphics | [`Rendering/BCanvas.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/BCanvas.cs) `FillRect:106`, `FillGlyphContours:241`, `DrawBitmap:345`, `FillRectTiled:389`, `FillLinear/Radial/ConicGradientRect:425/468/508` | Single-threaded scanline loops | `Parallel.For` over scanline bands; per-band coverage buffer and clip stack | Per-row `coverage[]` and the `_clipOperations` list are instance state shared across rows — must become per-worker | **The 4–6× estimate belongs to item #5, not here.** Item #4 built this shape against the copy the profile measures and got 1.42× on one corpus page and nothing on three; the ceiling is set by fill size, not by cores ([§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page)). `BRasterParallelism` and `RasterBandParallelismTests` are the port-ready partitioner and exit gate | Low | 2–3 d (port) | 2 |
+| 4 | HTML | [`Broiler.HTML.Image/BCanvas.cs`](../../Broiler.HTML/Source/Broiler.HTML.Image/BCanvas.cs) — **DONE** | Was the same scanline shape; now `Parallel.For` over row bands via `BRasterParallelism`, with a measured area threshold and a per-band coverage buffer in `FillGlyphContours` | Nothing | **DONE, and smaller than the estimate.** Corpus `paint` page 1 594.7 ms → 1 096.5 ms (**1.42×** end to end, 1.61× on the stage) at 4 threads; **flat on `text`, `rules` and `boxes`, which split 0 fills between them** — their raster is glyphs, and a 95-pixel fill is not splittable at any core count. Pixels identical at 1/2/4 on all five pages. See [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page) | Low | Done | 2 |
+| 5 | Graphics / Layout | [`DisplayList.cs`](../../Broiler.Layout/Broiler.Layout/IR/DisplayList.cs) + [`BRenderList.cs`](../../Broiler.Graphics/Broiler.Graphics/RenderList/BRenderList.cs) replayed by [`RGraphicsRasterBackend`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs) | One pass, whole surface | **Tile-parallel replay**: partition the target into tiles, each worker replays the whole immutable list clipped to its tile | Already immutable and flat with explicit `ClipItem`/`RestoreItem`/`OpacityItem` stack items — this is the right structure. Needs per-tile state and layer (`OpacityItem`) handling | **5–7× on 8 cores** (estimate) for full-page renders; better locality than #3. **Measured:** the replay is 46.9–80.8% of a render while the display-list *build* is 0.3–0.7%, so only the replay is worth parallelizing — and item #4's result makes this **the only raster parallelism the corpus can use**, because a tile's unit of work is every fill touching it rather than one primitive ([§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page)) | Low–Medium | 6–10 d | 2 |
+| 6 | Media | [`JpegDecoder.cs:385`](../../Broiler.Media/Broiler.Media.Image.Managed/Jpeg/JpegDecoder.cs) dequantize+IDCT per block, `:424` upsample + YCbCr→RGB per row | Sequential | `Parallel.For` over blocks / rows. Entropy decode stays sequential (optionally per-RST-interval) | Nothing structural; blocks and output rows are disjoint | **DONE. Measured 2.08–2.61× at 4 threads** (gradient / flat-block fixtures, 1 024²), which lands inside the estimate. Byte-identical at 1, 2 and 4 threads. `JpegDct.Inverse` also took a caller-owned scratch buffer, removing a 512-byte allocation per block | Low | Done | 2 |
+| 7 | Media | [`PngDecoder.cs:293`](../../Broiler.Media/Broiler.Media.Image.Managed/Png/PngDecoder.cs) expand-to-RGBA | Sequential | `Parallel.For` over rows | Inflate (`:62`) and unfilter (`:63`) are genuinely sequential — Up/Paeth read the previous row | **DONE. Measured 1.22–1.29× at 4 threads**, just under the estimate: inflate and unfilter are a larger share of a PNG decode than the estimate assumed, and both are on the do-not-parallelize list | Low | Done | 2 |
+| 8 | Media / HTML | Per-image decode, driven from [`ImageLoadHandler.cs:177`](../../Broiler.HTML/Source/Broiler.HTML.Core/Handlers/ImageLoadHandler.cs) | Already `ThreadPool.QueueUserWorkItem` for file reads; decode is on the completion path | Decode *N* page images concurrently — coarser and better than #6/#7 | **Not what this cell said.** `BImageRenderer._images` is fixed and the decoders are covered by a re-entrancy test, but every headless entry point sets `AvoidAsyncImagesLoading`, so decode is synchronous and inline. Needs #2's prefetch/consume split fed by #17 ([§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor)) | **Near-linear in image count** up to core count | Low | 3–4 d, after #17 | 2 |
 | 9 | Graphics | [`FontsHandler.cs`](../../Broiler.Graphics/Broiler.Graphics/Text/FontsHandler.cs), [`TrueTypeFont.cs`](../../Broiler.Graphics/Broiler.Graphics/Text/TrueTypeFont.cs), [`FallbackSystemFont.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/FallbackSystemFont.cs), [`BImageRenderer.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/BImageRenderer.cs) — **DONE** | Plain `Dictionary`, no synchronization; and two lazy-init latches published before their values | Not a speedup itself — a **hard prerequisite** for #10, #12, #13, and per Phase 1 §2 for *every* CPU-parallel render-path item | Nothing now | **DONE.** Nested map flattened to one concurrent dictionary; image table concurrent and handle allocation interlocked; replay transform state moved per-call; `TrueTypeFont`'s five lazy tables re-published through `Lazy` in `ExecutionAndPublication`. Both P0-c residuals closed with it. Enables ~4 items | Low | Done | 2 |
-| 10 | Graphics | [`ComplexTextShaper.Shape:72`](../../Broiler.Graphics/Broiler.Graphics/Text/ComplexTextShaper.cs) | Called per run during layout | Already a static pure function → parallel-safe. Add a shaped-run cache keyed by (font, text, features) | Needs #9 | **Cache alone is the bigger win**; parallel shaping 3–5× on the shaping stage | Low | 3–4 d | 2 |
+| 10 | Graphics | [`TrueTypeFont.GetGlyphContours`](../../Broiler.Graphics/Broiler.Graphics/Text/TrueTypeFont.cs) — **DONE**; [`ComplexTextShaper.Shape:72`](../../Broiler.Graphics/Broiler.Graphics/Text/ComplexTextShaper.cs) — not built | Outlines were re-extracted per glyph *occurrence*; shaping is called per run during layout | Concurrent cache by glyph index, published through `GetOrAdd` | Nothing | **The item was right that the cache is the whole win, and wrong about which cache.** Glyph outlines: raster stage **1.34×** (`text`), **1.54×** (`boxes`), 1.00× on the text-free `paint` control. The shaped-run cache is deliberately unbuilt — `RequiresShaping` is false for the whole Latin corpus, so it would measure nothing ([§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names)) | Low | Done (outlines) | 2 |
 | 11 | CSS | [`CssStyleEngine.CollectFromRules:623`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) — linear scan of every rule of every sheet, per element | O(elements × rules) | **Not multithreading.** Rule index (bucket by id/class/tag) + ancestor bloom filter | Nothing — this is the standard engine design and it is simply absent | **DONE.** Exit gate met: with matches fixed at four, 32× the rules now costs 1.64× the time and 1.13× the bytes (was 30.8× / 32.0×) — up to **136.9× faster** and **600× less garbage** at 3 200 rules. On a whole render the corpus `rules` page is 5 218.96 ms → 1 841.71 ms (2.8×); see [What building Phase 1 changed](#what-building-phase-1-changed) §1. `patches/0123-css-cascade-rule-index.patch` | Low | Done | 1 |
 | 12 | CSS | `GetComputedStyle:151` / `GetCascadedDeclarationMap:555` over the element set | Sequential per element; caches under one global `_sync` lock | Parallel style recalc over DOM subtrees, Stylo-style | Global lock over `_cache`/`_sparseCache`/`_declaredCascadeCache` becomes the bottleneck; needs sharding + per-thread L1. Do #11 first or you parallelize the wrong thing | **2–4× on styling** after #11 | Medium | 10–15 d | 3 |
 | 13 | Layout | [`CssBox.PerformLayout:347`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.cs), [`PerformLayoutImp:37`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.Layout.cs) | Full-tree, in-place mutation, from the root every pass — **twice** when width is unrestricted ([`HtmlContainerInt.cs:929,936`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs)) | Parallel intrinsic sizing; parallel independent subtrees (abspos/fixed, flex+grid items, table cells, multicol, subdocuments) | Mutable shared tree; ambient thread-static state (`CssLengthParser` viewport, [`DocumentModeContext.cs:22`](../../Broiler.Layout/Broiler.Layout/DocumentModeContext.cs)); no dirty-bit invalidation to bound the work | **1.5–2.5×** of a stage **measured at 0.6–6.5% of a render** on every corpus page, including one built to load layout — so a few percent overall at best | **High** | 20–30 d | 4 |
@@ -400,6 +565,15 @@ rule-count axis), `PerformLayout`, display-list raster at 1280×1024, PNG/JPEG
 decode, and end-to-end headless render — over a five-page corpus generated
 deterministically in code, so the profile reproduces on a bare checkout with no
 WPT checkout and no fixture files.
+
+**Republished after Phase 1 and Phase 2.** The profile checked in when P0-a closed
+predates item #11 and every item below, so the numbers in
+[What measuring Phase 0 changed](#what-measuring-phase-0-changed) are what the
+figures *were* — they are kept as written because that is what the decisions of the
+time were made on. The current publication is the file itself; the corpus, the
+method and the exit gate are unchanged, and the header now also records the raster
+thread budget, because the raster share is a function of a setting and two
+publications taken at different settings are not comparable without it.
 
 **Exit gate — met.** One command:
 
@@ -555,19 +729,37 @@ The best return in the repository, and the least risky.
    code before the change and pass after it, `Broiler.Graphics.Tests` 64/64 over
    five consecutive runs. Blocked items 10, 12, 13 — and, per Phase 1 §2, every
    CPU-parallel render-path item.
-3. **Scanline-band parallelism inside the primitives** (item #3): hoist
-   `coverage[]` and the clip stack to per-band state, `Parallel.For` over bands
-   with a minimum band height so small fills stay on one thread.
-   *Exit gate:* WPT pixel results byte-identical to the sequential path; a
-   `--raster-threads 1` switch reproduces the sequential output exactly.
-4. **Tile-parallel display-list replay** (item #5). This supersedes step 3 for
-   whole-page renders — step 3 remains the right answer for a single large
-   primitive. Handle `OpacityItem`/`BlendModeItem` layers by rendering the layer
-   into a tile-local scratch buffer.
+3. **Scanline-band parallelism inside the primitives** — **DONE for item #4**,
+   the copy the profile measures; item #3's copy is an unstarted port.
+   `BRasterParallelism` splits the `y` range, `FillGlyphContours`' coverage
+   accumulator and crossing list moved inside the band, and the budget is
+   `BROILER_RASTER_THREADS` (default one thread per core).
+   *Exit gate — met.* Pixels identical at 1, 2 and 4 threads on all five corpus
+   pages (`--raster-scaling`, which fails the run if any setting differs) and
+   across 42 `RasterBandParallelismTests` cases covering every split primitive,
+   including one under a clip; a budget of 1 splits nothing at all.
+   **Read [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page)
+   before porting it to item #3's copy.** It bought 1.42× on one corpus page and
+   nothing on three, because those pages' raster is glyph fills of ~95 pixels and
+   no threshold makes those splittable. The port is cheap now that the partitioner
+   and the gate exist, but it should be scheduled for what it is — the Writer and
+   Broiler.UI paths, which the corpus does not render — and not for a repeat of
+   the 4–6× estimate.
+4. **Tile-parallel display-list replay** (item #5) — **now the item that matters
+   here**, for the reason above: a tile's unit of work is every fill that touches
+   it, which is the only unit all five pages have. Handle
+   `OpacityItem`/`BlendModeItem` layers by rendering the layer into a tile-local
+   scratch buffer.
    *Exit gate:* identical output at 1, 2, 4, and 8 tiles; measured scaling curve
-   published.
-5. **Shaped-run cache + parallel shaping** (item #10). Measure the cache alone
-   before adding threads; it may be the whole win.
+   published. `RasterScaling` already does the identity half of that gate for a
+   whole-corpus render and can take the tile axis as-is.
+5. **Glyph outline cache — DONE**; shaped-run cache and parallel shaping (item
+   #10) — not built. The item's own advice, measure the cache alone first, is
+   what found the outline cache one layer below the shaper, and it is worth more
+   than the threading it was a prerequisite for:
+   [§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names).
+   The shaped-run cache needs a complex-script page in the corpus before it can
+   be measured at all, which is the work to do before starting it.
 
 **Not recommended:** parallelizing the Direct2D / OpenGL / Vulkan backends. They
 already hand work to the GPU; adding CPU threads there adds synchronization for
@@ -666,9 +858,13 @@ scripts concurrently.
    the WPT corpus.
 2. **Speculative preload scan** (item #17) on a worker over the raw byte buffer,
    feeding step 1 and item #16. Read-only over an immutable buffer, so it is
-   safe by construction.
-3. **Concurrent image decode** (item #8) once the decoder statics are cleared by
-   P0-c.
+   safe by construction. **It now also gates step 3**, which is why it moved
+   above it.
+3. **Concurrent image decode** (item #8). The decoder statics are cleared — they
+   have a re-entrancy test — and `BImageRenderer._images` is fixed, but the
+   headless render path loads images synchronously and inline, so this is the
+   same prefetch/consume split as step 1 over the image URLs step 2 supplies:
+   [§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor).
 
 **Not recommended:** parallel HTML tokenization. The tokenizer is a
 specification-mandated state machine whose transitions depend on the tree
@@ -677,16 +873,30 @@ here, and step 2 is that.
 
 ### Broiler.Media
 
-1. **Concurrent decode across images** (item #8) — coarse, simple, and the
-   better win when a page has several images.
-2. **JPEG intra-image** (item #6): `Parallel.For` over blocks for
-   dequantize + IDCT, and over rows for upsample + YCbCr→RGB. Optionally split
-   entropy decode at restart-interval markers when the stream has them.
-3. **PNG intra-image** (item #7): only the expand-to-RGBA pass. Inflate and
-   unfilter carry real sequential dependencies (Up/Paeth read the previous row)
-   — do not attempt them.
-   *Exit gate for both:* decoded output byte-identical to the sequential
-   decoder across the existing `Broiler.Media.Image.Managed.Tests` corpus.
+1. **Concurrent decode across images** (item #8) — still the better win when a
+   page has several images, but it is a prefetch/consume split rather than the
+   coarse `Parallel.For` this step used to describe, and it wants item #17 first:
+   [§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor).
+2. **JPEG intra-image** (item #6) — **DONE**. Bands of block rows for
+   dequantize + IDCT, bands of output rows for upsample + YCbCr→RGB; the
+   dequantized block and the IDCT intermediate moved inside the band, which is
+   both what makes it thread-safe and less garbage than the sequential version
+   produced. Entropy decode is untouched. **2.08–2.61× at 4 threads.**
+3. **PNG intra-image** (item #7) — **DONE**, expand-to-RGBA only, interlaced
+   passes included (a pass's rows land on distinct `y`, so bands of one pass stay
+   disjoint; the seven passes stay sequential because they overwrite each other by
+   design). Inflate and unfilter untouched. **1.22–1.29× at 4 threads**, just under
+   the 1.3–1.6× estimate.
+   *Exit gate for both — met.* Decoded output byte-identical to the sequential
+   decoder at 1, 2, 4 and 8 threads over four fixtures including an interlaced PNG
+   and a progressive JPEG (`Broiler.Media.Image.Managed.Tests`), and at every
+   setting of the `--decode-scaling` harness, which fails the run on a single
+   differing byte.
+
+Both go through `ImageDecodeParallelism`, whose budget is
+`BROILER_IMAGE_DECODE_THREADS` and whose default any host running several renders
+at once must divide — see
+[§7](#7-two-kinds-of-parallelism-now-multiply-and-the-runner-has-to-divide).
 
 ### Tooling — Broiler.Wpt and Broiler.Cli
 
@@ -745,7 +955,7 @@ Recording these so they are not revisited each time the topic comes up:
 |---|---|---|
 | **0 — Make it measurable and deterministic** | P0-a benchmarks, P0-b single-threaded event loop (#15), P0-c static-state audit, GC config evaluation (#19) | Nothing after this is trustworthy without it. #15 is a correctness fix that also removes lock overhead from the cascade. |
 | **1 — Free wins and the sequential fixes** — **DONE** | WPT worker pool (#1), CLI batch (#20), concurrent sub-resource fetch (#2), CSS rule indexing (#11) | Cheap, low-risk, and #1 shortens the feedback loop for everything else. #11 is single-threaded but must precede #12. **What it changed:** #11 met its exit gate (cascade cost is now flat in total rules) but is 2.8× on a whole render, and `parse+cascade` still dominates the rule-heavy page — so #12 needs that stage split before it is started; #20 had to use processes, which makes item #9 a gate on every render-path item, not three. |
-| **2 — Raster, decode, text** — *in progress* | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), shaped-run cache (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed:** the item was four sites rather than one, two of which were lazy-init latches that no cache audit looks for; and the raster stage the profile measures turns out to be item **#4's** copy of the rasterizer, not item #3's, which is what decides where the unification step starts. See [What building Phase 2 changed](#what-building-phase-2-changed). |
+| **2 — Raster, decode, text** — *in progress; 5 of 9 items done* | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), text caches (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed, in the order it matters:** band parallelism inside a primitive turned out to be the wrong unit for a page — three of five corpus pages split zero fills, because their raster is glyphs — which promotes **#5 from "supersedes #3" to the only raster parallelism the corpus can use (§4)**; the phase's largest single win was a *cache*, and not the one #10 names (§5); #8 is a prefetch/consume split needing #17 first, not a `Parallel.For` (§6); the pool and the in-process threads multiply, so the runner now divides them (§7); the item-#9 findings (§1–§3) stand. **What is left:** #5, #3's port, #17 then #8. See [What building Phase 2 changed](#what-building-phase-2-changed). |
 | **3 — Style and incremental layout** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. |
 | **4 — Parallel layout and workers** | Parallel intrinsic sizing and independent subtrees (#13), Web Workers (#18) | Highest cost, highest risk, lowest ceiling. Only worth starting once Phase 3's measurements say layout is still the bottleneck. |
 

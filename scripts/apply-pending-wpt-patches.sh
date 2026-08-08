@@ -49,7 +49,15 @@ set -euo pipefail
 #   * 0123 (Broiler.CSS, cascade rule index) — landed upstream as Broiler.CSS
 #     377c6dd and the submodule pointer is bumped, so it reaches CI through the
 #     pointer. The idempotence guard would skip it from here on anyway.
+#
+# Listed below, and both deliberately so: 0124 changes the code that draws every
+# WPT pixel and 0125 changes the glyph geometry it draws from. Each claims the
+# rendering does not move, and a WPT run against the pinned pointers is the check
+# that claim deserves — unlike a thread-safety or scheduling patch, either of
+# these *could* move pixels if it were wrong.
 PENDING_PATCHES=(
+  "Broiler.HTML|patches/0124-raster-band-parallel-scanline-fills.patch"
+  "Broiler.Graphics|patches/0125-text-glyph-outline-cache.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

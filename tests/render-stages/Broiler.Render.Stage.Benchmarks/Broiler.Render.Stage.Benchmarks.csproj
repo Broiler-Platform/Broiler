@@ -39,6 +39,12 @@
     <!-- BColor, and the image encode formats the decode benchmark builds its fixtures with. -->
     <ProjectReference Include="..\..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
     <ProjectReference Include="..\..\..\Broiler.Media\Broiler.Media.Image\Broiler.Media.Image.csproj" />
+    <!--
+      The decode-scaling mode sets `ImageDecodeParallelism.MaxDegreeOfParallelism`, which is internal
+      to the managed codecs (see the InternalsVisibleTo there). Referenced explicitly rather than
+      relied on transitively, because that is the assembly this project actually names in source.
+    -->
+    <ProjectReference Include="..\..\..\Broiler.Media\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" />
   </ItemGroup>
 
 </Project>

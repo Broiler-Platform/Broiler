@@ -56,6 +56,44 @@ dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchma
 `--job short` is enough to separate anything that differs by more than a few percent and
 finishes in minutes; drop it for publication numbers.
 
+## Thread scaling — items #4, #6, #7
+
+Two modes that answer "how does this stage scale with threads, and does it change a
+pixel". Both report the second question as part of the first and **exit non-zero if any
+setting produced different bytes**, because a speedup measured without that check is not
+evidence of anything.
+
+```sh
+dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --raster-scaling
+dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --decode-scaling
+```
+
+`--raster-scaling` renders the whole corpus at 1, 2, 4 and *cores* raster threads, and
+follows the timings with the partitioner's own count of how many fills were large enough to
+split. That second table is the point: it is what distinguishes "the threads did not help"
+from "no fill ever reached the threshold", which call for opposite next steps. It is how the
+threshold in `BRasterParallelism` was chosen, and re-running it is how to re-choose it when
+the rasterizer's per-pixel cost changes.
+
+`--decode-scaling` decodes 1 024² PNG and JPEG fixtures in two content shapes (a
+photographic ramp and flat tiles, which load the entropy stages very differently) at the same
+settings.
+
+**Both interleave their settings within each iteration rather than measuring one setting at a
+time.** This container's throughput drifts by tens of percent over tens of seconds — enough
+that the same untouched decode measured in two consecutive processes differs by more than the
+effect being measured. Blocked measurement cannot tell a speedup from the box getting faster.
+
+The budgets are also settable directly, which is what a caller running several renders at once
+should do (see the multithreading roadmap, "two kinds of parallelism now multiply"):
+
+| Variable | Controls |
+|---|---|
+| `BROILER_RASTER_THREADS` | Threads one scanline fill may use |
+| `BROILER_RASTER_MIN_AREA` | Pixels a fill must cover before it is split at all |
+| `BROILER_RASTER_MIN_BAND` | Pixels one band must be worth |
+| `BROILER_IMAGE_DECODE_THREADS` | Threads one decode pass may use |
+
 ## GC configuration — item #19
 
 The mode is fixed when the runtime starts, so one process cannot compare the two. Run it
