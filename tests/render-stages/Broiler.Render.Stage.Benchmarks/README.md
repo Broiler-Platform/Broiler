@@ -58,13 +58,14 @@ finishes in minutes; drop it for publication numbers.
 
 ## Thread scaling — items #4, #6, #7
 
-Two modes that answer "how does this stage scale with threads, and does it change a
-pixel". Both report the second question as part of the first and **exit non-zero if any
+Three modes that answer "how does this stage scale with threads, and does it change a
+pixel". All report the second question as part of the first and **exit non-zero if any
 setting produced different bytes**, because a speedup measured without that check is not
 evidence of anything.
 
 ```sh
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --raster-scaling
+dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --tile-scaling
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --decode-scaling
 ```
 
@@ -74,6 +75,15 @@ split. That second table is the point: it is what distinguishes "the threads did
 from "no fill ever reached the threshold", which call for opposite next steps. It is how the
 threshold in `BRasterParallelism` was chosen, and re-running it is how to re-choose it when
 the rasterizer's per-pixel cost changes.
+
+`--tile-scaling` renders the corpus at 1, 2, 4 and *cores* tiles (item #5) and reports the
+`PerformPaint` stage as well as the whole render — tiling changes one stage, and on a page
+where that stage is a tenth of the render an end-to-end table divides the effect by ten before
+printing it. It follows the timings with the driver's own count of how many replays were tiled
+and, when one was not, whether the **surface** refused it or its **display list** did. Those
+call for opposite next steps, which is why they are counted apart. It also prints how many tile
+views reached the compat backend, which is the one assumption the design rests on and is
+expected to be zero.
 
 `--decode-scaling` decodes 1 024² PNG and JPEG fixtures in two content shapes (a
 photographic ramp and flat tiles, which load the entropy stages very differently) at the same
@@ -89,10 +99,16 @@ should do (see the multithreading roadmap, "two kinds of parallelism now multipl
 
 | Variable | Controls |
 |---|---|
-| `BROILER_RASTER_THREADS` | Threads one scanline fill may use |
+| `BROILER_RASTER_THREADS` | Threads one scanline fill may use (item #4) |
 | `BROILER_RASTER_MIN_AREA` | Pixels a fill must cover before it is split at all |
 | `BROILER_RASTER_MIN_BAND` | Pixels one band must be worth |
+| `BROILER_RASTER_TILES` | Tiles one display-list replay may be split into (item #5) |
+| `BROILER_RASTER_MIN_TILE_ROWS` | Rows a tile must be worth before the surface is split further |
 | `BROILER_IMAGE_DECODE_THREADS` | Threads one decode pass may use |
+
+The two raster budgets do not compound: a tile view runs its scanline bands inline, so a render
+spends whichever of the two it is using and never both. A host dividing cores between processes
+should give each the same figure rather than a share of it.
 
 ## GC configuration — item #19
 

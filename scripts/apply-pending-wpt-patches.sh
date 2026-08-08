@@ -49,15 +49,18 @@ set -euo pipefail
 #   * 0123 (Broiler.CSS, cascade rule index) — landed upstream as Broiler.CSS
 #     377c6dd and the submodule pointer is bumped, so it reaches CI through the
 #     pointer. The idempotence guard would skip it from here on anyway.
+#   * 0124 (Broiler.HTML, band-parallel scanline fills) and 0125 (Broiler.Graphics,
+#     glyph outline cache) — both landed upstream and both pointers are bumped, so
+#     they reach CI through the pointer. Their patch files are deleted for the same
+#     reason: this directory is a backlog, not an archive.
 #
-# Listed below, and both deliberately so: 0124 changes the code that draws every
-# WPT pixel and 0125 changes the glyph geometry it draws from. Each claims the
-# rendering does not move, and a WPT run against the pinned pointers is the check
-# that claim deserves — unlike a thread-safety or scheduling patch, either of
-# these *could* move pixels if it were wrong.
+# Listed below, and deliberately so: 0126 rewrites the loop that draws every WPT
+# pixel and adds a second thread to it. Its claim is precisely that the rendering
+# does not move, and a WPT run against the pinned pointers is the check that claim
+# deserves — unlike a thread-safety or scheduling patch, it *could* move pixels if
+# it were wrong.
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0124-raster-band-parallel-scanline-fills.patch"
-  "Broiler.Graphics|patches/0125-text-glyph-outline-cache.patch"
+  "Broiler.HTML|patches/0126-raster-tile-parallel-replay.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

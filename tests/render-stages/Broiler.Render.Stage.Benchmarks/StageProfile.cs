@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using Broiler.Graphics;
 using Broiler.HTML.Image;
+using Broiler.Layout.IR;
 using BBitmap = Broiler.HTML.Image.BBitmap;
 
 namespace Broiler.Render.Stage.Benchmarks;
@@ -263,6 +264,9 @@ internal static class StageProfile
         Console.WriteLine(
             $"- Raster threads: {BRasterParallelism.MaxDegreeOfParallelism} " +
             $"(item #4; `BROILER_RASTER_THREADS`, default one per core)");
+        Console.WriteLine(
+            $"- Raster tiles: {TileParallelReplay.MaxDegreeOfParallelism} " +
+            $"(item #5; `BROILER_RASTER_TILES`, default one per core)");
         Console.WriteLine($"- GC: {(System.Runtime.GCSettings.IsServerGC ? "Server" : "Workstation")}, "
             + $"{(System.Runtime.GCSettings.LatencyMode)} latency mode");
         Console.WriteLine();
