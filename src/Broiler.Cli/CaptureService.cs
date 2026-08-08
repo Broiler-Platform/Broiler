@@ -12,6 +12,7 @@ using Broiler.CSS;
 using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
+using Broiler.HtmlBridge.Internal.Scripting;
 using Broiler.Media.Image;
 using Broiler.HtmlBridge.Dom;
 
@@ -447,12 +448,57 @@ public class CaptureService
     /// guaranteed order. All pending timers and rAF callbacks are flushed
     /// before serialisation.
     /// </summary>
+    /// <summary>
+    /// Starts the document's speculative preload scan (multithreading roadmap item #17) and returns
+    /// the prefetcher its worker fills, or <c>null</c> when no scan ran.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This host walks the script tags itself and fetched each external one <em>inline as it
+    /// reached it</em> — the serial round trips item #2 exists to remove, in a call site item #2
+    /// never reached, because the split it built lives in <c>ScriptExtractionService.ExtractAll</c>
+    /// and capture does its own extraction. The scan is what supplies the URL set early enough to
+    /// fix that: the whole set from one pass of the source, on a worker, before the loop below has
+    /// looked at the first tag.
+    /// </para>
+    /// <para>
+    /// <b>The prefetch key is derived exactly as the consume site derives it</b> — the raw
+    /// attribute value resolved against the page URL by the same
+    /// <see cref="UrlResolver"/> call <c>FetchExternalScript</c> makes. The scan also computes a
+    /// resolution of its own, against the document's <c>&lt;base href&gt;</c>, which is the more
+    /// correct answer and the wrong one to use here: a prefetch stored under a key the consumer
+    /// never asks for is not a saved round trip, it is a second one. Whether script <c>src</c>
+    /// should honour <c>&lt;base&gt;</c> is a separate question about the consume site.
+    /// </para>
+    /// <para>
+    /// Nothing is lost if the worker is slower than this thread: <c>Consume</c> starts the fetch
+    /// itself when the scan has not reached that URL yet, and the two collapse onto one request.
+    /// </para>
+    /// </remarks>
+    private static SubResourcePrefetcher? StartScriptPrefetch(string html, string url, ContentSecurityPolicy? csp)
+    {
+        var prefetcher = new SubResourcePrefetcher(
+            resolved => ScriptExtractionService.FetchExternalScript(resolved, url));
+
+        var scan = SpeculativePreloadScan.Start(
+            html,
+            url,
+            csp,
+            result => prefetcher.Prefetch(
+                result.RawUrls(PreloadKind.Script)
+                    .Select(raw => UrlResolver.Resolve(raw, url)?.AbsoluteUri)
+                    .OfType<string>()));
+
+        return scan is null ? null : prefetcher;
+    }
+
     internal static string ExecuteScriptsWithDom(string html, string url, string? localResourceBasePath = null)
     {
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
         var moduleRoots = new List<string>();
         var csp = ContentSecurityPolicy.FromHtml(html);
+        var scriptPrefetcher = StartScriptPrefetch(html, url, csp);
         foreach (Match match in AnyScriptPattern.Matches(html))
         {
             var attrs = match.Groups["attrs"].Value;
@@ -482,7 +528,10 @@ public class CaptureService
                     if (csp != null && !csp.AllowsExternalScript(srcUri, url, nonce))
                         continue;
 
-                    var fetched = FetchExternalScript(srcUri, url);
+                    // Consume side of item #2's split. Identical resolution and identical result;
+                    // the difference is that the preload scan has had this request in flight since
+                    // before the loop started, instead of it beginning here, one script at a time.
+                    var fetched = ScriptExtractionService.FetchExternalScript(srcUri, url, scriptPrefetcher);
                     if (!string.IsNullOrEmpty(fetched))
                         scriptContent = fetched;
                 }

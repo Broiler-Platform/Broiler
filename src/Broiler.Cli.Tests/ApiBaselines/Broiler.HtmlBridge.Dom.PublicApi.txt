@@ -19,6 +19,7 @@ TYPE Broiler.HtmlBridge.DomBridge : Broiler.HtmlBridge.Dom.IDomBridgeRuntime, Sy
   method System.Void ResolveAnchorPositions(System.Int32, System.Int32)
   method System.Void ResolveAnimationSnapshots()
   method System.Void SetLocalBasePath(System.String)
+  method System.Void SyncWindowMembersOntoGlobal()
   property Broiler.Dom.DomDocument Document { get; }
   property Broiler.Dom.DomElement DocumentElement { get; }
   property Broiler.HtmlBridge.Scripting.ContentSecurityPolicy Csp { get; set; }
