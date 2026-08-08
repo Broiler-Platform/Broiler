@@ -20,6 +20,13 @@ public sealed partial class DomBridge
 
     private void ParseHtml(string html)
     {
+        // Multithreading roadmap item #17. Everything from here to BuildDocumentTree is CPU the
+        // document's sub-resource fetches could have been overlapping with, and until now they did
+        // not start until the parse had finished and the sheet list had been collected. Start the
+        // speculative scan first, so its worker is issuing requests while this thread tears the old
+        // document down and builds the new one.
+        StartSpeculativePreloadScan(html);
+
         // Parse/re-parse tears down and rebuilds the live tree wholesale (ClearChildren + build);
         // these are document-construction mutations, not script mutations, so suppress observer
         // delivery for them (matching the prior explicit channel, which parse never drove).

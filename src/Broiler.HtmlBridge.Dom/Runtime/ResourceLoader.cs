@@ -79,24 +79,49 @@ internal sealed class ResourceLoader
     /// reached, and a URL that is consumed without having been prefetched takes the direct path.
     /// </para>
     /// <para>
-    /// A single URL is not worth prefetching — there is nothing to overlap it with — so the caller
-    /// is expected to hand over the whole set it knows about at once.
+    /// <paramref name="minimumToOverlap"/> is how many URLs make the call worth making, and the
+    /// answer depends on what the requests are being overlapped <em>with</em>. The post-parse
+    /// caller (the collected sheet list) overlaps them only with each other, so one URL buys
+    /// nothing and the default is two. The speculative preload scan (item #17) overlaps them with
+    /// the parse itself, which has not started when it calls, so there one URL is worth issuing and
+    /// it passes 1.
     /// </para>
     /// </remarks>
-    public void Prefetch(IReadOnlyCollection<string> urls)
+    public void Prefetch(IReadOnlyCollection<string> urls, int minimumToOverlap = 2)
     {
-        if (urls.Count < 2)
+        if (urls.Count < minimumToOverlap)
             return;
 
-        _prefetcher ??= new SubResourcePrefetcher(LoadTextDirect);
-        _prefetcher.Prefetch(urls.Where(url => Uri.TryCreate(url, UriKind.Absolute, out _)));
+        Prefetcher().Prefetch(urls.Where(url => Uri.TryCreate(url, UriKind.Absolute, out _)));
     }
+
+    /// <summary>
+    /// The document's prefetcher, created on first use.
+    /// </summary>
+    /// <remarks>
+    /// <b>Published atomically, because the callers are no longer all on one thread.</b> Item #17's
+    /// scan calls <see cref="Prefetch"/> from a worker while the parse it overlaps may reach the
+    /// post-parse stylesheet call on the main thread, so <c>??=</c> here would be the exact lazy-init
+    /// race the Phase 2 findings record (§1): two prefetchers built, one published, and every
+    /// request issued into the one that lost. The loser is discarded before it has issued anything —
+    /// <see cref="SubResourcePrefetcher"/> starts requests in <c>Prefetch</c>, not in its
+    /// constructor — so the cost of losing is an allocation.
+    /// </remarks>
+    private SubResourcePrefetcher Prefetcher() =>
+        _prefetcher ??
+        Interlocked.CompareExchange(ref _prefetcher, new SubResourcePrefetcher(LoadTextDirect), null) ??
+        _prefetcher;
 
     /// <summary>
     /// Requests in flight for this document, created on the first <see cref="Prefetch"/>. Null
     /// until then, so a document that never prefetches carries no extra machinery at all.
     /// </summary>
-    private SubResourcePrefetcher? _prefetcher;
+    /// <remarks>
+    /// <c>volatile</c> so the read in <see cref="LoadText"/> — a plain field read on the main
+    /// thread — cannot observe the reference before the constructor's writes that
+    /// <see cref="Prefetcher"/> published from a worker.
+    /// </remarks>
+    private volatile SubResourcePrefetcher? _prefetcher;
 
     /// <summary>
     /// Reads a local file <paramref name="path"/> as a sub-resource, applying the file read + MIME policy

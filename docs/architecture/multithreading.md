@@ -6,15 +6,19 @@ the tooling.
 
 ## Status
 
-**Phase 2 is under way.** Six of its nine items have landed (#9, #4, #5, #6, #7,
-#10); three have not (#3, #8, #17). What building them
+**Phase 2 is under way.** Seven of its nine items have landed (#9, #4, #5, #6, #7,
+#10, #17); two have not (#3, #8). What building them
 changed is in [What building Phase 2 changed](#what-building-phase-2-changed) —
-including the three findings that matter most for what is left: **band parallelism
+including the findings that matter most for what is left: **band parallelism
 inside a primitive is the wrong unit for a page** (§4), **the largest single win
 the phase has produced was a cache, not a thread** (§5), and — from item #5 —
 **most of what looked like raster parallelism was the rasterizer drawing pixels
 nothing could see** (§8). The raster stage is no longer the largest share of a
 render on any corpus page ([§9](#9-raster-is-no-longer-the-stage-to-aim-at-and-the-published-profile-says-so)).
+Item #17 added a tenth: **the split item #2 built was never reached by the host
+that does its own script extraction**, so a whole family of round trips was still
+serial in the path this repository measures
+([§10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split)).
 
 | Item | State | Evidence |
 |---|---|---|
@@ -23,9 +27,9 @@ render on any corpus page ([§9](#9-raster-is-no-longer-the-stage-to-aim-at-and-
 | #3 — band-parallel raster (`Broiler.Graphics`) | Not started | The partitioner and the exit-gate harness now exist; this is porting them to the second copy, and [§2](#2-the-rasterizer-the-profile-measures-is-item-4s-copy-not-item-3s) still says unify first. [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page) and [§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see) both say the *clip narrowing* is the part worth porting first |
 | #5 — tile-parallel replay | **Done** | `TileParallelReplay`, `patches/0126-…`; `PerformPaint` at 1 → 4 tiles: `paint` **1 323.7 → 461.4 ms (2.87×)**, `rules` 3.49×, `text` 2.42×, `mixed` 2.44×, `boxes` 1.76× — faster than band parallelism on all five pages, including the three bands could not touch. Pixels identical at 1/2/4 tiles crossed with 1/4 bands on every page (`--tile-scaling`), 69 `RasterTileParallelismTests` cases, and a full WPT run at 1 and 4 tiles whose entire output diffs to **zero lines**. Most of the win was single-threaded — see [§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see) |
 | #6/#7 — image decode | **Done** | `ImageDecodeParallelism`; JPEG **2.08–2.61×**, PNG **1.22–1.29×** at 4 threads, byte-identical at every setting (`--decode-scaling`, plus two cases in `Broiler.Media.Image.Managed.Tests`) |
-| #8 — concurrent decode across images | Not started | Unblocked by #9, but the headless render path loads images **synchronously and inline** (`AvoidAsyncImagesLoading`), so this needs #2's prefetch/consume split rather than a `Parallel.For` — see [§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor) |
+| #8 — concurrent decode across images | Not started | Unblocked by #9, but the headless render path loads images **synchronously and inline** (`AvoidAsyncImagesLoading`), so this needs #2's prefetch/consume split rather than a `Parallel.For` — see [§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor). Its remaining prerequisite is met: #17 supplies the image URL set (`PreloadScanResult.ResolvedUrls(PreloadKind.Image)`), so what is left is the consume split at `ImageLoadHandler` |
 | #10 — glyph outline cache | **Done** | `TrueTypeFont` caches outlines by glyph index; raster stage **1.34×** on `text`, **1.54×** on `boxes`, **1.00×** on the text-free `paint` control. The shaped-run cache the item names is *not* built — see [§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names) |
-| #17 — preload scan | Not started | — |
+| #17 — preload scan | **Done** | `PreloadScanner` / `SpeculativePreloadScan`; a document's sub-resources are found by one tokenizer pass on a worker started before the parse. Stylesheet requests are **in flight while the document is still parsing** and external scripts in the capture host now overlap instead of going one at a time — **755.1 → 521.4 ms** (median paired ratio **0.655** over 5 interleaved pairs) on 8 scripts at 40 ms each, peak concurrency 6 against 1. Exit gate: `css/css-backgrounds` identical at `BROILER_PRELOAD_SCAN` on and off (40/16/5 both ways, every verdict and pixel-match percentage the same). 40 test cases, of which the two load-order ones are assertions on *when* a request reaches the origin rather than on a stopwatch. It also found a URL-resolution defect the CSP matcher was reading through — see [§10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split) and [§11](#11-a-root-relative-url-resolved-to-the-filesystem-root-and-csp-was-matching-against-it) |
 
 **Phase 1 is complete.** All four items landed; what each one turned out to be
 worth is in [What building Phase 1 changed](#what-building-phase-1-changed).
@@ -289,6 +293,13 @@ says #17 "feeds step 1". The dependency is stronger than "compounds": for those 
 families the preload scan is not an amplifier, it is the only source of a prefetch
 trigger.
 
+**This section is right about the families and wrong about the unit.** Building #17
+showed that "wired to two of its four call-site families" is a statement about *one
+host*: `CaptureService` extracts scripts itself and so reached none of the wiring
+described here, and its script fetches were still strictly serial. A split is a
+property of a call site, not of a codebase —
+[Phase 2 §10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split).
+
 ### 4. The WPT pool is bounded by memory, and the default has to know it
 
 Sized `min(cores, availableRam / 1.5 GiB)`, which on the 4-core/13 GiB container is
@@ -310,9 +321,12 @@ per-test allowance is a full GiB.
 
 ## What building Phase 2 changed
 
-Nine findings. The first three came out of item #9, the gate; the rest came out of
-the raster, text and decode work that followed it, and three of them change what
-the rest of the phase — and the phase after it — should be.
+Eleven findings. The first three came out of item #9, the gate; §4–§9 came out of
+the raster, text and decode work that followed it, and three of those change what
+the rest of the phase — and the phase after it — should be. The last two came out
+of item #17, and neither is about a thread: one is about which *host* a
+prefetch/consume split reaches, the other about a URL-resolution defect the whole
+bridge was reading through.
 
 ### 1. Item #9 was four sites, not one, and the audit's method is what hid two of them
 
@@ -536,6 +550,15 @@ This generalises past the WPT runner: **every host that runs more than one rende
 at once now owns a division it did not have to make before** — the CLI's batch
 processes are the other one in this repository.
 
+**Item #17's worker is deliberately not in that division, and the reason is the
+test for whether something belongs there.** `ApplyRenderThreadBudget` divides
+budgets that put *cores* under contention: a raster band, a tile, a decode band
+each occupy a core for the length of a render. The preload scan occupies one pool
+thread for one tokenizer pass and then blocks on I/O, so *N* workers do not produce
+*N × cores* runnable threads — they produce *N* threads that are almost always
+waiting on a socket. It has an on/off switch (`BROILER_PRELOAD_SCAN`) because the
+exit gate requires a sequential equivalent, not because a host has to size it.
+
 ### 8. Most of item #5 was not parallelism; it was the rasterizer drawing pixels nothing could see
 
 Tile-parallel replay was built as a threading item and it delivered threading
@@ -624,6 +647,101 @@ and item #12 (parallel style recalc) must not be started against a stage whose
 composition is unmeasured. That is now the largest unattributed question in the
 document, and it is larger than anything left in Phase 2.
 
+### 10. Item #17's win was not the scan; it was a host that never reached item #2's split
+
+The item is scoped as "a worker scans raw bytes for `src`/`href` while the main
+parse runs, feeding #2", and that is what was built: one `HtmlTokenizer` pass on a
+pool thread, started as the first statement of `DomBridge.ParseHtml`, whose sink
+hands the stylesheet set to the loader before the parse has produced a node. The
+part of it that produced a number was somewhere else.
+
+**The stylesheet half is worth exactly the parse, and no more.** Item #2 already
+issues a document's sheets concurrently *with each other*; all this moves is when
+they start, from after the parse to before it. The gain is therefore bounded by the
+parse time and is invisible on a small document. It is asserted rather than timed —
+an origin that holds every request open shows three sheet requests arrived while
+`Attach` was still running, and shows **zero** requests exist at the same point with
+the scan off. That is the claim; a stopwatch on it would mostly measure the host.
+
+**The script half was a serial fetch nobody had noticed, in the path this
+repository measures.** `CaptureService.ExecuteScriptsWithDom` — the capture and WPT
+entry point — walks the script tags with its own regex and called
+`FetchExternalScript` inline as it reached each one. Item #2's prefetch/consume
+split does exist for scripts, in `ScriptExtractionService.ExtractAll`, and this host
+does not call it: it extracts scripts itself. So the split was built, tested,
+measured, and **not reached by the host that renders the corpus**. Fed by the scan,
+that loop's round trips overlap:
+
+| 8 external scripts, 40 ms each | serial (scan off) | overlapped (scan on) | ratio | saved |
+|---|---:|---:|---:|---:|
+| idle machine | 755.1 ms | 521.4 ms | **0.655×** | 233.7 ms |
+| under the rest of the suite | 941.2 ms | 678.6 ms | 0.702× | 262.6 ms |
+
+Medians of five interleaved pairs each. The arithmetic predicts a saving of 240 ms
+— eight requests at six-per-host is two waves, so 320 ms of latency becomes 80 ms —
+and both runs bracket it, which is the point of quoting two: the *ratio* moves with
+what else the box is doing, the *saving* does not, because it is a count of round
+trips rather than a speed. Peak concurrency at the origin is **6** with the scan and
+exactly **1** without, which is the assertion the table rests on — `1` is the
+definition of serial, and it is checked rather than inferred.
+
+**The exit gate.** `BROILER_PRELOAD_SCAN=0` is the sequential path rather than an
+approximation of it: with no scan there is no prefetcher entry for any speculated
+URL, so every consume site takes the branch it took before the scan existed.
+`css/css-backgrounds` (61 tests) was run at both settings — **40 passed, 16 failed,
+5 skipped** each time, and diffing the full output leaves the header's
+available-memory reading and two elapsed-time lines. Every per-test verdict, every
+pixel-match percentage and every failure bucket is identical, which is what the
+change claims: it moves when a request starts and nothing else.
+
+**The generalisation is about where a split lives.** A prefetch/consume split is a
+property of a *call site*, not of a codebase: a second host that re-implements the
+extraction re-implements the serial fetch along with it, and nothing in the first
+host's tests can see that. Phase 1 §3 recorded item #2 as "wired to two of its four
+call-site families"; the truer statement is that it was wired to two families **in
+one of the hosts that has them**. Before declaring a latency item done, ask which
+entry points reach the code it was built in — and note that this is the same lesson
+as §2's, one layer up: there, the profile was measuring a different copy of the
+rasterizer than the item was aimed at.
+
+### 11. A root-relative URL resolved to the filesystem root, and CSP was matching against it
+
+`UrlResolver.Resolve` is the bridge's one URL-resolution implementation — script
+fetching, `@import`, sub-documents, `fetch()` redirects and the **CSP source
+matcher** all go through it. Its first line asked `Uri.TryCreate(url,
+UriKind.Absolute, …)` and returned the result if it succeeded.
+
+On Unix that succeeds for `/app.js`, because a leading slash is a valid absolute
+*file path* there, and yields `file:///app.js`. So every path-absolute reference in
+a document was taken off the filesystem root instead of the page's own origin:
+`<script src="/app.js">` on an `https:` page resolved to `file:///app.js`, and
+`CspSourceMatching.ResolveUri` handed that to the policy comparison — a
+`script-src 'self'` check on a URL whose origin had been replaced. Scheme-relative
+`//cdn.example/x` had the same fault for the same reason.
+
+It is one line to fix (neither form is an absolute URI under RFC 3986 — both
+require the base), and the fix is invisible on `file:` pages, which is the whole of
+the WPT corpus: resolving `/x` against `file:///a/b.html` gives `file:///x` either
+way. That is why nothing caught it.
+
+**One copy of the same mistake is left, and is deliberately left.**
+`SubDocuments.LoadSubResource` does not call the shared resolver first — it asks
+`Uri.TryCreate(resourceUrl, UriKind.Absolute, …)` itself and keeps the raw string
+when it succeeds, which is the identical fault at an identical line. Fixing it
+changes which document an `<iframe src="/x">` loads, so it belongs in a change that
+can show a WPT run either side of it, not folded into a latency item. It is
+recorded here rather than in a comment because the shared resolver being right is
+now what makes that site's inline copy visibly wrong.
+
+**What is worth carrying forward is how it surfaced.** No behaviour changed to
+expose it. It appeared because item #17's tests asserted a *resolved* URL by
+value — `https://example.test/assets/a.css` — where the existing tests on the same
+resolver asserted that fetching worked. This is the fourth time in this document
+that a stage's own instrumentation found a defect the feature was not looking for,
+and it suggests the narrower rule behind §5 and §8: **an item that asserts its
+inputs by value audits every layer it reads through**, and the layers under a
+latency item are usually older than it is.
+
 ## Master table
 
 Gain is per-stage unless stated. Effort is engineering days for one person
@@ -633,7 +751,7 @@ non-deterministic correctness defect.
 | # | Component | Site | Currently | Parallel shape | What blocks it today | Est. gain (unmeasured) | Risk | Effort | Phase |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Tooling | [`Broiler.Wpt/Program.cs`](../../src/Broiler.Wpt/Program.cs) `RunDiscoveredTests` — **DONE** | Pool of *N* worker processes draining a shared queue (`--workers <N>\|auto`) | Work queue over *N* worker processes; results already buffered into `allResults` and sorted after the run, so order is not load-bearing | Nothing. Worker protocol is already one-command-per-line JSON over stdio | **Measured: 1.93× at 4 workers** on a 61-test subset (45.2 s → 23.4 s); identical classification at 1, 4 and auto. Bounded by RAM, not cores | Low | Done | 1 |
-| 2 | HtmlBridge | [`ScriptExtractionService.cs:303`](../../src/Broiler.HtmlBridge.Core/Scripting/ScriptExtractionService.cs), [`ResourceLoader.cs:56`](../../src/Broiler.HtmlBridge.Dom/Runtime/ResourceLoader.cs), [`SubDocuments.cs:581`](../../src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs) | Serial `GetStringAsync(..).GetAwaiter().GetResult()`, one resource at a time | Bounded-concurrency prefetch (6/host, browser convention) into a content-addressed cache; call sites then hit the cache | Call sites are synchronous and ordering-sensitive for `document.write`; needs a prefetch/consume split, not an `async` conversion | **Done for scripts and `<link>` stylesheets** (`SubResourcePrefetcher`, bounded 6/host). Iframes and `fetch()`/XHR are not wired: they have no point where the URL set is known before it is consumed, which is what item #17 supplies | Medium | Done (scripts, sheets) | 1 |
+| 2 | HtmlBridge | [`ScriptExtractionService.cs:303`](../../src/Broiler.HtmlBridge.Core/Scripting/ScriptExtractionService.cs), [`ResourceLoader.cs:56`](../../src/Broiler.HtmlBridge.Dom/Runtime/ResourceLoader.cs), [`SubDocuments.cs:581`](../../src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs) | Serial `GetStringAsync(..).GetAwaiter().GetResult()`, one resource at a time | Bounded-concurrency prefetch (6/host, browser convention) into a content-addressed cache; call sites then hit the cache | Call sites are synchronous and ordering-sensitive for `document.write`; needs a prefetch/consume split, not an `async` conversion | **Done for scripts and `<link>` stylesheets** (`SubResourcePrefetcher`, bounded 6/host), and since #17 **in the capture host too** — it extracts scripts itself and so reached none of this wiring, leaving its round trips serial ([§10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split)). Iframes and `fetch()`/XHR are still not wired: #17 now supplies their URL set, but the sub-document consume site yields `(content, contentType)` through a policy chain the text prefetcher cannot serve | Medium | Done (scripts, sheets) | 1 |
 | 3 | Graphics | [`Rendering/BCanvas.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/BCanvas.cs) `FillRect:106`, `FillGlyphContours:241`, `DrawBitmap:345`, `FillRectTiled:389`, `FillLinear/Radial/ConicGradientRect:425/468/508` | Single-threaded scanline loops | `Parallel.For` over scanline bands; per-band coverage buffer and clip stack | Per-row `coverage[]` and the `_clipOperations` list are instance state shared across rows — must become per-worker | **The 4–6× estimate belongs to item #5, not here.** Item #4 built this shape against the copy the profile measures and got 1.42× on one corpus page and nothing on three; the ceiling is set by fill size, not by cores ([§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page)). `BRasterParallelism` and `RasterBandParallelismTests` are the port-ready partitioner and exit gate | Low | 2–3 d (port) | 2 |
 | 4 | HTML | [`Broiler.HTML.Image/BCanvas.cs`](../../Broiler.HTML/Source/Broiler.HTML.Image/BCanvas.cs) — **DONE** | Was the same scanline shape; now `Parallel.For` over row bands via `BRasterParallelism`, with a measured area threshold and a per-band coverage buffer in `FillGlyphContours` | Nothing | **DONE, and smaller than the estimate.** Corpus `paint` page 1 594.7 ms → 1 096.5 ms (**1.42×** end to end, 1.61× on the stage) at 4 threads; **flat on `text`, `rules` and `boxes`, which split 0 fills between them** — their raster is glyphs, and a 95-pixel fill is not splittable at any core count. Pixels identical at 1/2/4 on all five pages. See [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page) | Low | Done | 2 |
 | 5 | Graphics / Layout | [`DisplayList.cs`](../../Broiler.Layout/Broiler.Layout/IR/DisplayList.cs) replayed by [`RGraphicsRasterBackend`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs) — **DONE** | Was one pass over the whole surface; now `Parallel.For` over horizontal strips via [`TileParallelReplay`](../../Broiler.Layout/Broiler.Layout/IR/TileParallelReplay.cs), each replaying the whole list into its own strip | Nothing | **DONE, and the estimate was right about the ceiling for the wrong reason.** `PerformPaint` at 1 → 4 tiles: `paint` **1 323.7 → 461.4 ms (2.87×)**, `rules` 3.49×, `text` 2.42×, `mixed` 2.44×, `boxes` 1.76× on a 4-core box — and it beats band parallelism on all five pages. But on the pages taller than their viewport — which is most documents — a large share of it came from *not drawing invisible pixels* rather than from threads ([§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see)). Pixels identical at 1/2/4 tiles × 1/4 bands; WPT output identical to the line | Low–Medium | Done | 2 |
@@ -648,7 +766,7 @@ non-deterministic correctness defect.
 | 14 | Layout | Same as #13 | No incremental invalidation | **Not multithreading.** Dirty bits + relayout roots | — | **5–50× on interactive relayout** — unmeasured, and the *first-render* layout it bounds is 0.6–6.5% of wall time; the interactive case this claims is not covered by the P0-a corpus. Also the precondition that makes #13 safe | Medium | 15–20 d | 3 |
 | 15 | JS | [`JSPromise.Post:376`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromise.cs), [`JSAsyncFunction.cs:152`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSAsyncFunction.cs), [`JSGenerator.cs:435`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Generator/JSGenerator.cs) — `ThreadPool.QueueUserWorkItem` when `sc == null` | JS continuations run on pool threads, racing main-thread layout | **Remove the parallelism.** Always pump a single-threaded event loop | This is the root cause behind WPT #1445 / #1143; the CSS `_sync` lock and the concurrent bridge memo maps are mitigations for it | Negative CPU gain, **large correctness gain**; removes lock overhead on hot cascade paths | Low | 5–8 d | 0 |
 | 16 | JS | [`JSContext.cs:1562`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.Engine/JSContext.cs) `DictionaryCodeCache` (process-shared, already concurrent) | Scripts compiled on demand, serially | Background/parallel compile of independent `<script>` sources; overlap with parse and network | Cache is already concurrent; needs a compile-ahead queue fed by the preload scanner (#17) | **Removes compile from the critical path**; 1.5–3× on script-heavy first paint | Medium | 8–12 d | 3 |
-| 17 | DOM / HTML | [`HtmlTokenizer.cs`](../../Broiler.DOM/Broiler.Dom.Html/HtmlTokenizer.cs), [`DomParser.cs`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs) | Sequential (correctly — the HTML tokenizer is spec-sequential and cannot be parallelized) | **Speculative preload scan**: a worker scans raw bytes for `src`/`href` while the main parse runs, feeding #2 | Nothing; it is a read-only scan of an immutable byte buffer | Overlaps network with parse — compounds #2 rather than adding CPU | Low | 4–6 d | 2 |
+| 17 | DOM / HTML | [`PreloadScanner.cs`](../../src/Broiler.HtmlBridge.Core/Scripting/PreloadScanner.cs), [`SpeculativePreloadScan.cs`](../../src/Broiler.HtmlBridge.Core/Scripting/SpeculativePreloadScan.cs) — **DONE** | The parse stays sequential (correctly — the HTML tokenizer is spec-sequential); the sub-resource *discovery* was sequential with it | A worker tokenizes the same immutable source and hands the URL sets to the prefetcher, started as the first statement of `ParseHtml` | Nothing; it is a read-only pass over an immutable string | **DONE, and it found a second thing.** Sheet requests are in flight while the document is still parsing (asserted at the origin, not timed). The number came from the script side: the capture host does its own extraction and so never reached item #2's split — 8 scripts at 40 ms go **755.1 → 521.4 ms**, median paired ratio **0.655** over 5 pairs, peak concurrency 6 against 1. It tokenizes rather than pattern-matching bytes, and `srcset`, `<template>` and `<noscript>` are documented exclusions. See [§10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split) | Low | Done | 2 |
 | 18 | JS | New: `Worker` / `MessageChannel` | Not implemented | One `JSContext` per worker thread, structured-clone message passing | Per-context state exists and `JSEngine.CurrentContext` is `AsyncLocal`, so isolation is feasible; needs the static-mutable audit from P0-c across Broiler.JS | Capability, not a speedup of existing work | High | 30–40 d | 4 |
 | 19 | Runtime | `Directory.Build.props` sets neither; `Broiler.JavaScript.Engine.Benchmarks.csproj` **does** set `ServerGarbageCollection` | Workstation GC defaults everywhere except that one benchmark project | Config knob; evaluate Server GC for headless/batch hosts | Nothing | **Measured: Server GC is 1.62× SLOWER** on a 4-core headless render (see below). Keep Workstation | Low | Done | 0 |
 | 20 | Tooling | [`Broiler.Cli`](../../src/Broiler.Cli) — capture, document convert, layout fuzz — **DONE** | Repeatable inputs + `--output-dir`, `--threads` | Threads for document convert; **child processes** for capture and fuzz | **Not "nothing":** the render path's unsynchronised caches (item #9) make two in-process renders a race, so those two go through processes | Fuzz 14.8 s → 8.9 s at 4; capture byte-identical at 1 and 4. Per-page PDF is out of scope here — the CLI shells out to the standalone Broiler.Pdf app | Low | Done | 1 |
@@ -968,14 +1086,22 @@ scripts concurrently.
    *Exit gate:* a page with *N* sub-resources issues them concurrently, and
    `document.write` ordering plus script execution order are unchanged across
    the WPT corpus.
-2. **Speculative preload scan** (item #17) on a worker over the raw byte buffer,
-   feeding step 1 and item #16. Read-only over an immutable buffer, so it is
-   safe by construction. **It now also gates step 3**, which is why it moved
-   above it.
+2. **Speculative preload scan** (item #17) — **DONE**. A worker tokenizes the raw
+   source while the main parse runs and hands the URL sets to step 1's
+   prefetcher. Read-only over an immutable string, so it is safe by construction,
+   and `BROILER_PRELOAD_SCAN=0` is the sequential path rather than an
+   approximation of it. It found that the capture host never reached step 1's
+   split at all: [§10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split).
+   **It gates step 3**, which is why it moved above it, and it feeds item #16.
+   Frames are the one family it discovers but does not wire — their consume site
+   yields `(content, contentType)` through a policy chain the text prefetcher
+   cannot serve, and on the paths measured here a frame is a disk read rather
+   than a round trip.
 3. **Concurrent image decode** (item #8). The decoder statics are cleared — they
    have a re-entrancy test — and `BImageRenderer._images` is fixed, but the
    headless render path loads images synchronously and inline, so this is the
-   same prefetch/consume split as step 1 over the image URLs step 2 supplies:
+   same prefetch/consume split as step 1 over the image URLs step 2 supplies —
+   `PreloadScanResult.ResolvedUrls(PreloadKind.Image)`, which now exists:
    [§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor).
 
 **Not recommended:** parallel HTML tokenization. The tokenizer is a
@@ -1067,7 +1193,7 @@ Recording these so they are not revisited each time the topic comes up:
 |---|---|---|
 | **0 — Make it measurable and deterministic** | P0-a benchmarks, P0-b single-threaded event loop (#15), P0-c static-state audit, GC config evaluation (#19) | Nothing after this is trustworthy without it. #15 is a correctness fix that also removes lock overhead from the cascade. |
 | **1 — Free wins and the sequential fixes** — **DONE** | WPT worker pool (#1), CLI batch (#20), concurrent sub-resource fetch (#2), CSS rule indexing (#11) | Cheap, low-risk, and #1 shortens the feedback loop for everything else. #11 is single-threaded but must precede #12. **What it changed:** #11 met its exit gate (cascade cost is now flat in total rules) but is 2.8× on a whole render, and `parse+cascade` still dominates the rule-heavy page — so #12 needs that stage split before it is started; #20 had to use processes, which makes item #9 a gate on every render-path item, not three. |
-| **2 — Raster, decode, text** — *in progress; 6 of 9 items done* | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), text caches (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed, in the order it matters:** band parallelism inside a primitive turned out to be the wrong unit for a page — three of five corpus pages split zero fills, because their raster is glyphs — which promotes **#5 from "supersedes #3" to the only raster parallelism the corpus can use (§4)**; the phase's largest single win was a *cache*, and not the one #10 names (§5); #8 is a prefetch/consume split needing #17 first, not a `Parallel.For` (§6); the pool and the in-process threads multiply, so the runner now divides them (§7); the item-#9 findings (§1–§3) stand. **#5 landed and about half of its win was single-threaded** — the rasterizer was walking pixels its clip could never admit (§8) — and between them #4, #10 and #5 have taken raster from the largest stage on three pages to the largest on one (§9). **What is left:** #3's port, #17 then #8 — none of them the next thing to do. The largest open question is now the parse/cascade split Phase 1 §1 named, which gates #12. See [What building Phase 2 changed](#what-building-phase-2-changed). |
+| **2 — Raster, decode, text** — *in progress; 7 of 9 items done* | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), text caches (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed, in the order it matters:** band parallelism inside a primitive turned out to be the wrong unit for a page — three of five corpus pages split zero fills, because their raster is glyphs — which promotes **#5 from "supersedes #3" to the only raster parallelism the corpus can use (§4)**; the phase's largest single win was a *cache*, and not the one #10 names (§5); #8 is a prefetch/consume split needing #17 first, not a `Parallel.For` (§6); the pool and the in-process threads multiply, so the runner now divides them (§7); the item-#9 findings (§1–§3) stand. **#5 landed and about half of its win was single-threaded** — the rasterizer was walking pixels its clip could never admit (§8) — and between them #4, #10 and #5 have taken raster from the largest stage on three pages to the largest on one (§9). **#17 landed and its number came from somewhere the item did not name:** the capture host does its own script extraction and so never reached the split item #2 built, leaving that family serial in the path this repository measures (§10). **What is left:** #3's port, and #8 — whose last prerequisite #17 has now supplied. The largest open question is still the parse/cascade split Phase 1 §1 named, which gates #12. See [What building Phase 2 changed](#what-building-phase-2-changed). |
 | **3 — Style and incremental layout** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. |
 | **4 — Parallel layout and workers** | Parallel intrinsic sizing and independent subtrees (#13), Web Workers (#18) | Highest cost, highest risk, lowest ceiling. Only worth starting once Phase 3's measurements say layout is still the bottleneck. |
 
