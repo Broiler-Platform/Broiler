@@ -16,11 +16,19 @@ namespace Broiler.Cli;
 /// </summary>
 public static class DocumentConvertService
 {
-    public static int Convert(string inputPath, string outputPath)
+    public static int Convert(string inputPath, string outputPath) =>
+        Convert(inputPath, outputPath, Console.Out, Console.Error);
+
+    /// <summary>
+    /// Converts one document, writing its transcript to the given writers rather than straight
+    /// to the console. A batch conversion runs several of these concurrently and replays each
+    /// item's output in input order, which it can only do if the output is capturable.
+    /// </summary>
+    public static int Convert(string inputPath, string outputPath, TextWriter standardOutput, TextWriter standardError)
     {
         if (!File.Exists(inputPath))
         {
-            Console.Error.WriteLine($"Error: input file not found: {inputPath}");
+            standardError.WriteLine($"Error: input file not found: {inputPath}");
             return 1;
         }
 
@@ -40,7 +48,7 @@ public static class DocumentConvertService
 
         if (match is null)
         {
-            Console.Error.WriteLine($"Error: no document codec recognized '{inputPath}'.");
+            standardError.WriteLine($"Error: no document codec recognized '{inputPath}'.");
             return 1;
         }
 
@@ -70,16 +78,20 @@ public static class DocumentConvertService
                 output = MarkdownWriter.WriteToArray(read.Document);
                 break;
             default:
-                Console.Error.WriteLine($"Error: unsupported output format '{extension}'. Use .txt, .rtf, .docx, .html, or .md.");
+                standardError.WriteLine($"Error: unsupported output format '{extension}'. Use .txt, .rtf, .docx, .html, or .md.");
                 return 1;
         }
 
+        var outputDirectory = Path.GetDirectoryName(Path.GetFullPath(outputPath));
+        if (!string.IsNullOrEmpty(outputDirectory))
+            Directory.CreateDirectory(outputDirectory);
+
         File.WriteAllBytes(outputPath, output);
-        Console.WriteLine(
+        standardOutput.WriteLine(
             $"Converted {inputPath} -> {outputPath} " +
             $"({match.Codec.Name}, {read.Document.ParagraphCount} paragraph(s), " +
             $"{read.Document.PlainText.Length} character(s), {read.Diagnostics.Count} diagnostic(s)).");
-        WriteDiagnostics(read.Diagnostics);
+        WriteDiagnostics(read.Diagnostics, standardOutput, standardError);
         return 0;
     }
 
@@ -88,13 +100,16 @@ public static class DocumentConvertService
     /// the hardest kind to debug, so the codes go to the console rather than
     /// being summarized away as a count.
     /// </summary>
-    private static void WriteDiagnostics(IReadOnlyList<DocumentDiagnostic> diagnostics)
+    private static void WriteDiagnostics(
+        IReadOnlyList<DocumentDiagnostic> diagnostics,
+        TextWriter standardOutput,
+        TextWriter standardError)
     {
         foreach (DocumentDiagnostic diagnostic in diagnostics)
         {
             TextWriter writer = diagnostic.Severity == DocumentDiagnosticSeverity.Error
-                ? Console.Error
-                : Console.Out;
+                ? standardError
+                : standardOutput;
             writer.WriteLine($"  {diagnostic.Severity}: {diagnostic.Code}: {diagnostic.Message}");
         }
     }
