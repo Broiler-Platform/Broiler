@@ -1320,17 +1320,19 @@ owned by a section above). Re-reported problems point at that section.
 19 927 failures, no incomplete shards. Cross-referencing the list against the
 three runs above: **seventeen of the thirty are tests those sections already
 name, or new members of families they own** (the nested view transitions, the
-`grid-lanes` subgrid pair, `auto-name`, the `massive-element-*` four). The other
-thirteen are new to the list, and this session worked the tail of them —
-**problems 21–30**. Three of those thirteen (17, 18, 20) were left untouched.
+`grid-lanes` subgrid pair, `auto-name`, the `massive-element-*` four). **The
+other thirteen are new to the list, and all thirteen were worked here** —
+problems 17, 18 and 20 through 30.
 
-What the ten came to: **problems 21–26 fixed** (the `css-contain` background
-cluster, the largest single-cause group on the list), **problem 27 fixed**,
-**problems 28 and 29 won't fix** — their reference is a render Chromium itself
-fails the reftest with — and **problem 30 diagnosed but not fixed**. So the
-at-a-glance table below carries a local number only where one was measured;
-everything else points at the section that already owns it rather than being
-re-measured.
+What they came to: **eight fixed** — problems 21–26 (the `css-contain`
+background cluster, the largest single-cause group on the list), 27 and 20;
+**two won't fix** — problems 28 and 29, whose reference is a render Chromium
+itself fails the reftest with; and **three diagnosed but not fixed** — problems
+17, 18 and 30, each with the cause isolated and an exit gate named. Two of the
+three turned out to be mis-attributed by their own test names: problem 17 is not
+a quirks bug and problem 18 is not a subgrid bug. So the at-a-glance table below
+carries a local number only where one was measured; everything else points at the
+section that already owns it rather than being re-measured.
 
 ### Containment other than `paint` never stopped background propagation — problems 21–26, **fixed**
 
@@ -1507,11 +1509,109 @@ re-measured.
   min-width, max-height and min-height one at a time and has **no max-width arm at
   all** (`CssLayoutEngine`, main repo). Left for a session that can do all three.
 
+### A `visibility: hidden` box stopped clipping its visible descendants — problem 20, **fixed**
+
+- **Test:** `css/css-overflow/overflow-scroll-resize-visibility-hidden`, 5.9% on
+  CI and reproducing here. Two `visibility: hidden` 100×100 scrollers each hold a
+  1000×1000 green child that re-declares `visibility: visible`; the reference is
+  the two 100×100 green squares the scrollers clip it to. Ours was the whole
+  viewport green.
+- **Owner:** `Broiler.HTML` (`IR/PaintWalker.Stacking.cs`), so it ships as
+  [`patches/0121`](../patches/README.md) — the push is 403, as `CLAUDE.md`
+  describes — and it is listed in `scripts/apply-pending-wpt-patches.sh` so the
+  WPT run exercises it on CI.
+- **Neither `resize` nor `scroll` is the interesting part of the test name.**
+  Five constructed probes separate the variables: the same scroller with
+  `visibility: visible` clips correctly to 100×100 **with and without
+  `resize: both`**, and swapping `overflow: scroll` for `overflow: hidden` makes
+  no difference either. The single variable that changes the outcome is
+  `visibility: hidden` on the scroller — which then paints 999×759 of green,
+  i.e. unclipped to the edge of the viewport.
+- **The cause is one early return.** `PaintWalker.PaintFragment` handles a
+  non-visible fragment by calling `PaintChildren` and returning — correctly, since
+  CSS2.1 §11.2 makes `visibility: hidden` suppress only the box's *own* rendering
+  and a descendant may re-declare `visible`. But that early return jumps over
+  everything the visible path sets up afterwards, including the overflow clip. The
+  box is still generated and still clips; only its own painting is suppressed. The
+  clip is now pushed around the child walk in both places that walk children of a
+  hidden fragment (`PaintFragment` and `PaintFragmentBackgroundPhase`).
+- **Not changed: the foreground phase.** `PaintFragmentForegroundPhase` returns on
+  a non-visible fragment *without* descending at all, so a visible descendant of a
+  hidden box inside a table never paints. That is a separate pre-existing gap with
+  a different fix, and no test on this list needs it.
+- **Measured.** The test goes **5.9% → 100%**, the 772-test `css/css-overflow`
+  subset **441 → 442 passing**, and the per-test diff across that whole subset is
+  **two lines** — that test leaving the failures and joining the passes, with
+  nothing else moving in either direction.
+- **Checked for over-reach on the subset that shares the clip path.** `contain:
+  paint` reaches the same `ClipsOverflow` predicate, so `css/css-contain` was
+  re-run: **583 result lines identical to the pristine pre-change baseline**, and
+  the aggregate (413 passing, 96.57% average match) is unchanged to the decimal.
+  10 cases in `VisibilityHiddenOverflowClipTests` cover every clipping `overflow`
+  value plus `contain: paint`, `visibility: collapse`, the `resize: both` the test
+  is named for, and three controls — that a hidden `overflow: visible` box must
+  *not* start clipping, that a visible scroller clips as it always did, and that
+  the child still paints *inside* the clip (a fix that simply suppressed the
+  visible descendant would pass the clip assertion and be wrong).
+
+### Replacing the document element renders nothing — problem 17, diagnosed, not fixed
+
+- **Test:** `quirks/tables-inherit-color-from-body-quirk-007`, 5.1% on CI. The
+  reference is the UA dark canvas (`html { color-scheme: dark }`) with light text
+  and a white 200px Ahem square. **Ours is a blank white page** — not a colour
+  mistake, nothing rendered at all.
+- **The quirk the test is named for never gets a chance to matter.** The test
+  builds its content in a `<div>`, appends it to the document element, then does
+  `document.documentElement.remove()` and `document.append(root.cloneNode(true))`
+  — the point being that `<body>` is never created, so the "tables inherit color
+  from body" quirk has no body to inherit from. Six probes isolate which step
+  loses the render:
+  - static markup with the same content and `color-scheme: dark` → dark canvas,
+    renders;
+  - script building the `<div>` and appending it to the document element → dark
+    canvas, renders (so scripting and the append are fine);
+  - adding `documentElement.remove()` + `document.append(clone)` → **white, empty**.
+  - `documentElement.remove()` alone → white, as it should be;
+  - `remove()` then appending a **hand-built** `<html><body>` with a lime block →
+    still white;
+  - `remove()` then appending a clone carrying a lime block → still white.
+- **So the finding is not about `cloneNode`, and not about quirks.** After
+  `documentElement.remove()`, appending *any* element to `document` does not
+  install it as the new document element: the render stays empty. That is the
+  whole 5.1%, and it is a DOM/bridge-level gap (the render tree is built from a
+  document root that was never re-established), not a paint or cascade one.
+- **Exit gate for whoever takes it:** the fifth probe above — remove the document
+  element, append a fresh `<html>` containing a 200×200 lime block, and get lime
+  pixels. Everything the test actually asserts is downstream of that.
+
+### Problem 18 is not a subgrid bug — diagnosed, not fixed
+
+- **Test:** `css/css-grid/subgrid/orthogonal-writing-mode-006`, 5.6% on CI.
+- **Its reference is the same markup with one declaration removed.** The
+  `-ref.html` is byte-for-byte the test except that `.grid > .grid` drops
+  `grid-template: subgrid / subgrid` — so the test asserts that a subgrid whose
+  parent declares no explicit tracks lays out exactly like a plain nested grid.
+- **Broiler renders the test and its own reference to the identical PNG.**
+  Rendering both and comparing gives byte equality, which settles the attribution:
+  `grid-template: subgrid / subgrid` changes nothing here (it is dropped), so
+  **subgrid is a no-op in both directions and cannot be what fails**. The whole
+  5.6% is the grid layout the test and the reference *share*.
+- **What that shared layout gets wrong** is visible in one render: the body is a
+  `display: grid` with `place-items: start`, so each of the eight cyan `.grid`
+  children should shrink-wrap; ours stretch to the full viewport width, stack in a
+  single column, and scatter the eight Ahem strings along the top. The vertical
+  writing modes (`vertical-rl` on half the boxes) are the other half of it.
+- **So the exit gate is not "implement subgrid".** It is `place-items: start`
+  shrink-wrapping on a grid container plus orthogonal writing modes inside one —
+  and the check that subgrid stays a no-op while that is fixed, since the
+  reference depends on it being one.
+
 ### #1562 problems, at a glance
 
-CI percentages are the issue's. **"—" means not measured here** — problems 21–30
-were investigated this session; the rest point at the section that already owns
-them, and their status is that section's, not a fresh measurement.
+CI percentages are the issue's. **"—" means not measured here** — problems 17,
+18 and 20–30 were investigated across this run's sessions; the rest point at the
+section that already owns them, and their status is that section's, not a fresh
+measurement.
 
 | # | Test | CI | Local | Status |
 | --- | --- | --- | --- | --- |
@@ -1525,10 +1625,10 @@ them, and their status is that section's, not a fresh measurement.
 | 11 | `css-view-transitions/view-transition-waituntil-animation-manipulation` | 1.3% | — | does not reproduce offline (98.46% at #1538 problem 19) — judge from CI |
 | 12 | `css-view-transitions/root-to-shared-animation-start` | 1.5% | — | new to this list — needs the rasterised root snapshot, #1491 problems 19/21/23 |
 | 13–16 | `css-view-transitions/massive-element-{left,right}-of-viewport-partially-onscreen-{new,old}` (4) | 2.0%, 2.6% | — | open — **half fixed** at #1538 problems 22/23/25/26; these still fail on the snapshot clone's box sizing |
-| 17 | `quirks/tables-inherit-color-from-body-quirk-007` | 5.1% | — | new to this list — not investigated |
-| 18 | `css-grid/subgrid/orthogonal-writing-mode-006` | 5.6% | — | new to this list — not investigated |
+| 17 | `quirks/tables-inherit-color-from-body-quirk-007` | 5.1% | — | open — **diagnosed**: after `documentElement.remove()`, appending *any* element to `document` does not install a new document element, so the page renders empty. Not a quirks bug. See above |
+| 18 | `css-grid/subgrid/orthogonal-writing-mode-006` | 5.6% | — | open — **diagnosed, and mis-named**: Broiler renders the test and its own `-ref.html` to a byte-identical PNG, so subgrid is a no-op both ways. The gap is the grid layout they share. See above |
 | 19 | `css-backgrounds/background-image-shared-stylesheet` | 5.7% | — | re-report of #1538 problem 1 — needs the server's `trickle` pipe |
-| 20 | `css-overflow/overflow-scroll-resize-visibility-hidden` | 5.9% | — | new to this list — not investigated |
+| 20 | `css-overflow/overflow-scroll-resize-visibility-hidden` | 5.9% | **5.9% → 100%** | **fixed** — a `visibility: hidden` box still clips its visible descendants ([`patches/0121`](../patches/README.md)) |
 | 21–26 | `css-contain/contain-{body,html}-bg-00{1,3,4}` (6) | 7.5% | **7.5% → 99.8%** | **fixed** — any containment on html or body disables propagation from body ([`patches/0120`](../patches/README.md)) |
 | 27 | `css/filter-effects/fecolormatrix-negative` | 7.7% | **7.7% → 99.6%** | **fixed** — a colour-only filter chain over a solid fill recolours the shape; main repo, on CI immediately |
 | 28, 29 | `css/filter-effects/svg-filter-{filter,primitive}-units-user-space` (2) | 8.0% | 8.0% | **won't fix** — the reference is an all-green canvas: Chromium fails both against their own `-ref.html`. Ours is already the closer render |
