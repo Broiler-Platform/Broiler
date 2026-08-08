@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using Broiler.HTML.Image;
 using Broiler.HtmlBridge.Logging;
@@ -24,10 +25,20 @@ public class Program
             new Broiler.Media.MediaCodecCatalog(Broiler.Media.Image.Managed.ManagedImageCodecs.CreateCodecs()));
 
         string? pdfInputPath = null;
-        string? convertDocInput = null;
-        string? url = null;
-        string? captureImageUrl = null;
+        // Repeatable inputs: one is the single-input path this CLI has always had, more than
+        // one is a batch. Accumulating rather than overwriting is what makes `--convert-doc a
+        // --convert-doc b` mean both instead of only the last.
+        var convertDocInputs = new List<string>();
+        var urls = new List<string>();
+        var captureImageUrls = new List<string>();
         string? output = null;
+        string? outputDir = null;
+        string? outputFormat = null;
+        int? threads = null;
+        int? fuzzSeed = null;
+        // Set by the parent on a fuzz shard so the child appends a machine-readable totals line
+        // for it to sum. Not part of the documented surface — it only means anything to a parent.
+        bool emitFuzzTotals = false;
         bool preservePdfLayout = false;
         bool fullPage = false;
         bool testEngines = false;
@@ -47,16 +58,40 @@ public class Program
                     pdfInputPath = args[++i];
                     break;
                 case "--convert-doc" when i + 1 < args.Length:
-                    convertDocInput = args[++i];
+                    convertDocInputs.Add(args[++i]);
                     break;
                 case "--url" when i + 1 < args.Length:
-                    url = args[++i];
+                    urls.Add(args[++i]);
                     break;
                 case "--capture-image" when i + 1 < args.Length:
-                    captureImageUrl = args[++i];
+                    captureImageUrls.Add(args[++i]);
                     break;
                 case "--output" when i + 1 < args.Length:
                     output = args[++i];
+                    break;
+                case "--output-dir" when i + 1 < args.Length:
+                    outputDir = args[++i];
+                    break;
+                case "--output-format" when i + 1 < args.Length:
+                    outputFormat = args[++i];
+                    break;
+                case "--threads" when i + 1 < args.Length:
+                    if (!int.TryParse(args[++i], out int parsedThreads) || parsedThreads <= 0)
+                    {
+                        Console.Error.WriteLine("Error: '--threads' must be a positive integer.");
+                        return 1;
+                    }
+
+                    threads = parsedThreads;
+                    break;
+                case "--seed" when i + 1 < args.Length:
+                    if (!int.TryParse(args[++i], out int parsedSeed))
+                    {
+                        Console.Error.WriteLine("Error: '--seed' must be an integer.");
+                        return 1;
+                    }
+
+                    fuzzSeed = parsedSeed;
                     break;
                 case "--preserve-layout":
                     preservePdfLayout = true;
@@ -94,6 +129,9 @@ public class Program
                 case "--fuzz-layout":
                     fuzzLayout = true;
                     break;
+                case "--emit-totals":
+                    emitFuzzTotals = true;
+                    break;
                 case "--diagnostics":
                     diagnostics = true;
                     break;
@@ -109,6 +147,10 @@ public class Program
                 case "--url":
                 case "--capture-image":
                 case "--output":
+                case "--output-dir":
+                case "--output-format":
+                case "--threads":
+                case "--seed":
                 case "--timeout":
                 case "--width":
                 case "--height":
@@ -126,16 +168,8 @@ public class Program
             }
         }
 
-        if (convertDocInput is not null)
-        {
-            if (output is null)
-            {
-                Console.Error.WriteLine("Error: '--convert-doc' requires '--output <file.txt|file.rtf|file.docx|file.html|file.md>'.");
-                return 1;
-            }
-
-            return DocumentConvertService.Convert(convertDocInput, output);
-        }
+        if (convertDocInputs.Count > 0)
+            return RunDocumentConversion(convertDocInputs, output, outputDir, outputFormat, threads);
 
         if (testEngines)
         {
@@ -145,7 +179,12 @@ public class Program
         if (fuzzLayout)
         {
             var fuzzService = new LayoutFuzzService();
-            return fuzzService.Run(fuzzCount, outputDir: output);
+            return fuzzService.Run(
+                fuzzCount,
+                seed: fuzzSeed,
+                outputDir: output,
+                threads: threads,
+                emitTotals: emitFuzzTotals);
         }
 
         // When --diagnostics is active, subscribe to the render logger and
@@ -161,6 +200,29 @@ public class Program
         }
 
         int exitCode;
+
+        // Batch capture runs each input as its own child process rather than on a thread: the
+        // render path still has unsynchronised caches on process-wide singletons (roadmap items
+        // #9/#8), so a second render in this process would be a data race. See BatchRunner.
+        if (captureImageUrls.Count > 1 || urls.Count > 1)
+        {
+            exitCode = RunBatchCapture(
+                captureImageUrls,
+                urls,
+                outputDir,
+                outputFormat,
+                threads,
+                width,
+                height,
+                fullPage,
+                followFirstLink,
+                timeoutSeconds);
+            EmitDiagnostics(diagHandler, diagnosticEntries);
+            return exitCode;
+        }
+
+        string? url = urls.Count > 0 ? urls[0] : null;
+        string? captureImageUrl = captureImageUrls.Count > 0 ? captureImageUrls[0] : null;
 
         if (pdfInputPath is not null)
         {
@@ -321,6 +383,120 @@ public class Program
         return exitCode;
     }
 
+    /// <summary>
+    /// Converts one document, or a batch of them across threads. Conversion touches no engine
+    /// state — Broiler.Documents has no assignable statics, only lookup tables — so a batch runs
+    /// in this process rather than paying for one child per file.
+    /// </summary>
+    private static int RunDocumentConversion(
+        IReadOnlyList<string> inputs,
+        string? output,
+        string? outputDir,
+        string? outputFormat,
+        int? threads)
+    {
+        if (inputs.Count == 1 && outputDir is null)
+        {
+            if (output is null)
+            {
+                Console.Error.WriteLine("Error: '--convert-doc' requires '--output <file.txt|file.rtf|file.docx|file.html|file.md>' (or '--output-dir <DIR> --output-format <EXT>').");
+                return 1;
+            }
+
+            return DocumentConvertService.Convert(inputs[0], output);
+        }
+
+        if (outputDir is null)
+        {
+            Console.Error.WriteLine("Error: converting several documents requires '--output-dir <DIR>'.");
+            return 1;
+        }
+
+        if (outputFormat is null)
+        {
+            Console.Error.WriteLine("Error: '--output-dir' requires '--output-format <txt|rtf|docx|html|md>' — the output format comes from the file extension, which a derived name has to be told.");
+            return 1;
+        }
+
+        var items = BatchRunner.DeriveOutputPaths(inputs, outputDir, outputFormat);
+        int degree = BatchRunner.ResolveDegreeOfParallelism(threads, items.Count, Environment.ProcessorCount);
+        Console.WriteLine($"Converting {items.Count} document(s) on {degree} thread(s)…");
+
+        return BatchRunner.RunInProcess(
+            items,
+            degree,
+            (item, standardOutput, standardError) =>
+                DocumentConvertService.Convert(item.Input, item.OutputPath, standardOutput, standardError))
+            .ExitCode;
+    }
+
+    /// <summary>
+    /// Captures several URLs concurrently, each in its own child <c>Broiler.Cli</c> process.
+    /// The child invocation is an ordinary single-URL capture, so a batched capture and a
+    /// hand-run one produce the same file by the same code path.
+    /// </summary>
+    private static int RunBatchCapture(
+        IReadOnlyList<string> captureImageUrls,
+        IReadOnlyList<string> urls,
+        string? outputDir,
+        string? outputFormat,
+        int? threads,
+        int width,
+        int height,
+        bool fullPage,
+        bool followFirstLink,
+        int timeoutSeconds)
+    {
+        if (captureImageUrls.Count > 0 && urls.Count > 0)
+        {
+            Console.Error.WriteLine("Error: '--capture-image' and '--url' cannot be batched together in one run.");
+            return 1;
+        }
+
+        if (outputDir is null)
+        {
+            Console.Error.WriteLine("Error: capturing several URLs requires '--output-dir <DIR>'.");
+            return 1;
+        }
+
+        bool imageMode = captureImageUrls.Count > 0;
+        var inputs = imageMode ? captureImageUrls : urls;
+        var extension = outputFormat ?? (imageMode ? "png" : "html");
+        var items = BatchRunner.DeriveOutputPaths(inputs, outputDir, extension);
+        int degree = BatchRunner.ResolveDegreeOfParallelism(threads, items.Count, Environment.ProcessorCount);
+
+        Directory.CreateDirectory(outputDir);
+        Console.WriteLine($"Capturing {items.Count} URL(s) across {degree} worker process(es)…");
+
+        return BatchRunner.RunInChildProcesses(items, degree, (item, _) =>
+        {
+            var arguments = new List<string>
+            {
+                imageMode ? "--capture-image" : "--url",
+                item.Input,
+                "--output",
+                item.OutputPath,
+                "--timeout",
+                timeoutSeconds.ToString(CultureInfo.InvariantCulture),
+            };
+
+            if (imageMode)
+            {
+                arguments.Add("--width");
+                arguments.Add(width.ToString(CultureInfo.InvariantCulture));
+                arguments.Add("--height");
+                arguments.Add(height.ToString(CultureInfo.InvariantCulture));
+            }
+
+            if (fullPage)
+                arguments.Add("--full-page");
+            if (followFirstLink)
+                arguments.Add("--follow-first-link");
+
+            return arguments;
+        }).ExitCode;
+    }
+
     private static void PrintUsage()
     {
         Console.WriteLine("Usage: Broiler.Cli --convert-pdf <PDF> [--output <FILE|DIR>] [--preserve-layout]");
@@ -336,6 +512,15 @@ public class Program
         Console.WriteLine("  --url <URL>            The URL of the website to capture");
         Console.WriteLine("  --capture-image <URL>  Capture the website as an image (PNG or JPEG)");
         Console.WriteLine("  --output <FILE|DIR>    Output file path, or output directory for PDF conversion");
+        Console.WriteLine("  --output-dir <DIR>     Output directory for a batch. --convert-doc, --url and");
+        Console.WriteLine("                         --capture-image may each be repeated; with more than one input");
+        Console.WriteLine("                         the items run concurrently and each result is written to");
+        Console.WriteLine("                         <DIR>/<input name>.<format>");
+        Console.WriteLine("  --output-format <EXT>  Output extension for a batch (default: png for --capture-image,");
+        Console.WriteLine("                         html for --url; required for --convert-doc batches)");
+        Console.WriteLine("  --threads <N>          Concurrency for a batch or for --fuzz-layout (default: one per");
+        Console.WriteLine("                         core). --threads 1 reproduces the sequential run exactly.");
+        Console.WriteLine("  --seed <N>             Base seed for --fuzz-layout (default: a clock reading)");
         Console.WriteLine("  --preserve-layout      Preserve PDF page layout and styling during PDF conversion");
         Console.WriteLine("  --width <PIXELS>       Image width in pixels (default: 1024, used with --capture-image)");
         Console.WriteLine("  --height <PIXELS>      Image height in pixels (default: 768, used with --capture-image)");

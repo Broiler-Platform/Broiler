@@ -40,7 +40,15 @@ internal sealed class ResourceLoader
     /// file. I/O exceptions propagate so the caller can log with its own context. This replaces the
     /// file/http switch that stylesheet/sub-resource feature callbacks used to inline.
     /// </summary>
-    public string? LoadText(string url)
+    public string? LoadText(string url) =>
+        // Consume side of the prefetch/consume split (multithreading roadmap item #2): identical
+        // policy and identical result, but a URL that was prefetched has been in flight since the
+        // document named it rather than starting its round trip here.
+        _prefetcher is { } prefetcher && prefetcher.IsPending(url)
+            ? prefetcher.Consume(url)
+            : LoadTextDirect(url);
+
+    private string? LoadTextDirect(string url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             return null;
@@ -57,6 +65,38 @@ internal sealed class ResourceLoader
 
         return null;
     }
+
+    /// <summary>
+    /// Issues concurrent requests for text sub-resources this document is going to load — external
+    /// stylesheets, above all — so <see cref="LoadText"/> blocks on a request already in flight.
+    /// Multithreading roadmap item #2.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The prefetcher lives on the loader, and the loader is per document, so a document's fetched
+    /// bytes cannot be served to the next one. Prefetching is idempotent and additive: a URL that
+    /// is never consumed costs one request that would have been made had the resource been
+    /// reached, and a URL that is consumed without having been prefetched takes the direct path.
+    /// </para>
+    /// <para>
+    /// A single URL is not worth prefetching — there is nothing to overlap it with — so the caller
+    /// is expected to hand over the whole set it knows about at once.
+    /// </para>
+    /// </remarks>
+    public void Prefetch(IReadOnlyCollection<string> urls)
+    {
+        if (urls.Count < 2)
+            return;
+
+        _prefetcher ??= new SubResourcePrefetcher(LoadTextDirect);
+        _prefetcher.Prefetch(urls.Where(url => Uri.TryCreate(url, UriKind.Absolute, out _)));
+    }
+
+    /// <summary>
+    /// Requests in flight for this document, created on the first <see cref="Prefetch"/>. Null
+    /// until then, so a document that never prefetches carries no extra machinery at all.
+    /// </summary>
+    private SubResourcePrefetcher? _prefetcher;
 
     /// <summary>
     /// Reads a local file <paramref name="path"/> as a sub-resource, applying the file read + MIME policy

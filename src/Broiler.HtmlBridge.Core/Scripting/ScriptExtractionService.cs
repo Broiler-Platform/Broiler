@@ -52,7 +52,8 @@ public static partial class ScriptExtractionService
     /// external check, then is decoded / fetched. Returns <c>null</c> when blocked, empty, or unresolvable.
     /// </summary>
     private static string? ResolveModuleSource(
-        ScriptSourceKind kind, string? url, string rawContent, string? nonce, ContentSecurityPolicy? csp, string? pageUrl)
+        ScriptSourceKind kind, string? url, string rawContent, string? nonce, ContentSecurityPolicy? csp, string? pageUrl,
+        SubResourcePrefetcher? prefetcher = null)
     {
         switch (kind)
         {
@@ -69,7 +70,7 @@ public static partial class ScriptExtractionService
             case ScriptSourceKind.External:
                 if (csp != null && !csp.AllowsExternalScript(url!, pageUrl, nonce))
                     return null;
-                var fetched = FetchExternalScript(url!, pageUrl);
+                var fetched = FetchExternalScript(url!, pageUrl, prefetcher);
                 return string.IsNullOrEmpty(fetched) ? null : fetched;
 
             default:
@@ -132,6 +133,11 @@ public static partial class ScriptExtractionService
         var moduleEntryKeys = new HashSet<string>(StringComparer.Ordinal);
         var csp = ContentSecurityPolicy.FromHtml(html);
 
+        // Prefetch pass (roadmap item #2): every external script this document will fetch is
+        // requested now, concurrently and bounded per host. The walk below is untouched — it still
+        // resolves each script in document order, it just no longer starts each round trip itself.
+        var prefetcher = CreateScriptPrefetcher(html, pageUrl, csp);
+
         var documentOrder = 0;
         foreach (var tag in HtmlScriptScanner.EnumerateScripts(html))
         {
@@ -160,7 +166,7 @@ public static partial class ScriptExtractionService
                 // per-occurrence key, so they never dedup; a repeated src module is recorded once.
                 if (kind == ScriptSourceKind.Inline || !moduleMap.TryGet(moduleKey, out _))
                 {
-                    var moduleSource = ResolveModuleSource(kind, url, tag.RawContent, nonce, csp, pageUrl);
+                    var moduleSource = ResolveModuleSource(kind, url, tag.RawContent, nonce, csp, pageUrl, prefetcher);
                     moduleMap.Add(new ModuleMapEntry(documentOrder, kind, moduleKey, url, moduleSource, IsExecutable: moduleSource != null));
 
                     if (moduleSource != null)
@@ -198,7 +204,7 @@ public static partial class ScriptExtractionService
                 {
                     if (csp == null || csp.AllowsExternalScript(url!, pageUrl, nonce))
                     {
-                        var fetched = FetchExternalScript(url!, pageUrl);
+                        var fetched = FetchExternalScript(url!, pageUrl, prefetcher);
                         if (!string.IsNullOrEmpty(fetched))
                             scriptContent = fetched;
                     }
@@ -282,29 +288,27 @@ public static partial class ScriptExtractionService
     /// Relative URLs are resolved against the page <paramref name="pageUrl"/>.
     /// Returns the script text content, or <c>null</c> on failure.
     /// </summary>
-    public static string? FetchExternalScript(string scriptUrl, string? pageUrl)
+    public static string? FetchExternalScript(string scriptUrl, string? pageUrl) =>
+        FetchExternalScript(scriptUrl, pageUrl, prefetcher: null);
+
+    /// <summary>
+    /// The same fetch, but consuming <paramref name="prefetcher"/> when one is supplied. The URL
+    /// resolution, the ordering, and the value the caller gets back are unchanged — the only
+    /// difference is that the request may already have been in flight since the document was
+    /// scanned. Multithreading roadmap item #2.
+    /// </summary>
+    internal static string? FetchExternalScript(string scriptUrl, string? pageUrl, SubResourcePrefetcher? prefetcher)
     {
         try
         {
             // Resolve relative URLs against the page URL via the shared resolver.
             if (UrlResolver.Resolve(scriptUrl, pageUrl) is not { } resolvedUri)
                 return null;
+
             var resolvedUrl = resolvedUri.AbsoluteUri;
-
-            // Handle file:// URLs — read from local filesystem
-            if (resolvedUri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
-            {
-                var path = resolvedUri.LocalPath;
-                return File.Exists(path) ? File.ReadAllText(path) : null;
-            }
-
-            // Synchronous HTTP fetch.  ConfigureAwait(false) prevents
-            // deadlocks when the caller is on a UI dispatcher.
-            var content = SharedHttpClient.GetStringAsync(resolvedUrl)
-                .ConfigureAwait(false)
-                .GetAwaiter()
-                .GetResult();
-            return content;
+            return prefetcher is not null
+                ? prefetcher.Consume(resolvedUrl)
+                : FetchResolvedScript(resolvedUrl);
         }
         catch (Exception ex)
         {
@@ -312,6 +316,75 @@ public static partial class ScriptExtractionService
                 $"Failed to fetch external script '{scriptUrl}': {ex.Message}", ex);
             return null;
         }
+    }
+
+    /// <summary>
+    /// Fetches an already-resolved absolute script URL. This is the blocking primitive: it runs
+    /// inline at the call site when there is no prefetcher, and on a prefetch worker when there is.
+    /// </summary>
+    private static string? FetchResolvedScript(string resolvedUrl)
+    {
+        if (!Uri.TryCreate(resolvedUrl, UriKind.Absolute, out var uri))
+            return null;
+
+        // Handle file:// URLs — read from local filesystem
+        if (uri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
+        {
+            var path = uri.LocalPath;
+            return File.Exists(path) ? File.ReadAllText(path) : null;
+        }
+
+        // Synchronous HTTP fetch.  ConfigureAwait(false) prevents
+        // deadlocks when the caller is on a UI dispatcher.
+        return SharedHttpClient.GetStringAsync(resolvedUrl)
+            .ConfigureAwait(false)
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    /// <summary>
+    /// Issues concurrent requests for every external script the document will fetch, before the
+    /// document-order walk that consumes them one at a time. Multithreading roadmap item #2.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The scan applies the <em>same</em> CSP check the consuming walk applies. Prefetching a
+    /// blocked script would put a request on the wire that the policy forbids — the request itself
+    /// is the thing CSP is stopping, so "we fetched it but did not run it" is not a defensible
+    /// reading of the policy.
+    /// </para>
+    /// <para>
+    /// A document with fewer than two external scripts gets no prefetcher: there is no round trip
+    /// to overlap, and the sequential path is then bit-for-bit the code that ran before.
+    /// </para>
+    /// </remarks>
+    internal static SubResourcePrefetcher? CreateScriptPrefetcher(
+        string html,
+        string? pageUrl,
+        ContentSecurityPolicy? csp)
+    {
+        var urls = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var tag in HtmlScriptScanner.EnumerateScripts(html))
+        {
+            var src = GetSrc(tag.Attributes);
+            if (src is null || src.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (csp != null && !csp.AllowsExternalScript(src, pageUrl, GetNonce(tag.Attributes)))
+                continue;
+
+            if (UrlResolver.Resolve(src, pageUrl) is { } resolved && seen.Add(resolved.AbsoluteUri))
+                urls.Add(resolved.AbsoluteUri);
+        }
+
+        if (urls.Count < 2)
+            return null;
+
+        var prefetcher = new SubResourcePrefetcher(FetchResolvedScript);
+        prefetcher.Prefetch(urls);
+        return prefetcher;
     }
 
     [GeneratedRegex(@"\s+", RegexOptions.Compiled)]
