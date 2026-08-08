@@ -25,18 +25,21 @@ namespace Broiler.Layout;
 /// is invisible without a check.
 /// </para>
 /// <para>
-/// <b>Armed by <see cref="EnforceOnThisThread"/>, and off by default, which is a finding rather
-/// than timidity.</b> Turning it on unconditionally fails today's single-threaded suite, because
-/// <see cref="DocumentModeContext.CurrentQuirksMode"/> is genuinely never set on the HTML-string
-/// render path: only the HtmlBridge DOM path publishes it
-/// (<c>src/Broiler.HtmlBridge.Dom/DomBridge.HtmlParsing.cs</c>). Single-threaded that is harmless —
-/// the thread-static default is <c>false</c>, and standards mode is what the string path wants —
-/// but it means the class's own claim that "each parse overwrites it, so a stale <c>true</c> never
-/// leaks into a later standards-mode render" holds only because one thread renders one document at
-/// a time. On a pool thread that previously rendered a quirks document, it does not hold. The
-/// assertion exists to catch exactly that, so the switch is here for the work that introduces
-/// worker threads to turn on; leaving it on now would report a defect that is currently unreachable
-/// as a test failure.
+/// <b>Armed by <see cref="EnforceOnThisThread"/>, and off by default.</b> It stays off because the
+/// check is for threads that skip the contract, and arming it process-wide would make every
+/// existing single-threaded render pay for a hazard it does not have; the switch is for the code
+/// that introduces worker threads, which is also the code that calls <see cref="Establish"/>.
+/// </para>
+/// <para>
+/// <b>Both slot gaps this used to name are now closed</b> (Phase 2, item #9). The HTML-string render
+/// path publishes <see cref="DocumentModeContext.CurrentQuirksMode"/> at
+/// <c>HtmlContainerInt.SetHtmlWithStyleSet</c>, so the flag no longer depends on whichever document
+/// this pooled thread rendered last — the failure that made <see cref="DocumentModeContext"/>'s own
+/// claim ("each parse overwrites it, so a stale <c>true</c> never leaks") true only for as long as
+/// one thread rendered one document at a time. And <see cref="Slots.Viewport"/> now has a read-side
+/// assertion, in <c>CssLengthParser</c> itself, because that is the assembly its eight thread-statics
+/// live in; <see cref="EstablishedOnThisThread"/> reads the bit from there so that
+/// <c>HtmlContainerInt.PerformLayout</c>, which sets the viewport directly, is credited for it.
 /// </para>
 /// <para>
 /// <b>Per-slot rather than one flag.</b> Establishing the viewport does not establish the quirks
@@ -73,7 +76,17 @@ public static class AmbientRenderState
     private static Slots _established;
 
     /// <summary>What this thread has established. Diagnostic; the assertion is the intended use.</summary>
-    public static Slots EstablishedOnThisThread => _established;
+    /// <remarks>
+    /// The <see cref="Slots.Viewport"/> bit is read from <c>CssLengthParser</c> rather than from this
+    /// record. That slot's state lives in Broiler.CSS, which cannot reference this assembly, and
+    /// <c>HtmlContainerInt.PerformLayout</c> establishes it by calling
+    /// <c>CssLengthParser.SetViewportSize</c> directly rather than through <see cref="Establish"/> —
+    /// so crediting only what passed through here would report the repository's own render path as
+    /// having skipped the contract it in fact satisfies.
+    /// </remarks>
+    public static Slots EstablishedOnThisThread =>
+        _established
+        | (CssLengthParser.ViewportEstablishedOnThisThread ? Slots.Viewport : Slots.None);
 
     [ThreadStatic]
     private static bool _enforce;
@@ -96,7 +109,14 @@ public static class AmbientRenderState
     public static bool EnforceOnThisThread
     {
         get => _enforce;
-        set => _enforce = value;
+        set
+        {
+            _enforce = value;
+            // The viewport slot asserts from inside Broiler.CSS, which has no way to
+            // see this switch; arming both from one place keeps "enforce" a single
+            // decision rather than two that can disagree.
+            CssLengthParser.EnforceViewportAssertion = value;
+        }
     }
 
     /// <summary>
@@ -136,7 +156,11 @@ public static class AmbientRenderState
     /// into a zero-viewport read, which is just as wrong and harder to recognise; leaving them and
     /// clearing the record is what makes the next unestablished read assert instead.
     /// </remarks>
-    public static void ClearThreadRecord() => _established = Slots.None;
+    public static void ClearThreadRecord()
+    {
+        _established = Slots.None;
+        CssLengthParser.ClearViewportEstablishedRecord();
+    }
 
     /// <summary>
     /// Fires when <paramref name="slot"/> is read on a thread that never set it, and only while
@@ -147,7 +171,7 @@ public static class AmbientRenderState
     [Conditional("DEBUG")]
     public static void AssertEstablished(Slots slot, string site)
     {
-        if (!_enforce || (_established & slot) == slot)
+        if (!_enforce || (EstablishedOnThisThread & slot) == slot)
             return;
 
         throw new InvalidOperationException(

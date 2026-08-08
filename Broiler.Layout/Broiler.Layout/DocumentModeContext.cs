@@ -24,10 +24,13 @@ public static partial class DocumentModeContext
 
     /// <summary>The quirks-mode flag of the document currently being laid out.</summary>
     /// <remarks>
-    /// The paragraph above is true of the HtmlBridge DOM path, which publishes this on every parse.
-    /// It is <b>not</b> true of the HTML-string render path, which never writes here at all — see
-    /// <see cref="AmbientRenderState"/>, whose assertion exists to make that visible the moment a
-    /// second thread is involved.
+    /// Both render paths publish this on every parse: the HtmlBridge DOM path at
+    /// <c>DomBridge.HtmlParsing.cs</c>, and — since Phase 2 item #9 — the HTML-string path at
+    /// <c>HtmlContainerInt.SetHtmlWithStyleSet</c>. Until the second of those existed the flag was
+    /// simply never written on the string path, which was harmless only because one thread rendered
+    /// one document at a time; a pooled thread arriving from a quirks-mode DOM render would have
+    /// carried that <c>true</c> into a standards-mode string render. <see cref="AmbientRenderState"/>
+    /// is the check that would have caught it, and now has nothing to catch here.
     /// </remarks>
     public static bool CurrentQuirksMode
     {
