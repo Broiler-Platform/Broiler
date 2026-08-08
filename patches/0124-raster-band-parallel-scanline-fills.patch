@@ -1,0 +1,1117 @@
+From c8066479620488cd48bef37842d3c50cd57c7958 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 8 Aug 2026 13:18:42 +0000
+Subject: [PATCH] raster: band-parallel scanline fills in the managed
+ rasterizer
+
+Multithreading roadmap item #4. Every fill in BCanvas is a scanline loop whose
+rows write disjoint pixels and read state that is settled before the loop starts,
+so the y range is split into bands across threads and nothing else changes.
+
+BRasterParallelism owns the budget (BROILER_RASTER_THREADS, default one thread
+per core) and the split decision. A fill below the area threshold runs inline on
+exactly the code path it took before, which is the common case: a page of text is
+thousands of glyph fills of a few hundred pixels each.
+
+The threshold is measured rather than assumed. At the first value tried, 24K
+pixels, not one fill on four of the five corpus pages reached it and the feature
+was inert; the corpus renders 2,200-pixel fills in bulk and hundred-thousand-pixel
+fills almost never. At 2,048 the paint-heavy page splits 92.7% of its fill area
+and renders 1.42x faster at four threads, pixels identical.
+
+FillGlyphContours' coverage accumulator and crossing list move inside the band,
+which is the only per-fill mutable state the rasterizer had.
+
+Band parallelism is gated on BBitmap.SupportsConcurrentPixelWrites: a surface
+that has materialized a platform bitmap keeps the single-threaded rasterizer it
+was written against, since its threading rules are not ours to assume.
+---
+ Source/Broiler.HTML.Image/BBitmap.cs          |  57 +-
+ Source/Broiler.HTML.Image/BCanvas.cs          | 611 ++++++++++--------
+ .../Broiler.HTML.Image/BRasterParallelism.cs  | 212 ++++++
+ Source/SharedAssemblyInfo.cs                  |   3 +
+ 4 files changed, 584 insertions(+), 299 deletions(-)
+ create mode 100644 Source/Broiler.HTML.Image/BRasterParallelism.cs
+
+diff --git a/Source/Broiler.HTML.Image/BBitmap.cs b/Source/Broiler.HTML.Image/BBitmap.cs
+index 93e8545..746cbc8 100644
+--- a/Source/Broiler.HTML.Image/BBitmap.cs
++++ b/Source/Broiler.HTML.Image/BBitmap.cs
+@@ -113,26 +113,26 @@ public sealed class BBitmap : IDisposable
+         return resized;
+     }
+ 
+-    public static BBitmap Decode(byte[] data) => DecodeFrameAt(data, TimeSpan.Zero);
+-
+-    /// <summary>
+-    /// Decodes an image and returns the frame its own animation timeline is showing at
+-    /// <paramref name="presentationTime"/>. A still image decodes to itself whatever the time;
+-    /// an animated one advances through its frame delays, so a render taken 300 ms in shows
+-    /// what a browser would have been showing 300 ms in rather than always frame 0.
+-    /// </summary>
+-    /// <remarks>
+-    /// At <see cref="TimeSpan.Zero"/> — the default for callers with no clock — the later frames
+-    /// are not decoded at all, so the common still-image path costs exactly what it did before.
+-    /// </remarks>
+-    public static BBitmap DecodeFrameAt(byte[] data, TimeSpan presentationTime)
++    public static BBitmap Decode(byte[] data) => DecodeFrameAt(data, TimeSpan.Zero);
++
++    /// <summary>
++    /// Decodes an image and returns the frame its own animation timeline is showing at
++    /// <paramref name="presentationTime"/>. A still image decodes to itself whatever the time;
++    /// an animated one advances through its frame delays, so a render taken 300 ms in shows
++    /// what a browser would have been showing 300 ms in rather than always frame 0.
++    /// </summary>
++    /// <remarks>
++    /// At <see cref="TimeSpan.Zero"/> — the default for callers with no clock — the later frames
++    /// are not decoded at all, so the common still-image path costs exactly what it did before.
++    /// </remarks>
++    public static BBitmap DecodeFrameAt(byte[] data, TimeSpan presentationTime)
+     {
+         ArgumentNullException.ThrowIfNull(data);
+-
+-        bool needsTimeline = presentationTime > TimeSpan.Zero;
+-        ImageSequence sequence = DecodeMedia(data, preserveAnimation: needsTimeline);
+-        return FromImageBuffer(
+-            needsTimeline ? sequence.FrameAt(presentationTime).Pixels : sequence.FirstFrame);
++
++        bool needsTimeline = presentationTime > TimeSpan.Zero;
++        ImageSequence sequence = DecodeMedia(data, preserveAnimation: needsTimeline);
++        return FromImageBuffer(
++            needsTimeline ? sequence.FrameAt(presentationTime).Pixels : sequence.FirstFrame);
+     }
+ 
+     public static BBitmap Decode(Stream stream)
+@@ -169,7 +169,7 @@ public sealed class BBitmap : IDisposable
+         return new BBitmap(buffer.Width, buffer.Height, (byte[])buffer.Rgba.Clone());
+     }
+ 
+-    private static ImageSequence DecodeMedia(byte[] data, bool preserveAnimation = false)
++    private static ImageSequence DecodeMedia(byte[] data, bool preserveAnimation = false)
+     {
+         using var probeInput = new MediaInput(new MemoryStream(data), leaveOpen: false);
+         MediaCodecMatch? match = ImageCodecs.SelectAsync(MediaKind.Image, probeInput).AsTask().GetAwaiter().GetResult();
+@@ -177,7 +177,7 @@ public sealed class BBitmap : IDisposable
+             throw new NotSupportedException("Unrecognized image data. The media image codec catalog matched no image codec.");
+ 
+         using var decodeInput = new MediaInput(new MemoryStream(data), leaveOpen: false);
+-        return codec.DecodeAsync(decodeInput, new ImageDecodeOptions(preserveAnimation: preserveAnimation))
++        return codec.DecodeAsync(decodeInput, new ImageDecodeOptions(preserveAnimation: preserveAnimation))
+             .AsTask()
+             .GetAwaiter()
+             .GetResult();
+@@ -205,6 +205,23 @@ public sealed class BBitmap : IDisposable
+     };
+ 
+     internal bool HasMaterializedCompatBitmap => _compatSurface.IsMaterialized;
++
++    /// <summary>
++    /// Whether pixels of this bitmap may be written from several threads at once, given each
++    /// thread writes its own pixels. Gates the rasterizer's band parallelism (multithreading
++    /// roadmap item #4).
++    /// </summary>
++    /// <remarks>
++    /// A write is two steps: the managed pixel buffer, which is a byte array and so tolerates
++    /// disjoint concurrent writes by construction, and a mirror into the compat surface. The
++    /// mirror is what decides the answer. A surface that has never materialized a platform bitmap
++    /// has nothing to mirror into — the headless raster pipeline installs exactly such a stub —
++    /// whereas one backed by a real platform bitmap carries that bitmap's threading rules, which
++    /// are not ours to assume. So the parallel path is taken only for the former, and any surface
++    /// that reports itself materialized keeps the single-threaded rasterizer it was written
++    /// against.
++    /// </remarks>
++    internal bool SupportsConcurrentPixelWrites => !_compatSurface.IsMaterialized;
+     internal int CompatSyncInvocationCount { get; private set; }
+ 
+     internal object OpenCanvas() => _compatSurface.OpenCanvas();
+diff --git a/Source/Broiler.HTML.Image/BCanvas.cs b/Source/Broiler.HTML.Image/BCanvas.cs
+index f539778..ca44dac 100644
+--- a/Source/Broiler.HTML.Image/BCanvas.cs
++++ b/Source/Broiler.HTML.Image/BCanvas.cs
+@@ -145,18 +145,41 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         int maxX = Math.Min(CurrentTarget.Width - 1, (int)Math.Ceiling(translated.Right) - 1);
+         int maxY = Math.Min(CurrentTarget.Height - 1, (int)Math.Ceiling(translated.Bottom) - 1);
+ 
+-        for (int y = minY; y <= maxY; y++)
++        ForEachBand(minY, maxY, minX, maxX, (fromY, toY) =>
+         {
+-            for (int x = minX; x <= maxX; x++)
++            for (int y = fromY; y <= toY; y++)
+             {
+-                if (!IsVisible(x, y))
+-                    continue;
++                for (int x = minX; x <= maxX; x++)
++                {
++                    if (!IsVisible(x, y))
++                        continue;
+ 
+-                BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                    BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                }
+             }
+-        }
++        });
+     }
+ 
++    /// <summary>
++    /// Splits a fill's scanlines into bands across threads, or runs them inline when the fill is
++    /// too small to be worth it. Multithreading roadmap item #4; the reasoning is on
++    /// <see cref="BRasterParallelism"/>.
++    /// </summary>
++    /// <remarks>
++    /// Takes the clipped pixel bounds rather than a row count because the decision is about area:
++    /// a hundred-row fill one pixel wide is not worth a thread and a two-row fill across a 4K
++    /// surface may be. <see cref="CurrentTarget"/> is read here — once, before any band starts —
++    /// so the layer a fill draws into is fixed for the whole fill, exactly as it is in the
++    /// sequential path.
++    /// </remarks>
++    private void ForEachBand(int minY, int maxY, int minX, int maxX, Action<int, int> band) =>
++        BRasterParallelism.ForEachBand(
++            minY,
++            maxY,
++            maxX - minX + 1,
++            CurrentTarget.SupportsConcurrentPixelWrites,
++            band);
++
+     public void DrawLine(PointF start, PointF end, BColor color, float strokeWidth = 1f)
+     {
+         var p1 = Translate(start);
+@@ -170,18 +193,21 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         int maxX = Math.Min(CurrentTarget.Width - 1, (int)Math.Ceiling(Math.Max(p1.X, p2.X) + radius));
+         int maxY = Math.Min(CurrentTarget.Height - 1, (int)Math.Ceiling(Math.Max(p1.Y, p2.Y) + radius));
+ 
+-        for (int y = minY; y <= maxY; y++)
++        ForEachBand(minY, maxY, minX, maxX, (fromY, toY) =>
+         {
+-            for (int x = minX; x <= maxX; x++)
++            for (int y = fromY; y <= toY; y++)
+             {
+-                if (!IsVisible(x, y))
+-                    continue;
++                for (int x = minX; x <= maxX; x++)
++                {
++                    if (!IsVisible(x, y))
++                        continue;
+ 
+-                float distance = DistanceToSegment(x + 0.5f, y + 0.5f, p1, p2);
+-                if (distance <= radius)
+-                    BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                    float distance = DistanceToSegment(x + 0.5f, y + 0.5f, p1, p2);
++                    if (distance <= radius)
++                        BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                }
+             }
+-        }
++        });
+     }
+ 
+     public void DrawRectangleStroke(RectangleF rect, BColor color, float strokeWidth = 1f)
+@@ -219,17 +245,20 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         int endX = Math.Min(CurrentTarget.Width - 1, (int)Math.Ceiling(maxX));
+         int endY = Math.Min(CurrentTarget.Height - 1, (int)Math.Ceiling(maxY));
+ 
+-        for (int y = startY; y <= endY; y++)
++        ForEachBand(startY, endY, startX, endX, (fromY, toY) =>
+         {
+-            for (int x = startX; x <= endX; x++)
++            for (int y = fromY; y <= toY; y++)
+             {
+-                if (!IsVisible(x, y))
+-                    continue;
++                for (int x = startX; x <= endX; x++)
++                {
++                    if (!IsVisible(x, y))
++                        continue;
+ 
+-                if (ContainsPolygonPoint(translated, x + 0.5f, y + 0.5f))
+-                    BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                    if (ContainsPolygonPoint(translated, x + 0.5f, y + 0.5f))
++                        BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                }
+             }
+-        }
++        });
+     }
+ 
+     /// <summary>
+@@ -276,72 +305,81 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+ 
+         const int subSamples = 4;
+         int width = maxX - minX + 1;
+-        var coverage = new float[width];
+-        var crossings = new List<(float x, int dir)>(16);
+ 
+-        for (int y = minY; y <= maxY; y++)
++        // The coverage accumulator and the crossing list are per band, not per canvas: they are
++        // the only mutable state a scanline carries, and giving each band its own is what lets the
++        // bands run at once. A glyph is normally far below the parallel threshold and takes the
++        // inline path with exactly one band — this matters for the large fills (drop caps, SVG
++        // outlines, headline text) that are not.
++        ForEachBand(minY, maxY, minX, maxX, (fromY, toY) =>
+         {
+-            Array.Clear(coverage, 0, width);
++            var coverage = new float[width];
++            var crossings = new List<(float x, int dir)>(16);
+ 
+-            for (int s = 0; s < subSamples; s++)
++            for (int y = fromY; y <= toY; y++)
+             {
+-                float sampleY = y + (s + 0.5f) / subSamples;
+-                crossings.Clear();
++                Array.Clear(coverage, 0, width);
+ 
+-                foreach (var poly in devContours)
++                for (int s = 0; s < subSamples; s++)
+                 {
+-                    int n = poly.Length;
+-                    for (int i = 0; i < n; i++)
++                    float sampleY = y + (s + 0.5f) / subSamples;
++                    crossings.Clear();
++
++                    foreach (var poly in devContours)
+                     {
+-                        PointF p0 = poly[i];
+-                        PointF p1 = poly[(i + 1) % n];
+-                        if (p0.Y == p1.Y)
+-                            continue;
+-
+-                        float lo = Math.Min(p0.Y, p1.Y);
+-                        float hi = Math.Max(p0.Y, p1.Y);
+-                        if (sampleY < lo || sampleY >= hi)
+-                            continue;
+-
+-                        float t = (sampleY - p0.Y) / (p1.Y - p0.Y);
+-                        float xCross = p0.X + t * (p1.X - p0.X);
+-                        crossings.Add((xCross, p1.Y > p0.Y ? 1 : -1));
++                        int n = poly.Length;
++                        for (int i = 0; i < n; i++)
++                        {
++                            PointF p0 = poly[i];
++                            PointF p1 = poly[(i + 1) % n];
++                            if (p0.Y == p1.Y)
++                                continue;
++
++                            float lo = Math.Min(p0.Y, p1.Y);
++                            float hi = Math.Max(p0.Y, p1.Y);
++                            if (sampleY < lo || sampleY >= hi)
++                                continue;
++
++                            float t = (sampleY - p0.Y) / (p1.Y - p0.Y);
++                            float xCross = p0.X + t * (p1.X - p0.X);
++                            crossings.Add((xCross, p1.Y > p0.Y ? 1 : -1));
++                        }
+                     }
+-                }
+ 
+-                if (crossings.Count < 2)
+-                    continue;
++                    if (crossings.Count < 2)
++                        continue;
+ 
+-                crossings.Sort(static (l, r) => l.x.CompareTo(r.x));
++                    crossings.Sort(static (l, r) => l.x.CompareTo(r.x));
+ 
+-                int winding = 0;
+-                for (int i = 0; i < crossings.Count - 1; i++)
+-                {
+-                    winding += crossings[i].dir;
+-                    if (winding != 0)
+-                        AccumulateGlyphSpan(coverage, minX, crossings[i].x, crossings[i + 1].x, 1f / subSamples);
++                    int winding = 0;
++                    for (int i = 0; i < crossings.Count - 1; i++)
++                    {
++                        winding += crossings[i].dir;
++                        if (winding != 0)
++                            AccumulateGlyphSpan(coverage, minX, crossings[i].x, crossings[i + 1].x, 1f / subSamples);
++                    }
+                 }
+-            }
+ 
+-            for (int i = 0; i < width; i++)
+-            {
+-                float cov = coverage[i];
+-                if (cov <= 0f)
+-                    continue;
+-                if (cov > 1f)
+-                    cov = 1f;
++                for (int i = 0; i < width; i++)
++                {
++                    float cov = coverage[i];
++                    if (cov <= 0f)
++                        continue;
++                    if (cov > 1f)
++                        cov = 1f;
+ 
+-                int x = minX + i;
+-                if (!IsVisible(x, y))
+-                    continue;
++                    int x = minX + i;
++                    if (!IsVisible(x, y))
++                        continue;
+ 
+-                byte a = (byte)Math.Clamp((int)Math.Round(color.A * cov), 0, 255);
+-                if (a == 0)
+-                    continue;
++                    byte a = (byte)Math.Clamp((int)Math.Round(color.A * cov), 0, 255);
++                    if (a == 0)
++                        continue;
+ 
+-                BlendPixel(CurrentTarget, x, y, new BColor(color.R, color.G, color.B, a), blendMode: "normal");
++                    BlendPixel(CurrentTarget, x, y, new BColor(color.R, color.G, color.B, a), blendMode: "normal");
++                }
+             }
+-        }
++        });
+     }
+ 
+     private static void AccumulateGlyphSpan(float[] coverage, int minX, float spanStart, float spanEnd, float weight)
+@@ -381,23 +419,26 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         if (startX > endX || startY > endY)
+             return;
+ 
+-        for (int y = startY; y <= endY; y++)
++        ForEachBand(startY, endY, startX, endX, (fromY, toY) =>
+         {
+-            for (int x = startX; x <= endX; x++)
++            for (int y = fromY; y <= toY; y++)
+             {
+-                if (!IsVisible(x, y))
+-                    continue;
++                for (int x = startX; x <= endX; x++)
++                {
++                    if (!IsVisible(x, y))
++                        continue;
+ 
+-                float normalizedX = ((x + 0.5f) - translatedDest.Left) / translatedDest.Width;
+-                float normalizedY = ((y + 0.5f) - translatedDest.Top) / translatedDest.Height;
+-                if (normalizedX < 0f || normalizedX >= 1f || normalizedY < 0f || normalizedY >= 1f)
+-                    continue;
++                    float normalizedX = ((x + 0.5f) - translatedDest.Left) / translatedDest.Width;
++                    float normalizedY = ((y + 0.5f) - translatedDest.Top) / translatedDest.Height;
++                    if (normalizedX < 0f || normalizedX >= 1f || normalizedY < 0f || normalizedY >= 1f)
++                        continue;
+ 
+-                int srcX = Math.Clamp((int)Math.Floor(srcRect.Left + (normalizedX * srcRect.Width)), 0, source.Width - 1);
+-                int srcY = Math.Clamp((int)Math.Floor(srcRect.Top + (normalizedY * srcRect.Height)), 0, source.Height - 1);
+-                BlendPixel(CurrentTarget, x, y, source.GetPixel(srcX, srcY), blendMode: "normal");
++                    int srcX = Math.Clamp((int)Math.Floor(srcRect.Left + (normalizedX * srcRect.Width)), 0, source.Width - 1);
++                    int srcY = Math.Clamp((int)Math.Floor(srcRect.Top + (normalizedY * srcRect.Height)), 0, source.Height - 1);
++                    BlendPixel(CurrentTarget, x, y, source.GetPixel(srcX, srcY), blendMode: "normal");
++                }
+             }
+-        }
++        });
+     }
+ 
+     public void DrawPathStroke(IReadOnlyList<PointF> points, BColor color, float strokeWidth = 1f)
+@@ -423,26 +464,29 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         int maxX = Math.Min(CurrentTarget.Width - 1, (int)Math.Ceiling(translatedDest.Right) - 1);
+         int maxY = Math.Min(CurrentTarget.Height - 1, (int)Math.Ceiling(translatedDest.Bottom) - 1);
+ 
+-        for (int y = minY; y <= maxY; y++)
++        ForEachBand(minY, maxY, minX, maxX, (fromY, toY) =>
+         {
+-            for (int x = minX; x <= maxX; x++)
++            for (int y = fromY; y <= toY; y++)
+             {
+-                if (!IsVisible(x, y))
+-                    continue;
+-
+-                float sampleX = x + 0.5f;
+-                float sampleY = y + 0.5f;
+-                int srcX = Math.Clamp(
+-                    (int)Math.Floor(srcRect.Left + PositiveModulo(sampleX - translatedOrigin.X, srcRect.Width)),
+-                    0,
+-                    source.Width - 1);
+-                int srcY = Math.Clamp(
+-                    (int)Math.Floor(srcRect.Top + PositiveModulo(sampleY - translatedOrigin.Y, srcRect.Height)),
+-                    0,
+-                    source.Height - 1);
+-                BlendPixel(CurrentTarget, x, y, source.GetPixel(srcX, srcY), blendMode: "normal");
++                for (int x = minX; x <= maxX; x++)
++                {
++                    if (!IsVisible(x, y))
++                        continue;
++
++                    float sampleX = x + 0.5f;
++                    float sampleY = y + 0.5f;
++                    int srcX = Math.Clamp(
++                        (int)Math.Floor(srcRect.Left + PositiveModulo(sampleX - translatedOrigin.X, srcRect.Width)),
++                        0,
++                        source.Width - 1);
++                    int srcY = Math.Clamp(
++                        (int)Math.Floor(srcRect.Top + PositiveModulo(sampleY - translatedOrigin.Y, srcRect.Height)),
++                        0,
++                        source.Height - 1);
++                    BlendPixel(CurrentTarget, x, y, source.GetPixel(srcX, srcY), blendMode: "normal");
++                }
+             }
+-        }
++        });
+     }
+ 
+     public void FillLinearGradientRect(RectangleF rect, IReadOnlyList<BColor> colors, IReadOnlyList<float>? positions, float angle)
+@@ -473,20 +517,23 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+             return;
+         }
+ 
+-        for (int y = minY; y <= maxY; y++)
++        ForEachBand(minY, maxY, minX, maxX, (fromY, toY) =>
+         {
+-            for (int x = minX; x <= maxX; x++)
++            for (int y = fromY; y <= toY; y++)
+             {
+-                if (!IsVisible(x, y))
+-                    continue;
++                for (int x = minX; x <= maxX; x++)
++                {
++                    if (!IsVisible(x, y))
++                        continue;
+ 
+-                float sampleX = x + 0.5f;
+-                float sampleY = y + 0.5f;
+-                float t = (((sampleX - startPoint.X) * gradientX) + ((sampleY - startPoint.Y) * gradientY)) / gradientLengthSquared;
+-                var color = SampleGradientColor(colors, normalizedPositions, Math.Clamp(t, 0f, 1f));
+-                BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                    float sampleX = x + 0.5f;
++                    float sampleY = y + 0.5f;
++                    float t = (((sampleX - startPoint.X) * gradientX) + ((sampleY - startPoint.Y) * gradientY)) / gradientLengthSquared;
++                    var color = SampleGradientColor(colors, normalizedPositions, Math.Clamp(t, 0f, 1f));
++                    BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                }
+             }
+-        }
++        });
+     }
+ 
+     /// <summary>
+@@ -525,20 +572,23 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         if (rx <= 0 || ry <= 0)
+             return;
+ 
+-        for (int y = minY; y <= maxY; y++)
++        ForEachBand(minY, maxY, minX, maxX, (fromY, toY) =>
+         {
+-            for (int x = minX; x <= maxX; x++)
++            for (int y = fromY; y <= toY; y++)
+             {
+-                if (!IsVisible(x, y))
+-                    continue;
++                for (int x = minX; x <= maxX; x++)
++                {
++                    if (!IsVisible(x, y))
++                        continue;
+ 
+-                float dx = (x + 0.5f - cx) / rx;
+-                float dy = (y + 0.5f - cy) / ry;
+-                float t = Math.Clamp((float)Math.Sqrt((dx * dx) + (dy * dy)), 0f, 1f);
+-                var color = SampleGradientColor(colors, normalizedPositions, t);
+-                BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                    float dx = (x + 0.5f - cx) / rx;
++                    float dy = (y + 0.5f - cy) / ry;
++                    float t = Math.Clamp((float)Math.Sqrt((dx * dx) + (dy * dy)), 0f, 1f);
++                    var color = SampleGradientColor(colors, normalizedPositions, t);
++                    BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                }
+             }
+-        }
++        });
+     }
+ 
+     /// <summary>
+@@ -571,24 +621,27 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         float cx = translatedRect.Left + (centerX * translatedRect.Width);
+         float cy = translatedRect.Top + (centerY * translatedRect.Height);
+ 
+-        for (int y = minY; y <= maxY; y++)
++        ForEachBand(minY, maxY, minX, maxX, (fromY, toY) =>
+         {
+-            for (int x = minX; x <= maxX; x++)
++            for (int y = fromY; y <= toY; y++)
+             {
+-                if (!IsVisible(x, y))
+-                    continue;
++                for (int x = minX; x <= maxX; x++)
++                {
++                    if (!IsVisible(x, y))
++                        continue;
+ 
+-                float dx = x + 0.5f - cx;
+-                float dy = y + 0.5f - cy;
++                    float dx = x + 0.5f - cx;
++                    float dy = y + 0.5f - cy;
+ 
+-                // atan2(dx, -dy) yields 0 at 12 o'clock and increases clockwise.
+-                float angleDeg = (float)(Math.Atan2(dx, -dy) * 180.0 / Math.PI);
+-                float t = PositiveModulo(angleDeg - fromAngleDeg, 360f) / 360f;
++                    // atan2(dx, -dy) yields 0 at 12 o'clock and increases clockwise.
++                    float angleDeg = (float)(Math.Atan2(dx, -dy) * 180.0 / Math.PI);
++                    float t = PositiveModulo(angleDeg - fromAngleDeg, 360f) / 360f;
+ 
+-                var color = SampleGradientColor(colors, normalizedPositions, t);
+-                BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                    var color = SampleGradientColor(colors, normalizedPositions, t);
++                    BlendPixel(CurrentTarget, x, y, color, blendMode: "normal");
++                }
+             }
+-        }
++        });
+     }
+ 
+     public void SaveOpacityLayer(float opacity)
+@@ -605,20 +658,20 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         CompositeLayer(layer);
+     }
+ 
+-    public void SaveFilterLayer(string filter)
+-    {
+-        _layerStack.Push(new LayerState(new BBitmap(_rootBitmap.Width, _rootBitmap.Height), 1f, "normal", filter));
+-    }
+-
+-    public void RestoreFilterLayer()
+-    {
+-        if (_layerStack.Count == 0)
+-            return;
+-
+-        var layer = _layerStack.Pop();
+-        CompositeLayer(layer);
+-    }
+-
++    public void SaveFilterLayer(string filter)
++    {
++        _layerStack.Push(new LayerState(new BBitmap(_rootBitmap.Width, _rootBitmap.Height), 1f, "normal", filter));
++    }
++
++    public void RestoreFilterLayer()
++    {
++        if (_layerStack.Count == 0)
++            return;
++
++        var layer = _layerStack.Pop();
++        CompositeLayer(layer);
++    }
++
+     public void SaveBlendLayer(string blendMode)
+     {
+         _layerStack.Push(new LayerState(new BBitmap(_rootBitmap.Width, _rootBitmap.Height), 1f, blendMode ?? "normal"));
+@@ -680,9 +733,9 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+                 if (source.A == 0)
+                     continue;
+ 
+-                if (layer.Filter is { } filter)
+-                    source = ApplyColorFilter(source, filter);
+-
++                if (layer.Filter is { } filter)
++                    source = ApplyColorFilter(source, filter);
++
+                 if (layer.Opacity < 1f)
+                     source = ApplyOpacity(source, layer.Opacity);
+ 
+@@ -700,136 +753,136 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+         return new BColor(color.R, color.G, color.B, alpha);
+     }
+ 
+-    private static readonly System.Text.RegularExpressions.Regex FilterFunctionPattern =
+-        new(@"([a-zA-Z-]+)\(([^)]*)\)", System.Text.RegularExpressions.RegexOptions.Compiled);
+-
+-    /// <summary>
+-    /// Applies the colour-matrix CSS filter functions (invert/grayscale/brightness/contrast/
+-    /// sepia/saturate/opacity/hue-rotate) to a single pixel, left to right. Unsupported functions
+-    /// (blur/drop-shadow/…) are skipped. Matrices follow Filter Effects §16.
+-    /// </summary>
+-    private static BColor ApplyColorFilter(BColor color, string filter)
+-    {
+-        float r = color.R, g = color.G, b = color.B, a = color.A;
+-        foreach (System.Text.RegularExpressions.Match match in FilterFunctionPattern.Matches(filter))
+-        {
+-            var name = match.Groups[1].Value.ToLowerInvariant();
+-            var arg = match.Groups[2].Value.Trim();
+-            switch (name)
+-            {
+-                case "invert":
+-                {
+-                    float t = ParseFilterAmount(arg, 1f, clampToOne: true);
+-                    r = Lerp(r, 255f - r, t); g = Lerp(g, 255f - g, t); b = Lerp(b, 255f - b, t);
+-                    break;
+-                }
+-                case "grayscale":
+-                {
+-                    float t = ParseFilterAmount(arg, 1f, clampToOne: true);
+-                    float l = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+-                    r = Lerp(r, l, t); g = Lerp(g, l, t); b = Lerp(b, l, t);
+-                    break;
+-                }
+-                case "brightness":
+-                {
+-                    float t = ParseFilterAmount(arg, 1f, clampToOne: false);
+-                    r *= t; g *= t; b *= t;
+-                    break;
+-                }
+-                case "contrast":
+-                {
+-                    float t = ParseFilterAmount(arg, 1f, clampToOne: false);
+-                    r = (r - 128f) * t + 128f; g = (g - 128f) * t + 128f; b = (b - 128f) * t + 128f;
+-                    break;
+-                }
+-                case "opacity":
+-                {
+-                    float t = ParseFilterAmount(arg, 1f, clampToOne: true);
+-                    a *= t;
+-                    break;
+-                }
+-                case "saturate":
+-                {
+-                    float s = ParseFilterAmount(arg, 1f, clampToOne: false);
+-                    (r, g, b) = (
+-                        (0.213f + 0.787f * s) * r + (0.715f - 0.715f * s) * g + (0.072f - 0.072f * s) * b,
+-                        (0.213f - 0.213f * s) * r + (0.715f + 0.285f * s) * g + (0.072f - 0.072f * s) * b,
+-                        (0.213f - 0.213f * s) * r + (0.715f - 0.715f * s) * g + (0.072f + 0.928f * s) * b);
+-                    break;
+-                }
+-                case "sepia":
+-                {
+-                    float s = 1f - ParseFilterAmount(arg, 1f, clampToOne: true);
+-                    (r, g, b) = (
+-                        (0.393f + 0.607f * s) * r + (0.769f - 0.769f * s) * g + (0.189f - 0.189f * s) * b,
+-                        (0.349f - 0.349f * s) * r + (0.686f + 0.314f * s) * g + (0.168f - 0.168f * s) * b,
+-                        (0.272f - 0.272f * s) * r + (0.534f - 0.534f * s) * g + (0.131f + 0.869f * s) * b);
+-                    break;
+-                }
+-                case "hue-rotate":
+-                {
+-                    float rad = ParseFilterAngleRadians(arg);
+-                    float cos = MathF.Cos(rad), sin = MathF.Sin(rad);
+-                    (r, g, b) = (
+-                        (0.213f + cos * 0.787f - sin * 0.213f) * r + (0.715f - cos * 0.715f - sin * 0.715f) * g + (0.072f - cos * 0.072f + sin * 0.928f) * b,
+-                        (0.213f - cos * 0.213f + sin * 0.143f) * r + (0.715f + cos * 0.285f + sin * 0.140f) * g + (0.072f - cos * 0.072f - sin * 0.283f) * b,
+-                        (0.213f - cos * 0.213f - sin * 0.787f) * r + (0.715f - cos * 0.715f + sin * 0.715f) * g + (0.072f + cos * 0.928f + sin * 0.072f) * b);
+-                    break;
+-                }
+-            }
+-        }
+-
+-        return new BColor(ClampByte(r), ClampByte(g), ClampByte(b), ClampByte(a));
+-    }
+-
+-    private static float Lerp(float from, float to, float t) => from + (to - from) * t;
+-
+-    private static byte ClampByte(float value) => (byte)Math.Clamp((int)MathF.Round(value), 0, 255);
+-
+-    /// <summary>Parses a filter amount: a number, or a percentage (n%). <paramref name="clampToOne"/>
+-    /// caps at 1 for the [0,1]-ranged functions (invert/grayscale/sepia/opacity).</summary>
+-    private static float ParseFilterAmount(string arg, float fallback, bool clampToOne)
+-    {
+-        if (string.IsNullOrWhiteSpace(arg))
+-            return fallback;
+-
+-        float value;
+-        if (arg.EndsWith("%", StringComparison.Ordinal))
+-        {
+-            if (!float.TryParse(arg.AsSpan(0, arg.Length - 1), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var pct))
+-                return fallback;
+-            value = pct / 100f;
+-        }
+-        else if (!float.TryParse(arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value))
+-        {
+-            return fallback;
+-        }
+-
+-        value = Math.Max(0f, value);
+-        return clampToOne ? Math.Min(1f, value) : value;
+-    }
+-
+-    private static float ParseFilterAngleRadians(string arg)
+-    {
+-        arg = arg.Trim();
+-        if (string.IsNullOrEmpty(arg) || arg == "0")
+-            return 0f;
+-
+-        (string suffix, float perUnit) = arg switch
+-        {
+-            _ when arg.EndsWith("rad", StringComparison.OrdinalIgnoreCase) => ("rad", 1f),
+-            _ when arg.EndsWith("grad", StringComparison.OrdinalIgnoreCase) => ("grad", MathF.PI / 200f),
+-            _ when arg.EndsWith("turn", StringComparison.OrdinalIgnoreCase) => ("turn", MathF.PI * 2f),
+-            _ when arg.EndsWith("deg", StringComparison.OrdinalIgnoreCase) => ("deg", MathF.PI / 180f),
+-            _ => ("", MathF.PI / 180f),
+-        };
+-
+-        var numberSpan = suffix.Length > 0 ? arg.AsSpan(0, arg.Length - suffix.Length) : arg.AsSpan();
+-        return float.TryParse(numberSpan, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var n)
+-            ? n * perUnit
+-            : 0f;
+-    }
+-
++    private static readonly System.Text.RegularExpressions.Regex FilterFunctionPattern =
++        new(@"([a-zA-Z-]+)\(([^)]*)\)", System.Text.RegularExpressions.RegexOptions.Compiled);
++
++    /// <summary>
++    /// Applies the colour-matrix CSS filter functions (invert/grayscale/brightness/contrast/
++    /// sepia/saturate/opacity/hue-rotate) to a single pixel, left to right. Unsupported functions
++    /// (blur/drop-shadow/…) are skipped. Matrices follow Filter Effects §16.
++    /// </summary>
++    private static BColor ApplyColorFilter(BColor color, string filter)
++    {
++        float r = color.R, g = color.G, b = color.B, a = color.A;
++        foreach (System.Text.RegularExpressions.Match match in FilterFunctionPattern.Matches(filter))
++        {
++            var name = match.Groups[1].Value.ToLowerInvariant();
++            var arg = match.Groups[2].Value.Trim();
++            switch (name)
++            {
++                case "invert":
++                {
++                    float t = ParseFilterAmount(arg, 1f, clampToOne: true);
++                    r = Lerp(r, 255f - r, t); g = Lerp(g, 255f - g, t); b = Lerp(b, 255f - b, t);
++                    break;
++                }
++                case "grayscale":
++                {
++                    float t = ParseFilterAmount(arg, 1f, clampToOne: true);
++                    float l = 0.2126f * r + 0.7152f * g + 0.0722f * b;
++                    r = Lerp(r, l, t); g = Lerp(g, l, t); b = Lerp(b, l, t);
++                    break;
++                }
++                case "brightness":
++                {
++                    float t = ParseFilterAmount(arg, 1f, clampToOne: false);
++                    r *= t; g *= t; b *= t;
++                    break;
++                }
++                case "contrast":
++                {
++                    float t = ParseFilterAmount(arg, 1f, clampToOne: false);
++                    r = (r - 128f) * t + 128f; g = (g - 128f) * t + 128f; b = (b - 128f) * t + 128f;
++                    break;
++                }
++                case "opacity":
++                {
++                    float t = ParseFilterAmount(arg, 1f, clampToOne: true);
++                    a *= t;
++                    break;
++                }
++                case "saturate":
++                {
++                    float s = ParseFilterAmount(arg, 1f, clampToOne: false);
++                    (r, g, b) = (
++                        (0.213f + 0.787f * s) * r + (0.715f - 0.715f * s) * g + (0.072f - 0.072f * s) * b,
++                        (0.213f - 0.213f * s) * r + (0.715f + 0.285f * s) * g + (0.072f - 0.072f * s) * b,
++                        (0.213f - 0.213f * s) * r + (0.715f - 0.715f * s) * g + (0.072f + 0.928f * s) * b);
++                    break;
++                }
++                case "sepia":
++                {
++                    float s = 1f - ParseFilterAmount(arg, 1f, clampToOne: true);
++                    (r, g, b) = (
++                        (0.393f + 0.607f * s) * r + (0.769f - 0.769f * s) * g + (0.189f - 0.189f * s) * b,
++                        (0.349f - 0.349f * s) * r + (0.686f + 0.314f * s) * g + (0.168f - 0.168f * s) * b,
++                        (0.272f - 0.272f * s) * r + (0.534f - 0.534f * s) * g + (0.131f + 0.869f * s) * b);
++                    break;
++                }
++                case "hue-rotate":
++                {
++                    float rad = ParseFilterAngleRadians(arg);
++                    float cos = MathF.Cos(rad), sin = MathF.Sin(rad);
++                    (r, g, b) = (
++                        (0.213f + cos * 0.787f - sin * 0.213f) * r + (0.715f - cos * 0.715f - sin * 0.715f) * g + (0.072f - cos * 0.072f + sin * 0.928f) * b,
++                        (0.213f - cos * 0.213f + sin * 0.143f) * r + (0.715f + cos * 0.285f + sin * 0.140f) * g + (0.072f - cos * 0.072f - sin * 0.283f) * b,
++                        (0.213f - cos * 0.213f - sin * 0.787f) * r + (0.715f - cos * 0.715f + sin * 0.715f) * g + (0.072f + cos * 0.928f + sin * 0.072f) * b);
++                    break;
++                }
++            }
++        }
++
++        return new BColor(ClampByte(r), ClampByte(g), ClampByte(b), ClampByte(a));
++    }
++
++    private static float Lerp(float from, float to, float t) => from + (to - from) * t;
++
++    private static byte ClampByte(float value) => (byte)Math.Clamp((int)MathF.Round(value), 0, 255);
++
++    /// <summary>Parses a filter amount: a number, or a percentage (n%). <paramref name="clampToOne"/>
++    /// caps at 1 for the [0,1]-ranged functions (invert/grayscale/sepia/opacity).</summary>
++    private static float ParseFilterAmount(string arg, float fallback, bool clampToOne)
++    {
++        if (string.IsNullOrWhiteSpace(arg))
++            return fallback;
++
++        float value;
++        if (arg.EndsWith("%", StringComparison.Ordinal))
++        {
++            if (!float.TryParse(arg.AsSpan(0, arg.Length - 1), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var pct))
++                return fallback;
++            value = pct / 100f;
++        }
++        else if (!float.TryParse(arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value))
++        {
++            return fallback;
++        }
++
++        value = Math.Max(0f, value);
++        return clampToOne ? Math.Min(1f, value) : value;
++    }
++
++    private static float ParseFilterAngleRadians(string arg)
++    {
++        arg = arg.Trim();
++        if (string.IsNullOrEmpty(arg) || arg == "0")
++            return 0f;
++
++        (string suffix, float perUnit) = arg switch
++        {
++            _ when arg.EndsWith("rad", StringComparison.OrdinalIgnoreCase) => ("rad", 1f),
++            _ when arg.EndsWith("grad", StringComparison.OrdinalIgnoreCase) => ("grad", MathF.PI / 200f),
++            _ when arg.EndsWith("turn", StringComparison.OrdinalIgnoreCase) => ("turn", MathF.PI * 2f),
++            _ when arg.EndsWith("deg", StringComparison.OrdinalIgnoreCase) => ("deg", MathF.PI / 180f),
++            _ => ("", MathF.PI / 180f),
++        };
++
++        var numberSpan = suffix.Length > 0 ? arg.AsSpan(0, arg.Length - suffix.Length) : arg.AsSpan();
++        return float.TryParse(numberSpan, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var n)
++            ? n * perUnit
++            : 0f;
++    }
++
+     private static void BlendPixel(BBitmap bitmap, int x, int y, BColor source, string blendMode)
+     {
+         if (source.A == 0)
+@@ -1070,7 +1123,7 @@ internal sealed class BCanvas(BBitmap bitmap) : IDisposable
+ 
+     private readonly record struct CanvasState(PointF Translation, float ScaleX, float ScaleY, int ClipOperationCount);
+ 
+-    private sealed record LayerState(BBitmap Bitmap, float Opacity, string BlendMode, string? Filter = null);
++    private sealed record LayerState(BBitmap Bitmap, float Opacity, string BlendMode, string? Filter = null);
+ 
+     private readonly record struct ClipOperation(
+         RectangleF Rect,
+diff --git a/Source/Broiler.HTML.Image/BRasterParallelism.cs b/Source/Broiler.HTML.Image/BRasterParallelism.cs
+new file mode 100644
+index 0000000..4eae730
+--- /dev/null
++++ b/Source/Broiler.HTML.Image/BRasterParallelism.cs
+@@ -0,0 +1,212 @@
++using System;
++using System.Threading.Tasks;
++
++namespace Broiler.HTML.Image;
++
++/// <summary>
++/// The thread budget the managed rasterizer spends on scanline bands, and the partitioner its
++/// primitives go through. Multithreading roadmap item #4 (and, when the two rasterizers are
++/// unified, item #3).
++/// </summary>
++/// <remarks>
++/// <para>
++/// <b>Why bands, and why inside the primitive.</b> Every fill in <see cref="BCanvas"/> is a
++/// <c>for y { for x { BlendPixel } }</c> over a rectangle whose rows write disjoint pixels and read
++/// only state that is fixed for the duration of the call — the clip list, the transform, the layer
++/// stack and the source bitmap are all settled before the loop starts and none of them is touched
++/// until it ends. Splitting the <c>y</c> range is therefore the whole change: no locks, no
++/// reordering, and no arithmetic that depends on which rows a thread happens to own.
++/// </para>
++/// <para>
++/// <b>Identical output at any thread count is the point.</b> Each row computes its pixels from the
++/// input geometry alone, so a row's result does not depend on whether another row has run yet. The
++/// exit gate — a single-threaded setting reproducing the parallel image exactly — is checkable by
++/// comparing bytes, which is what <c>BCanvasBandParallelismTests</c> does.
++/// </para>
++/// <para>
++/// <b>The area threshold is not a micro-optimisation.</b> A page of text is thousands of glyph
++/// fills a few hundred pixels each; handing those to the scheduler would cost more than drawing
++/// them. Only a fill large enough to amortise the dispatch is split, so the common small primitive
++/// takes exactly the code path it took before — the same loop on the same thread.
++/// </para>
++/// <para>
++/// <b>Budget, and who else is spending it.</b> The default is one thread per core, overridable
++/// with <c>BROILER_RASTER_THREADS</c>. A host that already runs several renders at once — the WPT
++/// runner's worker pool, the CLI's batch processes — should set it down accordingly; N processes
++/// each spawning N raster threads is N² threads competing for N cores, which is slower than either
++/// alone.
++/// </para>
++/// </remarks>
++internal static class BRasterParallelism
++{
++    /// <summary>Environment variable that overrides the default thread budget.</summary>
++    internal const string ThreadsEnvironmentVariable = "BROILER_RASTER_THREADS";
++
++    /// <summary>Environment variable overriding <see cref="MinimumParallelArea"/>.</summary>
++    internal const string MinimumAreaEnvironmentVariable = "BROILER_RASTER_MIN_AREA";
++
++    /// <summary>Environment variable overriding <see cref="MinimumBandArea"/>.</summary>
++    internal const string MinimumBandAreaEnvironmentVariable = "BROILER_RASTER_MIN_BAND";
++
++    /// <summary>
++    /// Pixels a fill must cover before it is split at all, and pixels a single band must be worth.
++    /// </summary>
++    /// <remarks>
++    /// <b>These are measured, not guessed.</b> The corpus render is thousands of fills of a couple
++    /// of thousand pixels each and almost none of a hundred thousand, so where the threshold sits
++    /// decides whether band parallelism does anything at all on a page — a conservative value makes
++    /// the feature inert rather than merely cautious. They are settable so the sweep that picked
++    /// them can be re-run when the rasterizer's per-pixel cost changes; see the raster-scaling mode
++    /// of <c>Broiler.Render.Stage.Benchmarks</c>.
++    /// </remarks>
++    internal static int MinimumParallelArea { get; set; } = ReadConfiguredArea(MinimumAreaEnvironmentVariable, 2048);
++
++    /// <inheritdoc cref="MinimumParallelArea"/>
++    internal static int MinimumBandArea { get; set; } = ReadConfiguredArea(MinimumBandAreaEnvironmentVariable, 1024);
++
++    private static int ReadConfiguredArea(string variable, int fallback)
++    {
++        var configured = Environment.GetEnvironmentVariable(variable);
++        return !string.IsNullOrWhiteSpace(configured) && int.TryParse(configured, out var area) && area > 0
++            ? area
++            : fallback;
++    }
++
++    private static int _maxDegreeOfParallelism = ReadConfiguredDegree();
++
++    [ThreadStatic] private static long _inlineFills;
++    [ThreadStatic] private static long _splitFills;
++    [ThreadStatic] private static long _inlineArea;
++    [ThreadStatic] private static long _splitArea;
++
++    /// <summary>
++    /// Whether to count what the partitioner decided. Off by default and read once per fill, so the
++    /// hot path pays a predictable branch and nothing else.
++    /// </summary>
++    /// <remarks>
++    /// Exists because the interesting question about band parallelism is not how fast a split fill
++    /// is — that is arithmetic — but <em>how much of a real page's raster is in fills big enough to
++    /// split at all</em>. Without this the answer is a guess, and a scaling table that shows no
++    /// speedup cannot distinguish "the threads did not help" from "no fill ever reached the
++    /// threshold". Those call for opposite next steps, which is exactly why the counter is here.
++    /// </remarks>
++    internal static bool CollectDiagnostics { get; set; }
++
++    /// <summary>
++    /// Fills taken inline, fills split into bands, and the pixel area of each, counted on the
++    /// calling thread since the last reset.
++    /// </summary>
++    /// <remarks>
++    /// <b>Per thread, which is also what makes the counters usable.</b> The decision is taken on
++    /// the thread that issues the fill — the bands themselves never count — so a thread's totals
++    /// describe exactly the renders that thread drove. Process-wide counters would need
++    /// interlocked writes on a path that runs thousands of times per render, and would still be
++    /// wrong for anyone measuring one render while another test or worker renders alongside it.
++    /// </remarks>
++    internal static (long InlineFills, long SplitFills, long InlineArea, long SplitArea) Diagnostics =>
++        (_inlineFills, _splitFills, _inlineArea, _splitArea);
++
++    /// <summary>Zeroes the calling thread's counters.</summary>
++    internal static void ResetDiagnostics()
++    {
++        _inlineFills = 0;
++        _splitFills = 0;
++        _inlineArea = 0;
++        _splitArea = 0;
++    }
++
++    /// <summary>
++    /// Maximum threads a single fill may use. <c>1</c> is the sequential rasterizer — not an
++    /// approximation of it, the same loop with one band.
++    /// </summary>
++    internal static int MaxDegreeOfParallelism
++    {
++        get => _maxDegreeOfParallelism;
++        set => _maxDegreeOfParallelism = Math.Max(1, value);
++    }
++
++    private static int ReadConfiguredDegree()
++    {
++        var configured = Environment.GetEnvironmentVariable(ThreadsEnvironmentVariable);
++        if (!string.IsNullOrWhiteSpace(configured) &&
++            int.TryParse(configured, out var threads) &&
++            threads > 0)
++        {
++            return threads;
++        }
++
++        return Environment.ProcessorCount;
++    }
++
++    /// <summary>
++    /// Runs <paramref name="band"/> over contiguous, inclusive row bands covering
++    /// <c>[minY, maxY]</c> — in parallel when the fill is large enough and the target tolerates
++    /// concurrent pixel writes, inline on the calling thread otherwise.
++    /// </summary>
++    /// <param name="rowWidth">
++    /// Pixels in one row of the fill, used to decide whether there is enough work to split. Callers
++    /// pass the clipped width, not the primitive's nominal one, so a wide rectangle that is mostly
++    /// off-surface is judged on what it will actually draw.
++    /// </param>
++    /// <param name="concurrentWritesAllowed">
++    /// Whether the destination can take pixel writes from several threads. False forces the inline
++    /// path, so a target that mirrors into a platform bitmap keeps its single-threaded contract.
++    /// </param>
++    internal static void ForEachBand(int minY, int maxY, int rowWidth, bool concurrentWritesAllowed, Action<int, int> band)
++    {
++        ArgumentNullException.ThrowIfNull(band);
++
++        var rows = maxY - minY + 1;
++        if (rows <= 0)
++            return;
++
++        var threads = BandCount(rows, rowWidth, concurrentWritesAllowed);
++        if (CollectDiagnostics)
++        {
++            var area = (long)rows * Math.Max(0, rowWidth);
++            if (threads <= 1)
++            {
++                _inlineFills++;
++                _inlineArea += area;
++            }
++            else
++            {
++                _splitFills++;
++                _splitArea += area;
++            }
++        }
++
++        if (threads <= 1)
++        {
++            band(minY, maxY);
++            return;
++        }
++
++        var rowsPerBand = (rows + threads - 1) / threads;
++        Parallel.For(
++            0,
++            threads,
++            new ParallelOptions { MaxDegreeOfParallelism = threads },
++            i =>
++            {
++                var from = minY + (i * rowsPerBand);
++                var to = Math.Min(from + rowsPerBand - 1, maxY);
++                if (from <= to)
++                    band(from, to);
++            });
++    }
++
++    /// <summary>How many bands this fill is worth, which is <c>1</c> whenever it should stay inline.</summary>
++    private static int BandCount(int rows, int rowWidth, bool concurrentWritesAllowed)
++    {
++        if (!concurrentWritesAllowed || _maxDegreeOfParallelism <= 1 || rowWidth <= 0)
++            return 1;
++
++        var area = (long)rows * rowWidth;
++        if (area < MinimumParallelArea)
++            return 1;
++
++        var affordable = (int)Math.Min(int.MaxValue, area / Math.Max(1, MinimumBandArea));
++        return Math.Max(1, Math.Min(Math.Min(_maxDegreeOfParallelism, rows), affordable));
++    }
++}
+diff --git a/Source/SharedAssemblyInfo.cs b/Source/SharedAssemblyInfo.cs
+index 3ffb263..8c53c49 100644
+--- a/Source/SharedAssemblyInfo.cs
++++ b/Source/SharedAssemblyInfo.cs
+@@ -18,3 +18,6 @@ using System.Runtime.InteropServices;
+ [assembly: InternalsVisibleTo("Broiler.HTML.Image.Compat")]
+ [assembly: InternalsVisibleTo("Broiler.HTML.Image.Tests")]
+ [assembly: InternalsVisibleTo("Broiler.Cli.Tests")]
++// Sets BRasterParallelism.MaxDegreeOfParallelism to measure raster thread scaling (multithreading
++// item #4); see tests/render-stages/Broiler.Render.Stage.Benchmarks/RasterScaling.cs.
++[assembly: InternalsVisibleTo("Broiler.Render.Stage.Benchmarks")]
+-- 
+2.43.0
+

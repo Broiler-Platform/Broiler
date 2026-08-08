@@ -7,6 +7,17 @@ are versioned in lockstep during the preview.
 
 ## [Unreleased]
 
+### Changed
+
+- `Broiler.Media.Image.Managed` — PNG expand-to-RGBA and JPEG dequantize/IDCT and
+  colour conversion now run across threads (2.08–2.61x on a 1024x1024 JPEG,
+  1.22–1.29x on the PNG equivalent, at four cores). Output is byte-identical to
+  the single-threaded decoder at any thread count — the sequential path is the
+  same code with one band, not a separate implementation. Inflate, unfilter and
+  Huffman decode are unchanged: they carry real sequential dependencies. Set
+  `BROILER_IMAGE_DECODE_THREADS=1` to decode on the calling thread only, which a
+  host that already runs several decodes at once should do.
+
 ### Fixed
 
 - `Broiler.Documents` — the DOCX reader walked only the direct `w:p` children of

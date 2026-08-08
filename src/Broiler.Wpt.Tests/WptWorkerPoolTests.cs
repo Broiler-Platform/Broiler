@@ -258,4 +258,58 @@ public sealed class WptWorkerPoolTests
         Assert.Equal("css/b.html", snapshot.CurrentDisplayPath);
         Assert.Single(snapshot.InFlight!);
     }
+
+    /// <summary>
+    /// The pool and the in-process render threads multiply if nobody divides them; these cover the
+    /// division and the one case where the runner must keep its hands off.
+    /// </summary>
+    [Theory]
+    [InlineData(4, 4, "1 per worker")]
+    [InlineData(1, 4, "4 per worker")]
+    [InlineData(2, 8, "4 per worker")]
+    [InlineData(8, 4, "1 per worker")]   // more workers than cores: never below one thread each
+    public void Render_Threads_Are_Cores_Divided_By_Workers(int workers, int cores, string expected)
+    {
+        var previousRaster = Environment.GetEnvironmentVariable("BROILER_RASTER_THREADS");
+        var previousDecode = Environment.GetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS");
+        try
+        {
+            Environment.SetEnvironmentVariable("BROILER_RASTER_THREADS", null);
+            Environment.SetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS", null);
+
+            var description = Program.ApplyRenderThreadBudget(workers, cores);
+
+            Assert.StartsWith(expected, description, StringComparison.Ordinal);
+            var perWorker = expected.Split(' ')[0];
+            Assert.Equal(perWorker, Environment.GetEnvironmentVariable("BROILER_RASTER_THREADS"));
+            Assert.Equal(perWorker, Environment.GetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("BROILER_RASTER_THREADS", previousRaster);
+            Environment.SetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS", previousDecode);
+        }
+    }
+
+    [Fact]
+    public void An_Explicit_Render_Thread_Setting_Is_Left_Alone()
+    {
+        var previousRaster = Environment.GetEnvironmentVariable("BROILER_RASTER_THREADS");
+        var previousDecode = Environment.GetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS");
+        try
+        {
+            Environment.SetEnvironmentVariable("BROILER_RASTER_THREADS", "7");
+            Environment.SetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS", "3");
+
+            Program.ApplyRenderThreadBudget(workerCount: 4, processorCount: 4);
+
+            Assert.Equal("7", Environment.GetEnvironmentVariable("BROILER_RASTER_THREADS"));
+            Assert.Equal("3", Environment.GetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("BROILER_RASTER_THREADS", previousRaster);
+            Environment.SetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS", previousDecode);
+        }
+    }
 }

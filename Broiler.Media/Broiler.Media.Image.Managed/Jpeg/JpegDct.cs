@@ -55,9 +55,22 @@ internal static class JpegDct
     }
 
     /// <summary>Inverse DCT of a coefficient block (in place): <c>S = Mᵀ · F · M</c>.</summary>
-    public static void Inverse(double[] block)
+    public static void Inverse(double[] block) => Inverse(block, new double[N * N]);
+
+    /// <summary>
+    /// Inverse DCT of a coefficient block (in place), reusing a caller-owned intermediate.
+    /// </summary>
+    /// <param name="scratch">
+    /// A <c>64</c>-element buffer for the half-transformed block. The decoder reconstructs
+    /// thousands of blocks per image and each one needed its own allocation before; a caller that
+    /// hands the same buffer back every time — one per band, so it stays thread-confined — removes
+    /// that garbage entirely. Contents on entry are irrelevant and on exit meaningless.
+    /// </param>
+    public static void Inverse(double[] block, double[] scratch)
     {
-        var tmp = new double[N * N];
+        ArgumentNullException.ThrowIfNull(block);
+        ArgumentOutOfRangeException.ThrowIfLessThan(scratch?.Length ?? 0, N * N, nameof(scratch));
+        double[] tmp = scratch!;
 
         // tmp = Mᵀ · F  (tmp[n1, k2] = Σ M[k1, n1] · F[k1, k2])
         for (int n1 = 0; n1 < N; n1++)

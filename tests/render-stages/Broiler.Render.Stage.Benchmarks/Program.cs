@@ -26,6 +26,16 @@ public static class Program
             return StageProfile.Run(iterations, warmup, json);
         }
 
+        if (args.Length >= 1 && args[0] == "--decode-scaling")
+        {
+            return DecodeScaling.Run(ArgValue(args, "--iterations", 11), ArgValue(args, "--warmup", 3));
+        }
+
+        if (args.Length >= 1 && args[0] == "--raster-scaling")
+        {
+            return RasterScaling.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
+        }
+
         if (args.Length >= 1 && args[0] == "--gc-config")
         {
             GcConfigurationMetrics.Run(ArgValue(args, "--rounds", 20));
@@ -49,6 +59,14 @@ public static class Program
         Console.WriteLine("  --profile [--iterations N] [--warmup N] [--json PATH]");
         Console.WriteLine("        Attribute headless-render wall time to named stages over the corpus.");
         Console.WriteLine("        Exits 1 if any page attributes less than 90% to named stages.");
+        Console.WriteLine();
+        Console.WriteLine("  --decode-scaling [--iterations N] [--warmup N]");
+        Console.WriteLine("        PNG/JPEG decode time against the thread budget (items #6, #7).");
+        Console.WriteLine("        Exits 1 if any thread setting decodes different pixels.");
+        Console.WriteLine();
+        Console.WriteLine("  --raster-scaling [--iterations N] [--warmup N]");
+        Console.WriteLine("        Corpus render time against the raster thread budget (item #4).");
+        Console.WriteLine("        Exits 1 if any thread setting renders different pixels.");
         Console.WriteLine();
         Console.WriteLine("  --gc-config [--rounds N]");
         Console.WriteLine("        Throughput and GC counters for the process's GC mode (item #19).");

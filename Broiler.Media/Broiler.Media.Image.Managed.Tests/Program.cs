@@ -34,6 +34,8 @@ internal static class Program
             ("Encoded input limit is enforced", EncodedInputLimitEnforced),
             ("Still codecs reject animated encode", StillCodecsRejectAnimatedEncode),
             ("Media.Image.Managed runtime has no Graphics dependency", RuntimeHasNoGraphicsReference),
+            ("Parallel decode is byte-identical to single-threaded decode", ParallelDecodeMatchesSequential),
+            ("Decoders are re-entrant across threads", DecodersAreReentrant),
         };
 
         int passed = 0;
@@ -411,6 +413,103 @@ internal static class Program
             ComparePixels(expectedFrame.Pixels, actualFrame.Pixels);
         }
     }
+
+    /// <summary>
+    /// The exit gate for multithreading items #6 and #7: decoded output byte-identical to the
+    /// sequential decoder. The comparison is made at four thread settings over four fixtures,
+    /// including the two shapes where "parallel over rows" means something unusual — an
+    /// interlaced PNG, whose seven Adam7 passes each write a strided subset of the image, and a
+    /// progressive JPEG, which reconstructs from coefficients several scans contributed to.
+    /// </summary>
+    /// <remarks>
+    /// The fixtures are deliberately larger than the decoders' minimum band size. Below it every
+    /// setting runs inline and the test would pass without exercising a single thread — which is
+    /// exactly the way a concurrency test quietly stops testing anything.
+    /// </remarks>
+    private static ValueTask ParallelDecodeMatchesSequential()
+    {
+        ImageBuffer source = MakeGradient(512, 512);
+        (string Name, byte[] Bytes)[] fixtures =
+        [
+            ("png", new PngImageCodec().Encode(source)),
+            ("png interlaced", InterlacedGradient(512, 512)),
+            ("jpeg", new JpegImageCodec().Encode(source, quality: 90)),
+            ("jpeg progressive", Convert.FromBase64String(ProgressiveGradientBase64)),
+        ];
+
+        int configured = ImageDecodeParallelism.MaxDegreeOfParallelism;
+        try
+        {
+            foreach ((string name, byte[] bytes) in fixtures)
+            {
+                ImageDecodeParallelism.MaxDegreeOfParallelism = 1;
+                ImageBuffer sequential = Decode(bytes);
+
+                foreach (int threads in new[] { 2, 4, 8 })
+                {
+                    ImageDecodeParallelism.MaxDegreeOfParallelism = threads;
+                    ImageBuffer parallel = Decode(bytes);
+                    Assert.Equal(sequential.Width, parallel.Width, $"{name} width at {threads} threads");
+                    Assert.Equal(sequential.Height, parallel.Height, $"{name} height at {threads} threads");
+                    Assert.BytesEqual(sequential.Rgba, parallel.Rgba, $"{name} pixels at {threads} threads");
+                }
+            }
+        }
+        finally
+        {
+            ImageDecodeParallelism.MaxDegreeOfParallelism = configured;
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    /// <summary>
+    /// Item #8 decodes several of a page's images at once, which only works if a decoder holds no
+    /// state between calls. Runs the same four fixtures from eight threads simultaneously and
+    /// requires every result to equal the single-threaded one — so a shared buffer or a lazily
+    /// published table would show up as wrong pixels, not merely as a crash.
+    /// </summary>
+    private static async ValueTask DecodersAreReentrant()
+    {
+        ImageBuffer source = MakeGradient(192, 192);
+        byte[][] fixtures =
+        [
+            new PngImageCodec().Encode(source),
+            InterlacedGradient(192, 192),
+            new JpegImageCodec().Encode(source, quality: 85),
+            Convert.FromBase64String(ProgressiveGradientBase64),
+        ];
+
+        byte[][] expected = new byte[fixtures.Length][];
+        for (int i = 0; i < fixtures.Length; i++)
+            expected[i] = Decode(fixtures[i]).Rgba;
+
+        var workers = new List<Task>();
+        for (int worker = 0; worker < 8; worker++)
+        {
+            workers.Add(Task.Run(() =>
+            {
+                for (int repeat = 0; repeat < 3; repeat++)
+                    for (int i = 0; i < fixtures.Length; i++)
+                        Assert.BytesEqual(expected[i], Decode(fixtures[i]).Rgba, $"concurrent decode of fixture {i}");
+            }));
+        }
+
+        await Task.WhenAll(workers).ConfigureAwait(false);
+    }
+
+    /// <summary>An Adam7-interlaced PNG of the shared gradient, at the given size.</summary>
+    private static byte[] InterlacedGradient(int width, int height)
+    {
+        ImageBuffer source = MakeGradient(width, height);
+        return PngFormatBuilder.BuildInterlacedRgba(width, height, source.Rgba);
+    }
+
+    /// <summary>Decodes through the codec catalog's signature dispatch, as the render path does.</summary>
+    private static ImageBuffer Decode(byte[] bytes) =>
+        PngDecoder.IsPng(bytes)
+            ? new PngImageCodec().Decode(bytes)
+            : new JpegImageCodec().Decode(bytes);
 
     private static void ComparePixels(ImageBuffer expected, ImageBuffer actual)
     {

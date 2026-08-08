@@ -257,6 +257,12 @@ internal static class StageProfile
         Console.WriteLine($"- Viewport: {Corpus.ViewportWidth}x{Corpus.ViewportHeight}");
         Console.WriteLine($"- Iterations: {iterations} measured, {warmup} warm-up; figures are medians");
         Console.WriteLine($"- Runtime: {Environment.Version}, {Environment.ProcessorCount} logical cores");
+        // The raster share is now a function of a setting, so the setting has to appear next to it:
+        // the same corpus profiled at one raster thread and at four reports different raster
+        // figures, and a reader comparing two publications cannot tell which they are holding.
+        Console.WriteLine(
+            $"- Raster threads: {BRasterParallelism.MaxDegreeOfParallelism} " +
+            $"(item #4; `BROILER_RASTER_THREADS`, default one per core)");
         Console.WriteLine($"- GC: {(System.Runtime.GCSettings.IsServerGC ? "Server" : "Workstation")}, "
             + $"{(System.Runtime.GCSettings.LatencyMode)} latency mode");
         Console.WriteLine();

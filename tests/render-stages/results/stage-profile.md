@@ -3,80 +3,81 @@
 - Viewport: 1280x1024
 - Iterations: 15 measured, 5 warm-up; figures are medians
 - Runtime: 10.0.10, 4 logical cores
+- Raster threads: 4 (item #4; `BROILER_RASTER_THREADS`, default one per core)
 - GC: Workstation, Interactive latency mode
 
 ## text — line breaking, text measurement, glyph raster
 
-77,629 chars of source; 494.10 ms end to end.
+77,629 chars of source; 292.03 ms end to end.
 
 | Stage | ms | share |
 |---|---:|---:|
-| parse+cascade | 125.71 | 25.4% |
-| layout | 32.02 | 6.5% |
-| paint (display list) | 3.34 | 0.7% |
-| raster * | 314.75 | 63.7% |
-| (unattributed) * | 18.27 | 3.7% |
+| parse+cascade | 48.83 | 16.7% |
+| layout | 30.82 | 10.6% |
+| paint (display list) | 3.49 | 1.2% |
+| raster * | 199.75 | 68.4% |
+| (unattributed) * | 9.14 | 3.1% |
 
-Attributed to named stages: **96.3%**
+Attributed to named stages: **96.9%**
 
 ## rules — cascade: per-element rule scan (item #11)
 
-110,296 chars of source; 5218.96 ms end to end.
+110,296 chars of source; 2059.84 ms end to end.
 
 | Stage | ms | share |
 |---|---:|---:|
-| parse+cascade | 5035.35 | 96.5% |
-| layout | 33.71 | 0.6% |
-| paint (display list) | 3.68 | 0.1% |
-| raster * | 135.26 | 2.6% |
-| (unattributed) * | 10.96 | 0.2% |
+| parse+cascade | 1925.79 | 93.5% |
+| layout | 32.39 | 1.6% |
+| paint (display list) | 5.12 | 0.2% |
+| raster * | 87.62 | 4.3% |
+| (unattributed) * | 8.91 | 0.4% |
 
-Attributed to named stages: **99.8%**
+Attributed to named stages: **99.6%**
 
 ## boxes — layout: nested block/flex/grid tree
 
-47,210 chars of source; 528.60 ms end to end.
+47,210 chars of source; 269.18 ms end to end.
 
 | Stage | ms | share |
 |---|---:|---:|
-| parse+cascade | 423.28 | 80.1% |
-| layout | 26.08 | 4.9% |
-| paint (display list) | 2.93 | 0.6% |
-| raster * | 69.21 | 13.1% |
-| (unattributed) * | 7.11 | 1.3% |
+| parse+cascade | 199.33 | 74.1% |
+| layout | 29.06 | 10.8% |
+| paint (display list) | 2.21 | 0.8% |
+| raster * | 38.65 | 14.4% |
+| (unattributed) * | 0.00 | 0.0% |
 
-Attributed to named stages: **98.7%**
+Attributed to named stages: **100.0%**
 
 ## paint — raster: overlapping gradients, borders, alpha
 
-211,592 chars of source; 1932.97 ms end to end.
+211,592 chars of source; 975.72 ms end to end.
 
 | Stage | ms | share |
 |---|---:|---:|
-| parse+cascade | 403.69 | 20.9% |
-| layout | 19.16 | 1.0% |
-| paint (display list) | 8.06 | 0.4% |
-| raster * | 1503.70 | 77.8% |
-| (unattributed) * | 0.00 | 0.0% |
+| parse+cascade | 164.82 | 16.9% |
+| layout | 21.60 | 2.2% |
+| paint (display list) | 7.49 | 0.8% |
+| raster * | 774.11 | 79.3% |
+| (unattributed) * | 7.69 | 0.8% |
 
-Attributed to named stages: **100.1%**
+Attributed to named stages: **99.2%**
 
 ## mixed — blended control: table, borders, text
 
-20,102 chars of source; 497.90 ms end to end.
+20,102 chars of source; 220.69 ms end to end.
 
 | Stage | ms | share |
 |---|---:|---:|
-| parse+cascade | 221.20 | 44.4% |
-| layout | 19.40 | 3.9% |
-| paint (display list) | 2.24 | 0.4% |
-| raster * | 247.33 | 49.7% |
-| (unattributed) * | 7.74 | 1.6% |
+| parse+cascade | 72.04 | 32.6% |
+| layout | 21.93 | 9.9% |
+| paint (display list) | 1.73 | 0.8% |
+| raster * | 125.14 | 56.7% |
+| (unattributed) * | 0.00 | 0.0% |
 
-Attributed to named stages: **98.4%**
+Attributed to named stages: **100.1%**
 
 `*` derived by subtraction rather than timed directly; see `StageProfile`.
 
 Wrote tests/render-stages/results/stage-profile.json
 
-P0-a exit gate MET: every page attributes >=90% of wall time to named stages (worst: text at 96.3%).
+P0-a exit gate MET: every page attributes >=90% of wall time to named stages (worst: text at 96.9%).
