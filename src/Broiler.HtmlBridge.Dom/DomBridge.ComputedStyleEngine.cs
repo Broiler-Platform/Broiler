@@ -77,6 +77,12 @@ public sealed partial class DomBridge
         // gates each on the element's `media` attribute against the viewport and re-syncs the
         // engine only when the effective set changes. Text extraction (canonical DomText children /
         // CSSOM rule text / external-sheet runtime state) stays here because it needs the DOM and loading.
+        // Prefetch pass (multithreading roadmap item #2): the whole sheet set is known here, and the
+        // loop below fetches each external one at the moment it reaches it — serially. Issuing them
+        // all now lets the round trips overlap; the loop still consumes them in document order, so
+        // the cascade sees the same sheets in the same order.
+        PrefetchExternalStylesheets(styleElements);
+
         var sources = new List<CssStyleScopeBuilder.StyleSource>(styleElements.Count);
         foreach (var styleEl in styleElements)
             sources.Add(new CssStyleScopeBuilder.StyleSource(

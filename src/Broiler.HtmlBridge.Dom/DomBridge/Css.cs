@@ -733,6 +733,49 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Asks the loader to start fetching every external stylesheet in <paramref name="styleElements"/>
+    /// that this document has not already fetched. Multithreading roadmap item #2.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The URL handed over is the same string <see cref="GetStyleElementSourceText"/> will pass to
+    /// <see cref="FetchExternalStylesheet"/> — the raw <c>href</c> — because a prefetch keyed on a
+    /// differently-normalized URL would simply never be consumed, silently doubling the requests
+    /// instead of overlapping them.
+    /// </para>
+    /// <para>
+    /// The CSP check is applied here too: a sheet the policy blocks must not have a request put on
+    /// the wire on its behalf, and the consuming path already refuses it.
+    /// </para>
+    /// </remarks>
+    private void PrefetchExternalStylesheets(List<DomElement> styleElements)
+    {
+        List<string>? urls = null;
+
+        foreach (var styleEl in styleElements)
+        {
+            if (!string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!TryGetAttribute(styleEl, "href", out var href) || string.IsNullOrEmpty(href))
+                continue;
+
+            // Already fetched for this document — the consuming path reads the cached text and
+            // never calls the loader, so a request here would be pure waste.
+            if (StyleSheetStateFor(styleEl).FetchedCss.TryGet(out _))
+                continue;
+
+            if (!IsExternalStyleAllowedByCsp(styleEl, href))
+                continue;
+
+            (urls ??= []).Add(href);
+        }
+
+        if (urls is not null)
+            _resources.Prefetch(urls);
+    }
+
+    /// <summary>
     /// Fetches an external CSS stylesheet from an HTTP/HTTPS URL.
     /// Returns the CSS text content, or <c>null</c> on failure.
     /// </summary>
