@@ -6,6 +6,16 @@ the tooling.
 
 ## Status
 
+**Phase 1 is complete.** All four items landed; what each one turned out to be
+worth is in [What building Phase 1 changed](#what-building-phase-1-changed).
+
+| Item | State | Evidence |
+|---|---|---|
+| #1 — WPT worker pool | **Done** | `--workers <N>\|auto` in `src/Broiler.Wpt/Program.cs`; 45.2 s → 23.4 s on a 61-test subset at 4 cores, identical classification at 1, 4 and auto |
+| #20 — CLI batch parallelism | **Done** | `src/Broiler.Cli/BatchRunner.cs`; batch capture byte-identical at 1 and 4 threads, fuzz 14.8 s → 8.9 s with the same 224 failure files |
+| #2 — concurrent sub-resource fetch | **Done, partly** | `SubResourcePrefetcher`; wired to external scripts and `<link>` stylesheets. Iframes/`fetch()`/XHR are **not** wired — see the item below |
+| #11 — CSS rule indexing | **Done** | `patches/0123-css-cascade-rule-index.patch`; exit gate met — cascade cost is flat in total rules (32× rules: 30.8× → **1.64×** time, 32.0× → **1.13×** bytes); corpus `rules` page 5 219 ms → 1 842 ms; WPT unchanged |
+
 **Phase 0 is complete.** The estimates below are no longer the only evidence:
 there is a stage profile, a cascade benchmark, and a GC measurement, and three of
 the four Phase 0 items closed against their exit gates. What the numbers changed
@@ -155,6 +165,93 @@ not worth parallelizing; only its replay is.
 
 See item #19 below.
 
+## What building Phase 1 changed
+
+Four items, and the two things worth carrying forward are a shortfall and a
+constraint neither of which the plan anticipated.
+
+### 1. Rule indexing met its exit gate; the render it sits in did not move 10–100×
+
+Both statements are measurements of the same change and neither is the headline
+alone.
+
+**The exit gate — "cost scales with matched rules, not total rules" — is met.**
+`RuleScalingBenchmarks` holds the element set and the matched-rule count fixed at
+four and grows only the rules that cannot match:
+
+| Rules in sheet | Cold cascade, before | after | | Allocated, before | after |
+|---:|---:|---:|---:|---:|---:|
+| 100 | 114.9 ms | **15.74 ms** | 7.3× | 181.7 MB | **8.57 MB** |
+| 400 | 466.5 ms | **15.65 ms** | 29.8× | 722.0 MB | **8.70 MB** |
+| 1 600 | 2 532.2 ms | **18.80 ms** | 134.7× | 2 897.5 MB | **9.10 MB** |
+| 3 200 | 3 543.6 ms | **25.89 ms** | 136.9× | 5 817.9 MB | **9.69 MB** |
+
+32× the rules used to cost 30.8× the time and 32.0× the bytes; it now costs
+**1.64× the time and 1.13× the bytes**. That is the linear-in-total-rules defect
+gone, on both axes — and the allocation collapse (600× at the top of the range) is
+the second defect Phase 0 named, which no GC setting could have fixed. The
+projected 10–100× is real on this axis and exceeded at the top of it.
+
+*(Run with BenchmarkDotNet's short job, so the confidence intervals are wide — but
+the claim being made is flat-versus-linear across two orders of magnitude, which no
+plausible interval touches.)*
+
+**On a whole render it is 2.8×.** The corpus's `rules` page goes **5 218.96 ms →
+1 841.71 ms** end to end, its `parse+cascade` stage **5 035.35 ms → 1 698.11 ms**.
+That is not a contradiction: the benchmark isolates exactly the cost the index
+removes, while the stage also parses 110 296 characters of source and 900 rules and
+then cascades against the rules that *do* match. Amdahl, not a shortfall.
+
+**Consequence:** `parse+cascade` is still 92.2% of that page, and it is now unknown
+which half. The next cascade item is splitting that stage — item #12 (parallel style
+recalc) must not be started against a stage whose composition is unmeasured, and it
+would be aimed at the cascade half of a row that may now be mostly parse.
+
+### 2. The render path cannot be parallelized in-process yet, and that decides item #20's shape
+
+Item #20 reads "per-file / per-page parallelism", blocked by "Nothing". That is
+true of document conversion — `Broiler.Documents` has no assignable statics at all,
+only lookup tables — and false of everything that renders. The P0-c audit's two
+genuine unsynchronised caches (`FontsHandler`'s four dictionaries and
+`BImageRenderer._images`) sit on process-wide singletons on the render path, so two
+captures, or two layout-fuzz cases, in one process is a data race today.
+
+So the CLI parallelizes document conversion on threads and capture and layout fuzz
+across **child processes** — the same answer the WPT runner's worker pool already
+rested on, for the same reason. It is not a workaround: process isolation is what
+makes "identical output at any worker count" checkable by comparing bytes, which is
+what the global exit gate asks for.
+
+**Consequence:** item #9 (font-cache thread safety, Phase 2) gates more than the
+three items it is credited with. Until it lands, *every* CPU-parallel item on the
+render path is a process-parallel item.
+
+### 3. Item #2 is wired to two of its four call-site families, and the other two need item #17
+
+The prefetch/consume split is built and is live for external scripts and `<link>`
+stylesheets — the two places where the whole set of URLs is already known at a
+single point (the script scan; the collected sheet list). Iframes/sub-documents
+(`SubDocuments.cs`) and `fetch()`/XHR have no such point: a sub-document URL becomes
+known when the element is reached, which is the moment it is consumed, so there is
+nothing to overlap it with.
+
+That is what item #17, the speculative preload scan, is for, and the roadmap already
+says #17 "feeds step 1". The dependency is stronger than "compounds": for those two
+families the preload scan is not an amplifier, it is the only source of a prefetch
+trigger.
+
+### 4. The WPT pool is bounded by memory, and the default has to know it
+
+Sized `min(cores, availableRam / 1.5 GiB)`, which on the 4-core/13 GiB container is
+4 workers and on a 16-core box with 4 GiB free is 2. Measured on
+`css/css-backgrounds` (61 tests): 45.2 s at one worker, 23.4 s at four — 1.93×, not
+4×, because worker startup and the runner's own serial reporting are a fixed share
+of a 61-test run. On a full shard the constant amortizes.
+
+Where the memory figure cannot be read at all, the pool stays at **one** worker.
+Guessing high on an unreadable budget is how a runner OOM-kills a CI box, and the
+per-test allowance is a full GiB.
+
 ## Master table
 
 Gain is per-stage unless stated. Effort is engineering days for one person
@@ -163,8 +260,8 @@ non-deterministic correctness defect.
 
 | # | Component | Site | Currently | Parallel shape | What blocks it today | Est. gain (unmeasured) | Risk | Effort | Phase |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | Tooling | [`Broiler.Wpt/Program.cs:359`](../../src/Broiler.Wpt/Program.cs) — `foreach (var testPath in discoveredTests)` with one `WptWorkerClient` | Sequential, 1 worker process, ≤30 s/test | Work queue over *N* worker processes; results already buffered into `allResults` and sorted after the run, so order is not load-bearing | Nothing. Worker protocol is already one-command-per-line JSON over stdio | **Near-linear in worker count**; bounded by RAM, not cores (§Phase 1) | Low | 2–3 d | 1 |
-| 2 | HtmlBridge | [`ScriptExtractionService.cs:303`](../../src/Broiler.HtmlBridge.Core/Scripting/ScriptExtractionService.cs), [`ResourceLoader.cs:56`](../../src/Broiler.HtmlBridge.Dom/Runtime/ResourceLoader.cs), [`SubDocuments.cs:581`](../../src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs) | Serial `GetStringAsync(..).GetAwaiter().GetResult()`, one resource at a time | Bounded-concurrency prefetch (6/host, browser convention) into a content-addressed cache; call sites then hit the cache | Call sites are synchronous and ordering-sensitive for `document.write`; needs a prefetch/consume split, not an `async` conversion | **Page-load latency 3–6×** on multi-resource pages (latency, not CPU) | Medium | 5–8 d | 1 |
+| 1 | Tooling | [`Broiler.Wpt/Program.cs`](../../src/Broiler.Wpt/Program.cs) `RunDiscoveredTests` — **DONE** | Pool of *N* worker processes draining a shared queue (`--workers <N>\|auto`) | Work queue over *N* worker processes; results already buffered into `allResults` and sorted after the run, so order is not load-bearing | Nothing. Worker protocol is already one-command-per-line JSON over stdio | **Measured: 1.93× at 4 workers** on a 61-test subset (45.2 s → 23.4 s); identical classification at 1, 4 and auto. Bounded by RAM, not cores | Low | Done | 1 |
+| 2 | HtmlBridge | [`ScriptExtractionService.cs:303`](../../src/Broiler.HtmlBridge.Core/Scripting/ScriptExtractionService.cs), [`ResourceLoader.cs:56`](../../src/Broiler.HtmlBridge.Dom/Runtime/ResourceLoader.cs), [`SubDocuments.cs:581`](../../src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs) | Serial `GetStringAsync(..).GetAwaiter().GetResult()`, one resource at a time | Bounded-concurrency prefetch (6/host, browser convention) into a content-addressed cache; call sites then hit the cache | Call sites are synchronous and ordering-sensitive for `document.write`; needs a prefetch/consume split, not an `async` conversion | **Done for scripts and `<link>` stylesheets** (`SubResourcePrefetcher`, bounded 6/host). Iframes and `fetch()`/XHR are not wired: they have no point where the URL set is known before it is consumed, which is what item #17 supplies | Medium | Done (scripts, sheets) | 1 |
 | 3 | Graphics | [`Rendering/BCanvas.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/BCanvas.cs) `FillRect:106`, `FillGlyphContours:241`, `DrawBitmap:345`, `FillRectTiled:389`, `FillLinear/Radial/ConicGradientRect:425/468/508` | Single-threaded scanline loops | `Parallel.For` over scanline bands; per-band coverage buffer and clip stack | Per-row `coverage[]` and the `_clipOperations` list are instance state shared across rows — must become per-worker | **4–6× on 8 cores** (estimate) of a stage **measured at 46.9–80.8% of a render** — the largest measured share in the document | Low | 4–6 d | 2 |
 | 4 | HTML | [`Broiler.HTML.Image/BCanvas.cs`](../../Broiler.HTML/Source/Broiler.HTML.Image/BCanvas.cs) `:128/262/364/406/456/508/554/655` | Same scanline shape, second copy of the rasterizer | Same as #3 | Same as #3, plus the duplication itself | Same as #3 | Low | 3–4 d (or 0, if unified with #3 first) | 2 |
 | 5 | Graphics / Layout | [`DisplayList.cs`](../../Broiler.Layout/Broiler.Layout/IR/DisplayList.cs) + [`BRenderList.cs`](../../Broiler.Graphics/Broiler.Graphics/RenderList/BRenderList.cs) replayed by [`RGraphicsRasterBackend`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs) | One pass, whole surface | **Tile-parallel replay**: partition the target into tiles, each worker replays the whole immutable list clipped to its tile | Already immutable and flat with explicit `ClipItem`/`RestoreItem`/`OpacityItem` stack items — this is the right structure. Needs per-tile state and layer (`OpacityItem`) handling | **5–7× on 8 cores** (estimate) for full-page renders; better locality than #3. **Measured:** the replay is 46.9–80.8% of a render while the display-list *build* is 0.3–0.7%, so only the replay is worth parallelizing | Low–Medium | 6–10 d | 2 |
@@ -173,7 +270,7 @@ non-deterministic correctness defect.
 | 8 | Media / HTML | Per-image decode, driven from [`ImageLoadHandler.cs:177`](../../Broiler.HTML/Source/Broiler.HTML.Core/Handlers/ImageLoadHandler.cs) | Already `ThreadPool.QueueUserWorkItem` for file reads; decode is on the completion path | Decode *N* page images concurrently — coarser and better than #6/#7 | Decoder statics must be verified re-entrant; `BImageRenderer._images` is a plain `Dictionary` | **Near-linear in image count** up to core count | Low | 2–3 d | 2 |
 | 9 | Graphics | [`FontsHandler.cs:13`](../../Broiler.Graphics/Broiler.Graphics/Text/FontsHandler.cs) `_fontsCache`, `_featuredFontsCache`; [`TrueTypeFont.cs`](../../Broiler.Graphics/Broiler.Graphics/Text/TrueTypeFont.cs) | Plain `Dictionary`, no synchronization | Not a speedup itself — a **hard prerequisite** for #10, #12, #13 | Nested `Dictionary<string, Dictionary<double, Dictionary<FontStyle, RFont>>>` corrupts under concurrent read/write | Enables ~3 items | Low | 2 d | 2 |
 | 10 | Graphics | [`ComplexTextShaper.Shape:72`](../../Broiler.Graphics/Broiler.Graphics/Text/ComplexTextShaper.cs) | Called per run during layout | Already a static pure function → parallel-safe. Add a shaped-run cache keyed by (font, text, features) | Needs #9 | **Cache alone is the bigger win**; parallel shaping 3–5× on the shaping stage | Low | 3–4 d | 2 |
-| 11 | CSS | [`CssStyleEngine.CollectFromRules:623`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) — linear scan of every rule of every sheet, per element | O(elements × rules) | **Not multithreading.** Rule index (bucket by id/class/tag) + ancestor bloom filter | Nothing — this is the standard engine design and it is simply absent | **Measured:** the cascade is 96.3% of a 900-rule / 700-element render (3.68 s), and cost + allocation are both linear in *total* rules with matches held fixed (32× rules -> 30.8× time, 32.0× bytes). The document's 10–100× is a floor | Low | 8–12 d | 1 |
+| 11 | CSS | [`CssStyleEngine.CollectFromRules:623`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) — linear scan of every rule of every sheet, per element | O(elements × rules) | **Not multithreading.** Rule index (bucket by id/class/tag) + ancestor bloom filter | Nothing — this is the standard engine design and it is simply absent | **DONE.** Exit gate met: with matches fixed at four, 32× the rules now costs 1.64× the time and 1.13× the bytes (was 30.8× / 32.0×) — up to **136.9× faster** and **600× less garbage** at 3 200 rules. On a whole render the corpus `rules` page is 5 218.96 ms → 1 841.71 ms (2.8×); see [What building Phase 1 changed](#what-building-phase-1-changed) §1. `patches/0123-css-cascade-rule-index.patch` | Low | Done | 1 |
 | 12 | CSS | `GetComputedStyle:151` / `GetCascadedDeclarationMap:555` over the element set | Sequential per element; caches under one global `_sync` lock | Parallel style recalc over DOM subtrees, Stylo-style | Global lock over `_cache`/`_sparseCache`/`_declaredCascadeCache` becomes the bottleneck; needs sharding + per-thread L1. Do #11 first or you parallelize the wrong thing | **2–4× on styling** after #11 | Medium | 10–15 d | 3 |
 | 13 | Layout | [`CssBox.PerformLayout:347`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.cs), [`PerformLayoutImp:37`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.Layout.cs) | Full-tree, in-place mutation, from the root every pass — **twice** when width is unrestricted ([`HtmlContainerInt.cs:929,936`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs)) | Parallel intrinsic sizing; parallel independent subtrees (abspos/fixed, flex+grid items, table cells, multicol, subdocuments) | Mutable shared tree; ambient thread-static state (`CssLengthParser` viewport, [`DocumentModeContext.cs:22`](../../Broiler.Layout/Broiler.Layout/DocumentModeContext.cs)); no dirty-bit invalidation to bound the work | **1.5–2.5×** of a stage **measured at 0.6–6.5% of a render** on every corpus page, including one built to load layout — so a few percent overall at best | **High** | 20–30 d | 4 |
 | 14 | Layout | Same as #13 | No incremental invalidation | **Not multithreading.** Dirty bits + relayout roots | — | **5–50× on interactive relayout** — unmeasured, and the *first-render* layout it bounds is 0.6–6.5% of wall time; the interactive case this claims is not covered by the P0-a corpus. Also the precondition that makes #13 safe | Medium | 15–20 d | 3 |
@@ -182,7 +279,7 @@ non-deterministic correctness defect.
 | 17 | DOM / HTML | [`HtmlTokenizer.cs`](../../Broiler.DOM/Broiler.Dom.Html/HtmlTokenizer.cs), [`DomParser.cs`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs) | Sequential (correctly — the HTML tokenizer is spec-sequential and cannot be parallelized) | **Speculative preload scan**: a worker scans raw bytes for `src`/`href` while the main parse runs, feeding #2 | Nothing; it is a read-only scan of an immutable byte buffer | Overlaps network with parse — compounds #2 rather than adding CPU | Low | 4–6 d | 2 |
 | 18 | JS | New: `Worker` / `MessageChannel` | Not implemented | One `JSContext` per worker thread, structured-clone message passing | Per-context state exists and `JSEngine.CurrentContext` is `AsyncLocal`, so isolation is feasible; needs the static-mutable audit from P0-c across Broiler.JS | Capability, not a speedup of existing work | High | 30–40 d | 4 |
 | 19 | Runtime | `Directory.Build.props` sets neither; `Broiler.JavaScript.Engine.Benchmarks.csproj` **does** set `ServerGarbageCollection` | Workstation GC defaults everywhere except that one benchmark project | Config knob; evaluate Server GC for headless/batch hosts | Nothing | **Measured: Server GC is 1.62× SLOWER** on a 4-core headless render (see below). Keep Workstation | Low | Done | 0 |
-| 20 | Tooling | [`Broiler.Cli`](../../src/Broiler.Cli) — capture, document convert, layout fuzz | Sequential per input | Per-file / per-page parallelism | Nothing | Near-linear in file count | Low | 2–3 d | 1 |
+| 20 | Tooling | [`Broiler.Cli`](../../src/Broiler.Cli) — capture, document convert, layout fuzz — **DONE** | Repeatable inputs + `--output-dir`, `--threads` | Threads for document convert; **child processes** for capture and fuzz | **Not "nothing":** the render path's unsynchronised caches (item #9) make two in-process renders a race, so those two go through processes | Fuzz 14.8 s → 8.9 s at 4; capture byte-identical at 1 and 4. Per-page PDF is out of scope here — the CLI shells out to the standalone Broiler.Pdf app | Low | Done | 1 |
 | 21 | Tests | [`Broiler.JavaScript.BuiltIns.Tests/AssemblyInfo.cs:3`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/AssemblyInfo.cs) — `DisableTestParallelization = true` | Whole assembly serialized | Re-enable once #15 lands and per-test context isolation is confirmed | Almost certainly disabled *because* of #15 | Test-suite wall time | Low | 1–2 d | 3 |
 | 22 | Input | [`Broiler.Input.*`](../../Broiler.Input) — Linux keyboard `Task.Run`, Windows camera `new Thread`, `lock (_gate)` throughout | **Already correctly threaded** | — | — | None available | — | — | — |
 | 23 | UI | [`Broiler.UI`](../../Broiler.UI/src) measure/arrange over the widget tree | Sequential | Parallel measure is possible but widget trees are small (~hundreds of nodes) | — | Negligible; the real win is keeping layout/paint off the input thread (responsiveness, not throughput) | — | — | Not recommended |
@@ -371,13 +468,28 @@ no gain.
 
 ### Broiler.CSS
 
-1. **Rule indexing first** (item #11) — bucket rules by rightmost simple
-   selector (id / class / tag / universal) and add an ancestor bloom filter, so
-   an element tests a handful of candidate rules instead of all of them. This is
-   single-threaded and is expected to dominate every parallel option.
-   *Exit gate:* cascade benchmark from P0-a shows the per-element rule tests
-   scaling with matched rules, not total rules; computed-style output unchanged
-   across the CSS + WPT suites.
+1. **Rule indexing first** (item #11) — **DONE**, as
+   `patches/0123-css-cascade-rule-index.patch`. Rules are bucketed by their
+   rightmost simple selector (id / class / type / universal) in
+   `CssCascadeRuleIndex`; an element merges the buckets its own keys reach and
+   tests those.
+   *Exit gate — met.* `RuleScalingBenchmarks` with matches held at four: 32× the
+   rules costs 1.64× the time and 1.13× the allocation, against 30.8× and 32.0×
+   before — the per-element cost now tracks matched rules, not total rules.
+   Computed-style output unchanged: `Broiler.CSS.Tests` 341/341,
+   `Broiler.CSS.Dom.Tests` 383 passed (the 2 failures are pre-existing
+   architecture tests, verified on a clean tree), and WPT
+   `css/css-backgrounds` + `css/CSS2/linebox` is identical over 62 tests —
+   same pass/fail/skip and the same average pixel match to fourteen digits.
+   *Not built:* the ancestor bloom filter. The key buckets alone flattened the
+   scaling curve, so the filter has nothing left to remove on this benchmark;
+   it belongs with a measurement that shows descendant-combinator rejection
+   costing something.
+   Note for step 2 and item #12: the cascade now also carries a *third*
+   generation counter. The rule index is memoized against sheet/environment
+   changes only, deliberately not against the DOM-mutation invalidation that
+   clears the caches below — a sharding design must not collapse the two.
+
 2. **Shard the caches.** `_cache`, `_sparseCache`, and `_declaredCascadeCache`
    sit behind one `_sync`. Move to per-shard locks or `ConcurrentDictionary`
    with a per-thread first-level cache, keeping the existing generation-guard
@@ -525,7 +637,7 @@ Recording these so they are not revisited each time the topic comes up:
 | Phase | Contents | Rationale |
 |---|---|---|
 | **0 — Make it measurable and deterministic** | P0-a benchmarks, P0-b single-threaded event loop (#15), P0-c static-state audit, GC config evaluation (#19) | Nothing after this is trustworthy without it. #15 is a correctness fix that also removes lock overhead from the cascade. |
-| **1 — Free wins and the sequential fixes** | WPT worker pool (#1), CLI batch (#20), concurrent sub-resource fetch (#2), CSS rule indexing (#11) | Cheap, low-risk, and #1 shortens the feedback loop for everything else. #11 is single-threaded but must precede #12. |
+| **1 — Free wins and the sequential fixes** — **DONE** | WPT worker pool (#1), CLI batch (#20), concurrent sub-resource fetch (#2), CSS rule indexing (#11) | Cheap, low-risk, and #1 shortens the feedback loop for everything else. #11 is single-threaded but must precede #12. **What it changed:** #11 met its exit gate (cascade cost is now flat in total rules) but is 2.8× on a whole render, and `parse+cascade` still dominates the rule-heavy page — so #12 needs that stage split before it is started; #20 had to use processes, which makes item #9 a gate on every render-path item, not three. |
 | **2 — Raster, decode, text** | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), shaped-run cache (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. |
 | **3 — Style and incremental layout** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. |
 | **4 — Parallel layout and workers** | Parallel intrinsic sizing and independent subtrees (#13), Web Workers (#18) | Highest cost, highest risk, lowest ceiling. Only worth starting once Phase 3's measurements say layout is still the bottleneck. |

@@ -47,6 +47,11 @@ set -euo pipefail
 #     Listing it would fail this script and take the whole run down, so it needs
 #     regenerating against the current pointer before it can go back in.
 PENDING_PATCHES=(
+  # Multithreading roadmap item #11: the cascade tests only the rules an element's
+  # own keys reach instead of every rule of every sheet. Listed — unlike a thread-
+  # safety patch — because it *could* move rendering if the key extraction were
+  # wrong, and its whole claim is that it does not; the WPT run is that check.
+  "Broiler.CSS|patches/0123-css-cascade-rule-index.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
