@@ -35,7 +35,16 @@ public static partial class SvgFilterTable
     {
         _table = null;
         _colorTable = null;
+        AmbientRenderState.MarkEstablished(AmbientRenderState.Slots.SvgTables);
     }
+
+    /// <summary>
+    /// <see cref="Reset"/>, reachable from <see cref="AmbientRenderState.Establish"/> outside this
+    /// namespace. A worker thread establishes the tables by emptying them: an SVG reference on a
+    /// thread that has run no fragment-tree build resolves to nothing, which is correct, whereas
+    /// inheriting the previous document's table would resolve it to the wrong shape.
+    /// </summary>
+    public static void ResetForThread() => Reset();
 
     /// <summary>
     /// Records a colour-transform filter under its <c>id</c> — a chain whose primitives only change
@@ -52,6 +61,7 @@ public static partial class SvgFilterTable
     /// <summary>Resolves a <c>url(#id)</c> reference to a modelled colour-transform filter, if any.</summary>
     public static bool TryGetColorFilter(string id, out SvgColorFilter filter)
     {
+        AmbientRenderState.AssertEstablished(AmbientRenderState.Slots.SvgTables, nameof(TryGetColorFilter));
         filter = null!;
         return _colorTable != null && id != null && _colorTable.TryGetValue(id, out filter!);
     }
@@ -71,6 +81,7 @@ public static partial class SvgFilterTable
     /// </summary>
     public static bool TryGetFlood(string id, out FloodFilter filter)
     {
+        AmbientRenderState.AssertEstablished(AmbientRenderState.Slots.SvgTables, nameof(TryGetFlood));
         filter = default;
         return _table != null && id != null && _table.TryGetValue(id, out filter);
     }

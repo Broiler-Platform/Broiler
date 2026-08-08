@@ -99,3 +99,8 @@ __pycache__
 
 # Claude Code session-local settings (per-session permission state)
 .claude/settings.local.json
+
+# BenchmarkDotNet writes its logs and reports to a directory named after the working
+# directory it was launched from, so a run at the repository root leaves one here.
+# Published benchmark numbers belong under tests/*/results/, checked in by hand.
+BenchmarkDotNet.Artifacts/

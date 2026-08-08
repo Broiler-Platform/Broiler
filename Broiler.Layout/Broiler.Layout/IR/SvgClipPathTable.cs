@@ -52,7 +52,18 @@ public static class SvgClipPathTable
     private static Dictionary<string, ClipShape>? _table;
 
     /// <summary>Clears the table at the start of a render pass.</summary>
-    internal static void Reset() => _table = null;
+    internal static void Reset()
+    {
+        _table = null;
+        AmbientRenderState.MarkEstablished(AmbientRenderState.Slots.SvgTables);
+    }
+
+    /// <summary>
+    /// <see cref="Reset"/>, reachable from <see cref="AmbientRenderState.Establish"/> outside this
+    /// namespace. See <see cref="SvgFilterTable.ResetForThread"/> for why emptying is the right way
+    /// for a worker thread to establish the tables.
+    /// </summary>
+    public static void ResetForThread() => Reset();
 
     /// <summary>Records a clip path under its <c>id</c> (later definitions win, matching document order).</summary>
     internal static void Add(string id, ClipShape shape)
@@ -68,6 +79,7 @@ public static class SvgClipPathTable
     /// </summary>
     public static bool TryGet(string? id, out ClipShape shape)
     {
+        AmbientRenderState.AssertEstablished(AmbientRenderState.Slots.SvgTables, nameof(TryGet));
         shape = null!;
         return _table != null && id != null && _table.TryGetValue(id, out shape!);
     }

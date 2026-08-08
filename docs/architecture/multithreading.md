@@ -4,22 +4,47 @@ Where concurrency can make Broiler faster, where it cannot, and the order the
 work has to happen in. Scope is every component in the aggregate repository plus
 the tooling.
 
+## Status
+
+**Phase 0 is complete.** The estimates below are no longer the only evidence:
+there is a stage profile, a cascade benchmark, and a GC measurement, and three of
+the four Phase 0 items closed against their exit gates. What the numbers changed
+is recorded in [What measuring Phase 0 changed](#what-measuring-phase-0-changed);
+the master table's "Est. gain" column is still an estimate wherever a row has no
+measurement, and rows that now have one say so.
+
+| Item | State | Evidence |
+|---|---|---|
+| P0-a — stage benchmarks | **Done** | [`tests/render-stages/results/stage-profile.md`](../../tests/render-stages/results/stage-profile.md); ≥96.3% of wall time attributed on every corpus page |
+| P0-b — single-threaded determinism (#15) | **Done** | Two of the three named sites had already landed (`JSMicrotaskQueue`, `JSContext.PostJob`); the third is `patches/0122-js-async-generator-await-dispatch.patch` |
+| P0-c — static-state audit | **Done** | [Shared mutable state on the render path](multithreading-static-state.md); assertion in `Broiler.Layout/AmbientRenderState.cs` |
+| #19 — GC configuration | **Done — negative result** | Server GC measured **1.62× slower** on a 4-core headless render; see the item below |
+
+Two residuals are named rather than hidden, and both are one patch each: the
+`Viewport` ambient slot has no read-side assertion (it lives in `Broiler.CSS`),
+and `DocumentModeContext` is never published on the HTML-string render path.
+Both are in the P0-c document.
+
 ## Method and honesty caveat
 
-This analysis is **structural, not measured**. It comes from reading the hot
+This analysis began as **structural, not measured**. It came from reading the hot
 paths and classifying their data dependencies — which loops write disjoint
-memory, which caches are shared, which stages are genuinely sequential. The
-repository has five BenchmarkDotNet projects
-(`Broiler.JavaScript.Engine.Benchmarks`, two Unicode ones, two formatting-code
-phases) and **none of them cover cascade, layout, raster, or image decode**, so
-no stage-level profile exists to attribute wall time to.
+memory, which caches are shared, which stages are genuinely sequential — because
+the repository's BenchmarkDotNet projects (`Broiler.JavaScript.Engine.Benchmarks`,
+two Unicode ones, two formatting-code phases) **covered none of cascade, layout,
+raster, or image decode**.
 
-Every "estimated gain" below is therefore a bound derived from the shape of the
-code (loop independence, Amdahl ceiling given the sequential remainder), not an
-observation. **Phase 0 exists to replace those estimates with numbers**, and no
-item past Phase 0 should be started before its stage has a benchmark. Per the
+`Broiler.Render.Stage.Benchmarks` now does, so a stage-level figure below is an
+observation and is marked as one. Every unmarked "estimated gain" is still a bound
+derived from the shape of the code (loop independence, Amdahl ceiling given the
+sequential remainder), not an observation, and **no item should be started before
+its stage has a number**. Per the
 [documentation rules](../README.md#documentation-rules), an estimate is not
 evidence.
+
+All figures below were taken on a 4-logical-core Linux container, .NET 10.0.10,
+Workstation GC, at 1280×1024. Core count matters to some of them and where it
+does, it is said.
 
 ## Summary of findings
 
@@ -54,6 +79,82 @@ evidence.
 The cheapest high-value item in the whole document is the **WPT runner**: it
 runs 188 tests through a *single* worker process in a `foreach`.
 
+**Findings 1, 4, and 5 have since been measured, and one of them was wrong.** The
+next section has the numbers; in short, finding 1 holds, finding 4 understates the
+cascade by a wide margin, and finding 5's conclusion is right for a reason it does
+not give.
+
+## What measuring Phase 0 changed
+
+Four findings, in descending order of how much they should change what happens next.
+
+### 1. The cascade is not "a big win"; on a rule-heavy page it is the entire render
+
+Finding 4 above called the cascade's linear rule scan one of two single-threaded
+fixes that must come first. It understates it. On the corpus's `rules` page — 700
+`<div>`s carrying two classes each, against a 900-rule sheet — `parse+cascade` is
+**96.3% of a 5.0-second render**, and a `CssStyleEngine` benchmark over the same
+element set puts **3.68 s** of that in the cascade itself. The memoized pass over
+the same elements is **0.35 ms**, a ratio of about 10 600×.
+
+`RuleScalingBenchmarks` isolates the mechanism by holding the element set *and the
+matched-rule count* fixed at four while growing the sheet:
+
+| Rules in sheet | Cold cascade, 400 elements | Allocated |
+|---:|---:|---:|
+| 100 | 114.9 ms | 181.7 MB |
+| 400 | 466.5 ms | 722.0 MB |
+| 1 600 | 2 532.2 ms | 2 897.5 MB |
+| 3 200 | 3 543.6 ms | 5 817.9 MB |
+
+32× the rules, 30.8× the time, **32.0× the allocation** — for the same four matches.
+That is item #11's claim measured exactly, and it makes the roadmap's "10–100× on
+rule-heavy pages" a floor rather than a hope. The allocation figure is a second,
+independent defect the roadmap did not name: the cascade allocates in proportion to
+*total* rules, so a rule index would cut garbage as much as it cuts time.
+
+**Consequence:** item #11 is the highest-value item in the document, ahead of every
+parallel item including the rasterizer, and it is single-threaded work.
+
+### 2. Layout is not the bottleneck, on any page in the corpus
+
+| Page | layout share |
+|---|---:|
+| `text` | 6.5% |
+| `rules` | 0.6% |
+| `boxes` | 4.9% |
+| `paint` | 0.9% |
+| `mixed` | 4.6% |
+
+`boxes` is a nested block/flex/grid tree built specifically to load layout, and
+layout is 4.9% of it — against 80.1% for `parse+cascade`. The roadmap's ordering
+(layout last) is right; its stated *reason* — a low ceiling because block flow is
+sequential in the block direction — is not the operative one. **The operative reason
+is that layout is 0.6–6.5% of a render, so even a perfect parallel layout is worth
+at most a few percent.** Items #13 (20–30 d) and #14 (15–20 d) are 35–50 days
+against a stage that does not currently dominate anything measured here.
+
+The double-layout pass finding 4 names is also not reachable on this path: it is
+guarded by `MaxSize.Width <= 0.1`, and a headless render at a fixed viewport sets
+`MaxSize`. It costs a second traversal only in the auto-size shrink-to-fit case.
+
+### 3. The rasterizer estimate holds
+
+| Page | raster share |
+|---|---:|
+| `paint` | 80.8% |
+| `text` | 63.7% |
+| `mixed` | 46.9% |
+
+Items #3 and #5 are aimed at the right thing, and the corpus's `paint` page says a
+tile-parallel replay has 80% of a render to work with. The paint *walk* — fragment
+tree to display list — is 0.3–0.7% everywhere, so the display-list construction is
+not worth parallelizing; only its replay is.
+
+### 4. Server GC is a pessimization here, not a 1.1–1.4× win
+
+See item #19 below.
+
 ## Master table
 
 Gain is per-stage unless stated. Effort is engineering days for one person
@@ -64,23 +165,23 @@ non-deterministic correctness defect.
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | Tooling | [`Broiler.Wpt/Program.cs:359`](../../src/Broiler.Wpt/Program.cs) — `foreach (var testPath in discoveredTests)` with one `WptWorkerClient` | Sequential, 1 worker process, ≤30 s/test | Work queue over *N* worker processes; results already buffered into `allResults` and sorted after the run, so order is not load-bearing | Nothing. Worker protocol is already one-command-per-line JSON over stdio | **Near-linear in worker count**; bounded by RAM, not cores (§Phase 1) | Low | 2–3 d | 1 |
 | 2 | HtmlBridge | [`ScriptExtractionService.cs:303`](../../src/Broiler.HtmlBridge.Core/Scripting/ScriptExtractionService.cs), [`ResourceLoader.cs:56`](../../src/Broiler.HtmlBridge.Dom/Runtime/ResourceLoader.cs), [`SubDocuments.cs:581`](../../src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs) | Serial `GetStringAsync(..).GetAwaiter().GetResult()`, one resource at a time | Bounded-concurrency prefetch (6/host, browser convention) into a content-addressed cache; call sites then hit the cache | Call sites are synchronous and ordering-sensitive for `document.write`; needs a prefetch/consume split, not an `async` conversion | **Page-load latency 3–6×** on multi-resource pages (latency, not CPU) | Medium | 5–8 d | 1 |
-| 3 | Graphics | [`Rendering/BCanvas.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/BCanvas.cs) `FillRect:106`, `FillGlyphContours:241`, `DrawBitmap:345`, `FillRectTiled:389`, `FillLinear/Radial/ConicGradientRect:425/468/508` | Single-threaded scanline loops | `Parallel.For` over scanline bands; per-band coverage buffer and clip stack | Per-row `coverage[]` and the `_clipOperations` list are instance state shared across rows — must become per-worker | **4–6× on 8 cores** (memory-bandwidth bound for large fills, core-bound for glyphs/gradients) | Low | 4–6 d | 2 |
+| 3 | Graphics | [`Rendering/BCanvas.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/BCanvas.cs) `FillRect:106`, `FillGlyphContours:241`, `DrawBitmap:345`, `FillRectTiled:389`, `FillLinear/Radial/ConicGradientRect:425/468/508` | Single-threaded scanline loops | `Parallel.For` over scanline bands; per-band coverage buffer and clip stack | Per-row `coverage[]` and the `_clipOperations` list are instance state shared across rows — must become per-worker | **4–6× on 8 cores** (estimate) of a stage **measured at 46.9–80.8% of a render** — the largest measured share in the document | Low | 4–6 d | 2 |
 | 4 | HTML | [`Broiler.HTML.Image/BCanvas.cs`](../../Broiler.HTML/Source/Broiler.HTML.Image/BCanvas.cs) `:128/262/364/406/456/508/554/655` | Same scanline shape, second copy of the rasterizer | Same as #3 | Same as #3, plus the duplication itself | Same as #3 | Low | 3–4 d (or 0, if unified with #3 first) | 2 |
-| 5 | Graphics / Layout | [`DisplayList.cs`](../../Broiler.Layout/Broiler.Layout/IR/DisplayList.cs) + [`BRenderList.cs`](../../Broiler.Graphics/Broiler.Graphics/RenderList/BRenderList.cs) replayed by [`RGraphicsRasterBackend`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs) | One pass, whole surface | **Tile-parallel replay**: partition the target into tiles, each worker replays the whole immutable list clipped to its tile | Already immutable and flat with explicit `ClipItem`/`RestoreItem`/`OpacityItem` stack items — this is the right structure. Needs per-tile state and layer (`OpacityItem`) handling | **5–7× on 8 cores** for full-page renders; better locality than #3 | Low–Medium | 6–10 d | 2 |
+| 5 | Graphics / Layout | [`DisplayList.cs`](../../Broiler.Layout/Broiler.Layout/IR/DisplayList.cs) + [`BRenderList.cs`](../../Broiler.Graphics/Broiler.Graphics/RenderList/BRenderList.cs) replayed by [`RGraphicsRasterBackend`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs) | One pass, whole surface | **Tile-parallel replay**: partition the target into tiles, each worker replays the whole immutable list clipped to its tile | Already immutable and flat with explicit `ClipItem`/`RestoreItem`/`OpacityItem` stack items — this is the right structure. Needs per-tile state and layer (`OpacityItem`) handling | **5–7× on 8 cores** (estimate) for full-page renders; better locality than #3. **Measured:** the replay is 46.9–80.8% of a render while the display-list *build* is 0.3–0.7%, so only the replay is worth parallelizing | Low–Medium | 6–10 d | 2 |
 | 6 | Media | [`JpegDecoder.cs:385`](../../Broiler.Media/Broiler.Media.Image.Managed/Jpeg/JpegDecoder.cs) dequantize+IDCT per block, `:424` upsample + YCbCr→RGB per row | Sequential | `Parallel.For` over blocks / rows. Entropy decode stays sequential (optionally per-RST-interval) | Nothing structural; blocks and output rows are disjoint | **2–2.5× on decode** (Amdahl: Huffman ≈35% stays serial) | Low | 2–3 d | 2 |
 | 7 | Media | [`PngDecoder.cs:293`](../../Broiler.Media/Broiler.Media.Image.Managed/Png/PngDecoder.cs) expand-to-RGBA | Sequential | `Parallel.For` over rows | Inflate (`:62`) and unfilter (`:63`) are genuinely sequential — Up/Paeth read the previous row | **1.3–1.6× on decode** only | Low | 1–2 d | 2 |
 | 8 | Media / HTML | Per-image decode, driven from [`ImageLoadHandler.cs:177`](../../Broiler.HTML/Source/Broiler.HTML.Core/Handlers/ImageLoadHandler.cs) | Already `ThreadPool.QueueUserWorkItem` for file reads; decode is on the completion path | Decode *N* page images concurrently — coarser and better than #6/#7 | Decoder statics must be verified re-entrant; `BImageRenderer._images` is a plain `Dictionary` | **Near-linear in image count** up to core count | Low | 2–3 d | 2 |
 | 9 | Graphics | [`FontsHandler.cs:13`](../../Broiler.Graphics/Broiler.Graphics/Text/FontsHandler.cs) `_fontsCache`, `_featuredFontsCache`; [`TrueTypeFont.cs`](../../Broiler.Graphics/Broiler.Graphics/Text/TrueTypeFont.cs) | Plain `Dictionary`, no synchronization | Not a speedup itself — a **hard prerequisite** for #10, #12, #13 | Nested `Dictionary<string, Dictionary<double, Dictionary<FontStyle, RFont>>>` corrupts under concurrent read/write | Enables ~3 items | Low | 2 d | 2 |
 | 10 | Graphics | [`ComplexTextShaper.Shape:72`](../../Broiler.Graphics/Broiler.Graphics/Text/ComplexTextShaper.cs) | Called per run during layout | Already a static pure function → parallel-safe. Add a shaped-run cache keyed by (font, text, features) | Needs #9 | **Cache alone is the bigger win**; parallel shaping 3–5× on the shaping stage | Low | 3–4 d | 2 |
-| 11 | CSS | [`CssStyleEngine.CollectFromRules:623`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) — linear scan of every rule of every sheet, per element | O(elements × rules) | **Not multithreading.** Rule index (bucket by id/class/tag) + ancestor bloom filter | Nothing — this is the standard engine design and it is simply absent | **10–100× on rule-heavy pages**, single-threaded. Dwarfs any parallel styling | Low | 8–12 d | 1 |
+| 11 | CSS | [`CssStyleEngine.CollectFromRules:623`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) — linear scan of every rule of every sheet, per element | O(elements × rules) | **Not multithreading.** Rule index (bucket by id/class/tag) + ancestor bloom filter | Nothing — this is the standard engine design and it is simply absent | **Measured:** the cascade is 96.3% of a 900-rule / 700-element render (3.68 s), and cost + allocation are both linear in *total* rules with matches held fixed (32× rules -> 30.8× time, 32.0× bytes). The document's 10–100× is a floor | Low | 8–12 d | 1 |
 | 12 | CSS | `GetComputedStyle:151` / `GetCascadedDeclarationMap:555` over the element set | Sequential per element; caches under one global `_sync` lock | Parallel style recalc over DOM subtrees, Stylo-style | Global lock over `_cache`/`_sparseCache`/`_declaredCascadeCache` becomes the bottleneck; needs sharding + per-thread L1. Do #11 first or you parallelize the wrong thing | **2–4× on styling** after #11 | Medium | 10–15 d | 3 |
-| 13 | Layout | [`CssBox.PerformLayout:347`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.cs), [`PerformLayoutImp:37`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.Layout.cs) | Full-tree, in-place mutation, from the root every pass — **twice** when width is unrestricted ([`HtmlContainerInt.cs:929,936`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs)) | Parallel intrinsic sizing; parallel independent subtrees (abspos/fixed, flex+grid items, table cells, multicol, subdocuments) | Mutable shared tree; ambient thread-static state (`CssLengthParser` viewport, [`DocumentModeContext.cs:22`](../../Broiler.Layout/Broiler.Layout/DocumentModeContext.cs)); no dirty-bit invalidation to bound the work | **1.5–2.5×** — block flow is sequential in the block direction, so the ceiling is low | **High** | 20–30 d | 4 |
-| 14 | Layout | Same as #13 | No incremental invalidation | **Not multithreading.** Dirty bits + relayout roots | — | **5–50× on interactive relayout**; also the precondition that makes #13 safe | Medium | 15–20 d | 3 |
+| 13 | Layout | [`CssBox.PerformLayout:347`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.cs), [`PerformLayoutImp:37`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.Layout.cs) | Full-tree, in-place mutation, from the root every pass — **twice** when width is unrestricted ([`HtmlContainerInt.cs:929,936`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs)) | Parallel intrinsic sizing; parallel independent subtrees (abspos/fixed, flex+grid items, table cells, multicol, subdocuments) | Mutable shared tree; ambient thread-static state (`CssLengthParser` viewport, [`DocumentModeContext.cs:22`](../../Broiler.Layout/Broiler.Layout/DocumentModeContext.cs)); no dirty-bit invalidation to bound the work | **1.5–2.5×** of a stage **measured at 0.6–6.5% of a render** on every corpus page, including one built to load layout — so a few percent overall at best | **High** | 20–30 d | 4 |
+| 14 | Layout | Same as #13 | No incremental invalidation | **Not multithreading.** Dirty bits + relayout roots | — | **5–50× on interactive relayout** — unmeasured, and the *first-render* layout it bounds is 0.6–6.5% of wall time; the interactive case this claims is not covered by the P0-a corpus. Also the precondition that makes #13 safe | Medium | 15–20 d | 3 |
 | 15 | JS | [`JSPromise.Post:376`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromise.cs), [`JSAsyncFunction.cs:152`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSAsyncFunction.cs), [`JSGenerator.cs:435`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Generator/JSGenerator.cs) — `ThreadPool.QueueUserWorkItem` when `sc == null` | JS continuations run on pool threads, racing main-thread layout | **Remove the parallelism.** Always pump a single-threaded event loop | This is the root cause behind WPT #1445 / #1143; the CSS `_sync` lock and the concurrent bridge memo maps are mitigations for it | Negative CPU gain, **large correctness gain**; removes lock overhead on hot cascade paths | Low | 5–8 d | 0 |
 | 16 | JS | [`JSContext.cs:1562`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.Engine/JSContext.cs) `DictionaryCodeCache` (process-shared, already concurrent) | Scripts compiled on demand, serially | Background/parallel compile of independent `<script>` sources; overlap with parse and network | Cache is already concurrent; needs a compile-ahead queue fed by the preload scanner (#17) | **Removes compile from the critical path**; 1.5–3× on script-heavy first paint | Medium | 8–12 d | 3 |
 | 17 | DOM / HTML | [`HtmlTokenizer.cs`](../../Broiler.DOM/Broiler.Dom.Html/HtmlTokenizer.cs), [`DomParser.cs`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs) | Sequential (correctly — the HTML tokenizer is spec-sequential and cannot be parallelized) | **Speculative preload scan**: a worker scans raw bytes for `src`/`href` while the main parse runs, feeding #2 | Nothing; it is a read-only scan of an immutable byte buffer | Overlaps network with parse — compounds #2 rather than adding CPU | Low | 4–6 d | 2 |
 | 18 | JS | New: `Worker` / `MessageChannel` | Not implemented | One `JSContext` per worker thread, structured-clone message passing | Per-context state exists and `JSEngine.CurrentContext` is `AsyncLocal`, so isolation is feasible; needs the static-mutable audit from P0-c across Broiler.JS | Capability, not a speedup of existing work | High | 30–40 d | 4 |
-| 19 | Runtime | `Directory.Build.props` — no `ServerGarbageCollection` / `ConcurrentGarbageCollection` setting anywhere | Workstation GC defaults | Config knob; evaluate Server GC for headless/batch hosts and keep Workstation for interactive | Nothing | Unknown until measured; historically 1.1–1.4× on allocation-heavy batch work | Low | 0.5 d + measurement | 0 |
+| 19 | Runtime | `Directory.Build.props` sets neither; `Broiler.JavaScript.Engine.Benchmarks.csproj` **does** set `ServerGarbageCollection` | Workstation GC defaults everywhere except that one benchmark project | Config knob; evaluate Server GC for headless/batch hosts | Nothing | **Measured: Server GC is 1.62× SLOWER** on a 4-core headless render (see below). Keep Workstation | Low | Done | 0 |
 | 20 | Tooling | [`Broiler.Cli`](../../src/Broiler.Cli) — capture, document convert, layout fuzz | Sequential per input | Per-file / per-page parallelism | Nothing | Near-linear in file count | Low | 2–3 d | 1 |
 | 21 | Tests | [`Broiler.JavaScript.BuiltIns.Tests/AssemblyInfo.cs:3`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/AssemblyInfo.cs) — `DisableTestParallelization = true` | Whole assembly serialized | Re-enable once #15 lands and per-test context isolation is confirmed | Almost certainly disabled *because* of #15 | Test-suite wall time | Low | 1–2 d | 3 |
 | 22 | Input | [`Broiler.Input.*`](../../Broiler.Input) — Linux keyboard `Task.Run`, Windows camera `new Thread`, `lock (_gate)` throughout | **Already correctly threaded** | — | — | None available | — | — | — |
@@ -91,61 +192,152 @@ non-deterministic correctness defect.
 
 These gate everything below them and are not optional.
 
-### P0-a — A stage-level benchmark suite
+### P0-a — A stage-level benchmark suite — **DONE**
 
-**Current evidence:** no benchmark covers cascade, layout, raster, or decode.
-Every number in the table above is an estimate.
+**Current evidence:**
+[`tests/render-stages/Broiler.Render.Stage.Benchmarks`](../../tests/render-stages/Broiler.Render.Stage.Benchmarks/),
+in `Broiler.Benchmarks.slnx`. All five harnesses the item asked for: cascade +
+computed style (`CascadeBenchmarks`, plus `RuleScalingBenchmarks` for the
+rule-count axis), `PerformLayout`, display-list raster at 1280×1024, PNG/JPEG
+decode, and end-to-end headless render — over a five-page corpus generated
+deterministically in code, so the profile reproduces on a bare checkout with no
+WPT checkout and no fixture files.
 
-**Next action:** add BenchmarkDotNet harnesses under `Broiler.Benchmarks.slnx`
-for (1) cascade + computed style over a representative DOM, (2) `PerformLayout`
-over the same, (3) display-list raster at 1280×1024, (4) PNG/JPEG decode, (5)
-end-to-end headless render of a fixed page set. Report per-stage share of wall
-time.
+**Exit gate — met.** One command:
 
-**Exit gate:** a published profile that attributes ≥90% of headless-render wall
-time to named stages, reproducible from one command.
+```sh
+dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- \
+    --profile --iterations 15 --warmup 5 --json results/stage-profile.json
+```
 
-### P0-b — Single-threaded determinism first (item #15)
+It attributes **96.3–100.0%** of wall time to named stages, worst page `text` at
+96.3%, and **exits 1 if any page falls below 90%** — so the gate is checked by the
+command that produces the evidence. Published output:
+[`tests/render-stages/results/stage-profile.md`](../../tests/render-stages/results/stage-profile.md).
 
-**Current evidence:** `JSPromise.Post` falls back to
-`ThreadPool.QueueUserWorkItem` when no `SynchronizationContext` is installed.
-The comment block at
-[`CssStyleEngine.cs:26–37`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs)
-records the consequence: "JS continuations dispatched on ThreadPool threads run
-that computed-style/geometry work concurrently with the main-thread layout pass
-— a plain Dictionary/List corrupts under that race and aborts the process".
+Two method points, both documented at length in `StageProfile.cs`. The stage
+boundaries are the public pipeline (`HtmlRender.RenderToImageCore` is four public
+calls in a row) rather than instrumentation added to the engine, so the profiler
+cannot drift from the real path. And the residual is a reported row rather than
+absorbed: a profile whose total was the sum of its parts would pass its own gate by
+construction.
 
-**Next action:** install a single-threaded pump for every embedding (the
-`AsyncPump` machinery already exists in
-`Broiler.JavaScript.Runtime/AsyncPump.cs`) and make the `sc == null` fallback an
-error rather than a thread-pool dispatch. Then re-measure whether the CSS engine
-still needs `_sync` at all.
+**Not covered, and named as such:** the profile measures a *headless* render, which
+is the WPT/CLI/WebAssembly path. It says nothing about the Windows/Linux browsers,
+which raster on the GPU — for those the raster rows below do not apply at all.
 
-**Exit gate:** no engine callback runs on a thread other than the one that owns
-the document; the WPT suite is stable across 3 consecutive runs; the mitigation
-locks are either removed or justified by a *deliberate* threading design.
+### P0-b — Single-threaded determinism first (item #15) — **DONE**
 
-### P0-c — Shared-cache thread-safety audit
+**The item was largely already built when this document was written**, which the
+document did not know. `Broiler.JS` grew `JSMicrotaskQueue` — a per-context
+execution lock plus job queue — and `JSContext.PostJob`, a five-case dispatch rule
+that replaced the two wrong answers this section names. `JSPromise.Post` and
+`JSAsyncFunction.ToPromise` were both moved onto it. `JSMicrotaskQueue`'s remarks
+carry the measurement that motivated it: an async function called synchronously
+answered `"2,12"` instead of `"2,2"` in **0.60% of 3 000 runs**, and a detector
+before the execution lock existed saw **peak 2 concurrent executions and 172
+overlaps in 200 rounds**.
 
-**Current evidence:** unsynchronized mutable caches on paths that parallel work
-would reach — `FontsHandler._fontsCache` (nested `Dictionary`),
-`BImageRenderer._images`, the `RFont`/glyph caches. Files declaring at least one
-mutable private static, by component (a scope estimate, not a site count):
-Broiler.JS 306, `src/` 118, Broiler.HTML 67, Broiler.UI 56, Broiler.Documents
-46, Broiler.CSS 38, Broiler.Graphics 37, Broiler.Layout 34.
+**What was left, and is now closed.** `JSGenerator.AwaitThenable` — the third site
+this document names — was the one still deciding for itself: prefer whatever
+`SynchronizationContext` happened to be current, else `ThreadPool.QueueUserWorkItem`.
+Resuming an async generator runs the rest of its body, so that let a second thread
+into the context. Routed through `JSContext.PostJob`:
+`patches/0122-js-async-generator-await-dispatch.patch` (the `Broiler.JS` remote is
+outside this session's GitHub scope, so it is a patch rather than a pointer bump).
 
-Some ambient state is *already* thread-affine and must stay that way —
-[`SvgFilterTable`](../../Broiler.Layout/Broiler.Layout/IR/SvgFilterTable.cs) and
-`DocumentModeContext` are `[ThreadStatic]`, and `CssLengthParser` keeps a
-thread-static viewport. Any worker thread that runs layout or paint must
-initialize all three or it will silently read another document's state.
+**Exit gate — met, with one qualification recorded rather than glossed.** No engine
+callback dispatches outside `PostJob`, and every path it takes either runs on the
+context's own queue or takes the execution lock. The qualification is about how that
+was *tested*: the obvious regression test — drive the racy dispatch and watch
+`JSContext.ExecutionConcurrency` — **passes against the unfixed engine**, because
+the counter is incremented by `EnterExecution` and the whole defect is that the
+resumption never entered the context. A counter of entries cannot observe the
+absence of one. The discriminating assertion is ordering (the resumption must run
+before the host's next statement, where the specification puts a microtask): 5 of 5
+failures pre-fix, 5 of 5 passes with it. `AsyncGeneratorExclusionTests` records both
+cases and says which is which.
 
-**Next action:** enumerate the mutable statics on the render path, classify each
-as immutable / thread-static / needs-synchronization, and record the ambient
-state a worker thread must establish before it may run layout or paint.
+**Still open, and it is the second half of this item:** whether `CssStyleEngine`
+still needs `_sync`. Not re-measured. The lock is cheap relative to what the cascade
+costs (finding 1 above), so removing it is not the win it was expected to be — but
+the *sharding* the Broiler.CSS roadmap step 2 proposes should now be judged against
+the measured cascade cost, not against lock contention.
 
-**Exit gate:** a documented list, and a debug-mode assertion that fires when a
-thread-static ambient value is read before being set on that thread.
+### P0-c — Shared-cache thread-safety audit — **DONE**
+
+**Current evidence:**
+[Shared mutable state on the render path](multithreading-static-state.md), with the
+enumeration re-derivable from `scripts/audit-mutable-statics.py`.
+
+**Exit gate — met.** The documented list is that page; the assertion is
+[`AmbientRenderState`](../../Broiler.Layout/Broiler.Layout/AmbientRenderState.cs),
+covered by `AmbientRenderStateTests` on a real second thread.
+
+**This item's own framing turned out to be wrong, and its headline example is the
+proof.** Counting files that declare a mutable private static does not size the job.
+Enumerated over the nine render-path projects there are 27 non-thread-static static
+fields, and 21 are lookup tables filled by a static initialiser and never written
+again — safe under concurrent reads. The remaining six are set-once initialisation
+latches or, in one case (`ImageAnimationClock`), deliberately process-wide.
+
+The state that actually corrupts is **instance** state on a process-wide singleton,
+which a scan for `static` fields does not see. `FontsHandler`'s four caches — this
+section's own example — are `private readonly Dictionary` *instance* fields on the
+`RAdapter` behind `CompatProvider.ImageAdapter`; `BImageRenderer._images` is the
+same shape. The audit therefore classifies **shared instance roots** separately, and
+that list is short and specific: eight roots, of which two are genuine
+unsynchronised caches on the render path.
+
+**Two residuals, both one patch each, both named in the audit document:**
+
+1. The `Viewport` ambient slot has no read-side assertion. `CssLengthParser` is in
+   `Broiler.CSS`, so instrumenting its eight thread-statics needs a patch there.
+2. **`DocumentModeContext` has a latent per-thread defect today.**
+   `CurrentQuirksMode` is written *only* by the HtmlBridge DOM path; the HTML-string
+   render path never publishes it. Single-threaded that is harmless — the default is
+   `false` and standards mode is what that path wants — but the class's claim that
+   "each parse overwrites it, so a stale `true` never leaks" holds only because one
+   thread renders one document at a time. It becomes reachable with the first pooled
+   render thread and should be fixed before item #13, not after.
+
+This is also why `AmbientRenderState.EnforceOnThisThread` is **off by default**: arming the
+assertion unconditionally would fail every render in the repository for residual 2,
+which single-threaded execution makes unreachable.
+
+### #19 — GC configuration — **DONE, negative result**
+
+25 headless renders of the corpus at 1280×1024, same binary, same allocation, GC
+mode set through `DOTNET_gcServer`:
+
+| | Workstation | Server | Server ÷ Workstation |
+|---|---:|---:|---:|
+| per render | **1 741.9 ms** | 2 829.7 ms | **1.62× slower** |
+| allocated per render | 1 970.33 MiB | 1 970.29 MiB | 1.00× |
+| gen 0 collections | 3 036 | 4 531 | 1.49× |
+| gen 1 / gen 2 | 245 / 50 | 282 / 54 | 1.15× / 1.08× |
+
+**Do not enable Server GC for headless rendering.** The roadmap's "historically
+1.1–1.4× on allocation-heavy batch work" does not hold here, and the direction is
+wrong, not just the magnitude — identical allocation with *half again* as many
+gen-0 collections.
+
+**Read with its condition:** 4 logical cores, and a render that is single-threaded
+end to end. Server GC sizes its heap per core and is designed for a process with
+several allocating threads; on few cores with one allocating thread it is a known
+pessimization, so this measures "not on a small container", not "never". The
+question becomes live again if items #3/#5/#12 land and the render allocates from
+several threads — **re-measure then**, with the same command:
+
+```sh
+DOTNET_gcServer=0|1 dotnet run -c Release \
+  --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --gc-config --rounds 5
+```
+
+**The finding under the finding is the allocation itself:** ~1.97 GiB per render,
+and `RuleScalingBenchmarks` says it scales with *total* stylesheet rules rather than
+matched ones. No GC setting fixes a 2 GiB working set per page; item #11 does.
+`Directory.Build.props` is deliberately left unchanged.
 
 ## Roadmaps per component
 
