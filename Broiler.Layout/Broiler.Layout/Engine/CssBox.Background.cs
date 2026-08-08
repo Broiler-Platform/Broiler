@@ -12,34 +12,73 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// subclasses (e.g. <see cref="CssBoxImage"/>) that replace the base
     /// measurement logic.
     /// </summary>
-    protected void LoadBackgroundImageIfNeeded()
+    protected void LoadBackgroundImageIfNeeded() => LoadBackgroundImages(deferCompletions: false);
+
+    /// <summary>
+    /// Loads the background image layers, once.
+    /// </summary>
+    /// <param name="deferCompletions">
+    /// <c>true</c> when called from the image prefetch (multithreading item #8), which runs on a worker
+    /// before the layout pass: each layer's completion is then captured rather than applied, and the
+    /// inline call below applies it from the site that would have produced it. See
+    /// <see cref="DeferredImageLoad"/> for why only the decode is safe to move.
+    /// </param>
+    private void LoadBackgroundImages(bool deferCompletions)
     {
+        // A prefetched layer's completion is applied here — the point the serial path completed at —
+        // rather than on the worker that decoded it. This runs before the initialized check because
+        // the prefetch has already set that flag.
+        if (ReleaseDeferredBackgroundLoads())
+            return;
+
         if (BackgroundImage == CssConstants.None || _backgroundImagesInitialized)
             return;
 
         _backgroundImagesInitialized = true;
         var layers = SplitBackgroundImageLayers(BackgroundImage);
-        
+
         if (layers.Count == 0)
             return;
 
         _backgroundImageLoadHandlers = new List<ILayoutImageLoader?>(layers.Count);
-        
+
         foreach (var layer in layers)
         {
             var src = TryExtractBackgroundImageUrl(layer);
-            
+
             if (string.IsNullOrEmpty(src))
             {
                 _backgroundImageLoadHandlers.Add(null);
                 continue;
             }
 
-            var imageLoadHandler = LayoutEnvironment.CreateImageLoader(OnImageLoadComplete);
-            
+            var deferred = deferCompletions ? new DeferredImageLoad(OnImageLoadComplete) : null;
+            if (deferred != null)
+                (_deferredBackgroundLoads ??= []).Add(deferred);
+
+            var imageLoadHandler = LayoutEnvironment.CreateImageLoader(
+                deferred is null ? OnImageLoadComplete : deferred.OnCompleted);
+
             _backgroundImageLoadHandlers.Add(imageLoadHandler);
             imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl);
         }
+    }
+
+    /// <summary>
+    /// Applies the completions the prefetch captured for this box's background layers, in the order it
+    /// created them, and returns whether there were any.
+    /// </summary>
+    private bool ReleaseDeferredBackgroundLoads()
+    {
+        var deferred = _deferredBackgroundLoads;
+        if (deferred is null)
+            return false;
+
+        _deferredBackgroundLoads = null;
+        foreach (var load in deferred)
+            load.Release();
+
+        return true;
     }
 
     private static List<string> SplitBackgroundImageLayers(string backgroundImage)

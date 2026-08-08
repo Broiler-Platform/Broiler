@@ -56,9 +56,9 @@ dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchma
 `--job short` is enough to separate anything that differs by more than a few percent and
 finishes in minutes; drop it for publication numbers.
 
-## Thread scaling — items #4, #6, #7
+## Thread scaling — items #4, #5, #6, #7, #8
 
-Three modes that answer "how does this stage scale with threads, and does it change a
+Four modes that answer "how does this stage scale with threads, and does it change a
 pixel". All report the second question as part of the first and **exit non-zero if any
 setting produced different bytes**, because a speedup measured without that check is not
 evidence of anything.
@@ -67,6 +67,7 @@ evidence of anything.
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --raster-scaling
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --tile-scaling
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --decode-scaling
+dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --image-prefetch-scaling
 ```
 
 `--raster-scaling` renders the whole corpus at 1, 2, 4 and *cores* raster threads, and
@@ -89,10 +90,30 @@ expected to be zero.
 photographic ramp and flat tiles, which load the entropy stages very differently) at the same
 settings.
 
-**Both interleave their settings within each iteration rather than measuring one setting at a
-time.** This container's throughput drifts by tens of percent over tens of seconds — enough
+`--image-prefetch-scaling` renders an image-heavy document at 1, 2, 4 and *cores* concurrent
+image loads (item #8) and reports the `PerformLayout` stage — where an image load runs — beside
+the whole render. **It owns its fixture rather than using the corpus, and that is not a
+shortcut:** the five corpus pages contain no images by construction, since each is built to
+load one stage, so adding one would both fold decode into another page's row and invalidate
+every number the published profile quotes. The fixture is a directory of real PNG, JPEG files
+plus the document that references them, because `SetImageFromFile` is the path that is inline
+and serial; a `data:` URI takes a different one. It follows the timings with the walk's own
+count of how many loads it issued and, when it declined a document, whether that was for naming
+too few images or for a host that loads them asynchronously — as with the tile driver's two
+refusal counts, those call for opposite next steps.
+
+Its last column is the full concurrent-load budget with the *within*-image decode budget divided
+across the loads in flight — the correction that `N` loads × `N` bands on `N` cores obviously
+calls for. Over four runs it has no consistent sign (three favour it by 1–8%, one penalises it by
+9%), and it is kept as a column so that null result stays re-runnable rather than remembered.
+
+**All of them interleave their settings within each iteration rather than measuring one setting
+at a time.** This container's throughput drifts by tens of percent over tens of seconds — enough
 that the same untouched decode measured in two consecutive processes differs by more than the
 effect being measured. Blocked measurement cannot tell a speedup from the box getting faster.
+The divided column above is the cautionary example: measured in its own block it read 1.10×
+faster than the undivided one on one run and 1.17× *slower* on the next, and only interleaving
+it showed that the true answer is neither.
 
 The budgets are also settable directly, which is what a caller running several renders at once
 should do (see the multithreading roadmap, "two kinds of parallelism now multiply"):
@@ -104,11 +125,17 @@ should do (see the multithreading roadmap, "two kinds of parallelism now multipl
 | `BROILER_RASTER_MIN_BAND` | Pixels one band must be worth |
 | `BROILER_RASTER_TILES` | Tiles one display-list replay may be split into (item #5) |
 | `BROILER_RASTER_MIN_TILE_ROWS` | Rows a tile must be worth before the surface is split further |
-| `BROILER_IMAGE_DECODE_THREADS` | Threads one decode pass may use |
+| `BROILER_IMAGE_DECODE_THREADS` | Threads one decode pass may use (items #6, #7) |
+| `BROILER_IMAGE_PREFETCH_THREADS` | Image loads a document may have in flight at once (item #8) |
 
 The two raster budgets do not compound: a tile view runs its scanline bands inline, so a render
 spends whichever of the two it is using and never both. A host dividing cores between processes
 should give each the same figure rather than a share of it.
+
+The two *decode* budgets do compound — a concurrent image load decodes through the band
+partitioner — but dividing them measured as nothing (see above), so they are also given the same
+figure. `BROILER_IMAGE_PREFETCH_THREADS=1` turns the walk off entirely rather than running it one
+wide, which is what makes it the sequential path the exit gate compares against.
 
 ## GC configuration — item #19
 

@@ -10,6 +10,13 @@ internal sealed class CssBoxImage : CssBox
     private ILayoutImageLoader _imageLoadHandler;
     private bool _imageLoadingComplete;
 
+    /// <summary>
+    /// This box's replaced-content completion, captured by the image prefetch (multithreading item #8)
+    /// on the worker that decoded it and waiting for the layout thread to reach the point that would
+    /// have run it. Null whenever the prefetch did not claim this box, which is always when it is off.
+    /// </summary>
+    private DeferredImageLoad? _deferredContentLoad;
+
     public CssBoxImage(CssBox parent, HtmlTag tag, Uri baseUrl) : base(parent, tag, baseUrl)
     {
         _imageWord = new CssRectImage(this);
@@ -27,28 +34,74 @@ internal sealed class CssBoxImage : CssBox
             // CssBoxImage overrides MeasureWordsSize entirely, so the base
             // class's background-image loading code would otherwise be skipped.
             LoadBackgroundImageIfNeeded();
-
-            if (_imageLoadHandler == null && (LayoutEnvironment.AvoidAsyncImagesLoading || LayoutEnvironment.AvoidImagesLateLoading))
-            {
-                _imageLoadHandler = LayoutEnvironment.CreateImageLoader(OnLoadImageComplete);
-
-                if (Content != null && Content != CssConstants.Normal)
-                    _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes, BaseUrl);
-                else
-                {
-                    var src = GetAttribute("src");
-                    // <object data="..."> fallback: use 'data' attribute when 'src' is absent
-                    if (string.IsNullOrEmpty(src))
-                        src = GetAttribute("data");
-                    _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl);
-                }
-            }
+            LoadContentImageIfNeeded();
 
             MeasureWordSpacing(g);
             _wordsSizeMeasured = true;
         }
 
         CssLayoutEngine.MeasureImageSize(g, _imageWord);
+    }
+
+    /// <summary>
+    /// Creates this box's image loader and starts the load, once. Extracted from
+    /// <see cref="MeasureWordsSize"/> so the image prefetch (multithreading item #8) starts the load
+    /// by calling the same code rather than a copy of it — the <c>_imageLoadHandler != null</c> guard
+    /// is then what makes the later inline call a no-op, and the two cannot drift apart.
+    /// </summary>
+    /// <param name="deferCompletion">
+    /// <c>true</c> when called from the prefetch worker: the completion is captured rather than applied,
+    /// and the inline call applies it. It is the completion, not the decode, that a box's layout can
+    /// observe the timing of — see <see cref="DeferredImageLoad"/>.
+    /// </param>
+    private void LoadContentImageIfNeeded(bool deferCompletion = false)
+    {
+        // A prefetched load's completion is applied here, which is where the serial path applied it.
+        if (_deferredContentLoad is { } deferredLoad)
+        {
+            _deferredContentLoad = null;
+            deferredLoad.Release();
+            return;
+        }
+
+        if (_imageLoadHandler != null
+            || !(LayoutEnvironment.AvoidAsyncImagesLoading || LayoutEnvironment.AvoidImagesLateLoading))
+        {
+            return;
+        }
+
+        var deferred = deferCompletion ? new DeferredImageLoad(OnLoadImageComplete) : null;
+        _deferredContentLoad = deferred;
+        _imageLoadHandler = LayoutEnvironment.CreateImageLoader(
+            deferred is null ? OnLoadImageComplete : deferred.OnCompleted);
+
+        if (Content != null && Content != CssConstants.Normal)
+        {
+            _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes, BaseUrl);
+            return;
+        }
+
+        var src = GetAttribute("src");
+        // <object data="..."> fallback: use 'data' attribute when 'src' is absent
+        if (string.IsNullOrEmpty(src))
+            src = GetAttribute("data");
+        _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The replaced content is a load of its own, in addition to any background image, and it is the
+    /// one that decides a replaced box's intrinsic size — so an <c>&lt;img&gt;</c> with no background
+    /// is still worth claiming.
+    /// </remarks>
+    internal override bool HasPendingImageLoad =>
+        base.HasPendingImageLoad || _imageLoadHandler == null;
+
+    /// <inheritdoc/>
+    internal override void LoadImagesForPrefetch(ILayoutEnvironment g)
+    {
+        base.LoadImagesForPrefetch(g);
+        LoadContentImageIfNeeded(deferCompletion: true);
     }
 
     public override void Dispose()

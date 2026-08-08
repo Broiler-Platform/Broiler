@@ -108,6 +108,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     private List<ILayoutImageLoader?>? _backgroundImageLoadHandlers;
     private bool _backgroundImagesInitialized;
 
+    /// <summary>
+    /// Background-layer completions the image prefetch (multithreading item #8) captured on a worker,
+    /// waiting to be applied on the layout thread. Null on every box the prefetch did not claim, which
+    /// is every box when the prefetch is off.
+    /// </summary>
+    private List<DeferredImageLoad>? _deferredBackgroundLoads;
+
     internal Dictionary<string, string> CustomProperties { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     internal void SetCustomProperty(string propertyName, string value)
@@ -348,6 +355,15 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         try
         {
+            // Multithreading item #8: a document's images are loaded and decoded one at a time,
+            // inline, at whichever MeasureWordsSize first reaches each of them. Issue them all here
+            // instead, concurrently, and join before any measurement happens — so the pass below
+            // finds every image already loaded and does exactly what it did before. At the root
+            // only: a nested layout (a table cell re-measuring, a subdocument) shares this
+            // document's boxes, and re-walking them would find nothing pending but pay for the walk.
+            if (ParentBox == null)
+                PrefetchDocumentImages(this, g);
+
             // PROTOTYPE (BROILER_VERTICAL_FLOW): a vertical-writing-mode rotation
             // root lays its whole subtree out in a logical (horizontal) frame.
             // While that frame layout runs, a transposed box's physical

@@ -41,6 +41,11 @@ public static class Program
             return TileScaling.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
         }
 
+        if (args.Length >= 1 && args[0] == "--image-prefetch-scaling")
+        {
+            return ImagePrefetchScaling.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
+        }
+
         if (args.Length >= 1 && args[0] == "--gc-config")
         {
             GcConfigurationMetrics.Run(ArgValue(args, "--rounds", 20));
@@ -76,6 +81,10 @@ public static class Program
         Console.WriteLine("  --tile-scaling [--iterations N] [--warmup N]");
         Console.WriteLine("        Corpus render time against the raster tile budget (item #5).");
         Console.WriteLine("        Exits 1 if any tile setting renders different pixels.");
+        Console.WriteLine();
+        Console.WriteLine("  --image-prefetch-scaling [--iterations N] [--warmup N]");
+        Console.WriteLine("        Render time of an image-heavy page against the concurrent-load budget (item #8).");
+        Console.WriteLine("        Exits 1 if any setting renders different pixels.");
         Console.WriteLine();
         Console.WriteLine("  --gc-config [--rounds N]");
         Console.WriteLine("        Throughput and GC counters for the process's GC mode (item #19).");

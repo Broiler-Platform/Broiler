@@ -39,6 +39,14 @@ namespace Broiler.Media.Image.Managed;
 /// Setting it to <c>1</c> is the sequential path — not an approximation of it, the same code with
 /// one band.
 /// </para>
+/// <para>
+/// <b>It stays internal, and item #8 is the reason that is worth saying.</b> Layout now issues a
+/// document's image loads concurrently, so <em>N</em> loads each splitting their own decode into
+/// <em>N</em> bands is <em>N²</em> runnable threads on <em>N</em> cores — an obvious candidate for a
+/// host-side division of this budget. It was built and measured, and dividing was worth nothing
+/// either way (see <c>ImagePrefetch</c>) — so the seam that would have exposed this type to the hosts
+/// was removed again and the environment variable is still the only way a host configures it.
+/// </para>
 /// </remarks>
 internal static class ImageDecodeParallelism
 {
