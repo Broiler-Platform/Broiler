@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 20269,
+    "failed": 20271,
     "skipped": 0,
-    "total": 20269
+    "total": 20271
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 14493,
+      "count": 14494,
       "examples": [
         "accname/name/comp_tooltip.html",
         "appmanifest/icons-member/icons-member-cors-fail-manual.sub.html",
@@ -51,7 +51,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 1000,
+      "count": 1001,
       "examples": [
         "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
         "css/compositing/mix-blend-mode/mix-blend-mode-parent-with-text.html",
@@ -65,9 +65,9 @@
       "subCategory": null,
       "count": 73,
       "examples": [
-        "conformance-checkers/html/elements/table/integrity/Alexis_of_Russia-novalid.html",
         "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
-        "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html"
+        "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html",
+        "css/CSS2/cascade-import/cascade-import-005.xht"
       ]
     },
     {
@@ -128,7 +128,7 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      19851
+      19853
     ],
     [
       "Timeout",
@@ -6140,14 +6140,14 @@
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Alexis_of_Russia-novalid.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Feodor_I_of_Russia-novalid.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "category": "Timeout"
     },
     {
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Naser_al-Din_Shah_Qajar-novalid.html",
@@ -98284,7 +98284,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-view-transitions/auto-name.html",
@@ -109288,6 +109288,13 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
+    },
+    {
+      "relativeTestPath": "css/selectors/user-invalid-form-submission-invalidation.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/selectors/user-invalid.html",
@@ -137901,6 +137908,13 @@
     },
     {
       "relativeTestPath": "quirks/html-fills-viewport-quirk-vertical.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "quirks/html-fills-viewport-quirk.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
