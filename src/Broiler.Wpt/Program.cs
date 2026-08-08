@@ -49,6 +49,17 @@ public class Program
     private const double DefaultPassThresholdPercent = WptTestRunner.DefaultPassThresholdPercent;
     private const string PassThresholdEnvironmentVariable = "BROILER_WPT_PASS_THRESHOLD";
 
+    /// <summary>
+    /// Memory budgeted per parallel worker process when the pool size is chosen
+    /// automatically. A worker is allowed <see cref="DefaultRunTestMemoryLimitMegabytes"/>
+    /// of resident-set growth per test and is recycled once it reaches that cap, so
+    /// <em>N</em> workers can legitimately need <em>N</em> GiB plus baseline. The extra
+    /// half-gigabyte per worker is that baseline (runtime, fonts, the WPT manifest).
+    /// The pool is therefore sized by memory as well as by cores — a 16-core machine
+    /// with 4 GiB free runs 2 workers, not 16.
+    /// </summary>
+    internal const long WorkerMemoryBudgetBytes = 1536L * 1024 * 1024;
+
     private const int ProgressCheckpointInterval = 25;
     private const int TopBucketLimit = 5;
     private const int MissingContentDominantBucketMinimumFailures = 5;
@@ -100,6 +111,7 @@ public class Program
         bool verifyReference = false;
         bool workerMode = false;
         bool noWorkerIsolation = false;
+        int? requestedWorkerCount = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -110,6 +122,14 @@ public class Program
                     break;
                 case "--no-worker-isolation":
                     noWorkerIsolation = true;
+                    break;
+                case "--workers" when i + 1 < args.Length:
+                    if (!TryParseWorkerCount(args[++i], out requestedWorkerCount))
+                    {
+                        Console.Error.WriteLine("Error: '--workers' must be a positive integer or 'auto'.");
+                        return 1;
+                    }
+
                     break;
                 case "--wpt-dir" when i + 1 < args.Length:
                     wptPath = args[++i];
@@ -216,6 +236,7 @@ public class Program
                 case "--pass-threshold":
                 case "--shard-count":
                 case "--shard-index":
+                case "--workers":
                     Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
                     PrintUsage();
                     return 1;
@@ -305,6 +326,13 @@ public class Program
             useWorkerIsolation
                 ? "Isolation     : worker process (timed-out tests are killed)"
                 : "Isolation     : in-process");
+
+        var workerPoolSize = ResolveWorkerCount(
+            requestedWorkerCount,
+            useWorkerIsolation,
+            Environment.ProcessorCount,
+            GetAvailableMemoryBytes());
+        Console.WriteLine($"Workers       : {DescribeWorkerPool(workerPoolSize, requestedWorkerCount, useWorkerIsolation)}");
         Console.WriteLine(
             runTestMemoryLimitBytes > 0
                 ? $"Memory limit  : {WptMemoryGuard.FormatMebibytes(runTestMemoryLimitBytes)} of growth per test" +
@@ -394,9 +422,6 @@ public class Program
         if (totalTests > 0)
             Console.WriteLine("--- Progress ---");
 
-        // Collect all results first so they can still be sorted by percent
-        // match before writing the final summary/log output.
-        var allResults = new List<WptTestResult>(totalTests);
         var progressStopwatch = Stopwatch.StartNew();
         var runProgress = new WptRunProgress(totalTests);
         var terminationDiagnostics = new TerminationDiagnosticWriter(runProgress);
@@ -408,58 +433,28 @@ public class Program
             PosixSignal.SIGINT,
             "SIGINT",
             terminationDiagnostics.Write);
-        using var workerClient = useWorkerIsolation
-            ? new WptWorkerClient(
-                wptPath,
-                referenceDir,
-                failureImagesDir,
-                verifyReference,
-                runTestMemoryLimitBytes,
-                runPassThresholdPercent,
-                referenceTestsOnly)
-            : null;
-        int completed = 0, runningPassed = 0, runningFailed = 0, runningSkipped = 0;
 
-        foreach (var testPath in discoveredTests)
-        {
-            var displayPath = Path.GetRelativePath(wptPath, testPath).Replace('\\', '/');
-            runProgress.StartTest(testPath, displayPath, completed + 1);
-            Console.WriteLine($"[RUN ] ({completed + 1}/{totalTests}) {displayPath}");
-
-            var result = workerClient is not null
-                ? RunTestWithWorkerTimeout(
-                    workerClient,
-                    testPath,
-                    runTestTimeout,
-                    runProgress.SetWorkerProcessId)
-                : RunTestWithTimeout(
-                    runner,
-                    testPath,
-                    referenceDir,
-                    wptPath,
-                    runTestTimeout,
-                    runProgress.SetWorkerThreadId,
-                    runTestMemoryLimitBytes);
-            allResults.Add(result);
-            completed++;
-
-            if (result.Passed)
-                runningPassed++;
-            else if (result.Skipped)
-                runningSkipped++;
-            else
-                runningFailed++;
-
-            runProgress.CompleteTest(completed, runningPassed, runningFailed, runningSkipped);
-
-            if (completed == totalTests || completed % ProgressCheckpointInterval == 0)
-            {
-                Console.WriteLine(
-                    $"[INFO] Completed {completed}/{totalTests} tests " +
-                    $"({runningPassed} passed, {runningFailed} failed, {runningSkipped} skipped) " +
-                    $"after {progressStopwatch.Elapsed:hh\\:mm\\:ss}");
-            }
-        }
+        // Collect all results first so they can still be sorted by percent
+        // match before writing the final summary/log output. Results are stored
+        // by discovery index rather than by completion order, so the list a
+        // parallel run hands to the reporting below is the same list — in the
+        // same order — a sequential run would have produced.
+        var allResults = RunDiscoveredTests(
+            discoveredTests,
+            new TestQueueOptions(
+                WptPath: wptPath,
+                ReferenceDir: referenceDir,
+                FailureImagesDir: failureImagesDir,
+                VerifyReference: verifyReference,
+                MemoryLimitBytes: runTestMemoryLimitBytes,
+                PassThresholdPercent: runPassThresholdPercent,
+                ReferenceTestsOnly: referenceTestsOnly,
+                Timeout: runTestTimeout,
+                WorkerCount: workerPoolSize,
+                UseWorkerIsolation: useWorkerIsolation),
+            runner,
+            runProgress,
+            progressStopwatch);
 
         var skippedResults = allResults.Where(r => r.Skipped).ToList();
 
@@ -671,6 +666,263 @@ public class Program
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// Everything a queue slot needs to decide a test, gathered so the pool below can be
+    /// read without threading a dozen parameters through it.
+    /// </summary>
+    internal sealed record TestQueueOptions(
+        string WptPath,
+        string ReferenceDir,
+        string? FailureImagesDir,
+        bool VerifyReference,
+        long MemoryLimitBytes,
+        double PassThresholdPercent,
+        bool ReferenceTestsOnly,
+        TimeSpan Timeout,
+        int WorkerCount,
+        bool UseWorkerIsolation);
+
+    /// <summary>
+    /// Drains <paramref name="discoveredTests"/> through a pool of
+    /// <see cref="TestQueueOptions.WorkerCount"/> worker processes, each slot claiming the
+    /// next unstarted index and owning its own <see cref="WptWorkerClient"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Two properties make this safe to parallelize at all, and both are properties of the
+    /// existing design rather than anything added here: a worker process is a whole second
+    /// copy of the engine, so no engine state is shared between slots; and results were
+    /// already buffered and re-sorted before reporting, so completion order was never
+    /// load-bearing.
+    /// </para>
+    /// <para>
+    /// Results are written into a slot of the returned list keyed by discovery index, so the
+    /// order the reporting code sees is discovery order at any pool size — a one-worker run
+    /// is byte-identical to the sequential runner this replaced, and an <em>N</em>-worker run
+    /// produces the same pass/fail/skip classification in the same sequence.
+    /// </para>
+    /// <para>
+    /// The <c>[RUN ]</c> ordinal is the test's discovery index, not a completion counter:
+    /// with several tests in flight a counter would name a different test in each line's
+    /// numbering. The <c>[INFO]</c> checkpoint still counts completions.
+    /// </para>
+    /// </remarks>
+    internal static IReadOnlyList<WptTestResult> RunDiscoveredTests(
+        IReadOnlyList<string> discoveredTests,
+        TestQueueOptions options,
+        WptTestRunner runner,
+        WptRunProgress runProgress,
+        Stopwatch progressStopwatch)
+    {
+        int totalTests = discoveredTests.Count;
+        var results = new WptTestResult[totalTests];
+        if (totalTests == 0)
+            return results;
+
+        int nextIndex = -1;
+        int completed = 0, runningPassed = 0, runningFailed = 0, runningSkipped = 0;
+        var counterSync = new object();
+
+        void RunSlot(int slot)
+        {
+            // Each slot owns its worker process for the whole run: it is recycled on
+            // timeout/memory-limit exactly as before, but never shared, so one slot killing
+            // its worker cannot abort a test another slot is midway through.
+            using var workerClient = options.UseWorkerIsolation
+                ? new WptWorkerClient(
+                    options.WptPath,
+                    options.ReferenceDir,
+                    options.FailureImagesDir,
+                    options.VerifyReference,
+                    options.MemoryLimitBytes,
+                    options.PassThresholdPercent,
+                    options.ReferenceTestsOnly)
+                : null;
+
+            while (true)
+            {
+                int index = Interlocked.Increment(ref nextIndex);
+                if (index >= totalTests)
+                    return;
+
+                var testPath = discoveredTests[index];
+                var displayPath = Path.GetRelativePath(options.WptPath, testPath).Replace('\\', '/');
+                runProgress.StartTest(slot, testPath, displayPath, index + 1);
+                Console.WriteLine($"[RUN ] ({index + 1}/{totalTests}) {displayPath}");
+
+                var result = workerClient is not null
+                    ? RunTestWithWorkerTimeout(
+                        workerClient,
+                        testPath,
+                        options.Timeout,
+                        processId => runProgress.SetWorkerProcessId(slot, processId))
+                    : RunTestWithTimeout(
+                        runner,
+                        testPath,
+                        options.ReferenceDir,
+                        options.WptPath,
+                        options.Timeout,
+                        threadId => runProgress.SetWorkerThreadId(slot, threadId),
+                        options.MemoryLimitBytes);
+                results[index] = result;
+
+                lock (counterSync)
+                {
+                    completed++;
+                    if (result.Passed)
+                        runningPassed++;
+                    else if (result.Skipped)
+                        runningSkipped++;
+                    else
+                        runningFailed++;
+
+                    runProgress.CompleteTest(slot, completed, runningPassed, runningFailed, runningSkipped);
+
+                    if (completed == totalTests || completed % ProgressCheckpointInterval == 0)
+                    {
+                        Console.WriteLine(
+                            $"[INFO] Completed {completed}/{totalTests} tests " +
+                            $"({runningPassed} passed, {runningFailed} failed, {runningSkipped} skipped) " +
+                            $"after {progressStopwatch.Elapsed:hh\\:mm\\:ss}");
+                    }
+                }
+            }
+        }
+
+        int slotCount = Math.Clamp(options.WorkerCount, 1, totalTests);
+        if (slotCount == 1)
+        {
+            // Run on the calling thread when there is one slot: the sequential path stays
+            // exactly as reproducible as it was, with no task scheduling in between.
+            RunSlot(0);
+            return results;
+        }
+
+        var slots = new Task[slotCount];
+        for (int slot = 0; slot < slotCount; slot++)
+        {
+            int capturedSlot = slot;
+            slots[slot] = Task.Run(() => RunSlot(capturedSlot));
+        }
+
+        Task.WaitAll(slots);
+        return results;
+    }
+
+    /// <summary>
+    /// Resolves the worker-pool size. An explicit <c>--workers N</c> wins; otherwise the pool
+    /// is <c>min(cores, availableMemory / 1.5 GiB)</c>, because a worker's ceiling is RAM, not
+    /// CPU (see <see cref="WorkerMemoryBudgetBytes"/>). In-process mode is always one slot: the
+    /// engine is single-threaded by design (multithreading roadmap item #15) and running two
+    /// documents in one process would race the shared render state the P0-c audit enumerates.
+    /// </summary>
+    internal static int ResolveWorkerCount(
+        int? requested,
+        bool useWorkerIsolation,
+        int processorCount,
+        long availableMemoryBytes)
+    {
+        if (!useWorkerIsolation)
+            return 1;
+
+        if (requested is { } explicitCount)
+            return Math.Max(1, explicitCount);
+
+        int byCores = Math.Max(1, processorCount);
+        if (availableMemoryBytes <= 0)
+            return 1;
+
+        long byMemory = availableMemoryBytes / WorkerMemoryBudgetBytes;
+        return (int)Math.Clamp(byMemory, 1, byCores);
+    }
+
+    private static string DescribeWorkerPool(int workerCount, int? requested, bool useWorkerIsolation)
+    {
+        if (!useWorkerIsolation)
+            return "1 (in-process mode renders one document at a time)";
+
+        var sizing = requested.HasValue
+            ? "explicit (--workers)"
+            : $"auto: min({Environment.ProcessorCount} core(s), " +
+              $"{WptMemoryGuard.FormatMebibytes(GetAvailableMemoryBytes())} available / " +
+              $"{WptMemoryGuard.FormatMebibytes(WorkerMemoryBudgetBytes)} per worker)";
+
+        return $"{workerCount} worker process(es) — {sizing}";
+    }
+
+    /// <summary>
+    /// Memory the pool may plan around. Both sources are consulted and the smaller wins:
+    /// <c>/proc/meminfo</c>'s <c>MemAvailable</c> knows what other processes on the machine are
+    /// already using but reports the host's memory inside a container, while the GC's figure
+    /// honours the cgroup limit but not the machine's current load. Returns 0 when neither is
+    /// readable, which <see cref="ResolveWorkerCount"/> treats as "do not parallelize".
+    /// </summary>
+    internal static long GetAvailableMemoryBytes()
+    {
+        long available = 0;
+
+        try
+        {
+            long totalAvailable = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+            if (totalAvailable > 0)
+                available = totalAvailable;
+        }
+        catch (PlatformNotSupportedException)
+        {
+            // Fall through to the /proc reading below.
+        }
+
+        if (TryReadLinuxMemAvailableBytes(out long memAvailable))
+            available = available > 0 ? Math.Min(available, memAvailable) : memAvailable;
+
+        return available;
+    }
+
+    private static bool TryReadLinuxMemAvailableBytes(out long bytes)
+    {
+        bytes = 0;
+        if (!OperatingSystem.IsLinux())
+            return false;
+
+        try
+        {
+            foreach (var line in File.ReadLines("/proc/meminfo"))
+            {
+                if (!line.StartsWith("MemAvailable:", StringComparison.Ordinal))
+                    continue;
+
+                var fields = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (fields.Length >= 2 &&
+                    long.TryParse(fields[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out long kibibytes))
+                {
+                    bytes = kibibytes * 1024;
+                    return bytes > 0;
+                }
+
+                return false;
+            }
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+        {
+            return false;
+        }
+
+        return false;
+    }
+
+    internal static bool TryParseWorkerCount(string value, out int? workerCount)
+    {
+        workerCount = null;
+        if (string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) || parsed < 1)
+            return false;
+
+        workerCount = parsed;
+        return true;
     }
 
     private static WptTestResult RunTestWithWorkerTimeout(
@@ -1412,57 +1664,55 @@ public class Program
         };
     }
 
-    private sealed class WptRunProgress
+    /// <summary>
+    /// Run-wide progress, tracking one in-flight test per pool slot. A SIGTERM during a
+    /// parallel run has to name <em>every</em> test that was running, not just one — with N
+    /// workers the test that hung is as likely to be in another slot as in the one the
+    /// snapshot happens to report first.
+    /// </summary>
+    internal sealed class WptRunProgress
     {
         private readonly object _sync = new();
         private readonly Stopwatch _runStopwatch = Stopwatch.StartNew();
         private readonly int _totalTests;
-        private Stopwatch? _currentTestStopwatch;
+        private readonly Dictionary<int, SlotState> _inFlight = [];
         private int _completed;
         private int _passed;
         private int _failed;
         private int _skipped;
-        private int? _currentOrdinal;
-        private int _workerThreadId = -1;
-        private int? _workerProcessId;
-        private string? _currentDisplayPath;
-        private string? _currentTestPath;
 
         internal WptRunProgress(int totalTests)
         {
             _totalTests = totalTests;
         }
 
-        internal void StartTest(string testPath, string displayPath, int ordinal)
+        internal void StartTest(int slot, string testPath, string displayPath, int ordinal)
         {
             lock (_sync)
             {
-                _currentTestPath = testPath;
-                _currentDisplayPath = displayPath;
-                _currentOrdinal = ordinal;
-                _workerThreadId = -1;
-                _workerProcessId = null;
-                _currentTestStopwatch = Stopwatch.StartNew();
+                _inFlight[slot] = new SlotState(testPath, displayPath, ordinal);
             }
         }
 
-        internal void SetWorkerThreadId(int workerThreadId)
+        internal void SetWorkerThreadId(int slot, int workerThreadId)
         {
             lock (_sync)
             {
-                _workerThreadId = workerThreadId;
+                if (_inFlight.TryGetValue(slot, out var state))
+                    state.WorkerThreadId = workerThreadId;
             }
         }
 
-        internal void SetWorkerProcessId(int workerProcessId)
+        internal void SetWorkerProcessId(int slot, int workerProcessId)
         {
             lock (_sync)
             {
-                _workerProcessId = workerProcessId;
+                if (_inFlight.TryGetValue(slot, out var state))
+                    state.WorkerProcessId = workerProcessId;
             }
         }
 
-        internal void CompleteTest(int completed, int passed, int failed, int skipped)
+        internal void CompleteTest(int slot, int completed, int passed, int failed, int skipped)
         {
             lock (_sync)
             {
@@ -1470,12 +1720,7 @@ public class Program
                 _passed = passed;
                 _failed = failed;
                 _skipped = skipped;
-                _currentTestPath = null;
-                _currentDisplayPath = null;
-                _currentOrdinal = null;
-                _workerThreadId = -1;
-                _workerProcessId = null;
-                _currentTestStopwatch = null;
+                _inFlight.Remove(slot);
             }
         }
 
@@ -1483,20 +1728,46 @@ public class Program
         {
             lock (_sync)
             {
+                // Ordered by slot so a snapshot of the same set of in-flight tests always
+                // reads the same way; the first is reported as "current" so the
+                // single-worker diagnostic is unchanged.
+                var inFlight = _inFlight
+                    .OrderBy(entry => entry.Key)
+                    .Select(entry => entry.Value.ToRecord())
+                    .ToList();
+                var current = inFlight.Count > 0 ? inFlight[0] : (WptInFlightTest?)null;
+
                 return new WptRunProgressSnapshot(
                     _completed,
                     _totalTests,
                     _passed,
                     _failed,
                     _skipped,
-                    _currentOrdinal,
-                    _currentDisplayPath,
-                    _currentTestPath,
+                    current?.Ordinal,
+                    current?.DisplayPath,
+                    current?.TestPath,
                     _runStopwatch.Elapsed,
-                    _currentTestStopwatch?.Elapsed,
-                    _workerThreadId,
-                    _workerProcessId);
+                    current?.Elapsed,
+                    current?.WorkerThreadId ?? -1,
+                    current?.WorkerProcessId,
+                    inFlight);
             }
+        }
+
+        private sealed class SlotState(string testPath, string displayPath, int ordinal)
+        {
+            private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
+
+            internal int WorkerThreadId { get; set; } = -1;
+            internal int? WorkerProcessId { get; set; }
+
+            internal WptInFlightTest ToRecord() => new(
+                ordinal,
+                displayPath,
+                testPath,
+                _stopwatch.Elapsed,
+                WorkerThreadId,
+                WorkerProcessId);
         }
     }
 
@@ -1520,6 +1791,21 @@ public class Program
         }
     }
 
+    /// <summary>One test a pool slot had in flight when the snapshot was taken.</summary>
+    internal readonly record struct WptInFlightTest(
+        int Ordinal,
+        string DisplayPath,
+        string TestPath,
+        TimeSpan Elapsed,
+        int WorkerThreadId,
+        int? WorkerProcessId);
+
+    /// <summary>
+    /// The <c>Current*</c> members describe the first in-flight test — the whole story for a
+    /// one-worker run. <see cref="InFlight"/> carries all of them, which is what a parallel run
+    /// needs; it defaults to null so a snapshot can still be constructed from the
+    /// single-test fields alone.
+    /// </summary>
     internal readonly record struct WptRunProgressSnapshot(
         int Completed,
         int TotalTests,
@@ -1532,7 +1818,8 @@ public class Program
         TimeSpan RunElapsed,
         TimeSpan? CurrentTestElapsed,
         int WorkerThreadId,
-        int? WorkerProcessId);
+        int? WorkerProcessId,
+        IReadOnlyList<WptInFlightTest>? InFlight = null);
 
     internal static string CreateTerminationDiagnostics(
         string reason,
@@ -1570,6 +1857,23 @@ public class Program
         else
         {
             diagnostics.AppendLine("Current test: none");
+        }
+
+        // With a worker pool the "current" test above is one of several, and the one that
+        // hung is as likely to be any of the others — so list every slot that was busy.
+        if (snapshot.InFlight is { Count: > 1 } inFlight)
+        {
+            diagnostics.AppendLine();
+            diagnostics.AppendLine($"In-flight tests: {inFlight.Count}");
+            foreach (var test in inFlight)
+            {
+                var processTag = test.WorkerProcessId.HasValue
+                    ? $"pid {test.WorkerProcessId.Value}"
+                    : "pid unknown";
+                diagnostics.AppendLine(
+                    $"  ({test.Ordinal}/{snapshot.TotalTests}) {test.DisplayPath} " +
+                    $"[{processTag}, elapsed {FormatDuration(test.Elapsed)}]");
+            }
         }
 
         return diagnostics
@@ -1636,7 +1940,7 @@ public class Program
     /// analytics and automated triage.
     /// </summary>
     private static void WriteJsonReport(
-        List<WptTestResult> allResults,
+        IReadOnlyList<WptTestResult> allResults,
         string path,
         int passed,
         int failed,
@@ -1797,7 +2101,7 @@ public class Program
     }
 
     private static void WriteMarkdownSummary(
-        List<WptTestResult> allResults,
+        IReadOnlyList<WptTestResult> allResults,
         string path,
         int passed,
         int failed,
@@ -2648,7 +2952,12 @@ public class Program
         Console.WriteLine("                             identical to the Chromium reference");
         Console.WriteLine($"                             (default: {FormatPassThreshold(DefaultPassThresholdPercent)}, env: {PassThresholdEnvironmentVariable})");
         Console.WriteLine("  --no-worker-isolation      Run tests in-process instead of the default worker process");
-        Console.WriteLine("                             isolation. Useful for debugger sessions only.");
+        Console.WriteLine("                             isolation. Useful for debugger sessions only. Implies");
+        Console.WriteLine("                             --workers 1.");
+        Console.WriteLine("  --workers <N>|auto         Number of worker processes draining the test queue");
+        Console.WriteLine("                             (default: auto = min(cores, available RAM / 1.5 GiB), since a");
+        Console.WriteLine("                             worker's ceiling is memory rather than CPU). --workers 1");
+        Console.WriteLine("                             reproduces the sequential run exactly.");
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");
         Console.WriteLine("  --markdown-output <PATH>   Write triage-focused Markdown summary to the given path");
         Console.WriteLine("  --failure-images <DIR>     Save rendered/reference/diff PNGs for each failure under DIR");
