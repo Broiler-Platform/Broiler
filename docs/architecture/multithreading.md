@@ -24,7 +24,7 @@ worth is in [What building Phase 1 changed](#what-building-phase-1-changed).
 
 | Item | State | Evidence |
 |---|---|---|
-| #1 — WPT worker pool | **Done** | `--workers <N>\|auto` in `src/Broiler.Wpt/Program.cs`; 45.2 s → 23.4 s on a 61-test subset at 4 cores, identical classification at 1, 4 and auto |
+| #1 — WPT worker pool | **Done** | `--workers <N>\|auto` in `src/Broiler.Wpt/Program.cs`; **full corpus 90 min → 45 min (2.0×)** at 4 cores, 45.2 s → 23.4 s on the 61-test subset it was developed against, identical classification at 1, 4 and auto |
 | #20 — CLI batch parallelism | **Done** | `src/Broiler.Cli/BatchRunner.cs`; batch capture byte-identical at 1 and 4 threads, fuzz 14.8 s → 8.9 s with the same 224 failure files |
 | #2 — concurrent sub-resource fetch | **Done, partly** | `SubResourcePrefetcher`; wired to external scripts and `<link>` stylesheets. Iframes/`fetch()`/XHR are **not** wired — see the item below |
 | #11 — CSS rule indexing | **Done** | `patches/0123-css-cascade-rule-index.patch`; exit gate met — cascade cost is flat in total rules (32× rules: 30.8× → **1.64×** time, 32.0× → **1.13×** bytes); corpus `rules` page 5 219 ms → 1 842 ms; WPT unchanged |
@@ -261,6 +261,13 @@ Sized `min(cores, availableRam / 1.5 GiB)`, which on the 4-core/13 GiB container
 4×, because worker startup and the runner's own serial reporting are a fixed share
 of a 61-test run. On a full shard the constant amortizes.
 
+**It does.** A full WPT run on the same 4-core shape goes **90 minutes → 45**, so
+the whole-corpus figure is **2.0×** against the subset's 1.93× — the fixed cost
+this section predicted would wash out at scale does wash out, and the remaining
+gap to 4× is the per-test GiB budget capping the pool at four workers, not the
+runner's serial remainder. That is the first measurement of item #1 at corpus
+scale; every earlier figure here is the 61-test subset.
+
 Where the memory figure cannot be read at all, the pool stays at **one** worker.
 Guessing high on an unreadable budget is how a runner OOM-kills a CI box, and the
 per-test allowance is a full GiB.
@@ -269,7 +276,7 @@ per-test allowance is a full GiB.
 
 One item so far — #9, the gate — and it moved two things that were not on the plan.
 
-### 1. Item #9 was three sites, not one, and the audit's method is what hid the other two
+### 1. Item #9 was four sites, not one, and the audit's method is what hid two of them
 
 The item is scoped as "make the font caches thread-safe", and P0-c had already
 corrected the roadmap once on this point: the hazard is **instance** state on a
