@@ -846,17 +846,24 @@ public class Program
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>The two kinds of parallelism in this runner multiply, and nothing else notices.</b> The
-    /// pool (item #1) runs <c>N</c> worker processes; band-parallel raster (item #4) and
-    /// band-parallel image decode (items #6, #7) each default to one thread per core <em>inside</em>
-    /// a process. Left alone that is <c>N × cores</c> runnable threads on <c>cores</c> cores, which
-    /// is slower than either parallelism alone and turns the per-test timeout into a lottery. So
-    /// the runner divides: <c>max(1, cores / workers)</c> render threads each.
+    /// <b>The kinds of parallelism in this runner multiply, and nothing else notices.</b> The pool
+    /// (item #1) runs <c>N</c> worker processes; band-parallel raster (item #4), tile-parallel
+    /// display-list replay (item #5) and band-parallel image decode (items #6, #7) each default to
+    /// one thread per core <em>inside</em> a process. Left alone that is <c>N × cores</c> runnable
+    /// threads on <c>cores</c> cores, which is slower than any of them alone and turns the per-test
+    /// timeout into a lottery. So the runner divides: <c>max(1, cores / workers)</c> render threads
+    /// each.
     /// </para>
     /// <para>
-    /// <b>An explicit setting always wins.</b> If the caller has already put either variable in the
-    /// environment, it is left exactly as it is — this is a default for a runner that happens to
-    /// know both numbers, not a policy the runner imposes on someone who has measured something.
+    /// <b>The tile budget and the band budget get the same figure, not a share of it.</b> They do not
+    /// compound: a tile view runs its bands inline, so a render spends whichever of the two it is
+    /// using and never both. Splitting the division between them would leave a page that tiles with
+    /// a quarter of the cores it could have used.
+    /// </para>
+    /// <para>
+    /// <b>An explicit setting always wins.</b> If the caller has already put one of these variables
+    /// in the environment, it is left exactly as it is — this is a default for a runner that happens
+    /// to know both numbers, not a policy the runner imposes on someone who has measured something.
     /// </para>
     /// </remarks>
     internal static string ApplyRenderThreadBudget(int workerCount, int processorCount)
@@ -874,9 +881,9 @@ public class Program
         }
 
         return applied.Count == 0
-            ? "inherited from the environment (both variables already set)"
+            ? "inherited from the environment (every variable already set)"
             : $"{perWorker} per worker — {Math.Max(1, processorCount)} core(s) / {Math.Max(1, workerCount)} worker(s), " +
-              $"set as {string.Join(" and ", applied)}";
+              $"set as {string.Join(", ", applied)}";
     }
 
     /// <summary>
@@ -887,6 +894,7 @@ public class Program
     private static readonly string[] RenderThreadVariables =
     [
         "BROILER_RASTER_THREADS",
+        "BROILER_RASTER_TILES",
         "BROILER_IMAGE_DECODE_THREADS",
     ];
 

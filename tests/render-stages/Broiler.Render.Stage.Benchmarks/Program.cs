@@ -36,6 +36,11 @@ public static class Program
             return RasterScaling.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
         }
 
+        if (args.Length >= 1 && args[0] == "--tile-scaling")
+        {
+            return TileScaling.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
+        }
+
         if (args.Length >= 1 && args[0] == "--gc-config")
         {
             GcConfigurationMetrics.Run(ArgValue(args, "--rounds", 20));
@@ -67,6 +72,10 @@ public static class Program
         Console.WriteLine("  --raster-scaling [--iterations N] [--warmup N]");
         Console.WriteLine("        Corpus render time against the raster thread budget (item #4).");
         Console.WriteLine("        Exits 1 if any thread setting renders different pixels.");
+        Console.WriteLine();
+        Console.WriteLine("  --tile-scaling [--iterations N] [--warmup N]");
+        Console.WriteLine("        Corpus render time against the raster tile budget (item #5).");
+        Console.WriteLine("        Exits 1 if any tile setting renders different pixels.");
         Console.WriteLine();
         Console.WriteLine("  --gc-config [--rounds N]");
         Console.WriteLine("        Throughput and GC counters for the process's GC mode (item #19).");

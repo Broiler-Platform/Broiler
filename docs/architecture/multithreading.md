@@ -6,19 +6,22 @@ the tooling.
 
 ## Status
 
-**Phase 2 is under way.** Five of its nine items have landed (#9, #4, #6, #7,
-#10); four have not (#3, #5, #8, #17). What building them
+**Phase 2 is under way.** Six of its nine items have landed (#9, #4, #5, #6, #7,
+#10); three have not (#3, #8, #17). What building them
 changed is in [What building Phase 2 changed](#what-building-phase-2-changed) —
-including the two findings that matter most for what is left: **band parallelism
-inside a primitive is the wrong unit for a page** (§4), and **the largest single
-win the phase has produced was a cache, not a thread** (§5).
+including the three findings that matter most for what is left: **band parallelism
+inside a primitive is the wrong unit for a page** (§4), **the largest single win
+the phase has produced was a cache, not a thread** (§5), and — from item #5 —
+**most of what looked like raster parallelism was the rasterizer drawing pixels
+nothing could see** (§8). The raster stage is no longer the largest share of a
+render on any corpus page ([§9](#9-raster-is-no-longer-the-stage-to-aim-at-and-the-published-profile-says-so)).
 
 | Item | State | Evidence |
 |---|---|---|
 | #9 — shared render-path caches | **Done** | `FontsHandler`, `BImageRenderer`, `FallbackSystemFont` contour caches and `TrueTypeFont`'s five lazy tables; `RenderPathConcurrencyTests` (6 cases, 5 of which fail against the code before the change). Both P0-c residuals closed with it |
-| #4 — band-parallel raster (`Broiler.HTML.Image`) | **Done** | `BRasterParallelism`, `patches/0124-…`; corpus `paint` page **1 594.7 ms → 1 096.5 ms (1.42×)** at 4 threads, 92.7% of its fill area split; pixels identical at 1/2/4 on all five pages, `RasterBandParallelismTests` 42 cases. Flat on the three pages whose raster is glyphs — see [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page) |
-| #3 — band-parallel raster (`Broiler.Graphics`) | Not started | The partitioner and the exit-gate harness now exist; this is porting them to the second copy, and [§2](#2-the-rasterizer-the-profile-measures-is-item-4s-copy-not-item-3s) still says unify first |
-| #5 — tile-parallel replay | Not started | **Now the phase's main remaining item**, and [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page) is the measurement that says why |
+| #4 — band-parallel raster (`Broiler.HTML.Image`) | **Done** | `BRasterParallelism`, upstream in the pinned `Broiler.HTML` pointer (its patch file is retired); corpus `paint` page **1 594.7 ms → 1 096.5 ms (1.42×)** at 4 threads, 92.7% of its fill area split; pixels identical at 1/2/4 on all five pages, `RasterBandParallelismTests` 42 cases. Flat on the three pages whose raster is glyphs — see [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page) |
+| #3 — band-parallel raster (`Broiler.Graphics`) | Not started | The partitioner and the exit-gate harness now exist; this is porting them to the second copy, and [§2](#2-the-rasterizer-the-profile-measures-is-item-4s-copy-not-item-3s) still says unify first. [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page) and [§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see) both say the *clip narrowing* is the part worth porting first |
+| #5 — tile-parallel replay | **Done** | `TileParallelReplay`, `patches/0126-…`; `PerformPaint` at 1 → 4 tiles: `paint` **1 323.7 → 461.4 ms (2.87×)**, `rules` 3.49×, `text` 2.42×, `mixed` 2.44×, `boxes` 1.76× — faster than band parallelism on all five pages, including the three bands could not touch. Pixels identical at 1/2/4 tiles crossed with 1/4 bands on every page (`--tile-scaling`), 69 `RasterTileParallelismTests` cases, and a full WPT run at 1 and 4 tiles whose entire output diffs to **zero lines**. Most of the win was single-threaded — see [§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see) |
 | #6/#7 — image decode | **Done** | `ImageDecodeParallelism`; JPEG **2.08–2.61×**, PNG **1.22–1.29×** at 4 threads, byte-identical at every setting (`--decode-scaling`, plus two cases in `Broiler.Media.Image.Managed.Tests`) |
 | #8 — concurrent decode across images | Not started | Unblocked by #9, but the headless render path loads images **synchronously and inline** (`AvoidAsyncImagesLoading`), so this needs #2's prefetch/consume split rather than a `Parallel.For` — see [§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor) |
 | #10 — glyph outline cache | **Done** | `TrueTypeFont` caches outlines by glyph index; raster stage **1.34×** on `text`, **1.54×** on `boxes`, **1.00×** on the text-free `paint` control. The shaped-run cache the item names is *not* built — see [§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names) |
@@ -115,13 +118,25 @@ thousands of *small* fills rather than a few large ones. Only the sentence about
 tile-parallel replay survives intact, and it is now the whole of the finding —
 [What building Phase 2 changed §4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page).
 
+**And the surviving half has now been built, which retires the finding.** Tile
+parallelism is 1.76–3.49× per corpus page and beats band parallelism on all five,
+so the shape was right. But it also took raster from 46.9–80.8% of a render down to
+1.0–68.0%, which means **the finding's premise — that the rasterizer is the largest
+safe win — no longer holds on any page in the corpus**
+([§9](#9-raster-is-no-longer-the-stage-to-aim-at-and-the-published-profile-says-so)).
+Roughly half of the win was not parallelism at all
+([§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see)).
+
 **Finding 4 needs a third example.** It names the cascade's rule scan and layout's
 full-tree relayout as single-threaded fixes that must precede any threading. The
 glyph outline path was a third, hidden in a phase about threads and larger than the
 threading item that shared its stage
 ([§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names)).
 The generalisation the finding is reaching for: **before parallelizing a stage,
-check what the stage is recomputing.**
+check what the stage is recomputing.** Item #5 supplied a fourth example and
+widened it once more — the rasterizer was not only recomputing, it was *computing
+pixels nothing could see*, and deleting that work was worth about as much as the
+threads were ([§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see)).
 
 **Findings 1, 4, and 5 have since been measured, and one of them was wrong.** The
 next section has the numbers; in short, finding 1 holds, finding 4 understates the
@@ -295,9 +310,9 @@ per-test allowance is a full GiB.
 
 ## What building Phase 2 changed
 
-Six findings. The first three came out of item #9, the gate; the rest came out of
-the raster, text and decode work that followed it, and two of them change what the
-rest of the phase should be.
+Nine findings. The first three came out of item #9, the gate; the rest came out of
+the raster, text and decode work that followed it, and three of them change what
+the rest of the phase — and the phase after it — should be.
 
 ### 1. Item #9 was four sites, not one, and the audit's method is what hid two of them
 
@@ -501,8 +516,8 @@ does not move.
 ### 7. Two kinds of parallelism now multiply, and the runner has to divide
 
 Phase 1 gave the WPT runner a pool of *N* worker processes. Phase 2 gives every
-process band-parallel raster and band-parallel decode, each defaulting to one
-thread per core. Nobody sees both numbers except the runner: the default is
+process band-parallel raster, tile-parallel replay and band-parallel decode, each
+defaulting to one thread per core. Nobody sees both numbers except the runner: the default is
 per-process and correct in isolation, and the pool size is per-run and correct in
 isolation, but together they are *N × cores* runnable threads on *cores* cores.
 That is slower than either alone, and it makes the per-test timeout a lottery
@@ -510,13 +525,104 @@ rather than a limit.
 
 `Program.ApplyRenderThreadBudget` divides — `max(1, cores / workers)` — and
 publishes the result into the environment the workers inherit, leaving any
-variable the caller set explicitly untouched. It is printed in the run header next
-to the pool size, because a run whose two parallelism settings are invisible is a
+variable the caller set explicitly untouched. **The tile budget gets the same
+figure as the band budget rather than a share of it**: the two do not compound,
+because a tile view runs its bands inline, so a render spends whichever of them
+it is using and never both. They are printed in the run header
+next to the pool size, because a run whose parallelism settings are invisible is a
 run whose timings cannot be compared with another's.
 
 This generalises past the WPT runner: **every host that runs more than one render
 at once now owns a division it did not have to make before** — the CLI's batch
 processes are the other one in this repository.
+
+### 8. Most of item #5 was not parallelism; it was the rasterizer drawing pixels nothing could see
+
+Tile-parallel replay was built as a threading item and it delivered threading
+numbers — 2.87× on the `paint` page, 2.42× on `text`, and faster than band
+parallelism on all five pages including the three bands could not touch. But the
+first thing building it required was not a thread, and that part is worth more
+than the item's own framing suggests.
+
+**A tile that inherits only a clip does the whole page's work.** Each tile replays
+the whole display list, so every cost that is paid per primitive rather than per
+drawn pixel is paid once per tile. Three rejections had to be added before the
+tiles were worth anything, and each of them is a sequential fix:
+
+1. **`BCanvas` narrows the loop, not just the pixel.** It keeps a running
+   intersection of its including clips and clamps every primitive's pixel bounds
+   to it. Exact rather than approximate — a pixel the bounding box excludes is one
+   the per-pixel test already rejected — and it turns "reject three quarters of the
+   surface" from a per-pixel cost into a per-primitive one.
+2. **The backend skips an item whose drawn rectangle it derives itself.** A tiled
+   gradient allocates and renders a gradient tile bitmap *before* it draws with it,
+   so without this every tile rebuilt all 1 400 of the `paint` page's gradients.
+3. **The text backend rejects a run by row band**, computed from the font's own
+   ascent and descent before a glyph is looked at.
+
+**The order they were built in is the evidence.** With only (1), the `paint` page
+reached 1.59× at four tiles — still behind band parallelism — and `boxes`
+*regressed* to **0.81×**: it was paying four list walks for a page whose raster is
+34 ms. Adding (2) took `paint` to 2.84× and left `boxes` at 0.82×, because that
+page's per-tile cost is text. Adding (3) moved every page, `boxes` included. Two of
+the three are not about threads at all, and without them the item would have
+shipped a regression on one of the five pages it was measured against.
+
+**Here is what the three are worth with no threads at all.** Raster stage, one
+tile, one band:
+
+| Page | before | after culling | ratio |
+|---|---:|---:|---:|
+| text | 210.9 ms | 148.4 ms | 1.42× |
+| boxes | 41.7 ms | 14.0 ms | **2.98×** |
+| rules | 97.4 ms | 51.0 ms | 1.91× |
+| mixed | 153.8 ms | 143.4 ms | 1.07× |
+| paint | 1 334.7 ms | 1 323.7 ms | 1.01× |
+
+The two pages that barely move are the two whose content is mostly *on screen* —
+`paint` is 1 400 boxes swept across the viewport by construction. The pages that
+move are the ones taller than their viewport, which is to say: normal documents.
+
+This is the third time in this document that a stage's biggest win turned out to
+be work the stage should not have been doing — after the cascade's rule scan
+(#11) and the glyph outline cache ([§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names)).
+Finding 4 of the summary generalises to: **before parallelizing a stage, check
+what the stage is recomputing — and what it is computing that nobody will see.**
+
+**The bug worth carrying forward is about clips.** A tile view's `GetClip()`
+returns its parent's clip *unnarrowed*; the tile is added to the rasterizer's
+per-pixel test and to nothing above it. That is not tidiness. `DrawClippedImage`
+recomputes a scaled image's **source** rectangle from the intersection of its
+destination with `GetClip()`, so a tile-narrowed clip re-derives a different
+source rectangle and resamples the image. Algebraically the two mappings agree; a
+floating-point rounding apart, they do not — it surfaced as *one row of different
+pixels on two WPT tests out of 147*, and on none of the synthetic documents tried
+against it. **A caller may read a clip to derive geometry, not merely to obey
+it**, so any future work that hands a component a narrowed view of a surface owes
+the same audit. It is checked directly now (a tile view reports its parent's
+clip) rather than left to a pixel comparison that happened to catch it.
+
+### 9. Raster is no longer the stage to aim at, and the published profile says so
+
+Phase 0's measurement put raster at 46.9–80.8% of a render and called items #3
+and #5 "aimed at the right thing". After #4, #10 and #5 the same corpus at the
+same viewport on the same box reads:
+
+| Page | raster share, Phase 0 | now |
+|---|---:|---:|
+| paint | 80.8% | 68.0% |
+| text | 63.7% | 39.5% |
+| mixed | 46.9% | 29.8% |
+| boxes | 11.9% | 7.2% |
+| rules | 4.4% | 1.0% |
+
+`parse+cascade` is now the largest stage on four of the five pages, and on `rules`
+it is 96%+ of a render that item #11 already made three times faster. **The next
+measurement this document owes is the split of `parse+cascade` into parse and
+cascade** — Phase 1 §1 already flagged that it is unknown which half dominates,
+and item #12 (parallel style recalc) must not be started against a stage whose
+composition is unmeasured. That is now the largest unattributed question in the
+document, and it is larger than anything left in Phase 2.
 
 ## Master table
 
@@ -530,7 +636,7 @@ non-deterministic correctness defect.
 | 2 | HtmlBridge | [`ScriptExtractionService.cs:303`](../../src/Broiler.HtmlBridge.Core/Scripting/ScriptExtractionService.cs), [`ResourceLoader.cs:56`](../../src/Broiler.HtmlBridge.Dom/Runtime/ResourceLoader.cs), [`SubDocuments.cs:581`](../../src/Broiler.HtmlBridge.Dom/DomBridge/SubDocuments.cs) | Serial `GetStringAsync(..).GetAwaiter().GetResult()`, one resource at a time | Bounded-concurrency prefetch (6/host, browser convention) into a content-addressed cache; call sites then hit the cache | Call sites are synchronous and ordering-sensitive for `document.write`; needs a prefetch/consume split, not an `async` conversion | **Done for scripts and `<link>` stylesheets** (`SubResourcePrefetcher`, bounded 6/host). Iframes and `fetch()`/XHR are not wired: they have no point where the URL set is known before it is consumed, which is what item #17 supplies | Medium | Done (scripts, sheets) | 1 |
 | 3 | Graphics | [`Rendering/BCanvas.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/BCanvas.cs) `FillRect:106`, `FillGlyphContours:241`, `DrawBitmap:345`, `FillRectTiled:389`, `FillLinear/Radial/ConicGradientRect:425/468/508` | Single-threaded scanline loops | `Parallel.For` over scanline bands; per-band coverage buffer and clip stack | Per-row `coverage[]` and the `_clipOperations` list are instance state shared across rows — must become per-worker | **The 4–6× estimate belongs to item #5, not here.** Item #4 built this shape against the copy the profile measures and got 1.42× on one corpus page and nothing on three; the ceiling is set by fill size, not by cores ([§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page)). `BRasterParallelism` and `RasterBandParallelismTests` are the port-ready partitioner and exit gate | Low | 2–3 d (port) | 2 |
 | 4 | HTML | [`Broiler.HTML.Image/BCanvas.cs`](../../Broiler.HTML/Source/Broiler.HTML.Image/BCanvas.cs) — **DONE** | Was the same scanline shape; now `Parallel.For` over row bands via `BRasterParallelism`, with a measured area threshold and a per-band coverage buffer in `FillGlyphContours` | Nothing | **DONE, and smaller than the estimate.** Corpus `paint` page 1 594.7 ms → 1 096.5 ms (**1.42×** end to end, 1.61× on the stage) at 4 threads; **flat on `text`, `rules` and `boxes`, which split 0 fills between them** — their raster is glyphs, and a 95-pixel fill is not splittable at any core count. Pixels identical at 1/2/4 on all five pages. See [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page) | Low | Done | 2 |
-| 5 | Graphics / Layout | [`DisplayList.cs`](../../Broiler.Layout/Broiler.Layout/IR/DisplayList.cs) + [`BRenderList.cs`](../../Broiler.Graphics/Broiler.Graphics/RenderList/BRenderList.cs) replayed by [`RGraphicsRasterBackend`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs) | One pass, whole surface | **Tile-parallel replay**: partition the target into tiles, each worker replays the whole immutable list clipped to its tile | Already immutable and flat with explicit `ClipItem`/`RestoreItem`/`OpacityItem` stack items — this is the right structure. Needs per-tile state and layer (`OpacityItem`) handling | **5–7× on 8 cores** (estimate) for full-page renders; better locality than #3. **Measured:** the replay is 46.9–80.8% of a render while the display-list *build* is 0.3–0.7%, so only the replay is worth parallelizing — and item #4's result makes this **the only raster parallelism the corpus can use**, because a tile's unit of work is every fill touching it rather than one primitive ([§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page)) | Low–Medium | 6–10 d | 2 |
+| 5 | Graphics / Layout | [`DisplayList.cs`](../../Broiler.Layout/Broiler.Layout/IR/DisplayList.cs) replayed by [`RGraphicsRasterBackend`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs) — **DONE** | Was one pass over the whole surface; now `Parallel.For` over horizontal strips via [`TileParallelReplay`](../../Broiler.Layout/Broiler.Layout/IR/TileParallelReplay.cs), each replaying the whole list into its own strip | Nothing | **DONE, and the estimate was right about the ceiling for the wrong reason.** `PerformPaint` at 1 → 4 tiles: `paint` **1 323.7 → 461.4 ms (2.87×)**, `rules` 3.49×, `text` 2.42×, `mixed` 2.44×, `boxes` 1.76× on a 4-core box — and it beats band parallelism on all five pages. But on the pages taller than their viewport — which is most documents — a large share of it came from *not drawing invisible pixels* rather than from threads ([§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see)). Pixels identical at 1/2/4 tiles × 1/4 bands; WPT output identical to the line | Low–Medium | Done | 2 |
 | 6 | Media | [`JpegDecoder.cs:385`](../../Broiler.Media/Broiler.Media.Image.Managed/Jpeg/JpegDecoder.cs) dequantize+IDCT per block, `:424` upsample + YCbCr→RGB per row | Sequential | `Parallel.For` over blocks / rows. Entropy decode stays sequential (optionally per-RST-interval) | Nothing structural; blocks and output rows are disjoint | **DONE. Measured 2.08–2.61× at 4 threads** (gradient / flat-block fixtures, 1 024²), which lands inside the estimate. Byte-identical at 1, 2 and 4 threads. `JpegDct.Inverse` also took a caller-owned scratch buffer, removing a 512-byte allocation per block | Low | Done | 2 |
 | 7 | Media | [`PngDecoder.cs:293`](../../Broiler.Media/Broiler.Media.Image.Managed/Png/PngDecoder.cs) expand-to-RGBA | Sequential | `Parallel.For` over rows | Inflate (`:62`) and unfilter (`:63`) are genuinely sequential — Up/Paeth read the previous row | **DONE. Measured 1.22–1.29× at 4 threads**, just under the estimate: inflate and unfilter are a larger share of a PNG decode than the estimate assumed, and both are on the do-not-parallelize list | Low | Done | 2 |
 | 8 | Media / HTML | Per-image decode, driven from [`ImageLoadHandler.cs:177`](../../Broiler.HTML/Source/Broiler.HTML.Core/Handlers/ImageLoadHandler.cs) | Already `ThreadPool.QueueUserWorkItem` for file reads; decode is on the completion path | Decode *N* page images concurrently — coarser and better than #6/#7 | **Not what this cell said.** `BImageRenderer._images` is fixed and the decoders are covered by a re-entrancy test, but every headless entry point sets `AvoidAsyncImagesLoading`, so decode is synchronous and inline. Needs #2's prefetch/consume split fed by #17 ([§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor)) | **Near-linear in image count** up to core count | Low | 3–4 d, after #17 | 2 |
@@ -745,14 +851,20 @@ The best return in the repository, and the least risky.
    and the gate exist, but it should be scheduled for what it is — the Writer and
    Broiler.UI paths, which the corpus does not render — and not for a repeat of
    the 4–6× estimate.
-4. **Tile-parallel display-list replay** (item #5) — **now the item that matters
-   here**, for the reason above: a tile's unit of work is every fill that touches
-   it, which is the only unit all five pages have. Handle
-   `OpacityItem`/`BlendModeItem` layers by rendering the layer into a tile-local
-   scratch buffer.
-   *Exit gate:* identical output at 1, 2, 4, and 8 tiles; measured scaling curve
-   published. `RasterScaling` already does the identity half of that gate for a
-   whole-corpus render and can take the tile axis as-is.
+4. **Tile-parallel display-list replay** (item #5) — **DONE**. The surface is
+   split into horizontal strips and each replays the whole list into its own
+   strip, so a tile's unit of work is every fill that touches it — the only unit
+   all five pages have. Layers work per tile without a scratch buffer of their
+   own: each tile pushes its own layer bitmap and composites it back over the
+   box its clip could have written, which is the tile.
+   *Exit gate — met.* Pixels identical at 1, 2 and 4 tiles crossed with 1 and 4
+   bands on all five corpus pages (`--tile-scaling`, which fails the run if any
+   setting differs), 69 `RasterTileParallelismTests` cases over eight documents,
+   and a full WPT run at 1 and at 4 tiles whose entire output diffs to zero
+   lines. Scaling curve published above and in
+   [§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see),
+   which is also where to read **before** starting item #3: half the win was a
+   sequential fix that item #3's copy of the rasterizer has not had.
 5. **Glyph outline cache — DONE**; shaped-run cache and parallel shaping (item
    #10) — not built. The item's own advice, measure the cache alone first, is
    what found the outline cache one layer below the shaper, and it is worth more
@@ -955,7 +1067,7 @@ Recording these so they are not revisited each time the topic comes up:
 |---|---|---|
 | **0 — Make it measurable and deterministic** | P0-a benchmarks, P0-b single-threaded event loop (#15), P0-c static-state audit, GC config evaluation (#19) | Nothing after this is trustworthy without it. #15 is a correctness fix that also removes lock overhead from the cascade. |
 | **1 — Free wins and the sequential fixes** — **DONE** | WPT worker pool (#1), CLI batch (#20), concurrent sub-resource fetch (#2), CSS rule indexing (#11) | Cheap, low-risk, and #1 shortens the feedback loop for everything else. #11 is single-threaded but must precede #12. **What it changed:** #11 met its exit gate (cascade cost is now flat in total rules) but is 2.8× on a whole render, and `parse+cascade` still dominates the rule-heavy page — so #12 needs that stage split before it is started; #20 had to use processes, which makes item #9 a gate on every render-path item, not three. |
-| **2 — Raster, decode, text** — *in progress; 5 of 9 items done* | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), text caches (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed, in the order it matters:** band parallelism inside a primitive turned out to be the wrong unit for a page — three of five corpus pages split zero fills, because their raster is glyphs — which promotes **#5 from "supersedes #3" to the only raster parallelism the corpus can use (§4)**; the phase's largest single win was a *cache*, and not the one #10 names (§5); #8 is a prefetch/consume split needing #17 first, not a `Parallel.For` (§6); the pool and the in-process threads multiply, so the runner now divides them (§7); the item-#9 findings (§1–§3) stand. **What is left:** #5, #3's port, #17 then #8. See [What building Phase 2 changed](#what-building-phase-2-changed). |
+| **2 — Raster, decode, text** — *in progress; 6 of 9 items done* | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), text caches (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed, in the order it matters:** band parallelism inside a primitive turned out to be the wrong unit for a page — three of five corpus pages split zero fills, because their raster is glyphs — which promotes **#5 from "supersedes #3" to the only raster parallelism the corpus can use (§4)**; the phase's largest single win was a *cache*, and not the one #10 names (§5); #8 is a prefetch/consume split needing #17 first, not a `Parallel.For` (§6); the pool and the in-process threads multiply, so the runner now divides them (§7); the item-#9 findings (§1–§3) stand. **#5 landed and about half of its win was single-threaded** — the rasterizer was walking pixels its clip could never admit (§8) — and between them #4, #10 and #5 have taken raster from the largest stage on three pages to the largest on one (§9). **What is left:** #3's port, #17 then #8 — none of them the next thing to do. The largest open question is now the parse/cascade split Phase 1 §1 named, which gates #12. See [What building Phase 2 changed](#what-building-phase-2-changed). |
 | **3 — Style and incremental layout** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. |
 | **4 — Parallel layout and workers** | Parallel intrinsic sizing and independent subtrees (#13), Web Workers (#18) | Highest cost, highest risk, lowest ceiling. Only worth starting once Phase 3's measurements say layout is still the bottleneck. |
 

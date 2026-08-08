@@ -9,6 +9,17 @@ are versioned in lockstep during the preview.
 
 ### Changed
 
+- `Broiler.Layout` / `Broiler.HTML.Image` — a page's display list is now replayed
+  into disjoint horizontal strips of the target surface at once, and the managed
+  rasterizer no longer walks pixels its clip is certain to reject. The raster
+  stage is 1.76-3.49x faster per page of the roadmap corpus at four cores
+  (`paint` 1323.7 -> 461.4 ms), and about half of that is the clip narrowing
+  rather than the threads: a document taller than its viewport was rasterising
+  text and boxes that nothing could see. Output is byte-identical to the
+  single-tile render at any tile count, and the full WPT run reports the same
+  verdict and the same pixel-match percentage on every test. Set
+  `BROILER_RASTER_TILES=1` to replay on the calling thread only, which a host
+  that already runs several renders at once should do.
 - `Broiler.Media.Image.Managed` — PNG expand-to-RGBA and JPEG dequantize/IDCT and
   colour conversion now run across threads (2.08–2.61x on a 1024x1024 JPEG,
   1.22–1.29x on the PNG equivalent, at four cores). Output is byte-identical to
