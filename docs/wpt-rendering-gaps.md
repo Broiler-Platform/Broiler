@@ -7,8 +7,9 @@
   problem.
 - **Later runs get their own section rather than a rewrite**, since most of each
   new list is the same tests under new numbers:
-  [#1497 (2026-07-30)](#the-next-run-issue-1497-2026-07-30) and
-  [#1538 (2026-08-05)](#the-next-run-issue-1538-2026-08-05). Where a re-run
+  [#1497 (2026-07-30)](#the-next-run-issue-1497-2026-07-30),
+  [#1538 (2026-08-05)](#the-next-run-issue-1538-2026-08-05) and
+  [#1562 (2026-08-07)](#the-next-run-issue-1562-2026-08-07). Where a re-run
   contradicts something below, the section says so and the row here is struck
   through — read the newest section first.
 - **Not in scope:** problem 1 (the `DomDocument.CreateElement` crash) is fixed —
@@ -1313,6 +1314,325 @@ owned by a section above). Re-reported problems point at that section.
 | 28 | `css-view-transitions/reset-state-after-scrolled-view-transition` | 3.6% | 3.61% | **part-fixed** — the scroll no longer overshoots the end (CSSOM View clamp, main repo); still failing on the rasterised root snapshot, which is #1491's problems 19/21/23 |
 | 29 | `html/…/form-validation-validity-textarea-defaultValue` | 3.8% | 3.78% | open — a **testharness** test whose reference is Chromium's results table; three of its five subtests drive `test_driver.send_keys`, which the runner only stubs |
 | 30 | `css-fonts/…/font-size-math-001.tentative` | 3.9% | **3.93% → 99.86%** | **fixed** — `font-size: math` is `1em`; the subset goes 7 → 13 of 14, main repo |
+
+## The next run (issue #1562, 2026-08-07)
+
+19 927 failures, no incomplete shards. Cross-referencing the list against the
+three runs above: **seventeen of the thirty are tests those sections already
+name, or new members of families they own** (the nested view transitions, the
+`grid-lanes` subgrid pair, `auto-name`, the `massive-element-*` four). **The
+other thirteen are new to the list, and all thirteen were worked here** —
+problems 17, 18 and 20 through 30.
+
+What they came to: **eight fixed** — problems 21–26 (the `css-contain`
+background cluster, the largest single-cause group on the list), 27 and 20;
+**two won't fix** — problems 28 and 29, whose reference is a render Chromium
+itself fails the reftest with; and **three diagnosed but not fixed** — problems
+17, 18 and 30, each with the cause isolated and an exit gate named. Two of the
+three turned out to be mis-attributed by their own test names: problem 17 is not
+a quirks bug and problem 18 is not a subgrid bug. So the at-a-glance table below
+carries a local number only where one was measured; everything else points at the
+section that already owns it rather than being re-measured.
+
+### Containment other than `paint` never stopped background propagation — problems 21–26, **fixed**
+
+- **Tests:** `css/css-contain/contain-body-bg-001` (layout), `-003` (size),
+  `-004` (style) and `contain-html-bg-001`/`-003`/`-004` (the same three, set on
+  the root instead of body). All six are 7.5% on CI and **reproduce here at 7.5%
+  exactly** — 727 836 of 786 432 pixels differ, which is the whole 1024×768
+  canvas but for the test's 300×200 white `<p>`.
+- **Owner:** `Broiler.HTML` (`IR/PaintWalker.CanvasBackground.cs` and
+  `HtmlContainerInt.cs`), so it ships as
+  [`patches/0120`](../patches/README.md) — the push is 403, as `CLAUDE.md`
+  describes. It is listed in `scripts/apply-pending-wpt-patches.sh`, so the WPT
+  run exercises it on CI ahead of a maintainer landing it.
+- **One condition, one keyword too narrow.** Each test paints `<body>` red under
+  a white `<p>` that covers it exactly, so the only red that can reach the screen
+  is red the *canvas* took from body. `FindCanvasBackgroundAndImage` suppressed
+  propagation for `contain: paint` only (plus `strict`/`content`, the shorthands
+  that include it), so `layout`, `size` and `style` propagated as if no
+  containment were set and flooded the canvas. That is why `-002` — the `paint`
+  member of each family — was the one already passing, and why it is not on the
+  issue's list.
+- **The spec names all four, and it names both elements.** CSS Contain 2 §2:
+  *"when any containments are active on either the html or body elements,
+  propagation of properties from the body element to the initial containing
+  block, the viewport, or the canvas background, is disabled"*. So the check is
+  now "is **any** containment active", tokenised rather than substring-matched
+  (`none` must not read as a keyword), and it also answers yes for
+  `content-visibility: hidden`/`auto`, which apply containment by other means.
+  Both halves of the cascade were fixed together: `PaintWalker` decides what
+  paints the canvas, and `HtmlContainerInt.GetRootBackgroundColor` decides the
+  colour the surface is erased with — they have to agree, or the erase colour
+  wins in the margins.
+- **The mirror-image half, which the tests do not cover and Chromium settles.**
+  The old code applied the same suppression to the *root's own* background, so
+  `html { contain: paint; background: green }` painted a white canvas. That is
+  wrong in the other direction: the root element's background **is** the canvas
+  background rather than something propagated to it, and the spec disables
+  propagation *from body*. Asked directly — Chromium under Playwright, five
+  documents differing only in the `contain` value — the whole canvas comes back
+  `rgb(0,128,0)` for `layout`, `paint`, `size`, `style` and no containment alike.
+  Only `display: none` still holds the root's background back.
+- **Calibrated against Chromium rather than inferred.** Ten further probes fixed
+  the edges of the rule. Suppressing, on body: `contain: layout`, `style`,
+  `inline-size`, `content-visibility: hidden` and `content-visibility: auto`. On
+  html: `contain: inline-size` and `content-visibility: auto`. **Not**
+  suppressing: `contain: none`, and no `contain` at all — both still flood the
+  canvas red, which is what keeps the fix from over-suppressing.
+- **One divergence, recorded rather than papered over.** Containment does not
+  apply to a non-atomic inline, and Chromium duly keeps propagating for
+  `body { display: inline; contain: layout }`. Broiler cannot reproduce that
+  distinction: instrumenting both code paths shows the box tree reporting
+  `<body>` as `display: block` whatever `display` says, so a guard for it would
+  be unreachable. The first draft carried one; it was removed once the
+  instrumentation said so, and the comment now says why.
+- **Measured.** The 584-test `css/css-contain` subset goes **413 → 419 passing**,
+  the six tests **7.5% → 99.8%**, and the failing-test set differs by exactly
+  those six in one direction and nothing in the other. Average match
+  96.57% → 97.62% — and that +1.05 is precisely the six tests' own contribution
+  (6 × (99.8 − 7.5) ÷ 524), so no other test in the subset moved even
+  sub-threshold.
+- **Regression-checked on the two subsets that own the canvas.** `css-backgrounds`
+  (956 tests) and `css-color-adjust` (36) were run against the pinned engine and
+  against the patched one: **all 991 result lines byte-identical** — same passes,
+  same failures, same match percentages to the decimal. `RootBackgroundTests` and
+  `ContainPaintClipTests` are unchanged, and 20 new cases in
+  `CanvasBackgroundContainmentTests` cover every containment keyword on both
+  elements, both `content-visibility` values, the `none`/absent controls, the
+  root's own background, and `display: none` on body.
+
+### A colour-only SVG filter chain now recolours the shape — problem 27, **fixed**
+
+- **Test:** `css/filter-effects/fecolormatrix-negative`, 7.7% on CI and
+  **reproducing here at the same 7.7%**. Its reference is a cyan rectangle, which is also what the test's own
+  assertion says to expect; Broiler painted the unfiltered `#ffaa00` orange.
+- **Owner:** `Broiler.Layout` (`IR/SvgColorFilter.cs`, `IR/SvgRenderer.cs`,
+  `IR/SvgFilterTable.cs`) — **main repo, so it is on CI immediately**, no patch.
+- **What the filter does, in closed form.** `feColorMatrix` with the negative
+  entries inverts each channel — `#ffaa00` → (0, 0.333, 1) — and the arithmetic
+  `feComposite` with `k2="255"` multiplies the premultiplied channels by 255, so
+  every non-zero one saturates: (0, 1, 1), cyan. There is no raster pipeline
+  needed to know that, because **a shape filled with one solid colour has a
+  source graphic that is that colour inside it and transparent black outside**,
+  and a chain of per-pixel colour operations therefore produces exactly two
+  colours. That is the same kind of modelling the engine already applies to an
+  `feFlood`-only filter (`SvgFilterTable.FloodFilter`), extended to a chain.
+- **Why the region does not have to be modelled too** — the trap that makes this
+  cheap rather than a filter engine. Every step modelled here maps zero alpha to
+  zero alpha, so the *outside* colour stays transparent and the filter region
+  never becomes visible. `AMatrixThatZeroesAlpha_MakesTheShapeTransparent` pins
+  that property rather than leaving it as a comment.
+- **Deliberately narrow, and every bail-out renders unfiltered.** Only
+  `feColorMatrix` (`type="matrix"`, its default) and `feComposite`
+  (`operator="arithmetic"`); only a straight chain, where each primitive consumes
+  the previous one's `result`; only when the filter declares
+  `color-interpolation-filters="sRGB"`, because the default is linearRGB and the
+  conversion is not modelled — a filter that does not say sRGB is left alone
+  rather than computed in the wrong space. Applied only to an **unstroked**
+  `<rect>`: a stroked shape is not one colour, so recolouring its fill would not
+  describe what the filter does to it.
+- **A pre-existing over-match found while testing this, and left alone.**
+  `CollectFloodFilters` takes the first `feFlood` in a filter body whatever else
+  is in the chain, so a filter that is `feColorMatrix` + `feFlood` is treated as
+  flood-only. This change neither introduces nor fixes it; the test file records
+  it and declines to pin it.
+- **Measured.** `css/filter-effects` goes **180 → 181 passing** over 388 tests,
+  the test itself **7.7% → 99.6%**, and the per-test diff across the whole subset
+  is two lines: that test, and `fecolormatrix-display-p3` improving 97.2% → 98.0%
+  without crossing the threshold (its residual is the Display-P3 colour space, a
+  separate gap). **Nothing else moved in either direction.** 14 cases in
+  `SvgColorFilterTests` cover the WPT chain, an identity matrix, the alpha rule,
+  and six bail-outs.
+
+### Chromium fails two of these reftests against its own reference — problems 28 and 29, **won't fix**
+
+- **Tests:** `css/filter-effects/svg-filter-filter-units-user-space` and
+  `svg-filter-primitive-units-user-space`, both 8.0% on CI and **both reproducing
+  here at the same 8.0%**.
+- **The reference is a fully green 1024×768 canvas** — for both tests. Rendering
+  each test *and* its own `-ref.html` under Chromium settles what that means: the
+  `-ref.html` is the six-container layout the test describes (green 75×75 in the
+  150px `<svg>`, 100×100 in the 200px one, 50×50 for the filtered `<div>`s),
+  while the test itself comes out uniformly green. **Chromium fails these
+  reftests against their own references**, and the runner scores Broiler against
+  Chromium's failing render.
+- **Which element does it, isolated rather than assumed.** Reducing the test to
+  one element at a time: a `<div>` carrying `filter: url(#f)` for a filter with
+  `filterUnits="userSpaceOnUse"` and percentage `width`/`height` floods the
+  **entire viewport** green, while the same filter on an SVG `<rect>` stays local
+  and paints nothing outside the `<svg>`. So it is the CSS `filter: url()` path on
+  an HTML element whose filter region resolves unbounded.
+- **Broiler is already closer to the spec render than Chromium is.** Ours is the
+  six-container layout with the flood regions off — the green boxes are the
+  default `objectBoundingBox` region rather than the resolved
+  `filterUnits`/`primitiveUnits` subregion — which is a real gap, but a *smaller*
+  one than a whole-canvas flood. Passing the comparison would mean reproducing
+  Chromium's flood, i.e. rendering strictly worse. Same trap as #1491's problems
+  14/15 and #1538's problem 18; see the warning at the top of this document.
+- **The underlying gap is still worth naming, for whenever the reference is
+  fixed upstream.** Both regions are computable from what the tests contain:
+  the filter region (`filterUnits`, defaulting to `objectBoundingBox` at
+  −10%/+120%) intersected with the primitive subregion (`primitiveUnits`,
+  defaulting to `userSpaceOnUse`, with `x`/`y`/`width`/`height` defaulting to the
+  filter region and percentages resolving against the SVG viewport). Working the
+  six containers through that by hand reproduces the `-ref.html` exactly in both
+  tests. `SvgRenderer` currently hardcodes the default `objectBoundingBox` region
+  and ignores the primitive subregion entirely.
+
+### `<canvas>` is not a replaced element — problem 30, diagnosed, not fixed
+
+- **Test:** `css/css-sizing/replaced-max-size-saturation`, 8.3% on CI.
+  **No local percentage here** — the `css-sizing` subset was not run this session;
+  the diagnosis below is from rendering this test and eight constructed probes and
+  reading the pixels, not from a scored run. A `<canvas width=8000 height=8000>` under
+  `max-width: 120px; max-height: 100px` must render as a **100×100** green square
+  (CSS2.1 §10.4: both constraints violated, and `max-width/w > max-height/h`, so
+  the height wins and the width follows the 1:1 ratio). Broiler renders it
+  8000×8000, clipped by the viewport into a full-page green block.
+- **Not a max-size bug — a replaced-element bug.** Five constructed probes
+  separate the two: the same CSS on a `<div>` clamps correctly to 120×100, and so
+  does an `<img>` with the same attributes; a `<canvas>` with `display: block`
+  forced on it also clamps, to 120×100. Left alone, a `<canvas>` behaves exactly
+  like a `<span>` with the same CSS. So `<canvas>` is being laid out as a
+  **non-replaced inline** box, which is the one box type `max-width`/`max-height`
+  do not apply to. `DomParser` special-cases `<video>`, `<audio>`, `<iframe>` and
+  `<svg>` as replaced elements; `<canvas>` is missing from that list.
+- **Three things are needed, and only the first is small.** (1) Model `<canvas>`
+  as a replaced element sized from its `width`/`height` content attributes with
+  the 300×150 default, mirroring the `<video>` handling in `DomParser`
+  (`Broiler.HTML`, so a patch). (2) `max-height` on an `inline-block` is not
+  applied either — a `display: inline-block` canvas probe clamps the width to 120
+  and leaves the height unclamped, which is a second, separate gap. (3) Getting
+  100×100 rather than 120×100 needs the CSS2.1 §10.4 constrained-ratio algorithm,
+  which considers both violated constraints together; the current code applies
+  min-width, max-height and min-height one at a time and has **no max-width arm at
+  all** (`CssLayoutEngine`, main repo). Left for a session that can do all three.
+
+### A `visibility: hidden` box stopped clipping its visible descendants — problem 20, **fixed**
+
+- **Test:** `css/css-overflow/overflow-scroll-resize-visibility-hidden`, 5.9% on
+  CI and reproducing here. Two `visibility: hidden` 100×100 scrollers each hold a
+  1000×1000 green child that re-declares `visibility: visible`; the reference is
+  the two 100×100 green squares the scrollers clip it to. Ours was the whole
+  viewport green.
+- **Owner:** `Broiler.HTML` (`IR/PaintWalker.Stacking.cs`), so it ships as
+  [`patches/0121`](../patches/README.md) — the push is 403, as `CLAUDE.md`
+  describes — and it is listed in `scripts/apply-pending-wpt-patches.sh` so the
+  WPT run exercises it on CI.
+- **Neither `resize` nor `scroll` is the interesting part of the test name.**
+  Five constructed probes separate the variables: the same scroller with
+  `visibility: visible` clips correctly to 100×100 **with and without
+  `resize: both`**, and swapping `overflow: scroll` for `overflow: hidden` makes
+  no difference either. The single variable that changes the outcome is
+  `visibility: hidden` on the scroller — which then paints 999×759 of green,
+  i.e. unclipped to the edge of the viewport.
+- **The cause is one early return.** `PaintWalker.PaintFragment` handles a
+  non-visible fragment by calling `PaintChildren` and returning — correctly, since
+  CSS2.1 §11.2 makes `visibility: hidden` suppress only the box's *own* rendering
+  and a descendant may re-declare `visible`. But that early return jumps over
+  everything the visible path sets up afterwards, including the overflow clip. The
+  box is still generated and still clips; only its own painting is suppressed. The
+  clip is now pushed around the child walk in both places that walk children of a
+  hidden fragment (`PaintFragment` and `PaintFragmentBackgroundPhase`).
+- **Not changed: the foreground phase.** `PaintFragmentForegroundPhase` returns on
+  a non-visible fragment *without* descending at all, so a visible descendant of a
+  hidden box inside a table never paints. That is a separate pre-existing gap with
+  a different fix, and no test on this list needs it.
+- **Measured.** The test goes **5.9% → 100%**, the 772-test `css/css-overflow`
+  subset **441 → 442 passing**, and the per-test diff across that whole subset is
+  **two lines** — that test leaving the failures and joining the passes, with
+  nothing else moving in either direction.
+- **Checked for over-reach on the subset that shares the clip path.** `contain:
+  paint` reaches the same `ClipsOverflow` predicate, so `css/css-contain` was
+  re-run: **583 result lines identical to the pristine pre-change baseline**, and
+  the aggregate (413 passing, 96.57% average match) is unchanged to the decimal.
+  10 cases in `VisibilityHiddenOverflowClipTests` cover every clipping `overflow`
+  value plus `contain: paint`, `visibility: collapse`, the `resize: both` the test
+  is named for, and three controls — that a hidden `overflow: visible` box must
+  *not* start clipping, that a visible scroller clips as it always did, and that
+  the child still paints *inside* the clip (a fix that simply suppressed the
+  visible descendant would pass the clip assertion and be wrong).
+
+### Replacing the document element renders nothing — problem 17, diagnosed, not fixed
+
+- **Test:** `quirks/tables-inherit-color-from-body-quirk-007`, 5.1% on CI. The
+  reference is the UA dark canvas (`html { color-scheme: dark }`) with light text
+  and a white 200px Ahem square. **Ours is a blank white page** — not a colour
+  mistake, nothing rendered at all.
+- **The quirk the test is named for never gets a chance to matter.** The test
+  builds its content in a `<div>`, appends it to the document element, then does
+  `document.documentElement.remove()` and `document.append(root.cloneNode(true))`
+  — the point being that `<body>` is never created, so the "tables inherit color
+  from body" quirk has no body to inherit from. Six probes isolate which step
+  loses the render:
+  - static markup with the same content and `color-scheme: dark` → dark canvas,
+    renders;
+  - script building the `<div>` and appending it to the document element → dark
+    canvas, renders (so scripting and the append are fine);
+  - adding `documentElement.remove()` + `document.append(clone)` → **white, empty**.
+  - `documentElement.remove()` alone → white, as it should be;
+  - `remove()` then appending a **hand-built** `<html><body>` with a lime block →
+    still white;
+  - `remove()` then appending a clone carrying a lime block → still white.
+- **So the finding is not about `cloneNode`, and not about quirks.** After
+  `documentElement.remove()`, appending *any* element to `document` does not
+  install it as the new document element: the render stays empty. That is the
+  whole 5.1%, and it is a DOM/bridge-level gap (the render tree is built from a
+  document root that was never re-established), not a paint or cascade one.
+- **Exit gate for whoever takes it:** the fifth probe above — remove the document
+  element, append a fresh `<html>` containing a 200×200 lime block, and get lime
+  pixels. Everything the test actually asserts is downstream of that.
+
+### Problem 18 is not a subgrid bug — diagnosed, not fixed
+
+- **Test:** `css/css-grid/subgrid/orthogonal-writing-mode-006`, 5.6% on CI.
+- **Its reference is the same markup with one declaration removed.** The
+  `-ref.html` is byte-for-byte the test except that `.grid > .grid` drops
+  `grid-template: subgrid / subgrid` — so the test asserts that a subgrid whose
+  parent declares no explicit tracks lays out exactly like a plain nested grid.
+- **Broiler renders the test and its own reference to the identical PNG.**
+  Rendering both and comparing gives byte equality, which settles the attribution:
+  `grid-template: subgrid / subgrid` changes nothing here (it is dropped), so
+  **subgrid is a no-op in both directions and cannot be what fails**. The whole
+  5.6% is the grid layout the test and the reference *share*.
+- **What that shared layout gets wrong** is visible in one render: the body is a
+  `display: grid` with `place-items: start`, so each of the eight cyan `.grid`
+  children should shrink-wrap; ours stretch to the full viewport width, stack in a
+  single column, and scatter the eight Ahem strings along the top. The vertical
+  writing modes (`vertical-rl` on half the boxes) are the other half of it.
+- **So the exit gate is not "implement subgrid".** It is `place-items: start`
+  shrink-wrapping on a grid container plus orthogonal writing modes inside one —
+  and the check that subgrid stays a no-op while that is fixed, since the
+  reference depends on it being one.
+
+### #1562 problems, at a glance
+
+CI percentages are the issue's. **"—" means not measured here** — problems 17,
+18 and 20–30 were investigated across this run's sessions; the rest point at the
+section that already owns them, and their status is that section's, not a fresh
+measurement.
+
+| # | Test | CI | Local | Status |
+| --- | --- | --- | --- | --- |
+| 1 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | — | re-report of #1538 problem 2 — needs `.sub` substitution and a second host |
+| 2 | `css-page/page-margin-002-print` | 0.0% | — | re-report of #1538 problem 3 — [screen-layout gaps](#screen-layout-gaps-behind-the-three-print-html-tests) |
+| 3, 4 | `css-view-transitions/nested/nested-{position-with-border,root-capture-with-clip}` (2) | 0.0% | — | new to this list — the nested-transition family of [view transitions do not capture the document](#view-transitions-do-not-capture-the-document--still-open-2-will-not-be-won-here) |
+| 5 | `resource-timing/initiator-type/frameset` | 0.0% | — | re-report of #1538 problem 9 — [frameset frames render nothing](#frameset-frames-render-nothing) |
+| 6 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | — | **won't fix** — #1538 problem 10: Chromium fails this reftest against its own reference |
+| 7, 8 | `css-grid/…/grid-subgridded-to-grid-lanes/…` (2) | 0.8%, 0.9% | — | open — same `display: inline grid-lanes` family as #1538 problems 12/13, which Broiler drops as invalid because no stable browser ships it unflagged |
+| 9, 10 | `css-view-transitions/auto-name{-from-id-shadow,}` (2) | 1.3% | — | **won't fix** — the `auto-name` family, #1538 problem 18: the reference is Chromium's unfeatured render |
+| 11 | `css-view-transitions/view-transition-waituntil-animation-manipulation` | 1.3% | — | does not reproduce offline (98.46% at #1538 problem 19) — judge from CI |
+| 12 | `css-view-transitions/root-to-shared-animation-start` | 1.5% | — | new to this list — needs the rasterised root snapshot, #1491 problems 19/21/23 |
+| 13–16 | `css-view-transitions/massive-element-{left,right}-of-viewport-partially-onscreen-{new,old}` (4) | 2.0%, 2.6% | — | open — **half fixed** at #1538 problems 22/23/25/26; these still fail on the snapshot clone's box sizing |
+| 17 | `quirks/tables-inherit-color-from-body-quirk-007` | 5.1% | — | open — **diagnosed**: after `documentElement.remove()`, appending *any* element to `document` does not install a new document element, so the page renders empty. Not a quirks bug. See above |
+| 18 | `css-grid/subgrid/orthogonal-writing-mode-006` | 5.6% | — | open — **diagnosed, and mis-named**: Broiler renders the test and its own `-ref.html` to a byte-identical PNG, so subgrid is a no-op both ways. The gap is the grid layout they share. See above |
+| 19 | `css-backgrounds/background-image-shared-stylesheet` | 5.7% | — | re-report of #1538 problem 1 — needs the server's `trickle` pipe |
+| 20 | `css-overflow/overflow-scroll-resize-visibility-hidden` | 5.9% | **5.9% → 100%** | **fixed** — a `visibility: hidden` box still clips its visible descendants ([`patches/0121`](../patches/README.md)) |
+| 21–26 | `css-contain/contain-{body,html}-bg-00{1,3,4}` (6) | 7.5% | **7.5% → 99.8%** | **fixed** — any containment on html or body disables propagation from body ([`patches/0120`](../patches/README.md)) |
+| 27 | `css/filter-effects/fecolormatrix-negative` | 7.7% | **7.7% → 99.6%** | **fixed** — a colour-only filter chain over a solid fill recolours the shape; main repo, on CI immediately |
+| 28, 29 | `css/filter-effects/svg-filter-{filter,primitive}-units-user-space` (2) | 8.0% | 8.0% | **won't fix** — the reference is an all-green canvas: Chromium fails both against their own `-ref.html`. Ours is already the closer render |
+| 30 | `css-sizing/replaced-max-size-saturation` | 8.3% | — | open — **diagnosed**: `<canvas>` is not modelled as a replaced element, so it lays out as a non-atomic inline and `max-width`/`max-height` never apply. Three parts, see above |
 
 ## Reported problems, at a glance
 

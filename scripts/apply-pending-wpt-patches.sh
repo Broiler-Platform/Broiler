@@ -47,6 +47,8 @@ set -euo pipefail
 #     Listing it would fail this script and take the whole run down, so it needs
 #     regenerating against the current pointer before it can go back in.
 PENDING_PATCHES=(
+  "Broiler.HTML|patches/0120-html-canvas-background-containment.patch"
+  "Broiler.HTML|patches/0121-html-visibility-hidden-overflow-clip.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

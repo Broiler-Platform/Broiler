@@ -36,6 +36,7 @@ internal static class FragmentTreeBuilder
         if (!string.IsNullOrEmpty(fragment.SvgContent))
         {
             SvgRenderer.CollectFloodFilters(fragment.SvgContent);
+            SvgRenderer.CollectColorFilters(fragment.SvgContent);
             SvgRenderer.CollectClipPaths(fragment.SvgContent);
         }
 

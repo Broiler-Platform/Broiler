@@ -27,8 +27,34 @@ public static partial class SvgFilterTable
     [ThreadStatic]
     private static Dictionary<string, FloodFilter>? _table;
 
+    [ThreadStatic]
+    private static Dictionary<string, SvgColorFilter>? _colorTable;
+
     /// <summary>Clears the table at the start of a render pass.</summary>
-    internal static void Reset() => _table = null;
+    internal static void Reset()
+    {
+        _table = null;
+        _colorTable = null;
+    }
+
+    /// <summary>
+    /// Records a colour-transform filter under its <c>id</c> — a chain whose primitives only change
+    /// colour, so applied to a uniformly filled shape it recolours that shape (see
+    /// <see cref="SvgColorFilter"/>). Later definitions win, matching document order.
+    /// </summary>
+    internal static void AddColorFilter(string id, SvgColorFilter filter)
+    {
+        if (string.IsNullOrEmpty(id))
+            return;
+        (_colorTable ??= new Dictionary<string, SvgColorFilter>(StringComparer.Ordinal))[id] = filter;
+    }
+
+    /// <summary>Resolves a <c>url(#id)</c> reference to a modelled colour-transform filter, if any.</summary>
+    public static bool TryGetColorFilter(string id, out SvgColorFilter filter)
+    {
+        filter = null!;
+        return _colorTable != null && id != null && _colorTable.TryGetValue(id, out filter!);
+    }
 
     /// <summary>Records a flood filter under its <c>id</c> (later definitions win, matching document order).</summary>
     internal static void AddFlood(string id, BColor color)
