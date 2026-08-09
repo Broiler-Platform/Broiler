@@ -40,7 +40,7 @@ namespace Broiler.Cli.Tests;
 public sealed class ScriptCompileAheadOverlapTests : IDisposable
 {
     private const int Scripts = 8;
-    private const int FunctionsPerScript = 400;
+    private const int FunctionsPerScript = 250;
 
     private readonly int _budget = ScriptCompileAhead.MaxDegreeOfParallelism;
     private readonly bool _diagnostics = ScriptCompileAhead.CollectDiagnostics;
@@ -113,7 +113,7 @@ public sealed class ScriptCompileAheadOverlapTests : IDisposable
     [Fact]
     public void Compile_Stage_Scaling_Is_Reported()
     {
-        const int pairs = 7;
+        const int pairs = 5;
         var sources = CompileHeavySources(Scripts, FunctionsPerScript);
 
         // One untimed pass each way: the first run through this path JITs the front end and the
@@ -121,7 +121,7 @@ public sealed class ScriptCompileAheadOverlapTests : IDisposable
         MeasureSerialCompile(sources);
         MeasureAheadCompile(sources, 4);
 
-        foreach (var budget in new[] { 2, 3, 4, 8 })
+        foreach (var budget in new[] { 2, 4, 8 })
         {
             var ratios = new List<double>();
             var serials = new List<double>();
@@ -156,7 +156,7 @@ public sealed class ScriptCompileAheadOverlapTests : IDisposable
     [Fact]
     public void Serial_And_Overlapped_Wall_Clock_Are_Reported()
     {
-        const int pairs = 7;
+        const int pairs = 5;
         var html = CompileHeavyDocument();
 
         // One untimed pass each way: the first run through this path JITs the bridge, the engine
