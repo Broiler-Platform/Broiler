@@ -67,7 +67,21 @@ set -euo pipefail
 # it were wrong.
 PENDING_PATCHES=(
   "Broiler.HTML|patches/0126-raster-tile-parallel-replay.patch"
+  # 0128 and 0129 are one change (multithreading item #12) split across two
+  # submodules and must be applied together or not at all: 0129 adds the call to
+  # `CssStyleRecalc.Warm`, and 0128 gives that pass the memo it writes into.
+  # Applied on CI for the reason 0126 is — this one *could* move rendering if the
+  # warm pass and the box walk ever disagreed about an element's cascade, so
+  # having the WPT run exercise it against the pinned pointers is the check worth
+  # having, and its claim is precisely that nothing moves.
+  "Broiler.CSS|patches/0128-css-style-engine-cache-sharding.patch"
+  "Broiler.HTML|patches/0129-html-cascade-substage-trace-and-warm-pass.patch"
 )
+
+# Deliberately NOT listed: patches/0130-js-tests-reenable-parallelization.patch.
+# It changes only how `Broiler.JavaScript.BuiltIns.Tests` schedules its own
+# cases; the WPT run never builds that assembly, so applying it here would
+# exercise nothing.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"

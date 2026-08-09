@@ -59,6 +59,11 @@ public static class Program
             return TileScaling.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
         }
 
+        if (args.Length >= 1 && args[0] == "--style-scaling")
+        {
+            return StyleScaling.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
+        }
+
         if (args.Length >= 1 && args[0] == "--image-prefetch-scaling")
         {
             return ImagePrefetchScaling.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
@@ -106,6 +111,10 @@ public static class Program
         Console.WriteLine("  --tile-scaling [--iterations N] [--warmup N]");
         Console.WriteLine("        Corpus render time against the raster tile budget (item #5).");
         Console.WriteLine("        Exits 1 if any tile setting renders different pixels.");
+        Console.WriteLine();
+        Console.WriteLine("  --style-scaling [--iterations N] [--warmup N]");
+        Console.WriteLine("        Cascade sub-stage and render time against the style thread budget (item #12).");
+        Console.WriteLine("        Exits 1 if any thread setting renders different pixels.");
         Console.WriteLine();
         Console.WriteLine("  --image-prefetch-scaling [--iterations N] [--warmup N]");
         Console.WriteLine("        Render time of an image-heavy page against the concurrent-load budget (item #8).");

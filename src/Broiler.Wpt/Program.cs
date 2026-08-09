@@ -897,6 +897,10 @@ public class Program
         "BROILER_RASTER_TILES",
         "BROILER_IMAGE_DECODE_THREADS",
         "BROILER_IMAGE_PREFETCH_THREADS",
+        // Item #12's warm pass. It runs earlier than any of the others — before layout, let alone
+        // paint — so leaving it out would have been the worst of the five to miss: a pool of N
+        // workers would each open their render with N threads resolving a cascade.
+        "BROILER_STYLE_THREADS",
     ];
 
     private static string DescribeWorkerPool(int workerCount, int? requested, bool useWorkerIsolation)

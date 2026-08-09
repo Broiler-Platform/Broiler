@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using Broiler.Graphics;
 using Broiler.HTML.Image;
+using Broiler.Layout.Diagnostics;
 using Broiler.Layout.IR;
 using BBitmap = Broiler.HTML.Image.BBitmap;
 // Both rasterizers now carry a partitioner of this name — item #4's copy here and item
@@ -57,6 +58,18 @@ namespace Broiler.Render.Stage.Benchmarks;
 /// Whatever is left over is a row named <c>(unattributed)</c>. A profile that reached 100% by
 /// defining the total as the sum of its parts would pass its own exit gate by construction.
 /// </para>
+/// <para>
+/// <b>The parse+cascade breakdown is the one place this profile times inside the engine.</b> Phase 2
+/// §9 of the multithreading roadmap made "which half of <c>parse+cascade</c> dominates" the largest
+/// unattributed question in the document, and it is unanswerable from the outside: the HTML parse,
+/// the stylesheet parse, the cascade and the box-fixup passes are four private calls in a row and
+/// none of them is a pure function of the source, so the out-of-band trick that produces the raster
+/// split cannot be reused. <see cref="RenderStageTrace"/> carries the timers instead, on the real
+/// path and off by default; the reason that is not the drift risk P0-a rejects, and what a reader
+/// has to check in its place, are written up there. The sub-rows are printed against the measured
+/// <c>parse+cascade</c> figure with their own residual, so an untimed call inside the stage shows up
+/// as a gap rather than being divided among its neighbours.
+/// </para>
 /// </remarks>
 internal static class StageProfile
 {
@@ -80,6 +93,14 @@ internal static class StageProfile
     /// </param>
     internal sealed record StageRow(string Stage, double Milliseconds, double Share, bool Derived);
 
+    /// <summary>
+    /// One sub-stage of <c>parse+cascade</c>. <paramref name="ShareOfStage"/> is taken against the
+    /// stage rather than the render, because the question the breakdown answers — which half of the
+    /// stage dominates — is a question about the stage.
+    /// </summary>
+    internal sealed record SubStageRow(
+        string SubStage, double Milliseconds, double ShareOfStage, double ShareOfRender);
+
     /// <summary>Every stage of one page, plus the end-to-end total the shares are taken against.</summary>
     internal sealed record PageProfile(
         string Page,
@@ -87,7 +108,8 @@ internal static class StageProfile
         int SourceLength,
         double TotalMilliseconds,
         double AttributedShare,
-        IReadOnlyList<StageRow> Rows);
+        IReadOnlyList<StageRow> Rows,
+        IReadOnlyList<SubStageRow> ParseCascadeBreakdown);
 
     /// <summary>
     /// Runs the profile over the whole corpus and writes it to stdout, and to
@@ -146,25 +168,63 @@ internal static class StageProfile
 
     private static PageProfile ProfilePage(Corpus.Page page, int iterations, int warmup)
     {
-        for (var i = 0; i < warmup; i++)
-            MeasureOnce(page);
-
-        var totals = new double[iterations];
-        var parse = new double[iterations];
-        var layout = new double[iterations];
-        var paintTotal = new double[iterations];
-        var paintWalk = new double[iterations];
-
-        for (var i = 0; i < iterations; i++)
+        // On for the warm-up too: the sub-stage timers are four Stopwatch.GetTimestamp pairs per
+        // render, but profiling the measured iterations under a different code path from the ones
+        // that warmed it is a method error whatever the size of the difference.
+        RenderStageTrace.Enabled = true;
+        try
         {
-            var sample = MeasureOnce(page);
-            totals[i] = sample.Total;
-            parse[i] = sample.ParseCascade;
-            layout[i] = sample.Layout;
-            paintTotal[i] = sample.PaintTotal;
-            paintWalk[i] = sample.PaintWalk;
-        }
+            for (var i = 0; i < warmup; i++)
+                MeasureOnce(page);
 
+            var totals = new double[iterations];
+            var parse = new double[iterations];
+            var layout = new double[iterations];
+            var paintTotal = new double[iterations];
+            var paintWalk = new double[iterations];
+            var subStages = new Dictionary<string, double[]>(StringComparer.Ordinal);
+            foreach (var name in SubStageOrder)
+                subStages[name] = new double[iterations];
+
+            for (var i = 0; i < iterations; i++)
+            {
+                var sample = MeasureOnce(page);
+                totals[i] = sample.Total;
+                parse[i] = sample.ParseCascade;
+                layout[i] = sample.Layout;
+                paintTotal[i] = sample.PaintTotal;
+                paintWalk[i] = sample.PaintWalk;
+                foreach (var name in SubStageOrder)
+                    subStages[name][i] = sample.SubStages.TryGetValue(name, out var ms) ? ms : 0;
+            }
+
+            return Summarize(page, totals, parse, layout, paintTotal, paintWalk, subStages);
+        }
+        finally
+        {
+            RenderStageTrace.Enabled = false;
+        }
+    }
+
+    /// <summary>Sub-stages in pipeline order; the profile prints them in this order.</summary>
+    private static readonly string[] SubStageOrder =
+    [
+        RenderStageTrace.SubStages.HtmlParse,
+        RenderStageTrace.SubStages.CssParse,
+        RenderStageTrace.SubStages.CascadeResolve,
+        RenderStageTrace.SubStages.CascadeProject,
+        RenderStageTrace.SubStages.BoxFixups,
+    ];
+
+    private static PageProfile Summarize(
+        Corpus.Page page,
+        double[] totals,
+        double[] parse,
+        double[] layout,
+        double[] paintTotal,
+        double[] paintWalk,
+        Dictionary<string, double[]> subStages)
+    {
         var total = Median(totals);
         var parseMs = Median(parse);
         var layoutMs = Median(layout);
@@ -190,7 +250,23 @@ internal static class StageProfile
             new(Stages.Unattributed, unattributed, unattributed / total, Derived: true),
         };
 
-        return new PageProfile(page.Name, page.Loads, page.SourceLength, total, attributed / total, rows);
+        var breakdown = new List<SubStageRow>();
+        var subTotal = 0.0;
+        foreach (var name in SubStageOrder)
+        {
+            var ms = Median(subStages[name]);
+            subTotal += ms;
+            breakdown.Add(new SubStageRow(name, ms, ms / parseMs, ms / total));
+        }
+
+        // Same rule as the top-level table: what the timers did not cover is a row, not a rounding
+        // adjustment spread over the ones that did. A future call added inside the stage and left
+        // untimed shows up here instead of silently inflating the cascade.
+        var subResidual = Math.Max(0, parseMs - subTotal);
+        breakdown.Add(new SubStageRow("(untimed)", subResidual, subResidual / parseMs, subResidual / total));
+
+        return new PageProfile(
+            page.Name, page.Loads, page.SourceLength, total, attributed / total, rows, breakdown);
     }
 
     private readonly record struct Sample(
@@ -198,7 +274,8 @@ internal static class StageProfile
         double ParseCascade,
         double Layout,
         double PaintTotal,
-        double PaintWalk);
+        double PaintWalk,
+        IReadOnlyDictionary<string, double> SubStages);
 
     /// <summary>
     /// One render, timed stage by stage. Mirrors <c>HtmlRender.RenderToImageCore</c> — the entry
@@ -210,6 +287,7 @@ internal static class StageProfile
         const int height = Corpus.ViewportHeight;
         var clip = new RectangleF(0, 0, width, height);
 
+        RenderStageTrace.Reset();
         var outer = Stopwatch.StartNew();
 
         var bitmap = new BBitmap(width, height);
@@ -242,7 +320,8 @@ internal static class StageProfile
         walkWatch.Stop();
 
         return new Sample(
-            Ms(outer), Ms(parseWatch), Ms(layoutWatch), Ms(paintWatch), Ms(walkWatch));
+            Ms(outer), Ms(parseWatch), Ms(layoutWatch), Ms(paintWatch), Ms(walkWatch),
+            RenderStageTrace.Totals());
     }
 
     private static double Ms(Stopwatch watch) => watch.Elapsed.TotalMilliseconds;
@@ -294,6 +373,19 @@ internal static class StageProfile
             Console.WriteLine();
             Console.WriteLine($"Attributed to named stages: "
                 + $"**{(profile.AttributedShare * 100).ToString("F1", CultureInfo.InvariantCulture)}%**");
+            Console.WriteLine();
+            Console.WriteLine("Inside `parse+cascade`:");
+            Console.WriteLine();
+            Console.WriteLine("| Sub-stage | ms | of stage | of render |");
+            Console.WriteLine("|---|---:|---:|---:|");
+            foreach (var row in profile.ParseCascadeBreakdown)
+            {
+                Console.WriteLine($"| {row.SubStage} "
+                    + $"| {row.Milliseconds.ToString("F2", CultureInfo.InvariantCulture)} "
+                    + $"| {(row.ShareOfStage * 100).ToString("F1", CultureInfo.InvariantCulture)}% "
+                    + $"| {(row.ShareOfRender * 100).ToString("F1", CultureInfo.InvariantCulture)}% |");
+            }
+
             Console.WriteLine();
         }
 

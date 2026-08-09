@@ -25,6 +25,9 @@
     <InternalsVisibleTo Include="Broiler.DevConsole" />
     <InternalsVisibleTo Include="Broiler.DevConsole.Tests" />
     <InternalsVisibleTo Include="Broiler.Layout.Tests" />
+    <!-- The style-scaling mode sets CssStyleRecalc.MaxDegreeOfParallelism (multithreading
+         item #12), the same way the tile-scaling mode sets TileParallelReplay's budget. -->
+    <InternalsVisibleTo Include="Broiler.Render.Stage.Benchmarks" />
     <!-- The WPT runner sets NativeAnchorPlacement.Enabled around only the final
          render during the Phase 5 native anchor-placement cutover (P5.8d.2b). -->
     <InternalsVisibleTo Include="Broiler.Wpt" />

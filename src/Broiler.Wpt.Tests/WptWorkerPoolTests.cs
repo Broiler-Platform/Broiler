@@ -273,11 +273,13 @@ public sealed class WptWorkerPoolTests
         var previousRaster = Environment.GetEnvironmentVariable("BROILER_RASTER_THREADS");
         var previousTiles = Environment.GetEnvironmentVariable("BROILER_RASTER_TILES");
         var previousDecode = Environment.GetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS");
+        var previousStyle = Environment.GetEnvironmentVariable("BROILER_STYLE_THREADS");
         try
         {
             Environment.SetEnvironmentVariable("BROILER_RASTER_THREADS", null);
             Environment.SetEnvironmentVariable("BROILER_RASTER_TILES", null);
             Environment.SetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS", null);
+            Environment.SetEnvironmentVariable("BROILER_STYLE_THREADS", null);
 
             var description = Program.ApplyRenderThreadBudget(workers, cores);
 
@@ -289,12 +291,18 @@ public sealed class WptWorkerPoolTests
             // view runs its bands inline, so the two never spend cores at the same time.
             Assert.Equal(perWorker, Environment.GetEnvironmentVariable("BROILER_RASTER_TILES"));
             Assert.Equal(perWorker, Environment.GetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS"));
+
+            // Item #12's warm pass is the earliest of the four to spend a thread — it runs before
+            // layout, let alone paint — so a pool that divided the others and not this one would
+            // open every worker's render with `cores` threads on the cascade.
+            Assert.Equal(perWorker, Environment.GetEnvironmentVariable("BROILER_STYLE_THREADS"));
         }
         finally
         {
             Environment.SetEnvironmentVariable("BROILER_RASTER_THREADS", previousRaster);
             Environment.SetEnvironmentVariable("BROILER_RASTER_TILES", previousTiles);
             Environment.SetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS", previousDecode);
+            Environment.SetEnvironmentVariable("BROILER_STYLE_THREADS", previousStyle);
         }
     }
 
@@ -304,23 +312,27 @@ public sealed class WptWorkerPoolTests
         var previousRaster = Environment.GetEnvironmentVariable("BROILER_RASTER_THREADS");
         var previousTiles = Environment.GetEnvironmentVariable("BROILER_RASTER_TILES");
         var previousDecode = Environment.GetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS");
+        var previousStyle = Environment.GetEnvironmentVariable("BROILER_STYLE_THREADS");
         try
         {
             Environment.SetEnvironmentVariable("BROILER_RASTER_THREADS", "7");
             Environment.SetEnvironmentVariable("BROILER_RASTER_TILES", "5");
             Environment.SetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS", "3");
+            Environment.SetEnvironmentVariable("BROILER_STYLE_THREADS", "2");
 
             Program.ApplyRenderThreadBudget(workerCount: 4, processorCount: 4);
 
             Assert.Equal("7", Environment.GetEnvironmentVariable("BROILER_RASTER_THREADS"));
             Assert.Equal("5", Environment.GetEnvironmentVariable("BROILER_RASTER_TILES"));
             Assert.Equal("3", Environment.GetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS"));
+            Assert.Equal("2", Environment.GetEnvironmentVariable("BROILER_STYLE_THREADS"));
         }
         finally
         {
             Environment.SetEnvironmentVariable("BROILER_RASTER_THREADS", previousRaster);
             Environment.SetEnvironmentVariable("BROILER_RASTER_TILES", previousTiles);
             Environment.SetEnvironmentVariable("BROILER_IMAGE_DECODE_THREADS", previousDecode);
+            Environment.SetEnvironmentVariable("BROILER_STYLE_THREADS", previousStyle);
         }
     }
 }
