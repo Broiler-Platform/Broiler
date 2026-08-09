@@ -120,17 +120,33 @@ internal static class CssStyleRecalc
         if (elements.Count < MinimumParallelElements)
             return;
 
-        // Ranges rather than one work item per element: the per-element cascade is tens of
-        // microseconds, so a scheduler dispatch per element would be a visible share of it, and
-        // contiguous ranges are also what keeps the shared ancestor chain warm (see the remarks).
-        Parallel.ForEach(
-            Partitioner.Create(0, elements.Count),
-            new ParallelOptions { MaxDegreeOfParallelism = threads },
-            range =>
-            {
-                for (var i = range.Item1; i < range.Item2; i++)
-                    engine.GetCascadedStyle(elements[i], includeInlineStyle: true);
-            });
+        try
+        {
+            // Ranges rather than one work item per element: the per-element cascade is tens of
+            // microseconds, so a scheduler dispatch per element would be a visible share of it, and
+            // contiguous ranges are also what keeps the shared ancestor chain warm (see the remarks).
+            Parallel.ForEach(
+                Partitioner.Create(0, elements.Count),
+                new ParallelOptions { MaxDegreeOfParallelism = threads },
+                range =>
+                {
+                    for (var i = range.Item1; i < range.Item2; i++)
+                        engine.GetCascadedStyle(elements[i], includeInlineStyle: true);
+                });
+        }
+        catch (Exception)
+        {
+            // A pass that only moves *when* work happens must not be able to change *whether* the
+            // render succeeds. Every call above is one the box walk is about to make anyway, so an
+            // element that throws here throws again at the same element a moment later, from the
+            // walk, with the same exception and the same partially-styled tree behind it — which is
+            // exactly what happened before this pass existed. Swallowing therefore loses no
+            // diagnostic and removes the one way this could fail a render the sequential path would
+            // have completed: an element the warm pass reaches and the walk does not. `Collect` is
+            // already a subset of what the walk queries, so that case should not exist; this is the
+            // guard that makes "should not" not matter. Item #17's scan is written the same way and
+            // for the same reason.
+        }
     }
 
     /// <summary>
