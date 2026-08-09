@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 20271,
+    "failed": 20275,
     "skipped": 0,
-    "total": 20271
+    "total": 20275
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 14494,
+      "count": 14496,
       "examples": [
         "accname/name/comp_tooltip.html",
         "appmanifest/icons-member/icons-member-cors-fail-manual.sub.html",
@@ -39,7 +39,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 1561,
+      "count": 1564,
       "examples": [
         "conformance-checkers/html-aria/accessible-name-updates/706.html",
         "content-security-policy/blob/self-doesnt-match-blob.sub.html",
@@ -63,11 +63,11 @@
       "label": "Timeout",
       "category": "Timeout",
       "subCategory": null,
-      "count": 73,
+      "count": 68,
       "examples": [
+        "conformance-checkers/html/elements/table/integrity/Alexis_of_Russia-novalid.html",
         "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
-        "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html",
-        "css/CSS2/cascade-import/cascade-import-005.xht"
+        "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html"
       ]
     },
     {
@@ -86,7 +86,7 @@
   "topFailingDirectories": [
     [
       "css/CSS2",
-      3091
+      3085
     ],
     [
       "html/canvas",
@@ -114,7 +114,7 @@
     ],
     [
       "css/css-transforms",
-      552
+      553
     ],
     [
       "html/semantics",
@@ -128,11 +128,11 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      19853
+      19858
     ],
     [
       "Timeout",
-      73
+      68
     ]
   ],
   "droppedDeclarations": [],
@@ -6140,8 +6140,7 @@
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Alexis_of_Russia-novalid.html",
       "passed": false,
       "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "category": "Timeout"
     },
     {
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Feodor_I_of_Russia-novalid.html",
@@ -11946,12 +11945,6 @@
       "category": "Timeout"
     },
     {
-      "relativeTestPath": "css/CSS2/cascade-import/cascade-import-008.xht",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
       "relativeTestPath": "css/CSS2/cascade-import/cascade-import-009.xht",
       "passed": false,
       "skipped": false,
@@ -11959,12 +11952,6 @@
     },
     {
       "relativeTestPath": "css/CSS2/cascade-import/cascade-import-010.xht",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
-      "relativeTestPath": "css/CSS2/cascade-import/cascade-import-012.xht",
       "passed": false,
       "skipped": false,
       "category": "Timeout"
@@ -56065,6 +56052,12 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-fonts/web-font-no-longer-accessible-when-stylesheet-removed.html",
+      "passed": false,
+      "skipped": false,
+      "category": "Timeout"
+    },
+    {
       "relativeTestPath": "css/css-forms/appearance-base-basic.html",
       "passed": false,
       "skipped": false,
@@ -78882,7 +78875,8 @@
       "relativeTestPath": "css/css-scroll-snap/scroll-margin-overflow-ancestor.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-scroll-snap/scroll-margin.html",
@@ -94655,6 +94649,13 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "css/css-transforms/transform-inline-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-transforms/transform-input-002.html",
       "passed": false,
       "skipped": false,
@@ -98277,7 +98278,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-view-transitions/auto-name-from-id.html",
@@ -99093,6 +99094,13 @@
     },
     {
       "relativeTestPath": "css/css-view-transitions/scoped/implicit-contain.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-view-transitions/scoped/ink-overflow-on-target.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -106795,7 +106803,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/filter-effects/feComposite-intersection-feTile-input.html",
@@ -139544,6 +139552,13 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "svg/animations/cyclic-syncbase-2.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ColorShift"
+    },
+    {
       "relativeTestPath": "svg/animations/end-attribute-change-end-time.html",
       "passed": false,
       "skipped": false,
@@ -139640,6 +139655,13 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
+    },
+    {
+      "relativeTestPath": "svg/animations/scripted/syncbase-after-removal.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "svg/animations/set-dynamic-attributeName-css-property-cleanup.html",
@@ -141744,6 +141766,13 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "web-animations/timing-model/animations/reverse-running-animation.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "web-animations/timing-model/animations/sync-start-times.html",
