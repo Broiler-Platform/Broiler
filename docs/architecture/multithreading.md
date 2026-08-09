@@ -6,8 +6,8 @@ the tooling.
 
 ## Status
 
-**Phase 2 is under way.** Seven of its nine items have landed (#9, #4, #5, #6, #7,
-#10, #17); two have not (#3, #8). What building them
+**Phase 2 is under way.** Eight of its nine items have landed (#9, #4, #5, #6, #7,
+#8, #10, #17); one has not (#3). What building them
 changed is in [What building Phase 2 changed](#what-building-phase-2-changed) —
 including the findings that matter most for what is left: **band parallelism
 inside a primitive is the wrong unit for a page** (§4), **the largest single win
@@ -19,6 +19,11 @@ Item #17 added a tenth: **the split item #2 built was never reached by the host
 that does its own script extraction**, so a whole family of round trips was still
 serial in the path this repository measures
 ([§10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split)).
+Item #8 added an eleventh, and it is the sharpest one in the phase: **only half of
+a load was safe to move earlier.** Moving a load's *completion* off the layout
+thread as well as its decode changed the rendered page — on the failure path only,
+which is the path whose callback does something
+([§12](#12-only-half-of-an-image-load-was-safe-to-move-and-the-other-half-changed-the-page)).
 
 | Item | State | Evidence |
 |---|---|---|
@@ -27,7 +32,7 @@ serial in the path this repository measures
 | #3 — band-parallel raster (`Broiler.Graphics`) | Not started | The partitioner and the exit-gate harness now exist; this is porting them to the second copy, and [§2](#2-the-rasterizer-the-profile-measures-is-item-4s-copy-not-item-3s) still says unify first. [§4](#4-band-parallelism-inside-a-primitive-is-the-wrong-unit-for-a-page) and [§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see) both say the *clip narrowing* is the part worth porting first |
 | #5 — tile-parallel replay | **Done** | `TileParallelReplay`, `patches/0126-…`; `PerformPaint` at 1 → 4 tiles: `paint` **1 323.7 → 461.4 ms (2.87×)**, `rules` 3.49×, `text` 2.42×, `mixed` 2.44×, `boxes` 1.76× — faster than band parallelism on all five pages, including the three bands could not touch. Pixels identical at 1/2/4 tiles crossed with 1/4 bands on every page (`--tile-scaling`), 69 `RasterTileParallelismTests` cases, and a full WPT run at 1 and 4 tiles whose entire output diffs to **zero lines**. Most of the win was single-threaded — see [§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see) |
 | #6/#7 — image decode | **Done** | `ImageDecodeParallelism`; JPEG **2.08–2.61×**, PNG **1.22–1.29×** at 4 threads, byte-identical at every setting (`--decode-scaling`, plus two cases in `Broiler.Media.Image.Managed.Tests`) |
-| #8 — concurrent decode across images | Not started | Unblocked by #9, but the headless render path loads images **synchronously and inline** (`AvoidAsyncImagesLoading`), so this needs #2's prefetch/consume split rather than a `Parallel.For` — see [§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor). Its remaining prerequisite is met: #17 supplies the image URL set (`PreloadScanResult.ResolvedUrls(PreloadKind.Image)`), so what is left is the consume split at `ImageLoadHandler` |
+| #8 — concurrent decode across images | **Done** | `ImagePrefetch` / `CssBox.PrefetchDocumentImages` / `DeferredImageLoad`; a document's image loads are issued from a worker pool before the layout pass and joined before it starts, so the pass finds every image already loaded. On a 12-image fixture at 4 concurrent loads: `PerformLayout` **183.7 → 97.1 ms (1.89×)**, whole render 204.3 → 118.4 (1.73×), over four runs 1.80–1.96× and 1.70–1.81× (`--image-prefetch-scaling`). Pixels identical at 1/2/3/4/8 loads over eleven documents (51 `ImagePrefetchTests` cases) and `css/css-backgrounds` identical at the budget on and off (40/16/5 both ways). **Only the decode moved; the completion callback did not** — moving it changed the page, see [§12](#12-only-half-of-an-image-load-was-safe-to-move-and-the-other-half-changed-the-page). It also discharges P0-c's outstanding debt: this is the first worker in the repository to establish the ambient render state and arm its assertion (6 `ImagePrefetchWorkerContractTests` cases, 3 of which fail against the code before the change) |
 | #10 — glyph outline cache | **Done** | `TrueTypeFont` caches outlines by glyph index; raster stage **1.34×** on `text`, **1.54×** on `boxes`, **1.00×** on the text-free `paint` control. The shaped-run cache the item names is *not* built — see [§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names) |
 | #17 — preload scan | **Done** | `PreloadScanner` / `SpeculativePreloadScan`; a document's sub-resources are found by one tokenizer pass on a worker started before the parse. Stylesheet requests are **in flight while the document is still parsing** and external scripts in the capture host now overlap instead of going one at a time — **755.1 → 521.4 ms** (median paired ratio **0.655** over 5 interleaved pairs) on 8 scripts at 40 ms each, peak concurrency 6 against 1. Exit gate: `css/css-backgrounds` identical at `BROILER_PRELOAD_SCAN` on and off (40/16/5 both ways, every verdict and pixel-match percentage the same). 40 test cases, of which the two load-order ones are assertions on *when* a request reaches the origin rather than on a stopwatch. It also found a URL-resolution defect the CSP matcher was reading through — see [§10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split) and [§11](#11-a-root-relative-url-resolved-to-the-filesystem-root-and-csp-was-matching-against-it) |
 
@@ -399,18 +404,32 @@ bytes. It does mean items #8, #10, #12 and #13 no longer have to route around
 this, and that a future in-process worker pool is now a design choice rather than
 a blocked one.
 
-**What is still owed before that pool exists:** the ambient-state contract is
-instrumented on all three slots but still off by default, and nothing yet calls
-`AmbientRenderState.Establish` on a worker thread because there are no worker
-threads. The first item that creates one has to arm `EnforceOnThisThread` in the
-same place it calls `Establish`, or the instrumentation bought here goes unused.
+**What was still owed before that pool exists — and item #8 has now paid it.** The
+ambient-state contract was instrumented on all three slots but off by default,
+because nothing called `AmbientRenderState.Establish` on a worker thread: there
+were no worker threads. The debt was recorded here as *the first item that creates
+one has to arm `EnforceOnThisThread` in the same place it calls `Establish`, or the
+instrumentation bought here goes unused.* Item #8's image-prefetch worker is that
+thread, and it does both — `ImagePrefetch.RunAll` establishes every slot per load
+and arms the assertion for the duration, then clears the record and restores the
+switch so a pooled thread does not vouch for the next document's state or leave a
+trap for whatever runs on it next. `ImagePrefetchWorkerContractTests` asserts all
+of that on the real worker, and 3 of its 6 cases fail against the code before it.
+
+**What arming it bought, given that nothing failed:** an audit rather than a fix.
+An image load can reach SVG rasterization, which opens a canvas and draws — text
+included — so a prefetch worker is a render thread by any reasonable definition.
+Following the enforcement through said `BSvgRasterizer` reads none of the three
+slots: it parses its own attributes and builds its own coordinate context, and the
+font cache underneath it was made thread-safe by item #9. That is now a checked
+claim instead of an assumption, and the check is what will fire the day an image
+decode grows a dependency on the viewport.
 
 Band-parallel raster (item #4) does **not** discharge that debt, and it is worth
-saying why it does not need to: a band never leaves the primitive it was created
+saying why it did not need to: a band never leaves the primitive it was created
 in, so it inherits nothing and establishes nothing. The ambient slots are read
 during *layout* and during display-list *construction*, both of which have
-finished before a fill starts. The first item that has to arm the enforcement is
-still the first one that renders a whole document off the calling thread.
+finished before a fill starts.
 
 ### 4. Band parallelism inside a primitive is the wrong unit for a page
 
@@ -516,6 +535,31 @@ cache. The `SubResourcePrefetcher` written for #2 is the precedent, and item #17
 (the preload scan) is what supplies the URL set — so **#17 should come before
 #8**, which is the reverse of the order the component roadmap lists them in.
 
+**Half of that prediction was right, and the half that was wrong saved the work.**
+The shape is a prefetch/consume split, as this section says. But the URL set turned
+out not to need item #17 at all: the box tree already holds it, and it holds it
+better. A preload scan finds what a document's *source* names, which is a
+superset — an `<img>` inside a `display:none` subtree, or one a script removed
+before layout, is a URL in the source and not a load the document makes. The box
+tree, walked at the document root after construction and before the layout pass,
+names what layout is about to ask for; and because a box the walk skips simply
+loads inline as it always did, an incomplete answer costs speed rather than
+correctness. So `PreloadScanResult.ResolvedUrls(PreloadKind.Image)` is still
+unconsumed, and item #16 remains its only prospective customer. The general point
+is worth keeping: **discovering a resource set from the structure the consumer will
+actually walk beats discovering it from the source, whenever that structure exists
+in time.** For images it does; for stylesheets, which item #17 does feed, it does
+not — those are wanted before there is a tree at all.
+
+**And the "consuming from a cache" half was unnecessary too.** Layout already asks
+the host for a loader per image and calls `LoadImage` on it; the prefetch is those
+same two calls, moved. No cache keyed by URL, no ownership transfer, no second way
+to load an image — and no submodule change, because the whole of it sits in
+`Broiler.Layout`. A cache would additionally have had to decide what to do about a
+document referencing one file twice, which today is two loaders and two decodes;
+collapsing them would have changed how many times the file is read, which is not a
+change a latency item gets to make on the way past.
+
 **What the exit gate actually ran on.** The corpus scaling harness compares pixels
 per page, which is five documents. The gate the roadmap sets is the WPT corpus, and
 it was run twice at four workers — once with the raster and decode budgets forced
@@ -558,6 +602,40 @@ thread for one tokenizer pass and then blocks on I/O, so *N* workers do not prod
 *N × cores* runnable threads — they produce *N* threads that are almost always
 waiting on a socket. It has an on/off switch (`BROILER_PRELOAD_SCAN`) because the
 exit gate requires a sequential equivalent, not because a host has to size it.
+
+**Item #8's budget passes that test and is in the division**
+(`BROILER_IMAGE_PREFETCH_THREADS`): a concurrent image load holds a core for the
+length of a decode, which is exactly the shape the division is for. One consequence
+is worth stating rather than discovering: at the pool's default of one worker per
+core the per-worker figure is 1, and 1 turns the walk off. That is the right answer
+— *N* workers each rendering a document already saturate the cores, and there is
+nothing left for a second axis to win — but it does mean **a default WPT run does
+not exercise item #8**, which is why its gate is run at `--workers 1`.
+
+**Its two budgets are the first pair in this document that genuinely compound, and
+dividing them is still wrong.** A concurrent image load decodes through items
+#6/#7's band partitioner, so *N* loads at *N* bands is *N²* runnable threads on
+*N* cores — unlike bands and tiles, which a tile view keeps from ever running at
+once. The correction was built and measured at nothing: over four interleaved runs
+the layout stage reads 94.7 / 91.3 / 101.8 / 85.6 ms undivided against
+92.1 / 90.6 / 94.0 / 93.6 divided — three runs favour the division by 1–8% and the
+fourth penalises it by 9%, so the effect does not have a sign, let alone a size.
+The .NET pool already serialises the excess, and a document's images do not divide
+evenly into waves — the last wave runs with fewer loads than the budget and wants
+every core it can get. So the
+prefetch budget gets the same figure as the decode budget, for a different reason
+than the tile budget does, and `--image-prefetch-scaling` keeps the divided
+configuration as a column so the null result stays re-runnable.
+
+**How that null result was nearly a false positive is the more useful half.**
+Measured in its own block rather than inside the interleave, dividing read **1.10×
+faster** on the first run and **1.17× slower** on the second — the sign of the
+effect changed between two runs of the same code. `DecodeScaling` already documents
+why for this host (throughput drifts by tens of percent over tens of seconds) and
+its own settings are interleaved for that reason; the mistake was assuming a
+configuration measured *outside* the interleave could be compared with the ones
+inside it, however carefully its own medians were taken. **A median is only
+comparable with another median taken under the same drift.**
 
 ### 8. Most of item #5 was not parallelism; it was the rasterizer drawing pixels nothing could see
 
@@ -742,6 +820,66 @@ and it suggests the narrower rule behind §5 and §8: **an item that asserts its
 inputs by value audits every layer it reads through**, and the layers under a
 latency item are usually older than it is.
 
+### 12. Only half of an image load was safe to move, and the other half changed the page
+
+Item #8 is a latency-and-CPU item with an easy-looking shape: a document's images
+are read and decoded one at a time, inline, so issue them all at once from a pool
+before the layout pass and join before it starts. That is what shipped, and it is
+worth **1.73–1.89×** on a 12-image document. The first version of it rendered a
+different page, and what it got wrong is the part worth recording.
+
+**A load has two halves and only one of them is arithmetic.** The expensive half
+resolves the source, reads the bytes and decodes them. The other half is the
+completion callback: it stores the image and its rectangle on the box, sets a 2px
+error border when the image is null, and may ask the host to refresh. Moving the
+whole load to a worker moves both — and the second half is *observable*, because a
+box that acquires an error border before its width is resolved lays out differently
+from one that acquires it after. Three broken `<img>` elements rendered **6–10
+pixels wider** with the loads on workers than with them inline.
+
+**Every document with working images was byte-identical, which is how this class of
+defect survives a test suite.** The divergence lived entirely on the failure path,
+because that is the path whose callback *does* something: on success the callback
+stores two values the layout pass was going to read anyway, and the order it stores
+them in relative to the pass is invisible. Ten of the eleven documents in the item's
+test suite passed against the broken version. So the fix is not "handle failures
+too" — it is to stop relying on which documents were tried:
+`DeferredImageLoad` wraps the callback the host's loader is given, captures the
+completion on the worker, and applies it from the inline call site the serial path
+would have completed at. The real callback then runs on the layout thread, at the
+same call site, in the same order, with the arguments the loader produced. There is
+no document for which that can differ.
+
+**The generalisation.** Item #5's lesson was *check what a stage is recomputing, and
+what it is computing that nobody will see*. This one is the other half of moving
+work earlier: **ask what the work notifies, not only what it computes.** A pure
+function can be hoisted; a function that writes to the object its caller is about to
+measure cannot, and the difference is invisible on every input whose write happens
+to be idempotent with respect to the measurement.
+
+**A second thing this item did not need, and the reason is reusable.** §6 predicted
+#8 would consume item #17's image URL set. It does not, and should not: a preload
+scan finds what a document's *source* names, which is a superset of what layout will
+ask for — an `<img>` in a `display:none` subtree is in the source and is not a load
+the document makes. The box tree, walked at the root after construction, names what
+the consumer is about to walk. **Discover a resource set from the structure the
+consumer will actually walk, whenever that structure exists in time.** For images it
+does. For stylesheets, which #17 does feed, it does not: those are wanted before
+there is a tree at all. That is the whole of the difference between the two items,
+and it is why one scan does not serve both.
+
+**Recorded in passing, and deliberately not fixed here:** a missing image file
+completes with a null image and reports **nothing** to the host —
+`ImageLoadHandler.SetImageFromFile` calls `ImageLoadComplete()` on the
+`!source.Exists` branch without a `ReportError`, where every other failure path
+reports. It also passes `async: true` there on a host that has asked for
+synchronous loading, which is what makes a broken image request a refresh it should
+not. Both are pre-existing, both live in `Broiler.HTML`, and neither is something a
+concurrency item gets to change on the way past — a load that starts reporting
+would change what a host is told about pages that render identically today. They
+surfaced because this item's tests counted error reports, which is §11's lesson
+again: an item that asserts a value audits the layer under it.
+
 ## Master table
 
 Gain is per-stage unless stated. Effort is engineering days for one person
@@ -757,7 +895,7 @@ non-deterministic correctness defect.
 | 5 | Graphics / Layout | [`DisplayList.cs`](../../Broiler.Layout/Broiler.Layout/IR/DisplayList.cs) replayed by [`RGraphicsRasterBackend`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs) — **DONE** | Was one pass over the whole surface; now `Parallel.For` over horizontal strips via [`TileParallelReplay`](../../Broiler.Layout/Broiler.Layout/IR/TileParallelReplay.cs), each replaying the whole list into its own strip | Nothing | **DONE, and the estimate was right about the ceiling for the wrong reason.** `PerformPaint` at 1 → 4 tiles: `paint` **1 323.7 → 461.4 ms (2.87×)**, `rules` 3.49×, `text` 2.42×, `mixed` 2.44×, `boxes` 1.76× on a 4-core box — and it beats band parallelism on all five pages. But on the pages taller than their viewport — which is most documents — a large share of it came from *not drawing invisible pixels* rather than from threads ([§8](#8-most-of-item-5-was-not-parallelism-it-was-the-rasterizer-drawing-pixels-nothing-could-see)). Pixels identical at 1/2/4 tiles × 1/4 bands; WPT output identical to the line | Low–Medium | Done | 2 |
 | 6 | Media | [`JpegDecoder.cs:385`](../../Broiler.Media/Broiler.Media.Image.Managed/Jpeg/JpegDecoder.cs) dequantize+IDCT per block, `:424` upsample + YCbCr→RGB per row | Sequential | `Parallel.For` over blocks / rows. Entropy decode stays sequential (optionally per-RST-interval) | Nothing structural; blocks and output rows are disjoint | **DONE. Measured 2.08–2.61× at 4 threads** (gradient / flat-block fixtures, 1 024²), which lands inside the estimate. Byte-identical at 1, 2 and 4 threads. `JpegDct.Inverse` also took a caller-owned scratch buffer, removing a 512-byte allocation per block | Low | Done | 2 |
 | 7 | Media | [`PngDecoder.cs:293`](../../Broiler.Media/Broiler.Media.Image.Managed/Png/PngDecoder.cs) expand-to-RGBA | Sequential | `Parallel.For` over rows | Inflate (`:62`) and unfilter (`:63`) are genuinely sequential — Up/Paeth read the previous row | **DONE. Measured 1.22–1.29× at 4 threads**, just under the estimate: inflate and unfilter are a larger share of a PNG decode than the estimate assumed, and both are on the do-not-parallelize list | Low | Done | 2 |
-| 8 | Media / HTML | Per-image decode, driven from [`ImageLoadHandler.cs:177`](../../Broiler.HTML/Source/Broiler.HTML.Core/Handlers/ImageLoadHandler.cs) | Already `ThreadPool.QueueUserWorkItem` for file reads; decode is on the completion path | Decode *N* page images concurrently — coarser and better than #6/#7 | **Not what this cell said.** `BImageRenderer._images` is fixed and the decoders are covered by a re-entrancy test, but every headless entry point sets `AvoidAsyncImagesLoading`, so decode is synchronous and inline. Needs #2's prefetch/consume split fed by #17 ([§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor)) | **Near-linear in image count** up to core count | Low | 3–4 d, after #17 | 2 |
+| 8 | Media / HTML — **DONE** | The document-wide walk in [`CssBox.ImagePrefetch.cs`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.ImagePrefetch.cs), consumed at `MeasureWordsSize`; loads still run through [`ImageLoadHandler`](../../Broiler.HTML/Source/Broiler.HTML.Core/Handlers/ImageLoadHandler.cs) | One worker per image, up to `BROILER_IMAGE_PREFETCH_THREADS`, joined before the layout pass | Nothing. **Neither blocker this cell named was the one that mattered.** `BImageRenderer._images` was cleared by #9; the shape was decided by every headless entry point setting `AvoidAsyncImagesLoading`, which makes decode synchronous and inline ([§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor)). It needed neither #17's URL set nor a cache, and it needed one thing the row could not have predicted: the completion callback has to stay on the layout thread ([§12](#12-only-half-of-an-image-load-was-safe-to-move-and-the-other-half-changed-the-page)) | **Measured: 1.89× of `PerformLayout`, 1.73× end to end** at 4 concurrent loads on a 12-image fixture (1.80–1.96× / 1.70–1.81× over four runs). Sub-linear in image count, not near-linear: the decodes already split into bands, so the cores were not idle | Low | Done | 2 |
 | 9 | Graphics | [`FontsHandler.cs`](../../Broiler.Graphics/Broiler.Graphics/Text/FontsHandler.cs), [`TrueTypeFont.cs`](../../Broiler.Graphics/Broiler.Graphics/Text/TrueTypeFont.cs), [`FallbackSystemFont.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/FallbackSystemFont.cs), [`BImageRenderer.cs`](../../Broiler.Graphics/Broiler.Graphics/Rendering/BImageRenderer.cs) — **DONE** | Plain `Dictionary`, no synchronization; and two lazy-init latches published before their values | Not a speedup itself — a **hard prerequisite** for #10, #12, #13, and per Phase 1 §2 for *every* CPU-parallel render-path item | Nothing now | **DONE.** Nested map flattened to one concurrent dictionary; image table concurrent and handle allocation interlocked; replay transform state moved per-call; `TrueTypeFont`'s five lazy tables re-published through `Lazy` in `ExecutionAndPublication`. Both P0-c residuals closed with it. Enables ~4 items | Low | Done | 2 |
 | 10 | Graphics | [`TrueTypeFont.GetGlyphContours`](../../Broiler.Graphics/Broiler.Graphics/Text/TrueTypeFont.cs) — **DONE**; [`ComplexTextShaper.Shape:72`](../../Broiler.Graphics/Broiler.Graphics/Text/ComplexTextShaper.cs) — not built | Outlines were re-extracted per glyph *occurrence*; shaping is called per run during layout | Concurrent cache by glyph index, published through `GetOrAdd` | Nothing | **The item was right that the cache is the whole win, and wrong about which cache.** Glyph outlines: raster stage **1.34×** (`text`), **1.54×** (`boxes`), 1.00× on the text-free `paint` control. The shaped-run cache is deliberately unbuilt — `RequiresShaping` is false for the whole Latin corpus, so it would measure nothing ([§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names)) | Low | Done (outlines) | 2 |
 | 11 | CSS | [`CssStyleEngine.CollectFromRules:623`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) — linear scan of every rule of every sheet, per element | O(elements × rules) | **Not multithreading.** Rule index (bucket by id/class/tag) + ancestor bloom filter | Nothing — this is the standard engine design and it is simply absent | **DONE.** Exit gate met: with matches fixed at four, 32× the rules now costs 1.64× the time and 1.13× the bytes (was 30.8× / 32.0×) — up to **136.9× faster** and **600× less garbage** at 3 200 rules. On a whole render the corpus `rules` page is 5 218.96 ms → 1 841.71 ms (2.8×); see [What building Phase 1 changed](#what-building-phase-1-changed) §1. `patches/0123-css-cascade-rule-index.patch` | Low | Done | 1 |
@@ -1111,10 +1249,29 @@ here, and step 2 is that.
 
 ### Broiler.Media
 
-1. **Concurrent decode across images** (item #8) — still the better win when a
-   page has several images, but it is a prefetch/consume split rather than the
-   coarse `Parallel.For` this step used to describe, and it wants item #17 first:
-   [§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor).
+1. **Concurrent decode across images** (item #8) — **DONE**, and it is the better
+   win when a page has several images. A prefetch/consume split rather than the
+   coarse `Parallel.For` this step used to describe
+   ([§6](#6-item-8-is-a-prefetchconsume-split-not-a-parallelfor)), but **not** fed by
+   item #17 as that section predicted: the box tree names what layout will actually
+   ask for, where a source scan names a superset
+   ([§12](#12-only-half-of-an-image-load-was-safe-to-move-and-the-other-half-changed-the-page)).
+   The walk lives in `Broiler.Layout` — `ImagePrefetch` holds the budget
+   (`BROILER_IMAGE_PREFETCH_THREADS`, where 1 is the pre-change path) and
+   `DeferredImageLoad` is what keeps each completion on the layout thread.
+   *Exit gate — met.* Pixels identical at 1, 2, 3, 4 and 8 concurrent loads over
+   eleven documents chosen for what decides something about the walk (background
+   layers, a box that is both, duplicate sources, both kinds of failure, SVG, inline
+   data, hidden subtrees, table cells) — 51 `ImagePrefetchTests` cases; the walk's
+   claim count asserted directly where pixels cannot see it, which is what pins the
+   `display:none` exclusion; and WPT `css/CSS2` — whose `visudet` replaced-element
+   tests carry seven images each, the shape a late decode would corrupt — identical
+   at the budget on and off (13 passed, 4 failed, 0 skipped both ways, 97.16%
+   average match, whole output differing by one elapsed-time line).
+   `css/css-backgrounds` was run the same way and is also identical (40/16/5), but
+   **that run is a no-regression check rather than a gate**: no file in that subset
+   references two images, so the walk never ran in it. Worth saying, because a
+   subset that cannot reach the code under test proves nothing about it.
 2. **JPEG intra-image** (item #6) — **DONE**. Bands of block rows for
    dequantize + IDCT, bands of output rows for upsample + YCbCr→RGB; the
    dequantized block and the IDCT intermediate moved inside the band, which is
@@ -1134,7 +1291,11 @@ here, and step 2 is that.
 Both go through `ImageDecodeParallelism`, whose budget is
 `BROILER_IMAGE_DECODE_THREADS` and whose default any host running several renders
 at once must divide — see
-[§7](#7-two-kinds-of-parallelism-now-multiply-and-the-runner-has-to-divide).
+[§7](#7-two-kinds-of-parallelism-now-multiply-and-the-runner-has-to-divide). Item
+#8's budget is in the same division, and the two of them are the first pair in this
+document that genuinely compound: a concurrent load decodes through the band
+partitioner, so *N* loads at *N* bands is *N²* threads. Dividing the inner one
+anyway measured as nothing, and §7 has the figures.
 
 ### Tooling — Broiler.Wpt and Broiler.Cli
 
@@ -1193,7 +1354,7 @@ Recording these so they are not revisited each time the topic comes up:
 |---|---|---|
 | **0 — Make it measurable and deterministic** | P0-a benchmarks, P0-b single-threaded event loop (#15), P0-c static-state audit, GC config evaluation (#19) | Nothing after this is trustworthy without it. #15 is a correctness fix that also removes lock overhead from the cascade. |
 | **1 — Free wins and the sequential fixes** — **DONE** | WPT worker pool (#1), CLI batch (#20), concurrent sub-resource fetch (#2), CSS rule indexing (#11) | Cheap, low-risk, and #1 shortens the feedback loop for everything else. #11 is single-threaded but must precede #12. **What it changed:** #11 met its exit gate (cascade cost is now flat in total rules) but is 2.8× on a whole render, and `parse+cascade` still dominates the rule-heavy page — so #12 needs that stage split before it is started; #20 had to use processes, which makes item #9 a gate on every render-path item, not three. |
-| **2 — Raster, decode, text** — *in progress; 7 of 9 items done* | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), text caches (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed, in the order it matters:** band parallelism inside a primitive turned out to be the wrong unit for a page — three of five corpus pages split zero fills, because their raster is glyphs — which promotes **#5 from "supersedes #3" to the only raster parallelism the corpus can use (§4)**; the phase's largest single win was a *cache*, and not the one #10 names (§5); #8 is a prefetch/consume split needing #17 first, not a `Parallel.For` (§6); the pool and the in-process threads multiply, so the runner now divides them (§7); the item-#9 findings (§1–§3) stand. **#5 landed and about half of its win was single-threaded** — the rasterizer was walking pixels its clip could never admit (§8) — and between them #4, #10 and #5 have taken raster from the largest stage on three pages to the largest on one (§9). **#17 landed and its number came from somewhere the item did not name:** the capture host does its own script extraction and so never reached the split item #2 built, leaving that family serial in the path this repository measures (§10). **What is left:** #3's port, and #8 — whose last prerequisite #17 has now supplied. The largest open question is still the parse/cascade split Phase 1 §1 named, which gates #12. See [What building Phase 2 changed](#what-building-phase-2-changed). |
+| **2 — Raster, decode, text** — *in progress; 8 of 9 items done* | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), text caches (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed, in the order it matters:** band parallelism inside a primitive turned out to be the wrong unit for a page — three of five corpus pages split zero fills, because their raster is glyphs — which promotes **#5 from "supersedes #3" to the only raster parallelism the corpus can use (§4)**; the phase's largest single win was a *cache*, and not the one #10 names (§5); the pool and the in-process threads multiply, so the runner now divides them (§7); the item-#9 findings (§1–§3) stand. **#5 landed and about half of its win was single-threaded** — the rasterizer was walking pixels its clip could never admit (§8) — and between them #4, #10 and #5 have taken raster from the largest stage on three pages to the largest on one (§9). **#17 landed and its number came from somewhere the item did not name:** the capture host does its own script extraction and so never reached the split item #2 built, leaving that family serial in the path this repository measures (§10). **#8 landed, and it needed neither of the two things §6 predicted** — not #17's URL set (the box tree names what layout will actually ask for, where a source scan names a superset) and not a cache (layout's existing loader seam is the split) — but it did need one thing nothing predicted: **only the decode was safe to move off the layout thread, not the completion callback**, which changed the rendered page on the failure path and nowhere else (§12). It also discharges P0-c's last debt, being the first worker to establish the ambient state and arm its assertion. **What is left: #3's port**, which §4 and §8 both say should be the clip narrowing first and should be scheduled for the Writer and Broiler.UI paths rather than for a repeat of the 4–6x estimate. The largest open question is still the parse/cascade split Phase 1 §1 named, which gates #12 — and §9 makes it the largest unattributed question in the document. See [What building Phase 2 changed](#what-building-phase-2-changed). |
 | **3 — Style and incremental layout** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. |
 | **4 — Parallel layout and workers** | Parallel intrinsic sizing and independent subtrees (#13), Web Workers (#18) | Highest cost, highest risk, lowest ceiling. Only worth starting once Phase 3's measurements say layout is still the bottleneck. |
 

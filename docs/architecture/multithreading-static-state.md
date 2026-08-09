@@ -99,6 +99,20 @@ the code that introduces worker threads, which is also the code that calls
 `Establish`; arming it process-wide would make every existing single-threaded render
 pay for a hazard it does not have.
 
+*It now has one caller, which is what this instrumentation was waiting for.*
+Multithreading item #8's image prefetch (`Broiler.Layout/ImagePrefetch.cs`) runs a
+document's image loads on pool threads before the layout pass, and
+`ImagePrefetch.RunAll` calls `Establish` and arms the switch per load, then calls
+`ClearThreadRecord` and restores the switch on the way out — so a pooled thread
+neither vouches for the next document's state nor leaves the assertion armed for
+unrelated work that lands on it next. `ImagePrefetchWorkerContractTests` asserts both
+halves on the real worker, and 3 of its 6 cases fail against the code before that item.
+**What arming it found was nothing, and that is the useful part**: an image load can
+reach SVG rasterization, which opens a canvas and draws text, but `BSvgRasterizer`
+reads none of these slots — it parses its own attributes and builds its own coordinate
+context, and the font caches under it were made thread-safe by item #9. That was an
+assumption before and is a checked claim now.
+
 *Until Phase 2 there was a second, stronger reason, and it was a finding rather than
 a preference:* turning it on failed every render in the repository, because
 `DocumentModeContext.CurrentQuirksMode` was **never written on the HTML-string render

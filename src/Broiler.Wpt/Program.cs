@@ -896,6 +896,7 @@ public class Program
         "BROILER_RASTER_THREADS",
         "BROILER_RASTER_TILES",
         "BROILER_IMAGE_DECODE_THREADS",
+        "BROILER_IMAGE_PREFETCH_THREADS",
     ];
 
     private static string DescribeWorkerPool(int workerCount, int? requested, bool useWorkerIsolation)
