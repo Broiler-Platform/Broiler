@@ -56,9 +56,9 @@ dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchma
 `--job short` is enough to separate anything that differs by more than a few percent and
 finishes in minutes; drop it for publication numbers.
 
-## Thread scaling — items #3, #4, #5, #6, #7, #8
+## Thread scaling — items #3, #4, #5, #6, #7, #8, #12
 
-Five modes that answer "how does this stage scale with threads, and does it change a
+Six modes that answer "how does this stage scale with threads, and does it change a
 pixel". All report the second question as part of the first and **exit non-zero if any
 setting produced different bytes**, because a speedup measured without that check is not
 evidence of anything.
@@ -69,6 +69,7 @@ dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchma
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --tile-scaling
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --decode-scaling
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --image-prefetch-scaling
+dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --style-scaling
 ```
 
 `--raster-scaling` renders the whole corpus at 1, 2, 4 and *cores* raster threads, and
@@ -121,6 +122,21 @@ and serial; a `data:` URI takes a different one. It follows the timings with the
 count of how many loads it issued and, when it declined a document, whether that was for naming
 too few images or for a host that loads them asynchronously — as with the tile driver's two
 refusal counts, those call for opposite next steps.
+
+`--style-scaling` renders the corpus at 1, 2, 4 and *cores* style threads (item #12) and
+reports the two cascade sub-stages together, because the item has two halves that do not
+scale together: `cascade (resolve)` is the threaded warm pass and `cascade (project)` is the
+ordered box walk that consumes it and cannot be threaded. Its `project residue` column is
+therefore Amdahl's serial fraction **measured rather than assumed** — it says how much of a
+further speedup is even available, which is what decides whether another thread is worth
+adding to a page. A budget of 1 is not one thread through the warm pass but the warm pass
+switched off, which is the code that shipped before the item. Published run:
+[`../results/style-scaling.md`](../results/style-scaling.md).
+
+Reading it needs the sub-stage rows the profile also prints, and those come from
+`RenderStageTrace` — the one place in this project that times *inside* the engine rather than
+around it. Why that is not the drift risk P0-a rejects, and what a reader has to check in its
+place, is written up on the type itself.
 
 Its last column is the full concurrent-load budget with the *within*-image decode budget divided
 across the loads in flight — the correction that `N` loads × `N` bands on `N` cores obviously

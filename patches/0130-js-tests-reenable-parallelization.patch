@@ -1,0 +1,71 @@
+From bb00b6c44dfced2be906f61263dd430fa7dbe74e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 9 Aug 2026 10:48:57 +0000
+Subject: [PATCH] Re-enable test parallelization for
+ Broiler.JavaScript.BuiltIns.Tests
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Multithreading roadmap item #21. The assembly set
+`[assembly: CollectionBehavior(DisableTestParallelization = true)]`, and the
+roadmap's guess about why was right: the engine used to dispatch promise
+continuations, async function resumptions and generator steps onto ThreadPool
+threads whenever no synchronization context was installed — which is exactly the
+situation in a unit test — so two tests running at once could have their
+continuations interleaved onto each other's ambient context. Item #15 removed
+that dispatch.
+
+What makes it safe rather than merely no-longer-obviously-unsafe is that a
+context is reachable from exactly one thread: JSEngine.Current is [ThreadStatic]
+and the async-local mirror that restores it across await points is AsyncLocal,
+so two xUnit test threads each holding their own JSContext cannot see each
+other's at all. What they do share is process-wide and already concurrent — the
+interned key strings, the built-in registry's static constructors (which the CLR
+serialises), and DictionaryCodeCache.Current, whose per-key compilation is
+serialised by Lazy<T>.
+
+2 118 tests, 0 failures, 57-59 s serial against 31-37 s parallel on four cores,
+three runs each.
+
+The file keeps a note on what to look for if this ever has to go back to serial:
+a new piece of process-wide mutable state, not a new test.
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CwWJ8VrrbUxz4mKHH3jFjF
+---
+ .../AssemblyInfo.cs                           | 24 +++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/AssemblyInfo.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/AssemblyInfo.cs
+index 21712008..b9702516 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/AssemblyInfo.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/AssemblyInfo.cs
+@@ -1,3 +1,23 @@
+-using Xunit;
++// Test parallelization is ON for this assembly — multithreading roadmap item #21.
++//
++// It was off, with `[assembly: CollectionBehavior(DisableTestParallelization = true)]`, and the
++// roadmap's guess about why was right: the engine used to dispatch promise continuations, async
++// function resumptions and generator steps onto `ThreadPool` threads whenever no synchronization
++// context was installed, which is exactly the situation in a unit test. Two tests running at once
++// could then have their continuations interleaved onto each other's ambient context. Item #15
++// removed that dispatch — continuations pump a single-threaded event loop now — so the reason the
++// attribute existed is gone.
++//
++// What makes it safe rather than merely no-longer-obviously-unsafe is that a context is reachable
++// from exactly one thread. `JSEngine.Current` is `[ThreadStatic]` and the async-local mirror that
++// restores it across await points is `AsyncLocal`, so two xUnit test threads each running
++// `using var ctx = new JSContext()` cannot see each other's context at all. What they do share is
++// process-wide: the interned key strings, the built-in registry's static constructors (which the
++// CLR already serialises), and `DictionaryCodeCache.Current`, which is a `ConcurrentDictionary`
++// whose per-key compilation is serialised by `Lazy<T>` — the code cache is documented as
++// process-shared and concurrent, and item #16 is built on that being true.
++//
++// If this file ever needs to go back to serial, the thing to look for is a *new* piece of
++// process-wide mutable state, not a new test.
+ 
+-[assembly: CollectionBehavior(DisableTestParallelization = true)]
++using Xunit;
+-- 
+2.43.0
+

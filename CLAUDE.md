@@ -82,6 +82,30 @@ e.g. issue #1119's `Broiler.HTML` `HtmlParser.AppendCanonicalNode` text-node
 coalescing is shipped as `patches/0001-…`, with the active fallback
 `DomBridge.RemoveRenderCommentNodes` in the main repo until the patch lands.
 
+### Keep the patch small: put the *type* in the main repo, the *call* in the submodule
+
+A feature whose code sits entirely in a submodule makes a large patch, and it also
+makes the main repo unbuildable the moment the submodule tree is reverted (step 3)
+— main-repo benchmarks and tests that name the new type stop compiling. Where the
+dependency direction allows it, define the type in the main repo (`Broiler.Layout`
+is usually the right home: the submodules reference it, not the other way round)
+and let the submodule patch be the one or two lines that call it.
+`Broiler.Layout.IR.TileParallelReplay` (item #5),
+`Broiler.Layout.Engine.CssStyleRecalc` and `Broiler.Layout.Diagnostics.RenderStageTrace`
+(item #12) are all shaped that way, and each submodule patch is a handful of lines
+as a result. The alternative — the `#if` file-existence probe in
+`Broiler.Render.Stage.Benchmarks.csproj` for `--graphics-raster-scaling` — is what
+to fall back to when the type genuinely cannot move.
+
+### Watch the line endings when editing submodule sources
+
+Several `Broiler.HTML` and `Broiler.CSS` files are CRLF, and some are *mixed* CRLF
+and LF within one file. An editor that rewrites the whole file normalizes them, and
+the patch then shows every line as changed and is far more likely to conflict.
+Check with `git show --stat` after committing: a two-line change that reports two
+thousand is a line-ending rewrite, not a diff. Restore the original bytes and
+re-apply the edit rather than shipping it.
+
 ### Egress-scope caveat
 
 Pushes go through the session's git proxy, which only authorizes repos in the

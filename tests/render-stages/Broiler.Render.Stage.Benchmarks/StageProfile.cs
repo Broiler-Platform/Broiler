@@ -8,7 +8,7 @@ using System.Text;
 using System.Text.Json;
 using Broiler.Graphics;
 using Broiler.HTML.Image;
-using Broiler.HTML.Orchestration;
+using Broiler.Layout.Diagnostics;
 using Broiler.Layout.IR;
 using BBitmap = Broiler.HTML.Image.BBitmap;
 // Both rasterizers now carry a partitioner of this name — item #4's copy here and item
@@ -211,7 +211,8 @@ internal static class StageProfile
     [
         RenderStageTrace.SubStages.HtmlParse,
         RenderStageTrace.SubStages.CssParse,
-        RenderStageTrace.SubStages.Cascade,
+        RenderStageTrace.SubStages.CascadeResolve,
+        RenderStageTrace.SubStages.CascadeProject,
         RenderStageTrace.SubStages.BoxFixups,
     ];
 
