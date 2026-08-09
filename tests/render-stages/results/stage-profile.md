@@ -9,76 +9,126 @@
 
 ## text — line breaking, text measurement, glyph raster
 
-77,629 chars of source; 164.44 ms end to end.
+77,629 chars of source; 266.61 ms end to end.
 
 | Stage | ms | share |
 |---|---:|---:|
-| parse+cascade | 60.59 | 36.8% |
-| layout | 32.26 | 19.6% |
-| paint (display list) | 7.62 | 4.6% |
-| raster * | 64.96 | 39.5% |
-| (unattributed) * | 0.00 | 0.0% |
+| parse+cascade | 90.60 | 34.0% |
+| layout | 51.56 | 19.3% |
+| paint (display list) | 6.66 | 2.5% |
+| raster * | 114.29 | 42.9% |
+| (unattributed) * | 3.50 | 1.3% |
 
-Attributed to named stages: **100.6%**
+Attributed to named stages: **98.7%**
+
+Inside `parse+cascade`:
+
+| Sub-stage | ms | of stage | of render |
+|---|---:|---:|---:|
+| html parse | 2.19 | 2.4% | 0.8% |
+| css parse | 0.38 | 0.4% | 0.1% |
+| cascade | 73.67 | 81.3% | 27.6% |
+| box fixups | 7.31 | 8.1% | 2.7% |
+| (untimed) | 7.04 | 7.8% | 2.6% |
 
 ## rules — cascade: per-element rule scan (item #11)
 
-110,296 chars of source; 2047.69 ms end to end.
+110,296 chars of source; 2898.69 ms end to end.
 
 | Stage | ms | share |
 |---|---:|---:|
-| parse+cascade | 1989.68 | 97.2% |
-| layout | 30.80 | 1.5% |
-| paint (display list) | 2.77 | 0.1% |
-| raster * | 20.65 | 1.0% |
-| (unattributed) * | 3.80 | 0.2% |
+| parse+cascade | 2813.13 | 97.0% |
+| layout | 43.42 | 1.5% |
+| paint (display list) | 5.48 | 0.2% |
+| raster * | 24.15 | 0.8% |
+| (unattributed) * | 12.50 | 0.4% |
 
-Attributed to named stages: **99.8%**
+Attributed to named stages: **99.6%**
+
+Inside `parse+cascade`:
+
+| Sub-stage | ms | of stage | of render |
+|---|---:|---:|---:|
+| html parse | 28.84 | 1.0% | 1.0% |
+| css parse | 3.42 | 0.1% | 0.1% |
+| cascade | 2769.65 | 98.5% | 95.5% |
+| box fixups | 4.14 | 0.1% | 0.1% |
+| (untimed) | 7.09 | 0.3% | 0.2% |
 
 ## boxes — layout: nested block/flex/grid tree
 
-47,210 chars of source; 263.93 ms end to end.
+47,210 chars of source; 425.28 ms end to end.
 
 | Stage | ms | share |
 |---|---:|---:|
-| parse+cascade | 213.38 | 80.8% |
-| layout | 21.87 | 8.3% |
-| paint (display list) | 4.16 | 1.6% |
-| raster * | 18.96 | 7.2% |
-| (unattributed) * | 5.56 | 2.1% |
+| parse+cascade | 349.28 | 82.1% |
+| layout | 50.60 | 11.9% |
+| paint (display list) | 4.22 | 1.0% |
+| raster * | 12.74 | 3.0% |
+| (unattributed) * | 8.42 | 2.0% |
 
-Attributed to named stages: **97.9%**
+Attributed to named stages: **98.0%**
+
+Inside `parse+cascade`:
+
+| Sub-stage | ms | of stage | of render |
+|---|---:|---:|---:|
+| html parse | 6.46 | 1.9% | 1.5% |
+| css parse | 1.06 | 0.3% | 0.2% |
+| cascade | 339.89 | 97.3% | 79.9% |
+| box fixups | 2.37 | 0.7% | 0.6% |
+| (untimed) | 0.00 | 0.0% | 0.0% |
 
 ## paint — raster: overlapping gradients, borders, alpha
 
-211,592 chars of source; 667.62 ms end to end.
+211,592 chars of source; 857.91 ms end to end.
 
 | Stage | ms | share |
 |---|---:|---:|
-| parse+cascade | 176.46 | 26.4% |
-| layout | 25.84 | 3.9% |
-| paint (display list) | 7.78 | 1.2% |
-| raster * | 454.02 | 68.0% |
-| (unattributed) * | 3.52 | 0.5% |
+| parse+cascade | 248.22 | 28.9% |
+| layout | 31.40 | 3.7% |
+| paint (display list) | 10.88 | 1.3% |
+| raster * | 555.54 | 64.8% |
+| (unattributed) * | 11.87 | 1.4% |
 
-Attributed to named stages: **99.5%**
+Attributed to named stages: **98.6%**
+
+Inside `parse+cascade`:
+
+| Sub-stage | ms | of stage | of render |
+|---|---:|---:|---:|
+| html parse | 10.81 | 4.4% | 1.3% |
+| css parse | 0.63 | 0.3% | 0.1% |
+| cascade | 238.05 | 95.9% | 27.7% |
+| box fixups | 0.64 | 0.3% | 0.1% |
+| (untimed) | 0.00 | 0.0% | 0.0% |
 
 ## mixed — blended control: table, borders, text
 
-20,102 chars of source; 162.36 ms end to end.
+20,102 chars of source; 223.38 ms end to end.
 
 | Stage | ms | share |
 |---|---:|---:|
-| parse+cascade | 86.24 | 53.1% |
-| layout | 18.90 | 11.6% |
-| paint (display list) | 1.96 | 1.2% |
-| raster * | 48.35 | 29.8% |
-| (unattributed) * | 6.90 | 4.3% |
+| parse+cascade | 113.02 | 50.6% |
+| layout | 31.83 | 14.2% |
+| paint (display list) | 2.91 | 1.3% |
+| raster * | 72.93 | 32.6% |
+| (unattributed) * | 2.70 | 1.2% |
 
-Attributed to named stages: **95.7%**
+Attributed to named stages: **98.8%**
+
+Inside `parse+cascade`:
+
+| Sub-stage | ms | of stage | of render |
+|---|---:|---:|---:|
+| html parse | 2.37 | 2.1% | 1.1% |
+| css parse | 0.33 | 0.3% | 0.1% |
+| cascade | 104.65 | 92.6% | 46.8% |
+| box fixups | 1.27 | 1.1% | 0.6% |
+| (untimed) | 4.39 | 3.9% | 2.0% |
 
 `*` derived by subtraction rather than timed directly; see `StageProfile`.
 
 Wrote results/stage-profile.json
 
-P0-a exit gate MET: every page attributes >=90% of wall time to named stages (worst: mixed at 95.7%).
+P0-a exit gate MET: every page attributes >=90% of wall time to named stages (worst: boxes at 98.0%).

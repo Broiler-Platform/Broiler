@@ -13,38 +13,70 @@
       "Page": "text",
       "Loads": "line breaking, text measurement, glyph raster",
       "SourceLength": 77629,
-      "TotalMilliseconds": 164.4432,
-      "AttributedShare": 1.0059972075464354,
+      "TotalMilliseconds": 266.6075,
+      "AttributedShare": 0.9868908414054368,
       "Rows": [
         {
           "Stage": "parse\u002Bcascade",
-          "Milliseconds": 60.5925,
-          "Share": 0.36847069383227765,
+          "Milliseconds": 90.5984,
+          "Share": 0.3398193974288045,
           "Derived": false
         },
         {
           "Stage": "layout",
-          "Milliseconds": 32.2617,
-          "Share": 0.19618749817566186,
+          "Milliseconds": 51.5621,
+          "Share": 0.19340078579934922,
           "Derived": false
         },
         {
           "Stage": "paint (display list)",
-          "Milliseconds": 7.6181,
-          "Share": 0.04632663436371951,
+          "Milliseconds": 6.6617,
+          "Share": 0.024986918972647053,
           "Derived": false
         },
         {
           "Stage": "raster",
-          "Milliseconds": 64.9571,
-          "Share": 0.39501238117477644,
+          "Milliseconds": 114.2903,
+          "Share": 0.428683739204636,
           "Derived": true
         },
         {
           "Stage": "(unattributed)",
-          "Milliseconds": 0,
-          "Share": 0,
+          "Milliseconds": 3.4950000000000045,
+          "Share": 0.013109158594563184,
           "Derived": true
+        }
+      ],
+      "ParseCascadeBreakdown": [
+        {
+          "SubStage": "html parse",
+          "Milliseconds": 2.191604,
+          "ShareOfStage": 0.02419031682678723,
+          "ShareOfRender": 0.008220338887690706
+        },
+        {
+          "SubStage": "css parse",
+          "Milliseconds": 0.375031,
+          "ShareOfStage": 0.00413948811458039,
+          "ShareOfRender": 0.0014066783567604061
+        },
+        {
+          "SubStage": "cascade",
+          "Milliseconds": 73.672502,
+          "ShareOfStage": 0.8131766344659508,
+          "ShareOfRender": 0.27633319392740263
+        },
+        {
+          "SubStage": "box fixups",
+          "Milliseconds": 7.314773,
+          "ShareOfStage": 0.08073843467434304,
+          "ShareOfRender": 0.027436486220380144
+        },
+        {
+          "SubStage": "(untimed)",
+          "Milliseconds": 7.044489999999996,
+          "ShareOfStage": 0.07775512591833847,
+          "ShareOfRender": 0.026422700036570598
         }
       ]
     },
@@ -52,38 +84,70 @@
       "Page": "rules",
       "Loads": "cascade: per-element rule scan (item #11)",
       "SourceLength": 110296,
-      "TotalMilliseconds": 2047.688,
-      "AttributedShare": 0.9981459089470661,
+      "TotalMilliseconds": 2898.6905,
+      "AttributedShare": 0.9956894328663235,
       "Rows": [
         {
           "Stage": "parse\u002Bcascade",
-          "Milliseconds": 1989.6828,
-          "Share": 0.9716728329706479,
+          "Milliseconds": 2813.1341,
+          "Share": 0.9704844653128715,
           "Derived": false
         },
         {
           "Stage": "layout",
-          "Milliseconds": 30.7957,
-          "Share": 0.015039254026980671,
+          "Milliseconds": 43.4239,
+          "Share": 0.014980523101724727,
           "Derived": false
         },
         {
           "Stage": "paint (display list)",
-          "Milliseconds": 2.7654,
-          "Share": 0.001350498708787667,
+          "Milliseconds": 5.4849,
+          "Share": 0.0018921992534215017,
           "Derived": false
         },
         {
           "Stage": "raster",
-          "Milliseconds": 20.6475,
-          "Share": 0.010083323240649943,
+          "Milliseconds": 24.1526,
+          "Share": 0.008332245198305924,
           "Derived": true
         },
         {
           "Stage": "(unattributed)",
-          "Milliseconds": 3.796600000000126,
-          "Share": 0.0018540910529339068,
+          "Milliseconds": 12.495000000000346,
+          "Share": 0.0043105671336765156,
           "Derived": true
+        }
+      ],
+      "ParseCascadeBreakdown": [
+        {
+          "SubStage": "html parse",
+          "Milliseconds": 28.838074,
+          "ShareOfStage": 0.010251226203542872,
+          "ShareOfRender": 0.009948655780946603
+        },
+        {
+          "SubStage": "css parse",
+          "Milliseconds": 3.4214,
+          "ShareOfStage": 0.0012162235707142437,
+          "ShareOfRender": 0.001180326081725524
+        },
+        {
+          "SubStage": "cascade",
+          "Milliseconds": 2769.649774,
+          "ShareOfStage": 0.9845423913492072,
+          "ShareOfRender": 0.9554830962463912
+        },
+        {
+          "SubStage": "box fixups",
+          "Milliseconds": 4.139036,
+          "ShareOfStage": 0.0014713255226617172,
+          "ShareOfRender": 0.001427898563161538
+        },
+        {
+          "SubStage": "(untimed)",
+          "Milliseconds": 7.08581600000025,
+          "ShareOfStage": 0.002518833353873976,
+          "ShareOfRender": 0.0024444886406466125
         }
       ]
     },
@@ -91,38 +155,70 @@
       "Page": "boxes",
       "Loads": "layout: nested block/flex/grid tree",
       "SourceLength": 47210,
-      "TotalMilliseconds": 263.9313,
-      "AttributedShare": 0.9789255764663001,
+      "TotalMilliseconds": 425.277,
+      "AttributedShare": 0.98019220413989,
       "Rows": [
         {
           "Stage": "parse\u002Bcascade",
-          "Milliseconds": 213.3791,
-          "Share": 0.80846455119192,
+          "Milliseconds": 349.2814,
+          "Share": 0.8213032917369151,
           "Derived": false
         },
         {
           "Stage": "layout",
-          "Milliseconds": 21.8692,
-          "Share": 0.08285944107424924,
+          "Milliseconds": 50.6033,
+          "Share": 0.11898903538164537,
           "Derived": false
         },
         {
           "Stage": "paint (display list)",
-          "Milliseconds": 4.1614,
-          "Share": 0.015766981786548243,
+          "Milliseconds": 4.2242,
+          "Share": 0.009932820255974341,
           "Derived": false
         },
         {
           "Stage": "raster",
-          "Milliseconds": 18.9594,
-          "Share": 0.07183460241358261,
+          "Milliseconds": 12.744299999999999,
+          "Share": 0.029967056765355285,
           "Derived": true
         },
         {
           "Stage": "(unattributed)",
-          "Milliseconds": 5.5622000000000185,
-          "Share": 0.021074423533699937,
+          "Milliseconds": 8.423799999999972,
+          "Share": 0.019807795860109934,
           "Derived": true
+        }
+      ],
+      "ParseCascadeBreakdown": [
+        {
+          "SubStage": "html parse",
+          "Milliseconds": 6.463591,
+          "ShareOfStage": 0.01850539708097826,
+          "ShareOfRender": 0.015198543537506144
+        },
+        {
+          "SubStage": "css parse",
+          "Milliseconds": 1.055697,
+          "ShareOfStage": 0.003022482731688547,
+          "ShareOfRender": 0.0024823750167537865
+        },
+        {
+          "SubStage": "cascade",
+          "Milliseconds": 339.8885,
+          "ShareOfStage": 0.9731079295948768,
+          "ShareOfRender": 0.7992167457915665
+        },
+        {
+          "SubStage": "box fixups",
+          "Milliseconds": 2.37436,
+          "ShareOfStage": 0.00679784265637964,
+          "ShareOfRender": 0.0055830905503942135
+        },
+        {
+          "SubStage": "(untimed)",
+          "Milliseconds": 0,
+          "ShareOfStage": 0,
+          "ShareOfRender": 0
         }
       ]
     },
@@ -130,38 +226,70 @@
       "Page": "paint",
       "Loads": "raster: overlapping gradients, borders, alpha",
       "SourceLength": 211592,
-      "TotalMilliseconds": 667.6238,
-      "AttributedShare": 0.994725173069025,
+      "TotalMilliseconds": 857.9065,
+      "AttributedShare": 0.9861663246519289,
       "Rows": [
         {
           "Stage": "parse\u002Bcascade",
-          "Milliseconds": 176.4624,
-          "Share": 0.26431412421186906,
+          "Milliseconds": 248.2154,
+          "Share": 0.2893268672052257,
           "Derived": false
         },
         {
           "Stage": "layout",
-          "Milliseconds": 25.8376,
-          "Share": 0.03870083720802044,
+          "Milliseconds": 31.4039,
+          "Share": 0.03660527108723386,
           "Derived": false
         },
         {
           "Stage": "paint (display list)",
-          "Milliseconds": 7.7805,
-          "Share": 0.01165401832588952,
+          "Milliseconds": 10.879,
+          "Share": 0.012680869069065218,
           "Derived": false
         },
         {
           "Stage": "raster",
-          "Milliseconds": 454.0217,
-          "Share": 0.6800561933232459,
+          "Milliseconds": 555.5402,
+          "Share": 0.647553317290404,
           "Derived": true
         },
         {
           "Stage": "(unattributed)",
-          "Milliseconds": 3.5215999999999212,
-          "Share": 0.005274826930975082,
+          "Milliseconds": 11.867999999999938,
+          "Share": 0.013833675348071074,
           "Derived": true
+        }
+      ],
+      "ParseCascadeBreakdown": [
+        {
+          "SubStage": "html parse",
+          "Milliseconds": 10.8133,
+          "ShareOfStage": 0.043564178532033065,
+          "ShareOfRender": 0.012604287297042277
+        },
+        {
+          "SubStage": "css parse",
+          "Milliseconds": 0.634768,
+          "ShareOfStage": 0.0025573272246605166,
+          "ShareOfRender": 0.0007399034743296618
+        },
+        {
+          "SubStage": "cascade",
+          "Milliseconds": 238.052653,
+          "ShareOfStage": 0.9590567426517452,
+          "ShareOfRender": 0.2774808828234778
+        },
+        {
+          "SubStage": "box fixups",
+          "Milliseconds": 0.636691,
+          "ShareOfStage": 0.002565074528010752,
+          "ShareOfRender": 0.0007421449773372739
+        },
+        {
+          "SubStage": "(untimed)",
+          "Milliseconds": 0,
+          "ShareOfStage": 0,
+          "ShareOfRender": 0
         }
       ]
     },
@@ -169,38 +297,70 @@
       "Page": "mixed",
       "Loads": "blended control: table, borders, text",
       "SourceLength": 20102,
-      "TotalMilliseconds": 162.3568,
-      "AttributedShare": 0.957481916371843,
+      "TotalMilliseconds": 223.3811,
+      "AttributedShare": 0.9879309395468103,
       "Rows": [
         {
           "Stage": "parse\u002Bcascade",
-          "Milliseconds": 86.2446,
-          "Share": 0.5312041134094785,
+          "Milliseconds": 113.0179,
+          "Share": 0.5059420873117735,
           "Derived": false
         },
         {
           "Stage": "layout",
-          "Milliseconds": 18.9039,
-          "Share": 0.11643429779350173,
+          "Milliseconds": 31.8282,
+          "Share": 0.14248385382648754,
           "Derived": false
         },
         {
           "Stage": "paint (display list)",
-          "Milliseconds": 1.9582,
-          "Share": 0.012061090142205315,
+          "Milliseconds": 2.9053,
+          "Share": 0.013006024233921313,
           "Derived": false
         },
         {
           "Stage": "raster",
-          "Milliseconds": 48.347,
-          "Share": 0.29778241502665737,
+          "Milliseconds": 72.9337,
+          "Share": 0.32649897417462803,
           "Derived": true
         },
         {
           "Stage": "(unattributed)",
-          "Milliseconds": 6.9030999999999665,
-          "Share": 0.04251808362815704,
+          "Milliseconds": 2.695999999999998,
+          "Share": 0.01206906045318963,
           "Derived": true
+        }
+      ],
+      "ParseCascadeBreakdown": [
+        {
+          "SubStage": "html parse",
+          "Milliseconds": 2.374817,
+          "ShareOfStage": 0.02101275107748419,
+          "ShareOfRender": 0.010631235140305067
+        },
+        {
+          "SubStage": "css parse",
+          "Milliseconds": 0.332275,
+          "ShareOfStage": 0.002940021005522134,
+          "ShareOfRender": 0.0014874803642743275
+        },
+        {
+          "SubStage": "cascade",
+          "Milliseconds": 104.649832,
+          "ShareOfStage": 0.925958029657249,
+          "ShareOfRender": 0.4684811382878856
+        },
+        {
+          "SubStage": "box fixups",
+          "Milliseconds": 1.269103,
+          "ShareOfStage": 0.01122922121186113,
+          "ShareOfRender": 0.005681335618814663
+        },
+        {
+          "SubStage": "(untimed)",
+          "Milliseconds": 4.39187299999999,
+          "ShareOfStage": 0.03885997704788347,
+          "ShareOfRender": 0.019660897900493773
         }
       ]
     }
