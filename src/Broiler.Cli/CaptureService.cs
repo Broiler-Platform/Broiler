@@ -574,6 +574,15 @@ public class CaptureService
         using var microTaskContext = MicroTaskSynchronizationContext.Install(microTasks);
         using JSContext context = useEngineModules ? new BridgeModuleContext(csp, url) : new JSContext();
         RegisterRuntimeExtensions(context, microTasks, csp);
+        // Multithreading roadmap item #16, and the earliest point it can start: the last of these
+        // sources was unknown until the external fetches above returned, so there is no version of
+        // this that precedes the context. What it overlaps with is everything between here and the
+        // eval loop — the parse and DOM build in Attach — and then, once the loop is running, the
+        // execution of each script overlaps the compile of the ones behind it. Ordering is
+        // untouched: the loop below still evaluates the same sources in the same order on this
+        // thread, and finds the compile already done instead of doing it inline. Disposed (joined)
+        // before the context, so no compile outlives the cache it writes into.
+        using var compileAhead = ScriptCompileAhead.Start(context, [.. scripts, .. deferredScripts]);
         // Disposed with this call, and declared after the context so it is torn down first: the
         // bridge owns a per-document session — the headless layout view and its HtmlContainer
         // (hence the whole box tree and every sub-resource its image load handlers hold), timer
