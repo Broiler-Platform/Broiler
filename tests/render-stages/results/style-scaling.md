@@ -1,5 +1,13 @@
 # Parallel style recalc scaling (multithreading item #12)
 
+> **Reproducing this needs the two pending submodule patches applied.**
+> `0129-html-cascade-substage-trace-and-warm-pass` (`Broiler.HTML`) is what calls
+> the warm pass and opens the sub-stage timers; `0128-css-style-engine-cache-sharding`
+> (`Broiler.CSS`) is the memo it publishes into. Against bare pinned pointers the
+> mode runs, renders identically at every setting, and reports 1.00x with an empty
+> breakdown — which is a correct measurement of a feature that is not there, not a
+> failure. `scripts/apply-pending-wpt-patches.sh` applies both, as CI does.
+
 - Runtime: 10.0.10, 4 logical cores
 - Viewport: 1280x1024
 - 9 measured iterations, 3 warm-up; figures are medians

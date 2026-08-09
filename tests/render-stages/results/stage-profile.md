@@ -1,5 +1,22 @@
 # Headless render stage profile
 
+> **Two notes before reading the `parse+cascade` breakdown.** It is produced by
+> `RenderStageTrace`, whose scopes are opened in `Broiler.HTML`'s `DomParser` —
+> which reaches the pinned submodule pointer only through
+> `patches/0129-html-cascade-substage-trace-and-warm-pass.patch`. Against a bare
+> checkout the sub-stage rows are all zero and the whole stage lands in
+> `(untimed)`; apply the patch (or let `scripts/apply-pending-wpt-patches.sh` do
+> it, as CI does) to reproduce them.
+>
+> And this run **predates multithreading item #12**, so its single `cascade` row
+> is the stage as the roadmap had been carrying it. Today's profiler splits that
+> row in two — `cascade (resolve)`, the threaded warm pass, and
+> `cascade (project)`, the ordered box walk — which is what
+> [`style-scaling.md`](style-scaling.md) reads. The composition this run reports
+> is what Phase 3 §1 of the multithreading roadmap quotes, and it is kept as
+> written for the reason the roadmap keeps every superseded measurement: it is
+> what the decision was made on.
+
 - Viewport: 1280x1024
 - Iterations: 15 measured, 5 warm-up; figures are medians
 - Runtime: 10.0.10, 4 logical cores
