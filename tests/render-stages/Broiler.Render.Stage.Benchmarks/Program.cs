@@ -69,6 +69,11 @@ public static class Program
             return ImagePrefetchScaling.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
         }
 
+        if (args.Length >= 1 && args[0] == "--relayout-profile")
+        {
+            return RelayoutProfile.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
+        }
+
         if (args.Length >= 1 && args[0] == "--gc-config")
         {
             GcConfigurationMetrics.Run(ArgValue(args, "--rounds", 20));
@@ -113,6 +118,7 @@ public static class Program
         Console.WriteLine("        Exits 1 if any tile setting renders different pixels.");
         Console.WriteLine();
         Console.WriteLine("  --style-scaling [--iterations N] [--warmup N]");
+        Console.WriteLine("  --relayout-profile [--iterations N] [--warmup N]");
         Console.WriteLine("        Cascade sub-stage and render time against the style thread budget (item #12).");
         Console.WriteLine("        Exits 1 if any thread setting renders different pixels.");
         Console.WriteLine();
