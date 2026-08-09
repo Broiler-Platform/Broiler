@@ -22,6 +22,28 @@
     <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
   </ItemGroup>
 
+  <!--
+    The item-#3 mode (the graphics-raster-scaling switch) sets Broiler.Graphics's raster thread budget,
+    which arrived with `patches/0127-graphics-raster-band-parallelism.patch`. That patch could not
+    be pushed to the submodule remote (403, see patches/README.md), so the pinned pointer does not
+    carry it and a clean checkout would fail to compile these two files.
+
+    Rather than leave the project broken until a maintainer applies the patch, the mode compiles
+    only when the submodule tree actually has the partitioner. The probe is the source file itself
+    because that is the exact thing being depended on — a version string or a date would be a proxy
+    for it, and would go stale. Once the patch lands upstream and the pointer is bumped, the file is
+    there and this condition simply stops doing anything.
+  -->
+  <PropertyGroup>
+    <BroilerGraphicsRasterParallelism Condition="Exists('$(MSBuildThisFileDirectory)..\..\..\Broiler.Graphics\Broiler.Graphics\Rendering\BRasterParallelism.cs')">true</BroilerGraphicsRasterParallelism>
+    <DefineConstants Condition="'$(BroilerGraphicsRasterParallelism)' == 'true'">$(DefineConstants);BROILER_GRAPHICS_RASTER_PARALLELISM</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(BroilerGraphicsRasterParallelism)' != 'true'">
+    <Compile Remove="GraphicsRasterScaling.cs" />
+    <Compile Remove="GraphicsSceneCorpus.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- The headless render stack, entered at HtmlRender / HtmlContainer. -->
     <ProjectReference Include="..\..\..\Broiler.HTML\Source\Broiler.HTML.Image\Broiler.HTML.Image.csproj" />

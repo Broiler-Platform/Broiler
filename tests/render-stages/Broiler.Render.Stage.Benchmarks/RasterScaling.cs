@@ -4,6 +4,10 @@ using System.Diagnostics;
 using System.Globalization;
 using Broiler.Graphics;
 using Broiler.HTML.Image;
+// Both rasterizers now carry a partitioner of this name — item #4's copy here and item
+// #3's in Broiler.Graphics — so the reference has to say which. This file measures the
+// HTML one. The ambiguity goes away when the two rasterizers are unified.
+using BRasterParallelism = Broiler.HTML.Image.BRasterParallelism;
 
 namespace Broiler.Render.Stage.Benchmarks;
 

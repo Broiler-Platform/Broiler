@@ -53,6 +53,12 @@ set -euo pipefail
 #     glyph outline cache) — both landed upstream and both pointers are bumped, so
 #     they reach CI through the pointer. Their patch files are deleted for the same
 #     reason: this directory is a backlog, not an archive.
+#   * 0127 (Broiler.Graphics, raster band parallelism and clip narrowing) — it
+#     changes Broiler.Graphics's rasterizer, and WPT draws its pixels with
+#     Broiler.HTML.Image's. Applying it here would exercise nothing: the WPT run
+#     would take longer to set up and test exactly the same code. The patch's own
+#     gate is Broiler.Graphics.Tests plus the --graphics-raster-scaling mode, and
+#     both compare pixels directly.
 #
 # Listed below, and deliberately so: 0126 rewrites the loop that draws every WPT
 # pixel and adds a second thread to it. Its claim is precisely that the rendering
