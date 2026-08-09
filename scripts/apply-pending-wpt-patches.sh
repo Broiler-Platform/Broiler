@@ -53,27 +53,22 @@ set -euo pipefail
 #     glyph outline cache) — both landed upstream and both pointers are bumped, so
 #     they reach CI through the pointer. Their patch files are deleted for the same
 #     reason: this directory is a backlog, not an archive.
-#   * 0127 (Broiler.Graphics, raster band parallelism and clip narrowing) — it
-#     changes Broiler.Graphics's rasterizer, and WPT draws its pixels with
-#     Broiler.HTML.Image's. Applying it here would exercise nothing: the WPT run
-#     would take longer to set up and test exactly the same code. The patch's own
-#     gate is Broiler.Graphics.Tests plus the --graphics-raster-scaling mode, and
-#     both compare pixels directly.
+#   * 0126 (Broiler.HTML, tile-parallel replay) and 0127 (Broiler.Graphics, raster
+#     band parallelism) — both landed upstream and both submodule pointers are
+#     bumped, so they reach CI through the pointer. Their patch files are deleted
+#     for the same reason: patches/ is a backlog, not an archive. 0126 was listed
+#     here until then; its entry is removed rather than left to skip forever,
+#     because an entry that can only ever skip is noise.
 #
-# Listed below, and deliberately so: 0126 rewrites the loop that draws every WPT
-# pixel and adds a second thread to it. Its claim is precisely that the rendering
-# does not move, and a WPT run against the pinned pointers is the check that claim
-# deserves — unlike a thread-safety or scheduling patch, it *could* move pixels if
-# it were wrong.
+# Listed below, and deliberately so: 0128 and 0129 *could* move rendering if the
+# warm pass and the box walk ever disagreed about an element's cascade, so having
+# the WPT run exercise them against the pinned pointers is the check that claim
+# deserves — unlike a thread-safety or scheduling patch, which cannot move pixels
+# even when it is wrong.
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0126-raster-tile-parallel-replay.patch"
   # 0128 and 0129 are one change (multithreading item #12) split across two
   # submodules and must be applied together or not at all: 0129 adds the call to
   # `CssStyleRecalc.Warm`, and 0128 gives that pass the memo it writes into.
-  # Applied on CI for the reason 0126 is — this one *could* move rendering if the
-  # warm pass and the box walk ever disagreed about an element's cascade, so
-  # having the WPT run exercise it against the pinned pointers is the check worth
-  # having, and its claim is precisely that nothing moves.
   "Broiler.CSS|patches/0128-css-style-engine-cache-sharding.patch"
   "Broiler.HTML|patches/0129-html-cascade-substage-trace-and-warm-pass.patch"
 )

@@ -6,25 +6,32 @@ the tooling.
 
 ## Status
 
-**Phase 3 is two items in, and the other two are blocked on a precondition each
-rather than on difficulty.** #12 and #21 have landed; #14 and #16 are not started,
-and [What building Phase 3 changed](#what-building-phase-3-changed) says exactly
-what has to exist first in each case. The phase opened by answering the question
-Phase 2 §9 said the document owed before #12 could begin, and the answer reframed
-the item: **`parse+cascade` is 81.3–98.2% cascade on every corpus page**
+**Phase 3 is three items in, and #14 is the remainder.** #12, #21 and #16 have
+landed; #14 is not started, and
+[§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)
+says what has to exist first. The phase opened by answering the question Phase 2
+§9 said the document owed before #12 could begin, and the answer reframed the
+item: **`parse+cascade` is 81.3–98.2% cascade on every corpus page**
 ([§1](#1-parsecascade-is-a-cascade-stage-the-name-overstates-the-parse)). Building
 #12 then contradicted both blockers its own row named — the lock was not the
 bottleneck
 ([§3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is))
 and the box walk is not the parallel unit
 ([§4](#4-the-parallel-unit-is-not-the-box-walk--this-is-a-prefetchconsume-split-the-fourth-in-this-document)).
+**Then #16 contradicted the blocker this document had written for it two sections
+later**, which is the same failure mode three items running: the store §6 said had
+to be built already existed
+([§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache)). Its
+measurement also went one step past the number — the obvious cause of a 1.62×
+ceiling on four cores was tested and **is not the cause**
+([§9](#9-the-compile-stages-ceiling-is-not-the-thing-that-looks-like-it)).
 
 | Item | State | Evidence |
 |---|---|---|
 | #12 — cache sharding + parallel style recalc | **Done** | `CssStyleRecalc` (budget `BROILER_STYLE_THREADS`) resolves every element's cascade ahead of the unchanged box walk; the engine's memo caches are `ConcurrentDictionary` with the generation guard intact, plus a fourth cache that gives the warm pass a store. **Cascade stage 1.16–2.01× at 4 threads, 1.08–1.96× end to end**, pixel-identical at 1/2/4 across the corpus (`--style-scaling`) and at 1/2/3/4/8 over 22 `ParallelStyleRecalcTests` cases; `CssStyleEngineConcurrencyTests` extended from "the caches survive" to "the answers match". Published: [`tests/render-stages/results/style-scaling.md`](../../tests/render-stages/results/style-scaling.md) |
 | #21 — re-enable JS test parallelization | **Done** | `Broiler.JavaScript.BuiltIns.Tests` no longer sets `DisableTestParallelization`; isolation is structural (`[ThreadStatic]` current context + `AsyncLocal` mirror), and the only shared state is process-wide and already concurrent. **2 118 tests, 0 failures, 57-59 s → 31-37 s (~1.75×)** on 4 cores |
+| #16 — parallel script compile | **Done** | `ScriptCompileAhead` (budget `BROILER_SCRIPT_COMPILE_THREADS`) compiles a document's classic script sources into the context's own code cache while the host parses and while the ordered eval loop runs the scripts ahead of them; the loop is untouched and finds each compile done. **Compile stage 1.41×/1.62×/1.52× at 2/4/8 threads, whole capture 1.44× on a compile-heavy document and 1.22× on a modestly scripted one**; 45 tests, 8 documents × budgets 1/2/3/4/8 compared byte for byte, plus an assertion on the cache's own counters that the worker's key is the key `Eval` asks for. **No submodule change and no patch** — see [§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache). Published: [`tests/render-stages/results/script-compile-ahead.md`](../../tests/render-stages/results/script-compile-ahead.md) |
 | #14 — layout dirty bits | **Not started — blocked** | Bounds the *second* layout; nothing in the P0-a corpus performs one. A relayout harness has to exist first ([§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)) |
-| #16 — parallel script compile | **Not started — blocked** | The code cache is concurrent but **per context**, built inside `JSContext`'s constructor; a compile-ahead worker has nowhere to put results until `JSContextOptions` can carry a cache instance ([§6](#6-item-16-is-blocked-on-a-store-not-on-concurrency--the-same-shape-as-4-found-earlier)) |
 
 **Phase 2 is complete.** All nine items have landed (#9, #4, #5, #6, #7, #8, #10,
 #17, #3). What building them
@@ -1168,6 +1175,12 @@ in the same column.
 
 ### 6. Item #16 is blocked on a store, not on concurrency — the same shape as §4, found earlier
 
+> **Superseded by [§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache).**
+> The reasoning below is kept because it is the reasoning the item was scheduled
+> on, and because the half of it that is right — a compile needs no live context —
+> is what made the item cheap once the other half was checked. The blocker it
+> names does not exist.
+
 The item's "What blocks it today" says the code cache *is already concurrent,
 which is the hard part*, and it is: `DictionaryCodeCache` is a
 `ConcurrentDictionary` whose per-key compilation is serialised by `Lazy<T>`, and
@@ -1213,6 +1226,87 @@ one. That harness is small next to the item (15–20 days) and it is what turns
 "5–50×" from a hope into a number. **Recorded as the first thing Phase 3's
 remainder should build, ahead of any dirty bit.**
 
+### 8. Item #16's blocker did not exist: the store is the context's own cache
+
+[§6](#6-item-16-is-blocked-on-a-store-not-on-concurrency--the-same-shape-as-4-found-earlier)
+recorded item #16 as blocked, and the master table copied the finding into its
+"What blocks it today" cell as *"a store, before a queue"*. The premise was
+checked and is correct: `JSContext` builds its cache in its own constructor, and
+`JSContextOptions` carries cache *options* rather than a cache *instance*. The
+conclusion drawn from it — *"a compile-ahead worker today has nowhere to put its
+results"* — does not follow, for a reason visible on the next screen of the same
+file: **`JSContext.CodeCache` is a public settable property.** The store exists
+the moment the context does.
+
+**And the context is not late.** The shape §6 was reaching for is a worker
+started *before* the context, at preload-scan time, which is why it wanted the
+cache to precede it. But a document's script sources are not all known until the
+external fetches have returned, and those are consumed by the host's own
+extraction loop, which finishes after the context is built. So there is nothing
+for a pre-context worker to compile: the earliest honest start is exactly where
+the context already is, and from there the compiles overlap the parse, the DOM
+build and the execution of every script ahead of them.
+
+Three consequences, and the third is the one worth carrying forward:
+
+1. **No engine change, no submodule patch.** The whole item is one main-repo
+   type plus a two-line call site — the reverse of the situation the "keep the
+   patch small" note in `CLAUDE.md` exists to engineer, arrived at for free.
+2. **The cross-document isolation question §6 raised does not arise.** It was a
+   consequence of the *other* option §6 floated (making the bridge take the
+   process-shared cache); a per-context cache handed to a per-document worker has
+   exactly the lifetime it had before, so no WPT run of its own is owed.
+3. **This is the fourth item in a row whose stated blocker was not the operative
+   one** — #8 (§6 of Phase 2), #12 (§3 and §4), and now #16. The pattern is not
+   that the blockers were wrong when written; it is that they were written from
+   the item's *description* rather than from the code, and none of them cost more
+   than an hour to check. The master table's "What blocks it today" column should
+   be read as a hypothesis, and checking it should be the first hour of any item
+   it gates — not the last.
+
+**What the item does still owe its restrictions to is real, and it is not the
+cache.** The compiler reads direct-eval state from the ambient context
+(`FastCompiler`'s constructor, via `JSEngine.Current`), and the cache key does
+*not* carry it. For a top-level script that state is "none" on both threads — a
+worker has no ambient context at all — so the two agree by construction. An
+`eval()` body's would not, which is why `ScriptCompileAhead` is offered document
+script sources and nothing else, and why that restriction is stated in the type
+rather than left to a caller to infer.
+
+### 9. The compile stage's ceiling is not the thing that looks like it
+
+Item #16's compile stage scales **1.41× / 1.62× / 1.52× at 2 / 4 / 8 threads** on
+a four-core host. Saturating at four is right; stopping at 1.62× rather than
+approaching 4× is not obviously so, and this document's habit would have been to
+publish the number with a plausible cause attached.
+
+There was an unusually good candidate. `CompilationStack.Run` moves every
+compilation onto a second, engine-sized pooled thread and **blocks the caller**,
+so each concurrent compile occupies two threads rather than one — on four cores
+at budget 4 that is eight threads for four cores of work. It also has an
+environment opt-out, so the hypothesis was testable in one run rather than
+arguable. With `BROILER_JS_COMPILE_STACK_BYTES=0` the ceiling is **1.69× against
+1.62×** — inside the run-to-run spread.
+
+**So the handoff is not what bounds it, and the cause is recorded as
+unattributed.** The remaining candidate this document can name is the GC:
+compilation is allocation-heavy, and item #19 measured Workstation as the faster
+mode *for a whole render* without asking what a compile-bound parallel section
+prefers. `--gc-config` is the harness that would settle it, and that is the next
+measurement rather than a guess to publish now.
+
+**The experiment did turn up a number, and it is a sequential one.** Turning the
+handoff off takes the serial stage from 4 491.7 → 3 742.9 ms and the four-thread
+stage from 2 779.5 → 2 364.7 ms — **15–17% either way**, far more than the
+~180 µs per compile `CompilationStack` documents for itself. That is not a
+recommendation to change the default: the engine sizes that stack because a
+front-end stack overflow is not a catchable exception on .NET, so the tax buys a
+host that does not abort on a deeply nested script. It belongs to whoever repairs
+`StackGuard` — the real fix `CompilationStack` says it is only buying time for —
+and it is recorded here because it is the largest single figure this item's
+measurement produced, and it would have gone unmeasured had the ceiling been
+explained instead of tested.
+
 ## Master table
 
 Gain is per-stage unless stated. Effort is engineering days for one person
@@ -1236,7 +1330,7 @@ non-deterministic correctness defect.
 | 13 | Layout | [`CssBox.PerformLayout:347`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.cs), [`PerformLayoutImp:37`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.Layout.cs) | Full-tree, in-place mutation, from the root every pass — **twice** when width is unrestricted ([`HtmlContainerInt.cs:929,936`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs)) | Parallel intrinsic sizing; parallel independent subtrees (abspos/fixed, flex+grid items, table cells, multicol, subdocuments) | Mutable shared tree; ambient thread-static state (`CssLengthParser` viewport, [`DocumentModeContext.cs:22`](../../Broiler.Layout/Broiler.Layout/DocumentModeContext.cs)); no dirty-bit invalidation to bound the work | **1.5–2.5×** of a stage **measured at 0.6–6.5% of a render** on every corpus page, including one built to load layout — so a few percent overall at best | **High** | 20–30 d | 4 |
 | 14 | Layout | Same as #13 | No incremental invalidation | **Not multithreading.** Dirty bits + relayout roots | **A benchmark that does not exist.** P0-a renders each page once from a clean container at a fixed viewport, so nothing it measures performs a second layout — the stage this item bounds ([§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)) | **5–50× on interactive relayout** — unmeasured, and the *first-render* layout it bounds is 0.6–6.5% of wall time; the interactive case this claims is not covered by the P0-a corpus. Also the precondition that makes #13 safe | Medium | 15–20 d, **preceded by a relayout harness** | 3 |
 | 15 | JS | [`JSPromise.Post:376`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromise.cs), [`JSAsyncFunction.cs:152`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSAsyncFunction.cs), [`JSGenerator.cs:435`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Generator/JSGenerator.cs) — `ThreadPool.QueueUserWorkItem` when `sc == null` | JS continuations run on pool threads, racing main-thread layout | **Remove the parallelism.** Always pump a single-threaded event loop | This is the root cause behind WPT #1445 / #1143; the CSS `_sync` lock and the concurrent bridge memo maps are mitigations for it | Negative CPU gain, **large correctness gain**; removes lock overhead on hot cascade paths | Low | 5–8 d | 0 |
-| 16 | JS | [`JSContext.cs:1574`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.Engine/JSContext.cs) `DictionaryCodeCache` (concurrent, but **per context**, not process-shared) | Scripts compiled on demand, serially | Background/parallel compile of independent `<script>` sources; overlap with parse and network | **A store, before a queue.** The cache is concurrent and `CoreScript.Compile` already takes an explicit cache and options, so a compile needs no live context — but the render path builds its cache *inside* the `JSContext` constructor and `JSContextOptions` can pass cache options, not a cache instance, so a compile-ahead worker has nowhere to put results ([§6](#6-item-16-is-blocked-on-a-store-not-on-concurrency--the-same-shape-as-4-found-earlier)) | **Removes compile from the critical path**; 1.5–3× on script-heavy first paint. The estimate and the risk cover the queue only, not the cache-injection change in front of it | Medium | 8–12 d, **plus the store** | 3 |
+| 16 | JS | [`ScriptCompileAhead`](../../src/Broiler.HtmlBridge.Core/Scripting/ScriptCompileAhead.cs), consumed by the eval loop in [`CaptureService`](../../src/Broiler.Cli/CaptureService.cs) — **DONE** | Was compiled on demand, serially, by the ordered eval loop | Every classic script source compiled on `BROILER_SCRIPT_COMPILE_THREADS` into the context's own cache; the loop is unchanged and reads hits | Nothing, and **the blocker this cell used to name did not exist**: `JSContext.CodeCache` is public, so the store is the context's own and no engine change is needed. The context is not late either — a document's sources are not all known until its fetches return ([§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache)) | **Measured: compile stage 1.41×/1.62×/1.52× at 2/4/8 threads; whole capture 1.44× on a compile-heavy document, 1.22× on a modestly scripted one.** The estimate's 1.5–3× lands only on the stage, and only where a page's scripts are large. The sub-linear ceiling is **not** the compile-thread handoff — tested, not assumed ([§9](#9-the-compile-stages-ceiling-is-not-the-thing-that-looks-like-it)) | Low | Done | 3 |
 | 17 | DOM / HTML | [`PreloadScanner.cs`](../../src/Broiler.HtmlBridge.Core/Scripting/PreloadScanner.cs), [`SpeculativePreloadScan.cs`](../../src/Broiler.HtmlBridge.Core/Scripting/SpeculativePreloadScan.cs) — **DONE** | The parse stays sequential (correctly — the HTML tokenizer is spec-sequential); the sub-resource *discovery* was sequential with it | A worker tokenizes the same immutable source and hands the URL sets to the prefetcher, started as the first statement of `ParseHtml` | Nothing; it is a read-only pass over an immutable string | **DONE, and it found a second thing.** Sheet requests are in flight while the document is still parsing (asserted at the origin, not timed). The number came from the script side: the capture host does its own extraction and so never reached item #2's split — 8 scripts at 40 ms go **755.1 → 521.4 ms**, median paired ratio **0.655** over 5 pairs, peak concurrency 6 against 1. It tokenizes rather than pattern-matching bytes, and `srcset`, `<template>` and `<noscript>` are documented exclusions. See [§10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split) | Low | Done | 2 |
 | 18 | JS | New: `Worker` / `MessageChannel` | Not implemented | One `JSContext` per worker thread, structured-clone message passing | Per-context state exists and `JSEngine.CurrentContext` is `AsyncLocal`, so isolation is feasible; needs the static-mutable audit from P0-c across Broiler.JS | Capability, not a speedup of existing work | High | 30–40 d | 4 |
 | 19 | Runtime | `Directory.Build.props` sets neither; `Broiler.JavaScript.Engine.Benchmarks.csproj` **does** set `ServerGarbageCollection` | Workstation GC defaults everywhere except that one benchmark project | Config knob; evaluate Server GC for headless/batch hosts | Nothing | **Measured: Server GC is 1.62× SLOWER** on a 4-core headless render (see below). Keep Workstation | Low | Done | 0 |
@@ -1579,12 +1673,17 @@ than steps 3 and 4 combined.
    constructors, `DictionaryCodeCache.Current`). The attribute is gone and the
    file now records what to look for if it ever has to come back: a new piece of
    process-wide mutable state, not a new test.
-3. **Parallel/background script compile** (item #16), fed by the preload scanner
-   so compilation overlaps download and parse. The `DictionaryCodeCache` is
-   concurrent, which is the hard part — but it is **per context** on the render
-   path, not process-shared, so the compile-ahead has no store to write into
-   until `JSContextOptions` can carry a cache instance
-   ([§6](#6-item-16-is-blocked-on-a-store-not-on-concurrency--the-same-shape-as-4-found-earlier)).
+3. **Parallel/background script compile** (item #16) — **DONE**. The
+   `DictionaryCodeCache` is concurrent, which is the hard part, and the store the
+   compile-ahead writes into turned out to be the context's own: `CodeCache` is a
+   public property, so nothing had to be added to `JSContextOptions`
+   ([§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache)).
+   It is **not** fed by the preload scanner, and that was a deliberate change of
+   plan rather than an omission: the scanner supplies URLs, whereas a compile
+   needs *source*, and a document's sources are not all in hand until its fetches
+   have returned — which is after the context exists. The earliest honest start is
+   therefore where the context already is, and from there the compiles overlap the
+   parse, the DOM build, and the execution of every script ahead of them.
 4. **Workers** (item #18) — a feature, scoped and scheduled as one. Gate it on
    the P0-c static-state audit; anything genuinely global (interned
    strings, shapes/hidden classes, the code cache) needs an explicit
@@ -1734,7 +1833,7 @@ Recording these so they are not revisited each time the topic comes up:
 | **0 — Make it measurable and deterministic** | P0-a benchmarks, P0-b single-threaded event loop (#15), P0-c static-state audit, GC config evaluation (#19) | Nothing after this is trustworthy without it. #15 is a correctness fix that also removes lock overhead from the cascade. |
 | **1 — Free wins and the sequential fixes** — **DONE** | WPT worker pool (#1), CLI batch (#20), concurrent sub-resource fetch (#2), CSS rule indexing (#11) | Cheap, low-risk, and #1 shortens the feedback loop for everything else. #11 is single-threaded but must precede #12. **What it changed:** #11 met its exit gate (cascade cost is now flat in total rules) but is 2.8× on a whole render, and `parse+cascade` still dominates the rule-heavy page — so #12 needs that stage split before it is started; #20 had to use processes, which makes item #9 a gate on every render-path item, not three. |
 | **2 — Raster, decode, text** — **DONE** | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), text caches (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed, in the order it matters:** band parallelism inside a primitive turned out to be the wrong unit for a page — three of five corpus pages split zero fills, because their raster is glyphs — which promotes **#5 from "supersedes #3" to the only raster parallelism the corpus can use (§4)**; the phase's largest single win was a *cache*, and not the one #10 names (§5); the pool and the in-process threads multiply, so the runner now divides them (§7); the item-#9 findings (§1–§3) stand. **#5 landed and about half of its win was single-threaded** — the rasterizer was walking pixels its clip could never admit (§8) — and between them #4, #10 and #5 have taken raster from the largest stage on three pages to the largest on one (§9). **#17 landed and its number came from somewhere the item did not name:** the capture host does its own script extraction and so never reached the split item #2 built, leaving that family serial in the path this repository measures (§10). **#8 landed, and it needed neither of the two things §6 predicted** — not #17's URL set (the box tree names what layout will actually ask for, where a source scan names a superset) and not a cache (layout's existing loader seam is the split) — but it did need one thing nothing predicted: **only the decode was safe to move off the layout thread, not the completion callback**, which changed the rendered page on the failure path and nowhere else (§12). It also discharges P0-c's last debt, being the first worker to establish the ambient state and arm its assertion. **#3's port closed the phase, and it corrected this document rather than confirming it** — §8 said to port the clip narrowing first, and the sequential win turned out to be a per-pixel target lookup that banding forced out of the loop; the narrowing itself pays only on content inside the surface and outside the clip, which the corpus scene written for it did not contain (§13). Its threading is 1.00–1.39x at four threads with 85–100% of area split, so **both copies now say band parallelism is the wrong unit, for opposite reasons.** It leaves one named follow-up: a two-band split measured slower than none, and only the ported copy refuses one. The largest open question is still the parse/cascade split Phase 1 §1 named, which gates #12 — and §9 makes it the largest unattributed question in the document, now that nothing in Phase 2 is open. See [What building Phase 2 changed](#what-building-phase-2-changed). |
-| **3 — Style and incremental layout** — **#12 and #21 done; #14 and #16 blocked on a precondition each** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. **What it changed, in the order it matters:** the phase opened by answering the question Phase 2 §9 said it owed, and the answer reframes the item it gates — **`parse+cascade` is 81.3–98.2% cascade on every page**, so item #12 aims at the whole stage rather than a fraction of it, and the stage's name is a legacy of nobody having measured it ([§1](#1-parsecascade-is-a-cascade-stage-the-name-overstates-the-parse)); getting that number needed the profile's first instrumentation *inside* the engine, because none of the four sub-stages is a pure function of the source and P0-a's out-of-band trick therefore does not reach them ([§2](#2-measuring-it-needed-instrumentation-and-p0-as-method-note-is-why-that-is-worth-saying)). **#12 landed and both of the blockers its row named were the wrong ones.** The `_sync` lock was not the bottleneck — the per-element cascade was 210 µs on a *five-rule* page, which no number of lock acquires explains ([§3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is)) — and the parallel unit is not the box walk, which cannot be split at all: it rewrites `display` before children read it, hides a closed `<details>`'s subtree after cascading it, and inserts generated boxes on the way back up. So #12 is a **prefetch/consume split**, the fourth in this document to arrive at that shape after the item named a different one ([§4](#4-the-parallel-unit-is-not-the-box-walk--this-is-a-prefetchconsume-split-the-fourth-in-this-document)). **1.16–2.01× on the cascade stage at four threads, 1.08–1.96× end to end, pixel-identical at 1/2/4** — and the harness now publishes the serial residue per page (16–55%), so what is left is measured rather than guessed ([§5](#5-the-serial-residue-is-measured-now-and-it-differs-three-fold-across-pages)). **#21 landed** and cost nothing but the reading that says why it is safe — 2 118 tests, 0 failures, **57–59 s → 31–37 s (~1.75×)** on four cores. **#14 and #16 are not started, and in both cases the reason is a missing store or harness rather than a difficulty**: #16's code cache is per-context, so a compile-ahead worker has nowhere to put results until `JSContextOptions` can carry a cache instance ([§6](#6-item-16-is-blocked-on-a-store-not-on-concurrency--the-same-shape-as-4-found-earlier)); #14 bounds the *second* layout and nothing in the P0-a corpus performs one, so a relayout harness has to exist before a dirty bit is worth writing ([§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)). Those two are the phase's remainder, in that order. See [What building Phase 3 changed](#what-building-phase-3-changed). |
+| **3 — Style and incremental layout** — **#12, #21 and #16 done; #14 is the remainder** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. **What it changed, in the order it matters:** the phase opened by answering the question Phase 2 §9 said it owed, and the answer reframes the item it gates — **`parse+cascade` is 81.3–98.2% cascade on every page**, so item #12 aims at the whole stage rather than a fraction of it, and the stage's name is a legacy of nobody having measured it ([§1](#1-parsecascade-is-a-cascade-stage-the-name-overstates-the-parse)); getting that number needed the profile's first instrumentation *inside* the engine, because none of the four sub-stages is a pure function of the source and P0-a's out-of-band trick therefore does not reach them ([§2](#2-measuring-it-needed-instrumentation-and-p0-as-method-note-is-why-that-is-worth-saying)). **#12 landed and both of the blockers its row named were the wrong ones.** The `_sync` lock was not the bottleneck — the per-element cascade was 210 µs on a *five-rule* page, which no number of lock acquires explains ([§3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is)) — and the parallel unit is not the box walk, which cannot be split at all: it rewrites `display` before children read it, hides a closed `<details>`'s subtree after cascading it, and inserts generated boxes on the way back up. So #12 is a **prefetch/consume split**, the fourth in this document to arrive at that shape after the item named a different one ([§4](#4-the-parallel-unit-is-not-the-box-walk--this-is-a-prefetchconsume-split-the-fourth-in-this-document)). **1.16–2.01× on the cascade stage at four threads, 1.08–1.96× end to end, pixel-identical at 1/2/4** — and the harness now publishes the serial residue per page (16–55%), so what is left is measured rather than guessed ([§5](#5-the-serial-residue-is-measured-now-and-it-differs-three-fold-across-pages)). **#21 landed** and cost nothing but the reading that says why it is safe — 2 118 tests, 0 failures, **57–59 s → 31–37 s (~1.75×)** on four cores. **#16 landed, and it needed none of what this document said it needed.** The store §6 said had to be built was already there — `JSContext.CodeCache` is public — so the item is one main-repo type and a two-line call site, with no engine change, no submodule patch and none of the cross-document isolation §6 worried about ([§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache)). That makes **four items running whose stated blocker was not the operative one** (#8, #12 twice, #16), and the lesson is now explicit: the "What blocks it today" column is a hypothesis, and checking it belongs in an item's first hour rather than its last. **Compile stage 1.41×/1.62×/1.52× at 2/4/8 threads, whole capture 1.44× on a compile-heavy document and 1.22× on a modestly scripted one** — and its measurement tested the obvious explanation for the ceiling instead of publishing it, which is how the explanation turned out to be wrong and a 15–17% *sequential* tax turned up instead ([§9](#9-the-compile-stages-ceiling-is-not-the-thing-that-looks-like-it)). **#14 is the phase's remainder**: it bounds the *second* layout and nothing in the P0-a corpus performs one, so a relayout harness has to exist before a dirty bit is worth writing ([§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)). See [What building Phase 3 changed](#what-building-phase-3-changed). |
 | **4 — Parallel layout and workers** | Parallel intrinsic sizing and independent subtrees (#13), Web Workers (#18) | Highest cost, highest risk, lowest ceiling. Only worth starting once Phase 3's measurements say layout is still the bottleneck — and so far they say the opposite twice over: layout is 0.6–6.5% of a render (Phase 1 §2), and Phase 3 §7 records that the *relayout* case #13 and #14 are really about has no harness to be measured with at all. Build that harness before this phase, not during it. Phase 3 §4 is also a warning about #13's wording: three items in a row have found that the structure an item names is not the structure that can be split. |
 
 **Global exit gate:** every parallel path has a `--threads 1` equivalent that
