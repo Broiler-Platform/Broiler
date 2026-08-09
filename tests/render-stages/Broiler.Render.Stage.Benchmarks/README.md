@@ -56,15 +56,16 @@ dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchma
 `--job short` is enough to separate anything that differs by more than a few percent and
 finishes in minutes; drop it for publication numbers.
 
-## Thread scaling — items #4, #5, #6, #7, #8
+## Thread scaling — items #3, #4, #5, #6, #7, #8
 
-Four modes that answer "how does this stage scale with threads, and does it change a
+Five modes that answer "how does this stage scale with threads, and does it change a
 pixel". All report the second question as part of the first and **exit non-zero if any
 setting produced different bytes**, because a speedup measured without that check is not
 evidence of anything.
 
 ```sh
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --raster-scaling
+dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --graphics-raster-scaling
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --tile-scaling
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --decode-scaling
 dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --image-prefetch-scaling
@@ -76,6 +77,25 @@ split. That second table is the point: it is what distinguishes "the threads did
 from "no fill ever reached the threshold", which call for opposite next steps. It is how the
 threshold in `BRasterParallelism` was chosen, and re-running it is how to re-choose it when
 the rasterizer's per-pixel cost changes.
+
+`--graphics-raster-scaling` is the same question asked of the **other** rasterizer —
+`Broiler.Graphics.BCanvas`, which backs `BImageRenderer` and through it Broiler.UI and the
+Writer (item #3). It does not render HTML, because that path does not reach this rasterizer;
+it replays four `BRenderList` scenes built from the draw-call mix `Broiler.UI/src` actually
+issues, and reports the same split-share table for the same reason `--raster-scaling` does.
+
+Two things about it are worth knowing before quoting a number from it. `--only-threads N`
+times a single setting so that one build can be compared against another — which is how the
+port was separated from the parallelism, and is the only way to compare against a build that
+lacks the feature. And the scenes always run in the order the corpus lists them, because a
+process that replays only the largest scene measures it at 823 ms where this harness measures
+it at 362: that scene is thirteen enormous fills and enters the fill path too few times to
+leave OSR-compiled code, and the small fills ahead of it are what promote it. **A figure from
+this command is comparable to another figure from this command and to nothing else.**
+
+It needs `patches/0127-graphics-raster-band-parallelism.patch` applied to the
+`Broiler.Graphics` submodule; without it the mode compiles itself out and says so, so the
+project still builds on a clean checkout.
 
 `--tile-scaling` renders the corpus at 1, 2, 4 and *cores* tiles (item #5) and reports the
 `PerformPaint` stage as well as the whole render — tiling changes one stage, and on a page
@@ -163,8 +183,20 @@ documents.
 | `text` | line breaking, text measurement, glyph raster |
 | `rules` | the cascade's per-element rule scan (item #11) |
 | `boxes` | layout: a nested block/flex/grid tree |
-| `paint` | raster: overlapping gradients, borders, alpha (items #3, #5) |
+| `paint` | raster: overlapping gradients, borders, alpha (items #4, #5) |
 | `mixed` | blended control — a bordered table with text, no stage emphasised |
+
+`GraphicsSceneCorpus.cs` holds a second, smaller corpus for `--graphics-raster-scaling`: four
+`BRenderList` scenes rather than HTML pages, because item #3's rasterizer is reached by
+drawing a render list and not by rendering a document. Same rules — deterministic, generated
+in code, no fixtures.
+
+| Scene | Built to load |
+|---|---|
+| `chrome` | a whole window: title bar, toolbar, sidebar tree, content rows, status bar |
+| `list` | a scrolled list whose overflow falls **off the surface** — the case the loop clamp already handles |
+| `pane` | a grid clipped to a pane, overflow **on the surface** — the case only a clip bound can reject |
+| `canvas` | the control: surface-sized fills and nothing small, so a flat row means the threads, not the content |
 
 Pages that load one stage each are what makes the stages separable. A single
 "representative page" produces one blended number and answers none of the roadmap's open

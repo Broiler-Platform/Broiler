@@ -36,6 +36,24 @@ public static class Program
             return RasterScaling.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
         }
 
+        if (args.Length >= 1 && args[0] == "--graphics-raster-scaling")
+        {
+#if BROILER_GRAPHICS_RASTER_PARALLELISM
+            var only = ArgValue(args, "--only-threads", 0);
+            return GraphicsRasterScaling.Run(
+                ArgValue(args, "--iterations", 9),
+                ArgValue(args, "--warmup", 2),
+                only > 0 ? only : null);
+#else
+            // Compiled out because the checked-out Broiler.Graphics has no raster partitioner; see
+            // the condition in this project's .csproj and patches/0127 in patches/README.md.
+            Console.WriteLine(
+                "--graphics-raster-scaling needs patches/0127-graphics-raster-band-parallelism.patch"
+                + " applied to the Broiler.Graphics submodule. See patches/README.md.");
+            return 2;
+#endif
+        }
+
         if (args.Length >= 1 && args[0] == "--tile-scaling")
         {
             return TileScaling.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
@@ -77,6 +95,13 @@ public static class Program
         Console.WriteLine("  --raster-scaling [--iterations N] [--warmup N]");
         Console.WriteLine("        Corpus render time against the raster thread budget (item #4).");
         Console.WriteLine("        Exits 1 if any thread setting renders different pixels.");
+        Console.WriteLine();
+        Console.WriteLine("  --graphics-raster-scaling [--iterations N] [--warmup N] [--only-threads N]");
+        Console.WriteLine("        Broiler.Graphics scene replay time against the raster thread budget (item #3).");
+        Console.WriteLine("        This is the BImageRenderer / Broiler.UI / Writer rasterizer, not the HTML one.");
+        Console.WriteLine("        Exits 1 if any thread setting renders different pixels.");
+        Console.WriteLine("        --only-threads N times ONE setting, which is the comparable measurement:");
+        Console.WriteLine("        interleaving settings in one process makes the 1-thread baseline read 2.2x fast.");
         Console.WriteLine();
         Console.WriteLine("  --tile-scaling [--iterations N] [--warmup N]");
         Console.WriteLine("        Corpus render time against the raster tile budget (item #5).");
