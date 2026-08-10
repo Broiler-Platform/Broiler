@@ -560,8 +560,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public void Attach(JSContext context, string html)
     {
         ThrowIfDisposed();
-        ParseHtml(html);
-        RegisterDocument(context);
+        using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.ParseHtml))
+            ParseHtml(html);
+        using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegisterDocument))
+            RegisterDocument(context);
         EnforceConfiguredStyleContentSecurityPolicy();
     }
 
@@ -588,8 +592,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         {
             _pageUrl = url;
         }
-        ParseHtml(html);
-        RegisterDocument(context);
+        using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.ParseHtml))
+            ParseHtml(html);
+        using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegisterDocument))
+            RegisterDocument(context);
         EnforceConfiguredStyleContentSecurityPolicy();
     }
 

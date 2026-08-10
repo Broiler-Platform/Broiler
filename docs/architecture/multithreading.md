@@ -34,6 +34,7 @@ one beneficiary. `patches/0133`. Published:
 | Phases 2–3 measured on WPT | **Null result** | `ca53d44` vs HEAD, both sequential per render, 2 213 reftests over two suites: **1.017× and 1.013×**, inside the host's 5–7% drift, classification identical. WPT pages are 1 018 bytes at the median against a 20–212 KB corpus, so the surviving sequential wins have nothing to act on ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)) |
 | Per-render fixed cost | **Measured; §4's conclusion refuted** | Engine: **3.48 ms** empty, 15–19 ms at WPT median, 77% of the empty render being bitmap alloc + erase. Runner: the render is **1.6–2.0%** of a test — **76–79% is `ExecuteScriptsWithDom`** and **16–21% `PixelDiffRunner.Compare`**. Neither is a rendering problem, and neither is in this document ([§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)) |
 | Pixel comparison | **Fixed** | **284.61 → 4.50 ms (62×)** on the match path; the suite 368.5 → 297.3 s (1.24×). 92% of it was a PNG round trip measured to be an identity — not the per-pixel loop §5 pointed at, which was ~22 ms of 284. Classification identical name for name. `patches/0134` ([§6](#6-the-pixel-comparison-is-fixed-and-the-part-that-read-worst-was-not-the-part-that-cost)) |
+| `ExecuteScriptsWithDom` | **Profiled; not fixed** | **`DomBridge.RegisterDocument` is 50.6–53.6% of a whole WPT run** at ~440 ms per document, twice per reftest — and it is *fixed* cost (436 vs 446 ms/call across two subsets). The DOM build it sits next to is **0.61 ms**. Script eval is 20–25%; the render 1.1–1.7%. Making it cheaper is a bridge design change, not a profiling result ([§7](#7-half-a-wpt-run-is-publishing-the-dom-api-and-the-dom-build-is-06-ms)) |
 
 **Phase 3 is complete: #12, #21, #16 and #14.** The relayout harness
 [§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)
@@ -1938,6 +1939,55 @@ through a different door.
 `patches/0134`. Published:
 [`pixel-compare.md`](../../tests/render-stages/results/pixel-compare.md). **What is left of §5's
 two targets is the larger one**: `ExecuteScriptsWithDom` at 76–79% of a WPT run.
+
+### 7. Half a WPT run is publishing the DOM API, and the DOM build is 0.6 ms
+
+[§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)'s larger
+remaining target was `ExecuteScriptsWithDom` at 76–79% of a WPT run. Profiled sub-phase by
+sub-phase, on two unrelated subsets:
+
+| phase | `css-backgrounds/animations` (41) | `css-fonts` (373) | ms/call |
+|---|---:|---:|---|
+| **scripts + DOM bridge** | **79.3%** | **78.2%** | 683 / 651 |
+| ├ script scan + sheet inlining | 0.0% | 0.0% | 0.30 / 0.12 |
+| ├ JSContext construction | 0.8% | 0.6% | 7.14 / 4.95 |
+| ├ **DomBridge.Attach** | **52.0%** | **54.9%** | 448 / 457 |
+| · ParseHtml (DOM build) | **0.1%** | **0.0%** | **0.61 / 0.40** |
+| · **RegisterDocument (DOM API surface)** | **50.6%** | **53.6%** | **436 / 446** |
+| ├ script eval + drains | 25.0% | 20.5% | 216 / 171 |
+| ├ load event + snapshots + anchors | 1.1% | 1.9% | 9.9 / 16.1 |
+| └ SerializeToHtml | 0.1% | 0.2% | 0.57 / 1.81 |
+| render | 1.1% | 1.7% | 9.5 / 14.4 |
+| attributed | 98.8% | 97.2% | |
+
+**`DomBridge.RegisterDocument` is 50.6–53.6% of a whole WPT run** — publishing the document, the
+window and the DOM API surface onto a fresh `JSContext`, ~440 ms per document and twice per
+reftest. It is the largest single item measured anywhere in this investigation, larger than the
+render, the pixel comparison and script execution combined.
+
+**The phase above it is misnamed for what it does, which is why this needed measuring rather than
+reading.** "`DomBridge.Attach`" sounds like a DOM build, and [§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)
+described it as one. The DOM build is **0.61 / 0.40 ms — 0.1% and 0.0%**. Attach is 99.9% API
+registration. That is the fourth time in this phase that the operation an item is named after was
+not the operation that costs.
+
+**And it is fixed cost, measured rather than inferred**: 435.86 ms/call on one subset against
+445.80 on the other — 2% apart across unrelated directories and 9× the test count — while the
+parse that *does* scale with the document stays under a millisecond. A WPT reftest document is
+1 018 bytes at the median, so nearly all of what a test costs is the engine rebuilding the same
+API surface from nothing, twice, for a page with almost nothing in it.
+
+Two incidental findings from reading the path: the
+`scripts.Count == 0 && deferredScripts.Count == 0` early-out in
+`WptTestRunner.ExecuteScriptsWithDom` is **unreachable** (two `scripts.Insert(0, …)` calls run
+before it, so the list is never empty), and `SerializeToHtml` — the DOM-back-to-markup step this
+architecture is built on — is **0.57 ms**, so the round trip through markup is not what costs.
+
+**Not attempted, deliberately.** Making `RegisterDocument` cheaper is a design change to the
+bridge — lazy or cached host-object registration, or reusing a context across documents where
+isolation permits — not a profiling result, and per-document isolation is exactly the property a
+WPT runner must not lose. Published:
+[`script-dom-phase.md`](../../tests/render-stages/results/script-dom-phase.md).
 
 ## Master table
 

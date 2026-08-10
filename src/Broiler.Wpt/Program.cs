@@ -370,6 +370,8 @@ public class Program
 
             WptPhaseTrace.Enabled = true;
             WptPhaseTrace.Reset();
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Enabled = true;
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Reset();
         }
 
         var phaseTraceWatch = Stopwatch.StartNew();

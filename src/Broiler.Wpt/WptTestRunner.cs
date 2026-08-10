@@ -2699,6 +2699,8 @@ internal sealed partial class WptTestRunner
 
         // Inline linked stylesheets so the DomBridge passes that re-parse <style> source (view
         // transitions, animations) see them, not just the render-time cascade. Cascade-neutral.
+        var scanScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.ScriptScan);
+
         html = InlineLinkedStylesheets(html, testDir, wptRoot);
 
         bool needsStubs = false;
@@ -2778,6 +2780,8 @@ internal sealed partial class WptTestRunner
         scripts.Insert(0, FormattableString.Invariant(
             $"window.__broilerDeferPromiseTests = {(DeferPromiseTests ? "true" : "false")};"));
 
+        scanScope.Dispose();
+
         if (scripts.Count == 0 && deferredScripts.Count == 0)
         {
             // Even with no inline scripts, we still need to process anchor
@@ -2800,7 +2804,9 @@ internal sealed partial class WptTestRunner
         // synchronization context when it is created, so without this the engine resumes await
         // continuations on the thread pool, racing this thread's serialize/render.
         using var microTaskContext = MicroTaskSynchronizationContext.Install(microTasks);
+        var contextScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.JsContext);
         using var context = new JSContext();
+        contextScope.Dispose();
         // Disposed with this call: the bridge owns a per-document session — the headless layout
         // view and its HtmlContainer (hence the whole box tree and every sub-resource its image
         // load handlers hold), timer/animation queues, listener stores and observers. Leaving it
@@ -2824,6 +2830,7 @@ internal sealed partial class WptTestRunner
 
             return JSUndefined.Value;
         }, "queueMicrotask", 1);
+        var attachScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.BridgeAttach);
         bridge.Attach(context, html, url);
 
         // Enforce the CSP style-src family (style-src / -elem / -attr) on the
@@ -2837,6 +2844,7 @@ internal sealed partial class WptTestRunner
 
         // Register DOM elements with IDs as globals (HTML5 named access).
         bridge.RegisterNamedElementGlobals(context);
+        attachScope.Dispose();
 
         void DrainAsyncWork()
         {
@@ -2873,6 +2881,7 @@ internal sealed partial class WptTestRunner
         if (batchStyleInvalidations)
             bridge.BeginStyleInvalidationBatch();
 
+        var evalScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.ScriptEval);
         try
         {
             foreach (var script in scripts)
@@ -2912,11 +2921,13 @@ internal sealed partial class WptTestRunner
         {
             if (batchStyleInvalidations)
                 bridge.EndStyleInvalidationBatch();
+            evalScope.Dispose();
         }
 
         // Resolve CSS animation snapshots: for elements with animation + negative
         // delay, compute the animated property values at t=0 and write them as
         // inline styles so the static renderer can produce the correct output.
+        var postScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.PostScript);
         bridge.ResolveAnimationSnapshots();
 
         // Resolve CSS anchor positioning: for elements that use anchor()
@@ -2926,7 +2937,10 @@ internal sealed partial class WptTestRunner
         bridge.ResolveAnchorPositions();
 
         var layoutAssertions = bridge.EvaluateCheckLayoutAssertions();
-        return (bridge.SerializeToHtml(), layoutAssertions);
+        postScope.Dispose();
+
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Serialize))
+            return (bridge.SerializeToHtml(), layoutAssertions);
     }
 
     /// <summary>

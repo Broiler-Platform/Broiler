@@ -75,6 +75,27 @@ internal static class WptPhaseTrace
 
         /// <summary>Mismatch classification, band analysis and failure-image writing — failures only.</summary>
         public const string Diagnose = "failure diagnostics";
+
+        // --- Sub-phases of Scripts. These nest inside it, so they are reported separately and
+        // must not be added to the top-level total; Report() knows the difference.
+
+        /// <summary>Inlining linked stylesheets and regex-scanning the document for scripts.</summary>
+        public const string ScriptScan = "  ├ script scan + sheet inlining";
+
+        /// <summary>Constructing the <c>JSContext</c> — the JS engine's per-document world.</summary>
+        public const string JsContext = "  ├ JSContext construction";
+
+        /// <summary>`DomBridge.Attach` — parse, DOM build, and the bridge's per-document session.</summary>
+        public const string BridgeAttach = "  ├ DomBridge.Attach";
+
+        /// <summary>Evaluating the document's scripts, including the always-injected stubs.</summary>
+        public const string ScriptEval = "  ├ script eval + drains";
+
+        /// <summary>Window load, animation snapshots, anchor positions, check-layout assertions.</summary>
+        public const string PostScript = "  ├ load event + snapshots + anchors";
+
+        /// <summary>`DomBridge.SerializeToHtml` — the mutated DOM back to markup.</summary>
+        public const string Serialize = "  └ SerializeToHtml";
     }
 
     private static readonly Dictionary<string, (double Ms, int Count)> _accumulator = new(StringComparer.Ordinal);
@@ -135,7 +156,12 @@ internal static class WptPhaseTrace
     /// </summary>
     public static void Report(System.IO.TextWriter output, double wallMs, int testCount)
     {
-        var totals = Totals();
+        // Merged, not printed separately: the bridge's own scopes nest inside DomBridge.Attach,
+        // which nests inside Scripts, and a reader comparing three tables would have to do the
+        // nesting arithmetic by hand. Report() already knows which rows are nested.
+        var totals = new Dictionary<string, (double Ms, int Count)>(Totals(), StringComparer.Ordinal);
+        foreach (var (phase, entry) in Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Totals())
+            totals[phase] = entry;
         if (totals.Count == 0)
         {
             output.WriteLine("Phase trace was enabled but recorded nothing.");
@@ -144,9 +170,30 @@ internal static class WptPhaseTrace
 
         var order = new[]
         {
-            Phases.FileRead, Phases.Fonts, Phases.Scripts, Phases.PostProcess,
-            Phases.Render, Phases.Compare, Phases.Diagnose,
+            Phases.FileRead, Phases.Fonts, Phases.Scripts,
+            Phases.ScriptScan, Phases.JsContext, Phases.BridgeAttach,
+            Phases.ScriptEval, Phases.PostScript, Phases.Serialize,
+            Phases.PostProcess, Phases.Render, Phases.Compare, Phases.Diagnose,
         };
+
+        // DomBridge.Attach's own split, spliced in under it.
+        order =
+        [
+            .. order[..order.ToList().IndexOf(Phases.ScriptEval)],
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.ParseHtml,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegisterDocument,
+            .. order[order.ToList().IndexOf(Phases.ScriptEval)..],
+        ];
+
+        // The sub-phases sit inside Scripts, so counting them into the attributed total would
+        // double-count that whole phase and make the residual negative.
+        var nested = new HashSet<string>(new[]
+        {
+            Phases.ScriptScan, Phases.JsContext, Phases.BridgeAttach,
+            Phases.ScriptEval, Phases.PostScript, Phases.Serialize,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.ParseHtml,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegisterDocument,
+        }, StringComparer.Ordinal);
 
         output.WriteLine();
         output.WriteLine("=== Phase breakdown ===");
@@ -160,7 +207,8 @@ internal static class WptPhaseTrace
         {
             if (!totals.TryGetValue(phase, out var entry))
                 continue;
-            named += entry.Ms;
+            if (!nested.Contains(phase))
+                named += entry.Ms;
             output.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"| {phase} | {entry.Ms / 1000.0:F2} | {entry.Ms / wallMs * 100:F1}% | {entry.Count} | {entry.Ms / Math.Max(1, entry.Count):F2} | {entry.Ms / Math.Max(1, testCount):F1} |"));
         }
