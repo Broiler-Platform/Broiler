@@ -182,6 +182,13 @@ internal static class WptPhaseTrace
             .. order[..order.ToList().IndexOf(Phases.ScriptEval)],
             Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.ParseHtml,
             Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegisterDocument,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegDocumentObject,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowBasics,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowGlobals,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowObjects,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegContentPolyfills,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegSecurityPolyfills,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowMirror,
             .. order[order.ToList().IndexOf(Phases.ScriptEval)..],
         ];
 
@@ -193,6 +200,13 @@ internal static class WptPhaseTrace
             Phases.ScriptEval, Phases.PostScript, Phases.Serialize,
             Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.ParseHtml,
             Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegisterDocument,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegDocumentObject,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowBasics,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowGlobals,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowObjects,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegContentPolyfills,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegSecurityPolyfills,
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowMirror,
         }, StringComparer.Ordinal);
 
         output.WriteLine();

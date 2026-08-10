@@ -34,7 +34,8 @@ one beneficiary. `patches/0133`. Published:
 | Phases 2–3 measured on WPT | **Null result** | `ca53d44` vs HEAD, both sequential per render, 2 213 reftests over two suites: **1.017× and 1.013×**, inside the host's 5–7% drift, classification identical. WPT pages are 1 018 bytes at the median against a 20–212 KB corpus, so the surviving sequential wins have nothing to act on ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)) |
 | Per-render fixed cost | **Measured; §4's conclusion refuted** | Engine: **3.48 ms** empty, 15–19 ms at WPT median, 77% of the empty render being bitmap alloc + erase. Runner: the render is **1.6–2.0%** of a test — **76–79% is `ExecuteScriptsWithDom`** and **16–21% `PixelDiffRunner.Compare`**. Neither is a rendering problem, and neither is in this document ([§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)) |
 | Pixel comparison | **Fixed** | **284.61 → 4.50 ms (62×)** on the match path; the suite 368.5 → 297.3 s (1.24×). 92% of it was a PNG round trip measured to be an identity — not the per-pixel loop §5 pointed at, which was ~22 ms of 284. Classification identical name for name. `patches/0134` ([§6](#6-the-pixel-comparison-is-fixed-and-the-part-that-read-worst-was-not-the-part-that-cost)) |
-| `ExecuteScriptsWithDom` | **Profiled; not fixed** | **`DomBridge.RegisterDocument` is 50.6–53.6% of a whole WPT run** at ~440 ms per document, twice per reftest — and it is *fixed* cost (436 vs 446 ms/call across two subsets). The DOM build it sits next to is **0.61 ms**. Script eval is 20–25%; the render 1.1–1.7%. Making it cheaper is a bridge design change, not a profiling result ([§7](#7-half-a-wpt-run-is-publishing-the-dom-api-and-the-dom-build-is-06-ms)) |
+| `ExecuteScriptsWithDom` | **Profiled** | **`DomBridge.RegisterDocument` was 50.6–53.6% of a whole WPT run** at ~440 ms per document, twice per reftest — and *fixed* cost (436 vs 446 ms/call across two subsets). The DOM build next to it is **0.61 ms**. Script eval is 20–25%; the render 1.1–1.7% ([§7](#7-half-a-wpt-run-is-publishing-the-dom-api-and-the-dom-build-is-06-ms)) |
+| `RegisterDocument` | **Fixed** | **422.10 → 13.74 ms/call (30.7×)**; the suite 368.5 → 195.7 s (**1.88×**). The bridge was recompiling its own constant JavaScript for every document; the process-shared code cache is installed for that call only, so no page-controlled source can enter it. Failing set identical to pristine name for name ([§8](#8-registerdocument-was-recompiling-the-bridges-own-javascript-per-document--422-ms--137-ms)) |
 
 **Phase 3 is complete: #12, #21, #16 and #14.** The relayout harness
 [§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)
@@ -1988,6 +1989,58 @@ bridge — lazy or cached host-object registration, or reusing a context across 
 isolation permits — not a profiling result, and per-document isolation is exactly the property a
 WPT runner must not lose. Published:
 [`script-dom-phase.md`](../../tests/render-stages/results/script-dom-phase.md).
+
+### 8. `RegisterDocument` was recompiling the bridge's own JavaScript per document — 422 ms → 13.7 ms
+
+[§7](#7-half-a-wpt-run-is-publishing-the-dom-api-and-the-dom-build-is-06-ms) named
+`DomBridge.RegisterDocument` as half a WPT run and stopped at profiling. Profiled one level
+further, the phase splits into seven steps and **all seven fall by the same factor**, which is the
+shape of one shared cause rather than a hot spot:
+
+| step | before (ms/call) | after (ms/call) |
+|---|---:|---:|
+| document object | 106.66 | 6.67 |
+| window basics + fetch | 61.25 | 1.66 |
+| content-rendering polyfills | 61.73 | 1.65 |
+| security/constructor polyfills | 148.49 | 2.12 |
+| window→global mirror | 40.54 | 1.36 |
+| window globals, performance/navigator/viewport | 3.41 | 0.09 |
+| **RegisterDocument** | **422.10** | **13.74** |
+
+**The cause is compilation, not execution.** Registration evaluates a fixed set of *bridge-owned*
+JavaScript sources — the content-rendering polyfill asset, the `DOMException`/`Node`/`SVGLength`
+constructors, `XMLHttpRequest`, the mutation-observer and event shims, the window→global mirror.
+Every document gets a fresh `JSContext`, a fresh context builds its own `DictionaryCodeCache`, and
+so every one of those sources was parsed and compiled again from nothing, per document, twice per
+reftest. Installing the process-shared cache for the duration of the call — and restoring the
+context's own afterwards — removes 97% of the phase while changing nothing about what the sources
+do when they run. **That the swap alone accounts for it is the evidence that the cost was
+compiling.**
+
+**The scope is the call, deliberately, and this is the interesting design point.** The engine
+already offers `JSContextOptions.UseProcessSharedCodeCache`, which applies the shared cache to
+*everything* a context evaluates including page script — a far larger claim, and one that would
+put one document's compiled code where the next document's evaluation can find it. A WPT runner is
+exactly where that must not happen. Nothing here needs it: inside `RegisterDocument` every
+evaluated source is a compile-time constant owned by the bridge assembly — **verified rather than
+assumed**, no reachable `Eval` takes an interpolated or page-derived string — and page script does
+not run until the host's loop, after `Attach` returns. Inline event handlers, which *are*
+page-controlled, compile at dispatch time and still use the context's own cache. So the shared
+cache holds a bounded set of strings that ship in the assembly and cannot grow with documents
+rendered.
+
+**On the suite: `css/css-backgrounds` reftests 368.5 → 195.7 s, 1.88×** — 173 s off a six-minute
+subset, with `patches/0134` unapplied, so the two fixes are independent and compose.
+
+**Correctness:** failing-test set **identical to the pristine tree, name for name** (266) and
+stable across two runs, classification 444/266/1 unchanged, and `css-fonts` + `css-writing-modes`
+unchanged at 685/815. `Broiler.Wpt.Tests` goes 748/57 → **750/55 with nothing newly failing**; the
+two that flip are both `RunTestWithTimeout_*_Completes_Without_Timing_Out`, which is the fix doing
+its job rather than noise.
+
+Published: [`register-document.md`](../../tests/render-stages/results/register-document.md).
+**Where that leaves a WPT run:** the render was 1.1–1.7% before any of this and the two largest
+terms have now been cut; what remains largest is script eval.
 
 ## Master table
 

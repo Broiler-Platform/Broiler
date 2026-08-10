@@ -40,6 +40,29 @@ public static class BridgePhaseTrace
         /// onto the JS context.
         /// </summary>
         public const string RegisterDocument = "    · RegisterDocument (DOM API surface)";
+
+        // --- Sub-steps of RegisterDocument, nested one level further. ---
+
+        /// <summary>Document object: basics, events, writing, traversal, collections, metadata.</summary>
+        public const string RegDocumentObject = "        - document object";
+
+        /// <summary>Window basics, fetch, MessageChannel, CSSStyleSheet, getComputedStyle.</summary>
+        public const string RegWindowBasics = "        - window basics + fetch";
+
+        /// <summary>`RegisterWindowGlobals` — timers, storage, location and the rest of window.</summary>
+        public const string RegWindowGlobals = "        - window globals";
+
+        /// <summary>performance, navigator and viewport objects.</summary>
+        public const string RegWindowObjects = "        - performance/navigator/viewport";
+
+        /// <summary>`RegisterContentRenderingPolyfills`.</summary>
+        public const string RegContentPolyfills = "        - content-rendering polyfills";
+
+        /// <summary>`RegisterSecurityAndConstructorPolyfills`.</summary>
+        public const string RegSecurityPolyfills = "        - security/constructor polyfills";
+
+        /// <summary>`MirrorWindowMembersOntoGlobal` — the window-to-global descriptor sweep.</summary>
+        public const string RegWindowMirror = "        - window→global mirror";
     }
 
     private static readonly Dictionary<string, (double Ms, int Count)> _accumulator = new(StringComparer.Ordinal);
