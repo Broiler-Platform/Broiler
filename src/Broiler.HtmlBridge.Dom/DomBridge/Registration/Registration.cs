@@ -244,7 +244,24 @@ public sealed partial class DomBridge
     /// </summary>
     public void SyncWindowMembersOntoGlobal()
     {
-        if (_jsContext is { } context && _windowJSObject is { } window)
+        if (_jsContext is not { } context || _windowJSObject is not { } window)
+            return;
+
+        // Same reasoning as RegisterDocument's swap, and the same bounded set: the source
+        // MirrorWindowMembersOntoGlobal evaluates is a compile-time constant in this assembly. This
+        // path matters more than it looks — a host calls it after *every* script, so the mirror was
+        // being recompiled once per script per document (253 calls across 41 reftests, 12 ms each,
+        // 8.2% of a WPT run). Restores the context's own cache, under which the host's page scripts
+        // continue to compile.
+        var previousCache = context.CodeCache;
+        context.CodeCache = DictionaryCodeCache.Current;
+        try
+        {
             MirrorWindowMembersOntoGlobal(context, window);
+        }
+        finally
+        {
+            context.CodeCache = previousCache;
+        }
     }
 }

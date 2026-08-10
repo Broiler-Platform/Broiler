@@ -2780,6 +2780,12 @@ internal sealed partial class WptTestRunner
         scripts.Insert(0, FormattableString.Invariant(
             $"window.__broilerDeferPromiseTests = {(DeferPromiseTests ? "true" : "false")};"));
 
+        // The leading entries of `scripts` are this runner's own constant sources, not the
+        // document's — the promise-test flag, BrowserApiStubs, and TestharnessStubs when the test
+        // pulls in testharness.js. Counted here so the phase trace can separate what the runner
+        // injects from what the page brought.
+        var injectedScriptCount = 2 + (needsStubs ? 1 : 0);
+
         scanScope.Dispose();
 
         if (scripts.Count == 0 && deferredScripts.Count == 0)
@@ -2884,13 +2890,24 @@ internal sealed partial class WptTestRunner
         var evalScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.ScriptEval);
         try
         {
-            foreach (var script in scripts)
+            for (var si = 0; si < scripts.Count; si++)
             {
                 try
                 {
-                    context.Eval(script);
-                    PromoteWindowGlobalsToContext(bridge);
-                    DrainAsyncWork();
+                    if (si < injectedScriptCount)
+                    {
+                        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalStubs))
+                            EvalInjectedStub(context, scripts[si]);
+                    }
+                    else
+                    {
+                        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalPage))
+                            context.Eval(scripts[si]);
+                    }
+                    using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalSync))
+                        PromoteWindowGlobalsToContext(bridge);
+                    using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalDrain))
+                        DrainAsyncWork();
                 }
                 catch (Exception ex)
                 {
@@ -2903,9 +2920,12 @@ internal sealed partial class WptTestRunner
             {
                 try
                 {
-                    context.Eval(script);
-                    PromoteWindowGlobalsToContext(bridge);
-                    DrainAsyncWork();
+                    using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalPage))
+                        context.Eval(script);
+                    using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalSync))
+                        PromoteWindowGlobalsToContext(bridge);
+                    using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalDrain))
+                        DrainAsyncWork();
                 }
                 catch (Exception ex)
                 {
@@ -2915,7 +2935,8 @@ internal sealed partial class WptTestRunner
             }
 
             bridge.FireWindowLoadEvent();
-            DrainAsyncWork();
+            using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalDrain))
+                DrainAsyncWork();
         }
         finally
         {
@@ -2960,6 +2981,40 @@ internal sealed partial class WptTestRunner
     /// listing names keeps this correct as libraries come and go.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Evaluates one of this runner's own injected stub sources with the process-shared code cache
+    /// installed, so it is compiled once per process rather than once per document.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The injected sources are <c>BrowserApiStubs</c> (~10 KB), <c>TestharnessStubs</c> (~4.8 KB)
+    /// and a one-line flag — <c>private const string</c> fields of this class, so a fixed and
+    /// bounded set that cannot carry page content. Every document got a fresh <see cref="JSContext"/>
+    /// with its own code cache, so all of it was recompiled per document: <b>64.49 ms per eval and
+    /// 28.5% of a WPT run</b>, second only to <c>RegisterDocument</c> before that was fixed the same
+    /// way.
+    /// </para>
+    /// <para>
+    /// <b>Deliberately not applied to the document's own scripts</b>, which are evaluated through
+    /// the plain <c>context.Eval</c> a few lines up. Those are page content: sharing their compiled
+    /// form across documents is exactly the cross-document path a conformance runner must not
+    /// create, and it would buy little anyway since WPT documents rarely repeat a script verbatim.
+    /// </para>
+    /// </remarks>
+    private static void EvalInjectedStub(JSContext context, string source)
+    {
+        var previousCache = context.CodeCache;
+        context.CodeCache = Broiler.JavaScript.Runtime.DictionaryCodeCache.Current;
+        try
+        {
+            context.Eval(source);
+        }
+        finally
+        {
+            context.CodeCache = previousCache;
+        }
+    }
+
     private static void PromoteWindowGlobalsToContext(DomBridge bridge)
     {
         try

@@ -96,6 +96,20 @@ internal static class WptPhaseTrace
 
         /// <summary>`DomBridge.SerializeToHtml` — the mutated DOM back to markup.</summary>
         public const string Serialize = "  └ SerializeToHtml";
+
+        // --- Sub-phases of ScriptEval. ---
+
+        /// <summary>Evaluating the runner's always-injected stub sources.</summary>
+        public const string EvalStubs = "      * injected stubs";
+
+        /// <summary>Evaluating the document's own scripts.</summary>
+        public const string EvalPage = "      * page scripts";
+
+        /// <summary>`SyncWindowMembersOntoGlobal`, run after every script.</summary>
+        public const string EvalSync = "      * window→global sync";
+
+        /// <summary>Microtask and timer drains between and after scripts.</summary>
+        public const string EvalDrain = "      * drains";
     }
 
     private static readonly Dictionary<string, (double Ms, int Count)> _accumulator = new(StringComparer.Ordinal);
@@ -172,7 +186,8 @@ internal static class WptPhaseTrace
         {
             Phases.FileRead, Phases.Fonts, Phases.Scripts,
             Phases.ScriptScan, Phases.JsContext, Phases.BridgeAttach,
-            Phases.ScriptEval, Phases.PostScript, Phases.Serialize,
+            Phases.ScriptEval, Phases.EvalStubs, Phases.EvalPage, Phases.EvalSync, Phases.EvalDrain,
+            Phases.PostScript, Phases.Serialize,
             Phases.PostProcess, Phases.Render, Phases.Compare, Phases.Diagnose,
         };
 
@@ -197,7 +212,8 @@ internal static class WptPhaseTrace
         var nested = new HashSet<string>(new[]
         {
             Phases.ScriptScan, Phases.JsContext, Phases.BridgeAttach,
-            Phases.ScriptEval, Phases.PostScript, Phases.Serialize,
+            Phases.ScriptEval, Phases.EvalStubs, Phases.EvalPage, Phases.EvalSync, Phases.EvalDrain,
+            Phases.PostScript, Phases.Serialize,
             Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.ParseHtml,
             Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegisterDocument,
             Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegDocumentObject,

@@ -36,6 +36,7 @@ one beneficiary. `patches/0133`. Published:
 | Pixel comparison | **Fixed** | **284.61 → 4.50 ms (62×)** on the match path; the suite 368.5 → 297.3 s (1.24×). 92% of it was a PNG round trip measured to be an identity — not the per-pixel loop §5 pointed at, which was ~22 ms of 284. Classification identical name for name. `patches/0134` ([§6](#6-the-pixel-comparison-is-fixed-and-the-part-that-read-worst-was-not-the-part-that-cost)) |
 | `ExecuteScriptsWithDom` | **Profiled** | **`DomBridge.RegisterDocument` was 50.6–53.6% of a whole WPT run** at ~440 ms per document, twice per reftest — and *fixed* cost (436 vs 446 ms/call across two subsets). The DOM build next to it is **0.61 ms**. Script eval is 20–25%; the render 1.1–1.7% ([§7](#7-half-a-wpt-run-is-publishing-the-dom-api-and-the-dom-build-is-06-ms)) |
 | `RegisterDocument` | **Fixed** | **422.10 → 13.74 ms/call (30.7×)**; the suite 368.5 → 195.7 s (**1.88×**). The bridge was recompiling its own constant JavaScript for every document; the process-shared code cache is installed for that call only, so no page-controlled source can enter it. Failing set identical to pristine name for name ([§8](#8-registerdocument-was-recompiling-the-bridges-own-javascript-per-document--422-ms--137-ms)) |
+| Script eval | **Fixed, in part** | Injected stubs **64.49 → 1.24 ms (52×)** and the window→global sync **11.98 → 0.12 ms (100×)** — the same constant-recompiled-per-document fault in two more places. **Page scripts deliberately untouched** (41.99 → 43.60): sharing page-derived compiled code across documents is the one thing a conformance runner must not do. Suite **368.5 → 108.6 s cumulative, 3.39×** ([§9](#9-the-same-fault-in-two-more-places-and-the-boundary-that-stopped-it-spreading)) |
 
 **Phase 3 is complete: #12, #21, #16 and #14.** The relayout harness
 [§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)
@@ -2041,6 +2042,45 @@ its job rather than noise.
 Published: [`register-document.md`](../../tests/render-stages/results/register-document.md).
 **Where that leaves a WPT run:** the render was 1.1–1.7% before any of this and the two largest
 terms have now been cut; what remains largest is script eval.
+
+### 9. The same fault in two more places, and the boundary that stopped it spreading
+
+[§8](#8-registerdocument-was-recompiling-the-bridges-own-javascript-per-document--422-ms--137-ms)
+left script eval as the largest remaining phase. Split into its parts, most of it was not the
+document's scripts:
+
+| step | calls | before (ms/call) | after (ms/call) |
+|---|---:|---:|---:|
+| **injected stubs** | 164 | **64.49** | **1.24** |
+| page scripts | 92 | 41.99 | 43.60 |
+| **window→global sync** | 253 | **11.98** | **0.12** |
+| drains | 335 | 1.30 | 1.81 |
+| **script eval** | 82 | **240.15** | **82.48** |
+
+**The stubs are the runner's own constants** — `BrowserApiStubs` (~10 KB), `TestharnessStubs`
+(~4.8 KB) and a one-line flag, all `private const string` — recompiled for every document: **28.5%
+of a whole WPT run, 52×**. **The window→global sync is a constant mirror source the host
+re-evaluates after every script** — 253 calls across 41 reftests, recompiled each time, **100×**.
+Same fault as §8 in two more places, fixed the same way.
+
+**The interesting part is where the fix stops.** Page scripts are 43.60 ms/call and are now the
+largest item in the phase, and they are deliberately left alone: they are page content, and
+sharing their compiled form across documents is precisely the cross-document path a conformance
+runner must not create. The measurement confirms the boundary held — 41.99 before, 43.60 after.
+Every swap in §8 and here wraps a single evaluation of a *named constant*, so what the shared
+cache can hold is a fixed, bounded set of strings shipped in the assemblies, and no page-derived
+source can reach it.
+
+**Cumulative on `css/css-backgrounds` reftests: 368.5 → 195.7 → 108.6 s, 3.39×**, with
+`patches/0134` still unapplied. Failing set identical to pristine name for name (266) and stable,
+`css-fonts`/`css-writing-modes` unchanged at 685/815, `Broiler.Wpt.Tests` 748/57 → 750/55 with
+nothing newly failing (the two that flip are the timeout tests, and the suite runs 10 m → 3.5 m).
+
+**Where a WPT run now stands, against the item this document is about**: the render — everything
+Phases 0–3 optimised — was 1.1–1.7% of a run before any of this began, and the four things that
+actually cost were a PNG round trip, and three copies of "recompile a constant for every
+document". None of them is a threading problem, and none was in this document. Published:
+[`script-eval.md`](../../tests/render-stages/results/script-eval.md).
 
 ## Master table
 
