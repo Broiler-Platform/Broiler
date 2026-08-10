@@ -266,5 +266,179 @@ public sealed class WorkerBindingTests : IDisposable
         Assert.True(disposed.Elapsed < TimeSpan.FromSeconds(10), "bridge disposal did not join worker threads promptly");
     }
 
+    // ---------------------------------------------------------------- timers
+
+    /// <summary>A worker's <c>setTimeout</c> fires, and its callback can post back.</summary>
+    [Fact]
+    public void Worker_setTimeout_fires_and_can_post()
+    {
+        var script = WriteWorker("timeout.js", @"
+            onmessage = function () {
+                setTimeout(function () { postMessage({ late: true }); }, 20);
+            };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage(null);",
+            "got !== null");
+
+        Assert.True(ok, "the worker's setTimeout never fired");
+        Assert.True(context.Eval("got.late").BooleanValue);
+    }
+
+    /// <summary>
+    /// Deadline ordering, which is the property inherited from the page's loop: a later-registered
+    /// shorter timeout runs before an earlier-registered longer one.
+    /// </summary>
+    [Fact]
+    public void Worker_timers_fire_in_deadline_order()
+    {
+        var script = WriteWorker("order.js", @"
+            onmessage = function () {
+                var seen = [];
+                setTimeout(function () { seen.push('slow'); postMessage({ order: seen.join(',') }); }, 60);
+                setTimeout(function () { seen.push('fast'); }, 5);
+            };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage(null);",
+            "got !== null");
+
+        Assert.True(ok, "the worker never reported timer order");
+        Assert.Equal("fast,slow", context.Eval("got.order").ToString());
+    }
+
+    /// <summary><c>setInterval</c> repeats, and <c>clearInterval</c> stops it.</summary>
+    [Fact]
+    public void Worker_setInterval_repeats_until_cleared()
+    {
+        var script = WriteWorker("interval.js", @"
+            onmessage = function () {
+                var n = 0;
+                var id = setInterval(function () {
+                    n++;
+                    if (n === 3) { clearInterval(id); postMessage({ ticks: n }); }
+                }, 5);
+            };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage(null);",
+            "got !== null");
+
+        Assert.True(ok, "the worker's interval never reported");
+        Assert.Equal(3, context.Eval("got.ticks").DoubleValue);
+    }
+
+    /// <summary>
+    /// A pending timer must not starve the inbox: a worker with a live <c>setInterval</c> still
+    /// answers messages. This is the case a naive pump — one that drains timers until none are due
+    /// before looking at the queue — gets wrong.
+    /// </summary>
+    [Fact]
+    public void A_running_interval_does_not_starve_incoming_messages()
+    {
+        var script = WriteWorker("busy.js", @"
+            var ticks = 0;
+            setInterval(function () { ticks++; }, 1);
+            onmessage = function () { postMessage({ answered: true, ticks: ticks }); };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage(null);",
+            "got !== null");
+
+        Assert.True(ok, "a worker with a running interval did not answer a message");
+        Assert.True(context.Eval("got.answered").BooleanValue);
+    }
+
+    /// <summary>
+    /// <c>clearTimeout</c> before the deadline cancels the callback, and the ids are interchangeable
+    /// with <c>clearInterval</c> as the HTML spec requires.
+    /// </summary>
+    [Fact]
+    public void Worker_clearTimeout_cancels_and_ids_are_interchangeable()
+    {
+        var script = WriteWorker("cancel.js", @"
+            onmessage = function () {
+                var fired = false;
+                var a = setTimeout(function () { fired = true; }, 10);
+                clearInterval(a);                       // interchangeable id space
+                var b = setInterval(function () { fired = true; }, 10);
+                clearTimeout(b);                        // and the other way round
+                setTimeout(function () { postMessage({ fired: fired }); }, 40);
+            };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage(null);",
+            "got !== null");
+
+        Assert.True(ok, "the worker never reported");
+        Assert.False(context.Eval("got.fired").BooleanValue, "a cleared timer still fired");
+    }
+
+    /// <summary>
+    /// A worker sitting on a repeating timer must still terminate promptly — the timer keeps the pump
+    /// awake, so termination has to win over it rather than wait for it to go quiet.
+    /// </summary>
+    [Fact]
+    public void Terminate_stops_a_worker_with_a_live_interval()
+    {
+        var script = WriteWorker("forever.js", @"
+            setInterval(function () { }, 1);
+            onmessage = function () { postMessage({ up: true }); };");
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage(null);",
+            "got !== null");
+        Assert.True(ok, "the worker never started");
+
+        var stopped = System.Diagnostics.Stopwatch.StartNew();
+        bridge.Dispose();
+        stopped.Stop();
+
+        Assert.True(stopped.Elapsed < TimeSpan.FromSeconds(10),
+            $"disposal took {stopped.Elapsed} with a live interval — termination did not win over the timer");
+    }
+
     private static string Quote(string path) => "'" + path.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
 }

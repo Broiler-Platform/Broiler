@@ -45,7 +45,7 @@ reply in flight keeps the host's drain alive instead of racing the end of the do
 
 ## Verified
 
-`WorkerBindingTests`, six cases, all driving the real bridge rather than the binding in isolation —
+`WorkerBindingTests`, twelve cases, all driving the real bridge rather than the binding in isolation —
 the seam most likely to be wrong is where the worker thread meets the page's loop:
 
 | case | asserts |
@@ -64,13 +64,40 @@ so a newly-defined global can silently change which path a test takes. It did no
 - `css/css-fonts` + `css/css-writing-modes`: unchanged at 685/815.
 - `Broiler.Wpt.Tests`: 750 passed / 55 failed, unchanged.
 
+## Timers, and why they are not the page's loop
+
+`setTimeout`, `setInterval`, `clearTimeout`, `clearInterval` — one shared id space, interchangeable
+clears, delays clamped so `NaN`/negative/absent all mean 0, and firing in `(deadline, seq)` order so
+a later-registered shorter timeout beats an earlier longer one.
+
+**Reusing the page's `BrowserEventLoop` was tried first and its clock is why it cannot be.** That
+loop is explicitly virtual — *"not wall-clock: a synchronous drain has no real time, only the
+relative ordering of deadlines"* — because the page's timers are drained in bounded bursts by a host
+that wants determinism, never pumped continuously. A worker is the opposite: a long-lived pump. Under
+a virtual clock a worker's `setInterval(fn, 1000)` has its deadline reached the instant the loop
+looks at it, so it would fire as fast as the CPU allows and the worker would spin hot forever.
+
+So worker timers use real deadlines, and the pump waits for **whichever comes first — an inbound
+message or the next deadline**. A plain blocking take would sleep through every timer; a poll would
+burn a core. An idle worker with no timers blocks indefinitely.
+
+**What this costs is determinism, and it is confined to the worker.** A page's timers still fire on
+the virtual clock and a capture is still reproducible; a worker's fire in real time, so *when* its
+messages arrive relative to the page's drain is not. That is inherent to running on another thread
+rather than a choice made here, and the containment is that a page only ever observes a worker
+through queued messages it must explicitly wait for.
+
+Six more cases cover it, including the two that catch a wrong pump: **a live `setInterval` must not
+starve the inbox** (the bug a pump that drains timers to exhaustion before checking messages would
+have), and **`terminate()` must win over a repeating timer** rather than wait for it to go quiet.
+
 ## Deliberately out of this slice
 
-Refused or absent rather than half-built: timers inside a worker, `importScripts`, module workers,
-`SharedWorker`, nested workers, and transferables (an `ArrayBuffer` in a transfer list is cloned,
-not transferred). Worker scripts resolve from the filesystem only — a worker whose script would have
-to be fetched over the network fires `error` rather than blocking a render on a request this host
-has no policy for.
+Refused or absent rather than half-built: `importScripts`, module workers, `SharedWorker`, nested
+workers, `requestAnimationFrame` in a worker, and transferables (an `ArrayBuffer` in a transfer list
+is cloned, not transferred). Worker scripts resolve from the filesystem only — a worker whose script
+would have to be fetched over the network fires `error` rather than blocking a render on a request
+this host has no policy for.
 
 Those are the honest boundary of a first slice. Each is additive to what is here, and none of them
 changes the two-clone contract above, which is the part that would have been expensive to get wrong.

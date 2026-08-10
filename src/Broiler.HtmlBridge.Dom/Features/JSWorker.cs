@@ -9,6 +9,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.BuiltIns.Null;
+using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Storage;
 
@@ -39,6 +40,8 @@ internal sealed class JSWorker
     private readonly CancellationTokenSource _cancel = new();
     private readonly Thread _thread;
     private readonly ManualResetEventSlim _started = new();
+
+    private readonly WorkerTimers _timers = new();
 
     private JSObject? _handle;
     private WorkerBinding? _owner;
@@ -121,12 +124,39 @@ internal sealed class JSWorker
 
             _started.Set();
 
-            foreach (var detached in _inbox.GetConsumingEnumerable(_cancel.Token))
+            // The pump waits for whichever comes first: an inbound message, or the next timer
+            // deadline. A plain blocking take would sleep through every timer; a poll would burn a
+            // core. TryTake's timeout is exactly "time until the next deadline", so an idle worker
+            // with no timers blocks indefinitely and one with timers wakes only when it must.
+            while (!_cancel.IsCancellationRequested && !_closed)
             {
-                if (_closed)
-                    break;
+                var untilNext = _timers.TimeUntilNext();
+                var waitMs = untilNext is null
+                    ? Timeout.Infinite
+                    : (int)Math.Min(int.MaxValue, Math.Ceiling(untilNext.Value));
 
-                DispatchToWorker(context, detached);
+                bool took;
+                JSValue? detached;
+                try
+                {
+                    took = _inbox.TryTake(out detached, waitMs, _cancel.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (InvalidOperationException)
+                {
+                    // CompleteAdding raced us and the collection is drained: close() or terminate().
+                    break;
+                }
+
+                if (took && detached is not null)
+                    DispatchToWorker(context, detached);
+
+                // Always after the take, whether it produced a message or timed out: a message that
+                // arrives just before a deadline must not postpone the timer past it.
+                _timers.RunDue();
             }
         }
         catch (OperationCanceledException)
@@ -141,6 +171,7 @@ internal sealed class JSWorker
         finally
         {
             _started.Set();
+            _timers.ClearAll();
             context?.Dispose();
         }
     }
@@ -231,9 +262,29 @@ internal sealed class JSWorker
             return JSUndefined.Value;
         }, "addEventListener", 2);
 
+        context["setTimeout"] = new JSFunction((in a) => new JSNumber(
+            _timers.Add(a.Length > 0 ? a[0] as JSFunction : null, DelayOf(a), repeating: false)), "setTimeout", 2);
+
+        context["setInterval"] = new JSFunction((in a) => new JSNumber(
+            _timers.Add(a.Length > 0 ? a[0] as JSFunction : null, DelayOf(a), repeating: true)), "setInterval", 2);
+
+        // One id space, and clearTimeout/clearInterval interchangeable, per the HTML spec — the same
+        // contract the page's loop keeps.
+        var clear = new JSFunction((in a) =>
+        {
+            if (a.Length > 0 && a[0] is { } id && !id.IsNullOrUndefined)
+                _timers.Clear((int)id.DoubleValue);
+
+            return JSUndefined.Value;
+        }, "clearTimeout", 1);
+        context["clearTimeout"] = clear;
+        context["clearInterval"] = clear;
+
         context["close"] = new JSFunction((in _) =>
         {
             _closed = true;
+            // A closing worker stops its timers; leaving them would keep the pump awake past close().
+            _timers.ClearAll();
             try { _inbox.CompleteAdding(); } catch (ObjectDisposedException) { }
             return JSUndefined.Value;
         }, "close", 0);
@@ -257,6 +308,10 @@ internal sealed class JSWorker
 
         context["console"] = console;
     }
+
+    /// <summary>The delay argument of a timer call, defaulting to 0 when absent or not a number.</summary>
+    private static double DelayOf(in Arguments a) =>
+        a.Length > 1 && a[1] is { } delay && !delay.IsNullOrUndefined ? delay.DoubleValue : 0;
 
     private void QueueError(string message)
     {
