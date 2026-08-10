@@ -1,12 +1,11 @@
 # Headless render stage profile
 
 > **Two notes before reading the `parse+cascade` breakdown.** It is produced by
-> `RenderStageTrace`, whose scopes are opened in `Broiler.HTML`'s `DomParser` —
-> which reaches the pinned submodule pointer only through
-> `patches/0129-html-cascade-substage-trace-and-warm-pass.patch`. Against a bare
-> checkout the sub-stage rows are all zero and the whole stage lands in
-> `(untimed)`; apply the patch (or let `scripts/apply-pending-wpt-patches.sh` do
-> it, as CI does) to reproduce them.
+> `RenderStageTrace`, whose scopes are opened in `Broiler.HTML`'s `DomParser`.
+> Those scopes arrived as `patches/0129-html-cascade-substage-trace-and-warm-pass`
+> and are **upstream now**, so the pinned pointer carries them and a bare checkout
+> reproduces these rows; against a `Broiler.HTML` older than the pin the sub-stage
+> rows are all zero and the whole stage lands in `(untimed)`.
 >
 > And this run **predates multithreading item #12**, so its single `cascade` row
 > is the stage as the roadmap had been carrying it. Today's profiler splits that

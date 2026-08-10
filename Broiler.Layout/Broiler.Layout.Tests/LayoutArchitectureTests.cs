@@ -60,6 +60,11 @@ public sealed class LayoutArchitectureTests
                 // (NativeAnchorPlacement.VisualViewportScale) around the shared geometry snapshot.
                 "Broiler.HtmlBridge.Dom",
                 "Broiler.Layout.Tests",
+                // The stage profiler drives internal knobs the render path exposes to no one else
+                // — CssStyleRecalc's thread budget for --style-scaling, and the same for the
+                // raster and tile budgets. Added with item #12; this list was not updated with it,
+                // which is why this gate was red before item #14 touched anything.
+                "Broiler.Render.Stage.Benchmarks",
                 // The WPT runner toggles NativeAnchorPlacement.Enabled around the final
                 // render for the Phase 5 native anchor-placement cutover (P5.8d.2b).
                 "Broiler.Wpt",

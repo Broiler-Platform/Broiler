@@ -59,24 +59,25 @@ set -euo pipefail
 #     for the same reason: patches/ is a backlog, not an archive. 0126 was listed
 #     here until then; its entry is removed rather than left to skip forever,
 #     because an entry that can only ever skip is noise.
+#   * 0128 (Broiler.CSS, cache sharding) and 0129 (Broiler.HTML, sub-stage trace
+#     and warm pass) — multithreading item #12, both upstream and both pointers
+#     bumped, so they reach CI through the pointer. They were listed here, and
+#     for a stated reason: they *could* have moved rendering if the warm pass and
+#     the box walk ever disagreed about an element's cascade. That check has since
+#     been run against the pointer rather than against a patch, so the entries go
+#     the way 0126's did.
+#   * 0130 (Broiler.JS, test parallelization) — upstream. It was never listed:
+#     it changes only how `Broiler.JavaScript.BuiltIns.Tests` schedules its own
+#     cases, and the WPT run never builds that assembly.
 #
-# Listed below, and deliberately so: 0128 and 0129 *could* move rendering if the
-# warm pass and the box walk ever disagreed about an element's cascade, so having
-# the WPT run exercise them against the pinned pointers is the check that claim
-# deserves — unlike a thread-safety or scheduling patch, which cannot move pixels
-# even when it is wrong.
+# Listed below, and deliberately so: 0131 decides whether the render tree is
+# rebuilt after a DOM mutation, so a wrong classification is a *stale page* —
+# the one failure mode a pixel-comparing suite is built to catch, and one no
+# unit test over the classifier can reach. Unlike a thread-safety or scheduling
+# patch, this one can move pixels even when the engine below it is perfect.
 PENDING_PATCHES=(
-  # 0128 and 0129 are one change (multithreading item #12) split across two
-  # submodules and must be applied together or not at all: 0129 adds the call to
-  # `CssStyleRecalc.Warm`, and 0128 gives that pass the memo it writes into.
-  "Broiler.CSS|patches/0128-css-style-engine-cache-sharding.patch"
-  "Broiler.HTML|patches/0129-html-cascade-substage-trace-and-warm-pass.patch"
+  "Broiler.HTML|patches/0131-html-relayout-invalidation-ledger.patch"
 )
-
-# Deliberately NOT listed: patches/0130-js-tests-reenable-parallelization.patch.
-# It changes only how `Broiler.JavaScript.BuiltIns.Tests` schedules its own
-# cases; the WPT run never builds that assembly, so applying it here would
-# exercise nothing.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
