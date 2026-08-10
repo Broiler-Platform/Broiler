@@ -376,7 +376,11 @@ internal static class RelayoutProfile
     }
 
     /// <summary>Class names as the corpus writes them: <c>.name</c> at a selector position.</summary>
-    private static readonly Regex StyledClassPattern = new(@"\.([A-Za-z_][\w-]*)", RegexOptions.Compiled);
+    // Fully qualified: this project references the JS engine (for the js-context-scaling mode),
+    // which brings a Broiler.Regex namespace into scope, and inside namespace Broiler.* an
+    // enclosing-namespace match for "Regex" beats both the using directive and a using-alias.
+    private static readonly System.Text.RegularExpressions.Regex StyledClassPattern =
+        new(@"\.([A-Za-z_][\w-]*)", RegexOptions.Compiled);
 
     /// <summary>The mutation list, for the parity gate that renders what this profile times.</summary>
     internal static IReadOnlyList<MutationCase> MutationsForParity => Mutations;

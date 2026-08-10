@@ -30,7 +30,7 @@ one beneficiary. `patches/0133`. Published:
 |---|---|---|
 | #13 — parallel intrinsic sizing and independent subtrees | **Not started; re-argued** | Its stage is 3.3–20.1% of a render, up from the 0.6–6.5% the phase row quoted, entirely by Amdahl ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)) |
 | Layout roadmap step 1 — stop laying out the tree twice | **Retired as written** | `--layout-passes` (`patches/0133`): every fixed-viewport row is 1 call / 1 pass; auto-size is 2 passes at **0.80–1.35×** one pass, not 2× ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)) |
-| #18 — Web Workers | **Not started** | Unchanged: a capability, not a speedup of existing work |
+| #18 — Web Workers | **Gate passed; feature not started** | The audit the roadmap gates it on is executable now and clears both halves: `JSContextIsolationTests` (5 cases, 4 overlapping threads) and **2.66×/3.22× at 4 threads** — contexts are isolated *and* genuinely parallel, so the item is not gated on an engine that would serialize it. `Worker`/`MessageChannel`/structured clone are unwritten; 30–40 d, High risk stands ([§10](#10-item-18s-gate-passes-on-both-halves--and-one-of-them-is-the-half-nobody-was-asking-about)) |
 | Phases 2–3 measured on WPT | **Null result** | `ca53d44` vs HEAD, both sequential per render, 2 213 reftests over two suites: **1.017× and 1.013×**, inside the host's 5–7% drift, classification identical. WPT pages are 1 018 bytes at the median against a 20–212 KB corpus, so the surviving sequential wins have nothing to act on ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)) |
 | Per-render fixed cost | **Measured; §4's conclusion refuted** | Engine: **3.48 ms** empty, 15–19 ms at WPT median, 77% of the empty render being bitmap alloc + erase. Runner: the render is **1.6–2.0%** of a test — **76–79% is `ExecuteScriptsWithDom`** and **16–21% `PixelDiffRunner.Compare`**. Neither is a rendering problem, and neither is in this document ([§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)) |
 | Pixel comparison | **Fixed** | **284.61 → 4.50 ms (62×)** on the match path; the suite 368.5 → 297.3 s (1.24×). 92% of it was a PNG round trip measured to be an identity — not the per-pixel loop §5 pointed at, which was ~22 ms of 284. Classification identical name for name. `patches/0134` ([§6](#6-the-pixel-comparison-is-fixed-and-the-part-that-read-worst-was-not-the-part-that-cost)) |
@@ -2081,6 +2081,47 @@ Phases 0–3 optimised — was 1.1–1.7% of a run before any of this began, and
 actually cost were a PNG round trip, and three copies of "recompile a constant for every
 document". None of them is a threading problem, and none was in this document. Published:
 [`script-eval.md`](../../tests/render-stages/results/script-eval.md).
+
+### 10. Item #18's gate passes, on both halves — and one of them is the half nobody was asking about
+
+The roadmap does not schedule Web Workers until the P0-c static-state audit clears them, and #18's
+row asserts the other side ("per-context state exists … so isolation is feasible"). Both are claims
+about code, so the gate is built here as something that runs.
+
+**Correctness.** `JSContextIsolationTests` — five cases, four real threads each owning a
+`JSContext` for its lifetime (item #18's proposed shape), released together on a barrier, each case
+aimed at a named piece of process-wide state: globals not leaking, interned key strings and shape
+transitions under identical property names, identical sources compiled at maximum contention, the
+process-shared code cache, and the built-in registry's static initialization. **All five pass**, and
+each run asserts the threads *actually overlapped*, because a concurrency test whose threads run one
+after another passes for the wrong reason.
+
+**Throughput, which is the half a correctness test cannot reach.** An engine holding one global lock
+would pass every assertion above and still make a worker useless — the point of a worker is to run
+*while* the main context runs, so **correct-but-serialized is the outcome that would sink the item**.
+`--js-context-scaling`, one context per thread, same CPU-bound workload each, compiled before the
+clock:
+
+| code cache | 1 thread | 2 threads | 4 threads |
+|---|---:|---:|---:|
+| per-context | 1.00× | 1.82× | **2.66×** |
+| process-shared | 1.00× | 1.88× | **3.22×** |
+
+**The premise holds.** Contexts are isolated under real concurrency and run genuinely in parallel.
+Item #18 is not gated on an engine that would serialize it.
+
+**The second finding is about this phase's own work.** §8/§9 routed the bridge's and the runner's
+constant sources through the process-shared `DictionaryCodeCache.Current`, which is safe today only
+because those hosts render on one thread per process — under #18, several threads reach it at once.
+It is not just safe under contention, it **scales better** than the per-context cache (3.22× against
+2.66×), which is what work that stops being repeated per context should do. A blocker introduced by
+this phase's own optimisation would have been an unpleasant thing to find after building the
+feature on top of it.
+
+**What this is not**: the feature. `Worker`, `MessageChannel` and structured-clone message passing
+are unwritten and the 30–40 day, High-risk estimate stands; the workload exercises the shared state
+the roadmap names, not the bridge, timers, promises or modules. Published:
+[`js-context-concurrency.md`](../../tests/render-stages/results/js-context-concurrency.md).
 
 ## Master table
 

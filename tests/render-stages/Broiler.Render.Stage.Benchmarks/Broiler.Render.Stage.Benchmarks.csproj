@@ -60,6 +60,9 @@
     <ProjectReference Include="..\..\..\Broiler.DOM\Broiler.Dom.Html\Broiler.Dom.Html.csproj" />
     <!-- BColor, and the image encode formats the decode benchmark builds its fixtures with. -->
     <ProjectReference Include="..\..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+    <!-- For the js-context-scaling mode: whether two JSContexts on two threads actually run at
+         the same time, which is the question multithreading item #18 (Web Workers) turns on. -->
+    <ProjectReference Include="..\..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
     <ProjectReference Include="..\..\..\Broiler.Media\Broiler.Media.Image\Broiler.Media.Image.csproj" />
     <!--
       The decode-scaling mode sets `ImageDecodeParallelism.MaxDegreeOfParallelism`, which is internal

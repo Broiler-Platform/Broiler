@@ -74,6 +74,11 @@ public static class Program
             return RelayoutProfile.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
         }
 
+        if (args.Length >= 1 && args[0] == "--js-context-scaling")
+        {
+            return JSContextScaling.Run(ArgValue(args, "--iterations", 7), ArgValue(args, "--warmup", 2));
+        }
+
         if (args.Length >= 1 && args[0] == "--pixel-compare-cost")
         {
             return PixelCompareCost.Run(ArgValue(args, "--iterations", 11), ArgValue(args, "--warmup", 3));
@@ -141,6 +146,10 @@ public static class Program
         Console.WriteLine("  --relayout-profile [--iterations N] [--warmup N]");
         Console.WriteLine("        Cascade sub-stage and render time against the style thread budget (item #12).");
         Console.WriteLine("        Exits 1 if any thread setting renders different pixels.");
+        Console.WriteLine();
+        Console.WriteLine("  --js-context-scaling [--iterations N] [--warmup N]");
+        Console.WriteLine("        Whether JavaScript in separate JSContexts runs concurrently across threads");
+        Console.WriteLine("        or serializes — the measurement item #18 (Web Workers) turns on.");
         Console.WriteLine();
         Console.WriteLine("  --pixel-compare-cost [--iterations N] [--warmup N]");
         Console.WriteLine("        What PixelDiffRunner.Compare costs and which half of it is the cost.");
