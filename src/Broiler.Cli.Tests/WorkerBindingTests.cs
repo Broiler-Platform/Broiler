@@ -440,5 +440,151 @@ public sealed class WorkerBindingTests : IDisposable
             $"disposal took {stopped.Elapsed} with a live interval — termination did not win over the timer");
     }
 
+    // ---------------------------------------------------------- importScripts
+
+    /// <summary>Imported scripts run in the worker's own global, in order, before the call returns.</summary>
+    [Fact]
+    public void ImportScripts_runs_scripts_in_order_in_the_worker_global()
+    {
+        WriteWorker("lib-a.js", "var trail = 'a'; function fromA() { return 'A'; }");
+        WriteWorker("lib-b.js", "trail += 'b';");
+        var script = WriteWorker("importer.js", @"
+            importScripts('lib-a.js', 'lib-b.js');
+            var afterImport = trail;               // synchronous: already 'ab' here
+            onmessage = function () { postMessage({ trail: afterImport, call: fromA() }); };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage(null);",
+            "got !== null");
+
+        Assert.True(ok, "the importing worker never replied");
+        Assert.Equal("ab", context.Eval("got.trail").ToString());
+        Assert.Equal("A", context.Eval("got.call").ToString());
+    }
+
+    /// <summary>
+    /// Specifiers resolve against the <em>worker's</em> directory, not the page's — which is what the
+    /// spec means by "relative to the worker's script URL".
+    /// </summary>
+    /// <remarks>
+    /// The check is built so it cannot pass by accident: the worker lives in a subdirectory, and a
+    /// <em>different</em> file of the same name sits next to the page. Resolving against the page's
+    /// base path would find the decoy and report the wrong marker rather than failing to load.
+    /// </remarks>
+    [Fact]
+    public void ImportScripts_resolves_against_the_workers_own_directory()
+    {
+        var sub = Directory.CreateDirectory(Path.Combine(_dir, "nested")).FullName;
+        File.WriteAllText(Path.Combine(_dir, "shared.js"), "var marker = 'page-level-decoy';");
+        File.WriteAllText(Path.Combine(sub, "shared.js"), "var marker = 'worker-level';");
+        var script = Path.Combine(sub, "w.js");
+        File.WriteAllText(script, @"
+            importScripts('shared.js');
+            onmessage = function () { postMessage({ marker: marker }); };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+        bridge.SetLocalBasePath(_dir);   // the page's base path points at the decoy
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage(null);",
+            "got !== null");
+
+        Assert.True(ok, "the worker never replied");
+        Assert.Equal("worker-level", context.Eval("got.marker").ToString());
+    }
+
+    /// <summary>
+    /// A specifier that cannot be loaded is a <c>NetworkError</c>, and it aborts the call — later
+    /// specifiers in the same <c>importScripts</c> do not run.
+    /// </summary>
+    [Fact]
+    public void ImportScripts_throws_NetworkError_and_aborts_the_rest_of_the_call()
+    {
+        WriteWorker("after.js", "loadedAfter = true;");
+        var script = WriteWorker("bad-import.js", @"
+            var loadedAfter = false, threw = '';
+            try { importScripts('no-such-file.js', 'after.js'); }
+            catch (e) { threw = String(e && e.name ? e.name : e); }
+            onmessage = function () { postMessage({ threw: threw, loadedAfter: loadedAfter }); };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage(null);",
+            "got !== null");
+
+        Assert.True(ok, "the worker never replied");
+        Assert.Contains("NetworkError", context.Eval("got.threw").ToString(), StringComparison.Ordinal);
+        Assert.False(context.Eval("got.loadedAfter").BooleanValue,
+            "a specifier after the failing one still ran — the call did not abort");
+    }
+
+    /// <summary>An imported script that throws propagates to the importer rather than being swallowed.</summary>
+    [Fact]
+    public void A_throwing_imported_script_propagates()
+    {
+        WriteWorker("boom.js", "throw new Error('from-import');");
+        var script = WriteWorker("catches.js", @"
+            var caught = '';
+            try { importScripts('boom.js'); } catch (e) { caught = String(e.message || e); }
+            onmessage = function () { postMessage({ caught: caught }); };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage(null);",
+            "got !== null");
+
+        Assert.True(ok, "the worker never replied");
+        Assert.Contains("from-import", context.Eval("got.caught").ToString(), StringComparison.Ordinal);
+    }
+
+    /// <summary><c>importScripts</c> is re-entrant: an imported script may import further scripts.</summary>
+    [Fact]
+    public void Imported_scripts_may_import_further_scripts()
+    {
+        WriteWorker("leaf.js", "var depth = 'leaf';");
+        WriteWorker("middle.js", "importScripts('leaf.js'); depth += '<middle';");
+        var script = WriteWorker("root.js", @"
+            importScripts('middle.js');
+            onmessage = function () { postMessage({ depth: depth }); };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage(null);",
+            "got !== null");
+
+        Assert.True(ok, "the worker never replied");
+        Assert.Equal("leaf<middle", context.Eval("got.depth").ToString());
+    }
+
     private static string Quote(string path) => "'" + path.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
 }

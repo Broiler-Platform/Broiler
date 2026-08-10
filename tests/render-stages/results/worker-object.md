@@ -45,7 +45,7 @@ reply in flight keeps the host's drain alive instead of racing the end of the do
 
 ## Verified
 
-`WorkerBindingTests`, twelve cases, all driving the real bridge rather than the binding in isolation —
+`WorkerBindingTests`, seventeen cases, all driving the real bridge rather than the binding in isolation —
 the seam most likely to be wrong is where the worker thread meets the page's loop:
 
 | case | asserts |
@@ -91,13 +91,33 @@ Six more cases cover it, including the two that catch a wrong pump: **a live `se
 starve the inbox** (the bug a pump that drains timers to exhaustion before checking messages would
 have), and **`terminate()` must win over a repeating timer** rather than wait for it to go quiet.
 
+## `importScripts`
+
+Synchronous, in order, in the worker's own global, and re-entrant — an imported script may import
+further scripts.
+
+**Specifiers resolve against the worker's own directory**, which is what the spec means by "relative
+to the worker's script URL" — not the document's base path. The resolver seam therefore takes a base
+directory: `null` for `new Worker(url)` (resolve against the page), the worker's directory for
+`importScripts`.
+
+That distinction is easy to get accidentally right, so the test is built so it cannot be: the worker
+lives in a subdirectory and a **different file of the same name** sits next to the page, with the
+page's base path pointing at it. Resolving the wrong way finds the decoy and reports the wrong
+marker rather than failing to load.
+
+Failure behaviour follows the spec: a specifier that cannot be loaded raises **`NetworkError`** and
+**aborts the whole call**, so later specifiers in the same `importScripts` do not run — asserted, not
+assumed. A script that *throws* propagates to the importer rather than being swallowed; catching it
+would leave the worker running with a half-initialised global and no way to find out.
+
 ## Deliberately out of this slice
 
-Refused or absent rather than half-built: `importScripts`, module workers, `SharedWorker`, nested
-workers, `requestAnimationFrame` in a worker, and transferables (an `ArrayBuffer` in a transfer list
-is cloned, not transferred). Worker scripts resolve from the filesystem only — a worker whose script
-would have to be fetched over the network fires `error` rather than blocking a render on a request
-this host has no policy for.
+Refused or absent rather than half-built: module workers, `SharedWorker`, nested workers,
+`requestAnimationFrame` in a worker, and transferables (an `ArrayBuffer` in a transfer list is
+cloned, not transferred). Worker scripts — including imports — resolve from the filesystem only; one
+that would have to be fetched over the network fires `error` (or `NetworkError` for an import)
+rather than blocking a render on a request this host has no policy for.
 
 Those are the honest boundary of a first slice. Each is additive to what is here, and none of them
 changes the two-clone contract above, which is the part that would have been expensive to get wrong.

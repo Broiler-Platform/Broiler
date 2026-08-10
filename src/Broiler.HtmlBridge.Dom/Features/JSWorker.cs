@@ -34,7 +34,7 @@ namespace Broiler.HtmlBridge.Dom.Features;
 internal sealed class JSWorker
 {
     private readonly string _name;
-    private readonly string _source;
+    private readonly WorkerScript _script;
     private readonly IWorkerHost _host;
     private readonly BlockingCollection<JSValue> _inbox = new(new ConcurrentQueue<JSValue>());
     private readonly CancellationTokenSource _cancel = new();
@@ -47,10 +47,10 @@ internal sealed class JSWorker
     private WorkerBinding? _owner;
     private volatile bool _closed;
 
-    public JSWorker(string name, string source, IWorkerHost host)
+    public JSWorker(string name, WorkerScript script, IWorkerHost host)
     {
         _name = name;
-        _source = source;
+        _script = script;
         _host = host;
         _thread = new Thread(Pump) { IsBackground = true, Name = $"broiler-worker:{name}" };
     }
@@ -112,7 +112,7 @@ internal sealed class JSWorker
 
             try
             {
-                context.Eval(_source);
+                context.Eval(_script.Source);
             }
             catch (Exception ex)
             {
@@ -279,6 +279,35 @@ internal sealed class JSWorker
         }, "clearTimeout", 1);
         context["clearTimeout"] = clear;
         context["clearInterval"] = clear;
+
+        // importScripts(...urls): fetch and run each in order, synchronously, in this global.
+        // Specifiers resolve against the worker's own script directory, which is what the HTML spec
+        // means by "relative to the worker's script URL" — not the document's base path.
+        context["importScripts"] = new JSFunction((in a) =>
+        {
+            for (var i = 0; i < a.Length; i++)
+            {
+                var specifier = a[i]?.ToString() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(specifier))
+                    continue;
+
+                var imported = _host.ResolveWorkerScript(specifier, _script.BaseDirectory);
+                if (imported is null)
+                {
+                    // Spec: a script that cannot be fetched is a NetworkError, and it aborts the
+                    // whole call — later specifiers in the same call do not run.
+                    DomBridge.ThrowDOMException(context, $"importScripts: could not load '{specifier}'.", "NetworkError");
+                    return JSUndefined.Value;
+                }
+
+                // Deliberately not wrapped: a throwing imported script propagates to the caller,
+                // exactly as an inline one would. Swallowing it here would leave the worker running
+                // with a half-initialised global and no way to find out.
+                context.Eval(imported.Value.Source);
+            }
+
+            return JSUndefined.Value;
+        }, "importScripts", 1);
 
         context["close"] = new JSFunction((in _) =>
         {

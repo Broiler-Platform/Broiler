@@ -99,8 +99,8 @@ internal sealed class WorkerBinding : IDisposable
         if (string.IsNullOrWhiteSpace(specifier))
             return Reject("Worker requires a script URL.", "SyntaxError");
 
-        var source = _host.ResolveWorkerScript(specifier);
-        if (source is null)
+        var script = _host.ResolveWorkerScript(specifier, baseDirectory: null);
+        if (script is null)
         {
             // A worker whose script cannot be fetched fires `error` at the Worker object; it does
             // not throw from the constructor, and it must not take the page down.
@@ -113,7 +113,7 @@ internal sealed class WorkerBinding : IDisposable
         JSWorker worker;
         try
         {
-            worker = new JSWorker(specifier, source, _host);
+            worker = new JSWorker(specifier, script.Value, _host);
         }
         catch (Exception ex)
         {

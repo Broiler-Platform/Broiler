@@ -40,16 +40,16 @@ public sealed partial class DomBridge : IWorkerHost
     }
 
     /// <summary>
-    /// Resolves a worker script the way the document's other sub-resources resolve: against the
-    /// local base path the host set, then as given.
+    /// Resolves a worker script against <paramref name="baseDirectory"/> when one is given (the
+    /// <c>importScripts</c> case), otherwise against the page's local base path, then as given.
     /// </summary>
     /// <remarks>
-    /// Only <c>file</c>-shaped specifiers are resolved. A worker whose script would have to be
-    /// fetched over the network returns <see langword="null"/> here and surfaces as an <c>error</c>
-    /// event on the Worker object, rather than blocking a render on a request this host has no
-    /// policy for.
+    /// Only <c>file</c>-shaped specifiers are resolved. A worker script that would have to be
+    /// fetched over the network returns <see langword="null"/> here — surfacing as an <c>error</c>
+    /// event for <c>new Worker()</c>, and as a <c>NetworkError</c> for <c>importScripts</c> — rather
+    /// than blocking a render on a request this host has no policy for.
     /// </remarks>
-    string? IWorkerHost.ResolveWorkerScript(string specifier)
+    WorkerScript? IWorkerHost.ResolveWorkerScript(string specifier, string? baseDirectory)
     {
         try
         {
@@ -58,18 +58,27 @@ public sealed partial class DomBridge : IWorkerHost
                 if (!absolute.IsFile)
                     return null;
 
-                return File.Exists(absolute.LocalPath) ? File.ReadAllText(absolute.LocalPath) : null;
+                return Read(absolute.LocalPath);
             }
 
-            var basePath = _resources.LocalBasePath;
-            if (!string.IsNullOrEmpty(basePath))
+            // The worker's own directory first when there is one: importScripts resolves against the
+            // worker's script URL, not the document's.
+            if (!string.IsNullOrEmpty(baseDirectory))
             {
-                var candidate = Path.Combine(basePath, specifier);
-                if (File.Exists(candidate))
-                    return File.ReadAllText(candidate);
+                var relative = Path.Combine(baseDirectory, specifier);
+                if (File.Exists(relative))
+                    return Read(relative);
             }
 
-            return File.Exists(specifier) ? File.ReadAllText(specifier) : null;
+            var pageBase = _resources.LocalBasePath;
+            if (!string.IsNullOrEmpty(pageBase))
+            {
+                var candidate = Path.Combine(pageBase, specifier);
+                if (File.Exists(candidate))
+                    return Read(candidate);
+            }
+
+            return File.Exists(specifier) ? Read(specifier) : null;
         }
         catch (Exception ex)
         {
@@ -77,5 +86,10 @@ public sealed partial class DomBridge : IWorkerHost
                 $"Could not read worker script '{specifier}': {ex.Message}", ex);
             return null;
         }
+
+        static WorkerScript? Read(string path) =>
+            File.Exists(path)
+                ? new WorkerScript(File.ReadAllText(path), Path.GetDirectoryName(Path.GetFullPath(path)))
+                : null;
     }
 }

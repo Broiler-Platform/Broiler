@@ -30,7 +30,7 @@ one beneficiary. `patches/0133`. Published:
 |---|---|---|
 | #13 — parallel intrinsic sizing and independent subtrees | **Not started; re-argued** | Its stage is 3.3–20.1% of a render, up from the 0.6–6.5% the phase row quoted, entirely by Amdahl ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)) |
 | Layout roadmap step 1 — stop laying out the tree twice | **Retired as written** | `--layout-passes` (`patches/0133`): every fixed-viewport row is 1 call / 1 pass; auto-size is 2 passes at **0.80–1.35×** one pass, not 2× ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)) |
-| #18 — Web Workers | **Built (first slice); gate passed** | Contexts isolated and genuinely parallel — **2.66×/3.22× at 4 threads** ([§10](#10-item-18s-gate-passes-on-both-halves--and-one-of-them-is-the-half-nobody-was-asking-about)). `MessageChannel` and structured clone were **already built**, with cross-realm cloning verified ([§11](#11-messagechannel-was-already-built-the-unverified-word-was-cross-context)). **`Worker` now exists**: own thread, own `JSContext`, messages cloned twice — sender-side into an unreachable graph, receiver-side into its realm — and replies queued onto the page's loop, so item #15 holds. 12 tests; WPT classification identical name for name ([§12](#12-worker-is-built-and-the-design-content-was-where-the-clone-happens)). `importScripts`, module/shared/nested workers, worker `requestAnimationFrame` and transferables remain |
+| #18 — Web Workers | **Built (first slice); gate passed** | Contexts isolated and genuinely parallel — **2.66×/3.22× at 4 threads** ([§10](#10-item-18s-gate-passes-on-both-halves--and-one-of-them-is-the-half-nobody-was-asking-about)). `MessageChannel` and structured clone were **already built**, with cross-realm cloning verified ([§11](#11-messagechannel-was-already-built-the-unverified-word-was-cross-context)). **`Worker` now exists**: own thread, own `JSContext`, messages cloned twice — sender-side into an unreachable graph, receiver-side into its realm — and replies queued onto the page's loop, so item #15 holds. 17 tests; WPT classification identical name for name ([§12](#12-worker-is-built-and-the-design-content-was-where-the-clone-happens)). module/shared/nested workers, worker `requestAnimationFrame` and transferables remain |
 | Phases 2–3 measured on WPT | **Null result** | `ca53d44` vs HEAD, both sequential per render, 2 213 reftests over two suites: **1.017× and 1.013×**, inside the host's 5–7% drift, classification identical. WPT pages are 1 018 bytes at the median against a 20–212 KB corpus, so the surviving sequential wins have nothing to act on ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)) |
 | Per-render fixed cost | **Measured; §4's conclusion refuted** | Engine: **3.48 ms** empty, 15–19 ms at WPT median, 77% of the empty render being bitmap alloc + erase. Runner: the render is **1.6–2.0%** of a test — **76–79% is `ExecuteScriptsWithDom`** and **16–21% `PixelDiffRunner.Compare`**. Neither is a rendering problem, and neither is in this document ([§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)) |
 | Pixel comparison | **Fixed** | **284.61 → 4.50 ms (62×)** on the match path; the suite 368.5 → 297.3 s (1.24×). 92% of it was a PNG round trip measured to be an identity — not the per-pixel loop §5 pointed at, which was ~22 ms of 284. Classification identical name for name. `patches/0134` ([§6](#6-the-pixel-comparison-is-fixed-and-the-part-that-read-worst-was-not-the-part-that-cost)) |
@@ -2180,7 +2180,7 @@ nothing dispatches JavaScript from a foreign thread: a worker's reply is *queued
 drain runs it. Pending frame actions count as pending work, so a reply in flight keeps the host's
 drain alive instead of racing the end of the document.
 
-**Verified** by twelve `WorkerBindingTests` cases driving the real bridge — round trip; cloning proved
+**Verified** by seventeen `WorkerBindingTests` cases driving the real bridge — round trip; cloning proved
 in *both* directions by mutating each side after sending; `Date`/`RegExp`/arrays/nesting/cycles
 surviving; realm separation plus asynchronous delivery; a missing script firing `error` without
 throwing; and `terminate()` plus disposal joining threads promptly.
@@ -2202,9 +2202,18 @@ a worker through messages it must wait for. Two of the six timer cases are the o
 wrong pump: a live interval must not starve the inbox, and `terminate()` must win over a repeating
 timer rather than wait for it to go quiet.
 
-**Out of this slice, refused rather than half-built**: `importScripts`, module workers,
-`SharedWorker`, nested workers, `requestAnimationFrame` in a worker, transferables (an `ArrayBuffer`
-in a transfer list is cloned, not transferred), and network-fetched worker scripts. Published:
+**`importScripts` is in**: synchronous, in order, in the worker's global, and re-entrant. Specifiers
+resolve against the **worker's** directory rather than the document's base path — what the spec means
+by "relative to the worker's script URL" — so the resolver seam now takes a base directory. That is
+easy to get accidentally right, so the test puts a *different file of the same name* next to the page
+with the page's base path pointing at it: resolving the wrong way finds the decoy and reports the
+wrong marker instead of failing to load. A specifier that cannot be loaded raises `NetworkError` and
+**aborts the rest of the call** (asserted); a script that throws propagates rather than being
+swallowed.
+
+**Out of this slice, refused rather than half-built**: module workers, `SharedWorker`, nested
+workers, `requestAnimationFrame` in a worker, transferables (an `ArrayBuffer` in a transfer list is
+cloned, not transferred), and network-fetched worker scripts. Published:
 [`worker-object.md`](../../tests/render-stages/results/worker-object.md).
 
 ## Master table
