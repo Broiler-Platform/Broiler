@@ -78,7 +78,6 @@ set -euo pipefail
 # (0131 was the first half of the same item and is upstream now, so its entry
 # is gone with it: an entry whose idempotence guard can only ever skip is noise.)
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0132-html-cascade-invalidation-set.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
