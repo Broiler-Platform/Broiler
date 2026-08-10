@@ -114,7 +114,27 @@ explanation for a small number is exactly the kind that gets published untested.
 ## What this says about making WPT faster
 
 Not one item in the multithreading roadmap. The run is CPU-bound at ~1.1 CPU-s per
-render of a 1 KB document, and that cost is flat in document size — so it is
-per-render fixed cost inside the engine, which no item in this document has ever
-measured or aimed at. **That is the target for WPT wall clock**, and it is a different
-investigation from anything Phases 0–4 contain.
+render of a 1 KB document, and that cost is flat in document size.
+
+> **Correction — the next sentence used to say that cost was "per-render fixed cost
+> inside the engine", and that was an inference, not a measurement. It is wrong.**
+> [`render-fixed-cost.md`](render-fixed-cost.md) measured the engine directly through
+> the same entry the runner calls: an empty document renders in **3.5 ms** and a
+> WPT-median one in **15–19 ms**, and a phase trace of the runner puts the render at
+> **1.6–2.0% of a test**. The ~1.1 CPU-s per "render" counted here is the runner's
+> per-render *path*, not the engine's render: **76–79% of it is
+> `ExecuteScriptsWithDom`** (DOM build, JS execution, re-serialization, run twice per
+> reftest) and **16–21% is `PixelDiffRunner.Compare`**. Those two are the target for
+> WPT wall clock, and neither is a rendering problem.
+>
+> The reasoning that produced the wrong answer is worth keeping visible: this file
+> ruled out I/O and process startup, found the remaining time was CPU and did not scale
+> with the document, and concluded it was fixed cost *in the engine* — when "does not
+> scale with the document" was equally consistent with fixed cost in the **harness**,
+> which is where it turned out to be. Eliminating two candidates does not confirm a
+> third.
+
+Everything above the correction stands: the sequential wins are worth nothing here, and
+the mechanism is that they are aimed at work a WPT document barely has. The measurement
+that followed only sharpens it — they were aimed at the page-proportional part of 2% of
+the run.

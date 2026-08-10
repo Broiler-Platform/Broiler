@@ -74,6 +74,11 @@ public static class Program
             return RelayoutProfile.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
         }
 
+        if (args.Length >= 1 && args[0] == "--render-fixed-cost")
+        {
+            return RenderFixedCost.Run(ArgValue(args, "--iterations", 11), ArgValue(args, "--warmup", 4));
+        }
+
         if (args.Length >= 1 && args[0] == "--layout-passes")
         {
             return LayoutPassProfile.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
@@ -131,6 +136,10 @@ public static class Program
         Console.WriteLine("  --relayout-profile [--iterations N] [--warmup N]");
         Console.WriteLine("        Cascade sub-stage and render time against the style thread budget (item #12).");
         Console.WriteLine("        Exits 1 if any thread setting renders different pixels.");
+        Console.WriteLine();
+        Console.WriteLine("  --render-fixed-cost [--iterations N] [--warmup N]");
+        Console.WriteLine("        Render time against document size through the entry the WPT runner uses,");
+        Console.WriteLine("        fitted to separate per-render fixed cost from per-element cost.");
         Console.WriteLine();
         Console.WriteLine("  --layout-passes [--iterations N] [--warmup N]");
         Console.WriteLine("        How many full-tree layout passes one PerformLayout performs, per corpus");

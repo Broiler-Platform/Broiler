@@ -2048,7 +2048,8 @@ internal sealed partial class WptTestRunner
         // Fonts before the first render, for the same reason the golden path loads them
         // there: the first text measurement caches the typeface it resolves per family.
         if (wptRoot != null)
-            EnsureWptFontsLoaded(wptRoot);
+            using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Fonts))
+                EnsureWptFontsLoaded(wptRoot);
 
         HTML.Image.BBitmap rendered;
         try
@@ -2078,6 +2079,18 @@ internal sealed partial class WptTestRunner
         }
     }
 
+
+    /// <summary>
+    /// <see cref="PixelDiffRunner.Compare"/> under a phase scope. A local helper rather than a
+    /// <c>using</c> at each call site because the result is itself disposable and the two scopes
+    /// would nest confusingly.
+    /// </summary>
+    private PixelDiffResult MeasuredCompare(HTML.Image.BBitmap rendered, HTML.Image.BBitmap reference)
+    {
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Compare))
+            return PixelDiffRunner.Compare(rendered, reference, _pixelDiffConfig);
+    }
+
     /// <summary>
     /// The <c>rel="match"</c> half of <see cref="RunReferenceTest"/>: pass on the first
     /// reference the render reproduces, otherwise report the closest candidate.
@@ -2102,7 +2115,7 @@ internal sealed partial class WptTestRunner
 
             using (reference)
             {
-                using var diff = PixelDiffRunner.Compare(rendered, reference, _pixelDiffConfig);
+                using var diff = MeasuredCompare(rendered, reference);
                 double matchPct = (1.0 - diff.DiffRatio) * 100;
 
                 if (diff.IsMatch)
@@ -2118,6 +2131,7 @@ internal sealed partial class WptTestRunner
 
                 if (closestFailure is null || matchPct > (closestFailure.MatchPercent ?? -1))
                 {
+                    using var diagnoseScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.Diagnose);
                     var diagnostics = MismatchClassifier.Classify(
                         diff, rendered.Width, rendered.Height, reference.Width, reference.Height);
                     var bands = DisplacementBandAnalyzer.Analyze(diff.Mismatches);
@@ -2386,7 +2400,9 @@ internal sealed partial class WptTestRunner
 
     private HTML.Image.BBitmap RenderHtmlFileBitmapCore(string htmlPath, string? wptRoot)
     {
-        var html = File.ReadAllText(htmlPath);
+        string html;
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.FileRead))
+            html = File.ReadAllText(htmlPath);
 
         if (IsMediaPlaybackTest(html))
             throw new InvalidOperationException("Test requires media playback.");
@@ -2397,8 +2413,10 @@ internal sealed partial class WptTestRunner
         var testBaseUrl = new Uri(Path.GetFullPath(htmlPath)).AbsoluteUri;
 
         // Set local base path for sub-resource resolution.
-        html = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot).Html;
-        html = HtmlPostProcessor.Process(html);
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Scripts))
+            html = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot).Html;
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.PostProcess))
+            html = HtmlPostProcessor.Process(html);
 
         EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetHandler = null;
         EventHandler<HtmlImageLoadEventArgs>? imageHandler = null;
@@ -2420,9 +2438,12 @@ internal sealed partial class WptTestRunner
         }
 
         using var presentation = ImageAnimationClock.Pin(presentationTime);
-        return RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
-            backgroundColor: BColor.White,
-            stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Render))
+        {
+            return RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
+                backgroundColor: BColor.White,
+                stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
+        }
     }
 
     /// <summary>

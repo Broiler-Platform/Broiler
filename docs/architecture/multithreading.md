@@ -32,6 +32,7 @@ one beneficiary. `patches/0133`. Published:
 | Layout roadmap step 1 — stop laying out the tree twice | **Retired as written** | `--layout-passes` (`patches/0133`): every fixed-viewport row is 1 call / 1 pass; auto-size is 2 passes at **0.80–1.35×** one pass, not 2× ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)) |
 | #18 — Web Workers | **Not started** | Unchanged: a capability, not a speedup of existing work |
 | Phases 2–3 measured on WPT | **Null result** | `ca53d44` vs HEAD, both sequential per render, 2 213 reftests over two suites: **1.017× and 1.013×**, inside the host's 5–7% drift, classification identical. WPT pages are 1 018 bytes at the median against a 20–212 KB corpus, so the surviving sequential wins have nothing to act on ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)) |
+| Per-render fixed cost | **Measured; §4's conclusion refuted** | Engine: **3.48 ms** empty, 15–19 ms at WPT median, 77% of the empty render being bitmap alloc + erase. Runner: the render is **1.6–2.0%** of a test — **76–79% is `ExecuteScriptsWithDom`** and **16–21% `PixelDiffRunner.Compare`**. Neither is a rendering problem, and neither is in this document ([§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)) |
 
 **Phase 3 is complete: #12, #21, #16 and #14.** The relayout harness
 [§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)
@@ -1845,6 +1846,53 @@ per render of a 1 KB page, flat in document size — per-render *fixed* cost ins
 engine, which no item here has measured or aimed at. That is the target for WPT wall
 clock, and it is a different investigation from anything Phases 0–4 contain. Published:
 [`wpt-sequential-wins.md`](../../tests/render-stages/results/wpt-sequential-wins.md).
+
+### 5. The engine's per-render fixed cost is 3.5 ms, and §4's closing sentence was wrong
+
+[§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why) ended by naming
+per-render fixed cost "inside the engine" as the target for WPT wall clock. That was an
+inference from a null result, and measuring it took one harness and refuted it.
+
+**The engine side.** `--render-fixed-cost` sweeps document size through
+`HtmlRender.RenderToImageWithStyleSet` at 1024x768 — the call `WptTestRunner` makes — and fits
+`ms = 6.06 + 0.19 * boxes`. An **empty** document renders in **3.48 ms**, a WPT-median one
+(~1 KB) in **15–19 ms**. Three quarters of the empty render is allocating and clearing the
+3 MB bitmap (2.32 of 3.02 ms); `SetHtmlWithStyleSet` is 0.58, layout 0.09, paint 0.02, the
+container constructor and disposal both 0.00. Nothing there is within two orders of magnitude
+of the ~1.1 CPU-s per render §4 inferred.
+
+**The runner side.** `--phase-trace` (in `Broiler.Wpt`, single-process so wall ≈ CPU) says where
+a test's time really goes, on two subsets picked to differ:
+
+| phase | `css-backgrounds/animations` (41) | `css-fonts` (373) | ms/call |
+|---|---:|---:|---|
+| **scripts + DOM bridge** | **76.0%** | **79.3%** | 928 / 704 |
+| **pixel compare** | **20.5%** | **15.9%** | 501 / 327 |
+| **render** | **1.6%** | **2.0%** | 19.5 / 17.7 |
+| file read, fonts, post-process, diagnostics | <0.2% each | <0.1% each | |
+| attributed | 98.3% | 97.3% | |
+
+**The render is 1.6–2.0% of a WPT test**, and its 19.5 / 17.7 ms per call independently
+reproduces the first harness's 15–19 ms by a completely different method — which is the reason
+to believe either. What costs the run is `ExecuteScriptsWithDom` (build a DOM, run the classic
+scripts, re-serialize — twice per reftest) and `PixelDiffRunner.Compare`, which walks 786 432
+pixels through a per-pixel `GetPixel` on both bitmaps and a `SetPixel` on a diff bitmap for
+*every* pixel, and allocates that diff bitmap unconditionally before discarding it on the ~62%
+of tests that pass. That accessor pattern is the same shape item #3 already found and fixed in
+the rasterizer, where hoisting the per-pixel lookup was worth 1.58–2.96× by itself.
+
+**So §4's mechanism was right and its conclusion was not.** Phases 2 and 3 measured zero on WPT
+because they were aimed at 2% of the run — and only at the page-proportional part of that 2%.
+No engine work, parallel or sequential, could have shown up.
+
+**The reasoning error is the part worth keeping.** §4 ruled out I/O and process startup, found
+the remaining cost was CPU and flat in document size, and concluded it was fixed cost *in the
+engine*. "Flat in document size" was equally consistent with fixed cost in the **harness**,
+which is where it was. Eliminating two candidates does not confirm a third — and this document
+has now made the same class of mistake twice in one phase, after
+[§3](#3-the-harness-nearly-published-a-false-positive-the-same-way-phase-2-7s-did) caught the
+first. Published:
+[`render-fixed-cost.md`](../../tests/render-stages/results/render-fixed-cost.md).
 
 ## Master table
 
