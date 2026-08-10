@@ -74,6 +74,11 @@ public static class Program
             return RelayoutProfile.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
         }
 
+        if (args.Length >= 1 && args[0] == "--layout-passes")
+        {
+            return LayoutPassProfile.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
+        }
+
         if (args.Length >= 1 && args[0] == "--relayout-parity")
         {
             return RelayoutParity.Run();
@@ -126,6 +131,11 @@ public static class Program
         Console.WriteLine("  --relayout-profile [--iterations N] [--warmup N]");
         Console.WriteLine("        Cascade sub-stage and render time against the style thread budget (item #12).");
         Console.WriteLine("        Exits 1 if any thread setting renders different pixels.");
+        Console.WriteLine();
+        Console.WriteLine("  --layout-passes [--iterations N] [--warmup N]");
+        Console.WriteLine("        How many full-tree layout passes one PerformLayout performs, per corpus");
+        Console.WriteLine("        page and per caller shape (fixed viewport / auto-size / measure) — the");
+        Console.WriteLine("        precondition for the Broiler.Layout roadmap's step 1.");
         Console.WriteLine();
         Console.WriteLine("  --relayout-parity");
         Console.WriteLine("        Renders every corpus page after every mutation with the render-tree");
