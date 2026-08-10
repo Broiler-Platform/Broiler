@@ -31,6 +31,7 @@ one beneficiary. `patches/0133`. Published:
 | #13 — parallel intrinsic sizing and independent subtrees | **Not started; re-argued** | Its stage is 3.3–20.1% of a render, up from the 0.6–6.5% the phase row quoted, entirely by Amdahl ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)) |
 | Layout roadmap step 1 — stop laying out the tree twice | **Retired as written** | `--layout-passes` (`patches/0133`): every fixed-viewport row is 1 call / 1 pass; auto-size is 2 passes at **0.80–1.35×** one pass, not 2× ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)) |
 | #18 — Web Workers | **Not started** | Unchanged: a capability, not a speedup of existing work |
+| Phases 2–3 measured on WPT | **Null result** | `ca53d44` vs HEAD, both sequential per render, 2 213 reftests over two suites: **1.017× and 1.013×**, inside the host's 5–7% drift, classification identical. WPT pages are 1 018 bytes at the median against a 20–212 KB corpus, so the surviving sequential wins have nothing to act on ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)) |
 
 **Phase 3 is complete: #12, #21, #16 and #14.** The relayout harness
 [§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)
@@ -417,6 +418,16 @@ this section predicted would wash out at scale does wash out, and the remaining
 gap to 4× is the per-test GiB budget capping the pool at four workers, not the
 runner's serial remainder. That is the first measurement of item #1 at corpus
 scale; every earlier figure here is the 61-test subset.
+
+> **Which tree that was measured on matters, and it is not the one a reader would
+> assume.** `ca53d44` was written while Phase 2 was one commit old: it contains item
+> #9 — a thread-safety prerequisite the master table records as "not a speedup
+> itself" — and **none** of #4, #5, #6, #7, #8, #10, #17, #3, or any of Phase 3. So
+> both endpoints of the 2.0× are an essentially **end-of-Phase-1** engine, and the
+> figure is a pool ratio measured on a tree that predates every sequential win since.
+> Phase 4 §4 re-measured the endpoints against today's engine and found them
+> **unmoved**, which is a finding about WPT rather than about the wins
+> ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)).
 
 Where the memory figure cannot be read at all, the pool stays at **one** worker.
 Guessing high on an unreadable budget is how a runner OOM-kills a CI box, and the
@@ -1774,6 +1785,66 @@ the section warning about it. The tell was cheap and general: **a number moved w
 nothing did.** The counts, being structural rather than timed, were correct in every run —
 which is the argument for measuring a structural question with a counter rather than
 inferring it from a time.
+
+### 4. Phases 2 and 3 are worth nothing on a WPT run, and the pages are why
+
+Phase 1 §4's "90 minutes → 45" is a `--workers 1` vs `--workers 4` ratio, and its note
+above now records the thing that makes the ratio's *endpoints* interesting: `ca53d44`
+contains Phase 2 item #9 and nothing else, so both endpoints are an end-of-Phase-1
+engine. Every sequential win since — #5's off-screen elision, #10's glyph cache, #3's
+per-pixel target lookup, #12's fourth memo, #14's invalidation — postdates the number,
+and none of them was ever measured on WPT. The expectation was that they had moved the
+absolute endpoints down and the ratio had simply divided them out of both sides.
+
+**They have not moved them.** Baseline `ca53d44` against today's HEAD, both at
+`--workers 4` on 4 cores — where HEAD's own header reports `Render threads: 1 per
+worker`, so both trees are sequential per render — run A,B,B,A so drift cancels:
+
+| suite | reftests | baseline (s) | head (s) | head/baseline |
+|---|---:|---|---|---:|
+| `css/css-backgrounds` | 713 | 368.5, 367.1 (367.8) | 377.3, 371.1 (374.2) | 1.017 |
+| `css/css-fonts` + `css/css-writing-modes` | 1 500 | 781.3, 788.0 (784.7) | 792.1, 797.3 (794.7) | 1.013 |
+
+Classification is identical on every run of both suites (443/267/1 and 685/815/0).
+**The 1.3–1.7% is not a regression**: the same HEAD, same command, ninety minutes later
+read 393.7 / 399.4 s on the first suite — 5–7% off itself, so the deltas are inside the
+host's drift. What is *outside* the drift is the size of the thing being looked for.
+The two suites were picked to disagree if page character mattered —
+`css-backgrounds` is the best case for the raster items, `css-fonts`/`css-writing-modes`
+for the glyph cache — and they agree.
+
+**The mechanism is the pages, and it is not overhead.** The run is CPU-bound at 359% of
+4 cores (90% utilization), and per-process fixed cost is 1.69 CPU-s — 1.8% of the run it
+was subtracted from. What is left is ≈2.2–2.5 CPU-s per reftest, ≈1.1 CPU-s per render,
+roughly flat across two unrelated test sets. And the documents are **1 018 bytes at the
+median** (p90 1 895, max 8 518, n = 1 168) against a corpus of 20 102–211 592 — *every*
+corpus page is larger than *every* WPT page in that directory, and a 77 KB corpus page
+renders in ~250 ms where a 1 KB WPT page costs ~1.1 CPU-s.
+
+So the per-render cost here is dominated by something that does not scale with the
+document, and every surviving sequential win does: #5 needs a page taller than the
+viewport (a reftest is written to fit one), #10 needs repeated glyphs, #12 needs many
+elements, #14 needs a *second* layout, and #3's win is in `Broiler.Graphics`' rasterizer,
+which [§2](#2-the-rasterizer-the-profile-measures-is-item-4s-copy-not-item-3s) already
+records is not the copy this path uses. The wins are real on the corpus, which was built
+to load each stage, and have nothing to act on here.
+
+**One hypothesis was tested rather than published.** The obvious candidate for the small
+negative sign was item #14 charging bookkeeping a suite that never relayouts can only
+pay for. With its own switch: `BROILER_RENDER_TREE_ELISION=0` **399.4 s**, `=1` **393.7 s**
+— turning it off is not faster, so that is not the cause.
+
+**Scope, stated rather than implied:** this is the reftest suite, not the golden-image
+suite 90/45 comes from, and 2 213 of the corpus's 19 398 reftests were measured, not all
+of them — a full A/B is ~6 h on this host and two independent suites already agree
+inside the drift. The negative conclusion is what transfers, because its mechanism is
+page size, a property of WPT documents generally rather than of the directories sampled.
+
+**What it makes actionable is not in this document.** The run is CPU-bound at ~1.1 CPU-s
+per render of a 1 KB page, flat in document size — per-render *fixed* cost inside the
+engine, which no item here has measured or aimed at. That is the target for WPT wall
+clock, and it is a different investigation from anything Phases 0–4 contain. Published:
+[`wpt-sequential-wins.md`](../../tests/render-stages/results/wpt-sequential-wins.md).
 
 ## Master table
 
