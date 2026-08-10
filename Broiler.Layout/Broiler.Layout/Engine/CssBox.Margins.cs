@@ -66,6 +66,42 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             last.MarginBottom = "0";
     }
 
+    /// <summary>
+    /// Clears the margin-collapse result this box carries from a previous layout pass, at the top of
+    /// its next one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why a layout needs this at all.</b> <see cref="CssBoxProperties.CollapsedMarginTop"/> is
+    /// not an input; it is what <see cref="MarginTopCollapse"/> decided last time, kept so that a
+    /// following sibling can subtract the part of a collapsed margin already spent and so that a
+    /// first child can tell how much of its top margin the parent has already absorbed. Every writer
+    /// sets it during a layout pass — and nothing cleared it between passes, so a <em>second</em>
+    /// layout of the same box tree read the first pass's answer as if it were the parent's own
+    /// margin.
+    /// </para>
+    /// <para>
+    /// <b>What that cost.</b> The first in-flow child's top margin propagates by shifting the parent
+    /// down (the branch below), and it does that only when the child's margin exceeds
+    /// <c>max(parent margin, parent CollapsedMarginTop)</c>. On the first pass that comparison is
+    /// against zero and the shift happens; on the second, the stale value equals the child's own
+    /// margin, the comparison fails, and the shift does not — so the document lays out two pixels
+    /// shorter the second time, for
+    /// <c>&lt;div style="margin-top:2px"&gt;</c> directly inside <c>&lt;body&gt;</c>. Nothing in this
+    /// repository laid the same tree out twice before item #14, which is why a pass-dependent result
+    /// could sit here: every relayout rebuilt the tree from scratch and got a fresh box. The moment
+    /// a rebuild can be skipped, "lay out the same tree again" has to mean what "build it and lay it
+    /// out" meant, and <c>--relayout-parity</c> is what caught that it did not.
+    /// </para>
+    /// <para>
+    /// Resetting at the top of the box's own layout is the point where no writer has run yet for this
+    /// pass: a box's own value is written while it is being positioned, and the value a first child
+    /// writes onto its <em>parent</em> is written after the parent's own layout has begun. Both are
+    /// downstream of this.
+    /// </para>
+    /// </remarks>
+    protected void ResetCollapsedMarginState() => CollapsedMarginTop = 0;
+
     protected double MarginTopCollapse(CssBoxProperties prevSibling)
     {
         double value;

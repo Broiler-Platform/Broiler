@@ -1,0 +1,43 @@
+From 1a228cbc544b3d3cdc29100483515cdd67a62c6d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 10 Aug 2026 09:37:29 +0000
+Subject: [PATCH] Ask the stylesheets what an attribute write can change before
+ rebuilding
+
+Multithreading roadmap item #14, second half. BuildBoundDocument now hands
+Broiler.Layout.Engine.RenderTreeInvalidation the set of attribute names,
+class names and ids the sheets it just cascaded can see, so a connected
+attribute write that no selector filters on and no attr() reads is answered
+without a rebuild.
+---
+ .../Broiler.HTML.Orchestration/HtmlContainerInt.cs | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+index f5e9a9f..a12f310 100644
+--- a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
++++ b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+@@ -487,8 +487,18 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
+             BaseUrl,
+             (ref styleSet) => parser.GenerateCssTree(_boundDocument, this, ref styleSet, baseUri));
+         _boundDocumentVersion = _boundDocument.Version;
+-        _boundDocumentInvalidation?.MarkRebuilt();
+-    }
++        _boundDocumentInvalidation?.MarkRebuilt(BuildCascadeDependencies());
++    }
++
++    // Item #14, second half. The tree just built cascaded these sheets, so this is what a
++    // mutation arriving before the next build has to be judged against: an attribute no selector
++    // filters on and no attr() reads cannot have changed what it shows. The set is rebuilt here
++    // rather than cached because _styleSet is not final until GenerateCssTree returns — <style>
++    // elements and @import are appended to it during the parse — and because a scan of the sheets
++    // is nothing against the rebuild it is attached to.
++    private Broiler.Layout.Engine.CascadeInvalidationSet BuildCascadeDependencies() =>
++        Broiler.Layout.Engine.CascadeInvalidationSet.Build(
++            [_styleSet?.UserAgentStyleSheet, _styleSet?.AuthorStyleSheet]);
+ 
+     private void EnsureBoundDocumentCurrent()
+     {
+-- 
+2.43.0
+

@@ -1,3 +1,4 @@
+using Broiler.CSS;
 using Broiler.Dom;
 using Broiler.Layout.Engine;
 
@@ -293,6 +294,181 @@ public class RenderTreeInvalidationTests
         ledger.RequiresRebuild();
         Assert.Equal(1, RenderTreeInvalidation.Decisions.Elided);
         Assert.Equal(1, RenderTreeInvalidation.Decisions.Required);
+    }
+
+    // ---- The second rule: a connected attribute write nothing can see ----------------------
+    //
+    // Everything above is the connectivity rule, and every case below is a *connected* mutation —
+    // the side the first slice could not elide at all. The stakes are higher here for the same
+    // reason: the element is on screen, so a wrong "no rebuild" shows.
+
+    /// <summary>A ledger over <see cref="Tree"/> whose render tree was built from <paramref name="css"/>.</summary>
+    private static (DomDocument Document, DomElement Paragraph, RenderTreeInvalidation Ledger) Styled(string css)
+    {
+        var (document, _, paragraph, _) = Tree();
+        var ledger = new RenderTreeInvalidation(document);
+        ledger.MarkRebuilt(CascadeInvalidationSet.Build([new CssParser().ParseStyleSheet(css)]));
+        return (document, paragraph, ledger);
+    }
+
+    [Fact]
+    public void A_connected_write_of_an_attribute_no_sheet_can_see_requires_no_rebuild()
+    {
+        // The row the relayout profile sizes at 997.8 ms on the rule-heavy page.
+        var (_, paragraph, ledger) = Styled(".a{color:red}");
+        using var _held = ledger;
+
+        paragraph.SetAttribute("data-relayout-probe", "1");
+
+        Assert.False(ledger.RequiresRebuild());
+        Assert.Equal(1, ledger.ElidedMutations);
+    }
+
+    [Fact]
+    public void A_connected_write_of_an_attribute_a_selector_filters_on_requires_one()
+    {
+        var (_, paragraph, ledger) = Styled("[data-k=\"3\"]{color:red}");
+        using var _held = ledger;
+
+        paragraph.SetAttribute("data-k", "3");
+
+        Assert.True(ledger.RequiresRebuild());
+    }
+
+    [Fact]
+    public void Without_a_set_every_connected_write_still_rebuilds()
+    {
+        // The default, and what a container that never installs a set gets: the first slice's
+        // behaviour exactly. A ledger that elided on "no stylesheet information" would elide most
+        // aggressively in the case it knows least about.
+        var (document, _, paragraph, _) = Tree();
+        using var ledger = new RenderTreeInvalidation(document);
+
+        paragraph.SetAttribute("data-relayout-probe", "1");
+
+        Assert.Null(ledger.CascadeDependencies);
+        Assert.True(ledger.RequiresRebuild());
+    }
+
+    [Fact]
+    public void An_unstyled_class_token_is_elidable_and_a_styled_one_is_not()
+    {
+        var (_, paragraph, ledger) = Styled(".styled{color:red}");
+        using var _held = ledger;
+
+        paragraph.SetAttribute("class", "unstyled");
+        Assert.False(ledger.RequiresRebuild());
+
+        paragraph.SetAttribute("class", "unstyled styled");
+        Assert.True(ledger.RequiresRebuild());
+    }
+
+    [Theory]
+    // Names the cascade may not mention and box construction reads anyway. `id` is the one that
+    // looks most elidable: no #id selector means no cascade dependency, and the box tree still
+    // carries it for anchor resolution and the PDF link map.
+    [InlineData("id")]
+    [InlineData("src")]
+    [InlineData("colspan")]
+    [InlineData("style")]
+    [InlineData("hidden")]
+    // The engine's own channel into the layout engine, inside the otherwise inert data-* namespace.
+    [InlineData("data-broiler-scroll-top")]
+    public void An_attribute_the_box_tree_reads_requires_a_rebuild_whatever_the_sheet_says(string name)
+    {
+        var (_, paragraph, ledger) = Styled(".a{color:red}");
+        using var _held = ledger;
+
+        paragraph.SetAttribute(name, "1");
+
+        Assert.True(ledger.RequiresRebuild());
+    }
+
+    [Fact]
+    public void Nothing_inside_an_svg_subtree_is_elidable()
+    {
+        // FragmentTreeBuilder serializes an inline <svg> subtree back to markup attribute by
+        // attribute and hands it to a renderer with its own idea of what class and data-* mean, so
+        // the allow-list — a statement about this engine's HTML box construction — does not apply.
+        var (document, _, paragraph, _) = Tree();
+        var svg = document.CreateElementNS(DomNamespaces.Svg, "svg");
+        var rect = document.CreateElementNS(DomNamespaces.Svg, "rect");
+        svg.AppendChild(rect);
+        paragraph.AppendChild(svg);
+
+        using var ledger = new RenderTreeInvalidation(document);
+        ledger.MarkRebuilt(CascadeInvalidationSet.Build([new CssParser().ParseStyleSheet(".a{color:red}")]));
+
+        rect.SetAttribute("data-relayout-probe", "1");
+
+        Assert.True(ledger.RequiresRebuild());
+    }
+
+    [Fact]
+    public void A_namespaced_attribute_is_never_elidable()
+    {
+        var (document, _, paragraph, _) = Tree();
+        using var ledger = new RenderTreeInvalidation(document);
+        ledger.MarkRebuilt(CascadeInvalidationSet.Build([new CssParser().ParseStyleSheet(".a{color:red}")]));
+
+        paragraph.SetAttributeNS("http://www.w3.org/1999/xlink", "xlink:data-probe", "1");
+
+        Assert.True(ledger.RequiresRebuild());
+    }
+
+    [Fact]
+    public void Child_list_and_text_edits_are_not_reached_by_the_attribute_rule()
+    {
+        // The set answers a question about attributes, and the classification must not let it
+        // answer one about structure: a sheet that mentions nothing still has to rebuild for an
+        // inserted node or a changed text run.
+        var (document, _, paragraph, text) = Tree();
+        using var ledger = new RenderTreeInvalidation(document);
+        ledger.MarkRebuilt(CascadeInvalidationSet.Build([new CssParser().ParseStyleSheet(".a{color:red}")]));
+
+        paragraph.AppendChild(document.CreateElement("span"));
+        Assert.True(ledger.RequiresRebuild());
+
+        ledger.MarkRebuilt();
+        text.Data = "changed";
+        Assert.True(ledger.RequiresRebuild());
+    }
+
+    [Fact]
+    public void A_sheet_the_scanner_gave_up_on_elides_nothing()
+    {
+        var (_, paragraph, ledger) = Styled(".a\\.b{color:red}");
+        using var _held = ledger;
+
+        Assert.True(ledger.CascadeDependencies!.IsConservative);
+
+        paragraph.SetAttribute("data-relayout-probe", "1");
+
+        Assert.True(ledger.RequiresRebuild());
+    }
+
+    [Fact]
+    public void The_installed_set_describes_the_tree_that_was_built()
+    {
+        // MarkRebuilt(set) is one call because the two facts are one fact. A mutation classified
+        // before the install is classified against whatever the previous build knew, which is the
+        // stylesheet set the tree on screen was actually built from.
+        var (document, _, paragraph, _) = Tree();
+        using var ledger = new RenderTreeInvalidation(document);
+
+        paragraph.SetAttribute("data-relayout-probe", "1");
+        Assert.True(ledger.RequiresRebuild());
+
+        ledger.MarkRebuilt(CascadeInvalidationSet.Build([new CssParser().ParseStyleSheet(".a{color:red}")]));
+        Assert.False(ledger.RequiresRebuild());
+
+        paragraph.SetAttribute("data-relayout-probe", "2");
+        Assert.False(ledger.RequiresRebuild());
+
+        // A parameterless MarkRebuilt keeps the set: a rebuild is not a reason to forget what the
+        // sheets say, and clearing it there would silently turn the elision off after the first one.
+        ledger.MarkRebuilt();
+        Assert.NotNull(ledger.CascadeDependencies);
     }
 
     [Fact]

@@ -36,6 +36,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
     protected virtual void PerformLayoutImp(ILayoutEnvironment g)
     {
+        ResetCollapsedMarginState();
+
         if (Display != CssConstants.None)
         {
             RectanglesReset();

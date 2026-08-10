@@ -6,8 +6,7 @@ the tooling.
 
 ## Status
 
-**Phase 3 has landed #12, #21 and #16, and #14's first slice; #14's cascade half is
-what remains.** The relayout harness
+**Phase 3 is complete: #12, #21, #16 and #14.** The relayout harness
 [§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)
 said had to exist before any dirty bit was built first, and it changed the item:
 **a relayout is 60–97% box-tree rebuild and re-cascade**, so dirty bits on the
@@ -19,6 +18,13 @@ offscreen-build case — and it needed no `Broiler.DOM` change at all, because t
 typed mutation feed the item was recorded as blocked on has been there all along
 ([§11](#11-item-14s-blocker-did-not-exist-either-and-the-burst-does-not-amortise)).
 That makes **five items running whose stated blocker was not the operative one**.
+Its second half asks the *stylesheets* instead of the tree — an attribute write no
+selector filters on, no `attr()` reads and no box-construction path consults is
+answered without a rebuild — which takes the row §11 left open from **1 476.7 to
+43.0 ms (34.4×)** on the rule-heavy page. **Its exit gate failed on first run, and
+what it found was older than the item**: laying the same box tree out twice was not
+idempotent, so the two-pixel drift it produced had been live in the first slice all
+along ([§12](#12-item-14s-second-half-the-sheets-already-knew-and-the-gate-caught-a-bug-nothing-else-could)).
 The phase opened by answering the question Phase 2
 §9 said the document owed before #12 could begin, and the answer reframed the
 item: **`parse+cascade` is 81.3–98.2% cascade on every corpus page**
@@ -41,7 +47,7 @@ ceiling on four cores was tested and **is not the cause**
 | #12 — cache sharding + parallel style recalc | **Done** | `CssStyleRecalc` (budget `BROILER_STYLE_THREADS`) resolves every element's cascade ahead of the unchanged box walk; the engine's memo caches are `ConcurrentDictionary` with the generation guard intact, plus a fourth cache that gives the warm pass a store. **Cascade stage 1.16–2.01× at 4 threads, 1.08–1.96× end to end**, pixel-identical at 1/2/4 across the corpus (`--style-scaling`) and at 1/2/3/4/8 over 22 `ParallelStyleRecalcTests` cases; `CssStyleEngineConcurrencyTests` extended from "the caches survive" to "the answers match". Published: [`tests/render-stages/results/style-scaling.md`](../../tests/render-stages/results/style-scaling.md) |
 | #21 — re-enable JS test parallelization | **Done** | `Broiler.JavaScript.BuiltIns.Tests` no longer sets `DisableTestParallelization`; isolation is structural (`[ThreadStatic]` current context + `AsyncLocal` mirror), and the only shared state is process-wide and already concurrent. **2 118 tests, 0 failures, 57-59 s → 31-37 s (~1.75×)** on 4 cores |
 | #16 — parallel script compile | **Done** | `ScriptCompileAhead` (budget `BROILER_SCRIPT_COMPILE_THREADS`) compiles a document's classic script sources into the context's own code cache while the host parses and while the ordered eval loop runs the scripts ahead of them; the loop is untouched and finds each compile done. **Compile stage 1.41×/1.62×/1.52× at 2/4/8 threads, whole capture 1.44× on a compile-heavy document and 1.22× on a modestly scripted one**; 45 tests, 8 documents × budgets 1/2/3/4/8 compared byte for byte, plus an assertion on the cache's own counters that the worker's key is the key `Eval` asks for. **No submodule change and no patch** — see [§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache). Published: [`tests/render-stages/results/script-compile-ahead.md`](../../tests/render-stages/results/script-compile-ahead.md) |
-| #14 — incremental invalidation (was "layout dirty bits") | **First slice done; the cascade half remains** | The relayout harness §7 asked for exists (`--relayout-profile`) and re-aimed the item: **a relayout is 60–97% box-tree rebuild and re-cascade, not layout**, so the item as written bounds 3–39% of the cost and 2.9% on the rule-heavy page ([§10](#10-item-14s-harness-exists-now-and-it-says-the-item-is-aimed-at-the-smaller-half)). `RenderTreeInvalidation` consumes `DomDocument.Mutated` — which needed no `Broiler.DOM` change, the typed record having been published all along — and skips the rebuild for mutations that cannot reach the render tree. **Offscreen build: `rules` 1 032.7 → 11.5 ms (89.8×)**, `boxes` 25.8×, `paint` 22.6×, `mixed` 16.3×, `text` 10.0×; the other thirty harness rows move 0.82–1.27, i.e. run-to-run spread. 16 `RenderTreeInvalidationTests` cases, and `Broiler.Cli.Tests` run in full both ways with **identical failure sets** (2 931 tests, the same 82 pre-existing failures each way). **What remains is larger than what was taken** — an unstyled `data-*` write still costs 997.8 ms on `rules` and needs invalidation sets over item #11's rule index ([§11](#11-item-14s-blocker-did-not-exist-either-and-the-burst-does-not-amortise)). `patches/0131`. Published: [`tests/render-stages/results/relayout-profile.md`](../../tests/render-stages/results/relayout-profile.md) |
+| #14 — incremental invalidation (was "layout dirty bits") | **Done** | The relayout harness §7 asked for exists (`--relayout-profile`) and re-aimed the item: **a relayout is 60–97% box-tree rebuild and re-cascade, not layout**, so the item as written bounds 3–39% of the cost and 2.9% on the rule-heavy page ([§10](#10-item-14s-harness-exists-now-and-it-says-the-item-is-aimed-at-the-smaller-half)). `RenderTreeInvalidation` consumes `DomDocument.Mutated` — which needed no `Broiler.DOM` change, the typed record having been published all along — and skips the rebuild for mutations that cannot reach the render tree. **Offscreen build: `rules` 1 032.7 → 11.5 ms (89.8×)**, `boxes` 25.8×, `paint` 22.6×, `mixed` 16.3×, `text` 10.0×; the other thirty harness rows move 0.82–1.27, i.e. run-to-run spread. 16 `RenderTreeInvalidationTests` cases, and `Broiler.Cli.Tests` run in full both ways with **identical failure sets** (2 931 tests, the same 82 pre-existing failures each way). **The second half then took what was left**: `CascadeInvalidationSet` scans the sheets the tree was cascaded from for every class, id and attribute name any selector mentions and any `attr()` reads, and elides a connected attribute write that neither the cascade nor box construction can see — **`rules` 1 476.7 → 43.0 ms (34.4×)** on the row §11 sized, 14.2× `paint`, 13.8× `mixed`, 9.5× `boxes`, 2.1× `text`, plus 36.0× on `rules`' class toggle; rows that still rebuild span 0.79–1.21. Its gate is `--relayout-parity` (45 pairs, 22 elided, images identical), **which failed on first run and found a defect older than the item** — laying the same box tree out twice was not idempotent ([§12](#12-item-14s-second-half-the-sheets-already-knew-and-the-gate-caught-a-bug-nothing-else-could)). What is left is a *scoped* rebuild rather than a skipped one. `patches/0132`. Published: [`tests/render-stages/results/relayout-profile.md`](../../tests/render-stages/results/relayout-profile.md) |
 
 **Phase 2 is complete.** All nine items have landed (#9, #4, #5, #6, #7, #8, #10,
 #17, #3). What building them
@@ -1033,13 +1039,17 @@ but it is sound by measurement now, not by assumption.
 
 ## What building Phase 3 changed
 
-Eleven findings. The first two come out of the measurement Phase 2 §9 said the
+Twelve findings. The first two come out of the measurement Phase 2 §9 said the
 document owed before item #12 could be started, and they change what item #12
 *is*. §3–§5 come out of building it. §6 and §7 were about the two items this phase
 had not yet built, and both were reports of a missing precondition rather than of a
 difficulty — which is the useful thing to know about them. §8–§11 are what building
-those two turned up, and between them they close the phase: both preconditions
-turned out to be misdescribed, in the same way, one section after the other.
+those two turned up: both preconditions turned out to be misdescribed, in the same
+way, one section after the other. §12 finishes the item §11 left half-built, and it
+is the first section in this document whose most useful result is a *defect* the
+work found rather than a speedup it delivered — the exit gate for a skipped rebuild
+turns out to be the first thing in this repository that ever laid the same box tree
+out twice.
 
 ### 1. `parse+cascade` is a cascade stage; the name overstates the parse
 
@@ -1510,6 +1520,136 @@ stay at zero and every row of the run where *everything* rebuilt printed as
 `ELIDED`. A diagnostic that cannot say "no decision was recorded" will say the
 opposite of the truth on exactly the run it exists to be compared against.
 
+### 12. Item #14's second half: the sheets already knew, and the gate caught a bug nothing else could
+
+[§11](#11-item-14s-blocker-did-not-exist-either-and-the-burst-does-not-amortise) left
+the item with a named remainder and a number for it: a `data-*` write that no corpus
+selector can reach still cost **997.8 ms** on the `rules` page, because the ledger
+could ask whether a mutation was *connected* and nothing else. Answering the other
+question — could any rule match differently — is
+`Broiler.Layout.Engine.CascadeInvalidationSet`, built from the sheets the render tree
+was last cascaded from and installed by the same call that marks the tree current.
+
+**Three sources, and the second is the one an implementation would miss.** Selectors
+are obvious: every class, id and attribute name mentioned anywhere in a selector's
+text. `attr()` is not — `content: attr(data-label)` makes a `data-*` write change the
+rendering with no selector mentioning it at all, so declaration values are scanned
+too. The third is the escape hatch: an escaped identifier, a namespaced attribute
+(`[svg|href]`), anything the scanner does not model makes the whole set conservative
+and every attribute affecting, which is the behaviour that was there before it.
+
+**The scan is flat, and that is what makes it sound under combinators.** An attribute
+write changes what a selector matches if the selector mentions that attribute
+*anywhere*, not only in its subject compound: `.a .b` is affected by a class write on
+an ancestor, `[hidden] + p` by one on a sibling, `:has([open])` by one on a
+descendant. So the set files every name it sees, including inside `:not()` and
+`:is()`, and the test is pure membership — a name that appears nowhere cannot change
+any match, whatever the combinators between it and the subject. No combinator is
+modelled, and none needs to be.
+
+**The cascade's answer is not sufficient on its own, and this is the half the item's
+wording does not contain.** Box construction reads attributes for reasons that never
+go through a selector: `src`, `href`, `colspan`, and the presentational attributes
+`DomParser.TranslateAttributes` maps onto box properties. A set built from stylesheets
+knows nothing about any of that, so it would happily elide a `<td colspan>` write on a
+page whose sheet never mentions `colspan`. The elision therefore needs *both* halves
+to say no, and the box half is an **allow-list** — `class`, `data-*`, `aria-*`,
+`role` — because a deny-list puts every attribute nobody thought of on the elidable
+side, and the cost of missing one is a stale page.
+
+Two carve-outs inside that allow-list are worth stating because both were found by
+reading the engine rather than by reasoning about the web platform:
+
+- **`data-broiler-*` is not inert.** The custom-data namespace is inert by
+  definition, and then the engine helped itself to part of it: `data-broiler-scroll-top`,
+  `-top-layer`, `-backdrop`, `-frame-document`, `-anchor-cb`, `-part` are how the script
+  bridge tells the layout engine things it has no other channel for. Eliding those would be
+  eliding the engine's own messages to itself.
+- **Nothing inside an `<svg>` subtree is inert.** `FragmentTreeBuilder` serializes an
+  inline `<svg>` back to markup *attribute by attribute* and hands the string to a
+  renderer with its own idea of what a `class` or a `data-*` means. The allow-list is a
+  statement about this engine's HTML box construction and does not transfer, so foreign
+  content is excluded wholesale.
+
+**`id` is deliberately not on the list**, and it is the case that looks most elidable
+and is not: with no `#id` selector there is no cascade dependency at all, but
+`HtmlContainerInt` reads `id` off boxes to build the link map a PDF export writes and
+`DomUtils` resolves a fragment anchor by scanning boxes for it. An elided `id` write
+leaves those answering from the old tree — a wrong answer rather than a slow one.
+
+#### What it is worth, and the two rows that say it is the sheets doing the work
+
+Paired on one host, the pinned `Broiler.HTML` against the same tree with both halves
+applied ([published in full](../../tests/render-stages/results/relayout-profile.md)).
+The row §11 sized at 997.8 ms — one `data-*` write no selector reaches — is elided on
+every page: `rules` **1 476.7 → 43.0 ms (34.4×)**, `paint` 14.2×, `mixed` 13.8×,
+`boxes` 9.5×, `text` 2.1× (whose remainder is the layout pass, which is most of what a
+relayout costs on a page of prose). A class toggle joins it wherever the sheet does not
+name the token: **36.0× on `rules`**, 12.2× on `paint`, 9.4× on `mixed`. Rows that
+still rebuild span 0.79–1.21, this host's spread.
+
+**The harness grew two control rows with the feature, and they are what make the rest
+of the table readable.** "The unstyled write went to zero" is equally consistent with
+an implementation that elides *every* `data-*` write, which would be a stale page
+rather than a fast one. So `styled attribute` writes `data-k` — the attribute `rules`
+builds 180 of its 900 selectors around — and `styled class` writes a class the page's
+own sheet names. `rules` is the only page whose sheet mentions `data-k`, and the only
+page where `styled attribute` still rebuilds; `boxes` is the page whose deepest element
+carries a styled class, and the only page where `class toggle` still rebuilds. Same
+mutation, opposite decision, decided by the document.
+
+#### The gate failed the first time it ran, and the bug was older than the item
+
+The exit gate is `--relayout-parity`: render every corpus page after every mutation
+twice, once with the elision on and once with it off, and compare the images byte for
+byte. A unit test over the classifier agrees with the implementation's own reasoning
+and therefore cannot say whether that reasoning is right *about the engine*; only a
+rendered page can. It also fails a run in which nothing was elided, because a green run
+that compared no elisions is how a gate stops being one.
+
+It failed three `boxes` rows — and one of them, `detached build`, is elided by the
+**first** slice, which shipped in `patches/0131`. So the failure could not be the new
+classification. The no-mutation control found it: on that page, laying the same box
+tree out a second time produced a different image from laying it out once, with no
+mutation at all. Reduced, the whole of it is `<div style="margin-top:2px">` directly
+inside `<body>`. `CollapsedMarginTop` records what the previous margin collapse
+decided; a first in-flow child's top margin propagates by shifting its parent down
+only when the child's margin exceeds what the parent has already absorbed; read from
+the *previous pass*, that comparison fails and the shift does not happen. **The
+document lays out two pixels shorter the second time.**
+
+**Nothing in this repository had ever laid the same box tree out twice.** Every
+relayout disposed the render tree and rebuilt it, so every layout got a fresh box and
+a pass-dependent result could sit in the margin code indefinitely — correct on the
+only path that existed. Item #14 is what creates the second path, and the two-pixel
+drift was live in the first slice for as long as that slice has been upstream. The fix
+is a reset at the top of each box's own layout (`CssBox.ResetCollapsedMarginState`),
+kept by `LayoutIdempotenceTests`, including a case asserting the margin is still
+*applied* — the tempting fix makes both passes agree on the short answer. The
+render-bearing half of `Broiler.Cli.Tests` (Acid, WPT, `GoogleSearchPolyfill`,
+form-control and CSSOM — 928 tests) was run in full both ways on one host and the two
+failure sets are **identical name for name**: 41 failures each way, 40 unique names,
+none added and none fixed.
+
+**The lesson generalises past this bug**, and it is the one this section is worth
+keeping for: an optimisation that *skips* work is a new execution path, and its gate
+has to exercise that path end to end. Every other item in this document was gated on
+"the parallel answer equals the sequential answer" over the same code; this one is the
+first whose gate compares two *different* paths through the engine, and the first
+run of it found a defect the whole test suite had never had a reason to look for.
+`BROILER_RENDER_TREE_ELISION=0` is the switch that separates the two paths outside the
+harness, which is where a suspected stale render should be bisected first.
+
+#### What is left of item #14
+
+A **scoped** rebuild rather than a skipped one. Everything still rebuilding is a
+mutation the engine genuinely has to react to — an inline-style write, a text change,
+an inserted subtree, an attribute a rule really does match on — and it reacts by
+regenerating the whole box tree and re-cascading the whole document for a one-element
+change. Narrowing that needs the rebuild to have a unit smaller than the document,
+which neither the ledger nor the set provides, and it is a different kind of work from
+either half of this one.
+
 ## Master table
 
 Gain is per-stage unless stated. Effort is engineering days for one person
@@ -1531,7 +1671,7 @@ non-deterministic correctness defect.
 | 11 | CSS | [`CssStyleEngine.CollectFromRules:623`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) — linear scan of every rule of every sheet, per element | O(elements × rules) | **Not multithreading.** Rule index (bucket by id/class/tag) + ancestor bloom filter | Nothing — this is the standard engine design and it is simply absent | **DONE.** Exit gate met: with matches fixed at four, 32× the rules now costs 1.64× the time and 1.13× the bytes (was 30.8× / 32.0×) — up to **136.9× faster** and **600× less garbage** at 3 200 rules. On a whole render the corpus `rules` page is 5 218.96 ms → 1 841.71 ms (2.8×); see [What building Phase 1 changed](#what-building-phase-1-changed) §1. `patches/0123-css-cascade-rule-index.patch` | Low | Done | 1 |
 | 12 | CSS | [`CssStyleEngine.GetCascadedStyle`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) resolved ahead of the box walk by [`CssStyleRecalc`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/Parse/CssStyleRecalc.cs) — **DONE** | Was sequential per element, with the three memo caches under one global `_sync` | Warm pass over every element on `BROILER_STYLE_THREADS`, then the unchanged ordered box walk reads the memo; caches sharded to `ConcurrentDictionary`, generation guard kept | Nothing now. **Neither blocker this cell named was the operative one.** The lock was not the bottleneck — the per-element cascade was 210 µs on a five-rule page ([§3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is)) — and the parallel unit is not the box walk, which cannot be split at all ([§4](#4-the-parallel-unit-is-not-the-box-walk--this-is-a-prefetchconsume-split-the-fourth-in-this-document)) | **Measured: 1.16–2.01× on the cascade stage at 4 threads, 1.08–1.96× end to end**, pixel-identical at 1/2/4. The serial residue is now measured per page (16–55%), so what is left is stated rather than guessed ([§5](#5-the-serial-residue-is-measured-now-and-it-differs-three-fold-across-pages)) | Medium | Done | 3 |
 | 13 | Layout | [`CssBox.PerformLayout:347`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.cs), [`PerformLayoutImp:37`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.Layout.cs) | Full-tree, in-place mutation, from the root every pass — **twice** when width is unrestricted ([`HtmlContainerInt.cs:929,936`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs)) | Parallel intrinsic sizing; parallel independent subtrees (abspos/fixed, flex+grid items, table cells, multicol, subdocuments) | Mutable shared tree; ambient thread-static state (`CssLengthParser` viewport, [`DocumentModeContext.cs:22`](../../Broiler.Layout/Broiler.Layout/DocumentModeContext.cs)); no dirty-bit invalidation to bound the work | **1.5–2.5×** of a stage **measured at 0.6–6.5% of a render** on every corpus page, including one built to load layout — so a few percent overall at best | **High** | 20–30 d | 4 |
-| 14 | DOM / Layout | [`RenderTreeInvalidation`](../../Broiler.Layout/Broiler.Layout/Engine/RenderTreeInvalidation.cs) consulted by `HtmlContainerInt.EnsureBoundDocumentCurrent` — **first slice done**; the cascade half is the remainder | Was: **any** DOM version bump disposes the render tree and re-cascades the whole document, then lays out the whole tree | **Not multithreading.** A consumer for `DomDocument.Mutated`, then invalidation sets over the rule index | **Neither blocker this cell named was the operative one, and that is now five items running.** The DOM's signal was never a bare counter — `DomDocument.Mutated` has published a typed `DomMutationRecord` since before the item was written; what was missing was a consumer, and it is in the main repo, not `Broiler.DOM` ([§11](#11-item-14s-blocker-did-not-exist-either-and-the-burst-does-not-amortise)). What blocks the **remainder** is real and different: eliding a *connected* mutation needs the cascade to answer whether any rule's subject could match differently | **Measured: the offscreen-build case goes from a full rebuild to none — `rules` 1 032.7 → 11.5 ms (89.8×)**, `boxes` 25.8×, `paint` 22.6×, `mixed` 16.3×, `text` 10.0×; the other thirty harness rows move 0.82–1.27, which is run-to-run spread. **What is left is larger**: an unstyled `data-*` write still costs 997.8 ms on `rules`. A perfect layout dirty bit alone remains worth 1.03× | Medium–High | ~12–16 d remaining; `patches/0131` | 3 |
+| 14 | DOM / Layout | [`RenderTreeInvalidation`](../../Broiler.Layout/Broiler.Layout/Engine/RenderTreeInvalidation.cs) and [`CascadeInvalidationSet`](../../Broiler.Layout/Broiler.Layout/Engine/CascadeInvalidationSet.cs) consulted by `HtmlContainerInt.EnsureBoundDocumentCurrent` — **done**; a *scoped* rebuild is the remainder | Was: **any** DOM version bump disposes the render tree and re-cascades the whole document, then lays out the whole tree | **Not multithreading.** A consumer for `DomDocument.Mutated`, then invalidation sets over the rule index | **Neither blocker this cell named was the operative one, and that is now five items running.** The DOM's signal was never a bare counter — `DomDocument.Mutated` has published a typed `DomMutationRecord` since before the item was written; what was missing was a consumer, and it is in the main repo, not `Broiler.DOM` ([§11](#11-item-14s-blocker-did-not-exist-either-and-the-burst-does-not-amortise)). What blocks the **remainder** is real and different: eliding a *connected* mutation needs the cascade to answer whether any rule's subject could match differently | **Measured, both halves: the offscreen-build case goes from a full rebuild to none — `rules` 1 032.7 → 11.5 ms (89.8×)**, `boxes` 25.8×, `paint` 22.6×, `mixed` 16.3×, `text` 10.0×; and the connected `data-*` write the first half could not touch goes **1 476.7 → 43.0 ms (34.4×)** on `rules`, 14.2× `paint`, 13.8× `mixed`, 9.5× `boxes`, 2.1× `text`, with a class toggle 36.0× on `rules`. Rows that still rebuild span 0.79–1.21, i.e. run-to-run spread. A perfect layout dirty bit alone remains worth 1.03× | Medium–High | Done; `patches/0132` | 3 |
 | 15 | JS | [`JSPromise.Post:376`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromise.cs), [`JSAsyncFunction.cs:152`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSAsyncFunction.cs), [`JSGenerator.cs:435`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Generator/JSGenerator.cs) — `ThreadPool.QueueUserWorkItem` when `sc == null` | JS continuations run on pool threads, racing main-thread layout | **Remove the parallelism.** Always pump a single-threaded event loop | This is the root cause behind WPT #1445 / #1143; the CSS `_sync` lock and the concurrent bridge memo maps are mitigations for it | Negative CPU gain, **large correctness gain**; removes lock overhead on hot cascade paths | Low | 5–8 d | 0 |
 | 16 | JS | [`ScriptCompileAhead`](../../src/Broiler.HtmlBridge.Core/Scripting/ScriptCompileAhead.cs), consumed by the eval loop in [`CaptureService`](../../src/Broiler.Cli/CaptureService.cs) — **DONE** | Was compiled on demand, serially, by the ordered eval loop | Every classic script source compiled on `BROILER_SCRIPT_COMPILE_THREADS` into the context's own cache; the loop is unchanged and reads hits | Nothing, and **the blocker this cell used to name did not exist**: `JSContext.CodeCache` is public, so the store is the context's own and no engine change is needed. The context is not late either — a document's sources are not all known until its fetches return ([§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache)) | **Measured: compile stage 1.41×/1.62×/1.52× at 2/4/8 threads; whole capture 1.44× on a compile-heavy document, 1.22× on a modestly scripted one.** The estimate's 1.5–3× lands only on the stage, and only where a page's scripts are large. The sub-linear ceiling is **not** the compile-thread handoff — tested, not assumed ([§9](#9-the-compile-stages-ceiling-is-not-the-thing-that-looks-like-it)) | Low | Done | 3 |
 | 17 | DOM / HTML | [`PreloadScanner.cs`](../../src/Broiler.HtmlBridge.Core/Scripting/PreloadScanner.cs), [`SpeculativePreloadScan.cs`](../../src/Broiler.HtmlBridge.Core/Scripting/SpeculativePreloadScan.cs) — **DONE** | The parse stays sequential (correctly — the HTML tokenizer is spec-sequential); the sub-resource *discovery* was sequential with it | A worker tokenizes the same immutable source and hands the URL sets to the prefetcher, started as the first statement of `ParseHtml` | Nothing; it is a read-only pass over an immutable string | **DONE, and it found a second thing.** Sheet requests are in flight while the document is still parsing (asserted at the origin, not timed). The number came from the script side: the capture host does its own extraction and so never reached item #2's split — 8 scripts at 40 ms go **755.1 → 521.4 ms**, median paired ratio **0.655** over 5 pairs, peak concurrency 6 against 1. It tokenizes rather than pattern-matching bytes, and `srcset`, `<template>` and `<noscript>` are documented exclusions. See [§10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split) | Low | Done | 2 |
@@ -1858,10 +1998,14 @@ first.
    slice is a consumer for it in `Broiler.Layout`
    ([§11](#11-item-14s-blocker-did-not-exist-either-and-the-burst-does-not-amortise)).
    That slice is built — mutations that cannot reach the render tree no longer
-   rebuild it, worth 10–90× on the offscreen-build case. The remainder is the
-   *connected* mutation: eliding a `data-*` write no selector reaches needs
-   invalidation sets over the rule index step 1 of the Broiler.CSS roadmap built,
-   and that row still costs 997.8 ms on the rule-heavy page.
+   rebuild it, worth 10–90× on the offscreen-build case. **The connected half is
+   built too**: `CascadeInvalidationSet` scans the sheets the tree was cascaded
+   from for every class, id and attribute name any selector mentions and any
+   `attr()` reads, and a connected attribute write that neither the cascade nor
+   box construction can see is answered without a rebuild
+   ([§12](#12-item-14s-second-half-the-sheets-already-knew-and-the-gate-caught-a-bug-nothing-else-could)).
+   What is left of the item is the *scoped* rebuild — narrowing a rebuild rather
+   than skipping one, for the connected mutations that do reach the tree.
 3. **Parallel intrinsic sizing.** Min/max-content measurement of independent
    subtrees is a pure function of the subtree given resolved style, so it
    parallelizes before the mutating flow pass does.
@@ -2050,7 +2194,7 @@ Recording these so they are not revisited each time the topic comes up:
 | **0 — Make it measurable and deterministic** | P0-a benchmarks, P0-b single-threaded event loop (#15), P0-c static-state audit, GC config evaluation (#19) | Nothing after this is trustworthy without it. #15 is a correctness fix that also removes lock overhead from the cascade. |
 | **1 — Free wins and the sequential fixes** — **DONE** | WPT worker pool (#1), CLI batch (#20), concurrent sub-resource fetch (#2), CSS rule indexing (#11) | Cheap, low-risk, and #1 shortens the feedback loop for everything else. #11 is single-threaded but must precede #12. **What it changed:** #11 met its exit gate (cascade cost is now flat in total rules) but is 2.8× on a whole render, and `parse+cascade` still dominates the rule-heavy page — so #12 needs that stage split before it is started; #20 had to use processes, which makes item #9 a gate on every render-path item, not three. |
 | **2 — Raster, decode, text** — **DONE** | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), text caches (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed, in the order it matters:** band parallelism inside a primitive turned out to be the wrong unit for a page — three of five corpus pages split zero fills, because their raster is glyphs — which promotes **#5 from "supersedes #3" to the only raster parallelism the corpus can use (§4)**; the phase's largest single win was a *cache*, and not the one #10 names (§5); the pool and the in-process threads multiply, so the runner now divides them (§7); the item-#9 findings (§1–§3) stand. **#5 landed and about half of its win was single-threaded** — the rasterizer was walking pixels its clip could never admit (§8) — and between them #4, #10 and #5 have taken raster from the largest stage on three pages to the largest on one (§9). **#17 landed and its number came from somewhere the item did not name:** the capture host does its own script extraction and so never reached the split item #2 built, leaving that family serial in the path this repository measures (§10). **#8 landed, and it needed neither of the two things §6 predicted** — not #17's URL set (the box tree names what layout will actually ask for, where a source scan names a superset) and not a cache (layout's existing loader seam is the split) — but it did need one thing nothing predicted: **only the decode was safe to move off the layout thread, not the completion callback**, which changed the rendered page on the failure path and nowhere else (§12). It also discharges P0-c's last debt, being the first worker to establish the ambient state and arm its assertion. **#3's port closed the phase, and it corrected this document rather than confirming it** — §8 said to port the clip narrowing first, and the sequential win turned out to be a per-pixel target lookup that banding forced out of the loop; the narrowing itself pays only on content inside the surface and outside the clip, which the corpus scene written for it did not contain (§13). Its threading is 1.00–1.39x at four threads with 85–100% of area split, so **both copies now say band parallelism is the wrong unit, for opposite reasons.** It leaves one named follow-up: a two-band split measured slower than none, and only the ported copy refuses one. The largest open question is still the parse/cascade split Phase 1 §1 named, which gates #12 — and §9 makes it the largest unattributed question in the document, now that nothing in Phase 2 is open. See [What building Phase 2 changed](#what-building-phase-2-changed). |
-| **3 — Style and incremental layout** — **#12, #21, #16 done; #14's first slice done, its cascade half is the remainder** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. **What it changed, in the order it matters:** the phase opened by answering the question Phase 2 §9 said it owed, and the answer reframes the item it gates — **`parse+cascade` is 81.3–98.2% cascade on every page**, so item #12 aims at the whole stage rather than a fraction of it, and the stage's name is a legacy of nobody having measured it ([§1](#1-parsecascade-is-a-cascade-stage-the-name-overstates-the-parse)); getting that number needed the profile's first instrumentation *inside* the engine, because none of the four sub-stages is a pure function of the source and P0-a's out-of-band trick therefore does not reach them ([§2](#2-measuring-it-needed-instrumentation-and-p0-as-method-note-is-why-that-is-worth-saying)). **#12 landed and both of the blockers its row named were the wrong ones.** The `_sync` lock was not the bottleneck — the per-element cascade was 210 µs on a *five-rule* page, which no number of lock acquires explains ([§3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is)) — and the parallel unit is not the box walk, which cannot be split at all: it rewrites `display` before children read it, hides a closed `<details>`'s subtree after cascading it, and inserts generated boxes on the way back up. So #12 is a **prefetch/consume split**, the fourth in this document to arrive at that shape after the item named a different one ([§4](#4-the-parallel-unit-is-not-the-box-walk--this-is-a-prefetchconsume-split-the-fourth-in-this-document)). **1.16–2.01× on the cascade stage at four threads, 1.08–1.96× end to end, pixel-identical at 1/2/4** — and the harness now publishes the serial residue per page (16–55%), so what is left is measured rather than guessed ([§5](#5-the-serial-residue-is-measured-now-and-it-differs-three-fold-across-pages)). **#21 landed** and cost nothing but the reading that says why it is safe — 2 118 tests, 0 failures, **57–59 s → 31–37 s (~1.75×)** on four cores. **#16 landed, and it needed none of what this document said it needed.** The store §6 said had to be built was already there — `JSContext.CodeCache` is public — so the item is one main-repo type and a two-line call site, with no engine change, no submodule patch and none of the cross-document isolation §6 worried about ([§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache)). That makes **four items running whose stated blocker was not the operative one** (#8, #12 twice, #16), and the lesson is now explicit: the "What blocks it today" column is a hypothesis, and checking it belongs in an item's first hour rather than its last. **Compile stage 1.41×/1.62×/1.52× at 2/4/8 threads, whole capture 1.44× on a compile-heavy document and 1.22× on a modestly scripted one** — and its measurement tested the obvious explanation for the ceiling instead of publishing it, which is how the explanation turned out to be wrong and a 15–17% *sequential* tax turned up instead ([§9](#9-the-compile-stages-ceiling-is-not-the-thing-that-looks-like-it)). **#14 is the phase's remainder, and its precondition is now built.** The relayout harness §7 asked for exists (`--relayout-profile`), and its first result re-aims the item: a relayout is **60–97% box-tree rebuild and re-cascade**, because any DOM version bump disposes the render tree and re-cascades the whole document before the layout pass runs — so dirty bits on `CssBox.PerformLayout` bound 3–39% of the cost, and 2.9% on the rule-heavy page. The available ceiling is real (34× on that page if the rebuild goes, against 1.03× for a perfect layout dirty bit alone) but it sits in the box tree and the cascade, and the work starts a layer down in `Broiler.DOM`, where every script-shaped mutation is today indistinguishable from every other ([§10](#10-item-14s-harness-exists-now-and-it-says-the-item-is-aimed-at-the-smaller-half)). **#14's first slice then landed, and its blocker did not exist either — the fifth in a row.** The DOM was never limited to a version counter: `DomDocument.Mutated` has published a typed `DomMutationRecord` since before the item was written, so the item does not start in `Broiler.DOM` at all; what was missing was a consumer, and `RenderTreeInvalidation` is it. Mutations that cannot reach the render tree no longer rebuild it — **`rules` 1 032.7 → 11.5 ms (89.8×)** on the offscreen-build case, 10.0–25.8× on the other four pages, with the remaining thirty rows inside the run-to-run spread. The measurement also refuted one of §10's own two predictions (the burst does not amortise — a rebuild is whole-document for a single attribute write) and reinterpreted the other ("changes nothing observable" is already free at the value level). **The remainder is larger than the slice**: an unstyled `data-*` write still costs 997.8 ms on `rules`, and eliding it needs invalidation sets over item #11's rule index ([§11](#11-item-14s-blocker-did-not-exist-either-and-the-burst-does-not-amortise)). See [What building Phase 3 changed](#what-building-phase-3-changed). |
+| **3 — Style and incremental layout** — **DONE** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. **What it changed, in the order it matters:** the phase opened by answering the question Phase 2 §9 said it owed, and the answer reframes the item it gates — **`parse+cascade` is 81.3–98.2% cascade on every page**, so item #12 aims at the whole stage rather than a fraction of it, and the stage's name is a legacy of nobody having measured it ([§1](#1-parsecascade-is-a-cascade-stage-the-name-overstates-the-parse)); getting that number needed the profile's first instrumentation *inside* the engine, because none of the four sub-stages is a pure function of the source and P0-a's out-of-band trick therefore does not reach them ([§2](#2-measuring-it-needed-instrumentation-and-p0-as-method-note-is-why-that-is-worth-saying)). **#12 landed and both of the blockers its row named were the wrong ones.** The `_sync` lock was not the bottleneck — the per-element cascade was 210 µs on a *five-rule* page, which no number of lock acquires explains ([§3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is)) — and the parallel unit is not the box walk, which cannot be split at all: it rewrites `display` before children read it, hides a closed `<details>`'s subtree after cascading it, and inserts generated boxes on the way back up. So #12 is a **prefetch/consume split**, the fourth in this document to arrive at that shape after the item named a different one ([§4](#4-the-parallel-unit-is-not-the-box-walk--this-is-a-prefetchconsume-split-the-fourth-in-this-document)). **1.16–2.01× on the cascade stage at four threads, 1.08–1.96× end to end, pixel-identical at 1/2/4** — and the harness now publishes the serial residue per page (16–55%), so what is left is measured rather than guessed ([§5](#5-the-serial-residue-is-measured-now-and-it-differs-three-fold-across-pages)). **#21 landed** and cost nothing but the reading that says why it is safe — 2 118 tests, 0 failures, **57–59 s → 31–37 s (~1.75×)** on four cores. **#16 landed, and it needed none of what this document said it needed.** The store §6 said had to be built was already there — `JSContext.CodeCache` is public — so the item is one main-repo type and a two-line call site, with no engine change, no submodule patch and none of the cross-document isolation §6 worried about ([§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache)). That makes **four items running whose stated blocker was not the operative one** (#8, #12 twice, #16), and the lesson is now explicit: the "What blocks it today" column is a hypothesis, and checking it belongs in an item's first hour rather than its last. **Compile stage 1.41×/1.62×/1.52× at 2/4/8 threads, whole capture 1.44× on a compile-heavy document and 1.22× on a modestly scripted one** — and its measurement tested the obvious explanation for the ceiling instead of publishing it, which is how the explanation turned out to be wrong and a 15–17% *sequential* tax turned up instead ([§9](#9-the-compile-stages-ceiling-is-not-the-thing-that-looks-like-it)). **#14 is the phase's remainder, and its precondition is now built.** The relayout harness §7 asked for exists (`--relayout-profile`), and its first result re-aims the item: a relayout is **60–97% box-tree rebuild and re-cascade**, because any DOM version bump disposes the render tree and re-cascades the whole document before the layout pass runs — so dirty bits on `CssBox.PerformLayout` bound 3–39% of the cost, and 2.9% on the rule-heavy page. The available ceiling is real (34× on that page if the rebuild goes, against 1.03× for a perfect layout dirty bit alone) but it sits in the box tree and the cascade, and the work starts a layer down in `Broiler.DOM`, where every script-shaped mutation is today indistinguishable from every other ([§10](#10-item-14s-harness-exists-now-and-it-says-the-item-is-aimed-at-the-smaller-half)). **#14's first slice then landed, and its blocker did not exist either — the fifth in a row.** The DOM was never limited to a version counter: `DomDocument.Mutated` has published a typed `DomMutationRecord` since before the item was written, so the item does not start in `Broiler.DOM` at all; what was missing was a consumer, and `RenderTreeInvalidation` is it. Mutations that cannot reach the render tree no longer rebuild it — **`rules` 1 032.7 → 11.5 ms (89.8×)** on the offscreen-build case, 10.0–25.8× on the other four pages, with the remaining thirty rows inside the run-to-run spread. The measurement also refuted one of §10's own two predictions (the burst does not amortise — a rebuild is whole-document for a single attribute write) and reinterpreted the other ("changes nothing observable" is already free at the value level). **The remainder was larger than the slice** — an unstyled `data-*` write still cost 997.8 ms on `rules` — and **#14's second half then took it**: `CascadeInvalidationSet` asks the sheets the tree was cascaded from whether any rule could match differently, and asks box construction separately whether it reads the attribute for reasons of its own, because a set built from stylesheets would happily elide a `<td colspan>` write on a page whose sheet never mentions `colspan`. **`rules` 1 476.7 → 43.0 ms (34.4×)** on that row, 9.5–14.2× on three other pages, 36.0× on `rules`' class toggle, with two control rows (`styled attribute`, `styled class`) that still rebuild on exactly the pages whose sheets name what they write. **The phase's last finding is not a speedup but a defect, and the gate is what makes that worth stating**: `--relayout-parity` renders every page with the elision on and off and compares images, it failed on first run, and the cause was that laying the same box tree out twice was never idempotent — a two-pixel margin drift that had been live in the *first* slice since it shipped, because nothing in this repository had ever taken that path twice ([§12](#12-item-14s-second-half-the-sheets-already-knew-and-the-gate-caught-a-bug-nothing-else-could)). An optimisation that skips work is a new execution path, and its gate has to run that path end to end. What is left of #14 is a *scoped* rebuild rather than a skipped one. See [What building Phase 3 changed](#what-building-phase-3-changed). |
 | **4 — Parallel layout and workers** | Parallel intrinsic sizing and independent subtrees (#13), Web Workers (#18) | Highest cost, highest risk, lowest ceiling. Only worth starting once Phase 3's measurements say layout is still the bottleneck — and they now say the opposite three times over: layout is 0.6–6.5% of a first render (Phase 1 §2), and the relayout harness Phase 3 §7 asked for has since been built and says the layout pass is **3–39% of a relayout** too, the rest being the box-tree rebuild and the cascade ([§10](#10-item-14s-harness-exists-now-and-it-says-the-item-is-aimed-at-the-smaller-half)). So the interactive case does not rescue this phase either: it is a cascade problem, like the first render — and item #14's first slice has since confirmed that from the other direction, by taking a relayout to 11.5 ms on the page that hurts most simply by not re-cascading it ([§11](#11-item-14s-blocker-did-not-exist-either-and-the-burst-does-not-amortise)). Phase 3 §4, §8 and §11 are also a warning about #13's wording: **five** items in a row have found that the structure an item names is not the structure that can be split, or that the blocker it names is not the one holding it. |
 
 **Global exit gate:** every parallel path has a `--threads 1` equivalent that

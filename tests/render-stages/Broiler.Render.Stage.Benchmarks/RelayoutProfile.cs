@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Broiler.Dom;
 using Broiler.Dom.Html;
 using Broiler.Graphics;
@@ -86,11 +87,21 @@ namespace Broiler.Render.Stage.Benchmarks;
 /// </description></item>
 /// <item><description>
 /// <c>unstyled attribute</c> — one <c>data-*</c> write on a connected element, which no selector in
-/// any corpus page can reach. It still costs a full rebuild, and it is here to size what is left on
-/// the table: eliding it needs the cascade to answer whether a rule's subject could match
-/// differently, which is the rest of item #14 rather than a connectivity test.
+/// any corpus page can reach. It sized what a connectivity test cannot elide, and
+/// <see cref="CascadeInvalidationSet"/> — item #14's second half — elides it.
 /// </description></item>
 /// </list>
+/// <para>
+/// <b>Two controls, added with that second half, and they are the reason the row above can be
+/// believed.</b> "The unstyled write went to zero" is equally consistent with an implementation that
+/// elides <em>every</em> <c>data-*</c> write, which would be a stale page rather than a fast one. So
+/// <c>styled attribute</c> writes <c>data-k</c> — the attribute <c>rules</c> builds 180 of its 900
+/// selectors around — and <c>styled class</c> writes a class the page's own sheet names. Each differs
+/// from its unstyled twin only in the name being written, so a decision column that does not
+/// distinguish them is reporting something other than the sheet. Both are page-dependent by design:
+/// no sheet but <c>rules</c>' mentions <c>data-k</c>, so <c>styled attribute</c> elides on the other
+/// four, and that is the set being a function of the document rather than of the attribute.
+/// </para>
 /// <para>
 /// <b>The rebuild column is now a fact rather than an inference, and it has three states rather
 /// than two.</b> A row that skips the rebuild is otherwise indistinguishable from a row that
@@ -107,7 +118,12 @@ internal static class RelayoutProfile
     private const int Height = Corpus.ViewportHeight;
 
     /// <summary>One mutation, named for what a script would have been doing.</summary>
-    private sealed record Mutation(string Name, Action<DomDocument> Apply);
+    /// <remarks>
+    /// Visible to <see cref="RelayoutParity"/> through <see cref="MutationsForParity"/>: the parity
+    /// gate has to render exactly the mutations this profile times, or the two can drift into
+    /// measuring one set and proving another.
+    /// </remarks>
+    internal sealed record MutationCase(string Name, Action<Corpus.Page, DomDocument> Apply);
 
     /// <summary>One page's figures for one mutation.</summary>
     private sealed record Row(
@@ -180,7 +196,7 @@ internal static class RelayoutProfile
     /// "first layout" read a warmed font cache and a warmed style engine that the first sample's
     /// did not have, which is the comparison this harness is about.
     /// </remarks>
-    private static Row MeasureOnce(Corpus.Page page, Mutation mutation)
+    private static Row MeasureOnce(Corpus.Page page, MutationCase mutation)
     {
         var clip = new RectangleF(0, 0, Width, Height);
         var document = ParseDocument(page);
@@ -199,7 +215,7 @@ internal static class RelayoutProfile
         container.PerformLayout(bitmap, clip);
         first.Stop();
 
-        mutation.Apply(document);
+        mutation.Apply(page, document);
 
         // The trace is reset here rather than at the top: the first layout also rebuilds (the
         // document is bound but has never been built), and charging its sub-stages to the relayout
@@ -236,22 +252,24 @@ internal static class RelayoutProfile
     /// <summary>
     /// The mutations, in ascending order of how much of the tree they could justify touching. The
     /// first four cost the same as each other, which was the harness's first result rather than an
-    /// assumption; the last three were added when item #14 was picked up, and only
-    /// <c>detached build</c> is answered without a rebuild.
+    /// assumption; <c>detached build</c>, <c>burst</c> and <c>unstyled attribute</c> were added when
+    /// item #14 was picked up, and the two <c>styled</c> rows when its second half was — as the
+    /// controls that keep the decision column from being read as "every write of this shape is
+    /// elided".
     /// </summary>
-    private static readonly Mutation[] Mutations =
+    private static readonly MutationCase[] Mutations =
     [
-        new("class toggle", document =>
+        new("class toggle", (_, document) =>
         {
             var target = DeepestElement(document);
             target?.SetAttribute("class", "relayout-toggled");
         }),
-        new("inline style write", document =>
+        new("inline style write", (_, document) =>
         {
             var target = DeepestElement(document);
             target?.SetAttribute("style", "color:#123456");
         }),
-        new("text write", document =>
+        new("text write", (_, document) =>
         {
             // The text node itself, not the element: writing an element's textContent replaces its
             // children, which is an insertion/removal as well as a text change and would measure
@@ -261,7 +279,7 @@ internal static class RelayoutProfile
             if (target != null)
                 target.Data = "relayout";
         }),
-        new("inserted subtree", document =>
+        new("inserted subtree", (_, document) =>
         {
             var host = DeepestElement(document)?.ParentNode ?? document.DocumentElement;
             if (host == null)
@@ -272,7 +290,7 @@ internal static class RelayoutProfile
             inserted.AppendChild(document.CreateElement("span"));
             host.AppendChild(inserted);
         }),
-        new("detached build", document =>
+        new("detached build", (_, document) =>
         {
             // Built and never inserted. Twenty-four version bumps, none of which any render tree
             // built from this document could show — the case item #14's first slice elides, and the
@@ -288,7 +306,7 @@ internal static class RelayoutProfile
                 detached.AppendChild(row);
             }
         }),
-        new("burst (20 writes)", document =>
+        new("burst (20 writes)", (_, document) =>
         {
             // Twenty connected edits before one layout. Not a saving — the version compare already
             // collapses a burst into a single rebuild — but it is the case the first publication of
@@ -298,15 +316,70 @@ internal static class RelayoutProfile
             for (var i = 0; i < targets.Count; i++)
                 targets[i].SetAttribute("class", "burst-" + i.ToString(CultureInfo.InvariantCulture));
         }),
-        new("unstyled attribute", document =>
+        new("unstyled attribute", (_, document) =>
         {
-            // A data-* write no corpus selector can reach. It still rebuilds, and that is the point
-            // of the row: it sizes what a connectivity test cannot elide and an invalidation set
-            // could.
+            // A data-* write no corpus selector can reach — the row that sized what a connectivity
+            // test cannot elide and an invalidation set could, and the row that set now elides.
             var target = DeepestElement(document);
             target?.SetAttribute("data-relayout-probe", "1");
         }),
+        new("styled attribute", (_, document) =>
+        {
+            // The same shape of write, on the one attribute name a corpus sheet does filter on:
+            // `rules` builds 180 of its 900 selectors as [data-k="…"]. It is the control for the row
+            // above — without it, "unstyled attribute went to zero" is equally consistent with an
+            // invalidation set that elides every data-* write, which would be a stale page on the
+            // page that hurts most. The two rows differ only in the attribute's name, so the decision
+            // column is reporting the set and nothing else, and it is page-dependent by design: the
+            // other four sheets never mention data-k, so this elides there and must not on `rules`.
+            var target = DeepestElement(document);
+            target?.SetAttribute("data-k", "3");
+        }),
+        new("styled class", (page, document) =>
+        {
+            // A class the page's own sheet styles, which is what most real class toggles are. The
+            // "class toggle" row above writes an invented token and is elidable on any page whose
+            // sheet does not name it; this one must rebuild wherever the sheet does, and the pair is
+            // the honest version of "class toggles got faster".
+            var target = DeepestElement(document);
+            target?.SetAttribute("class", StyledClassFor(page, target));
+        }),
     ];
+
+    /// <summary>
+    /// A class the page's own stylesheet names and the element does not already carry: the token a
+    /// real <c>classList.add</c> writes.
+    /// </summary>
+    /// <remarks>
+    /// Taken from <see cref="Corpus.Page.Css"/> rather than hard-coded, because the pages build
+    /// their class names differently (<c>c0…c39</c> on <c>rules</c>, <c>row</c>/<c>col</c>/<c>cell</c>
+    /// on <c>boxes</c>) and a constant would silently become an <em>un</em>styled write on a page
+    /// that stopped using it. "That the element does not already carry" matters as much: writing a
+    /// value an attribute already has is not a mutation at all — <c>Broiler.DOM</c> returns before
+    /// publishing — so this row would measure nothing and report <c>n/a</c>.
+    /// A page whose sheet names no class (<c>text</c>, <c>paint</c>) has nothing styled to write, and
+    /// the row falls back to an invented token, measuring what <c>class toggle</c> measures.
+    /// </remarks>
+    private static string StyledClassFor(Corpus.Page page, DomElement? element)
+    {
+        var carried = (element?.GetAttribute("class") ?? string.Empty)
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (Match match in StyledClassPattern.Matches(page.Css))
+        {
+            var name = match.Groups[1].Value;
+            if (!carried.Contains(name, StringComparer.Ordinal))
+                return name;
+        }
+
+        return "relayout-styled";
+    }
+
+    /// <summary>Class names as the corpus writes them: <c>.name</c> at a selector position.</summary>
+    private static readonly Regex StyledClassPattern = new(@"\.([A-Za-z_][\w-]*)", RegexOptions.Compiled);
+
+    /// <summary>The mutation list, for the parity gate that renders what this profile times.</summary>
+    internal static IReadOnlyList<MutationCase> MutationsForParity => Mutations;
 
     /// <summary>The first <paramref name="count"/> elements of the document, in document order.</summary>
     private static List<DomElement> ConnectedElements(DomDocument document, int count)
