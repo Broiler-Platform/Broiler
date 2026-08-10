@@ -33,6 +33,7 @@ one beneficiary. `patches/0133`. Published:
 | #18 — Web Workers | **Not started** | Unchanged: a capability, not a speedup of existing work |
 | Phases 2–3 measured on WPT | **Null result** | `ca53d44` vs HEAD, both sequential per render, 2 213 reftests over two suites: **1.017× and 1.013×**, inside the host's 5–7% drift, classification identical. WPT pages are 1 018 bytes at the median against a 20–212 KB corpus, so the surviving sequential wins have nothing to act on ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)) |
 | Per-render fixed cost | **Measured; §4's conclusion refuted** | Engine: **3.48 ms** empty, 15–19 ms at WPT median, 77% of the empty render being bitmap alloc + erase. Runner: the render is **1.6–2.0%** of a test — **76–79% is `ExecuteScriptsWithDom`** and **16–21% `PixelDiffRunner.Compare`**. Neither is a rendering problem, and neither is in this document ([§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)) |
+| Pixel comparison | **Fixed** | **284.61 → 4.50 ms (62×)** on the match path; the suite 368.5 → 297.3 s (1.24×). 92% of it was a PNG round trip measured to be an identity — not the per-pixel loop §5 pointed at, which was ~22 ms of 284. Classification identical name for name. `patches/0134` ([§6](#6-the-pixel-comparison-is-fixed-and-the-part-that-read-worst-was-not-the-part-that-cost)) |
 
 **Phase 3 is complete: #12, #21, #16 and #14.** The relayout harness
 [§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)
@@ -1893,6 +1894,50 @@ has now made the same class of mistake twice in one phase, after
 [§3](#3-the-harness-nearly-published-a-false-positive-the-same-way-phase-2-7s-did) caught the
 first. Published:
 [`render-fixed-cost.md`](../../tests/render-stages/results/render-fixed-cost.md).
+
+### 6. The pixel comparison is fixed, and the part that read worst was not the part that cost
+
+[§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong) named two
+targets outside this document. The smaller one is done: **`PixelDiffRunner.Compare` goes
+284.61 → 4.50 ms on the match path (62×)** and 285.23 → 7.92 on the mismatch path (36×).
+
+**The fix was not where the code looked worst.** The per-pixel `GetPixel`/`SetPixel` loop over
+786 432 pixels — the thing §5 singled out, and the same shape item #3 had already fixed in the
+rasterizer — is real, and it was **~22 ms of 284**. The other **92% was `NormalizeForComparison`**:
+`BBitmap.Decode(source.Encode(Png, 100))` on *both* inputs before a pixel was read, a full PNG
+compress and decompress of 3 MB each, per comparison. So §5's own diagnosis was half right in
+the same way §4's was — the mechanism it named existed, and was not the cost.
+
+**The round trip was an identity, and this time it was measured before anything was deleted.**
+A synthetic opaque image, one with graded alpha, one fully transparent with non-zero RGB — the
+two cases where a PNG codec may premultiply or collapse the colour type — and 25 real WPT
+reference PNGs off disk all round-tripped byte-identical. It could not have been otherwise:
+`Encode` serialises the same `_pixels` array `GetPixel` reads, so a lossless round trip has
+nothing to normalise between two `BBitmap`s.
+
+Three changes, in descending order of what they were worth: the inputs are compared directly;
+the loop reads backing spans instead of a call and a `BColor` 1.57 M times; and the diff bitmap
+is built **only when the comparison failed**, instead of being allocated and written for every
+pixel and discarded on the match path — 3 MB and 786 432 `SetPixel` calls nothing looked at, on
+the ~62% of tests that pass.
+
+On the suite: `css/css-backgrounds` reftests at four workers, **368.5 → 297.3 s (1.24×)** — less
+than the 186 CPU-s removed, because four workers divide it. Classification identical (444/266/1,
+failing sets identical name for name) and `Broiler.Wpt.Tests` 748/57 both ways.
+
+**The verification produced one false alarm worth keeping.** The first post-fix run differed by
+three `background-size` tests. Restoring normalization while keeping the loop rewrite reproduced
+*the same three*, which cleared both changes; running the **pristine** tree under the same
+invocation then produced exactly the fix's 266-failure set. They are a pre-existing
+nondeterministic fringe in the suite, and the runs they had been compared against were taken
+back-to-back inside one script invocation. **A before/after taken under different invocation
+conditions is not a before/after** — the same lesson as
+[§3](#3-the-harness-nearly-published-a-false-positive-the-same-way-phase-2-7s-did), arriving
+through a different door.
+
+`patches/0134`. Published:
+[`pixel-compare.md`](../../tests/render-stages/results/pixel-compare.md). **What is left of §5's
+two targets is the larger one**: `ExecuteScriptsWithDom` at 76–79% of a WPT run.
 
 ## Master table
 
