@@ -70,13 +70,15 @@ set -euo pipefail
 #     it changes only how `Broiler.JavaScript.BuiltIns.Tests` schedules its own
 #     cases, and the WPT run never builds that assembly.
 #
-# Listed below, and deliberately so: 0131 decides whether the render tree is
+# Listed below, and deliberately so: 0132 decides whether the render tree is
 # rebuilt after a DOM mutation, so a wrong classification is a *stale page* —
 # the one failure mode a pixel-comparing suite is built to catch, and one no
 # unit test over the classifier can reach. Unlike a thread-safety or scheduling
 # patch, this one can move pixels even when the engine below it is perfect.
+# (0131 was the first half of the same item and is upstream now, so its entry
+# is gone with it: an entry whose idempotence guard can only ever skip is noise.)
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0131-html-relayout-invalidation-ledger.patch"
+  "Broiler.HTML|patches/0132-html-cascade-invalidation-set.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

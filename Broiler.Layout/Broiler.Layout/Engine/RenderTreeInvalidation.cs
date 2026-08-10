@@ -38,12 +38,23 @@ namespace Broiler.Layout.Engine;
 /// nothing about the visible result changes; what goes away is the rebuild for the offscreen half.
 /// </para>
 /// <para>
-/// <b>What it deliberately does not elide.</b> Anything connected — including mutations to elements
-/// that produce no boxes (a <c>&lt;meta&gt;</c>, a <c>&lt;title&gt;</c>) and attribute writes no
-/// selector can reach. Both are real and both would pay, and both need the cascade to be asked a
-/// question it cannot answer yet: whether any rule's subject could match differently. Answering it
-/// is the rest of item #14 (invalidation sets over the rule index, then a scoped rebuild), and
-/// guessing at it here would be trading a measured 34× ceiling for a wrong render.
+/// <b>The second rule: a connected attribute write no stylesheet and no box can see.</b> Given a
+/// <see cref="CascadeInvalidationSet"/> — which the container installs with each rebuild, describing
+/// the sheets that rebuild used — an attribute write is elided when <em>both</em> halves of the
+/// engine are blind to it. The cascade half is the set's question: could any rule match differently,
+/// or any <c>attr()</c> resolve differently, if this attribute changed. The box half is
+/// <see cref="IsInertToBoxConstruction"/>: the box tree reads attributes for its own reasons, none of
+/// which go through a selector, so the set's answer alone is not enough. This is the row the relayout
+/// profile sizes at <b>997.8 ms on the rule-heavy page</b> — one <c>data-*</c> write that nothing in
+/// the document can reach, paid for with a whole-document re-cascade.
+/// </para>
+/// <para>
+/// <b>What it still deliberately does not elide.</b> Anything connected that is not that case:
+/// mutations to elements that produce no boxes (a <c>&lt;meta&gt;</c>, a <c>&lt;title&gt;</c>),
+/// character-data and child-list edits anywhere in the page, and every attribute the box tree reads
+/// directly. Narrowing those needs a <em>scoped</em> rebuild rather than a skipped one — the rest of
+/// item #14 after this — and guessing at it here would be trading a measured ceiling for a wrong
+/// render.
 /// </para>
 /// <para>
 /// <b>The conservative direction is the safe one, and there is a backstop for the case this cannot
@@ -75,6 +86,19 @@ public sealed class RenderTreeInvalidation : IDisposable
 {
     private readonly DomDocument _document;
     private readonly object _gate = new();
+
+    /// <summary>
+    /// What the stylesheets behind the current render tree can see of an element's attributes.
+    /// Null until a rebuild installs one, and null means "assume everything matters".
+    /// </summary>
+    /// <remarks>
+    /// Volatile rather than lock-guarded on the read path: classification walks the mutated node's
+    /// parent chain, and doing that inside <see cref="_gate"/> would put a tree walk in the critical
+    /// section that the rest of this type keeps to a handful of field writes. The field is written
+    /// under the lock, so a reader sees either the previous set or the new one — and both are
+    /// answers about a tree that was standing, which is what the version backstop is for.
+    /// </remarks>
+    private volatile CascadeInvalidationSet? _cascadeDependencies;
 
     /// <summary>The document version as of the last record this ledger observed.</summary>
     private ulong _accountedVersion;
@@ -119,7 +143,7 @@ public sealed class RenderTreeInvalidation : IDisposable
 
     /// <summary>
     /// Whether the render tree has to be rebuilt to reflect everything published since the last
-    /// <see cref="MarkRebuilt"/>. <see langword="false"/> only when every version bump since then is
+    /// <see cref="MarkRebuilt()"/>. <see langword="false"/> only when every version bump since then is
     /// accounted for by a record that cannot have changed what the tree shows.
     /// </summary>
     /// <remarks>
@@ -150,7 +174,7 @@ public sealed class RenderTreeInvalidation : IDisposable
         bool skip;
         lock (_gate)
         {
-            skip = !RequiresRebuildLocked();
+            skip = Elision.Enabled && !RequiresRebuildLocked();
             if (skip)
                 MarkRebuiltLocked();
         }
@@ -171,6 +195,36 @@ public sealed class RenderTreeInvalidation : IDisposable
     {
         lock (_gate)
             MarkRebuiltLocked();
+    }
+
+    /// <summary>
+    /// Declares the render tree current and installs the stylesheet dependencies it was built from.
+    /// </summary>
+    /// <param name="dependencies">
+    /// The set describing the sheets that rebuild cascaded, or <see langword="null"/> to go back to
+    /// assuming every attribute matters.
+    /// </param>
+    /// <remarks>
+    /// Installing the set is part of marking the rebuild rather than a separate setter, because the
+    /// two are one fact: the set describes the tree standing right now. Installed independently it
+    /// could describe a stylesheet set the tree does not reflect — a sheet that arrived after the
+    /// build — and mutations would then be classified against rules the page is not showing.
+    /// </remarks>
+    public void MarkRebuilt(CascadeInvalidationSet? dependencies)
+    {
+        lock (_gate)
+        {
+            _cascadeDependencies = dependencies;
+            MarkRebuiltLocked();
+        }
+    }
+
+    /// <summary>
+    /// The stylesheet dependencies of the render tree as last built, for tests and diagnostics.
+    /// </summary>
+    public CascadeInvalidationSet? CascadeDependencies
+    {
+        get { lock (_gate) return _cascadeDependencies; }
     }
 
     private bool RequiresRebuildLocked() =>
@@ -201,7 +255,7 @@ public sealed class RenderTreeInvalidation : IDisposable
 
     private void OnMutated(DomMutationRecord record)
     {
-        var reaches = ReachesRenderTree(record, _document);
+        var reaches = ReachesRenderTree(record, _document, _cascadeDependencies);
 
         lock (_gate)
         {
@@ -221,10 +275,16 @@ public sealed class RenderTreeInvalidation : IDisposable
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The test is connectivity, and it is the whole classification: the box tree is generated by
-    /// walking <paramref name="document"/>, so a node whose root is anything else — a
+    /// The first test is connectivity, and it decides every record on its own: the box tree is
+    /// generated by walking <paramref name="document"/>, so a node whose root is anything else — a
     /// <c>DocumentFragment</c>, a <c>&lt;template&gt;</c>'s contents, an orphaned subtree, another
     /// document — contributes no box, and neither do its descendants.
+    /// </para>
+    /// <para>
+    /// A connected record is then decided by its type. Only an attribute write can be elided, and
+    /// only by <see cref="AttributeReachesRenderTree"/> — a child-list or character-data edit inside
+    /// the page changes the tree's shape or a text node's measured size, and neither question has an
+    /// answer cheaper than the rebuild that is already there.
     /// </para>
     /// <para>
     /// A <see cref="DomMutationType.ChildList"/> record names the <em>parent</em> as its target,
@@ -243,13 +303,167 @@ public sealed class RenderTreeInvalidation : IDisposable
     /// gap it was before.
     /// </para>
     /// </remarks>
-    private static bool ReachesRenderTree(DomMutationRecord record, DomDocument document)
+    private static bool ReachesRenderTree(
+        DomMutationRecord record,
+        DomDocument document,
+        CascadeInvalidationSet? dependencies)
     {
         var target = record?.Target;
         if (target is null)
             return true;
 
-        return ReferenceEquals(target.GetRootNode(), document);
+        if (!ReferenceEquals(target.GetRootNode(), document))
+            return false;
+
+        return record!.Type != DomMutationType.Attributes
+            || AttributeReachesRenderTree(record, dependencies);
+    }
+
+    /// <summary>
+    /// Whether an attribute write on a <em>connected</em> element could have changed what the render
+    /// tree shows: the second rule, and the one that needs to know about the stylesheets.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Two independent questions, both of which have to answer "no". The cascade's is
+    /// <see cref="CascadeInvalidationSet.AffectsStyle"/>. The box tree's is
+    /// <see cref="IsInertToBoxConstruction"/>, and it exists because box construction reads
+    /// attributes without going through a selector at all — <c>src</c>, <c>href</c>, <c>colspan</c>,
+    /// the presentational attributes <c>DomParser.TranslateAttributes</c> maps onto box properties.
+    /// A set built from the stylesheets knows nothing about any of that, so its answer alone would
+    /// elide a <c>&lt;td colspan&gt;</c> write on a page whose sheet never mentions <c>colspan</c>.
+    /// </para>
+    /// <para>
+    /// A namespaced attribute (<c>xlink:href</c>) is never elided: the set files unprefixed names,
+    /// so comparing a qualified name against it would be comparing two different things.
+    /// </para>
+    /// </remarks>
+    private static bool AttributeReachesRenderTree(DomMutationRecord record, CascadeInvalidationSet? dependencies)
+    {
+        if (dependencies is null)
+            return true;
+
+        if (record.AttributeNamespace is not null)
+            return true;
+
+        var name = record.AttributeName;
+        if (string.IsNullOrEmpty(name))
+            return true;
+
+        if (!IsInertToBoxConstruction(name))
+            return true;
+
+        if (IsInForeignContent(record.Target))
+            return true;
+
+        return dependencies.AffectsStyle(name, record.OldValue, record.NewValue);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="attributeName"/> is one that box construction and layout never read
+    /// for a reason of their own — that is, one the cascade is the only consumer of.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>An allow-list, not a deny-list, and the direction is the point.</b> Listing the attributes
+    /// the box tree <em>does</em> read would put every attribute nobody thought of on the elidable
+    /// side, and the cost of missing one is a stale page. So only names established to be inert are
+    /// here, and everything else — known or not — rebuilds.
+    /// </para>
+    /// <para>
+    /// <b><c>class</c></b> is read by the cascade and by nothing else in this engine: no box
+    /// construction path, no layout path and no fragment-tree path consults it, which is what makes
+    /// the token-level question <see cref="CascadeInvalidationSet"/> answers the whole question for
+    /// it.
+    /// </para>
+    /// <para>
+    /// <b><c>data-*</c>, except <c>data-broiler-*</c>.</b> The custom-data namespace is inert to the
+    /// engine by definition — and then the engine helped itself to part of it. <c>data-broiler-*</c>
+    /// is how the script bridge tells the layout engine things it has no other channel for: scroll
+    /// offsets (<c>data-broiler-scroll-top</c>), top-layer order, dialog backdrops, an iframe's live
+    /// document, anchor-induced containing blocks, shadow parts. Those drive rendering directly, so
+    /// the prefix is carved out. Eliding it would be eliding the engine's own messages to itself.
+    /// </para>
+    /// <para>
+    /// <b><c>aria-*</c> and <c>role</c></b> are consumed by no rendering path here. They are listed
+    /// because they are, with <c>class</c>, what scripts write most often without meaning to change
+    /// the picture.
+    /// </para>
+    /// <para>
+    /// <b><c>id</c> is deliberately absent</b>, and it is the case that looks elidable and is not.
+    /// The box tree carries it — <c>HtmlContainerInt</c> reads <c>id</c> off boxes to build the link
+    /// map a PDF export writes, and <c>DomUtils</c> resolves a fragment anchor by scanning boxes for
+    /// it. An elided <c>id</c> write leaves those answering from the old tree, which is a wrong
+    /// answer rather than a slow one. <see cref="CascadeInvalidationSet"/> still models ids, because
+    /// the cascade's half of the question is a real one; this is the other half saying no.
+    /// </para>
+    /// </remarks>
+    private static bool IsInertToBoxConstruction(string attributeName) =>
+        attributeName.Equals("class", StringComparison.OrdinalIgnoreCase)
+        || attributeName.Equals("role", StringComparison.OrdinalIgnoreCase)
+        || attributeName.StartsWith("aria-", StringComparison.OrdinalIgnoreCase)
+        || (attributeName.StartsWith("data-", StringComparison.OrdinalIgnoreCase)
+            && !attributeName.StartsWith("data-broiler-", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Whether <paramref name="node"/> is inside an SVG or MathML subtree, where no attribute is
+    /// inert.
+    /// </summary>
+    /// <remarks>
+    /// Inline <c>&lt;svg&gt;</c> is not laid out attribute by attribute: <c>FragmentTreeBuilder</c>
+    /// serializes the whole subtree back to markup — <em>every</em> attribute of every box, by name
+    /// — and hands the string to the SVG renderer, which has its own view of what a
+    /// <c>class</c> or a <c>data-*</c> means. The allow-list above is a statement about this
+    /// engine's HTML box construction and does not transfer to a renderer that re-parses the markup,
+    /// so foreign content is excluded wholesale rather than attribute by attribute.
+    /// </remarks>
+    private static bool IsInForeignContent(DomNode? node)
+    {
+        for (var current = node; current is not null; current = current.ParentNode)
+        {
+            if (current is not DomElement element)
+                continue;
+
+            var ns = element.NamespaceUri;
+            if (ns is not null
+                && !ns.Equals(DomNamespaces.Html, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The switch that turns every elision off, leaving the version compare that was there before
+    /// this type existed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The document's global exit gate asks every parallel path for a <c>--threads 1</c> equivalent
+    /// that reproduces the sequential output exactly. This is that, for a path whose parallelism is
+    /// <em>skipping work</em>: with it off, every version bump rebuilds, so a page rendered both ways
+    /// is a direct test of the claim the classification makes — that what it skipped could not have
+    /// changed the picture. <c>--relayout-parity</c> is the harness that does it, and a stale render
+    /// is exactly the failure it exists to catch.
+    /// </para>
+    /// <para>
+    /// It is also the switch to reach for from outside: <c>BROILER_RENDER_TREE_ELISION=0</c> in the
+    /// environment restores the old behaviour without a rebuild of anything, which is what a bug
+    /// suspected to be a stale render should be bisected with first.
+    /// </para>
+    /// </remarks>
+    public static class Elision
+    {
+        private static bool _enabled = Environment.GetEnvironmentVariable("BROILER_RENDER_TREE_ELISION") is not "0";
+
+        /// <summary>Whether <see cref="TrySkipRebuild"/> may answer "skip". Defaults to on.</summary>
+        public static bool Enabled
+        {
+            get => Volatile.Read(ref _enabled);
+            set => Volatile.Write(ref _enabled, value);
+        }
     }
 
     private static long _rebuildsRequired;

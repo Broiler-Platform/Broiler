@@ -74,6 +74,11 @@ public static class Program
             return RelayoutProfile.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
         }
 
+        if (args.Length >= 1 && args[0] == "--relayout-parity")
+        {
+            return RelayoutParity.Run();
+        }
+
         if (args.Length >= 1 && args[0] == "--gc-config")
         {
             GcConfigurationMetrics.Run(ArgValue(args, "--rounds", 20));
@@ -121,6 +126,11 @@ public static class Program
         Console.WriteLine("  --relayout-profile [--iterations N] [--warmup N]");
         Console.WriteLine("        Cascade sub-stage and render time against the style thread budget (item #12).");
         Console.WriteLine("        Exits 1 if any thread setting renders different pixels.");
+        Console.WriteLine();
+        Console.WriteLine("  --relayout-parity");
+        Console.WriteLine("        Renders every corpus page after every mutation with the render-tree");
+        Console.WriteLine("        elision on and off (item #14). Exits 1 if any elided relayout differs");
+        Console.WriteLine("        by a byte, or if no rebuild was skipped at all.");
         Console.WriteLine();
         Console.WriteLine("  --image-prefetch-scaling [--iterations N] [--warmup N]");
         Console.WriteLine("        Render time of an image-heavy page against the concurrent-load budget (item #8).");

@@ -10,6 +10,10 @@ internal sealed class CssBoxHr : CssBox
 
     protected override void PerformLayoutImp(ILayoutEnvironment g)
     {
+        // This override does not chain to the base, so it needs its own reset — see
+        // CssBox.ResetCollapsedMarginState. It calls MarginTopCollapse below like any other block.
+        ResetCollapsedMarginState();
+
         if (Display == CssConstants.None)
             return;
 

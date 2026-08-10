@@ -173,6 +173,35 @@ partitioner — but dividing them measured as nothing (see above), so they are a
 figure. `BROILER_IMAGE_PREFETCH_THREADS=1` turns the walk off entirely rather than running it one
 wide, which is what makes it the sequential path the exit gate compares against.
 
+## Relayout — item #14
+
+Two modes about the *second* layout, the one nothing else here performs. Everything above
+renders a page once from a clean container, which is the case a rebuild-avoidance item cannot
+be measured against at all.
+
+```sh
+dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --relayout-profile
+dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --relayout-parity
+```
+
+`--relayout-profile` mutates each corpus page the way a script would — nine mutations, from a
+class toggle to a twenty-write burst — and reports what the following layout cost, split into
+the box-tree rebuild and the layout pass beneath it. Its `rebuilt?` column reports the
+decision `RenderTreeInvalidation` recorded rather than leaving it to be inferred from a time,
+and it has three states: a submodule tree that consults the ledger nowhere prints `n/a`, which
+is not the same claim as `ELIDED`. Published run:
+[`../results/relayout-profile.md`](../results/relayout-profile.md).
+
+`--relayout-parity` is the exit gate, and it is the one that can fail. It renders every page
+after every mutation twice — elision on, then off (`RenderTreeInvalidation.Elision`, which is
+the version compare that shipped before item #14) — and compares the two images byte for byte.
+A wrong classification is a *stale page*, so this is the check that a skipped rebuild produced
+the page a rebuild would have. It also fails a run in which nothing was elided: a green run
+that compared no elisions is how this would quietly stop being a gate.
+
+The same switch is available as `BROILER_RENDER_TREE_ELISION=0`, which is what to reach for
+first when a rendering bug is suspected to be a stale relayout.
+
 ## GC configuration — item #19
 
 The mode is fixed when the runtime starts, so one process cannot compare the two. Run it

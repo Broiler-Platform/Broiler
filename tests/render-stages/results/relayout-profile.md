@@ -1,4 +1,4 @@
-# Relayout profile — the precondition for multithreading item #14, and its first slice
+# Relayout profile — the precondition for multithreading item #14, and both of its slices
 
 What a *second* layout costs after the document is mutated the way script mutates
 it. Roadmap [§7](../../docs/architecture/multithreading.md#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)
@@ -10,10 +10,14 @@ Reproduce with:
 ```sh
 dotnet run --project tests/render-stages/Broiler.Render.Stage.Benchmarks -c Release \
   -- --relayout-profile [--iterations N] [--warmup N]
+
+# the exit gate: same pages, same mutations, rendered with the elision on and off
+dotnet run --project tests/render-stages/Broiler.Render.Stage.Benchmarks -c Release \
+  -- --relayout-parity
 ```
 
 Host: 4 cores, .NET 10, Release, viewport 1280×1024, medians of 5 iterations
-after 1 warm-up. The `rebuilt?` column needs `patches/0131` applied to the
+after 1 warm-up. The `rebuilt?` column needs `patches/0132` applied to the
 `Broiler.HTML` tree; without it every row reads `n/a` and the run says so.
 
 ## What "relayout" is in this engine
@@ -30,64 +34,113 @@ layout pass alone; **relayout** is rebuild + layout.
 
 ## The result
 
-Two runs on one host, back to back: the pinned `Broiler.HTML` (**baseline**) and
-the same tree with `patches/0131` applied (**ledger**). Seven mutations per page;
-the last three were added when item #14 was picked up.
+Two runs on one host, back to back: the pinned `Broiler.HTML` with neither half of
+item #14 applied (**baseline**) and the same tree with both (**invalidation set**).
+Nine mutations per page — the last two are the controls that arrived with the
+second half.
 
-| Page | Mutation | Baseline relayout | Ledger relayout | Ratio | Rebuilt? |
+| Page | Mutation | Baseline relayout | Invalidation set | Ratio | Rebuilt? |
 |---|---|---:|---:|---:|---|
-| text | class toggle | 241.94 | 256.53 | 0.94 | yes |
-| text | inline style write | 104.33 | 126.86 | 0.82 | yes |
-| text | text write | 89.74 | 88.71 | 1.01 | yes |
-| text | inserted subtree | 81.97 | 82.09 | 1.00 | yes |
-| text | **detached build** | 117.18 | **11.72** | **10.0×** | **ELIDED** |
-| text | burst (20 writes) | 95.29 | 109.61 | 0.87 | yes |
-| text | unstyled attribute | 86.01 | 101.60 | 0.85 | yes |
-| rules | class toggle | 1 042.69 | 1 071.77 | 0.97 | yes |
-| rules | inline style write | 1 088.94 | 1 024.44 | 1.06 | yes |
-| rules | text write | 1 014.65 | 1 120.15 | 0.91 | yes |
-| rules | inserted subtree | 1 017.58 | 1 034.53 | 0.98 | yes |
-| rules | **detached build** | 1 032.72 | **11.50** | **89.8×** | **ELIDED** |
-| rules | burst (20 writes) | 1 074.82 | 1 037.45 | 1.04 | yes |
-| rules | unstyled attribute | 1 072.06 | 997.76 | 1.07 | yes |
-| boxes | class toggle | 261.66 | 296.13 | 0.88 | yes |
-| boxes | inline style write | 257.86 | 241.80 | 1.07 | yes |
-| boxes | text write | 250.80 | 261.61 | 0.96 | yes |
-| boxes | inserted subtree | 278.92 | 257.06 | 1.09 | yes |
-| boxes | **detached build** | 264.18 | **10.25** | **25.8×** | **ELIDED** |
-| boxes | burst (20 writes) | 250.63 | 255.97 | 0.98 | yes |
-| boxes | unstyled attribute | 269.50 | 249.14 | 1.08 | yes |
-| paint | class toggle | 223.48 | 194.63 | 1.15 | yes |
-| paint | inline style write | 219.67 | 199.75 | 1.10 | yes |
-| paint | text write | 203.83 | 170.44 | 1.20 | yes |
-| paint | inserted subtree | 206.66 | 195.51 | 1.06 | yes |
-| paint | **detached build** | 224.76 | **9.94** | **22.6×** | **ELIDED** |
-| paint | burst (20 writes) | 216.10 | 185.90 | 1.16 | yes |
-| paint | unstyled attribute | 199.24 | 197.35 | 1.01 | yes |
-| mixed | class toggle | 111.40 | 107.33 | 1.04 | yes |
-| mixed | inline style write | 101.37 | 96.51 | 1.05 | yes |
-| mixed | text write | 110.21 | 98.20 | 1.12 | yes |
-| mixed | inserted subtree | 124.29 | 98.02 | 1.27 | yes |
-| mixed | **detached build** | 116.87 | **7.16** | **16.3×** | **ELIDED** |
-| mixed | burst (20 writes) | 98.13 | 98.14 | 1.00 | yes |
-| mixed | unstyled attribute | 97.67 | 91.03 | 1.07 | yes |
+| text | **class toggle** | 287.47 | **118.08** | **2.4×** | **ELIDED** |
+| text | inline style write | 140.31 | 191.57 | 0.73 | yes |
+| text | text write | 155.60 | 178.52 | 0.87 | yes |
+| text | inserted subtree | 171.05 | 169.26 | 1.01 | yes |
+| text | detached build | 84.04 | 85.97 | 0.98 | **ELIDED** |
+| text | **burst (20 writes)** | 157.05 | **109.12** | **1.44** | **ELIDED** |
+| text | **unstyled attribute** | 179.57 | **85.91** | **2.1×** | **ELIDED** |
+| text | **styled attribute** | 175.89 | **93.48** | **1.9×** | **ELIDED** |
+| text | **styled class** | 173.66 | **98.88** | **1.8×** | **ELIDED** |
+| rules | **class toggle** | 1541.53 | **42.79** | **36.0×** | **ELIDED** |
+| rules | inline style write | 1526.76 | 1597.90 | 0.96 | yes |
+| rules | text write | 1565.66 | 1574.84 | 0.99 | yes |
+| rules | inserted subtree | 1360.72 | 1433.89 | 0.95 | yes |
+| rules | detached build | 34.97 | 48.78 | 0.72 | **ELIDED** |
+| rules | burst (20 writes) | 1552.48 | 1445.05 | 1.07 | yes |
+| rules | **unstyled attribute** | 1476.73 | **42.95** | **34.4×** | **ELIDED** |
+| rules | styled attribute | 1501.45 | 1455.79 | 1.03 | yes |
+| rules | styled class | 1350.27 | 1544.20 | 0.87 | yes |
+| boxes | class toggle | 282.68 | 312.01 | 0.91 | yes |
+| boxes | inline style write | 302.92 | 312.98 | 0.97 | yes |
+| boxes | text write | 269.77 | 328.19 | 0.82 | yes |
+| boxes | inserted subtree | 268.34 | 330.06 | 0.81 | yes |
+| boxes | detached build | 35.00 | 39.84 | 0.88 | **ELIDED** |
+| boxes | burst (20 writes) | 262.00 | 331.61 | 0.79 | yes |
+| boxes | **unstyled attribute** | 275.91 | **29.10** | **9.5×** | **ELIDED** |
+| boxes | **styled attribute** | 270.12 | **39.53** | **6.8×** | **ELIDED** |
+| boxes | styled class | 330.50 | 329.58 | 1.00 | yes |
+| paint | **class toggle** | 247.57 | **20.21** | **12.2×** | **ELIDED** |
+| paint | inline style write | 256.15 | 238.42 | 1.07 | yes |
+| paint | text write | 190.18 | 202.71 | 0.94 | yes |
+| paint | inserted subtree | 259.91 | 230.27 | 1.13 | yes |
+| paint | detached build | 17.26 | 16.79 | 1.03 | **ELIDED** |
+| paint | burst (20 writes) | 238.97 | 235.96 | 1.01 | yes |
+| paint | **unstyled attribute** | 245.88 | **17.32** | **14.2×** | **ELIDED** |
+| paint | **styled attribute** | 245.44 | **16.88** | **14.5×** | **ELIDED** |
+| paint | styled class | 276.98 | 229.38 | 1.21 | yes |
+| mixed | **class toggle** | 180.10 | **19.16** | **9.4×** | **ELIDED** |
+| mixed | inline style write | 165.86 | 155.88 | 1.06 | yes |
+| mixed | text write | 161.77 | 142.11 | 1.14 | yes |
+| mixed | inserted subtree | 159.24 | 150.71 | 1.06 | yes |
+| mixed | detached build | 11.92 | 29.13 | 0.41 | **ELIDED** |
+| mixed | **burst (20 writes)** | 162.82 | **11.47** | **14.2×** | **ELIDED** |
+| mixed | **unstyled attribute** | 179.49 | **12.98** | **13.8×** | **ELIDED** |
+| mixed | **styled attribute** | 162.96 | **30.56** | **5.3×** | **ELIDED** |
+| mixed | **styled class** | 159.45 | **28.56** | **5.6×** | **ELIDED** |
 
-**The thirty non-elided rows span 0.82–1.27, with no page and no mutation
-systematically on one side.** That is this host's run-to-run spread, which is the
-claim those rows are here to support: the ledger changes what is skipped, not what
-is done. The five elided rows report a rebuild of exactly 0.00 ms in the sub-stage
-table, so the saving is the absence of the stage and not a faster one.
+**Reading the table.** A **bold** row is one the ledger answered without rebuilding.
+`detached build` was already elided by the first slice, so its ratio here is
+baseline noise on a row that costs 12–86 ms either way, not a change. The rows that
+still rebuild span **0.79–1.21**, which is this host's run-to-run spread with no page
+and no mutation systematically on one side.
 
-**Nothing else moved.** `Broiler.Cli.Tests` was run in full both ways on the same
-host — 2 931 tests, 82 failures each way, and the two failure sets are **identical
-name for name** (77 unique names; none added, none fixed). Those 82 are
-pre-existing on the pinned pointer and environmental in character: the
-PDF-converter tests `CLAUDE.md` warns about, the Skia and `WebClient` architecture
-guards, the Acid image comparisons. `Broiler.Layout.Tests` is 308/308.
+**The two control rows are the point of the table, not its footnotes.** `rules` is
+the only corpus page whose sheet mentions `data-k`, and it is the only page where
+`styled attribute` still rebuilds (1.03 — unchanged). `boxes` is the page whose
+deepest element carries a class its sheet styles, and it is the only page where
+`class toggle` still rebuilds (0.91 — unchanged); `styled class` rebuilds there and
+on `rules` too. Same mutation, opposite decision, decided by the document: that is
+the set being a function of the stylesheets rather than of the attribute's name.
 
-Rebuild sub-stages remain dominated by the cascade on every page that rebuilds —
-`cascade (resolve)` plus `cascade (project)` are the overwhelming majority of the
-`rules` page's ~1 000 ms rebuild, against a few ms of HTML parse and CSS parse.
+## The exit gate
+
+```
+45 pairs, 22 of them with the rebuild skipped.
+PASS: every elided relayout renders the page a rebuild would have.
+```
+
+`--relayout-parity` renders every page after every mutation twice — elision on, then
+off — and compares the images byte for byte. It is the only check that can catch the
+failure this item risks, which is not a slow page but a **stale** one: a unit test
+over the classifier agrees with the implementation's own reasoning and cannot say
+whether that reasoning is right about the engine. It also fails a run in which
+nothing was elided, because a green run that compared no elisions is how this would
+quietly stop being a gate.
+
+**It failed the first time it was run, and the bug was not in the classification.**
+Three `boxes` rows differed — including `detached build`, which the *first* slice
+already elided and had shipped. The no-mutation control explains it: on that page,
+laying the same box tree out a second time produced a different image from laying it
+out once, with or without any mutation at all. Reduced, the whole of it is
+`<div style="margin-top:2px">` directly inside `<body>`: `CollapsedMarginTop` records
+what the previous margin collapse decided, a first in-flow child's top margin
+propagates by shifting its parent down only when the child's margin exceeds what the
+parent has already absorbed, and read from the *previous pass* that comparison fails.
+The document lays out two pixels shorter the second time.
+
+Nothing in this repository had ever laid the same box tree out twice — every relayout
+disposed the tree and rebuilt it — so a pass-dependent result could sit in the margin
+code indefinitely. The moment a rebuild can be skipped, "lay out the same tree again"
+has to mean what "build it and lay it out" meant. The fix is a reset at the top of
+each box's own layout (`CssBox.ResetCollapsedMarginState`), kept by
+`LayoutIdempotenceTests` — including a case asserting the margin is still *applied*,
+because the tempting fix is to make both passes agree on the short answer.
+
+`Broiler.Layout.Tests` is 353/353, and the render-bearing half of `Broiler.Cli.Tests`
+— Acid, WPT, `GoogleSearchPolyfill`, form-control and CSSOM, 928 tests — was run in
+full both ways on one host with **failure sets identical name for name** (41 failures
+each way, 40 unique names, none added and none fixed; all pre-existing and
+environmental in character). The full assembly is not the comparison, because it
+aborts partway on this host for memory reasons in both directions.
 
 ## Findings
 
@@ -123,24 +176,35 @@ rebuild to none.
 
 **4. The burst does not amortise, and that is a correction to what this file
 predicted.** The uncovered-cases note below used to say a coalesced burst would be
-a case "where the rebuild is amortised across them and the layout share rises".
-The layout share is **2.4% for one class toggle and 2.5% for twenty writes** on
-`rules`, and flat or slightly *lower* on `boxes` (11.3% → 10.4%), `paint` (10.9% →
-9.6%) and `mixed` (19.3% → 18.1%). Only `text` moves, from 55% to 70%, and that is
-the one page whose figures carry the first-measured-page overhead visible in its
-1st-layout column. There is nothing to amortise: the rebuild is a *whole-document* re-cascade for a single attribute
-write, so twenty of them cost exactly what one does. The burst case is worth
-keeping — it is what makes that statement a measurement — but it is a null result,
-and the prediction attached to it came from assuming a per-mutation cost the engine
-does not have.
+a case "where the rebuild is amortised across them and the layout share rises". The
+layout share was **2.4% for one class toggle and 2.5% for twenty writes** on `rules`,
+and flat or slightly *lower* on `boxes`, `paint` and `mixed`. There is nothing to
+amortise: the rebuild is a *whole-document* re-cascade for a single attribute write,
+so twenty of them cost exactly what one does. The burst case is worth keeping — it is
+what makes that statement a measurement — but it is a null result, and the prediction
+attached to it came from assuming a per-mutation cost the engine does not have.
+*(The burst now elides on the pages whose sheets do not name its `burst-N` classes,
+which is the second half at work rather than any amortisation.)*
 
-**5. What is left is bigger than what was taken, and the `unstyled attribute` row
-sizes it.** One `data-*` write that no corpus selector can reach still costs
-997.76 ms on `rules`. Eliding *that* is worth roughly what the connectivity rule
-was worth, and it needs something the connectivity rule does not: an answer to
-whether any rule's subject could match differently, which is invalidation sets over
-the cascade's rule index. That is the rest of item #14, and this row is the number
-it should be measured against.
+**5. The second half is worth what this file said it would be, and on more rows
+than the one that sized it.** `CascadeInvalidationSet` asks the sheets the tree was
+cascaded from whether any rule could match differently — and, separately, whether box
+construction reads the attribute for reasons of its own. The `unstyled attribute` row
+that finding 5 previously sized at ~1 000 ms is **1 476.7 → 43.0 ms (34.4×)** on
+`rules`, 14.2× on `paint`, 13.8× on `mixed`, 9.5× on `boxes` and 2.1× on `text` —
+whose remainder is the layout pass, which is most of what a relayout costs on a page
+of prose. The class toggle joins it wherever the sheet does not name the token:
+**36.0× on `rules`**, 12.2× on `paint`, 9.4× on `mixed`, and unchanged on `boxes`,
+where the token it replaces *is* styled.
+
+**6. What is left is a scoped rebuild, not a skipped one.** Everything still
+rebuilding is a connected mutation the engine genuinely has to react to: an inline
+style write, a text change, an inserted subtree, an attribute a rule really does
+match on. Nothing above narrows *what* is rebuilt — the box tree is regenerated whole
+and the document is re-cascaded whole for a one-element change. That is the next
+increment, and it is a different kind of work from either half of this one: it needs
+the rebuild to have a unit smaller than the document, which neither the ledger nor
+the set provides.
 
 ## What this measures, and what it does not
 
@@ -155,4 +219,10 @@ detached case, which is why that is the one measured.
 
 Still not covered: a mutation to a connected element that produces no box (a
 `<meta>`, a `<title>`), and a relayout at a changed viewport rather than a changed
-document.
+document. Both still rebuild.
+
+One more thing the table cannot show: an elided rebuild does not re-run the host
+callbacks a rebuild runs — the image-load event, in particular, which is handed every
+attribute of the element. A host that repaints on `data-*` writes it sets itself is
+relying on the rebuild rather than on a callback, and `BROILER_RENDER_TREE_ELISION=0`
+is the switch that tells it apart from a bug here.
