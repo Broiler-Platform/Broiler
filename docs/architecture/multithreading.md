@@ -30,7 +30,7 @@ one beneficiary. `patches/0133`. Published:
 |---|---|---|
 | #13 — parallel intrinsic sizing and independent subtrees | **Not started; re-argued** | Its stage is 3.3–20.1% of a render, up from the 0.6–6.5% the phase row quoted, entirely by Amdahl ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)) |
 | Layout roadmap step 1 — stop laying out the tree twice | **Retired as written** | `--layout-passes` (`patches/0133`): every fixed-viewport row is 1 call / 1 pass; auto-size is 2 passes at **0.80–1.35×** one pass, not 2× ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)) |
-| #18 — Web Workers | **Gate passed; feature not started** | The audit the roadmap gates it on is executable now and clears both halves: `JSContextIsolationTests` (5 cases, 4 overlapping threads) and **2.66×/3.22× at 4 threads** — contexts are isolated *and* genuinely parallel, so the item is not gated on an engine that would serialize it. `Worker`/`MessageChannel`/structured clone are unwritten; 30–40 d, High risk stands ([§10](#10-item-18s-gate-passes-on-both-halves--and-one-of-them-is-the-half-nobody-was-asking-about)) |
+| #18 — Web Workers | **Gate passed; `MessageChannel` half already built; `Worker` not started** | The audit the roadmap gates it on is executable and clears both halves: `JSContextIsolationTests` (5 cases, 4 overlapping threads) and **2.66×/3.22× at 4 threads** — isolated *and* genuinely parallel ([§10](#10-item-18s-gate-passes-on-both-halves--and-one-of-them-is-the-half-nobody-was-asking-about)). **`MessageChannel`, `MessagePort`, transfer lists and structured-clone payloads were already built**, and cross-realm cloning is verified correct by 6 new cases including a vacuity guard ([§11](#11-messagechannel-was-already-built-the-unverified-word-was-cross-context)). What remains: clone on the *receiving* side, deliver onto the receiving thread's loop, and the `Worker` object itself. 30–40 d, High risk stands |
 | Phases 2–3 measured on WPT | **Null result** | `ca53d44` vs HEAD, both sequential per render, 2 213 reftests over two suites: **1.017× and 1.013×**, inside the host's 5–7% drift, classification identical. WPT pages are 1 018 bytes at the median against a 20–212 KB corpus, so the surviving sequential wins have nothing to act on ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)) |
 | Per-render fixed cost | **Measured; §4's conclusion refuted** | Engine: **3.48 ms** empty, 15–19 ms at WPT median, 77% of the empty render being bitmap alloc + erase. Runner: the render is **1.6–2.0%** of a test — **76–79% is `ExecuteScriptsWithDom`** and **16–21% `PixelDiffRunner.Compare`**. Neither is a rendering problem, and neither is in this document ([§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)) |
 | Pixel comparison | **Fixed** | **284.61 → 4.50 ms (62×)** on the match path; the suite 368.5 → 297.3 s (1.24×). 92% of it was a PNG round trip measured to be an identity — not the per-pixel loop §5 pointed at, which was ~22 ms of 284. Classification identical name for name. `patches/0134` ([§6](#6-the-pixel-comparison-is-fixed-and-the-part-that-read-worst-was-not-the-part-that-cost)) |
@@ -2122,6 +2122,39 @@ feature on top of it.
 are unwritten and the 30–40 day, High-risk estimate stands; the workload exercises the shared state
 the roadmap names, not the bridge, timers, promises or modules. Published:
 [`js-context-concurrency.md`](../../tests/render-stages/results/js-context-concurrency.md).
+
+### 11. `MessageChannel` was already built; the unverified word was "cross-context"
+
+Item #18's row scopes the work as "New: `Worker` / `MessageChannel`", state "Not implemented", with
+structured-clone message passing as the shape to build. Checking before building: `MessageChannel`,
+`MessagePort`, entanglement, transfer lists, the pending queue, `MessageEvent` and
+`window.postMessage` are all in `MessagingBinding` with three test files over them — and **both**
+`window.postMessage` and `MessagePort.postMessage` already run their payload through
+`CloneForMessaging`, which calls the engine's own `structuredClone` (itself complete, down to
+Date/RegExp/Map/Set/ArrayBuffer and cycles). **Seventh row in this phase whose stated state was not
+the operative fact.**
+
+**What was genuinely unverified is whether a clone crosses a realm.** Everything above clones and
+delivers *within one context*, which is all a same-document channel needs. A worker is the other
+case, and a clone that quietly produced a sender-owned graph would pass every existing test while
+being exactly the cross-realm leak a worker must not have. That is testable without threads, so it
+was: `CrossContextStructuredCloneTests`, six cases, all passing — values copied with no identity
+shared, sender mutation not reaching the receiver (and the reverse), cloned objects answering to the
+**receiving** realm's `Array`/`Date`/`Map`/`Object.prototype`, functions refused, cycles preserved.
+
+**The sixth case is what makes the third mean anything**: it asserts the two contexts have *distinct*
+intrinsics, and that an array handed directly from A into B answers **false** to B's
+`instanceof Array`. Without it, a shared `Array` would have made every realm assertion true
+regardless of which realm built the clone. So the structured-clone half of item #18 is **done**, and
+now has a standing gate.
+
+**What is left is small and named.** The clone is made on the *sender's* side — `CloneForMessaging`
+runs before `QueueFrameAction`, with the sender's context current — which is correct only because
+both ends of a port share a realm today. A worker changes exactly that: the clone must be produced
+with the *receiving* context current, and delivery must hop to the receiving thread's event loop
+rather than the sender's frame-action queue. The rest is the `Worker` object itself — a thread
+owning its context and loop, a port pair straddling them, and termination rules. Published:
+[`message-channel-slice.md`](../../tests/render-stages/results/message-channel-slice.md).
 
 ## Master table
 
