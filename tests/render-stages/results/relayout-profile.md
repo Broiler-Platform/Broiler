@@ -1,4 +1,4 @@
-# Relayout profile — the precondition for multithreading item #14
+# Relayout profile — the precondition for multithreading item #14, and its first slice
 
 What a *second* layout costs after the document is mutated the way script mutates
 it. Roadmap [§7](../../docs/architecture/multithreading.md#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)
@@ -13,83 +13,146 @@ dotnet run --project tests/render-stages/Broiler.Render.Stage.Benchmarks -c Rele
 ```
 
 Host: 4 cores, .NET 10, Release, viewport 1280×1024, medians of 5 iterations
-after 1 warm-up. Requires `patches/0129` for the sub-stage split; without it the
-run reports totals and says so rather than printing zeros.
+after 1 warm-up. The `rebuilt?` column needs `patches/0131` applied to the
+`Broiler.HTML` tree; without it every row reads `n/a` and the run says so.
 
-## What "relayout" is in this engine today
+## What "relayout" is in this engine
 
 `HtmlContainerInt` holds a bound `DomDocument` and a copy of its `Version`.
-`EnsureBoundDocumentCurrent` compares the two at the top of every `PerformLayout`
-and, when they differ, calls `BuildBoundDocument` — which **disposes the render
-tree and regenerates it from scratch**. So a relayout is not a layout pass: it is
-a full box-tree rebuild and a full cascade, followed by a full-tree layout.
+`EnsureBoundDocumentCurrent` compares them at the top of every `PerformLayout`
+and, when they differ, rebuilds: `BuildBoundDocument` **disposes the render tree
+and regenerates it** — box tree and full cascade — before the layout pass runs.
+So a relayout is not a layout pass: it is a rebuild followed by a full-tree
+layout.
 
 Because `SetDocument` builds the tree, the **1st layout** column below is the
 layout pass alone; **relayout** is rebuild + layout.
 
 ## The result
 
-| Page | Mutation | 1st layout | Relayout | Rebuild | Layout | Rebuild share |
-|---|---|---|---|---|---|---|
-| text | class toggle | 93.29 | 287.66 | 191.59 | 96.06 | 66.6% |
-| text | inline style write | 76.33 | 179.04 | 111.53 | 67.52 | 62.3% |
-| text | text write | 62.06 | 161.00 | 103.96 | 57.04 | 64.6% |
-| text | inserted subtree | 56.80 | 185.43 | 111.70 | 73.73 | 60.2% |
-| rules | class toggle | 53.04 | **1 446.35** | 1 404.17 | 42.18 | **97.1%** |
-| rules | inline style write | 51.09 | **1 598.97** | 1 534.86 | 64.12 | 96.0% |
-| rules | text write | 51.73 | 1 462.52 | 1 405.11 | 57.41 | 96.1% |
-| rules | inserted subtree | 54.79 | 1 668.82 | 1 611.66 | 57.16 | 96.6% |
-| boxes | class toggle | 57.34 | 332.32 | 291.49 | 40.83 | 87.7% |
-| boxes | inline style write | 52.89 | 324.08 | 273.76 | 50.33 | 84.5% |
-| boxes | text write | 47.86 | 373.21 | 314.72 | 58.49 | 84.3% |
-| boxes | inserted subtree | 61.03 | 344.26 | 293.99 | 50.28 | 85.4% |
-| paint | class toggle | 37.66 | 254.90 | 207.41 | 47.50 | 81.4% |
-| paint | inline style write | 38.75 | 245.42 | 197.57 | 47.85 | 80.5% |
-| paint | text write | 30.36 | 180.03 | 163.09 | 16.93 | 90.6% |
-| paint | inserted subtree | 32.67 | 243.71 | 211.69 | 32.03 | 86.9% |
-| mixed | class toggle | 38.83 | 170.22 | 124.96 | 45.26 | 73.4% |
-| mixed | inline style write | 43.78 | 149.30 | 114.64 | 34.66 | 76.8% |
-| mixed | text write | 33.95 | 149.82 | 119.92 | 29.90 | 80.0% |
-| mixed | inserted subtree | 28.15 | 148.92 | 104.84 | 44.08 | 70.4% |
+Two runs on one host, back to back: the pinned `Broiler.HTML` (**baseline**) and
+the same tree with `patches/0131` applied (**ledger**). Seven mutations per page;
+the last three were added when item #14 was picked up.
 
-Rebuild sub-stages are dominated by the cascade on every page — `cascade
-(resolve)` plus `cascade (project)` are 1 108.6 + 218.7 ms of the `rules` page's
-1 404 ms rebuild, against 4.8 ms of HTML parse and 3.7 ms of CSS parse.
+| Page | Mutation | Baseline relayout | Ledger relayout | Ratio | Rebuilt? |
+|---|---|---:|---:|---:|---|
+| text | class toggle | 241.94 | 256.53 | 0.94 | yes |
+| text | inline style write | 104.33 | 126.86 | 0.82 | yes |
+| text | text write | 89.74 | 88.71 | 1.01 | yes |
+| text | inserted subtree | 81.97 | 82.09 | 1.00 | yes |
+| text | **detached build** | 117.18 | **11.72** | **10.0×** | **ELIDED** |
+| text | burst (20 writes) | 95.29 | 109.61 | 0.87 | yes |
+| text | unstyled attribute | 86.01 | 101.60 | 0.85 | yes |
+| rules | class toggle | 1 042.69 | 1 071.77 | 0.97 | yes |
+| rules | inline style write | 1 088.94 | 1 024.44 | 1.06 | yes |
+| rules | text write | 1 014.65 | 1 120.15 | 0.91 | yes |
+| rules | inserted subtree | 1 017.58 | 1 034.53 | 0.98 | yes |
+| rules | **detached build** | 1 032.72 | **11.50** | **89.8×** | **ELIDED** |
+| rules | burst (20 writes) | 1 074.82 | 1 037.45 | 1.04 | yes |
+| rules | unstyled attribute | 1 072.06 | 997.76 | 1.07 | yes |
+| boxes | class toggle | 261.66 | 296.13 | 0.88 | yes |
+| boxes | inline style write | 257.86 | 241.80 | 1.07 | yes |
+| boxes | text write | 250.80 | 261.61 | 0.96 | yes |
+| boxes | inserted subtree | 278.92 | 257.06 | 1.09 | yes |
+| boxes | **detached build** | 264.18 | **10.25** | **25.8×** | **ELIDED** |
+| boxes | burst (20 writes) | 250.63 | 255.97 | 0.98 | yes |
+| boxes | unstyled attribute | 269.50 | 249.14 | 1.08 | yes |
+| paint | class toggle | 223.48 | 194.63 | 1.15 | yes |
+| paint | inline style write | 219.67 | 199.75 | 1.10 | yes |
+| paint | text write | 203.83 | 170.44 | 1.20 | yes |
+| paint | inserted subtree | 206.66 | 195.51 | 1.06 | yes |
+| paint | **detached build** | 224.76 | **9.94** | **22.6×** | **ELIDED** |
+| paint | burst (20 writes) | 216.10 | 185.90 | 1.16 | yes |
+| paint | unstyled attribute | 199.24 | 197.35 | 1.01 | yes |
+| mixed | class toggle | 111.40 | 107.33 | 1.04 | yes |
+| mixed | inline style write | 101.37 | 96.51 | 1.05 | yes |
+| mixed | text write | 110.21 | 98.20 | 1.12 | yes |
+| mixed | inserted subtree | 124.29 | 98.02 | 1.27 | yes |
+| mixed | **detached build** | 116.87 | **7.16** | **16.3×** | **ELIDED** |
+| mixed | burst (20 writes) | 98.13 | 98.14 | 1.00 | yes |
+| mixed | unstyled attribute | 97.67 | 91.03 | 1.07 | yes |
 
-## Three findings, and the first one re-aims item #14
+**The thirty non-elided rows span 0.82–1.27, with no page and no mutation
+systematically on one side.** That is this host's run-to-run spread, which is the
+claim those rows are here to support: the ledger changes what is skipped, not what
+is done. The five elided rows report a rebuild of exactly 0.00 ms in the sub-stage
+table, so the saving is the absence of the stage and not a faster one.
 
-**1. A relayout is 60–97% rebuild. The layout pass is 17–96 ms and barely moves.**
-Item #14 as written — "dirty bits + relayout roots" on `CssBox.PerformLayout` —
-bounds the *layout* column, which is between 3% and 39% of what a relayout costs.
-On the rule-heavy page it is 2.9%. **The item is aimed at the smaller half**, and
-on the page where relayout hurts most it is aimed at almost none of it. The
-invalidation that would pay is on the box tree and the cascade — the work
-`BuildBoundDocument` throws away and redoes — not on the layout pass beneath it.
+**Nothing else moved.** `Broiler.Cli.Tests` was run in full both ways on the same
+host — 2 931 tests, 82 failures each way, and the two failure sets are **identical
+name for name** (77 unique names; none added, none fixed). Those 82 are
+pre-existing on the pinned pointer and environmental in character: the
+PDF-converter tests `CLAUDE.md` warns about, the Skia and `WebClient` architecture
+guards, the Acid image comparisons. `Broiler.Layout.Tests` is 308/308.
 
-**2. A one-attribute change costs a whole-document re-cascade, and the engine
-cannot tell the four mutations apart.** A class toggle, an inline-style write, a
-text write and an inserted subtree all bump `DomDocument.Version` by one and all
-produce the same total work, to within the noise, on every page. There is no
-granularity to exploit yet: the version counter is the only signal, and it says
-"something changed" and nothing else. Any dirty-bit scheme has to start by giving
-the DOM a way to say *what* changed, which is a `Broiler.DOM` change, before
-anything downstream can act on it.
+Rebuild sub-stages remain dominated by the cascade on every page that rebuilds —
+`cascade (resolve)` plus `cascade (project)` are the overwhelming majority of the
+`rules` page's ~1 000 ms rebuild, against a few ms of HTML parse and CSS parse.
 
-**3. The relayout is 3–31× the first layout, so the interactive case is worse
-than the first-render case rather than a cheaper version of it.** The `rules`
-page lays out in 53 ms and relays out in 1 446 ms. Item #14's estimate column
-("5–50× on interactive relayout") now has a measurement behind it, and the
-measurement says the ceiling is real but sits somewhere other than the item
-claims: eliminating the rebuild entirely would take that page's relayout from
-1 446 ms to about 42 ms — **34×** — while a perfect layout dirty bit alone would
-take it to 1 404 ms, or **1.03×**.
+## Findings
 
-## What this does not measure
+**1. A relayout is 60–97% rebuild. The layout pass barely moves.** Item #14 as
+written — "dirty bits + relayout roots" on `CssBox.PerformLayout` — bounds the
+*layout* column, which is between 3% and 39% of what a relayout costs and 2.9% on
+the rule-heavy page. **The item is aimed at the smaller half.** The invalidation
+that pays is on the box tree and the cascade — the work `BuildBoundDocument`
+throws away and redoes — not on the layout pass beneath it. *(Unchanged from this
+file's first publication; it is what re-aimed the item.)*
+
+**2. The engine could not tell the four original mutations apart — but the DOM
+could, and always could.** All four bump `Version` by one and cost the same. The
+conclusion drawn from that here was that item #14 "has to start by giving the DOM
+a way to say *what* changed, which is a `Broiler.DOM` change". **That was wrong,
+and cheaply checkable.** `DomDocument.Mutated` publishes a typed
+`DomMutationRecord` — type, target, added and removed nodes, attribute name, old
+and new value — and has since before the item was written; `DomRange` and
+`DomNodeIterator` subscribe to it. What was missing was a *consumer*. The whole of
+`EnsureBoundDocumentCurrent` was a version compare, standing next to a feed of
+exactly the records it needed.
+
+**3. The first thing a consumer can prove is connectivity, and it is worth 10–90×
+on the page it applies to.** `RenderTreeInvalidation` classifies each record by
+whether its target hangs off the bound document. Nothing else can contribute a
+box, so nothing else can change what the tree shows. `ChildList` records name the
+*parent*, which is what makes the test sound in both directions: nodes added to a
+detached parent are themselves detached, and a node moved *out* of the page is
+reported against the still-connected parent it left. The `detached build` row —
+twenty-four nodes assembled off-document and never inserted, the shape of every
+`DocumentFragment` population and every build-then-insert — goes from a full
+rebuild to none.
+
+**4. The burst does not amortise, and that is a correction to what this file
+predicted.** The uncovered-cases note below used to say a coalesced burst would be
+a case "where the rebuild is amortised across them and the layout share rises".
+The layout share is **2.4% for one class toggle and 2.5% for twenty writes** on
+`rules`, and flat or slightly *lower* on `boxes` (11.3% → 10.4%), `paint` (10.9% →
+9.6%) and `mixed` (19.3% → 18.1%). Only `text` moves, from 55% to 70%, and that is
+the one page whose figures carry the first-measured-page overhead visible in its
+1st-layout column. There is nothing to amortise: the rebuild is a *whole-document* re-cascade for a single attribute
+write, so twenty of them cost exactly what one does. The burst case is worth
+keeping — it is what makes that statement a measurement — but it is a null result,
+and the prediction attached to it came from assuming a per-mutation cost the engine
+does not have.
+
+**5. What is left is bigger than what was taken, and the `unstyled attribute` row
+sizes it.** One `data-*` write that no corpus selector can reach still costs
+997.76 ms on `rules`. Eliding *that* is worth roughly what the connectivity rule
+was worth, and it needs something the connectivity rule does not: an answer to
+whether any rule's subject could match differently, which is invalidation sets over
+the cascade's rule index. That is the rest of item #14, and this row is the number
+it should be measured against.
+
+## What this measures, and what it does not
 
 The mutation is applied and then one layout is requested, which is the shape of a
-script that changes one thing and reads geometry back. It does not cover a burst
-of mutations coalesced into one layout (where the rebuild is amortised across
-them and the layout share rises), nor a mutation that changes nothing observable
-(where a correct dirty-bit scheme should cost zero and today costs a full
-rebuild). Both are worth adding when item #14 is picked up; the second is the
-cheapest possible demonstration of the item's value and is one document away.
+script that changes one thing and reads geometry back. The two cases this file
+originally listed as uncovered — the coalesced burst and the mutation that changes
+nothing observable — are covered now, with one correction worth recording: at the
+*value* level there is nothing to elide, because `Broiler.DOM` returns before
+publishing when an attribute or text write does not change the value, so the
+version never moves. The honest form of "changes nothing observable" is the
+detached case, which is why that is the one measured.
+
+Still not covered: a mutation to a connected element that produces no box (a
+`<meta>`, a `<title>`), and a relayout at a changed viewport rather than a changed
+document.
