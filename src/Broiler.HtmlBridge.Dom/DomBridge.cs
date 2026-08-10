@@ -36,6 +36,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // resource loader (was the static SharedHttpClient plus the _localBasePath field). Feature
     // callbacks ask the loader instead of reaching a static HttpClient.
     private readonly Dom.Runtime.ResourceLoader _resources = new();
+    private Dom.Features.WorkerBinding? _workers;
     private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
         "scrollend"];
@@ -204,6 +205,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _forms = new Dom.Features.FormBinding(this);
         _formControl = new Dom.Features.FormControlBinding(this);
         _messaging = new Dom.Features.MessagingBinding(this, _eventTargets);
+        _workers = new Dom.Features.WorkerBinding(this);
+        // Every worker thread is stopped and joined when the bridge tears down; see WorkerBinding.
+        _disposal.Add(_workers);
         _fetch = new Dom.Features.FetchBinding(this, _resources);
         _attributes = new Dom.Features.AttributesBinding(this);
         _subDocuments = new Dom.Features.SubDocumentBinding(this);

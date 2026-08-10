@@ -148,6 +148,10 @@ public sealed partial class DomBridge
             RegisterContentRenderingPolyfills(context, document);
         using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegSecurityPolyfills))
             RegisterSecurityAndConstructorPolyfills(context, window);
+        // Worker (multithreading item #18). Registered after the window globals so the constructor
+        // lands on a fully-built window, and before the global mirror below so it is reachable
+        // unqualified the way page scripts spell it.
+        _workers?.Register(context, window);
         using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowMirror))
             MirrorWindowMembersOntoGlobal(context, window);
     }

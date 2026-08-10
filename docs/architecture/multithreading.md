@@ -30,7 +30,7 @@ one beneficiary. `patches/0133`. Published:
 |---|---|---|
 | #13 — parallel intrinsic sizing and independent subtrees | **Not started; re-argued** | Its stage is 3.3–20.1% of a render, up from the 0.6–6.5% the phase row quoted, entirely by Amdahl ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)) |
 | Layout roadmap step 1 — stop laying out the tree twice | **Retired as written** | `--layout-passes` (`patches/0133`): every fixed-viewport row is 1 call / 1 pass; auto-size is 2 passes at **0.80–1.35×** one pass, not 2× ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)) |
-| #18 — Web Workers | **Gate passed; `MessageChannel` half already built; `Worker` not started** | The audit the roadmap gates it on is executable and clears both halves: `JSContextIsolationTests` (5 cases, 4 overlapping threads) and **2.66×/3.22× at 4 threads** — isolated *and* genuinely parallel ([§10](#10-item-18s-gate-passes-on-both-halves--and-one-of-them-is-the-half-nobody-was-asking-about)). **`MessageChannel`, `MessagePort`, transfer lists and structured-clone payloads were already built**, and cross-realm cloning is verified correct by 6 new cases including a vacuity guard ([§11](#11-messagechannel-was-already-built-the-unverified-word-was-cross-context)). What remains: clone on the *receiving* side, deliver onto the receiving thread's loop, and the `Worker` object itself. 30–40 d, High risk stands |
+| #18 — Web Workers | **Built (first slice); gate passed** | Contexts isolated and genuinely parallel — **2.66×/3.22× at 4 threads** ([§10](#10-item-18s-gate-passes-on-both-halves--and-one-of-them-is-the-half-nobody-was-asking-about)). `MessageChannel` and structured clone were **already built**, with cross-realm cloning verified ([§11](#11-messagechannel-was-already-built-the-unverified-word-was-cross-context)). **`Worker` now exists**: own thread, own `JSContext`, messages cloned twice — sender-side into an unreachable graph, receiver-side into its realm — and replies queued onto the page's loop, so item #15 holds. 6 tests; WPT classification identical name for name ([§12](#12-worker-is-built-and-the-design-content-was-where-the-clone-happens)). Worker timers, `importScripts`, module/shared/nested workers and transferables remain |
 | Phases 2–3 measured on WPT | **Null result** | `ca53d44` vs HEAD, both sequential per render, 2 213 reftests over two suites: **1.017× and 1.013×**, inside the host's 5–7% drift, classification identical. WPT pages are 1 018 bytes at the median against a 20–212 KB corpus, so the surviving sequential wins have nothing to act on ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)) |
 | Per-render fixed cost | **Measured; §4's conclusion refuted** | Engine: **3.48 ms** empty, 15–19 ms at WPT median, 77% of the empty render being bitmap alloc + erase. Runner: the render is **1.6–2.0%** of a test — **76–79% is `ExecuteScriptsWithDom`** and **16–21% `PixelDiffRunner.Compare`**. Neither is a rendering problem, and neither is in this document ([§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)) |
 | Pixel comparison | **Fixed** | **284.61 → 4.50 ms (62×)** on the match path; the suite 368.5 → 297.3 s (1.24×). 92% of it was a PNG round trip measured to be an identity — not the per-pixel loop §5 pointed at, which was ~22 ms of 284. Classification identical name for name. `patches/0134` ([§6](#6-the-pixel-comparison-is-fixed-and-the-part-that-read-worst-was-not-the-part-that-cost)) |
@@ -2155,6 +2155,45 @@ with the *receiving* context current, and delivery must hop to the receiving thr
 rather than the sender's frame-action queue. The rest is the `Worker` object itself — a thread
 owning its context and loop, a port pair straddling them, and termination rules. Published:
 [`message-channel-slice.md`](../../tests/render-stages/results/message-channel-slice.md).
+
+### 12. `Worker` is built, and the design content was where the clone happens
+
+Item #18's remaining piece. `new Worker(url)` starts a thread that owns a `JSContext`, runs the
+worker script in it and pumps messages; the page gets `postMessage`/`onmessage`/`onerror`/
+`addEventListener`/`terminate`, the worker gets `self`/`postMessage`/`onmessage`/
+`addEventListener`/`close`/`console`.
+
+**The design content is not the thread — it is where the clone happens.** Two obvious designs are
+both wrong. Cloning once on the sender and handing the result over puts one realm's graph in another
+thread's hands. Cloning once on the receiver from the sender's *live* value is worse: the sending
+script keeps running and can mutate that graph while the receiver walks it, which is a data race on
+engine internals. So a message is cloned on the **sending** thread into a graph no script can reach,
+and cloned again on the **receiving** thread with the receiving context current. The intermediate is
+unreachable from either side, so nothing can mutate it while it is read — and the first clone is
+also what makes post-send mutation invisible and raises `DataCloneError` on the sender, where it
+belongs. Both clones are the engine's own `structuredClone`; a second implementation of the walk
+would have been a second definition of which types survive.
+
+**Item #15 is kept rather than bent.** Each context is still driven by one thread and one loop, and
+nothing dispatches JavaScript from a foreign thread: a worker's reply is *queued* onto the page's
+`BrowserEventLoop` (a `ConcurrentDictionary`, so enqueuing across threads is safe) and the page's own
+drain runs it. Pending frame actions count as pending work, so a reply in flight keeps the host's
+drain alive instead of racing the end of the document.
+
+**Verified** by six `WorkerBindingTests` cases driving the real bridge — round trip; cloning proved
+in *both* directions by mutating each side after sending; `Date`/`RegExp`/arrays/nesting/cycles
+surviving; realm separation plus asynchronous delivery; a missing script firing `error` without
+throwing; and `terminate()` plus disposal joining threads promptly.
+
+**The regression risk was feature detection, and it did not fire.** Adding `Worker` to the global can
+silently change which path a WPT test takes. `css/css-backgrounds` is **identical name for name**
+(266 failures, 444/266/1), `css-fonts`/`css-writing-modes` unchanged at 685/815, and
+`Broiler.Wpt.Tests` unchanged at 750/55.
+
+**Out of this slice, refused rather than half-built**: worker timers, `importScripts`, module
+workers, `SharedWorker`, nested workers, transferables (an `ArrayBuffer` in a transfer list is cloned,
+not transferred), and network-fetched worker scripts. Published:
+[`worker-object.md`](../../tests/render-stages/results/worker-object.md).
 
 ## Master table
 
