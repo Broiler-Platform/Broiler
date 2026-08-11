@@ -68,9 +68,11 @@ are versioned in lockstep during the preview.
   dimension left `auto`, not to overrule one the author stated, but the
   percentage-width branch of `MeasureImageSize` set the derive-the-height flag
   unconditionally — so `<img width="100%" height="50">` came out as tall as it was
-  wide. `css/CSS2/backgrounds` goes 204 → 247 of 339 reftests: the tests were
-  right all along, and the bug was in the reference documents they are compared
-  against, which draw their coloured band exactly that way.
+  wide. **+89 reftests, none lost**, over a 16 059-test sweep of every directory
+  that sizes a replaced element: `css/CSS2/backgrounds` +43 (204 → 247 of 339),
+  `normal-flow` +22, `borders` +13, `positioning` +10. The tests were right all
+  along — the bug was in the reference documents they are compared against, which
+  draw their coloured band exactly that way.
 - `Broiler.Documents` — the DOCX reader walked only the direct `w:p` children of
   `w:body`, so a document whose content lived inside a layout table (the shape CV
   and letterhead templates use) opened completely empty in Broiler.Writer. Block

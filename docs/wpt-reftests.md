@@ -500,8 +500,11 @@ The same flag also stood in for "the width is stated" in the aspect-ratio pass,
 where a percentage width had to stop counting as `auto` — otherwise fixing the
 height merely moved the bug to the width, deriving 50px back out of it.
 
-**`css/CSS2/backgrounds` goes 204 → 247 of 339.** The tests were rendering
-correctly the whole time.
+**`css/CSS2/backgrounds` goes 204 → 247 of 339**, and the fix reaches further than
+the directory that surfaced it: over a 16 059-test sweep of every directory that
+sizes a replaced element, **+89 reftests and none lost** — `backgrounds` +43,
+`CSS2/normal-flow` +22, `CSS2/borders` +13, `CSS2/positioning` +10. The tests were
+rendering correctly the whole time.
 
 **This is the reference-side failure mode the section above warns about, at
 scale.** The diff was in the part of the picture the tests were not about — 43
