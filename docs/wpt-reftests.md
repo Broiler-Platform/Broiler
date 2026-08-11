@@ -153,9 +153,12 @@ problems, all at 0.0–1.4% match):
   but `display: flow-root` painting nothing (fixed; it fixed 32 reftests across
   `css-break`, `css-box/margin-trim`, `CSS2/floats` and `css-rhythm`, all of
   them tests whose *reference* used a `flow-root` wrapper);
-  `quirks/tables-inherit-color-from-body-quirk-007` was `document.append`
-  missing from the bridge, not a colour bug (fixed — 0.0% → 94.9%; the quirk
-  itself is still open); and the two `css/css-image-animation/…-paused` tests
+  `quirks/tables-inherit-color-from-body-quirk-007` was **two** bugs stacked, and
+  neither was the colour one its name points at — `document.append` missing from
+  the bridge took it from 0.0% to 94.9%, and the doctype the serializer emitted
+  unconditionally was destroying quirks mode for the whole corpus (see below);
+  the quirk itself is implemented now, and `-001`…`-003` pass on it; and the two
+  `css/css-image-animation/…-paused` tests
   were the one case that *was* what it looked like, an unimplemented
   `image-animation` (fixed, 0.0% → 100% each, and 15/22 → 20/22 for the
   directory).
@@ -173,11 +176,39 @@ problems, all at 0.0–1.4% match):
   forced-colors mode, and the two `*.sub.html` colour-scheme tests need the WPT
   server for their cross-origin substitution.
 
+- **The runner cannot represent what the test builds.** The rarest answer and
+  the hardest to see, because the render is neither wrong nor honest — it is of
+  a *different document*. The runner executes a test's scripts, serialises the
+  mutated DOM back to HTML, and renders that string; anything the script built
+  that markup cannot express is lost in the round trip. HTML tree construction
+  unconditionally creates a `<body>`, so
+  `quirks/tables-inherit-color-from-body-quirk-004`…`-007` — which exist to
+  check what a table does when the document has *no* body element — come back
+  with one, and the `body { color: red }` they declare then matches it. Nothing
+  in the failure points at the round trip. Suspect it when a test's script
+  removes or replaces `<html>`/`<body>`, and pin the behaviour in a unit test
+  over the box tree instead of waiting for the reftest.
+
 The largest single group in that issue — 13 of the 30 — are `*-print.html`
 tests, which state their expected rendering in terms of page boxes, named pages,
 margin boxes and fragmentation. The runner renders them in screen mode on both
 sides, so they are not measuring what they were written to measure; they need
 paged media, not thirteen separate fixes.
+
+## Quirks mode reaches the render, as of the doctype round-trip fix
+
+Worth knowing because it silently invalidated a whole directory. `SerializeToHtml`
+emitted `<!DOCTYPE html>` unconditionally, and the renderer re-derives the
+document mode from the string it is handed — so every doctype-less document was
+rendered as standards mode, and the `quirks/` directory, which is doctype-less by
+construction, could not exercise a single quirk. The serializer now emits a
+doctype only when the document has one whose name selects standards mode.
+
+The failure had no symptom of its own: quirks tests failed for whatever *other*
+reason they would have failed for, and a quirk implemented against them would
+have looked simply broken. If a mode-, encoding- or metadata-dependent behaviour
+appears not to work at all on this path, check what the round trip does to the
+signal that carries it before looking at the behaviour.
 
 **Do not "fix" a reftest by making both sides equally wrong.** The suite's own
 blind spot makes that easy to do by accident and impossible to see afterwards —
