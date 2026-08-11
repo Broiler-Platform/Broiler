@@ -718,8 +718,33 @@ internal abstract partial class CssBoxProperties
         {
             _color = value;
             _actualColor = BColor.Empty;
+            ColorSpecified = true;
         }
     }
+
+    /// <summary>
+    /// Whether a declaration set this box's <c>color</c>, as opposed to the box taking its
+    /// parent's through <see cref="InheritStyle"/>. Every specified route writes through the
+    /// <see cref="Color"/> setter — the cascade projection, the shorthand expansion and the
+    /// presentation attributes (<c>&lt;font color&gt;</c>, <c>text=</c>) — while inheritance
+    /// assigns <c>_color</c> directly, which is what makes the setter a reliable place to record
+    /// it. Read by <see cref="TablesInheritColorFromBodyQuirk"/>, which may only replace a colour
+    /// the box inherited.
+    /// </summary>
+    internal bool ColorSpecified { get; private set; }
+
+    /// <summary>
+    /// Replaces the box's inherited <c>color</c> without marking it specified — the write
+    /// inheritance itself would have made, had it come from somewhere else.
+    /// </summary>
+    internal void SetInheritedColor(string value)
+    {
+        _color = value;
+        _actualColor = BColor.Empty;
+    }
+
+    /// <summary>The initial value of <c>color</c> — what a box that inherited nothing carries.</summary>
+    internal const string InitialColor = "black";
 
     public string Content { get; set; } = "normal";
     public string Display { get; set; } = "inline";
@@ -931,6 +956,16 @@ internal abstract partial class CssBoxProperties
     public string TextTransform { get; set; } = "none";
 
     public string Visibility { get; set; } = "visible";
+
+    /// <summary>
+    /// CSS Image Animation 1 <c>image-animation</c>: whether the animated images this box paints
+    /// advance with the document's timeline (<c>normal</c>, the initial value), hold the frame
+    /// they had reached (<c>paused</c>), or reset to the first one (<c>stopped</c>). Inherited,
+    /// so setting it on the root governs the whole document unless a descendant overrides it.
+    /// Read by <see cref="CssBox.ImagePresentationTime"/>, which is what the box's image loads
+    /// are pinned to.
+    /// </summary>
+    public string ImageAnimation { get; set; } = "normal";
 
     public string WordSpacing
     {
@@ -2487,11 +2522,16 @@ internal abstract partial class CssBoxProperties
         BorderSpacing = p.BorderSpacing;
         BorderCollapse = p.BorderCollapse;
         _color = p._color;
+        // A box's cascade starts here, so anything a previous pass recorded about *this* box's
+        // own colour is stale by definition — the flag describes declarations, and none have been
+        // applied yet.
+        ColorSpecified = false;
         EmptyCells = p.EmptyCells;
         CaptionSide = p.CaptionSide;
         WhiteSpace = p.WhiteSpace;
         TextTransform = p.TextTransform;
         Visibility = p.Visibility;
+        ImageAnimation = p.ImageAnimation;
         _textIndent = p._textIndent;
         TextAlign = p.TextAlign;
         TextAlignLast = p.TextAlignLast;

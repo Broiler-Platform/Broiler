@@ -659,12 +659,25 @@ internal static class CssBoxHelper
     /// <summary>
     /// Returns <c>true</c> if <paramref name="box"/> establishes a new
     /// block formatting context (CSS2.1 §9.4.1, CSS Box Alignment §5.4).
+    /// <para>
+    /// The single source of truth for the question. Four near-copies of this
+    /// list had drifted apart across the engine (one had never gained the
+    /// flex/grid displays), so a display that establishes a BFC was recognised
+    /// in some float calculations and not others — which is how
+    /// <c>display: flow-root</c>, whose <em>only</em> job is to establish one,
+    /// came to establish none. The callers that guard on <c>float</c>/
+    /// <c>position</c> themselves before asking still do; those conditions are
+    /// simply redundant there, not wrong.
+    /// </para>
     /// </summary>
-    private static bool EstablishesBfc(CssBox box)
+    internal static bool EstablishesBfc(CssBox box)
     {
         return box.Float != CssConstants.None
             || box.Display == CssConstants.InlineBlock
             || box.Display == CssConstants.TableCell
+            // CSS Display 3 §2.5: `flow-root` is exactly "block box that
+            // establishes a new block formatting context".
+            || box.Display == "flow-root"
             || box.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
             || box.Position == CssConstants.Absolute
             || box.Position == CssConstants.Fixed

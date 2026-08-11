@@ -94,4 +94,59 @@ public sealed class DoctypeSentinelMigrationTests
         var html = bridge.SerializeToHtml();
         Assert.StartsWith("<!DOCTYPE html>", html.TrimStart());
     }
+
+    /// <summary>
+    /// The other half of the same rule, which used to be unconditional: a document with no doctype
+    /// serialises without one.
+    /// </summary>
+    /// <remarks>
+    /// This is not cosmetic. Whoever re-parses the serialised page re-derives the document mode
+    /// from it (<c>DocumentModeContext.IsQuirksHtml</c>, via
+    /// <c>HtmlContainerInt.SetHtmlWithStyleSet</c>), so emitting a doctype that was never there
+    /// turned every quirks-mode document into a standards-mode one — silently, and for every
+    /// consumer of the render path at once. No quirk could fire on the WPT path at all, whose
+    /// entire <c>quirks/</c> directory is doctype-less by construction.
+    /// </remarks>
+    [Fact]
+    public void A_Document_With_No_Doctype_Serializes_Without_One()
+    {
+        using var bridge = Attach("<html><head></head><body>hi</body></html>", out _);
+
+        var html = bridge.SerializeToHtml();
+        Assert.DoesNotContain("DOCTYPE", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("hi", html);
+    }
+
+    /// <summary>
+    /// It is the *mode* that round-trips, not the doctype's text. <c>IsQuirksHtml</c> keys off the
+    /// doctype's name alone, so an XHTML doctype — what the CSS2.1 <c>.xht</c> tests carry —
+    /// selects standards mode through the bare emitted form exactly as it did through the original.
+    /// Its public and system identifiers were already dropped here and still are.
+    /// </summary>
+    [Fact]
+    public void A_Doctype_With_Identifiers_Still_Selects_Standards_Mode()
+    {
+        using var bridge = Attach(
+            "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" " +
+            "\"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html><body>hi</body></html>",
+            out _);
+
+        var html = bridge.SerializeToHtml();
+        Assert.StartsWith("<!DOCTYPE html>", html.TrimStart());
+        Assert.False(Broiler.Layout.DocumentModeContext.IsQuirksHtml(html));
+    }
+
+    /// <summary>
+    /// A doctype whose name is not <c>html</c> selects quirks mode, so serialising it as no
+    /// doctype at all is what preserves the mode — the bare <c>&lt;!DOCTYPE html&gt;</c> this
+    /// serializer can emit would have flipped it to standards.
+    /// </summary>
+    [Fact]
+    public void A_Non_Html_Doctype_Round_Trips_As_Quirks_Mode()
+    {
+        using var bridge = Attach("<!DOCTYPE foo><html><body>hi</body></html>", out _);
+
+        var html = bridge.SerializeToHtml();
+        Assert.True(Broiler.Layout.DocumentModeContext.IsQuirksHtml(html));
+    }
 }

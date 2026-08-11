@@ -20,6 +20,8 @@ internal static class Program
             ("Animation timeline clamps delays too short to honour", FrameSelectionClampsShortDelays),
             ("Animation timeline loops or holds by loop count", FrameSelectionLoopCount),
             ("The animation clock pins and restores a presentation time", AnimationClockPin),
+            ("A per-image pin overrides the document time and nests", AnimationClockPinForImage),
+            ("A per-image pin reaches a decode deferred to the thread pool", AnimationClockPinForImageFlowsToPool),
         };
 
         int passed = 0;
@@ -183,6 +185,56 @@ internal static class Program
         Assert.Equal(TimeSpan.Zero, ImageAnimationClock.PresentationTime);
         ImageAnimationClock.PresentationTime = outer;
         return ValueTask.CompletedTask;
+    }
+
+    // CSS Image Animation 1: an image whose element paused it holds its frame while the rest of
+    // the document advances, so the per-image override has to win over the document pin — and give
+    // it back untouched, since only one image at a time is inside a scope.
+    private static ValueTask AnimationClockPinForImage()
+    {
+        using (ImageAnimationClock.Pin(TimeSpan.FromMilliseconds(300)))
+        {
+            Assert.Equal(TimeSpan.FromMilliseconds(300), ImageAnimationClock.PresentationTime);
+
+            using (ImageAnimationClock.PinForImage(TimeSpan.Zero))
+            {
+                Assert.Equal(TimeSpan.Zero, ImageAnimationClock.PresentationTime);
+
+                using (ImageAnimationClock.PinForImage(TimeSpan.FromMilliseconds(120)))
+                    Assert.Equal(TimeSpan.FromMilliseconds(120), ImageAnimationClock.PresentationTime);
+
+                // The inner image scope restores the outer image's override, not the document time.
+                Assert.Equal(TimeSpan.Zero, ImageAnimationClock.PresentationTime);
+            }
+
+            // Leaving every image scope hands the document time back.
+            Assert.Equal(TimeSpan.FromMilliseconds(300), ImageAnimationClock.PresentationTime);
+
+            ImageAnimationClock.PinForImage(TimeSpan.FromMilliseconds(-5)).Dispose();
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    // The reason the override is an AsyncLocal and not a [ThreadStatic]: an async host queues the
+    // decode to the pool from inside the scope, and only an AsyncLocal rides the captured
+    // ExecutionContext to the thread that runs it. A thread-local would read the document time
+    // there and the image would animate anyway — silently, and only in the async configuration.
+    private static async ValueTask AnimationClockPinForImageFlowsToPool()
+    {
+        using (ImageAnimationClock.Pin(TimeSpan.FromMilliseconds(300)))
+        {
+            var observed = new TaskCompletionSource<TimeSpan>();
+            using (ImageAnimationClock.PinForImage(TimeSpan.Zero))
+                ThreadPool.QueueUserWorkItem(_ => observed.SetResult(ImageAnimationClock.PresentationTime));
+
+            Assert.Equal(TimeSpan.Zero, await observed.Task);
+
+            // The control: queued outside any image scope, the pool thread sees the document time.
+            var unscoped = new TaskCompletionSource<TimeSpan>();
+            ThreadPool.QueueUserWorkItem(_ => unscoped.SetResult(ImageAnimationClock.PresentationTime));
+            Assert.Equal(TimeSpan.FromMilliseconds(300), await unscoped.Task);
+        }
     }
 
     private static ImageSequence Animation(int loopCount, int[] delaysMilliseconds)

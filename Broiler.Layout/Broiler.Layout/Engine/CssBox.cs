@@ -268,8 +268,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     public bool IsInline => (Display == CssConstants.Inline || Display == CssConstants.InlineBlock
         || Display == "inline-flex" || Display == "inline-grid") && !IsBrElement;
     
+    // CSS Display 3 §2.5: `flow-root` is block-level (its <display-outside> is
+    // `block`); the keyword only changes the <display-inside> to "block container
+    // that establishes a new BFC". Everything block layout does applies to it
+    // unchanged, so it belongs in this predicate — omitting it left such a box
+    // neither block nor inline, and it laid out and painted nothing at all.
     public bool IsBlock => Display == CssConstants.Block || Display == "flex"
-        || Display == "grid";
+        || Display == "grid" || Display == "flow-root";
     
     public virtual bool IsClickable
     {
@@ -363,7 +368,15 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // only: a nested layout (a table cell re-measuring, a subdocument) shares this
             // document's boxes, and re-walking them would find nothing pending but pay for the walk.
             if (ParentBox == null)
+            {
                 PrefetchDocumentImages(this, g);
+
+                // The quirks-mode "tables inherit color from body" rule, which needs the whole
+                // cascaded tree to answer — the body it names is the document's, and a table can
+                // sit outside it or even before it. Root only, and a no-op in standards mode or
+                // with no table in the document. See TablesInheritColorFromBodyQuirk.
+                TablesInheritColorFromBodyQuirk.Apply(this);
+            }
 
             // PROTOTYPE (BROILER_VERTICAL_FLOW): a vertical-writing-mode rotation
             // root lays its whole subtree out in a logical (horizontal) frame.

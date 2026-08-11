@@ -1,3 +1,4 @@
+using Broiler.Dom;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Null;
@@ -76,6 +77,142 @@ internal static class NodeMutationBinding
         }
 
         return a[0];
+    }
+
+    /// <summary>
+    /// DOM §4.2.6 <c>ParentNode.append()</c> on the document node: insert each argument after
+    /// the document's last child.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>Document</c> includes the <c>ParentNode</c> mixin, so <c>append</c>, <c>prepend</c>
+    /// and <c>replaceChildren</c> exist on it exactly as they do on an element. The bridge
+    /// bound only the <c>Node</c>-level <c>appendChild</c>/<c>insertBefore</c>/<c>removeChild</c>,
+    /// so <c>document.append(x)</c> was <c>undefined</c> — and a script calling it threw
+    /// mid-way, after whatever it had already done to the tree. That is worse than it sounds
+    /// for a reftest: WPT's <c>quirks/tables-inherit-color-from-body-quirk-007</c> does
+    /// <c>documentElement.remove()</c> and *then* <c>document.append(clone)</c>, so the throw
+    /// left a document with no root element at all and the test rendered blank.
+    /// </para>
+    /// <para>
+    /// The insert mirrors <see cref="AppendChild"/>: a node that already has a parent is
+    /// detached first (with the observer/iterator notifications that move owes), so
+    /// <c>append</c> moves rather than duplicating.
+    /// </para>
+    /// </remarks>
+    public static JSValue Append(INodeMutationHost host, in Arguments a)
+    {
+        if (a.Length == 0)
+            return JSUndefined.Value;
+
+        var doc = host.DocumentNode;
+        foreach (var node in host.BuildChildNodeArgumentNodes(a))
+            InsertIntoDocumentAt(host, node, doc.ChildNodes.Count);
+
+        return JSUndefined.Value;
+    }
+
+    /// <summary>
+    /// DOM §4.2.6 <c>ParentNode.prepend()</c> on the document node: insert the arguments before
+    /// the document's first child, keeping their order relative to each other.
+    /// </summary>
+    public static JSValue Prepend(INodeMutationHost host, in Arguments a)
+    {
+        if (a.Length == 0)
+            return JSUndefined.Value;
+
+        var insertIndex = 0;
+        foreach (var node in host.BuildChildNodeArgumentNodes(a))
+            InsertIntoDocumentAt(host, node, insertIndex++);
+
+        return JSUndefined.Value;
+    }
+
+    /// <summary>
+    /// DOM §4.2.6 <c>ParentNode.replaceChildren()</c> on the document node: remove every
+    /// existing child, then insert the arguments. Called with none, it empties the document.
+    /// </summary>
+    public static JSValue ReplaceChildren(INodeMutationHost host, in Arguments a)
+    {
+        var doc = host.DocumentNode;
+
+        // The nodes are resolved before anything is removed: an argument may be a node that
+        // is currently a child of the document, and clearing first would detach it and then
+        // re-insert it, which is the same end state but a different set of mutation records.
+        var nodes = a.Length == 0 ? [] : host.BuildChildNodeArgumentNodes(a);
+
+        for (var index = doc.ChildNodes.Count - 1; index >= 0; index--)
+        {
+            var child = DomBridge.ChildAt(doc, index);
+            host.NotifyNodeIteratorPreRemoval(child);
+            DomBridge.RemoveNthChild(doc, index);
+            DomBridge.SetParent(child, null);
+            host.NotifyChildRemoved(doc, child, index);
+        }
+
+        var insertIndex = 0;
+        foreach (var node in nodes)
+            InsertIntoDocumentAt(host, node, insertIndex++);
+
+        return JSUndefined.Value;
+    }
+
+    /// <summary>
+    /// Detaches <paramref name="node"/> from its current parent, if any, and inserts it into the
+    /// document at <paramref name="index"/>, firing the notifications each half owes.
+    /// </summary>
+    private static void InsertIntoDocumentAt(INodeMutationHost host, DomNode node, int index)
+    {
+        RejectElementBeforeDoctype(host, node, index);
+
+        var oldParent = DomBridge.ParentEl(node);
+        if (oldParent != null)
+        {
+            var oldIndex = DomBridge.ChildIndexOf(oldParent, node);
+            if (oldIndex >= 0)
+            {
+                host.NotifyNodeIteratorPreRemoval(node);
+                DomBridge.RemoveNthChild(oldParent, oldIndex);
+                host.NotifyChildRemoved(oldParent, node, oldIndex);
+            }
+        }
+
+        var doc = host.DocumentNode;
+        var at = Math.Clamp(index, 0, doc.ChildNodes.Count);
+        if (at == doc.ChildNodes.Count)
+            doc.AppendChild(node);
+        else
+            DomBridge.InsertChildAt(doc, at, node);
+
+        host.NotifyChildAdded(doc, node, at);
+    }
+
+    /// <summary>
+    /// DOM §4.2.3 "ensure pre-insertion validity", the one clause of it a `prepend` on a document
+    /// can trip: an element may not be inserted before the document's doctype. Without the check
+    /// the tree accepts `&lt;html&gt;` ahead of `&lt;!DOCTYPE&gt;`, which no serializer or
+    /// documentElement lookup expects — the document reads as having no root at all, silently.
+    /// <para>
+    /// Scoped to the three ParentNode methods this file added. <see cref="AppendChild"/> and
+    /// <see cref="InsertBefore"/> perform no validity checks either, and giving them one is a
+    /// behaviour change to existing bindings rather than part of adding the mixin.
+    /// </para>
+    /// </summary>
+    private static void RejectElementBeforeDoctype(INodeMutationHost host, DomNode node, int index)
+    {
+        if (node.NodeType != DomNodeType.Element)
+            return;
+
+        var doc = host.DocumentNode;
+        for (var i = index; i < doc.ChildNodes.Count; i++)
+        {
+            if (doc.ChildNodes[i].NodeType != DomNodeType.DocumentType)
+                continue;
+
+            if (host.JsContext is { } context)
+                DomBridge.ThrowDOMException(context, "Cannot insert an element before the doctype.", "HierarchyRequestError");
+            throw new InvalidOperationException("Cannot insert an element before the doctype.");
+        }
     }
 
     public static JSValue InsertBefore(INodeMutationHost host, in Arguments a)

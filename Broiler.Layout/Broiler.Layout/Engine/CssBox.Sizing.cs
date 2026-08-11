@@ -585,16 +585,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             // Don't recurse into nested BFC roots — their floats are
             // contained by them, not by the outer BFC.
-            bool childIsBfc = child.Float != CssConstants.None
-                || child.Display == CssConstants.InlineBlock
-                || child.Display == CssConstants.TableCell
-                || child.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
-                || child.Position == CssConstants.Absolute
-                || child.Position == CssConstants.Fixed
-                || (child.Overflow != null && child.Overflow != CssConstants.Visible)
-                || (child.AlignContent != null && child.AlignContent != "normal");
-
-            if (!childIsBfc)
+            if (!CssBoxHelper.EstablishesBfc(child))
                 FindMaxDescendantFloatBottom(child, ref maxBottom);
         }
     }

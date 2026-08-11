@@ -77,7 +77,14 @@ set -euo pipefail
 # patch, this one can move pixels even when the engine below it is perfect.
 # (0131 was the first half of the same item and is upstream now, so its entry
 # is gone with it: an entry whose idempotence guard can only ever skip is noise.)
+#
+# 0135 (Broiler.CSS, media-query range syntax and @custom-media) is listed for
+# the same reason: it decides whether an `@media` block's rules cascade at all,
+# so getting it wrong is a whole stylesheet applying — or not applying — to a
+# page. Its unit tests pin the grammar; only the pixel suite can say the rules
+# reached the render.
 PENDING_PATCHES=(
+  "Broiler.CSS|patches/0135-css-media-queries-range-and-custom-media.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

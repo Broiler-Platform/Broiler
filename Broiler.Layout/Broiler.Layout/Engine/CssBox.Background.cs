@@ -60,7 +60,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 deferred is null ? OnImageLoadComplete : deferred.OnCompleted);
 
             _backgroundImageLoadHandlers.Add(imageLoadHandler);
-            imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl);
+            LoadImageWithAnimationPolicy(
+                () => imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl));
         }
     }
 

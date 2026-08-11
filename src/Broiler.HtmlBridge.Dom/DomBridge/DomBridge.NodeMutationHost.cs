@@ -1,4 +1,5 @@
 using Broiler.Dom;
+using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.HtmlBridge;
@@ -15,6 +16,11 @@ public sealed partial class DomBridge : Dom.Features.INodeMutationHost
 
     DomNode? Dom.Features.INodeMutationHost.FindDomNodeByJSObject(JSObject jsObj)
         => FindDomNodeByJSObject(jsObj);
+
+    List<DomNode> Dom.Features.INodeMutationHost.BuildChildNodeArgumentNodes(in Arguments arguments)
+        => BuildChildNodeArgumentNodes(arguments);
+
+    JSContext? Dom.Features.INodeMutationHost.JsContext => _jsContext;
 
     void Dom.Features.INodeMutationHost.NotifyNodeIteratorPreRemoval(DomNode node)
         => NotifyNodeIteratorPreRemoval(node);
