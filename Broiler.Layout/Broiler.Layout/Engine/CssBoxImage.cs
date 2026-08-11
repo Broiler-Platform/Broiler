@@ -77,7 +77,8 @@ internal sealed class CssBoxImage : CssBox
 
         if (Content != null && Content != CssConstants.Normal)
         {
-            _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes, BaseUrl);
+            LoadImageWithAnimationPolicy(
+                () => _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes, BaseUrl));
             return;
         }
 
@@ -85,7 +86,8 @@ internal sealed class CssBoxImage : CssBox
         // <object data="..."> fallback: use 'data' attribute when 'src' is absent
         if (string.IsNullOrEmpty(src))
             src = GetAttribute("data");
-        _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl);
+        LoadImageWithAnimationPolicy(
+            () => _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl));
     }
 
     /// <inheritdoc/>

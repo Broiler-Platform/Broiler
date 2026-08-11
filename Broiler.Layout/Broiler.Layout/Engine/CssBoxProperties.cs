@@ -932,6 +932,16 @@ internal abstract partial class CssBoxProperties
 
     public string Visibility { get; set; } = "visible";
 
+    /// <summary>
+    /// CSS Image Animation 1 <c>image-animation</c>: whether the animated images this box paints
+    /// advance with the document's timeline (<c>normal</c>, the initial value), hold the frame
+    /// they had reached (<c>paused</c>), or reset to the first one (<c>stopped</c>). Inherited,
+    /// so setting it on the root governs the whole document unless a descendant overrides it.
+    /// Read by <see cref="CssBox.ImagePresentationTime"/>, which is what the box's image loads
+    /// are pinned to.
+    /// </summary>
+    public string ImageAnimation { get; set; } = "normal";
+
     public string WordSpacing
     {
         get { return _wordSpacing; }
@@ -2492,6 +2502,7 @@ internal abstract partial class CssBoxProperties
         WhiteSpace = p.WhiteSpace;
         TextTransform = p.TextTransform;
         Visibility = p.Visibility;
+        ImageAnimation = p.ImageAnimation;
         _textIndent = p._textIndent;
         TextAlign = p.TextAlign;
         TextAlignLast = p.TextAlignLast;

@@ -115,6 +115,7 @@ internal static partial class CssUtils
             "word-break" => cssBox.WordBreak,
             "line-break" => cssBox.LineBreak,
             "visibility" => cssBox.Visibility,
+            "image-animation" => cssBox.ImageAnimation,
             "word-spacing" => cssBox.WordSpacing,
             "font-family" => cssBox.FontFamily,
             "font-feature-settings" => cssBox.FontFeatureSettings,
@@ -676,6 +677,9 @@ internal static partial class CssUtils
                 break;
             case "visibility":
                 cssBox.Visibility = value;
+                break;
+            case "image-animation":
+                cssBox.ImageAnimation = value;
                 break;
             case "word-spacing":
                 cssBox.WordSpacing = value;
