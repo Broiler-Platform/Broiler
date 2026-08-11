@@ -203,7 +203,180 @@ The largest single group in that issue — 13 of the 30 — are `*-print.html`
 tests, which state their expected rendering in terms of page boxes, named pages,
 margin boxes and fragmentation. The runner renders them in screen mode on both
 sides, so they are not measuring what they were written to measure; they need
-paged media, not thirteen separate fixes.
+paged media, not thirteen separate fixes. There is now a paged render behind a
+lever — see [paged print rendering](#paged-print-rendering-and-why-it-is-off)
+for what it does and what it costs.
+
+## The bug is as likely to be in the reference, and that inverts the scoreboard
+
+The suite renders both sides, so a defect in the *reference* file is worth
+exactly as much as one in the test — and it is much harder to see, because the
+reference is the thing you are reading to decide what the test should look like.
+It also does something the test-side kind never does: **fixing the test can make
+the pass rate go down**, because a test whose two sides were wrong in the same
+direction was passing, and correcting one side alone separates them.
+
+That is not hypothetical. Implementing `line-clamp` (CSS Overflow 4 §5 —
+`max-lines`, `block-ellipsis` and the legacy `-webkit-line-clamp`, none of which
+had any implementation behind them) took `css/css-overflow/line-clamp` from
+**107/263 to 174/263**, and nine tests moved the other way. Four of the nine were
+`line-clamp-with-abspos-0{10,14}` and `line-clamp-with-fixed-pos-0{10,14}`, and
+none of them had anything to do with abspos, or with the clamp. Their
+*references* state the clamped result as `white-space: pre` text ending in a
+newline, and Broiler laid out a trailing preserved newline as an extra empty line
+box — so each reference rendered a line too tall, and the tests could only pass
+while the clamp was equally wrong. Fixing that (CSS Text 3 §4.1: a forced break
+at the end of a block generates no line box; the engine already applied it to a
+trailing `<br>` and not to the `pre` spelling of the same rule) fixed all four,
+took the directory to **181/263**, and moved another 14 tests elsewhere in the
+corpus that had nothing to do with clamping.
+
+**The tell is that the diff is in a part of the picture the test is not about.**
+When the rendered and reference images differ somewhere the test's own feature
+cannot reach — a margin, a trailing line, the height of a wrapper — read the
+reference as a document in its own right and reduce *it* to a minimal case
+against Chromium. The four above all showed the clamp working perfectly and the
+whole box a line too tall.
+
+## Issue #1604's top thirty: what a "biggest problem" list is made of
+
+Re-run after the work above, all thirty still fail, and the shape is worth
+recording because it is the shape these lists keep having — the ranking is by
+*blast radius*, and a 0.0% match is the signature of a missing feature rather
+than of a bug close to being fixed. In order of size: **13** `*-print` tests
+needing paged media; **5** `css-view-transitions`; **4** `jpegxl/` needing a
+JPEG XL decoder (Chromium has none either); **3** `fullscreen/` and **1**
+customizable-`select` needing `testdriver.js`; **3** `*.sub.html` colour-scheme
+tests needing the WPT server for their cross-origin substitution; **1**
+`forced-colors-mode-49` needing the run to be in forced-colors mode; **1**
+`root-box-003` that is stale upstream (see above); **1** `grid-lanes` test; and
+**1** whose `rel=match` is a bare 60×60 PNG compared against a full-page render
+that also carries a `<p>` of instructions, which cannot match at any threshold.
+
+Two of those deserve a note because they look actionable and are not:
+
+- **`css/css-grid/grid-lanes` is the corpus's single largest failure group —
+  478 reftests, 12.8% of every failure — and it is deliberate.** The engine drops
+  `display: grid-lanes` as an invalid value to match reference browsers, and
+  Chromium fails `column-align-items-001` against its own reference by 83% of
+  pixels, so the tests are unwinnable without shipping the experimental feature.
+  Doing so would trade **+478 reftests against the golden-image suite**, where
+  the drop is currently what makes ~1 400 of those tests pass (191 fail there
+  today). The trade is a large net loss and the reason the current behaviour is
+  what it is; see `CssUtils.NormalizeDisplayValue`.
+- **The `*-print` group needs paged media, not thirteen fixes** — the runner
+  renders both sides in screen mode, so those tests are not measuring what they
+  were written to measure. This is the same finding as issue #1601's triage.
+  A paged render now exists behind `BROILER_WPT_PAGED_PRINT=1`; the section
+  below has the numbers and the reason it is not the default yet.
+
+The list to work from is therefore not this one. The directory totals are:
+`css/css-grid/grid-lanes` 478 (above), `css/css-writing-modes` ~724 at 55–95%
+match (partial vertical layout — deep, and the largest winnable group),
+`css/css-flexbox` ~206, `css/css-overflow/line-clamp` (was 156, now 82).
+
+## Paged print rendering, and why it is off
+
+`BROILER_WPT_PAGED_PRINT=1`, default **off**. With it on, a reftest whose file
+stem ends in `-print` is rendered as CSS Paged Media says: the document's own
+`@page` `size` and `margin` give the page box, the flow is laid out once on a
+surface several page areas tall, and each page is the band of that surface from
+`k·H` to `(k+1)·H`, blitted into the output at its page's margin origin. Both
+sides of the comparison switch together — WPT's print references are *not*
+themselves named `-print` (`block-page-break-inside-avoid-1-print.html` matches
+`block-page-break-inside-avoid-print-ref.html`), so the mode is decided from the
+test and carried into the reference render.
+
+**It is off because it is not yet a better answer than not paginating at all.**
+Over the 409 print reftests: **252 pass unpaginated, 212 paged.** That is not the
+paging being wrong so much as it being partial. Where the flow is not paginated,
+a test and its reference are wrong in the *same* way and agree — this is the
+suite's blind spot working in the corpus's favour — and each unimplemented piece
+of paged media separates the pairs that rest on it. What is missing, in order of
+size in the current failures: fragmentation of flex and table content (34),
+per-name `@page` sizes, and monolithic content in grid.
+
+**The lever is still worth having, because without it every paged-media fix
+scores exactly zero.** It is what turned "the print tests need paged media" into
+a number that moves: implementing named pages (CSS Paged Media 3 §3.4 — the
+`page` property, its start/end propagation, and the break a name change forces)
+took the paged run **173 → 213**. Of the 118 print tests whose paged render came
+out with the wrong *page count*, 31 were `page-name` tests.
+
+**Page count is the failure mode to look at first.** A paged render that gets the
+count wrong reports 0.0% — the images are different sizes — so the ranked failure
+list fills with 0.0% entries that are all the same defect. Read the dimensions out
+of the message (`actual 480×576 vs baseline 480×864` is two pages against three)
+before reading anything into the percentage.
+
+### `@page` margin boxes, and what actually gates them
+
+The sixteen margin boxes of CSS Paged Media 3 §5 are implemented and reachable
+through the same lever. A box's slot is computed here — the ring of four corners
+and four edge strips, an edge's length shared out by §5.3.2 — and the box itself
+is emitted as ordinary markup laid over the page, because that is all it is: a box
+with a background, a border, a font and an alignment. Sharing an edge takes a
+measure render first (each box on its own, read back by the colour it is painted),
+since §5.3.2 divides the unused length *in proportion to max-content sizes* and
+counts a sized box's border and padding besides.
+
+**The cluster does not move, and the reason is not margin boxes.** It went 15/37
+to 13/37: one genuine new pass (`content-001`, at 100%) against three passes that
+were never real — `dimensions-003` and `-005` were passing at 99.5% and 99.2%
+*with none of their margin boxes drawn*, because the boxes are under 1% of a
+1024×768 page, and `dimensions-010`'s reference renders blank. What blocks the
+rest is in the **references**, and it is two engine gaps that have nothing to do
+with paged media:
+
+- **Flex items were never stretched on the cross axis** — fixed, in both halves:
+  the stretch itself (`css/css-flexbox` 470 → 568 of 994), and the re-layout a
+  flex container needs once the grid track it sits in has sized it. These
+  references render now, where 26 of the 36 were blank or nearly so. It is still
+  not enough to *pass* them — see below — but it is what makes the difference
+  readable at all.
+- **Generated `content` takes a single quoted string and nothing else.**
+  `content: "a" "b"` renders as `a" "b` and `content: counter(page)` renders as
+  the text `counter(page)`. Both sides of a comparison share the gap, so it costs
+  nothing today — and it is why the page counters are deliberately *not* evaluated
+  on the test side: doing so alone would separate the eight margin-box tests that
+  use one from references that still render the literal text.
+
+## Flex items are stretched now, and what that says about the scoreboard
+
+`align-items: stretch` is the initial value, so it is what happens to most flex
+items on most pages — and the engine did none of it. `CssBox.Flex.cs` only
+*shifted* items for `center`/`end`; nothing ever sized one. An item with a width
+and no height came out zero-tall and painted nothing, which is why any flex
+container used as a strip rendered blank. Two shorthands went unexpanded with it:
+`flex-flow: column` was silently laid out as a row (the wrong axis for everything
+in it), and `flex: 1` never delivered a grow factor.
+
+**`css/css-flexbox`: 470 → 568 of 994**, 123 won against 25 lost. The 25 are the
+pattern this document keeps coming back to, and worth checking before reading
+them as a regression: they are tests whose *reference* states the expected layout
+with absolutely positioned boxes that Broiler still sizes to their text.
+`flexbox_align-items-stretch` is exactly that — the render is now right to the
+pixel and the reference is not, where before the two were wrong together.
+
+**A flex container that is a grid item needs a second layout, and it scores
+nothing.** A grid item is measured before its track is sized and resized
+afterwards — fine for a block, whose content sits at the block-start either way,
+and wrong for a flex container, whose line's cross size is read from its height.
+Resizing the box alone left a strip that was the right size holding items sized
+for the wrong one. Measured over 10 000+ reftests (`css/CSS2`, `css-align`,
+`css-sizing`, `css-position`, `html/rendering`, `css-grid`, `css-flexbox`):
+**not one test changes**. It moves the print set −2, both of them references that
+used to render blank and now render, ending false passes. What it buys is that
+the references built this way — most of `margin-boxes` — draw their content at
+all, which is the difference between a diff you can read and a blank page.
+
+The second layout has one trap worth recording, because it looks like a
+pagination bug rather than a layout one: the pass re-places the item before the
+grid puts it back, and everything it touches goes into the document's running
+extent — which is what a paged render counts pages with. Leaking that
+intermediate position doubled the page count of every reference built this way,
+and turned eleven pixel mismatches into eleven 0.0% dimension mismatches.
+`GridItemFlexRelayoutTests` pins it.
 
 ## Quirks mode reaches the render, as of the doctype round-trip fix
 

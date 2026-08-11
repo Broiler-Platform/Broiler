@@ -539,9 +539,22 @@ public sealed partial class DomBridge
     /// the pseudo tree captures reflects them. Two selector forms are handled (css-view-transitions-2):
     /// <c>:active-view-transition-type(type)</c>, gated on the transition's active types, and the bare
     /// <c>:active-view-transition</c> pseudo-class, which matches whenever any transition is active.
-    /// Each matching rule is re-matched with the pseudo stripped out and its declarations baked onto
-    /// the matched elements.
+    /// Each matching rule is re-matched with the pseudo rewritten to <c>:root</c> and its
+    /// declarations baked onto the matched elements.
     /// </summary>
+    /// <remarks>
+    /// The rewrite is <c>:root</c> rather than deletion because both pseudo-classes match the
+    /// <em>root element only</em> (css-view-transitions-2 §
+    /// <c>:active-view-transition</c>). Deleting them made the originating compound match whatever
+    /// else it named, so <c>main:active-view-transition #target</c> — a selector written precisely
+    /// to assert that it never matches — styled the target. Substituting <c>:root</c> keeps the
+    /// compound intact and lets the ordinary selector matcher reject it: <c>main:root</c> matches
+    /// nothing, <c>html:root</c> matches, and a bare <c>:active-view-transition</c> becomes
+    /// <c>:root</c>, which is also what the old empty-compound special case hand-rolled.
+    /// </remarks>
+    /// <summary>What both view-transition pseudo-classes are rewritten to: they match the root only.</summary>
+    private const string RootPseudo = ":root";
+
     private void ApplyActiveViewTransitionTypeRules(DomElement root)
     {
         foreach (var (selectorText, declarations) in EnumerateAuthorStyleRules(root))
@@ -553,22 +566,17 @@ public sealed partial class DomBridge
             {
                 if (!AnyTypeActive(typeMatch.Groups[1].Value, _activeViewTransition!.Types))
                     continue;
-                stripped = ActiveViewTransitionType.Replace(selectorText, string.Empty).Trim();
+                stripped = ActiveViewTransitionType.Replace(selectorText, RootPseudo).Trim();
             }
             else if (ActiveViewTransitionBare.IsMatch(selectorText))
             {
                 // The bare pseudo-class is active for the whole transition, whatever its types.
-                stripped = ActiveViewTransitionBare.Replace(selectorText, string.Empty).Trim();
+                stripped = ActiveViewTransitionBare.Replace(selectorText, RootPseudo).Trim();
             }
             else
             {
                 continue;
             }
-
-            // Strip the pseudo-class; an empty resulting compound (the pseudo stood alone on the
-            // originating element) selects the document element itself.
-            if (stripped.Length == 0)
-                stripped = "html";
 
             foreach (var element in root.Descendants().OfType<DomElement>())
             {

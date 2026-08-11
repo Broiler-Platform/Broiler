@@ -106,6 +106,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             }
         }
 
+        // CSS Overflow 4 §5: the clamp runs once the children are laid out (the
+        // line count it cuts on exists only then) and before the height is
+        // resolved, so the container is sized to the lines it kept.
+        ApplyLineClamp(g);
+
         ApplyMultiColumnPostLayout();
         ResolveUsedBlockHeight();
         ApplyMinMaxHeightConstraints();
@@ -1151,7 +1156,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // CSS Box Alignment §6.2: distribute flex/grid items along
                 // the block (cross) axis per align-items / align-self.
                 ApplyFlexGridCrossAxisAlignment();
-                ApplyFlexColumnInlineAxisAlignment();
+                ApplyFlexColumnInlineAxisAlignment(g);
             }
             else if (Boxes.Count > 0)
             {
@@ -1194,9 +1199,31 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                         Size = new SizeF((float)colWidth, Size.Height);
                 }
 
-                foreach (var childBox in Boxes)
+                CssBox? previousInFlow = null;
+                for (int childIndex = 0; childIndex < Boxes.Count; childIndex++)
                 {
+                    var childBox = Boxes[childIndex];
                     childBox.PerformLayout(g);
+
+                    // CSS Fragmentation 3 §3: a forced page break before this child (or after the
+                    // one before it) moves it to the top of the next page. Applied here, between
+                    // siblings, so the child that follows lays out from the moved bottom edge.
+                    // CSS Paged Media 3 §3.4's page-name change is the same break, which is why it
+                    // is decided here too — from the index, since the sibling it is measured
+                    // against is not the same one a break-after is read from.
+                    ApplyForcedPageBreakBefore(childBox, childIndex, previousInFlow);
+
+                    // CSS Fragmentation 3 §4.1: and a page boundary falling inside an unbreakable
+                    // child moves the whole child past it. Breakable content needs nothing — the
+                    // surface is continuous, so it already resumes at the top of the next page.
+                    ApplyMonolithicPageFit(childBox);
+
+                    if (childBox.Display != CssConstants.None
+                        && childBox.Position is not (CssConstants.Absolute or CssConstants.Fixed)
+                        && childBox.Float == CssConstants.None)
+                    {
+                        previousInFlow = childBox;
+                    }
 
                     // CSS2.1 §13.3.1: When page-break-inside:avoid is
                     // set, move floated children to the next page if they

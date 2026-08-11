@@ -1,3 +1,8 @@
+using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.String;
+using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.Runtime;
+using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Dom.Features;
 using Broiler.Dom;
 
@@ -48,6 +53,34 @@ public sealed partial class DomBridge : IDialogHost
         else
         {
             DialogStateFor(element).PopoverOpen.Remove();
+        }
+    }
+
+    void IDialogHost.SetFullscreen(DomElement element, bool fullscreen)
+    {
+        if (fullscreen)
+            DialogStateFor(element).Fullscreen.Set(true);
+        else
+            DialogStateFor(element).Fullscreen.Remove();
+    }
+
+    DomElement? IDialogHost.GetFullscreenElement() => FindFullscreenElement();
+
+    void IDialogHost.DispatchFullscreenChange(DomElement target)
+    {
+        try
+        {
+            var evt = new JSObject();
+            evt.FastAddValue((KeyString)"type", new JSString("fullscreenchange"),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue((KeyString)"bubbles", JSBoolean.True,
+                JSPropertyAttributes.EnumerableConfigurableValue);
+            DispatchEventOnElement(target, evt);
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.DispatchFullscreenChange",
+                $"fullscreenchange handler error: {ex.Message}", ex);
         }
     }
 

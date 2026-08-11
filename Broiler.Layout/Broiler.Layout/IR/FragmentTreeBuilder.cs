@@ -71,6 +71,11 @@ internal static class FragmentTreeBuilder
                 // engine equivalent of the bridge writing display:none.
                 if (child.PositionHidden)
                     continue;
+                // CSS Overflow 4 §5 (`continue: discard`): a box whose content a
+                // line clamp discarded outright paints nothing — not its text,
+                // and not its own background or borders either.
+                if (child.ClampedAway)
+                    continue;
                 children.Add(BuildFragment(child, hasTransformAncestor));
             }
         }

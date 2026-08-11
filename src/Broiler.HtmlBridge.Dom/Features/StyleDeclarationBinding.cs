@@ -39,6 +39,34 @@ internal static partial class StyleDeclarationBinding
         "item", "getPropertyPriority",
     };
 
+    /// <summary>
+    /// The CSS property a CSSOM attribute name addresses — <see cref="CssPropertyNames.ToCssPropertyName"/>
+    /// plus the <em>webkit-cased attribute</em> of CSSOM §4.2.
+    /// </summary>
+    /// <remarks>
+    /// CSSOM defines two IDL attributes per vendor-prefixed property: the
+    /// camel-cased <c>WebkitLineClamp</c> and the webkit-cased
+    /// <c>webkitLineClamp</c>, both addressing <c>-webkit-line-clamp</c>. Only the
+    /// first falls out of the shared uppercase-to-hyphen rule; the second — the
+    /// spelling authors and libraries actually write — came back as
+    /// <c>webkit-line-clamp</c>, a property no part of the engine knows, so
+    /// <c>el.style.webkitLineClamp = …</c> was accepted and then silently had no
+    /// effect. Applied here, at the CSSOM boundary, rather than in the shared
+    /// helper: the rule is a property of this IDL surface, and the same helper
+    /// converts names on paths where a leading <c>webkit</c> is just a name.
+    /// </remarks>
+    private static string ToCssPropertyName(string domName)
+    {
+        if (domName.Length > 6
+            && domName.StartsWith("webkit", StringComparison.Ordinal)
+            && char.IsUpper(domName[6]))
+        {
+            return "-" + CssPropertyNames.ToCssPropertyName(domName);
+        }
+
+        return CssPropertyNames.ToCssPropertyName(domName);
+    }
+
     /// <summary>Builds the writable <c>element.style</c> CSSStyleDeclaration. Was
     /// <c>DomBridge.BuildStyleObject(element, onMutation, parentRule)</c>.</summary>
     internal static JSObject BuildInlineDeclaration(IInlineStyleHost host, DomElement element, Action? onMutation = null, JSValue? parentRule = null,
@@ -174,7 +202,7 @@ internal static partial class StyleDeclarationBinding
             var nameStr = name.ToString();
             if (!NonCssNames.Contains(nameStr))
             {
-                var kebab = CssPropertyNames.ToCssPropertyName(nameStr);
+                var kebab = ToCssPropertyName(nameStr);
                 var val = value?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(val))
                 {
@@ -234,7 +262,7 @@ internal static partial class StyleDeclarationBinding
             var nameStr = name.ToString();
             if (!NonCssNames.Contains(nameStr))
             {
-                var kebab = CssPropertyNames.ToCssPropertyName(nameStr);
+                var kebab = ToCssPropertyName(nameStr);
                 var val = value?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(val))
                     style.Remove(kebab);
@@ -308,7 +336,7 @@ internal static partial class StyleDeclarationBinding
         if (camel != property && declared.TryGetValue(camel, out value!))
             return true;
 
-        var kebab = CssPropertyNames.ToCssPropertyName(property);
+        var kebab = ToCssPropertyName(property);
         if (kebab != property && declared.TryGetValue(kebab, out value!))
             return true;
 
@@ -325,7 +353,7 @@ internal static partial class StyleDeclarationBinding
         if (camel != property && style.TryGetValue(camel, out value!))
             return true;
 
-        var kebab = CssPropertyNames.ToCssPropertyName(property);
+        var kebab = ToCssPropertyName(property);
         if (kebab != property && style.TryGetValue(kebab, out value!))
             return true;
 

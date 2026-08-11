@@ -121,12 +121,18 @@ internal sealed class DialogRuntimeState
     // finishes) — both have PopoverOpen set and the same transition declarations.
     public RuntimeValue<bool> PopoverTransitioningOut { get; } = new();
 
+    // Fullscreen §fullscreen-element: set by requestFullscreen(), cleared by exitFullscreen(). A
+    // fullscreen element is in the top layer and generates a ::backdrop exactly as a modal dialog
+    // does, which is why it shares this state rather than carrying its own table.
+    public RuntimeValue<bool> Fullscreen { get; } = new();
+
     public void CopyTo(DialogRuntimeState target)
     {
         Modal.CopyTo(target.Modal);
         TopLayerOrder.CopyTo(target.TopLayerOrder);
         PopoverOpen.CopyTo(target.PopoverOpen);
         PopoverTransitioningOut.CopyTo(target.PopoverTransitioningOut);
+        Fullscreen.CopyTo(target.Fullscreen);
     }
 }
 

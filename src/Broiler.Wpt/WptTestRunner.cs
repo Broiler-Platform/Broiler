@@ -629,6 +629,21 @@ internal sealed partial class WptTestRunner
   __broilerEnsureAnimate(document.body);
   var test_driver = window.test_driver || {};
   window.test_driver = test_driver;
+  // testdriver `bless(name, action)`: in wptrunner this grants transient user activation and then
+  // runs the action, so a test can call an API that requires a user gesture — requestFullscreen()
+  // in fullscreen/rendering, showPicker() in the customizable-select tests. There is no user here
+  // and nothing checks activation, so the activation half is a no-op and the action is what
+  // matters: without it the callback never runs and the test renders its un-activated state.
+  // Returns a promise resolving to the action's result, which is what callers await.
+  if (typeof test_driver.bless === 'undefined') {
+    test_driver.bless = function(name, action) {
+      try {
+        return Promise.resolve(typeof action === 'function' ? action() : undefined);
+      } catch (e) {
+        return Promise.reject(e);
+      }
+    };
+  }
   if (typeof test_driver.Actions === 'undefined') {
     function Actions() {
       this._pointers = Object.create(null);
@@ -1997,7 +2012,10 @@ internal sealed partial class WptTestRunner
     /// </summary>
     /// <param name="testPath">Path to the test HTML file.</param>
     /// <param name="wptRoot">WPT checkout root, for fonts and root-relative resources.</param>
-    internal WptTestResult RunReferenceTest(string testPath, string? wptRoot = null)
+    internal WptTestResult RunReferenceTest(string testPath, string? wptRoot = null) =>
+        InPageModeFor(testPath, () => RunReferenceTestCore(testPath, wptRoot));
+
+    private WptTestResult RunReferenceTestCore(string testPath, string? wptRoot)
     {
         if (!File.Exists(testPath))
         {
@@ -2316,7 +2334,10 @@ internal sealed partial class WptTestRunner
     /// <param name="testPath">Path to the test HTML file.</param>
     /// <param name="refHtmlPath">Path to the WPT reference HTML file.</param>
     /// <param name="wptRoot">Optional WPT root directory for font loading.</param>
-    internal WptTestResult RunMatchTest(string testPath, string refHtmlPath, string? wptRoot = null)
+    internal WptTestResult RunMatchTest(string testPath, string refHtmlPath, string? wptRoot = null) =>
+        InPageModeFor(testPath, () => RunMatchTestCore(testPath, refHtmlPath, wptRoot));
+
+    private WptTestResult RunMatchTestCore(string testPath, string refHtmlPath, string? wptRoot)
     {
         if (!File.Exists(testPath))
             return new WptTestResult { TestPath = testPath, Passed = false,
@@ -2494,6 +2515,15 @@ internal sealed partial class WptTestRunner
         using var presentation = ImageAnimationClock.Pin(presentationTime);
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Render))
         {
+            if (PagedRender)
+            {
+                var page = WptPageBox.Resolve(html, new System.Drawing.SizeF(_width, _height));
+                return RenderWithNativeAnchor(html, () => WptDocumentRenderer.RenderPaged(
+                    renderDocument, html, page,
+                    backgroundColor: BColor.White,
+                    stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
+            }
+
             return RenderWithNativeAnchor(html, () => renderDocument is not null
                 ? WptDocumentRenderer.RenderToImage(renderDocument, _width, _height,
                     backgroundColor: BColor.White,
@@ -2503,6 +2533,69 @@ internal sealed partial class WptTestRunner
                     stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
         }
     }
+
+    /// <summary>
+    /// Paged-print render lever. Default OFF: a <c>-print</c> reftest is rendered on the ordinary
+    /// viewport surface, both sides alike, as it always has been. Force on with
+    /// <c>BROILER_WPT_PAGED_PRINT=1</c> to render it as CSS Paged Media says — pages of the
+    /// document's own <c>@page</c> box, cut from the flow and stacked.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Off by default because paged rendering is not yet a better answer than not paginating at
+    /// all. Measured over the 409 print reftests: 252 passing unpaginated, 212 paged. That is not
+    /// the paging being wrong so much as it being partial — where the flow is unpaginated a test
+    /// and its reference are wrong in the same way and agree, and each unimplemented piece of
+    /// paged media (fragmentation of flex and table content, per-name page sizes) breaks that
+    /// agreement for the pairs that rest on it.
+    /// </para>
+    /// <para>
+    /// It is worth having behind a lever rather than not at all because it is the only way to
+    /// measure any of that: with the lever off, every paged-media fix scores exactly zero.
+    /// </para>
+    /// </remarks>
+    internal static bool PagedPrint { get; set; } =
+        Environment.GetEnvironmentVariable("BROILER_WPT_PAGED_PRINT") is ("1" or "true" or "TRUE" or "on");
+
+    /// <summary>
+    /// Whether the render in progress is a paged one. Set for the whole of one reftest — the test
+    /// document <em>and</em> its references — because a reftest is run in one mode, and WPT's own
+    /// print references are not themselves named <c>-print</c>
+    /// (<c>block-page-break-inside-avoid-1-print.html</c> matches
+    /// <c>block-page-break-inside-avoid-print-ref.html</c>). Deciding per document instead would
+    /// paginate one side of the comparison and not the other.
+    /// </summary>
+    /// <remarks>
+    /// <c>[ThreadStatic]</c> for the same reason the engine's <c>NativeZoom</c> and
+    /// <c>NativeAnchorPlacement</c> levers are: it scopes to the renders this thread is running,
+    /// and the runner's parallelism is across worker processes and threads, never inside one test.
+    /// </remarks>
+    [ThreadStatic]
+    private static bool PagedRender;
+
+    /// <summary>
+    /// Runs <paramref name="body"/> with paged rendering on iff the lever is on and
+    /// <paramref name="testPath"/> names a WPT print test — the <c>-print</c> suffix on the file's
+    /// stem, which is the convention the suite uses to mark one and the trigger every other runner
+    /// reads.
+    /// </summary>
+    private static T InPageModeFor<T>(string testPath, Func<T> body)
+    {
+        bool previous = PagedRender;
+        PagedRender = PagedPrint && IsPrintTestPath(testPath);
+        try
+        {
+            return body();
+        }
+        finally
+        {
+            PagedRender = previous;
+        }
+    }
+
+    /// <summary>Whether a path names a WPT print test: a stem ending in <c>-print</c>.</summary>
+    internal static bool IsPrintTestPath(string path) =>
+        Path.GetFileNameWithoutExtension(path).EndsWith("-print", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Runs <paramref name="render"/> with the Broiler.Layout engine's native
@@ -2613,7 +2706,10 @@ internal sealed partial class WptTestRunner
     {
         if (wptRoot != null)
             EnsureWptFontsLoaded(wptRoot);
-        return RenderHtmlFileBitmap(htmlPath, wptRoot);
+
+        // Through the same page-mode decision a reftest render goes through, so this renders the
+        // file the way the runner would rather than a viewport-only approximation of it.
+        return InPageModeFor(htmlPath, () => RenderHtmlFileBitmap(htmlPath, wptRoot));
     }
 
     /// <summary>

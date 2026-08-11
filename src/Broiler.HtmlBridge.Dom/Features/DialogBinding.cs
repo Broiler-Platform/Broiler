@@ -3,6 +3,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.JavaScript.BuiltIns.Promise;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge.Dom.Features;
@@ -50,6 +51,14 @@ internal sealed class DialogBinding(IDialogHost host)
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
+        // Fullscreen §Element.requestFullscreen() — on every element, not tied to a tag.
+        obj.FastAddValue((KeyString)"requestFullscreen",
+            new DomFunction((in _) => RequestFullscreen(element), "requestFullscreen", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"webkitRequestFullscreen",
+            new DomFunction((in _) => RequestFullscreen(element), "webkitRequestFullscreen", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // Popover API (HTML §popover) — showPopover()/hidePopover() are exposed on any element
         // carrying the global `popover` attribute, not tied to a tag.
         if (hasPopover)
@@ -65,6 +74,50 @@ internal sealed class DialogBinding(IDialogHost host)
         _host.SetOpenAttribute(element, a.Length > 0 && a[0].BooleanValue);
         _host.InvalidateStyleScope(element);
         return JSUndefined.Value;
+    }
+
+    /// <summary>
+    /// An already-resolved promise, the return value of the fullscreen methods. Both complete
+    /// synchronously here — there is no compositor step to wait on — so the promise exists only so
+    /// that <c>requestFullscreen().then(…)</c> works.
+    /// </summary>
+    private static JSValue ResolvedPromise() => Task.CompletedTask.ToPromise();
+
+    /// <summary>
+    /// Fullscreen §<c>requestFullscreen()</c>: promotes the element into the top layer, where the
+    /// UA geometry sizes it to the viewport and it generates a <c>::backdrop</c>, then fires
+    /// <c>fullscreenchange</c>. Returns a resolved promise.
+    /// </summary>
+    /// <remarks>
+    /// Two things a browser does that this deliberately does not. There is no transient
+    /// user-activation check — the runner has no user, and the WPT tests reach this through
+    /// <c>test_driver.bless</c>, whose whole job is to stand in for that activation. And the
+    /// element stack is flattened to a single element: nesting fullscreen requests is not something
+    /// the reftests exercise, and <see cref="IDialogHost.GetFullscreenElement"/> resolves ties by
+    /// top-layer order, so the most recent request wins.
+    /// </remarks>
+    internal JSValue RequestFullscreen(DomElement element)
+    {
+        _host.SetFullscreen(element, true);
+        _host.AssignNextTopLayerOrder(element);
+        _host.InvalidateStyleScope(element);
+        _host.DispatchFullscreenChange(element);
+        return ResolvedPromise();
+    }
+
+    /// <summary>
+    /// Fullscreen §<c>exitFullscreen()</c>: takes the document's fullscreen element back out of the
+    /// top layer and fires <c>fullscreenchange</c> at it. A no-op when nothing is fullscreen.
+    /// </summary>
+    internal JSValue ExitFullscreen()
+    {
+        if (_host.GetFullscreenElement() is not { } element)
+            return ResolvedPromise();
+
+        _host.SetFullscreen(element, false);
+        _host.InvalidateStyleScope(element);
+        _host.DispatchFullscreenChange(element);
+        return ResolvedPromise();
     }
 
     private JSValue ShowModal(DomElement element)

@@ -161,6 +161,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         double cursorY = contentTop;
         bool reverse = FlexDirection?.Trim().Equals("row-reverse", StringComparison.OrdinalIgnoreCase) == true;
+        double? definiteContentHeight = TryGetDefiniteContentHeight();
 
         foreach (var line in lines)
         {
@@ -175,6 +176,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 if (itemHeight > line.CrossSize)
                     line.CrossSize = itemHeight;
             }
+
+            // CSS Flexbox §9.4 step 15: a single-line container's line *is* its content box across
+            // the cross axis when that is definite, rather than the tallest item — so a 100px-tall
+            // container gives its line 100px to stretch into even when nothing in it is that tall.
+            if (lines.Count == 1 && definiteContentHeight is { } definite && definite > line.CrossSize)
+                line.CrossSize = definite;
+
+            StretchFlexLineItems(line);
 
             double usedWidth = 0;
 
@@ -456,6 +465,87 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
     }
 
+    /// <summary>
+    /// This box's content-box height when its block size is definite, and <c>null</c> when it is
+    /// not — the difference between a flex container that has cross-axis space to hand out and one
+    /// that is sized by what it holds.
+    /// </summary>
+    /// <remarks>
+    /// Read from the <c>height</c> declaration rather than from <see cref="CssBoxProperties.Size"/>,
+    /// which is content-derived at this point: the specified height is only pre-resolved into
+    /// <c>Size</c> for percentage values.
+    /// </remarks>
+    private double? TryGetDefiniteContentHeight()
+    {
+        if (string.IsNullOrEmpty(Height) || Height == CssConstants.Auto || HeightPercentageResolvesToAuto())
+            return null;
+
+        double containingBlockHeight =
+            Position == CssConstants.Fixed && LayoutEnvironment != null ? LayoutEnvironment.ViewportSize.Height
+            : ContainingBlock?.ParentBox == null && LayoutEnvironment != null ? LayoutEnvironment.ViewportSize.Height
+            : ContainingBlock?.Size.Height ?? 0;
+
+        double length = CssLengthParser.ParseLength(Height, containingBlockHeight, GetEmHeight());
+        double contentHeight = ResolveSpecifiedHeightToBorderBox(length)
+            - ActualPaddingTop - ActualPaddingBottom
+            - ActualBorderTopWidth - ActualBorderBottomWidth;
+
+        return contentHeight > 0 ? contentHeight : null;
+    }
+
+    /// <summary>
+    /// How a flex item is sized across its line, resolving <c>align-self: auto</c> against the
+    /// container's <c>align-items</c> the way CSS Box Alignment 3 §6.2 does.
+    /// </summary>
+    private string ResolveFlexItemAlignment(CssBox child)
+    {
+        string align = NormalizeBoxAlignment(child.AlignSelf);
+        if (align is "" or "auto" or "normal")
+            align = NormalizeBoxAlignment(AlignItems);
+
+        // `normal` behaves as `stretch` for a flex item, and it is what an unstyled container has.
+        return align is "" or "auto" or "normal" ? "stretch" : align;
+    }
+
+    /// <summary>
+    /// CSS Flexbox §9.4 step 11: a flex item whose cross size is auto is stretched to fill its
+    /// line. This is the initial value of <c>align-items</c>, so it is what happens to most flex
+    /// items on most pages, and until now Broiler did none of it — an item was left at the size its
+    /// own content gave it, which for an empty one is nothing at all.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Stretching a laid-out box does not reflow it, and does not need to. The cross axis is the
+    /// block axis here, so growing the box moves no line and re-breaks no text — the content stays
+    /// at the block-start, which is exactly what stretching means.
+    /// </para>
+    /// <para>
+    /// Three things opt an item out. A cross size of its own, obviously. An auto margin on either
+    /// cross-axis side, which CSS Flexbox §9.6 gives the free space to instead. And an alignment
+    /// that is not <c>stretch</c>, which asks for the item to be placed rather than sized.
+    /// </para>
+    /// </remarks>
+    private void StretchFlexLineItems(FlexLineLayout line)
+    {
+        foreach (var item in line.Items)
+        {
+            var child = item.Box;
+
+            if (ResolveFlexItemAlignment(child) != "stretch")
+                continue;
+            if (!string.IsNullOrEmpty(child.Height) && child.Height != CssConstants.Auto)
+                continue;
+            if (child.IsSpecifiedMarginTopAuto || child.IsSpecifiedMarginBottomAuto)
+                continue;
+
+            double target = line.CrossSize - child.ActualMarginTop - child.ActualMarginBottom;
+            if (target <= 0 || target <= child.Size.Height + 0.5)
+                continue;
+
+            child.Size = new SizeF(child.Size.Width, (float)target);
+        }
+    }
+
     private double ResolveFlexCrossOffset(CssBox child, double lineCrossSize)
     {
         string align = NormalizeBoxAlignment(child.AlignSelf);
@@ -479,7 +569,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         Math.Max(0, child.ActualBottom - child.Location.Y)
         + child.ActualMarginTop + child.ActualMarginBottom;
 
-    private void ApplyFlexColumnInlineAxisAlignment()
+    private void ApplyFlexColumnInlineAxisAlignment(ILayoutEnvironment g)
     {
         if (!IsFlexContainer())
             return;
@@ -495,21 +585,48 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (contentWidth <= 0)
             return;
 
-        string containerAlign = NormalizeBoxAlignment(AlignItems);
         foreach (var child in Boxes)
         {
             if (!IsInFlowFlexItem(child))
                 continue;
 
-            string align = NormalizeBoxAlignment(child.AlignSelf);
-            if (align is "" or "auto" or "normal")
-                align = containerAlign;
+            string align = ResolveFlexItemAlignment(child);
 
             double marginBoxWidth = child.Size.Width + child.ActualMarginLeft + child.ActualMarginRight;
             double freeSpace = contentWidth - marginBoxWidth;
 
             if (freeSpace <= 0.5)
                 continue;
+
+            // CSS Flexbox §9.4 step 11 again, on the axis a column container crosses. A column
+            // item reaches here shrink-wrapped — the column path lays items out as inline-blocks —
+            // so an empty one is zero wide and paints nothing until it is stretched.
+            if (align == "stretch")
+            {
+                if (!string.IsNullOrEmpty(child.Width) && child.Width != CssConstants.Auto)
+                    continue;
+                if (child.IsSpecifiedMarginLeftAuto || child.IsSpecifiedMarginRightAuto)
+                    continue;
+
+                // Laid out again at the stretched width rather than resized in place. A column
+                // item reaches here through the inline path, where its used width has already been
+                // written into the line box it sits in and into its own descendants; poking the
+                // box's size alone leaves both saying the old one.
+                double stretchedOuterWidth = contentWidth;
+                double left = child.Location.X;
+                double top = child.Location.Y;
+
+                LayoutFlexItemAtTargetWidth(g, child, stretchedOuterWidth);
+
+                double dxBack = left - child.Location.X;
+                double dyBack = top - child.Location.Y;
+                if (Math.Abs(dxBack) > 0.1)
+                    child.OffsetLeft(dxBack);
+                if (Math.Abs(dyBack) > 0.1)
+                    child.OffsetTop(dyBack);
+
+                continue;
+            }
 
             double offset = align switch
             {
@@ -557,29 +674,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             return;
 
         // A definite block size is required to have free space to distribute.
-        // (Size.Height is content-derived at this point — the specified height
-        // is only pre-resolved into Size for percentage values — so resolve
-        // the definite block size directly from the 'height' declaration.)
-        if (string.IsNullOrEmpty(Height) || Height == CssConstants.Auto || HeightPercentageResolvesToAuto())
+        if (TryGetDefiniteContentHeight() is not { } contentHeight)
             return;
-
-        double cbHeight;
-        
-        if (Position == CssConstants.Fixed && LayoutEnvironment != null)
-            cbHeight = LayoutEnvironment.ViewportSize.Height;
-        else if (ContainingBlock?.ParentBox == null && LayoutEnvironment != null)
-            cbHeight = LayoutEnvironment.ViewportSize.Height;
-        else
-            cbHeight = ContainingBlock?.Size.Height ?? 0;
 
         double contentTop = ClientTop;
-        double length = CssLengthParser.ParseLength(Height, cbHeight, GetEmHeight());
-        double contentHeight = ResolveSpecifiedHeightToBorderBox(length)
-            - ActualPaddingTop - ActualPaddingBottom
-            - ActualBorderTopWidth - ActualBorderBottomWidth;
-        
-        if (contentHeight <= 0)
-            return;
 
         string containerAlign = NormalizeBoxAlignment(AlignItems);
 

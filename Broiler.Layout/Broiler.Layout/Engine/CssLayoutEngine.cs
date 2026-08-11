@@ -298,6 +298,8 @@ internal static class CssLayoutEngine
         //Flow words and boxes
         FlowBox(g, blockBox, blockBox, limitRight, 0, startx, ref line, ref curx, ref cury, ref maxRight, ref maxBottom);
 
+        DropTrailingForcedBreakLine(blockBox);
+
         // if width is not restricted we need to lower it to the actual width
         if (blockBox.ActualRight >= 90999)
         {
@@ -562,6 +564,58 @@ internal static class CssLayoutEngine
         // lay those boxes out. Without this an abspos inside an inline CB reports
         // its static line position instead of its top/left inset box.
         LayoutOutOfFlowInlineDescendants(g, blockBox);
+    }
+
+    /// <summary>
+    /// CSS Text 3 §4.1: a forced line break at the <em>end</em> of a block
+    /// generates no line box of its own. Removes the trailing line if the flow
+    /// left one holding nothing but preserved newlines.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A preserved <c>\n</c> is flowed as a zero-width word that opens the next
+    /// line and is then reported onto it, so text ending in one leaves a final
+    /// line box whose only content is that break — and the block was sized a
+    /// whole line taller than every browser renders it. The engine already got
+    /// this right for a trailing <c>&lt;br&gt;</c>, which is the same rule; only
+    /// the <c>white-space: pre</c> spelling of it was wrong.
+    /// </para>
+    /// <para>
+    /// Only the last line, only when something precedes it, and only when that
+    /// something is real content. A break is only "at the end of the block" if
+    /// the block had a line to end — a container whose entire content is one
+    /// preserved newline still occupies a line box, and that line carries its
+    /// inline's line-height (<c>quirks/line-height-preserved-segment-break</c>
+    /// makes a 100px-line-height span holding nothing but a newline fill a
+    /// 100px box). An interior empty line is content too: <c>"a\n\nb"</c> is
+    /// three lines and stays three.
+    /// </para>
+    /// </remarks>
+    private static void DropTrailingForcedBreakLine(CssBox blockBox)
+    {
+        if (blockBox.LineBoxes.Count < 2)
+            return;
+
+        var last = blockBox.LineBoxes[^1];
+
+        if (last.Words.Count == 0 || last.Rectangles.Count > 0)
+            return;
+
+        foreach (var word in last.Words)
+        {
+            if (!word.IsLineBreak)
+                return;
+        }
+
+        bool precededByContent = false;
+        for (int i = 0; i < blockBox.LineBoxes.Count - 1 && !precededByContent; i++)
+            precededByContent = blockBox.LineBoxes[i].Words.Count > 0
+                || blockBox.LineBoxes[i].Rectangles.Count > 0;
+
+        if (!precededByContent)
+            return;
+
+        blockBox.LineBoxes.RemoveAt(blockBox.LineBoxes.Count - 1);
     }
 
     /// <summary>

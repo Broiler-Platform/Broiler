@@ -47,6 +47,8 @@ internal static partial class CssUtils
             "flex-shrink" => cssBox.FlexShrink,
             "flex-basis" => cssBox.FlexBasis,
             "flex-wrap" => cssBox.FlexWrap,
+            "flex-flow" => (cssBox.FlexDirection + " " + cssBox.FlexWrap).Trim(),
+            "flex" => string.Join(' ', cssBox.FlexGrow, cssBox.FlexShrink, cssBox.FlexBasis),
             "order" => cssBox.Order,
             "justify-content" => cssBox.JustifyContent,
             "justify-items" => cssBox.JustifyItems,
@@ -112,6 +114,16 @@ internal static partial class CssUtils
             "text-decoration-style" => cssBox.TextDecorationStyle,
             "text-decoration-color" => cssBox.TextDecorationColor,
             "white-space" => cssBox.WhiteSpace,
+            "break-before" => cssBox.BreakBefore,
+            "page-break-before" => cssBox.BreakBefore,
+            "break-after" => cssBox.BreakAfter,
+            "page-break-after" => cssBox.BreakAfter,
+            "page" => cssBox.Page,
+            "line-clamp" => cssBox.LineClamp,
+            "-webkit-line-clamp" => cssBox.WebkitLineClamp,
+            "max-lines" => cssBox.MaxLines,
+            "block-ellipsis" => cssBox.BlockEllipsis,
+            "-webkit-box-orient" => cssBox.WebkitBoxOrient,
             "word-break" => cssBox.WordBreak,
             "line-break" => cssBox.LineBreak,
             "visibility" => cssBox.Visibility,
@@ -158,6 +170,71 @@ internal static partial class CssUtils
             "color-scheme" => cssBox.ColorScheme,
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// CSS Flexbox §5.1 <c>flex-flow</c>: a direction, a wrap, or both, in either order. Expanded
+    /// here because nothing upstream expands it, and a container whose direction never arrives is
+    /// laid out as a row — the wrong axis for everything in it.
+    /// </summary>
+    private static void SetFlexFlowShorthand(CssBox cssBox, string value)
+    {
+        foreach (var token in value.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (token is "row" or "row-reverse" or "column" or "column-reverse")
+                cssBox.FlexDirection = token;
+            else if (token is "nowrap" or "wrap" or "wrap-reverse")
+                cssBox.FlexWrap = token;
+        }
+    }
+
+    /// <summary>
+    /// CSS Flexbox §7.1 <c>flex</c>: up to a grow factor, a shrink factor and a basis, in that
+    /// order, with the unstated ones taking the shorthand's own defaults rather than the
+    /// longhands' — <c>flex: 1</c> is <c>1 1 0%</c>, not <c>1 0 auto</c>.
+    /// </summary>
+    private static void SetFlexShorthand(CssBox cssBox, string value)
+    {
+        var v = value.Trim();
+
+        if (v.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            cssBox.FlexGrow = "0";
+            cssBox.FlexShrink = "0";
+            cssBox.FlexBasis = CssConstants.Auto;
+            return;
+        }
+
+        if (v.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase)
+            || v.Equals("initial", StringComparison.OrdinalIgnoreCase))
+        {
+            cssBox.FlexGrow = v.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase) ? "1" : "0";
+            cssBox.FlexShrink = "1";
+            cssBox.FlexBasis = CssConstants.Auto;
+            return;
+        }
+
+        string? grow = null, shrink = null, basis = null;
+        foreach (var token in v.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            bool isNumber = double.TryParse(
+                token, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out _);
+
+            if (isNumber && grow is null)
+                grow = token;
+            else if (isNumber && shrink is null)
+                shrink = token;
+            else
+                basis ??= token;
+        }
+
+        if (grow is null)
+            return;
+
+        cssBox.FlexGrow = grow;
+        cssBox.FlexShrink = shrink ?? "1";
+        cssBox.FlexBasis = basis ?? "0%";
     }
 
     public static void SetPropertyValue(CssBox cssBox, string propName, string value)
@@ -286,6 +363,12 @@ internal static partial class CssUtils
                 break;
             case "flex-wrap":
                 cssBox.FlexWrap = value;
+                break;
+            case "flex-flow":
+                SetFlexFlowShorthand(cssBox, value);
+                break;
+            case "flex":
+                SetFlexShorthand(cssBox, value);
                 break;
             case "order":
                 cssBox.Order = value;
@@ -594,6 +677,13 @@ internal static partial class CssUtils
                 cssBox.Content = value;
                 break;
             case "display":
+                // Remember a legacy `-webkit-box` before it is mapped away: the
+                // mapping depends on -webkit-box-orient, and the two declarations
+                // arrive in author order, so `display` is frequently applied first.
+                cssBox.LegacyWebkitBoxDisplay =
+                    value.Trim().Equals("-webkit-box", StringComparison.OrdinalIgnoreCase) ? "-webkit-box"
+                    : value.Trim().Equals("-webkit-inline-box", StringComparison.OrdinalIgnoreCase) ? "-webkit-inline-box"
+                    : null;
                 cssBox.Display = NormalizeDisplayValue(value, cssBox);
                 break;
             case "direction":
@@ -665,6 +755,37 @@ internal static partial class CssUtils
                 break;
             case "white-space":
                 cssBox.WhiteSpace = NormalizeWhiteSpaceValue(value);
+                break;
+            case "break-before":
+            case "page-break-before":
+                cssBox.BreakBefore = value;
+                break;
+            case "break-after":
+            case "page-break-after":
+                cssBox.BreakAfter = value;
+                break;
+            case "page":
+                cssBox.Page = value;
+                break;
+            case "line-clamp":
+                cssBox.LineClamp = value;
+                break;
+            case "-webkit-line-clamp":
+                cssBox.WebkitLineClamp = value;
+                break;
+            case "max-lines":
+                cssBox.MaxLines = value;
+                break;
+            case "block-ellipsis":
+                cssBox.BlockEllipsis = value;
+                break;
+            case "-webkit-box-orient":
+                cssBox.WebkitBoxOrient = value;
+                // Orientation decides how a legacy box is approximated, so a
+                // `display: -webkit-box` already applied on this box has to be
+                // re-mapped now that the axis is known.
+                if (cssBox.LegacyWebkitBoxDisplay is { } legacyBox)
+                    cssBox.Display = NormalizeDisplayValue(legacyBox, cssBox);
                 break;
             case "text-transform":
                 cssBox.TextTransform = value;
@@ -889,6 +1010,31 @@ internal static partial class CssUtils
         if (Array.Exists(parts, static p => p.Equals("grid-lanes", StringComparison.OrdinalIgnoreCase)))
             return DefaultDisplayForElement(box);
 
+        // The legacy WebKit flexible box. Every browser still supports it, and it
+        // is how `-webkit-line-clamp` is opted into, so it cannot be dropped the
+        // way grid-lanes is — an unmapped value is neither IsBlock nor IsInline
+        // and the box then lays out and paints nothing at all.
+        //
+        // It is approximated by a block container rather than by `flex`, because
+        // the clamp opts in through `-webkit-box-orient: vertical`, and a vertical
+        // legacy box stacks its children in the block direction exactly as a block
+        // container does. That is also the shape the css-overflow/line-clamp
+        // *references* assume: they draw the clamped result with a plain
+        // `display: -webkit-box` (31 of them) or `display: inline-block`
+        // (webkit-line-clamp-024-ref) and pre-typed ellipsis text. A horizontally
+        // oriented legacy box keeps the closest flex mapping instead; orientation
+        // is inherited, so it is read off the box rather than this value.
+        if (parts.Length == 1)
+        {
+            bool vertical = IsVerticalWebkitBoxOrient(box?.WebkitBoxOrient);
+
+            if (v.Equals("-webkit-box", StringComparison.OrdinalIgnoreCase))
+                return vertical ? CssConstants.Block : "flex";
+
+            if (v.Equals("-webkit-inline-box", StringComparison.OrdinalIgnoreCase))
+                return vertical ? CssConstants.InlineBlock : "inline-flex";
+        }
+
         if (parts.Length != 2)
             return v;
 
@@ -988,6 +1134,21 @@ internal static partial class CssUtils
             ("preserve-spaces", "wrap") => CssConstants.PreWrap,
             _ => CssConstants.Normal,
         };
+    }
+
+    /// <summary>
+    /// Whether a <c>-webkit-box-orient</c> value selects the block axis. The
+    /// legacy property spells it <c>vertical</c>; the CSS-aligned aliases
+    /// <c>block-axis</c> and <c>inline-axis</c> mean the same two things and are
+    /// accepted alongside it. Anything else (including the initial
+    /// <c>horizontal</c>) is the inline axis.
+    /// </summary>
+    internal static bool IsVerticalWebkitBoxOrient(string value)
+    {
+        string v = value?.Trim();
+        return v != null
+            && (v.Equals("vertical", StringComparison.OrdinalIgnoreCase)
+                || v.Equals("block-axis", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

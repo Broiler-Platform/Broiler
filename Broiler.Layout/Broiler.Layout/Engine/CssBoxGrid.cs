@@ -828,7 +828,91 @@ internal partial class CssBox
         // single border box — clear the stale inline rects and let paint fall
         // back to Location+Size.
         item.RectanglesReset();
+
+        RelayoutItemThatSizesItsOwnChildren(item, newWidth, newHeight);
     }
+
+    /// <summary>
+    /// Lays an item out again once the grid has given it its area, when what is inside it depends
+    /// on the size it was given.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A grid item is measured before its track is sized and resized afterwards, which is fine for
+    /// a block — its content sits at the block-start either way. It is not fine for a flex
+    /// container: its line's cross size, and so how far its own items stretch, is decided from its
+    /// height, and at measure time that height was still auto. Resizing the box alone leaves a
+    /// container that is the right size holding items sized for the wrong one — visibly, items that
+    /// are zero-tall inside a strip that is a hundred pixels tall.
+    /// </para>
+    /// <para>
+    /// This is the shape half of WPT's own reference files: <c>css-page/margin-boxes</c> states the
+    /// margin ring as a grid of flex strips, and 26 of its 36 references rendered blank because of
+    /// it. The item is laid out against the size it now has by stating that size as its
+    /// <c>width</c>/<c>height</c> for the pass — the same device the flex row path uses to lay an
+    /// item out at its resolved width — and its grid-resolved geometry is put back afterwards,
+    /// since the point is to re-flow the contents, not to re-place the item.
+    /// </para>
+    /// </remarks>
+    private void RelayoutItemThatSizesItsOwnChildren(CssBox item, double borderBoxWidth, double borderBoxHeight)
+    {
+        if (LayoutEnvironment is not { } environment)
+            return;
+
+        // Only flex containers: nothing else in the box tree reads its own used size while laying
+        // its children out, so for anything else this pass would cost a layout and change nothing.
+        if (item.Display is not ("flex" or "inline-flex"))
+            return;
+
+        if (borderBoxWidth <= 0 || borderBoxHeight <= 0 || item.Boxes.Count == 0)
+            return;
+
+        string savedWidth = item.Width;
+        string savedHeight = item.Height;
+        var savedLocation = item.Location;
+
+        item.Width = FormatGridPx(item.UsesBorderBoxSizing
+            ? borderBoxWidth
+            : borderBoxWidth - item.ActualPaddingLeft - item.ActualPaddingRight
+              - item.ActualBorderLeftWidth - item.ActualBorderRightWidth);
+        item.Height = FormatGridPx(item.UsesBorderBoxSizing
+            ? borderBoxHeight
+            : borderBoxHeight - item.ActualPaddingTop - item.ActualPaddingBottom
+              - item.ActualBorderTopWidth - item.ActualBorderBottomWidth);
+
+        // The pass re-places the item before this puts it back, and everything it touches on the
+        // way is recorded in the document's running extent — so the extent is snapshotted across
+        // it. The item's real geometry is the grid's to report, and the grid reports it from its
+        // own tracks once every item is placed.
+        var documentExtent = environment.ActualSize;
+
+        try
+        {
+            item.PerformLayout(environment);
+        }
+        finally
+        {
+            item.Width = savedWidth;
+            item.Height = savedHeight;
+            environment.ActualSize = documentExtent;
+        }
+
+        double dx = savedLocation.X - item.Location.X;
+        double dy = savedLocation.Y - item.Location.Y;
+        if (Math.Abs(dx) > 0.01 || Math.Abs(dy) > 0.01)
+        {
+            item.OffsetLeft(dx);
+            item.OffsetTop(dy);
+        }
+
+        item.Size = new SizeF((float)borderBoxWidth, (float)borderBoxHeight);
+        item.ActualRight = item.Location.X + borderBoxWidth;
+        item.ActualBottom = item.Location.Y + borderBoxHeight;
+        item.RectanglesReset();
+    }
+
+    private static string FormatGridPx(double value) =>
+        Math.Max(0, value).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + "px";
 
     /// <summary>
     /// CSS Grid §9 (Absolute Positioning): resolve each absolutely-positioned
